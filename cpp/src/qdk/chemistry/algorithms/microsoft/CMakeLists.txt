@@ -12,6 +12,8 @@ target_sources(chemistry PRIVATE
     cholesky_hamiltonian.cpp
     ctf12_hamiltonian.cpp
     ctf12_f12.cpp
+    ctf12_support.cpp
+    f12_scf.cpp
     macis_asci.cpp
     macis_base.cpp
     macis_cas.cpp

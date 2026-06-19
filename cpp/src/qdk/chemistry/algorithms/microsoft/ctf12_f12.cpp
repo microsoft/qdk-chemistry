@@ -6,6 +6,7 @@
 
 #include <qdk/chemistry/scf/util/geminal_eri.h>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -429,6 +430,7 @@ struct DressedResult {
   double e_hf;
   double e_f12hf;
   std::vector<double> gbar;     // dressed <pq|rs> in the original MO basis
+  Eigen::MatrixXd hbar;         // dressed one-body in the original MO basis
   Eigen::MatrixXd c_relaxed;    // original-MO -> F12-HF-relaxed-MO rotation
   Eigen::VectorXd eps_relaxed;  // dressed-Fock eigenvalues
   std::size_t nbf;
@@ -752,7 +754,7 @@ DressedResult run_f12_hf(const F12HartreeFockInput& in) {
 
   const ScfOut hf = run_scf(hmo, gp);
   const ScfOut f12 = run_scf(hbar, gbar);
-  return {hf.e, f12.e, std::move(gbar), f12.c, f12.eps, nbf, nocc, nc};
+  return {hf.e, f12.e, std::move(gbar), hbar, f12.c, f12.eps, nbf, nocc, nc};
 }
 
 }  // namespace
@@ -925,6 +927,61 @@ double mp2_f12_correction(const F12HartreeFockInput& in) {
       e_cc += ccbar_d * cc_d + ccbar_x * cc_x;
     }
   return e_nc + e_ct + e_cc;
+}
+
+DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
+                                             bool relax_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+  const DressedResult r = run_f12_hf(in);
+  const std::size_t n = r.nbf;
+
+  DressedHamiltonian out;
+  out.n_mo = n;
+  out.n_occupied = r.nocc;
+  out.n_core = r.ncore;
+  out.e_hf = r.e_hf;
+  out.e_f12hf = r.e_f12hf;
+
+  std::vector<double> two_body_phys;  // dressed <pq|rs> in the chosen basis
+  if (relax_orbitals) {
+    const Eigen::MatrixXd& u = r.c_relaxed;  // original-MO -> relaxed-MO
+    out.mo_coefficients = in.mo_coefficients * u;
+    out.orbital_energies = r.eps_relaxed;
+    out.one_body = u.transpose() * r.hbar * u;
+
+    // Rotate the dressed <pq|rs> into the relaxed basis by four sequential
+    // GEMM index transforms, cycling the leading index to the back each step.
+    two_body_phys = r.gbar;
+    const std::size_t n3 = n * n * n;
+    using RowMajorMat =
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    for (int step = 0; step < 4; ++step) {
+      Eigen::Map<RowMajorMat> m(two_body_phys.data(),
+                                static_cast<Eigen::Index>(n),
+                                static_cast<Eigen::Index>(n3));
+      const RowMajorMat rotated = (u.transpose() * m).transpose();
+      std::copy(rotated.data(), rotated.data() + n * n3, two_body_phys.begin());
+    }
+  } else {
+    out.mo_coefficients = in.mo_coefficients;
+    out.orbital_energies = in.orbital_energies;
+    out.one_body = r.hbar;
+    two_body_phys = r.gbar;
+  }
+
+  // Convert the dressed integrals from physicists' <pq|rs> to chemists'
+  // (pq|rs) = <pr|qs>, matching the data::Hamiltonian two-body layout.
+  out.two_body.assign(n * n * n * n, 0.0);
+  auto flat = [&](std::size_t p, std::size_t q, std::size_t rr, std::size_t s) {
+    return ((p * n + q) * n + rr) * n + s;
+  };
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t rr = 0; rr < n; ++rr)
+        for (std::size_t s = 0; s < n; ++s)
+          out.two_body[flat(p, q, rr, s)] = two_body_phys[flat(p, rr, q, s)];
+
+  return out;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft::ctf12

@@ -127,4 +127,46 @@ double f12_mp2_energy(const F12HartreeFockInput& input);
  */
 double mp2_f12_correction(const F12HartreeFockInput& input);
 
+/**
+ * @brief The dressed CT-F12 Hamiltonian expressed in a molecular-orbital basis.
+ *
+ * Holds the one- and two-body integrals of the transcorrelated Hamiltonian
+ * @f$ \bar{H}_{F12} @f$ over the full orbital basis, together with the orbital
+ * data of the basis in which they are expressed. The two-body integrals use the
+ * chemists' @f$ (pq|rs) @f$ convention with the flat layout
+ * @c ((p*n+q)*n+r)*n+s, matching @ref
+ * data::CanonicalFourCenterHamiltonianContainer.
+ */
+struct DressedHamiltonian {
+  std::size_t n_mo = 0;              ///< Number of molecular orbitals.
+  std::size_t n_occupied = 0;        ///< Number of doubly occupied orbitals.
+  std::size_t n_core = 0;            ///< Frozen core orbitals (formulation a).
+  Eigen::MatrixXd mo_coefficients;   ///< AO->MO coefficients, @c [n_ao, n_mo].
+  Eigen::VectorXd orbital_energies;  ///< Orbital energies, @c [n_mo].
+  Eigen::MatrixXd one_body;  ///< Dressed one-body integrals, @c [n_mo, n_mo].
+  std::vector<double> two_body;  ///< Dressed (pq|rs), flat @c n_mo^4.
+  double e_hf = 0.0;             ///< Bare Hartree-Fock energy.
+  double e_f12hf = 0.0;          ///< Self-consistent F12-HF energy.
+};
+
+/**
+ * @brief Build the dressed CT-F12 Hamiltonian over the orbital basis.
+ *
+ * Constructs the transcorrelated Hamiltonian @f$ \bar{H}_{F12} @f$ from the
+ * original Hartree-Fock reference (the geminal amplitudes are fixed from the
+ * original occupied orbitals). When @p relax_orbitals is true the closed-shell
+ * orbitals are relaxed in the dressed mean field and the Hamiltonian is
+ * returned in the relaxed F12-HF canonical basis with the dressed-Fock orbital
+ * energies; conventional post-Hartree-Fock methods over it then reproduce the
+ * canonical F12-MP2/F12-CCSD energies. When false the Hamiltonian is returned
+ * in the original reference basis (a drop-in replacement for the bare
+ * Hamiltonian) with the input orbital energies.
+ *
+ * @param input The F12-HF reference description.
+ * @param relax_orbitals Express the Hamiltonian in the relaxed F12-HF basis.
+ * @return The dressed Hamiltonian in the requested orbital basis.
+ */
+DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& input,
+                                             bool relax_orbitals);
+
 }  // namespace qdk::chemistry::algorithms::microsoft::ctf12

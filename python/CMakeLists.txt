@@ -144,6 +144,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/mcscf.cpp
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/effective_hamiltonian.cpp
+    src/pybind11/algorithms/f12_scf.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp

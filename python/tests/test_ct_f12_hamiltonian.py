@@ -1,8 +1,9 @@
 """Tests for the CT-F12 effective Hamiltonian constructor.
 
-These cover the new ``effective_hamiltonian_constructor`` algorithm type:
-registration, settings schema, and that ``run()`` dispatches to the backend.
-Numerical (F12-HF / F12-MP2) validation is added as the construction lands.
+These cover the ``effective_hamiltonian_constructor`` algorithm type:
+registration, settings schema, and that ``run()`` dispatches to the backend and
+returns a dressed Hamiltonian. Numerical F12-MP2 validation lives in the C++
+test ``test_ctf12_effective_hamiltonian``.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -10,6 +11,7 @@ Numerical (F12-HF / F12-MP2) validation is added as the construction lands.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import (
@@ -18,6 +20,15 @@ from qdk_chemistry.algorithms import (
     create,
     registry,
 )
+from qdk_chemistry.data import Hamiltonian, Structure
+
+
+@pytest.fixture(scope="module")
+def neon_hf():
+    """Closed-shell Hartree-Fock reference for the neon atom."""
+    mol = Structure(np.zeros((1, 3)), ["Ne"])
+    _, hf = create("scf_solver").run(mol, 0, 1, "aug-cc-pvdz")
+    return hf
 
 
 class TestCtF12Registration:
@@ -48,6 +59,7 @@ class TestCtF12Settings:
         assert s.get("frozen_core") == 0
         assert s.get("eri_method") == "direct"
         assert s.get("slater_factor") == "stg"
+        assert s.get("orbital_basis") == "relaxed"
         assert s.get("symmetrize_two_body") is False
 
     def test_create_with_kwargs(self):
@@ -70,11 +82,28 @@ class TestCtF12Settings:
         with pytest.raises(ValueError, match="out of allowed options"):
             s.set("slater_factor", "bogus")
 
+    def test_orbital_basis_choices_enforced(self):
+        s = create("effective_hamiltonian_constructor").settings()
+        with pytest.raises(ValueError, match="out of allowed options"):
+            s.set("orbital_basis", "bogus")
 
-class TestCtF12Dispatch:
-    """run() reaches the CT-F12 backend through the registry."""
 
-    def test_run_dispatches_to_backend(self, wavefunction_4e4o):
-        ctf12 = create("effective_hamiltonian_constructor", "qdk_ct_f12")
-        with pytest.raises(RuntimeError, match="not yet implemented"):
-            ctf12.run(wavefunction_4e4o)
+class TestCtF12Run:
+    """run() reaches the CT-F12 backend and emits a dressed Hamiltonian."""
+
+    def test_run_returns_dressed_hamiltonian(self, neon_hf):
+        ctf12 = create(
+            "effective_hamiltonian_constructor",
+            "qdk_ct_f12",
+            gamma=1.5,
+            frozen_core=1,
+            cabs_basis="aug-cc-pvdz-optri",
+        )
+        dressed = ctf12.run(neon_hf)
+        assert isinstance(dressed, Hamiltonian)
+
+        orbitals = dressed.get_orbitals()
+        assert orbitals.has_energies()
+        # The frozen core (1 orbital) is inactive; the rest is active.
+        n_active = len(orbitals.get_active_space_indices()[0])
+        assert n_active == orbitals.get_num_molecular_orbitals() - 1

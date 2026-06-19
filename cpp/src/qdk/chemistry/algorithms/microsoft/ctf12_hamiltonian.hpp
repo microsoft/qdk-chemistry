@@ -42,6 +42,15 @@ class CtF12HamiltonianSettings : public qdk::chemistry::data::Settings {
                 "geminal, 'cgtg' Gaussian-fitted geminal",
                 data::ListConstraint<std::string>{
                     {std::vector<std::string>{"stg", "cgtg"}}});
+    set_default("orbital_basis", std::string("relaxed"),
+                "Orbital basis of the emitted Hamiltonian: 'relaxed' relaxes "
+                "the closed-shell orbitals in the dressed mean field and emits "
+                "the F12-HF canonical basis (canonical post-HF over it "
+                "reproduces F12-MP2/F12-CCSD); 'reference' keeps the reference "
+                "orbital basis (a drop-in replacement for the bare "
+                "Hamiltonian)",
+                data::ListConstraint<std::string>{
+                    {std::vector<std::string>{"relaxed", "reference"}}});
     set_default("symmetrize_two_body", false,
                 "Symmetrize the dressed two-body tensor for solvers that "
                 "assume 8-fold permutational symmetry");

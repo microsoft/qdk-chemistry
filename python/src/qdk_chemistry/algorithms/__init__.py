@@ -30,6 +30,10 @@ from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
 )
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.f12_hartree_fock_solver import (
+    F12HartreeFockSolver,
+    QdkCtF12HartreeFockSolver,
+)
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -69,6 +73,7 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "EnergyEstimator",
+    "F12HartreeFockSolver",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -79,6 +84,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkCtF12HamiltonianConstructor",
+    "QdkCtF12HartreeFockSolver",
     "QdkEnergyEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2NaturalOrbitalLocalizer",

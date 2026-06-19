@@ -644,6 +644,7 @@ def _register_cpp_factories():
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
         EffectiveHamiltonianConstructorFactory,
+        F12HartreeFockSolverFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
@@ -656,6 +657,7 @@ def _register_cpp_factories():
     register_factory(ActiveSpaceSelectorFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
+    register_factory(F12HartreeFockSolverFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
