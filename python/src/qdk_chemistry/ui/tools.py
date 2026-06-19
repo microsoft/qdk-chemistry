@@ -55,7 +55,7 @@ from .validation import (
 )
 
 # Initialize FastMCP app
-app = FastMCP("qdk-chem-mcp", dependencies=["qdk_chemistry"])
+app = FastMCP("qdk-chemistry", dependencies=["qdk_chemistry"])
 
 # Register MCP Apps visualization tools (interactive UI via ui:// resources)
 from .visualization import register_visualization_tools  # noqa: E402
