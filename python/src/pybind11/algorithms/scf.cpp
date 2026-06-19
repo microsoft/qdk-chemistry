@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/f12_scf.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -224,6 +225,41 @@ See Also:
 Default constructor.
 
 Initializes an SCF solver with default settings.
+
+)");
+
+  // Bind concrete microsoft::CtF12ScfSolver implementation
+  py::class_<microsoft::CtF12ScfSolver, ScfSolver, py::smart_holder>(
+      m, "QdkCtF12ScfSolver", R"(
+QDK implementation of the canonical transcorrelated F12 (CT-F12) SCF solver.
+
+This SCF solver produces the relaxed F12-HF orbitals. It runs the configured
+``canonical_scf`` sub-step (any :class:`ScfSolver`) to obtain the canonical
+Hartree-Fock reference, builds the dressed transcorrelated Hamiltonian from it,
+and relaxes the closed-shell orbitals in the dressed mean field. The returned
+wavefunction carries the relaxed orbital coefficients and the dressed-Fock
+orbital energies, with the frozen core marked inactive, so its conventional MP2
+yields the F12-MP2 energy.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    solver = alg.QdkCtF12ScfSolver()
+    solver.settings().set("gamma", 1.5)
+    energy, relaxed = solver.run(structure, 0, 1, "aug-cc-pvdz")
+
+See Also:
+    :class:`ScfSolver`
+    :class:`QdkCtF12HamiltonianConstructor`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a CT-F12 SCF solver with default settings.
 
 )");
 }

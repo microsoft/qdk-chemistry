@@ -12,7 +12,6 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/f12_scf.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
@@ -141,12 +140,12 @@ void run_neon_f12_scf_module_mp2(const std::string& obs_name,
   auto scf_solver = algorithms::ScfSolverFactory::create("qdk");
   const auto reference = scf_solver->run(structure, 0, 1, obs_name).second;
 
-  // Relaxed F12-HF reference from the SCF module.
-  auto f12_scf = algorithms::F12HartreeFockSolverFactory::create("qdk_ct_f12");
+  // Relaxed F12-HF reference from the CT-F12 SCF solver.
+  auto f12_scf = algorithms::ScfSolverFactory::create("qdk_ct_f12");
   f12_scf->settings().set("gamma", gamma);
   f12_scf->settings().set("frozen_core", frozen_core);
   f12_scf->settings().set("cabs_basis", cabs_name);
-  auto relaxed_reference = f12_scf->run(reference);
+  const auto relaxed_reference = f12_scf->run(structure, 0, 1, obs_name).second;
 
   // Dressed Hamiltonian in the same relaxed basis.
   auto constructor =

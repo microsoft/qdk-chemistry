@@ -8,6 +8,8 @@
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "microsoft/f12_scf.hpp"
+
 namespace qdk::chemistry::algorithms {
 
 std::unique_ptr<ScfSolver> make_microsoft_scf_solver() {
@@ -16,10 +18,18 @@ std::unique_ptr<ScfSolver> make_microsoft_scf_solver() {
   return std::make_unique<qdk::chemistry::algorithms::microsoft::ScfSolver>();
 }
 
+std::unique_ptr<ScfSolver> make_microsoft_ctf12_scf_solver() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<
+      qdk::chemistry::algorithms::microsoft::CtF12ScfSolver>();
+}
+
 void ScfSolverFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   ScfSolverFactory::register_instance(&make_microsoft_scf_solver);
+  ScfSolverFactory::register_instance(&make_microsoft_ctf12_scf_solver);
 }
 
 }  // namespace qdk::chemistry::algorithms

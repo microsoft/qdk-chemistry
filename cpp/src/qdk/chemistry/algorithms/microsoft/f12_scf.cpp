@@ -10,6 +10,7 @@
 #include <optional>
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -22,14 +23,16 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-std::shared_ptr<data::Wavefunction> CtF12HartreeFockSolver::_run_impl(
-    std::shared_ptr<data::Wavefunction> reference) const {
+std::pair<double, std::shared_ptr<data::Wavefunction>>
+CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
+                          int charge, int multiplicity,
+                          BasisOrGuessType basis_or_guess) const {
   QDK_LOG_TRACE_ENTERING();
 
-  if (!reference) {
-    throw std::invalid_argument(
-        "CtF12HartreeFockSolver: reference wavefunction is null");
-  }
+  // Canonical Hartree-Fock reference from the configured SCF sub-step.
+  auto canonical_scf = _create_nested<ScfSolverFactory>("canonical_scf");
+  auto [e_hf, reference] =
+      canonical_scf->run(structure, charge, multiplicity, basis_or_guess);
 
   const double gamma = _settings->get<double>("gamma");
   const std::string cabs_basis = _settings->get<std::string>("cabs_basis");
@@ -67,7 +70,12 @@ std::shared_ptr<data::Wavefunction> CtF12HartreeFockSolver::_run_impl(
 
   auto container = std::make_unique<data::StateVectorContainer>(
       determinant, orbitals, "electrons");
-  return std::make_shared<data::Wavefunction>(std::move(container));
+  auto relaxed_reference =
+      std::make_shared<data::Wavefunction>(std::move(container));
+
+  const double total_energy =
+      dressed.e_f12hf + structure->calculate_nuclear_repulsion_energy();
+  return {total_energy, relaxed_reference};
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

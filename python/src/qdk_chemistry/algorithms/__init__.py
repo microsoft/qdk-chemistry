@@ -30,10 +30,6 @@ from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
 )
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
-from qdk_chemistry.algorithms.f12_hartree_fock_solver import (
-    F12HartreeFockSolver,
-    QdkCtF12HartreeFockSolver,
-)
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -59,7 +55,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
-from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
+from qdk_chemistry.algorithms.scf_solver import QdkCtF12ScfSolver, QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -73,7 +69,6 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "EnergyEstimator",
-    "F12HartreeFockSolver",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -84,7 +79,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkCtF12HamiltonianConstructor",
-    "QdkCtF12HartreeFockSolver",
+    "QdkCtF12ScfSolver",
     "QdkEnergyEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2NaturalOrbitalLocalizer",
