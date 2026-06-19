@@ -4,7 +4,7 @@ Tests both the classical preprocessing (fidelity of the decomposition) and
 the full Q# circuit (state preparation fidelity and gate counts).
 
 Attribution: The Berry decomposition tested here is based on code originally
-published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/15587498).
+published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/20393500).
 """
 
 # --------------------------------------------------------------------------------------------
