@@ -265,19 +265,19 @@ class TestVerstraeteCiracMapping:
                         f"Local plaquette stabilizer {p_str} has weight {w} > {max_weight}, violating local scaling"
                     )
 
-        def get_mst_edges(stabs_list: list[str], start_idx: int, count: int) -> list[tuple[int, int]]:
+        def get_mst_edges(stabs_list: list[str], start_idx: int, count: int, root: int) -> list[tuple[int, int]]:
             if count <= 1:
                 return []
 
             in_mst = [False] * count
-            min_weight = [1000000000] * count
-            parent = [0] * count
+            min_weight = [float("inf")] * count
+            parent = [root] * count
 
-            min_weight[0] = 0
+            min_weight[root] = 0
 
             for _ in range(count):
                 u = -1
-                min_val = 1000000000
+                min_val = float("inf")
                 for i in range(count):
                     if not in_mst[i] and min_weight[i] < min_val:
                         min_val = min_weight[i]
@@ -294,8 +294,9 @@ class TestVerstraeteCiracMapping:
                             parent[v] = u
 
             edges = []
-            for v in range(1, count):
-                edges.append((start_idx + parent[v], start_idx + v))
+            for v in range(count):
+                if v != root:
+                    edges.append((start_idx + parent[v], start_idx + v))
             return edges
 
         max_weights = []
@@ -315,8 +316,17 @@ class TestVerstraeteCiracMapping:
             if half_stabs >= 1:
                 threshold = (max_allowed_weight - 2) // 2
 
-                penalty_strings.add(stabs[0])
-                alpha_edges = get_mst_edges(stabs, 0, half_stabs)
+                # Find the lightest stabilizer as root for alpha
+                root_alpha = 0
+                root_alpha_weight = sum(1 for c in stabs[0] if c != "I")
+                for i in range(1, half_stabs):
+                    w = sum(1 for c in stabs[i] if c != "I")
+                    if w < root_alpha_weight:
+                        root_alpha = i
+                        root_alpha_weight = w
+
+                penalty_strings.add(stabs[root_alpha])
+                alpha_edges = get_mst_edges(stabs, 0, half_stabs, root_alpha)
                 for u, v in alpha_edges:
                     prod = multiply_pauli_labels(stabs[u], stabs[v])
                     penalty_strings.add(prod)
@@ -328,8 +338,17 @@ class TestVerstraeteCiracMapping:
                     )
                     check_local_plaquette(stabs, u, v, weight, prod, threshold, max_allowed_weight)
 
-                penalty_strings.add(stabs[half_stabs])
-                beta_edges = get_mst_edges(stabs, half_stabs, half_stabs)
+                # Find the lightest stabilizer as root for beta
+                root_beta = 0
+                root_beta_weight = sum(1 for c in stabs[half_stabs] if c != "I")
+                for i in range(1, half_stabs):
+                    w = sum(1 for c in stabs[half_stabs + i] if c != "I")
+                    if w < root_beta_weight:
+                        root_beta = i
+                        root_beta_weight = w
+
+                penalty_strings.add(stabs[half_stabs + root_beta])
+                beta_edges = get_mst_edges(stabs, half_stabs, half_stabs, root_beta)
                 for u, v in beta_edges:
                     prod = multiply_pauli_labels(stabs[u], stabs[v])
                     penalty_strings.add(prod)

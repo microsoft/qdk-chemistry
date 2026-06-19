@@ -779,19 +779,33 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
       auto build_mst_and_accumulate = [&](std::size_t start_idx,
                                           std::size_t count) {
+        if (count == 0) return;
+
+        // Find the lightest stabilizer as root
+        std::size_t root = 0;
+        int root_weight = get_packed_weight(packed_stabs[start_idx].word);
+        for (std::size_t i = 1; i < count; ++i) {
+          int w = get_packed_weight(packed_stabs[start_idx + i].word);
+          if (w < root_weight) {
+            root = i;
+            root_weight = w;
+          }
+        }
+
         // Accumulate the root boundary link stabilizer
-        acc.accumulate(packed_stabs[start_idx].word,
-                       -aux_ham_coefficient * packed_stabs[start_idx].coeff);
+        acc.accumulate(
+            packed_stabs[start_idx + root].word,
+            -aux_ham_coefficient * packed_stabs[start_idx + root].coeff);
 
         if (count <= 1) return;
 
-        // Prim's algorithm to find the Minimum Spanning Tree of stabilizer
-        // pairings
+        // Prim's algorithm to find the minimum spanning tree of stabilizer
+        // pairings starting from the chosen root
         std::vector<bool> in_mst(count, false);
         std::vector<int> min_weight(count, 1e9);
-        std::vector<std::size_t> parent(count, 0);
+        std::vector<std::size_t> parent(count, root);
 
-        min_weight[0] = 0;
+        min_weight[root] = 0;
 
         for (std::size_t step = 0; step < count; ++step) {
           std::size_t u = 0;
@@ -820,8 +834,10 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         }
 
         // Accumulate products for the selected MST edges
-        for (std::size_t v = 1; v < count; ++v) {
-          accumulate_product(start_idx + parent[v], start_idx + v);
+        for (std::size_t v = 0; v < count; ++v) {
+          if (v != root) {
+            accumulate_product(start_idx + parent[v], start_idx + v);
+          }
         }
       };
 
