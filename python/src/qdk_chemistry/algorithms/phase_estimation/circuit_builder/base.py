@@ -99,7 +99,7 @@ class QpeCircuitBuilder(Algorithm):
         self,
         qubit_hamiltonian: QubitHamiltonian,
         power: int,
-    ) -> Circuit:
+    ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
@@ -110,15 +110,19 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
+            A tuple of (circuit, num_ancilla_qubits) where circuit implements
+            controlled-:math:`U^{\\text{power}}` and num_ancilla_qubits is the number
+            of ancilla qubits used by the unitary beyond the system qubits.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        return circuit_mapper.run(controlled_unitary=controlled_unitary)
+        circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
+        return circuit, num_ancilla_qubits
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):

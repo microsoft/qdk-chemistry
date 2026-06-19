@@ -65,8 +65,8 @@ class DensePureStatePreparation(StatePreparation):
         for coeff, det in zip(coeffs, dets, strict=True):
             bits = det.to_bits()
             idx = 0
-            for b in bits:
-                idx = (idx << 1) | b
+            for i, b in enumerate(bits):
+                idx |= b << i
             statevector[idx] += coeff
 
         row_map = list(range(n_qubits - 1, -1, -1))

@@ -11,7 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, ControlledUnitary, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -148,14 +148,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
 
-        # Build the unitary and controlled circuit, extracting ancilla count.
-        unitary_builder = self._create_nested("unitary_builder")
-        unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        ctrl_unitary_circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
+        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
