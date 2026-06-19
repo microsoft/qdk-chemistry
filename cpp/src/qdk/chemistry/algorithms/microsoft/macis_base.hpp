@@ -10,6 +10,7 @@
 #include <macis/mcscf/mcscf.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {
