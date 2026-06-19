@@ -78,6 +78,12 @@ variables:
 - group: QdkChemistry
 - name: ComponentDetection.MaxDetectionThreads
   value: '16'
+# Force CodeQL to run on every queued build (override the default 24h cadence)
+# and upload the database trace log for debugging the dedicated CodeQLScan stage.
+- name: Codeql.PublishDatabaseLog
+  value: true
+- name: Codeql.Cadence
+  value: 0
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
@@ -145,6 +151,12 @@ extends:
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
+            sdl:
+              codeql:
+                compiled:
+                  enabled: false
+                interpreted:
+                  enabled: false
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
@@ -254,6 +266,54 @@ extends:
                 SymbolServerType: TeamServices
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
+
+
+    - stage: CodeQLScan
+      displayName: CodeQL C++ Scan
+      dependsOn: []   # parallel to Build; does not gate Approval/Release
+      jobs:
+      - job: CodeQL_Scan_linux_x86_64
+        displayName: CodeQL C++ scan (Linux x86_64)
+        pool:
+          name: $(CPU_POOL_X86)
+          demands:
+          - ImageOverride -equals Ubuntu24.04Nightly
+          os: linux
+        timeoutInMinutes: 90
+        variables:
+          LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+        templateContext:
+          sdl:
+            codeql:
+              compiled:
+                enabled: false  # we enable it manually # C++ only — Python is not built here
+        steps:
+        - checkout: self
+          persistCredentials: true
+          path: qdk-chemistry
+          fetchDepth: 1
+          retryCountOnTaskFailure: 3
+
+        # Heavy env setup + CMake configure run BEFORE CodeQL Init so the
+        # database is not polluted by configure-time toolchain probes.
+        - script: |
+            set -e
+            cd $(Agent.BuildDirectory)/qdk-chemistry
+            bash .pipelines/pip-scripts/codeql-scan.sh deps
+          displayName: Install deps + CMake configure (pre-CodeQL)
+
+        - task: CodeQL3000Init@0
+          displayName: 🛡 CodeQL Initialize
+
+        - script: |
+            set -e
+            cd $(Agent.BuildDirectory)/qdk-chemistry
+            bash .pipelines/pip-scripts/codeql-scan.sh build
+          displayName: CMake build (under CodeQL)
+
+        - task: CodeQL3000Finalize@0
+          displayName: 🛡 CodeQL Finalize
+          condition: always()
 
 
     - stage: Approval
