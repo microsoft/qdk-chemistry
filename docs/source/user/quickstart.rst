@@ -26,7 +26,7 @@ This example walks through the full quantum applications workflow: from building
 The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
-Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
+To run the examples, either clone the repository or download the packaged examples from the `GitHub releases page <https://github.com/microsoft/qdk-chemistry/releases>`_, as individual examples may depend on accompanying files within the examples directory.
 
 .. note::
 
@@ -40,6 +40,8 @@ Companion chemistry datasets and supporting assets are also available in `micros
       git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
+
+Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
 
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^
