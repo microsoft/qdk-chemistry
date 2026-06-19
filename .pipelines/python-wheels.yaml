@@ -92,7 +92,6 @@ extends:
     containers:
       linux_build_container:
         image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-        options: --user root
     sdl:
       autobaseline:
         enableForGitHub: true
@@ -177,6 +176,48 @@ extends:
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
 
           steps:
+          # 1ES PT pins all in-container steps to uid 1001 (cloudtest_azpcontainer)
+          # regardless of `options: --user root`, and the bare ubuntu:24.04 image
+          # ships without sudo. This step runs on the host agent (target: host),
+          # which has docker access, and uses `docker exec --user root` to install
+          # sudo into the live container and grant the azure_pipelines_sudo group
+          # passwordless access. After this, $SUDO works in subsequent steps.
+          - ${{ if eq(target.os, 'linux') }}:
+            - script: |
+                set -ex
+                CID=$(docker ps --filter "ancestor=mcr.microsoft.com/mirror/docker/library/ubuntu:24.04" \
+                      --format "{{.ID}}" | head -1)
+                if [ -z "$CID" ]; then
+                  echo "ERROR: could not find running ubuntu:24.04 container" >&2
+                  docker ps
+                  exit 1
+                fi
+                echo "Installing sudo into container $CID..."
+                docker exec --user root "$CID" bash -c "
+                  apt-get update -q &&
+                  DEBIAN_FRONTEND=noninteractive apt-get install -y -q sudo &&
+                  echo '%azure_pipelines_sudo ALL=(ALL) NOPASSWD:ALL' \
+                    > /etc/sudoers.d/azure_pipelines_sudo &&
+                  chmod 0440 /etc/sudoers.d/azure_pipelines_sudo
+                "
+              displayName: Install sudo in build container
+              target: host
+
+            # Sanity check: verify we're running inside the Ubuntu container as root,
+            # not on the host AzureLinux pool. If this fails the 1ES container job
+            # didn't actually containerize the steps.
+            - script: |
+                set -x
+                echo "whoami: $(whoami) (uid=$(id -u))"
+                echo $(id)
+                echo "--- /etc/os-release ---"
+                cat /etc/os-release
+                . /etc/os-release
+                echo "Trying sudo"
+                sudo apt-get update || true
+                apt-get update
+              displayName: Verify container
+
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
             inputs:
@@ -265,6 +306,30 @@ extends:
             path: qdk-chemistry
             fetchDepth: 1
             retryCountOnTaskFailure: 3
+
+          # 1ES PT pins all in-container steps to uid 1001 (cloudtest_azpcontainer)
+          # regardless of `options: --user root`, and the bare ubuntu:24.04 image
+          # ships without sudo. Install it from the host agent via docker exec.
+          - ${{ if eq(target.os, 'linux') }}:
+            - script: |
+                set -ex
+                CID=$(docker ps --filter "ancestor=mcr.microsoft.com/mirror/docker/library/ubuntu:24.04" \
+                      --format "{{.ID}}" | head -1)
+                if [ -z "$CID" ]; then
+                  echo "ERROR: could not find running ubuntu:24.04 container" >&2
+                  docker ps
+                  exit 1
+                fi
+                echo "Installing sudo into test container $CID..."
+                docker exec --user root "$CID" bash -c "
+                  apt-get update -q &&
+                  DEBIAN_FRONTEND=noninteractive apt-get install -y -q sudo &&
+                  echo '%azure_pipelines_sudo ALL=(ALL) NOPASSWD:ALL' \
+                    > /etc/sudoers.d/azure_pipelines_sudo &&
+                  chmod 0440 /etc/sudoers.d/azure_pipelines_sudo
+                "
+              displayName: Install sudo in test container
+              target: host
 
           # Sanity check: verify we're running inside the Ubuntu container as root.
           - ${{ if eq(target.os, 'linux') }}:

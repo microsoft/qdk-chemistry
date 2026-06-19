@@ -43,22 +43,6 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-# Sanity check: verify we're running inside the Ubuntu container as root,
-# not on the host AzureLinux pool. If this fails the 1ES container job
-# didn't actually containerize the steps.
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
-  - script: |
-      set -x
-      echo "whoami: $(whoami) (uid=$(id -u))"
-      echo $(id)
-      echo "--- /etc/os-release ---"
-      cat /etc/os-release
-      . /etc/os-release
-      echo "Trying sudo"
-      sudo apt-get update || true
-      apt-get update
-    displayName: Verify container
-
 # Check if user provided a development tag for release and validate before building wheels.
 # If a development tag is provided and is valid, the VERSION file in the top level directory
 # will be updated to include the dev tag before publishing to PyPI.
