@@ -53,6 +53,7 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
         Raises:
             ModuleNotFoundError: If Qiskit is not installed.
+            ValueError: If input circuits are incompatible with the expected qubit layout.
 
         """
         try:
@@ -82,9 +83,15 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             raise ValueError(
                 "Input state_preparation_circuit cannot be used for QiskitHadamardTestCircuitBuilder."
             ) from err
+        if state_prep_qc.num_qubits != num_system_qubits:
+            raise ValueError(
+                "Input state_preparation_circuit has incompatible width for "
+                f"QiskitHadamardTestCircuitBuilder: expected {num_system_qubits} "
+                f"qubits, got {state_prep_qc.num_qubits}."
+            )
         circuit.append(state_prep_qc.to_gate(), system_target)
 
-        # Prepare ancilla and apply controlled time evolution.
+        # Prepare control and apply controlled time evolution.
         control_qubit = control[0]
         target_qubits = list(system_target)
 
@@ -96,6 +103,13 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             raise ValueError(
                 "Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardTestCircuitBuilder."
             ) from err
+        expected_ctrl_evol_qubits = 1 + num_system_qubits
+        if ctrl_evol_qc.num_qubits != expected_ctrl_evol_qubits:
+            raise ValueError(
+                "Input ctrl_time_evol_unitary_circuit has incompatible width for "
+                f"QiskitHadamardTestCircuitBuilder: expected {expected_ctrl_evol_qubits} "
+                f"qubits, got {ctrl_evol_qc.num_qubits}."
+            )
         circuit.append(ctrl_evol_qc.to_gate(), [control_qubit, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.

@@ -55,8 +55,7 @@ class HadamardTestSettings(Settings):
         """Initialize the settings for the Hadamard test.
 
         Includes nested algorithm references for the circuit builder and the
-        circuit executor, the measurement basis for the control qubit, and the
-        number of ancilla qubits.
+        circuit executor, and the measurement basis for the control qubit.
 
         """
         super().__init__()

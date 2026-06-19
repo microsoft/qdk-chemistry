@@ -6,10 +6,8 @@ namespace QDKChemistry.Utils.HadamardTest {
 
     /// Prepare a Hadamard test circuit.
     ///
-    /// Qubits are allocated and laid out in a fixed order: `[control, system, ancilla]`.
-    /// The control qubit is always the first qubit, followed by the system qubits and then
-    /// the ancilla qubits. This avoids any possibility of index collisions between the
-    /// control, system, and ancilla registers.
+    /// Qubits are allocated and laid out in a fixed order: `[control, system]`.
+    /// The control qubit is always the first qubit, followed by the system qubits.
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
