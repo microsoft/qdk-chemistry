@@ -15,7 +15,7 @@ published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/1558749
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.state_preparation.mps_berry_preprocessing import (
+from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     compute_site_unitary_dense_data,
     decompose_2d,
     decompose_unitary_to_givens,
