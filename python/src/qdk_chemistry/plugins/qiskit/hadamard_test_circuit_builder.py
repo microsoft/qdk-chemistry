@@ -75,11 +75,11 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         ctrl_time_evol_unitary_circuit = self._create_controlled_circuit(unitary)
 
         # Build the base circuit with registers.
-        ancilla = QuantumRegister(1, "ancilla")
+        control = QuantumRegister(1, "control")
         system_target = QuantumRegister(num_system_qubits, "system")
-        registers = [ancilla, system_target]
+        registers = [control, system_target]
         if num_ancilla_qubits > 0:
-            extra_ancillas = QuantumRegister(num_ancilla_qubits, "ancilla_extra")
+            extra_ancillas = QuantumRegister(num_ancilla_qubits, "extra_ancillas")
             registers.append(extra_ancillas)
         classical = ClassicalRegister(1, "c")
         registers.append(classical)
@@ -95,12 +95,12 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         circuit.append(state_prep_qc.to_gate(), system_target)
 
         # Prepare ancilla and apply controlled time evolution.
-        control = ancilla[0]
+        control_qubit = control[0]
         target_qubits = list(system_target)
         if num_ancilla_qubits > 0:
             target_qubits += list(extra_ancillas)
 
-        circuit.h(control)
+        circuit.h(control_qubit)
 
         try:
             ctrl_evol_qc = ctrl_time_evol_unitary_circuit.get_qiskit_circuit()
@@ -108,19 +108,19 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             raise ValueError(
                 "Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardTestCircuitBuilder."
             ) from err
-        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
+        circuit.append(ctrl_evol_qc.to_gate(), [control_qubit, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
         if test_basis is HadamardTestBasis.X:
-            circuit.h(control)
+            circuit.h(control_qubit)
         elif test_basis is HadamardTestBasis.Y:
-            circuit.sdg(control)
-            circuit.h(control)
+            circuit.sdg(control_qubit)
+            circuit.h(control_qubit)
         elif test_basis is HadamardTestBasis.Z:
             pass
         else:
             raise ValueError(f"Unsupported test basis: {test_basis}.")
-        circuit.measure(control, classical[0])
+        circuit.measure(control_qubit, classical[0])
 
         Logger.debug(f"Completed qiskit circuit for measurement on {test_basis.value} basis.")
         return Circuit(qasm=qasm3.dumps(circuit))
