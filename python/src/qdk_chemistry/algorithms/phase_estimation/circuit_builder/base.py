@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -82,13 +83,17 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | Any = None,
+        *,
+        factorized_hamiltonian: Any = None,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
+                Mutually exclusive with qubit_hamiltonian.
 
         Returns:
             A list of quantum circuits for phase estimation.

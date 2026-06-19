@@ -104,58 +104,17 @@ class TestQROMStatePreparation:
         prep = registry.create("state_prep", "qrom_state_prep")
         assert isinstance(prep, QROMStatePreparation)
 
-    def test_fidelity_four_components(self):
-        """Verify the QROM state prep produces the correct statevector for a 4-component input.
+    @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
+    def test_fidelity_random(self, num_coefficients):
+        """Verify QROM state prep fidelity with random amplitudes.
 
         The SBM decomposition should prepare:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
         with quantized Ry rotations via phase gradient (bRot=10), so fidelity ≈ 1.
         """
-        amplitudes = [0.5, 0.3, 0.7, 0.1]
-        num_qubits = 2
-        actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
-        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
-
-        fidelity = abs(np.dot(np.conj(actual_sv), expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
-
-    def test_fidelity_uniform(self):
-        """Verify QROM state prep with uniform amplitudes produces an equal superposition."""
-        amplitudes = [1.0, 1.0, 1.0, 1.0]
-        num_qubits = 2
-        actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
-        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
-
-        fidelity = abs(np.dot(np.conj(actual_sv), expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
-
-    def test_fidelity_eight_components(self):
-        """Verify QROM state prep with an 8-component (3-qubit) input."""
-        amplitudes = [0.5, 0.3, 0.7, 0.1, 0.4, 0.2, 0.6, 0.8]
-        num_qubits = 3
-        actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
-        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
-
-        fidelity = abs(np.dot(np.conj(actual_sv), expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
-
-    def test_fidelity_non_power_of_two_length(self):
-        """Verify QROM state prep when the number of amplitudes is not a power of 2.
-
-        With 3 amplitudes on 2 qubits, the fourth basis state should have zero amplitude.
-        """
-        amplitudes = [0.5, 0.3, 0.7]
-        num_qubits = math.ceil(math.log2(len(amplitudes)))
-        actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
-        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
-
-        fidelity = abs(np.dot(np.conj(actual_sv), expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
-
-    def test_fidelity_single_dominant_component(self):
-        """Verify QROM state prep when one amplitude dominates the distribution."""
-        amplitudes = [0.99, 0.01, 0.01, 0.01]
-        num_qubits = 2
+        rng = np.random.default_rng(seed=42 + num_coefficients)
+        amplitudes = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
+        num_qubits = math.ceil(math.log2(num_coefficients))
         actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
         expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
 

@@ -147,6 +147,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             u_plus.T, u_minus.T, basis_vectors, num_d1, N, R, B
         )
 
+        # Compute free-rider data (G, r encoding for QROM)
+        free_rider = self._compute_free_rider_data(num_d1, N, R, C)
+
         # Compute normalization
         outer_arr = np.array(outer_coeffs)
         inner_arr = np.array(inner_coeffs)
@@ -163,6 +166,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             conditional_coefficients=inner_arr,
             num_inner_qubits=num_inner_qubits,
             num_bases=B,
+            free_rider_data=np.array(free_rider, dtype=bool) if free_rider else None,
         )
 
         select = SOSSASelect(
@@ -385,6 +389,50 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         inner_l1 = np.sum(np.abs(inner_coefficients), axis=1)
         lambda_sqrt = float(np.sum(np.abs(outer_coefficients) * inner_l1))
         return 0.5 * lambda_sqrt**2
+
+    @staticmethod
+    def _compute_free_rider_data(
+        num_one_body_plus: int,
+        N: int,
+        R: int,
+        C: int,
+    ) -> list[list[bool]]:
+        r"""Compute QROM free-rider data encoding (G, r) for each outer index.
+
+        Shape: ``[Xo][2 + R_bits]``.
+
+        Each entry ``data[x_o]`` encodes the generator type G (2 bits) and the
+        rank index r in little-endian binary.
+
+        G encoding (2 bits = ``[sf_vs_dq, d_vs_q]``):
+            - D1 (particle): ``[False, False]``
+            - Q1 (hole):     ``[False, True]``
+            - SF (two-body): ``[True,  True]``
+
+        Reference: Eq. 82 in arXiv:2502.15882v1.
+
+        """
+        Xo = N + R * C
+        N_D1 = num_one_body_plus
+        R_bits = int(ceil(log2(R))) if R > 1 else 0
+
+        data: list[list[bool]] = []
+        for x_o in range(Xo):
+            if x_o < N_D1:
+                g_bits = [False, False]
+                r_val = 0
+            elif x_o < N:
+                g_bits = [False, True]
+                r_val = 0
+            else:
+                g_bits = [True, True]
+                sf_idx = x_o - N
+                r_val = sf_idx // C
+
+            r_bits = [(r_val >> k) & 1 == 1 for k in range(R_bits)]
+            data.append(g_bits + r_bits)
+
+        return data
 
     def name(self) -> str:
         """Return the algorithm name."""

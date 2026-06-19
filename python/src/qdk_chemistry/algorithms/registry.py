@@ -764,10 +764,14 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         PrepSelPrepMapper,
+        SOSSAMapper,
     )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import (  # noqa: PLC0415
+        SOSSABuilder,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
@@ -815,6 +819,8 @@ def _register_python_algorithms():
     register(lambda: AliasSamplingStatePreparation())
     register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: SOSSAMapper())
+    register(lambda: SOSSABuilder())
     register(lambda: EulerIntegrator())
     register(lambda: MagnusPropagator())
     register(lambda: QdkFullStateSimulator())

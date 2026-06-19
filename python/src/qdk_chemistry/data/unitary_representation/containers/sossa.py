@@ -43,19 +43,31 @@ class SOSSAInnerPrepare:
     num_bases: int
     """Number of bases B (B+1 entries including identity term)."""
 
+    free_rider_data: np.ndarray | None = None
+    r"""Optional 2D boolean array, shape :math:`[X_o, n_{\text{fr}}]`.
+
+    Classical bits loaded into the free-rider register by the 2D QROM
+    alongside alias sampling data. Each row gives the free-rider bits
+    for the corresponding :math:`x_o` condition value.
+    """
+
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save to HDF5."""
         group.create_dataset("conditional_coefficients", data=self.conditional_coefficients)
         group.attrs["num_inner_qubits"] = self.num_inner_qubits
         group.attrs["num_bases"] = self.num_bases
+        if self.free_rider_data is not None:
+            group.create_dataset("free_rider_data", data=self.free_rider_data)
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAInnerPrepare":
         """Load from HDF5."""
+        free_rider = np.array(group["free_rider_data"]) if "free_rider_data" in group else None
         return cls(
             conditional_coefficients=np.array(group["conditional_coefficients"]),
             num_inner_qubits=int(group.attrs["num_inner_qubits"]),
             num_bases=int(group.attrs["num_bases"]),
+            free_rider_data=free_rider,
         )
 
 
@@ -201,6 +213,9 @@ class SOSSAContainer(BlockEncodingContainer):
                 "conditional_coefficients": self.inner_prepare.conditional_coefficients.tolist(),
                 "num_inner_qubits": self.inner_prepare.num_inner_qubits,
                 "num_bases": self.inner_prepare.num_bases,
+                **({
+                    "free_rider_data": self.inner_prepare.free_rider_data.tolist()
+                } if self.inner_prepare.free_rider_data is not None else {}),
             },
             "select": {
                 "rotation_angles": self.select.rotation_angles.tolist(),
@@ -235,10 +250,12 @@ class SOSSAContainer(BlockEncodingContainer):
         outer_prepare = Wavefunction.from_json(json_data["outer_prepare"])
 
         ip = json_data["inner_prepare"]
+        fr_data = np.array(ip["free_rider_data"], dtype=bool) if "free_rider_data" in ip else None
         inner_prepare = SOSSAInnerPrepare(
             conditional_coefficients=np.array(ip["conditional_coefficients"], dtype=float),
             num_inner_qubits=ip["num_inner_qubits"],
             num_bases=ip["num_bases"],
+            free_rider_data=fr_data,
         )
 
         sel = json_data["select"]

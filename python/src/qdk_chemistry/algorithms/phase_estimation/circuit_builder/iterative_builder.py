@@ -11,6 +11,8 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 from qdk_chemistry.data import AlgorithmRef, Circuit, ControlledUnitary, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -77,7 +79,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | Any = None,
+        *,
+        factorized_hamiltonian: Any = None,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -89,6 +93,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
+                Mutually exclusive with qubit_hamiltonian.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -98,6 +104,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             ValueError: If ``num_iteration`` >= ``num_bits``.
 
         """
+        hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
+        if hamiltonian is None:
+            raise ValueError("Either qubit_hamiltonian or factorized_hamiltonian must be provided.")
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
@@ -112,7 +121,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         for iteration in iterations:
             circuit = self._create_iteration_circuit(
                 state_preparation=state_preparation,
-                qubit_hamiltonian=qubit_hamiltonian,
+                hamiltonian=hamiltonian,
                 iteration=iteration,
                 total_iterations=num_bits,
                 phase_correction=phase_correction,
@@ -125,7 +134,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        hamiltonian: Any,
         *,
         iteration: int,
         total_iterations: int,
@@ -135,7 +144,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            hamiltonian: The Hamiltonian (QubitHamiltonian or FactorizedHamiltonianContainer).
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
@@ -145,13 +154,20 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
-        num_system_qubits = qubit_hamiltonian.num_qubits
+
+        # Determine num_system_qubits based on hamiltonian type
+        if isinstance(hamiltonian, QubitHamiltonian):
+            num_system_qubits = hamiltonian.num_qubits
+        else:
+            # FactorizedHamiltonianContainer: system is 2*N spin-orbitals
+            num_system_qubits = 2 * hamiltonian.get_num_orbitals()
+
         power = 2 ** (total_iterations - iteration - 1)
 
         # Build the unitary and controlled circuit, extracting ancilla count.
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        unitary_rep = unitary_builder.run(hamiltonian)
         num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")

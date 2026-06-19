@@ -13,6 +13,8 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
@@ -23,6 +25,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils import Logger
 
 from .circuit_builder.base import StandardQpeCircuitBuilder
@@ -70,15 +73,18 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | Any = None,
         *,
+        factorized_hamiltonian: Any = None,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
+        """Run the standard phase estimation algorithm given the state preparation and Hamiltonian.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
+                Mutually exclusive with qubit_hamiltonian.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -126,7 +132,12 @@ class StandardPhaseEstimation(PhaseEstimation):
             )
         if isinstance(unitary_builder, SOSSABuilder):
             # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
-            lambda_val = unitary_builder.settings().get("normalization")
+            hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
+            unitary_rep = unitary_builder.run(hamiltonian)
+            container = unitary_rep.get_container()
+            if not isinstance(container, SOSSAContainer):
+                raise TypeError(f"Expected SOSSAContainer, got {type(container)}")
+            lambda_val = container.normalization
             return QpeResult.from_qubitization_result(
                 method=self.name(),
                 phase_fraction=raw_phase,
