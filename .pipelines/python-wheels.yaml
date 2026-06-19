@@ -92,7 +92,7 @@ extends:
     containers:
       linux_build_container:
         image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-        # options: --user root
+        options: --user root
     sdl:
       autobaseline:
         enableForGitHub: true
