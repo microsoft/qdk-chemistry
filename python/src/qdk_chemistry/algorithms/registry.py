@@ -767,10 +767,10 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
         QdkHadamardTestCircuitBuilder,
     )
+    from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )

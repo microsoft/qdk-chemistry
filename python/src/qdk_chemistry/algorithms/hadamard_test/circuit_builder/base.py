@@ -7,7 +7,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,

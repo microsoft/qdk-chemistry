@@ -38,12 +38,7 @@ class HadamardTestBasis(Enum):
 
 def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
     """Map a ``HadamardTestBasis`` to ``qsharp.Pauli`` for Q# interop."""
-    try:
-        from qdk import qsharp as _qsharp  # noqa: PLC0415
-    except ModuleNotFoundError as err:
-        raise ModuleNotFoundError(
-            "qdk.qsharp is required to convert Hadamard test bases into qsharp.Pauli values."
-        ) from err
+    from qdk import qsharp as _qsharp  # noqa: PLC0415
 
     return getattr(_qsharp.Pauli, basis.value)
 

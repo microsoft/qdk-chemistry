@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
 from qdk_chemistry.data import Circuit, MajoranaMapping, Structure, UnitaryRepresentation
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None

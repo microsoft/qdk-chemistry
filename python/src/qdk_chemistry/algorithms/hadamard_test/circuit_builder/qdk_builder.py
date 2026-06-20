@@ -5,8 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis, basis_to_qsharp_pauli
 from qdk_chemistry.algorithms.hadamard_test.circuit_builder.base import HadamardTestCircuitBuilder
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis, basis_to_qsharp_pauli
 from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
