@@ -15,7 +15,7 @@ import pytest
 import qdk
 from qdk import qsharp
 
-QSHARP = cast(Any, qsharp)
+QSHARP = cast("Any", qsharp)
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
 _NS = "QDKChemistry.Utils.SelectSwap"
@@ -46,29 +46,19 @@ def _bools_to_qs(data: list) -> str:
 def _make_random_data_1d(n_data: int, n_bits: int, seed: int = 42) -> list[list[bool]]:
     """Generate random Bool[][] data for 1D SelectSwap tests."""
     rng = np.random.default_rng(seed)
-    return [
-        _int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits)
-        for _ in range(n_data)
-    ]
+    return [_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_data)]
 
 
-def _make_random_data_2d(
-    n_outer: int, n_inner: int, n_bits: int, seed: int = 42
-) -> list[list[list[bool]]]:
+def _make_random_data_2d(n_outer: int, n_inner: int, n_bits: int, seed: int = 42) -> list[list[list[bool]]]:
     """Generate random Bool[][][] data for 2D Select2DLoad tests."""
     rng = np.random.default_rng(seed)
-    return [
-        [
-            _int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits)
-            for _ in range(n_inner)
-        ]
-        for _ in range(n_outer)
-    ]
+    return [[_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_inner)] for _ in range(n_outer)]
 
 
 def _ceil_log2(n: int) -> int:
     """Ceiling of log2(n), i.e. number of address bits for n entries."""
     import math
+
     return math.ceil(math.log2(n))
 
 
@@ -81,8 +71,8 @@ def _phase_lookup_cost(n: int) -> int:
     """
     if n <= 0:
         return 0
-    n1 = n // 2       # floor(n/2)
-    n2 = n - n1       # ceil(n/2)
+    n1 = n // 2  # floor(n/2)
+    n2 = n - n1  # ceil(n/2)
     return max(0, 2**n1 - n1 - 1) + max(0, 2**n2 - n2 - 1)
 
 
@@ -160,22 +150,22 @@ def _expected_qubits_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> in
 class TestSelectSwapCorrectness:
     """Verify SelectSwap loads the correct data for each address."""
 
-    @pytest.mark.parametrize("n_data,n_bits,num_swap_bits", [
-        (4, 3, 0),   # no swap (plain Select)
-        (4, 3, 1),   # 1 swap bit
-        (8, 4, 0),   # 8 entries, no swap
-        (8, 4, 1),   # 8 entries, 1 swap bit
-        (8, 4, 2),   # 8 entries, 2 swap bits
-    ])
+    @pytest.mark.parametrize(
+        "n_data,n_bits,num_swap_bits",
+        [
+            (4, 3, 0),  # no swap (plain Select)
+            (4, 3, 1),  # 1 swap bit
+            (8, 4, 0),  # 8 entries, no swap
+            (8, 4, 1),  # 8 entries, 1 swap bit
+            (8, 4, 2),  # 8 entries, 2 swap bits
+        ],
+    )
     def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits):
         """For each address |i⟩, SelectSwap should load data[i] into output."""
         data = _make_random_data_1d(n_data, n_bits)
         ctx = _make_context()
         result = ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
-        assert result, (
-            f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, "
-            f"num_swap_bits={num_swap_bits}"
-        )
+        assert result, f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
 
     def test_1d_auto_lambda(self):
         """SelectSwap with numSwapBits=-1 (auto-optimal) should produce correct results."""
@@ -184,19 +174,21 @@ class TestSelectSwapCorrectness:
         result = ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
         assert result, "SelectSwap 1D with auto lambda failed"
 
-    @pytest.mark.parametrize("n_outer,n_inner,n_bits,num_swap_bits", [
-        (2, 4, 3, 0),   # no swap
-        (2, 4, 3, 1),   # 1 swap bit
-        (3, 4, 4, 0),   # non-power-of-2 outer
-    ])
+    @pytest.mark.parametrize(
+        "n_outer,n_inner,n_bits,num_swap_bits",
+        [
+            (2, 4, 3, 0),  # no swap
+            (2, 4, 3, 1),  # 1 swap bit
+            (3, 4, 4, 0),  # non-power-of-2 outer
+        ],
+    )
     def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits):
         """For each (i, j), Select2DLoad should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
         ctx = _make_context()
         result = ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
         assert result, (
-            f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, "
-            f"n_bits={n_bits}, num_swap_bits={num_swap_bits}"
+            f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )
 
 
@@ -209,7 +201,7 @@ class TestSelectSwapCorrectness:
 def qsharp_estimator():
     """Initialize qsharp with Q# project for resource estimation."""
     QSHARP.init(project_root=_PROJECT_ROOT)
-    yield QSHARP
+    return QSHARP
 
 
 def _estimate(qsharp_estimator, expr: str) -> dict:
@@ -228,45 +220,47 @@ class TestSelectSwapResourceEstimates:
     (Gidney arXiv:2505.15917).
     """
 
-    @pytest.mark.parametrize("n_data,n_bits", [
-        (4, 4),
-        (8, 4),
-        (8, 8),
-        (16, 4),
-    ])
+    @pytest.mark.parametrize(
+        "n_data,n_bits",
+        [
+            (4, 4),
+            (8, 4),
+            (8, 8),
+            (16, 4),
+        ],
+    )
     def test_1d_no_swap(self, qsharp_estimator, n_data, n_bits):
         """SelectSwap(lambda=0): plain Select, Toffoli = N - 2."""
         expected_tof = _expected_tof_1d(n_data, n_bits, 0)
         expected_qubits = _expected_qubits_1d(n_data, n_bits, 0)
         lc = _estimate(qsharp_estimator, f"{_NS}.EstimateSelectSwap1D({n_data}, {n_bits}, 0)")
         assert lc["cczCount"] == expected_tof, (
-            f"n_data={n_data}, n_bits={n_bits}: "
-            f"tof={lc['cczCount']}, expected={expected_tof}"
+            f"n_data={n_data}, n_bits={n_bits}: tof={lc['cczCount']}, expected={expected_tof}"
         )
         assert lc["numQubits"] == expected_qubits, (
-            f"n_data={n_data}, n_bits={n_bits}: "
-            f"qubits={lc['numQubits']}, expected={expected_qubits}"
+            f"n_data={n_data}, n_bits={n_bits}: qubits={lc['numQubits']}, expected={expected_qubits}"
         )
 
-    @pytest.mark.parametrize("n_data,n_bits,lam", [
-        (8, 4, 1),
-        (8, 4, 2),
-        (16, 4, 1),
-        (16, 8, 1),
-        (16, 8, 2),
-    ])
+    @pytest.mark.parametrize(
+        "n_data,n_bits,lam",
+        [
+            (8, 4, 1),
+            (8, 4, 2),
+            (16, 4, 1),
+            (16, 8, 1),
+            (16, 8, 2),
+        ],
+    )
     def test_1d_swap(self, qsharp_estimator, n_data, n_bits, lam):
         """SelectSwap(lambda>0): SWAP network trades qubits for Toffolis."""
         expected_tof = _expected_tof_1d(n_data, n_bits, lam)
         expected_qubits = _expected_qubits_1d(n_data, n_bits, lam)
         lc = _estimate(qsharp_estimator, f"{_NS}.EstimateSelectSwap1D({n_data}, {n_bits}, {lam})")
         assert lc["cczCount"] == expected_tof, (
-            f"n_data={n_data}, n_bits={n_bits}, lam={lam}: "
-            f"tof={lc['cczCount']}, expected={expected_tof}"
+            f"n_data={n_data}, n_bits={n_bits}, lam={lam}: tof={lc['cczCount']}, expected={expected_tof}"
         )
         assert lc["numQubits"] == expected_qubits, (
-            f"n_data={n_data}, n_bits={n_bits}, lam={lam}: "
-            f"qubits={lc['numQubits']}, expected={expected_qubits}"
+            f"n_data={n_data}, n_bits={n_bits}, lam={lam}: qubits={lc['numQubits']}, expected={expected_qubits}"
         )
 
 
@@ -278,17 +272,18 @@ class TestSelect2DResourceEstimates:
       Qubits = 2*ceil_log2(N_out) + 2*ceil_log2(N_in) - λ + K*b - 1
     """
 
-    @pytest.mark.parametrize("n_outer,n_inner,n_bits,lam", [
-        (2, 4, 4, 0),
-        (4, 4, 4, 0),
-        (4, 8, 4, 0),
-        (2, 4, 4, 1),
-        (4, 8, 4, 1),
-        (4, 8, 8, 2),
-    ])
-    def test_2d_toffoli_and_qubits(
-        self, qsharp_estimator, n_outer, n_inner, n_bits, lam
-    ):
+    @pytest.mark.parametrize(
+        "n_outer,n_inner,n_bits,lam",
+        [
+            (2, 4, 4, 0),
+            (4, 4, 4, 0),
+            (4, 8, 4, 0),
+            (2, 4, 4, 1),
+            (4, 8, 4, 1),
+            (4, 8, 8, 2),
+        ],
+    )
+    def test_2d_toffoli_and_qubits(self, qsharp_estimator, n_outer, n_inner, n_bits, lam):
         """Select2DLoad: Toffoli and qubit counts match analytical formulas."""
         expected_tof = _expected_tof_2d(n_outer, n_inner, n_bits, lam)
         expected_qubits = _expected_qubits_2d(n_outer, n_inner, n_bits, lam)

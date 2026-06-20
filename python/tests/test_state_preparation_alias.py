@@ -18,26 +18,6 @@ from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSampl
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
 
-# Q# wrapper: allocates qubits via QIR.Runtime so they persist for dump_machine
-# (Qubit values cannot cross the Python ↔ Q# boundary).
-_ALIAS_WRAPPER_QS = """
-operation RunAliasSamplingPrep(
-    coefficients : Double[],
-    bitsPrecision : Int,
-    numIndexQubits : Int,
-    numQubits : Int,
-) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(numQubits);
-    let params = new QDKChemistry.Utils.AliasSampling.AliasSamplingParams {
-        coefficients = coefficients,
-        bitsPrecision = bitsPrecision,
-        numIndexQubits = numIndexQubits,
-        numQubits = numQubits,
-    };
-    QDKChemistry.Utils.AliasSampling.AliasSamplingPrepare(params, qs);
-}
-"""
-
 
 def _run_alias_sampling_and_dump(
     coefficients: list[float],
@@ -52,8 +32,9 @@ def _run_alias_sampling_and_dump(
     """
     total_qubits = 2 * num_index_qubits + 2 * bits_precision + 1
     ctx = qdk.Context(project_root=_PROJECT_ROOT)
-    ctx.eval(_ALIAS_WRAPPER_QS)
-    ctx.code.RunAliasSamplingPrep(coefficients, bits_precision, num_index_qubits, total_qubits)
+    ctx.code.QDKChemistry.Utils.AliasSampling.RunAliasSamplingPrep(
+        coefficients, bits_precision, num_index_qubits, total_qubits
+    )
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 
@@ -77,7 +58,7 @@ def _compute_marginal_probs(
     for i in range(len(full_sv)):
         # Extract top num_index_qubits bits (BE) and reverse for LE value
         be_idx = (i >> shift) & (n_index - 1)
-        index_val = int('{:0{w}b}'.format(be_idx, w=num_index_qubits)[::-1], 2)
+        index_val = int("{:0{w}b}".format(be_idx, w=num_index_qubits)[::-1], 2)
         probs[index_val] += abs(full_sv[i]) ** 2
     return probs
 
@@ -117,7 +98,7 @@ class TestAliasSamplingStatePreparation:
         assert circuit is not None
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
-    
+
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_marginal_probs_random(self, num_coefficients):
         """Verify alias sampling marginal probabilities with random coefficients.
@@ -141,4 +122,4 @@ class TestAliasSamplingStatePreparation:
         expected_probs = abs_coeffs / np.sum(abs_coeffs)
 
         atol = 2.0 / (2**bits_precision)
-        np.testing.assert_allclose(marginal_probs[:len(coefficients)], expected_probs, atol=atol)
+        np.testing.assert_allclose(marginal_probs[: len(coefficients)], expected_probs, atol=atol)

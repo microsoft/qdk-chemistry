@@ -18,24 +18,6 @@ _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "ut
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 
-# Q# wrapper: allocates qubits via QIR.Runtime so they persist for dump_machine
-# (Qubit values cannot cross the Python ↔ Q# boundary).
-_QROM_WRAPPER_QS = """
-operation RunQROMStatePrep(
-    amplitudes : Double[],
-    rotationBitPrecision : Int,
-    numStateQubits : Int,
-) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(numStateQubits);
-    let params = new QDKChemistry.Utils.QROMStatePrep.QROMStatePrepParams {
-        amplitudes = amplitudes,
-        rotationBitPrecision = rotationBitPrecision,
-        numStateQubits = numStateQubits,
-    };
-    QDKChemistry.Utils.QROMStatePrep.QROMStatePrepare(params, qs);
-}
-"""
-
 
 def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int) -> np.ndarray:
     """Run the QROM state preparation via qdk.Context and return the statevector.
@@ -45,8 +27,7 @@ def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int) -> n
     statevector via ``ctx.dump_machine()``.
     """
     ctx = qdk.Context(project_root=str(_QS_DIR))
-    ctx.eval(_QROM_WRAPPER_QS)
-    ctx.code.RunQROMStatePrep(amplitudes, 10, num_qubits)
+    ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, 10, num_qubits)
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 

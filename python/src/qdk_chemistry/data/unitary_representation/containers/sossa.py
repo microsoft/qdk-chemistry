@@ -213,9 +213,11 @@ class SOSSAContainer(BlockEncodingContainer):
                 "conditional_coefficients": self.inner_prepare.conditional_coefficients.tolist(),
                 "num_inner_qubits": self.inner_prepare.num_inner_qubits,
                 "num_bases": self.inner_prepare.num_bases,
-                **({
-                    "free_rider_data": self.inner_prepare.free_rider_data.tolist()
-                } if self.inner_prepare.free_rider_data is not None else {}),
+                **(
+                    {"free_rider_data": self.inner_prepare.free_rider_data.tolist()}
+                    if self.inner_prepare.free_rider_data is not None
+                    else {}
+                ),
             },
             "select": {
                 "rotation_angles": self.select.rotation_angles.tolist(),
@@ -306,7 +308,7 @@ class SOSSAContainer(BlockEncodingContainer):
             f"  Xo = N + R*C = {n + r * c}\n"
             f"  Normalization Lambda = {self.normalization:.6f}\n"
             f"  Outer PREPARE: {self.outer_prepare.get_orbitals().num_modes()} qubits\n"
-            f"  Inner PREPARE: {self.inner_prepare.num_inner_qubits} qubits, {b+1} basis entries\n"
-            f"  System: {2*n} spin-orbitals\n"
+            f"  Inner PREPARE: {self.inner_prepare.num_inner_qubits} qubits, {b + 1} basis entries\n"
+            f"  System: {2 * n} spin-orbitals\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
         )

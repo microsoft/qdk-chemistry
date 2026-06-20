@@ -18,7 +18,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import (
     InnerPrepareMapper,
@@ -34,8 +33,6 @@ from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
-
-from .reference_tolerances import qpe_energy_tolerance
 
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
@@ -60,10 +57,12 @@ def _build_h2_dfthc_data():
     C = 1  # copies
 
     # Symmetric one-body matrix (adjusted for Majorana representation)
-    h1 = np.array([
-        [0.3, 0.1],
-        [0.1, -0.2],
-    ])
+    h1 = np.array(
+        [
+            [0.3, 0.1],
+            [0.1, -0.2],
+        ]
+    )
 
     # Basis vectors: unit vectors in R^N for each (r, b)
     # Shape: [R, B, N]
@@ -161,6 +160,7 @@ def _get_ground_state_and_energy(H_matrix, num_orbitals, nalpha=1, nbeta=1):
 
     Returns:
         (ground_energy, ground_state_vector) in the Q# spin-blocked basis ordering.
+
     """
     dim = H_matrix.shape[0]
     num_spin_orbitals = 2 * num_orbitals
@@ -173,8 +173,7 @@ def _get_ground_state_and_energy(H_matrix, num_orbitals, nalpha=1, nbeta=1):
     # Filter to correct particle number sector
     target_n = nalpha + nbeta
     sector_indices = [
-        i for i in range(len(eigenvalues))
-        if round(eigenvectors[:, i] @ N_hat @ eigenvectors[:, i]) == target_n
+        i for i in range(len(eigenvalues)) if round(eigenvectors[:, i] @ N_hat @ eigenvectors[:, i]) == target_n
     ]
 
     if not sector_indices:
@@ -207,7 +206,7 @@ def _python_to_qsharp_permutation(num_orbitals):
                 j = n_qubits - 1 - b
                 p, sigma = j // 2, j % 2
                 qs_qubit = sigma * num_orbitals + p
-                k |= (1 << qs_qubit)
+                k |= 1 << qs_qubit
         perm[i] = k
     return perm
 
@@ -223,7 +222,13 @@ def _sossa_qpe_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
         "qpe_circuit_builder",
         "qdk_iterative",
         num_bits=num_bits,
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "sossa"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper",
+            "sossa",
+            outer_prepare_algorithm="dense_pure",
+            inner_prepare_algorithm="direct",
+            select_algorithm="qrom_phase_gradient",
+        ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa", quantum_walk=True),
     )
 
@@ -270,9 +275,16 @@ class TestSOSSAQPEIntegration:
         inactive_fock = np.zeros((N, N))
 
         fh = FactorizedHamiltonianContainer(
-            h1, u_matrices, w_matrices, wb_matrix,
-            R, B, C,
-            orbitals, 0.0, inactive_fock,
+            h1,
+            u_matrices,
+            w_matrices,
+            wb_matrix,
+            R,
+            B,
+            C,
+            orbitals,
+            0.0,
+            inactive_fock,
         )
 
         # Build SOSSA unitary representation
@@ -313,8 +325,10 @@ class TestSOSSAQPEIntegration:
 
         # Build the Hamiltonian matrix for reference diagonalization
         H_matrix = _build_dfthc_hamiltonian_matrix(
-            data["h1"], data["basis_vectors"],
-            data["two_body_weights"], data["identity_weight"],
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
         )
         gs_energy, gs_vec = _get_ground_state_and_energy(H_matrix, N, nalpha=1, nbeta=1)
 
@@ -327,9 +341,16 @@ class TestSOSSAQPEIntegration:
         inactive_fock = np.zeros((N, N))
 
         fh = FactorizedHamiltonianContainer(
-            h1, u_matrices, w_matrices, wb_matrix,
-            R, B, C,
-            orbitals, 0.0, inactive_fock,
+            h1,
+            u_matrices,
+            w_matrices,
+            wb_matrix,
+            R,
+            B,
+            C,
+            orbitals,
+            0.0,
+            inactive_fock,
         )
 
         # Build SOSSA
@@ -400,10 +421,16 @@ class TestSOSSAQPEIntegration:
         orbitals = create_test_orbitals(N)
         inactive_fock = np.zeros((N, N))
         fh = FactorizedHamiltonianContainer(
-            data["h1"], data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(), data["identity_weight"],
-            R, B, C,
-            orbitals, 0.0, inactive_fock,
+            data["h1"],
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            R,
+            B,
+            C,
+            orbitals,
+            0.0,
+            inactive_fock,
         )
 
         # Step 1: SOSSABuilder → UnitaryRepresentation
@@ -431,8 +458,10 @@ class TestSOSSAQPEIntegration:
 
         # Step 4: Compute expected spectrum
         H_matrix = _build_dfthc_hamiltonian_matrix(
-            data["h1"], data["basis_vectors"],
-            data["two_body_weights"], data["identity_weight"],
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
         )
         eigenvalues = np.linalg.eigvalsh(H_matrix)
         # H_gap should be positive semi-definite
@@ -457,10 +486,16 @@ class TestSOSSAQPEIntegration:
         orbitals = create_test_orbitals(N)
         inactive_fock = np.zeros((N, N))
         fh = FactorizedHamiltonianContainer(
-            data["h1"], data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(), data["identity_weight"],
-            R, B, C,
-            orbitals, 0.0, inactive_fock,
+            data["h1"],
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            R,
+            B,
+            C,
+            orbitals,
+            0.0,
+            inactive_fock,
         )
 
         builder = SOSSABuilder(quantum_walk=True)
@@ -469,12 +504,14 @@ class TestSOSSAQPEIntegration:
         lambda_sos = container.normalization
 
         H_matrix = _build_dfthc_hamiltonian_matrix(
-            data["h1"], data["basis_vectors"],
-            data["two_body_weights"], data["identity_weight"],
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
         )
         eigenvalues = np.linalg.eigvalsh(H_matrix)
 
         # All eigenvalues should be ≤ 2Λ (with small numerical tolerance)
         assert np.all(eigenvalues <= 2 * lambda_sos + 1e-10), (
-            f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2*lambda_sos:.6f}"
+            f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2 * lambda_sos:.6f}"
         )

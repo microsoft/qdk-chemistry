@@ -30,6 +30,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
+    import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -76,8 +77,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 []
             };
             ConditionalAliasSamplingPrepareWithFreeRider(
-                innerCoefficients, freeRiderData, mu,
-                outerReg, indexReg, uniformReg, flagQubit, qromOut, freeRiderReg, -1);
+                innerCoefficients,
+                freeRiderData,
+                mu,
+                outerReg,
+                indexReg,
+                uniformReg,
+                flagQubit,
+                qromOut,
+                freeRiderReg, -1
+            );
         }
     }
 
@@ -156,9 +165,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// When false, uses direct controlled-Ry gates (simulation/testing).
     ///
     /// Register layout:
-    ///   outerReg:  [xoReg (xoBits)] [spinDQ (1)]
+    ///   outerReg:  [xoReg (xoBits)]
     ///   innerReg:  [bReg (bBits)] [alias garbage...] [freeRider: isSF(1) + dvsq(1) + rBits(...)]
-    ///   spinReg:   [spinSF (1)]
+    ///   spinReg:   [spinDQ (1)] [spinSF (1)]
     ///   systemReg: [sysDown (N)] [sysUp (N)]
     operation SelectImpl(
         params : SelectParams,
@@ -178,8 +187,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         // Register slicing
         let xoReg = outerReg[0..xoBits - 1];
-        let spinDQ = outerReg[xoBits];
-        let spinSF = spinReg[0];
+        let spinDQ = spinReg[0];
+        let spinSF = spinReg[1];
         let bReg = innerReg[0..bBits - 1];
         let sysRegDown = systemReg[0..N - 1];
         let sysRegUp = systemReg[N..2 * N - 1];
@@ -196,27 +205,37 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use bEqBQubit = Qubit();
 
         within {
-            // Compute spin from (isSF, spinDQ, spinSF) via two CCX gates
-            // DQ mode (isSF=0): spin ← spinDQ
-            within { X(isSF); } apply { CCNOT(isSF, spinDQ, spin); }
-            // SF mode (isSF=1): spin ← spinSF
-            CCNOT(isSF, spinSF, spin);
-            // SWAP up/down registers based on spin
-            for i in 0..N - 1 {
-                Controlled SWAP([spin], (sysRegDown[i], sysRegUp[i]));
-            }
+            SelectSpins(isSF, spinDQ, spinSF, spin, sysRegDown, sysRegUp);
         } apply {
             within {
                 // Givens rotations: basis change to localize amplitude on qubit 0
                 if usePhaseGradient {
                     ApplyGivensRotationsQROM(
-                        params, N, numSF, numBp1, numRotAngles, xoBits, xoReg, bReg, sysRegDown);
+                        params,
+                        N,
+                        numSF,
+                        numBp1,
+                        numRotAngles,
+                        xoBits,
+                        xoReg,
+                        bReg,
+                        sysRegDown
+                    );
                 } else {
                     ApplyConditionalGivensRotations(
-                        params, N, numSF, numBp1, numRotAngles, xoBits, xoReg, bReg, sysRegDown);
+                        params,
+                        N,
+                        numSF,
+                        numBp1,
+                        numRotAngles,
+                        xoBits,
+                        xoReg,
+                        bReg,
+                        sysRegDown
+                    );
                 }
                 // Set bEqB flag: 1 when (isSF AND b == B)
-                ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
+                // ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
             } apply {
                 // Majorana operator (Fig. 4 / Appendix B.6)
                 MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
@@ -248,53 +267,57 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         body ... {
             // U: OuterPREP · within{InnerPREP + H(spinSF)} apply{SELECT}
             outerPrepareOp(outerReg);
+            H(spinReg[0]);
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[0]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
             } apply {
                 selectOp(outerReg, innerReg, spinReg, systemReg);
             }
 
             // Ref_B: inner reflection (includes spinReg so spinSF participates)
-            ReflectAboutZero(innerReg + spinReg);
+            Reflect(innerReg + [spinReg[1]]);
 
             // U†
             Adjoint outerPrepareOp(outerReg);
+            H(spinReg[0]);
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[0]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
             } apply {
                 Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
             }
 
             // Ref_{a,B}: outer reflection
-            ReflectAboutZero(outerReg + innerReg + spinReg);
+            Reflect(outerReg + innerReg + spinReg);
         }
         adjoint auto;
         controlled (ctls, ...) {
             // Only reflections are controlled for QPE.
             outerPrepareOp(outerReg);
+            H(spinReg[0]);
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[0]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
             } apply {
                 selectOp(outerReg, innerReg, spinReg, systemReg);
             }
 
             // c-Ref_B
-            Controlled ReflectAboutZero(ctls, innerReg + spinReg);
+            Controlled Reflect(ctls, innerReg + [spinReg[1]]);
 
             // U†
             Adjoint outerPrepareOp(outerReg);
+            H(spinReg[0]);
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[0]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
             } apply {
                 Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
             }
 
             // c-Ref_{a,B}
-            Controlled ReflectAboutZero(ctls, outerReg + innerReg + spinReg);
+            Controlled Reflect(ctls, outerReg + innerReg + spinReg);
         }
         controlled adjoint auto;
     }
@@ -309,7 +332,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numInnerQubits : Int,
         power : Int,
     ) : (Qubit, Qubit[]) => Unit {
-        let numSpinQubits = 1; // spinReg = [spinSF]; spin is allocated inside SelectImpl
+        let numSpinQubits = 2; // spinReg = [spinDQ, spinSF]
         (control, allQubits) => {
             let outerReg = allQubits[0..numOuterQubits - 1];
             let innerReg = allQubits[numOuterQubits..numOuterQubits + numInnerQubits - 1];
@@ -334,7 +357,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numInnerQubits : Int,
         power : Int,
     ) : Unit {
-        let numSpinQubits = 1; // spinReg = [spinSF]; spin is allocated inside SelectImpl
+        let numSpinQubits = 2; // spinReg = [spinDQ, spinSF]
         let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits;
 
         use control = Qubit();
@@ -355,22 +378,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Reflection about the zero state: 2|0⟩⟨0| - I.
-    operation ReflectAboutZero(qs : Qubit[]) : Unit is Adj + Ctl {
-        let n = Length(qs);
-        if n == 0 {
-            // No qubits: global phase (no-op).
-        } elif n == 1 {
-            Z(qs[0]);
-        } else {
-            within {
-                ApplyToEachCA(X, qs);
-            } apply {
-                Controlled Z(qs[1...], qs[0]);
-            }
-            R(PauliI, 2.0 * PI(), qs[0]);
-        }
-    }
 
     /// Select spin qubit and SWAP up/down registers (arXiv:2502.15882v1, Step 4).
     ///
@@ -471,7 +478,14 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let bRot = params.rotationBitPrecision;
         let bBits = Length(bReg);
         let angleTables = ComputeGivensAngleTables(
-            params, N, numSF, numBp1, numRotAngles, xoBits, bBits);
+            params,
+            N,
+            numSF,
+            numBp1,
+            numRotAngles,
+            xoBits,
+            bBits
+        );
 
         use phaseGradient = Qubit[bRot];
         use angleReg = Qubit[bRot];
@@ -577,9 +591,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             Controlled Z([sf_vs_dq, spin], system_reg_0);
         }
         // DQ Q1 sign flip: Z(spin) when sf_vs_dq=0 AND d_vs_q=1
-        within { X(sf_vs_dq); } apply {
-            Controlled Z([sf_vs_dq, d_vs_q], spin);
-        }
+        // within { X(sf_vs_dq); } apply {
+        //     Controlled Z([sf_vs_dq, d_vs_q], spin);
+        // }
     }
 
     /// Apply a sequence of Givens rotations to target qubits (standalone, no CNOT sandwich).
@@ -594,5 +608,164 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 CNOT(target[j], target[j + 1]);
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
+    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Generic wrapper: applies an operation to a freshly allocated register.
+    operation TestApplyOuterPrep(op : (Qubit[]) => Unit is Adj + Ctl, n : Int) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(n);
+        op(qs);
+    }
+
+    /// Wrapper: applies outer prep then inner prep on separate registers.
+    operation TestApplyOuterInnerPrep(
+        outerOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerOp : (Qubit[], Qubit[]) => Unit is Adj,
+        nOuter : Int,
+        nInner : Int,
+    ) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(nOuter + nInner);
+        let outerReg = qs[0..nOuter - 1];
+        let innerReg = qs[nOuter..nOuter + nInner - 1];
+        outerOp(outerReg);
+        innerOp(outerReg, innerReg);
+    }
+
+    /// Apply Givens rotation chain to |10...0⟩ and leave state for dump_machine.
+    operation TestGivensRotation(angles : Double[], n : Int) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(n);
+        X(qs[0]);
+        ApplyGivensSequence(angles, qs);
+    }
+
+    /// Apply Adjoint Givens rotation to a prepared state (spread excitation) to verify round-trip.
+    operation TestGivensRoundTrip(angles : Double[], n : Int) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(n);
+        X(qs[0]);
+        ApplyGivensSequence(angles, qs);
+        Adjoint ApplyGivensSequence(angles, qs);
+    }
+
+    /// Apply SelectSpins and dump state to verify SWAP logic.
+    operation TestSelectSpins(spinDQVal : Bool, spinSFVal : Bool, n : Int) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(2 * n + 4);
+        // Register layout: isSF(1) + spinDQ(1) + spinSF(1) + spin(1) + sysDown(n) + sysUp(n)
+        let isSF = qs[0];
+        let spinDQ = qs[1];
+        let spinSF = qs[2];
+        let spin = qs[3];
+        let sysDown = qs[4..4 + n - 1];
+        let sysUp = qs[4 + n..4 + 2 * n - 1];
+
+        if spinDQVal { X(spinDQ); }
+        if spinSFVal { X(spinSF); }
+        X(sysDown[0]);
+
+        SelectSpins(isSF, spinDQ, spinSF, spin, sysDown, sysUp);
+    }
+
+    /// Apply SelectSpins in SF mode.
+    operation TestSelectSpinsSF(spinSFVal : Bool, n : Int) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(2 * n + 4);
+        let isSF = qs[0];
+        let spinDQ = qs[1];
+        let spinSF = qs[2];
+        let spin = qs[3];
+        let sysDown = qs[4..4 + n - 1];
+        let sysUp = qs[4 + n..4 + 2 * n - 1];
+
+        X(isSF);
+        if spinSFVal { X(spinSF); }
+        X(sysDown[0]);
+
+        SelectSpins(isSF, spinDQ, spinSF, spin, sysDown, sysUp);
+    }
+
+    /// Test the full SELECT on an entry with known angles.
+    operation TestSelectDQ(
+        selectData : SelectParams,
+        xoValue : Int,
+    ) : Unit {
+        let N = selectData.numOrbitals;
+        let numD1 = selectData.numD1;
+        let numSF = selectData.numRanks * selectData.numCopies;
+        let Xo = N + numSF;
+        let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
+        let numBp1 = selectData.numBases + 1;
+        let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
+        let nFR = selectData.numFreeRiderBits;
+
+        let nOuter = xoBits;
+        let nInner = bBits + nFR;
+        let nSpin = 2;
+        let nSystem = 2 * N;
+        let total = nOuter + nInner + nSpin + nSystem;
+        let qs = QIR.Runtime.AllocateQubitArray(total);
+
+        let outerReg = qs[0..nOuter - 1];
+        let innerReg = qs[nOuter..nOuter + nInner - 1];
+        let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
+        let systemReg = qs[nOuter + nInner + nSpin..total - 1];
+
+        let xoReg = outerReg[0..xoBits - 1];
+        for bit in 0..xoBits - 1 {
+            if (xoValue >>> bit) &&& 1 == 1 {
+                X(xoReg[bit]);
+            }
+        }
+        H(spinReg[0]); // spinDQ
+
+        let frStart = bBits;
+        if xoValue >= N { X(innerReg[frStart]); }
+        if xoValue >= numD1 { X(innerReg[frStart + 1]); }
+
+        X(systemReg[0]);
+
+        SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
+    }
+
+    /// Test SELECT round trip: SELECT†·SELECT should be identity.
+    operation TestSelectRT(
+        selectData : SelectParams,
+        xoValue : Int,
+    ) : Unit {
+        let N = selectData.numOrbitals;
+        let numD1 = selectData.numD1;
+        let numSF = selectData.numRanks * selectData.numCopies;
+        let Xo = N + numSF;
+        let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
+        let numBp1 = selectData.numBases + 1;
+        let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
+        let nFR = selectData.numFreeRiderBits;
+
+        let nOuter = xoBits;
+        let nInner = bBits + nFR;
+        let nSpin = 2;
+        let nSystem = 2 * N;
+        let total = nOuter + nInner + nSpin + nSystem;
+        let qs = QIR.Runtime.AllocateQubitArray(total);
+
+        let outerReg = qs[0..nOuter - 1];
+        let innerReg = qs[nOuter..nOuter + nInner - 1];
+        let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
+        let systemReg = qs[nOuter + nInner + nSpin..total - 1];
+
+        let xoReg = outerReg[0..xoBits - 1];
+        for bit in 0..xoBits - 1 {
+            if (xoValue >>> bit) &&& 1 == 1 { X(xoReg[bit]); }
+        }
+
+        let frStart = bBits;
+        if xoValue >= N { X(innerReg[frStart]); }
+        if xoValue >= numD1 { X(innerReg[frStart + 1]); }
+
+        X(systemReg[0]);
+
+        SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
+        Adjoint SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
     }
 }

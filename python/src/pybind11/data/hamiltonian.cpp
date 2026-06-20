@@ -1049,60 +1049,60 @@ Args:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Factorized-specific accessors
-  factorized_container.def(
-      "get_u_matrices", &FactorizedHamiltonianContainer::get_u_matrices,
-      py::return_value_policy::reference_internal, R"(
+  factorized_container.def("get_u_matrices",
+                           &FactorizedHamiltonianContainer::get_u_matrices,
+                           py::return_value_policy::reference_internal, R"(
 Get U matrices as flat vector [R*B*N].
 
 Returns:
     numpy.ndarray: Flat array of orbital rotation matrices
 )");
 
-  factorized_container.def(
-      "get_w_matrices", &FactorizedHamiltonianContainer::get_w_matrices,
-      py::return_value_policy::reference_internal, R"(
+  factorized_container.def("get_w_matrices",
+                           &FactorizedHamiltonianContainer::get_w_matrices,
+                           py::return_value_policy::reference_internal, R"(
 Get W matrices as flat vector [R*B*C].
 
 Returns:
     numpy.ndarray: Flat array of two-body weights
 )");
 
-  factorized_container.def(
-      "get_wb_matrix", &FactorizedHamiltonianContainer::get_wb_matrix,
-      py::return_value_policy::reference_internal, R"(
+  factorized_container.def("get_wb_matrix",
+                           &FactorizedHamiltonianContainer::get_wb_matrix,
+                           py::return_value_policy::reference_internal, R"(
 Get WB identity weight matrix [R x C].
 
 Returns:
     numpy.ndarray: Identity weight matrix
 )");
 
-  factorized_container.def(
-      "get_num_orbitals", &FactorizedHamiltonianContainer::get_num_orbitals,
-      R"(
+  factorized_container.def("get_num_orbitals",
+                           &FactorizedHamiltonianContainer::get_num_orbitals,
+                           R"(
 Number of spatial orbitals (N).
 
 Returns:
     int: Number of spatial orbitals
 )");
 
-  factorized_container.def(
-      "get_num_ranks", &FactorizedHamiltonianContainer::get_num_ranks, R"(
+  factorized_container.def("get_num_ranks",
+                           &FactorizedHamiltonianContainer::get_num_ranks, R"(
 Number of ranks (R).
 
 Returns:
     int: Number of ranks in the factorization
 )");
 
-  factorized_container.def(
-      "get_num_bases", &FactorizedHamiltonianContainer::get_num_bases, R"(
+  factorized_container.def("get_num_bases",
+                           &FactorizedHamiltonianContainer::get_num_bases, R"(
 Number of bases per rank (B).
 
 Returns:
     int: Number of bases per rank
 )");
 
-  factorized_container.def(
-      "get_num_copies", &FactorizedHamiltonianContainer::get_num_copies, R"(
+  factorized_container.def("get_num_copies",
+                           &FactorizedHamiltonianContainer::get_num_copies, R"(
 Number of copies per rank (C).
 
 Returns:
@@ -1118,16 +1118,16 @@ Returns:
     float: The BLISS core energy shift value
 )");
 
-  factorized_container.def(
-      "get_energy_gap", &FactorizedHamiltonianContainer::get_energy_gap, R"(
+  factorized_container.def("get_energy_gap",
+                           &FactorizedHamiltonianContainer::get_energy_gap, R"(
 Energy gap E_gap for SOS block encoding.
 
 Returns:
     float: The energy gap value
 )");
 
-  factorized_container.def(
-      "get_lambda", &FactorizedHamiltonianContainer::get_lambda, R"(
+  factorized_container.def("get_lambda",
+                           &FactorizedHamiltonianContainer::get_lambda, R"(
 Block-encoding normalization Lambda.
 
 Lambda = sum|eig(h1_majorana)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2
@@ -1136,8 +1136,8 @@ Returns:
     float: The block-encoding normalization factor
 )");
 
-  factorized_container.def(
-      "get_lambda_eff", &FactorizedHamiltonianContainer::get_lambda_eff, R"(
+  factorized_container.def("get_lambda_eff",
+                           &FactorizedHamiltonianContainer::get_lambda_eff, R"(
 Effective lambda for SOS walk.
 
 lambda_eff = sqrt(E_gap * (2*Lambda - E_gap))
@@ -1151,8 +1151,8 @@ Raises:
     RuntimeError: If E_gap is non-positive or >= 2*Lambda
 )");
 
-  factorized_container.def(
-      "get_h1_majorana", &FactorizedHamiltonianContainer::get_h1_majorana, R"(
+  factorized_container.def("get_h1_majorana",
+                           &FactorizedHamiltonianContainer::get_h1_majorana, R"(
 Adjusted one-body matrix in Majorana basis.
 
 h'(1)_{pq} = h1_{pq} - 0.5*sum_{rs} h2_{prrs->pq} + sum_{rs} h2_{pqrr}
@@ -1182,8 +1182,8 @@ Returns:
     two-body integral vectors [N^4] (all identical for restricted).
 )");
 
-  factorized_container.def(
-      "is_restricted", &FactorizedHamiltonianContainer::is_restricted, R"(
+  factorized_container.def("is_restricted",
+                           &FactorizedHamiltonianContainer::is_restricted, R"(
 Check if Hamiltonian is restricted. Always True for factorized container.
 
 Returns:

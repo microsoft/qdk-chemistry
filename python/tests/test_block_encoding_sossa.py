@@ -84,9 +84,16 @@ def _make_random_factorized_hamiltonian(
     inactive_fock = np.zeros((n, n))
 
     return FactorizedHamiltonianContainer(
-        h1, u_matrices, w_matrices, wb_matrix,
-        r, b, c,
-        orbitals, 0.0, inactive_fock,
+        h1,
+        u_matrices,
+        w_matrices,
+        wb_matrix,
+        r,
+        b,
+        c,
+        orbitals,
+        0.0,
+        inactive_fock,
     )
 
 
@@ -108,12 +115,14 @@ def _make_h2_sossa_unitary_representation():
     outer_statevector = np.sqrt(np.abs(outer_coefficients) / l1)
 
     # Inner coefficients: [Xo=4, B+1=2]
-    inner_coefficients = np.array([
-        [1.0, 0.0],
-        [1.0, 0.0],
-        [0.6, 0.4],
-        [0.7, 0.3],
-    ])
+    inner_coefficients = np.array(
+        [
+            [1.0, 0.0],
+            [1.0, 0.0],
+            [0.6, 0.4],
+            [0.7, 0.3],
+        ]
+    )
 
     # Rotation angles
     dq_rotation_angles = np.array([[0.3], [0.5]])
@@ -217,12 +226,8 @@ class TestSOSSAContainer:
         assert restored.type == container.type
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
-        assert np.allclose(
-            restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients()
-        )
-        assert np.allclose(
-            restored.select.sf_rotation_angles, container.select.sf_rotation_angles
-        )
+        assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
+        assert np.allclose(restored.select.sf_rotation_angles, container.select.sf_rotation_angles)
 
     def test_unitary_representation_json_dispatch(self):
         """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
@@ -359,8 +364,10 @@ class TestSOSSABuilder:
     def test_run_parametrized(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Test builder.run() for various (N, R, B, C) configurations."""
         fh = _make_random_factorized_hamiltonian(
-            num_orbitals=num_orbitals, num_ranks=num_ranks,
-            num_bases=num_bases, num_copies=num_copies,
+            num_orbitals=num_orbitals,
+            num_ranks=num_ranks,
+            num_bases=num_bases,
+            num_copies=num_copies,
         )
         builder = SOSSABuilder()
         result = builder.run(fh)
@@ -399,10 +406,7 @@ class TestOuterPrepareQSharp:
 
         sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
         qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-        qsharp.eval(
-            f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str});"
-            f" op(qs);"
-        )
+        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -422,10 +426,7 @@ class TestOuterPrepareQSharp:
 
         sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
         qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-        qsharp.eval(
-            f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str});"
-            f" op(qs);"
-        )
+        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -457,10 +458,7 @@ class TestInnerPrepareQSharp:
         # Test x_o=0: inner should be proportional to [0.8, 0.6]
         qsharp.eval(f"use outer = Qubit[{n_outer}];")
         qsharp.eval(f"use inner = Qubit[{n_inner}];")
-        qsharp.eval(
-            f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str});"
-            f" op(outer, inner);"
-        )
+        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}); op(outer, inner);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -494,9 +492,7 @@ class TestSelectQSharp:
         """Test ApplyGivensSequence with a single angle applies Ry(2θ)."""
         theta = 0.3
         qsharp.eval("use q = Qubit[1];")
-        qsharp.eval(
-            f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta:.16f}], q);"
-        )
+        qsharp.eval(f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta:.16f}], q);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -513,10 +509,7 @@ class TestSelectQSharp:
         """Test ApplyGivensSequence with two angles on 2 qubits."""
         theta0, theta1 = 0.3, 0.5
         qsharp.eval("use q = Qubit[2];")
-        qsharp.eval(
-            f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence("
-            f"[{theta0:.16f}, {theta1:.16f}], q);"
-        )
+        qsharp.eval(f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta0:.16f}, {theta1:.16f}], q);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -524,12 +517,14 @@ class TestSelectQSharp:
         # q[0]: cos(θ₀)|0⟩ + sin(θ₀)|1⟩
         # q[1]: cos(θ₁)|0⟩ + sin(θ₁)|1⟩
         # State: cos(θ₀)cos(θ₁)|00⟩ + cos(θ₀)sin(θ₁)|01⟩ + sin(θ₀)cos(θ₁)|10⟩ + sin(θ₀)sin(θ₁)|11⟩
-        expected = np.array([
-            np.cos(theta0) * np.cos(theta1),
-            np.cos(theta0) * np.sin(theta1),
-            np.sin(theta0) * np.cos(theta1),
-            np.sin(theta0) * np.sin(theta1),
-        ])
+        expected = np.array(
+            [
+                np.cos(theta0) * np.cos(theta1),
+                np.cos(theta0) * np.sin(theta1),
+                np.sin(theta0) * np.cos(theta1),
+                np.sin(theta0) * np.sin(theta1),
+            ]
+        )
         assert np.allclose(
             np.abs(amplitudes),
             np.abs(expected),

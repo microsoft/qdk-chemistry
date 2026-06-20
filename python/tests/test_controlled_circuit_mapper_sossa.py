@@ -28,31 +28,6 @@ from .test_helpers import create_test_orbitals
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
 
-# Generic wrapper that applies any (Qubit[]) => Unit is Adj + Ctl op.
-# Uses QIR.Runtime.AllocateQubitArray so qubits persist for dump_machine.
-_APPLY_OP_QS = """
-operation TestApplyOuterPrep(op : (Qubit[]) => Unit is Adj + Ctl, n : Int) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(n);
-    op(qs);
-}
-"""
-
-# Wrapper that applies outer prep then inner prep on separate registers.
-_APPLY_OUTER_INNER_QS = """
-operation TestApplyOuterInnerPrep(
-    outerOp : (Qubit[]) => Unit is Adj + Ctl,
-    innerOp : (Qubit[], Qubit[]) => Unit is Adj,
-    nOuter : Int,
-    nInner : Int
-) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(nOuter + nInner);
-    let outerReg = qs[0..nOuter - 1];
-    let innerReg = qs[nOuter..nOuter + nInner - 1];
-    outerOp(outerReg);
-    innerOp(outerReg, innerReg);
-}
-"""
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -87,9 +62,16 @@ def _make_random_factorized_hamiltonian(
     inactive_fock = np.zeros((n, n))
 
     return FactorizedHamiltonianContainer(
-        h1, u_matrices, w_matrices, wb_matrix,
-        r, b, c,
-        orbitals, 0.0, inactive_fock,
+        h1,
+        u_matrices,
+        w_matrices,
+        wb_matrix,
+        r,
+        b,
+        c,
+        orbitals,
+        0.0,
+        inactive_fock,
     )
 
 
@@ -155,7 +137,6 @@ class TestOuterPrepareMapper:
 
         # Fresh session to avoid leftover qubits from prior tests
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_APPLY_OP_QS)
 
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.unitary.get_container()
@@ -165,7 +146,7 @@ class TestOuterPrepareMapper:
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
-        qdk.code.TestApplyOuterPrep(op, num_qubits)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
         state = qsharp.dump_machine()
         actual_sv = np.array(state.as_dense_state())
 
@@ -176,7 +157,7 @@ class TestOuterPrepareMapper:
         for j, amp in enumerate(coefficients):
             if j < n_states:
                 if algorithm == "dense_pure":
-                    rev_j = int(f'{j:0{num_qubits}b}'[::-1], 2)
+                    rev_j = int(f"{j:0{num_qubits}b}"[::-1], 2)
                     expected[rev_j] = amp
                 else:
                     expected[j] = amp
@@ -195,7 +176,6 @@ class TestOuterPrepareMapper:
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_APPLY_OP_QS)
 
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.unitary.get_container()
@@ -207,7 +187,7 @@ class TestOuterPrepareMapper:
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
         total_qubits = 2 * num_index_qubits + 2 * bit_precision + 1
 
-        qdk.code.TestApplyOuterPrep(op, total_qubits)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
         state = qsharp.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
@@ -217,14 +197,15 @@ class TestOuterPrepareMapper:
         probs = np.zeros(n_index)
         for i in range(len(full_sv)):
             be_idx = (i >> shift) & (n_index - 1)
-            index_val = int('{:0{w}b}'.format(be_idx, w=num_index_qubits)[::-1], 2)
+            index_val = int("{:0{w}b}".format(be_idx, w=num_index_qubits)[::-1], 2)
             probs[index_val] += abs(full_sv[i]) ** 2
 
         abs_coeffs = np.abs(coefficients)
         expected_probs = abs_coeffs / np.sum(abs_coeffs)
 
         atol = 2.0 / (2**bit_precision)
-        np.testing.assert_allclose(probs[:len(coefficients)], expected_probs, atol=atol)
+        np.testing.assert_allclose(probs[: len(coefficients)], expected_probs, atol=atol)
+
 
 class TestInnerPrepareMapper:
     """Tests for the InnerPrepareMapper dataclass."""
@@ -249,13 +230,9 @@ class TestInnerPrepareMapper:
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_APPLY_OP_QS)
-        qsharp.eval(_APPLY_OUTER_INNER_QS)
 
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
-        controlled_unitary = _build_controlled_unitary(
-            num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1
-        )
+        controlled_unitary = _build_controlled_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = controlled_unitary.unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
@@ -264,9 +241,7 @@ class TestInnerPrepareMapper:
 
         # Build inner prep
         bit_precision = 6
-        inner_mapper = InnerPrepareMapper(
-            algorithm=algorithm, coefficient_bit_precision=bit_precision
-        )
+        inner_mapper = InnerPrepareMapper(algorithm=algorithm, coefficient_bit_precision=bit_precision)
         inner_op = inner_mapper.build_op(container)
 
         # Compute register sizes
@@ -285,7 +260,9 @@ class TestInnerPrepareMapper:
             num_inner_qubits = n_index_bits
 
         # Apply outer + inner prep
-        qdk.code.TestApplyOuterInnerPrep(outer_op, inner_op, num_outer_qubits, num_inner_qubits)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
+            outer_op, inner_op, num_outer_qubits, num_inner_qubits
+        )
         state = qsharp.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
@@ -303,12 +280,12 @@ class TestInnerPrepareMapper:
                 amp = full_sv[i]
                 if abs(amp) < 1e-15:
                     continue
-                bits = format(i, f'0{total_qubits}b')
+                bits = format(i, f"0{total_qubits}b")
                 outer_be = bits[:num_outer_qubits]
                 outer_val = int(outer_be[::-1], 2)  # LE
                 if outer_val != ell:
                     continue
-                inner_be = bits[num_outer_qubits:num_outer_qubits + n_index_bits]
+                inner_be = bits[num_outer_qubits : num_outer_qubits + n_index_bits]
                 # Alias sampling uses LE encoding; PreparePureStateD (direct) uses BE
                 if algorithm == "direct":
                     inner_val = int(inner_be, 2)
@@ -328,8 +305,8 @@ class TestInnerPrepareMapper:
 
             atol = 2.0 / (2**bit_precision) if algorithm == "controlled_alias_sampling" else 1e-3
             np.testing.assert_allclose(
-                probs[:n_coeffs], expected_probs, atol=atol,
-                err_msg=f"outer={ell}, algorithm={algorithm}")
+                probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
+            )
 
 
 class TestSelectMapper:
@@ -416,9 +393,7 @@ class TestSOSSAMapper:
     def test_rejects_multiple_control_qubits(self):
         """Verify SOSSAMapper raises ValueError for multiple control qubits."""
         controlled_unitary = _build_controlled_unitary()
-        controlled_unitary = ControlledUnitary(
-            unitary=controlled_unitary.unitary, control_indices=[0, 1]
-        )
+        controlled_unitary = ControlledUnitary(unitary=controlled_unitary.unitary, control_indices=[0, 1])
 
         mapper = SOSSAMapper()
         with pytest.raises(ValueError, match="single control qubit"):
@@ -441,9 +416,7 @@ class TestSOSSAMapper:
             "dense_alias_phase",
         ],
     )
-    def test_all_algorithm_combinations_produce_circuit(
-        self, outer_alg, inner_alg, select_alg
-    ):
+    def test_all_algorithm_combinations_produce_circuit(self, outer_alg, inner_alg, select_alg):
         """Test that all valid algorithm combinations produce a Circuit."""
         controlled_unitary = _build_controlled_unitary()
         mapper = SOSSAMapper(
@@ -466,9 +439,7 @@ class TestSOSSAMapper:
         ],
         ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1"],
     )
-    def test_mapping_parametrized_dimensions(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_mapping_parametrized_dimensions(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Test mapping for various (N, R, B, C) configurations."""
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,
@@ -495,10 +466,17 @@ class TestSOSSAMapper:
 
         # Verify expected keys in walk_params
         expected_keys = {
-            "outerPrepareOp", "innerPrepareOp", "selectOp",
-            "numSystemQubits", "numOuterQubits", "numInnerQubits",
-            "power", "outerReflectionIncludesKeep", "innerReflectionIncludesKeep",
-            "needsPhaseGradient", "phaseGradientBits",
+            "outerPrepareOp",
+            "innerPrepareOp",
+            "selectOp",
+            "numSystemQubits",
+            "numOuterQubits",
+            "numInnerQubits",
+            "power",
+            "outerReflectionIncludesKeep",
+            "innerReflectionIncludesKeep",
+            "needsPhaseGradient",
+            "phaseGradientBits",
         }
         assert expected_keys == set(factory.parameter.keys())
 
@@ -565,170 +543,6 @@ class TestSOSSAMapper:
 # SELECT fidelity tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Q# helpers for SELECT fidelity tests
-_GIVENS_TEST_QS = """
-import QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence;
-import QDKChemistry.Utils.SOSSAWalk.SelectSpins;
-import QDKChemistry.Utils.SOSSAWalk.MajoranaOp;
-import QDKChemistry.Utils.SOSSAWalk.ApplyConditionalGivensRotations;
-import QDKChemistry.Utils.SOSSAWalk.SelectImpl;
-import Std.Canon.ApplyControlledOnInt;
-import Std.Canon.ApplyToEachCA;
-import Std.Math.Ceiling;
-import Std.Math.Lg;
-import Std.Convert.IntAsDouble;
-
-/// Apply Givens rotation chain to |10...0⟩ and leave state for dump_machine.
-operation TestGivensRotation(angles : Double[], n : Int) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(n);
-    // Prepare single excitation on qubit 0: |10...0⟩
-    X(qs[0]);
-    // Apply Givens chain
-    ApplyGivensSequence(angles, qs);
-}
-
-/// Apply Adjoint Givens rotation to a prepared state (spread excitation) to verify round-trip.
-operation TestGivensRoundTrip(angles : Double[], n : Int) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(n);
-    X(qs[0]);
-    ApplyGivensSequence(angles, qs);
-    Adjoint ApplyGivensSequence(angles, qs);
-}
-
-/// Apply SelectSpins and dump state to verify SWAP logic.
-operation TestSelectSpins(spinDQVal : Bool, spinSFVal : Bool, n : Int) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(2 * n + 4);
-    // Register layout: isSF(1) + spinDQ(1) + spinSF(1) + spin(1) + sysDown(n) + sysUp(n)
-    let isSF = qs[0];
-    let spinDQ = qs[1];
-    let spinSF = qs[2];
-    let spin = qs[3];
-    let sysDown = qs[4..4 + n - 1];
-    let sysUp = qs[4 + n..4 + 2 * n - 1];
-
-    // Prepare: set spinDQ, prepare down register with content
-    if spinDQVal { X(spinDQ); }
-    if spinSFVal { X(spinSF); }
-    X(sysDown[0]);  // mark down[0] = 1
-
-    // Apply SelectSpins (DQ mode: isSF=0)
-    SelectSpins(isSF, spinDQ, spinSF, spin, sysDown, sysUp);
-}
-
-/// Apply SelectSpins in SF mode.
-operation TestSelectSpinsSF(spinSFVal : Bool, n : Int) : Unit {
-    let qs = QIR.Runtime.AllocateQubitArray(2 * n + 4);
-    let isSF = qs[0];
-    let spinDQ = qs[1];
-    let spinSF = qs[2];
-    let spin = qs[3];
-    let sysDown = qs[4..4 + n - 1];
-    let sysUp = qs[4 + n..4 + 2 * n - 1];
-
-    X(isSF);  // SF mode
-    if spinSFVal { X(spinSF); }
-    X(sysDown[0]);  // mark down[0] = 1
-
-    SelectSpins(isSF, spinDQ, spinSF, spin, sysDown, sysUp);
-}
-
-/// Test the full SELECT on an entry with known angles.
-/// Prepares |xo⟩ on outerReg, sets free-rider data (isSF, dvsq) in innerReg,
-/// prepares |10...0⟩ on sysDown, then applies SelectImpl.
-operation TestSelectDQ(
-    selectData : QDKChemistry.Utils.SOSSAWalk.SelectParams,
-    xoValue : Int
-) : Unit {
-    let N = selectData.numOrbitals;
-    let numD1 = selectData.numD1;
-    let numSF = selectData.numRanks * selectData.numCopies;
-    let Xo = N + numSF;
-    let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
-    let numBp1 = selectData.numBases + 1;
-    let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
-    let nFR = selectData.numFreeRiderBits;
-
-    // Allocate: outerReg(xoBits+1) + innerReg(bBits+nFR) + spinReg(1) + systemReg(2N)
-    let nOuter = xoBits + 1;
-    let nInner = bBits + nFR;
-    let nSpin = 1;
-    let nSystem = 2 * N;
-    let total = nOuter + nInner + nSpin + nSystem;
-    let qs = QIR.Runtime.AllocateQubitArray(total);
-
-    let outerReg = qs[0..nOuter - 1];
-    let innerReg = qs[nOuter..nOuter + nInner - 1];
-    let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
-    let systemReg = qs[nOuter + nInner + nSpin..total - 1];
-
-    // Prepare xo value in outerReg (little-endian)
-    let xoReg = outerReg[0..xoBits - 1];
-    for bit in 0..xoBits - 1 {
-        if (xoValue >>> bit) &&& 1 == 1 {
-            X(xoReg[bit]);
-        }
-    }
-    // H on spinDQ (outerReg[xoBits])
-    H(outerReg[xoBits]);
-
-    // Set free-rider data in innerReg: [isSF, dvsq] at end
-    // D1 (xo < numD1): isSF=0, dvsq=0
-    // Q1 (numD1 <= xo < N): isSF=0, dvsq=1
-    // SF (xo >= N): isSF=1, dvsq=1
-    let frStart = bBits;
-    if xoValue >= N { X(innerReg[frStart]); }        // isSF
-    if xoValue >= numD1 { X(innerReg[frStart + 1]); } // dvsq
-
-    // Prepare system: single excitation on sysDown[0]
-    X(systemReg[0]);
-
-    // Apply SELECT (direct rotation mode for simulation testing)
-    SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
-}
-
-/// Test SELECT round trip: SELECT†·SELECT should be identity.
-operation TestSelectRT(
-    selectData : QDKChemistry.Utils.SOSSAWalk.SelectParams,
-    xoValue : Int
-) : Unit {
-    let N = selectData.numOrbitals;
-    let numD1 = selectData.numD1;
-    let numSF = selectData.numRanks * selectData.numCopies;
-    let Xo = N + numSF;
-    let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
-    let numBp1 = selectData.numBases + 1;
-    let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
-    let nFR = selectData.numFreeRiderBits;
-
-    let nOuter = xoBits + 1;
-    let nInner = bBits + nFR;
-    let nSpin = 1;
-    let nSystem = 2 * N;
-    let total = nOuter + nInner + nSpin + nSystem;
-    let qs = QIR.Runtime.AllocateQubitArray(total);
-
-    let outerReg = qs[0..nOuter - 1];
-    let innerReg = qs[nOuter..nOuter + nInner - 1];
-    let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
-    let systemReg = qs[nOuter + nInner + nSpin..total - 1];
-
-    let xoReg = outerReg[0..xoBits - 1];
-    for bit in 0..xoBits - 1 {
-        if (xoValue >>> bit) &&& 1 == 1 { X(xoReg[bit]); }
-    }
-
-    // Set free-rider data: [isSF, dvsq] at end of innerReg
-    let frStart = bBits;
-    if xoValue >= N { X(innerReg[frStart]); }
-    if xoValue >= numD1 { X(innerReg[frStart + 1]); }
-
-    X(systemReg[0]);
-
-    SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
-    Adjoint SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg);
-}
-"""
-
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
     """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
@@ -761,7 +575,6 @@ class TestSelectGivensFidelity:
 
         N = 2
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         rng = np.random.default_rng(42)
         vec = rng.standard_normal(N)
@@ -769,16 +582,14 @@ class TestSelectGivensFidelity:
 
         angles = _vector_to_givens_angles(vec)
 
-        qdk.code.TestGivensRotation(angles, N)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
         # Big-endian: qs[j] occupied → sv[1 << (N-1-j)]
         for j in range(N):
             idx = 1 << (N - 1 - j)
-            assert abs(sv[idx] - vec[j]) < 1e-10, (
-                f"Mismatch at qubit {j}: expected {vec[j]:.6f}, got {sv[idx]}"
-            )
+            assert abs(sv[idx] - vec[j]) < 1e-10, f"Mismatch at qubit {j}: expected {vec[j]:.6f}, got {sv[idx]}"
 
         # All other amplitudes should be zero (no leakage for N=2)
         single_excitation_indices = {1 << (N - 1 - j) for j in range(N)}
@@ -792,7 +603,6 @@ class TestSelectGivensFidelity:
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         rng = np.random.default_rng(123 + N)
         vec = rng.standard_normal(N)
@@ -800,15 +610,13 @@ class TestSelectGivensFidelity:
 
         angles = _vector_to_givens_angles(vec)
 
-        qdk.code.TestGivensRoundTrip(angles, N)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRoundTrip(angles, N)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
         # Initial state X(qs[0]) → sv[2^(N-1)] (big-endian: qs[0] = MSB)
         initial_idx = 1 << (N - 1)
-        assert abs(sv[initial_idx]) > 1 - 1e-10, (
-            f"Round trip failed: sv[{initial_idx}] = {sv[initial_idx]}"
-        )
+        assert abs(sv[initial_idx]) > 1 - 1e-10, f"Round trip failed: sv[{initial_idx}] = {sv[initial_idx]}"
         for i in range(2**N):
             if i != initial_idx:
                 assert abs(sv[i]) < 1e-10, f"Non-zero at {i}: {sv[i]}"
@@ -829,11 +637,10 @@ class TestSelectGivensFidelity:
 
         N = len(vec)
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         angles = _vector_to_givens_angles(vec)
 
-        qdk.code.TestGivensRotation(angles, N)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -842,8 +649,7 @@ class TestSelectGivensFidelity:
             idx = 1 << (N - 1 - j)
             actual_amp = sv[idx]
             assert abs(actual_amp - vec[j]) < 1e-10, (
-                f"Vector {vec_desc}: mismatch at qubit {j}: "
-                f"expected {vec[j]}, got {actual_amp}"
+                f"Vector {vec_desc}: mismatch at qubit {j}: expected {vec[j]}, got {actual_amp}"
             )
 
     @pytest.mark.parametrize(
@@ -865,11 +671,10 @@ class TestSelectGivensFidelity:
 
         N = len(vec)
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         angles = _vector_to_givens_angles(vec)
 
-        qdk.code.TestGivensRotation(angles, N)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -900,9 +705,8 @@ class TestSelectSpinsFidelity:
         N = 2
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
-        qdk.code.TestSelectSpins(False, False, N)  # spinDQ=0, spinSF=0
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpins(False, False, N)  # spinDQ=0, spinSF=0
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -920,17 +724,16 @@ class TestSelectSpinsFidelity:
         N = 2
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
-        qdk.code.TestSelectSpins(True, False, N)  # spinDQ=1, spinSF=0
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpins(True, False, N)  # spinDQ=1, spinSF=0
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
         # Initial: spinDQ=1 (pos 1), sysDown[0]=1 (pos 4)
         # After SelectSpins: spin=1 (via CCNOT), SWAP moves sysDown[0]→sysUp[0]
         # Expected: spinDQ=1 (pos 1), spin=1 (pos 3), sysUp[0]=1 (pos 4+N=6)
-        spinDQ_bit = self._bit_of(1, total)    # bit 6
-        spin_bit = self._bit_of(3, total)      # bit 4
+        spinDQ_bit = self._bit_of(1, total)  # bit 6
+        spin_bit = self._bit_of(3, total)  # bit 4
         sysUp0_bit = self._bit_of(4 + N, total)  # bit 1
         expected_idx = (1 << spinDQ_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
         assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
@@ -944,18 +747,17 @@ class TestSelectSpinsFidelity:
         N = 2
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
-        qdk.code.TestSelectSpinsSF(True, N)  # spinSF=1
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpinsSF(True, N)  # spinSF=1
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
         # Initial: isSF=1 (pos 0), spinSF=1 (pos 2), sysDown[0]=1 (pos 4)
         # After SelectSpins: spin=1 (via CCNOT on isSF,spinSF), SWAP
         # Expected: isSF=1 (pos 0), spinSF=1 (pos 2), spin=1 (pos 3), sysUp[0]=1 (pos 4+N=6)
-        isSF_bit = self._bit_of(0, total)      # bit 7
-        spinSF_bit = self._bit_of(2, total)    # bit 5
-        spin_bit = self._bit_of(3, total)      # bit 4
+        isSF_bit = self._bit_of(0, total)  # bit 7
+        spinSF_bit = self._bit_of(2, total)  # bit 5
+        spin_bit = self._bit_of(3, total)  # bit 4
         sysUp0_bit = self._bit_of(4 + N, total)  # bit 1
         expected_idx = (1 << isSF_bit) | (1 << spinSF_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
         assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
@@ -976,7 +778,6 @@ class TestSelectFullFidelity:
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         rng = np.random.default_rng(42 + N)
         dq_angles = []
@@ -1000,10 +801,10 @@ class TestSelectFullFidelity:
             "dqRotationAngles": dq_angles,
             "sfRotationAngles": sf_angles,
             "rotationBitPrecision": 10,
-            "numFreeRiderBits": 2,  # isSF + dvsq (R=1, no rank bits)
+            "numFreeRiderBits": 2,
         }
 
-        qdk.code.TestSelectRT(select_data, 0)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectRT(select_data, 0)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -1023,7 +824,6 @@ class TestSelectFullFidelity:
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-        qsharp.eval(_GIVENS_TEST_QS)
 
         rng = np.random.default_rng(42 + N)
         dq_angles = []
@@ -1047,10 +847,10 @@ class TestSelectFullFidelity:
             "dqRotationAngles": dq_angles,
             "sfRotationAngles": sf_angles,
             "rotationBitPrecision": 10,
-            "numFreeRiderBits": 2,  # isSF + dvsq (R=1, no rank bits)
+            "numFreeRiderBits": 2,
         }
 
-        qdk.code.TestSelectDQ(select_data, 0)
+        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -1091,9 +891,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
-    def test_qubit_count_matches_formula(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify numQubits = 2N + n_Xo + n_B' + 2(spin) + 1(control) + O(ancilla).
 
         The persistent registers are:
@@ -1141,14 +939,12 @@ class TestSOSSAWalkLogicalCounts:
         select_ancilla = 3
 
         assert actual_qubits >= min_qubits + select_ancilla, (
-            f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} < "
-            f"min={min_qubits}+select_anc={select_ancilla}"
+            f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} < min={min_qubits}+select_anc={select_ancilla}"
         )
         # Upper bound: ancilla should be bounded by O(n_xo + n_b + N)
         max_overhead = n_xo + n_b + N + 10  # generous bound for MCX decomp
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
-            f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > "
-            f"max={min_qubits + select_ancilla + max_overhead}"
+            f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
 
     @pytest.mark.parametrize(
@@ -1160,9 +956,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
-    def test_toffoli_scaling_with_problem_size(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_toffoli_scaling_with_problem_size(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify Toffoli count scales as O(Xo * (N-1) * (Xo + R*(B+1))) for direct SELECT.
 
         For the direct rotation implementation (ApplyControlledOnInt + Ry),
@@ -1210,9 +1004,7 @@ class TestSOSSAWalkLogicalCounts:
 
         # Toffoli should be at least proportional to dominant term
         # (each multi-controlled gate costs >=1 Toffoli for non-trivial control)
-        assert tof >= dominant_term, (
-            f"N={N},R={R},B={B},C={C}: tof={tof} < dominant={dominant_term}"
-        )
+        assert tof >= dominant_term, f"N={N},R={R},B={B},C={C}: tof={tof} < dominant={dominant_term}"
         # Upper bound: each controlled gate costs at most O(control_bits) Toffolis
         Xo = N + num_sf
         xo_bits = math.ceil(math.log2(Xo)) if Xo > 1 else 1
@@ -1220,9 +1012,7 @@ class TestSOSSAWalkLogicalCounts:
         max_ctrl_cost = xo_bits + b_bits + 5  # MCX decomposition overhead
         # Include reflections and state prep overhead (generous 10x bound)
         max_tof = 10 * dominant_term * max_ctrl_cost
-        assert tof <= max_tof, (
-            f"N={N},R={R},B={B},C={C}: tof={tof} > max={max_tof}"
-        )
+        assert tof <= max_tof, f"N={N},R={R},B={B},C={C}: tof={tof} > max={max_tof}"
 
     def test_power_multiplies_toffoli_linearly(self):
         """Verify that power=p multiplies the walk step Toffoli cost by p.
@@ -1235,9 +1025,7 @@ class TestSOSSAWalkLogicalCounts:
         qsharp.init(project_root=_PROJECT_ROOT)
 
         N, R, B, C = 2, 1, 1, 1
-        fh = _make_random_factorized_hamiltonian(
-            num_orbitals=N, num_ranks=R, num_bases=B, num_copies=C, seed=42
-        )
+        fh = _make_random_factorized_hamiltonian(num_orbitals=N, num_ranks=R, num_bases=B, num_copies=C, seed=42)
 
         mapper = SOSSAMapper(
             outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
@@ -1264,9 +1052,7 @@ class TestSOSSAWalkLogicalCounts:
         tof_1 = lc1["cczCount"]
         tof_3 = lc3["cczCount"]
 
-        assert tof_3 == 3 * tof_1, (
-            f"power=3 Toffoli={tof_3} != 3 * power=1 Toffoli={tof_1}"
-        )
+        assert tof_3 == 3 * tof_1, f"power=3 Toffoli={tof_3} != 3 * power=1 Toffoli={tof_1}"
         # Qubit count should be the same (registers reused)
         assert lc3["numQubits"] == lc1["numQubits"], (
             f"power=3 qubits={lc3['numQubits']} != power=1 qubits={lc1['numQubits']}"
@@ -1280,9 +1066,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N3R2B2C1"],
     )
-    def test_majorana_op_contributes_14_toffoli_per_walk(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_majorana_op_contributes_14_toffoli_per_walk(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify MajoranaOp contributes exactly 2*7 = 14 Toffoli per walk step.
 
         The MajoranaOp (arXiv:2502.15882v1, Appendix B.6, Fig. 4) uses 7 CCZ
@@ -1320,9 +1104,7 @@ class TestSOSSAWalkLogicalCounts:
         # MajoranaOp has exactly 7 CCZ (3 Controlled-Z decompose to Toffoli)
         # Called 2x per walk step (once in U, once in U-adj)
         majorana_min_tof = 2 * 7
-        assert lc["cczCount"] >= majorana_min_tof, (
-            f"Total tof={lc['cczCount']} < majorana_min={majorana_min_tof}"
-        )
+        assert lc["cczCount"] >= majorana_min_tof, f"Total tof={lc['cczCount']} < majorana_min={majorana_min_tof}"
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -1333,9 +1115,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R2B1C1", "N3R2B2C1", "N4R3B2C2"],
     )
-    def test_spin_copy_contributes_2n_toffoli(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_spin_copy_contributes_2n_toffoli(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify SelectSpins contributes at least 2*N Toffoli per walk step.
 
         SelectSpins (arXiv:2502.15882v1, Step 4) applies N controlled-SWAP
@@ -1366,9 +1146,7 @@ class TestSOSSAWalkLogicalCounts:
         # SpinCopy: N Fredkin gates (each = 1 Toffoli), called 2x
         N = num_orbitals
         spin_copy_tof = 2 * N
-        assert lc["cczCount"] >= spin_copy_tof, (
-            f"N={N}: total tof={lc['cczCount']} < spin_copy_min={spin_copy_tof}"
-        )
+        assert lc["cczCount"] >= spin_copy_tof, f"N={N}: total tof={lc['cczCount']} < spin_copy_min={spin_copy_tof}"
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -1379,9 +1157,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N3R2B1C1", "N4R2B2C2"],
     )
-    def test_reflection_qubit_count(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_reflection_qubit_count(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify reflections act on the correct number of qubits.
 
         The walk step has two reflections (Eq. 77):
@@ -1426,6 +1202,5 @@ class TestSOSSAWalkLogicalCounts:
         # MCZ on n qubits (controlled by 1 QPE qubit) -> n-1 Toffoli
         min_ref_tof = max(0, outer_ref_qubits - 1) + max(0, inner_ref_qubits - 1)
         assert lc["cczCount"] >= min_ref_tof, (
-            f"N={N},R={R},B={B},C={C}: tof={lc['cczCount']} < "
-            f"min_reflection_tof={min_ref_tof}"
+            f"N={N},R={R},B={B},C={C}: tof={lc['cczCount']} < min_reflection_tof={min_ref_tof}"
         )

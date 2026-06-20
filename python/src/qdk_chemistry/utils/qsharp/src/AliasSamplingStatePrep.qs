@@ -147,11 +147,9 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Build QROM data table: (keep_ℓ, alt_ℓ) for each index
         let selectData = MappedOverRange(
             idx -> if idx < nCoeffs {
-                IntAsBoolArray(keepCoeff[idx], mu)
-                    + IntAsBoolArray(altIndex[idx], nIndexQubits)
+                IntAsBoolArray(keepCoeff[idx], mu) + IntAsBoolArray(altIndex[idx], nIndexQubits)
             } else {
-                IntAsBoolArray(barHeight, mu)
-                    + IntAsBoolArray(idx, nIndexQubits)
+                IntAsBoolArray(barHeight, mu) + IntAsBoolArray(idx, nIndexQubits)
             },
             0..nPadded - 1
         );
@@ -239,17 +237,11 @@ namespace QDKChemistry.Utils.AliasSampling {
                     let signBit = coefficients[c][b] < 0.0;
                     let signAltBit = coefficients[c][altIndex[b]] < 0.0;
                     set innerData += [
-                        IntAsBoolArray(keepCoeff[b], bitsPrecision)
-                        + IntAsBoolArray(altIndex[b], nIndexBits)
-                        + [signBit, signAltBit]
-                        + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
+                        IntAsBoolArray(keepCoeff[b], bitsPrecision) + IntAsBoolArray(altIndex[b], nIndexBits) + [signBit, signAltBit] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
                     ];
                 } else {
                     set innerData += [
-                        IntAsBoolArray(barHeight, bitsPrecision)
-                        + IntAsBoolArray(b, nIndexBits)
-                        + [false, false]
-                        + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
+                        IntAsBoolArray(barHeight, bitsPrecision) + IntAsBoolArray(b, nIndexBits) + [false, false] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
                     ];
                 }
             }
@@ -281,9 +273,17 @@ namespace QDKChemistry.Utils.AliasSampling {
         numSwapBits : Int
     ) : Unit is Adj {
         ConditionalAliasSamplingPrepareWithFreeRider(
-            coefficients, [], bitsPrecision,
-            conditionalRegister, indexRegister, uniformRegister,
-            flagQubit, qromOutput, [], numSwapBits);
+            coefficients,
+            [],
+            bitsPrecision,
+            conditionalRegister,
+            indexRegister,
+            uniformRegister,
+            flagQubit,
+            qromOutput,
+            [],
+            numSwapBits
+        );
     }
 
     /// Conditional alias sampling PREPARE with free-rider data — prepares
@@ -318,7 +318,10 @@ namespace QDKChemistry.Utils.AliasSampling {
 
         // Build 3D table for Select2D: shape [nCond][2^nIdx][dataBits]
         let table3D = BuildConditionalAliasTable3D(
-            coefficients, freeRiderData, bitsPrecision, nIndexBits
+            coefficients,
+            freeRiderData,
+            bitsPrecision,
+            nIndexBits
         );
 
         PrepareUniformSuperposition(nCoeffs, indexRegister);
@@ -357,21 +360,42 @@ namespace QDKChemistry.Utils.AliasSampling {
         Z(signOrigQubit);
     }
 
-    /// Test wrapper for conditional alias sampling correctness.
-    /// Returns true if the marginal probabilities match the expected distribution.
-    operation TestConditionalAliasSampling(
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
+    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Test wrapper: run alias sampling and leave state for dump_machine.
+    operation RunAliasSamplingPrep(
+        coefficients : Double[],
+        bitsPrecision : Int,
+        numIndexQubits : Int,
+        numQubits : Int,
+    ) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(numQubits);
+        let params = new AliasSamplingParams {
+            coefficients = coefficients,
+            bitsPrecision = bitsPrecision,
+            numIndexQubits = numIndexQubits,
+            numQubits = numQubits,
+        };
+        AliasSamplingPrepare(params, qs);
+    }
+
+    /// Test wrapper: run conditional alias sampling and leave state for dump_machine.
+    operation RunConditionalAliasSamplingPrep(
         coefficients : Double[][],
-        bitsPrecision : Int
+        bitsPrecision : Int,
+        conditionValue : Int,
     ) : Unit {
         let nCond = Length(coefficients);
         let nCoeffs = Length(coefficients[0]);
         let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-        // qromOutput = μ + nIdx + 2 (sign bits)
-        let nQromOutput = bitsPrecision + nIndexBits + 2;
         let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+        let nQromOutput = bitsPrecision + nIndexBits + 2;
+        let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput;
 
-        let qs = QIR.Runtime.AllocateQubitArray(
-            nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput);
+        let qs = QIR.Runtime.AllocateQubitArray(totalQubits);
 
         let conditionalReg = qs[0..nCondBits - 1];
         let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
@@ -379,28 +403,37 @@ namespace QDKChemistry.Utils.AliasSampling {
         let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
         let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
 
-        // Set conditional register to a specific value
-        // (test from Python will vary the condition)
+        // Set conditional register to |conditionValue⟩
+        ApplyXorInPlace(conditionValue, conditionalReg);
+
         ConditionalAliasSamplingPrepare(
-            coefficients, bitsPrecision,
-            conditionalReg, indexReg, uniformReg, flagQubit, qromOut, 0);
+            coefficients,
+            bitsPrecision,
+            conditionalReg,
+            indexReg,
+            uniformReg,
+            flagQubit,
+            qromOut,
+            0
+        );
     }
 
-    /// Test wrapper for conditional alias sampling with free-rider data.
-    operation TestConditionalAliasSamplingWithFreeRider(
+    /// Test wrapper: run conditional alias sampling with free-rider data.
+    operation RunConditionalAliasSamplingPrepWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
-        bitsPrecision : Int
+        bitsPrecision : Int,
+        conditionValue : Int,
     ) : Unit {
         let nCond = Length(coefficients);
         let nCoeffs = Length(coefficients[0]);
         let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
+        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
         let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let nQromOutput = bitsPrecision + nIndexBits + 2;
-        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+        let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput + nFreeRiderBits;
 
-        let qs = QIR.Runtime.AllocateQubitArray(
-            nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput + nFreeRiderBits);
+        let qs = QIR.Runtime.AllocateQubitArray(totalQubits);
 
         let conditionalReg = qs[0..nCondBits - 1];
         let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
@@ -409,9 +442,20 @@ namespace QDKChemistry.Utils.AliasSampling {
         let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
         let freeRiderReg = qs[nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput..nCondBits + nIndexBits + bitsPrecision + nQromOutput + nFreeRiderBits];
 
+        ApplyXorInPlace(conditionValue, conditionalReg);
+
         ConditionalAliasSamplingPrepareWithFreeRider(
-            coefficients, freeRiderData, bitsPrecision,
-            conditionalReg, indexReg, uniformReg, flagQubit, qromOut, freeRiderReg, 0);
+            coefficients,
+            freeRiderData,
+            bitsPrecision,
+            conditionalReg,
+            indexReg,
+            uniformReg,
+            flagQubit,
+            qromOut,
+            freeRiderReg,
+            0
+        );
     }
 
 }

@@ -83,4 +83,77 @@ namespace QDKChemistry.Utils.PhaseGradient {
         H(targetQubit);
         Adjoint S(targetQubit);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
+    // dump_machine.  Qubit layout: target[0], angle[0..n-1], pg[0..n-1].
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Test wrapper: apply Rz via phase gradient on |+⟩ and leave state.
+    operation TestRz(angleValue : Int, nBits : Int) : Unit {
+        let target = QIR.Runtime.AllocateQubitArray(1);
+        let angle = QIR.Runtime.AllocateQubitArray(nBits);
+        let pg = QIR.Runtime.AllocateQubitArray(nBits);
+
+        H(target[0]);
+
+        for k in 0..nBits - 1 {
+            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+        }
+
+        PreparePhaseGradientState(pg);
+        RzViaPhaseGradient(target[0], angle, pg);
+        Adjoint PreparePhaseGradientState(pg);
+    }
+
+    /// Test wrapper: apply Rz then Adjoint Rz (round-trip identity check).
+    operation TestRzRoundtrip(angleValue : Int, nBits : Int) : Unit {
+        let target = QIR.Runtime.AllocateQubitArray(1);
+        let angle = QIR.Runtime.AllocateQubitArray(nBits);
+        let pg = QIR.Runtime.AllocateQubitArray(nBits);
+
+        H(target[0]);
+
+        for k in 0..nBits - 1 {
+            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+        }
+
+        PreparePhaseGradientState(pg);
+        RzViaPhaseGradient(target[0], angle, pg);
+        Adjoint RzViaPhaseGradient(target[0], angle, pg);
+        Adjoint PreparePhaseGradientState(pg);
+    }
+
+    /// Test wrapper: apply Ry via phase gradient on |0⟩ and leave state.
+    operation TestRy(angleValue : Int, nBits : Int) : Unit {
+        let target = QIR.Runtime.AllocateQubitArray(1);
+        let angle = QIR.Runtime.AllocateQubitArray(nBits);
+        let pg = QIR.Runtime.AllocateQubitArray(nBits);
+
+        for k in 0..nBits - 1 {
+            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+        }
+
+        PreparePhaseGradientState(pg);
+        RyViaPhaseGradient(target[0], angle, pg);
+        Adjoint PreparePhaseGradientState(pg);
+    }
+
+    /// Test wrapper: apply Ry then Adjoint Ry (round-trip identity check).
+    operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
+        let target = QIR.Runtime.AllocateQubitArray(1);
+        let angle = QIR.Runtime.AllocateQubitArray(nBits);
+        let pg = QIR.Runtime.AllocateQubitArray(nBits);
+
+        H(target[0]);
+
+        for k in 0..nBits - 1 {
+            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+        }
+
+        PreparePhaseGradientState(pg);
+        RyViaPhaseGradient(target[0], angle, pg);
+        Adjoint RyViaPhaseGradient(target[0], angle, pg);
+        Adjoint PreparePhaseGradientState(pg);
+    }
 }
