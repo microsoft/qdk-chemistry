@@ -179,7 +179,7 @@ class HadamardTest(Algorithm):
 
     def name(self) -> str:
         """Return the name of the Hadamard test algorithm."""
-        return "qdk_hadamard_test"
+        return "qdk"
 
 
 class HadamardTestFactory(AlgorithmFactory):
@@ -194,5 +194,5 @@ class HadamardTestFactory(AlgorithmFactory):
         return "hadamard_test"
 
     def default_algorithm_name(self) -> str:
-        """Return 'qdk_hadamard_test' as the default algorithm name."""
+        """Return 'qdk' as the default algorithm name."""
         return "qdk"
