@@ -54,15 +54,16 @@ class HadamardTestSettings(Settings):
     def __init__(self):
         """Initialize the settings for the Hadamard test.
 
-        Includes nested algorithm references for the circuit builder and the
-        circuit executor, and the measurement basis for the control qubit.
+        Includes optional nested algorithm references for the circuit executor,
+        controlled circuit mapper, and the measurement basis for the control
+        qubit.
 
         """
         super().__init__()
         self._set_default(
-            "circuit_builder",
+            "controlled_circuit_mapper",
             "algorithm_ref",
-            AlgorithmRef("hadamard_test_circuit_builder", "qdk"),
+            None,
         )
         self._set_default(
             "circuit_executor",
@@ -82,25 +83,35 @@ class HadamardTest(Algorithm):
     """Hadamard test generator.
 
     Orchestrates the backend-agnostic Hadamard test workflow: it validates the
-    inputs, delegates the backend-specific circuit construction (including
-    mapping the target unitary into a controlled evolution circuit) to the
-    nested ``hadamard_test_circuit_builder``, and executes the resulting circuit
-    with the nested ``circuit_executor``.
+    inputs, delegates circuit construction (including mapping the target
+    unitary into a controlled evolution circuit) to
+    ``hadamard_test_circuit_builder`` (currently fixed to ``qdk``), and
+    executes the resulting circuit with the nested ``circuit_executor``.
     """
 
     def __init__(
         self,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        circuit_executor: AlgorithmRef | None = None,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
     ):
         """Initialize a Hadamard test generator.
 
         Args:
             test_basis: Measurement basis for the control qubit.
+            circuit_executor: Optional algorithm reference for circuit execution.
+            controlled_circuit_mapper: Optional algorithm reference for controlled circuit mapping.
 
         """
         super().__init__()
         self._settings = HadamardTestSettings()
         self._settings.set("test_basis", test_basis.value)
+        if circuit_executor is not None:
+            if not isinstance(circuit_executor, AlgorithmRef):
+                raise TypeError("circuit_executor must be an instance of AlgorithmRef.")
+            self._settings.set("circuit_executor", circuit_executor)
+        if controlled_circuit_mapper is not None:
+            self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test."""
@@ -136,13 +147,25 @@ class HadamardTest(Algorithm):
 
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
 
-        circuit_builder = self._create_nested("circuit_builder")
+        from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+        circuit_builder = create("hadamard_test_circuit_builder", "qdk")
         circuit_builder.settings().set("test_basis", test_basis.value)
+        controlled_circuit_mapper = self._settings.get("controlled_circuit_mapper")
+        if controlled_circuit_mapper is not None:
+            circuit_builder.settings().set("controlled_circuit_mapper", controlled_circuit_mapper)
 
         circuit = circuit_builder.run(
             state_preparation_circuit,
             unitary,
         )
+
+        circuit_executor_ref = self._settings.get("circuit_executor")
+        if circuit_executor_ref.algorithm_type != "circuit_executor":
+            raise ValueError(
+                "circuit_executor must reference algorithm type 'circuit_executor', "
+                f"got '{circuit_executor_ref.algorithm_type}'."
+            )
 
         circuit_executor = self._create_nested("circuit_executor")
 

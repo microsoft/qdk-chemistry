@@ -24,12 +24,7 @@ __all__: list[str] = [
 
 
 class HadamardTestCircuitBuilderSettings(Settings):
-    """Settings for the Hadamard test circuit builder algorithm.
-
-    Includes the nested algorithm reference for the controlled circuit mapper
-    used to synthesize the controlled evolution circuit and the measurement
-    basis for the control qubit.
-    """
+    """Settings for the Hadamard test circuit builder algorithm."""
 
     def __init__(self):
         """Initialize the settings for the Hadamard test circuit builder."""
@@ -72,6 +67,8 @@ class HadamardTestCircuitBuilder(Algorithm):
         super().__init__()
         self._settings = HadamardTestCircuitBuilderSettings()
         if controlled_circuit_mapper is not None:
+            if not isinstance(controlled_circuit_mapper, AlgorithmRef):
+                raise TypeError("controlled_circuit_mapper must be an instance of AlgorithmRef.")
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
         self._settings.set("test_basis", test_basis.value)
 
@@ -114,6 +111,13 @@ class HadamardTestCircuitBuilder(Algorithm):
 
         """
         controlled_unitary = ControlledUnitary(unitary=unitary, control_indices=[0])
+        circuit_mapper_ref = self._settings.get("controlled_circuit_mapper")
+        if circuit_mapper_ref.algorithm_type != "controlled_circuit_mapper":
+            raise ValueError(
+                "controlled_circuit_mapper must reference algorithm type 'controlled_circuit_mapper', "
+                f"got '{circuit_mapper_ref.algorithm_type}'."
+            )
+
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
