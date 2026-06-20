@@ -227,7 +227,7 @@ def _sossa_qpe_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
             "sossa",
             outer_prepare_algorithm="dense_pure",
             inner_prepare_algorithm="direct",
-            select_algorithm="qrom_phase_gradient",
+            select_algorithm="direct",  # Use direct for simulation (phase_gradient needs too many qubits)
         ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa", quantum_walk=True),
     )

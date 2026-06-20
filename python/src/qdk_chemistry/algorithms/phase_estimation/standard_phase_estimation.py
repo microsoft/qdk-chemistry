@@ -100,10 +100,13 @@ class StandardPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
         num_bits = circuit_builder.settings().get("num_bits")
-        circuits = circuit_builder.run(
-            state_preparation=state_preparation,
-            qubit_hamiltonian=qubit_hamiltonian,
-        )
+        builder_kwargs = {
+            "state_preparation": state_preparation,
+            "qubit_hamiltonian": qubit_hamiltonian,
+        }
+        if factorized_hamiltonian is not None:
+            builder_kwargs["factorized_hamiltonian"] = factorized_hamiltonian
+        circuits = circuit_builder.run(**builder_kwargs)
         circuit = circuits[0]
         shots = self._settings.get("shots")
         execution_data = circuit_executor.run(circuit, shots=shots, noise=noise)

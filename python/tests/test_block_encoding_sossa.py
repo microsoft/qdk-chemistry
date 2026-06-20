@@ -452,13 +452,15 @@ class TestInnerPrepareQSharp:
         inner_coefficients = [[0.8, 0.6], [0.3, 0.95]]
         n_outer = 1  # ceil(log2(2))
         n_inner = 1  # ceil(log2(2))
+        # No free-rider data for this unit test (empty array)
+        fr_str = "[]"
 
         ic_str = "[[0.8, 0.6], [0.3, 0.95]]"
 
         # Test x_o=0: inner should be proportional to [0.8, 0.6]
         qsharp.eval(f"use outer = Qubit[{n_outer}];")
         qsharp.eval(f"use inner = Qubit[{n_inner}];")
-        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}); op(outer, inner);")
+        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
