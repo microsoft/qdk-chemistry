@@ -82,10 +82,7 @@ class FactorizedHamiltonian(DataClass):
             raise ValueError(f"basis_vectors must have shape [R, B, N], got {basis_vectors.shape}")
         R, B, N_u = basis_vectors.shape
         if N_u != N:
-            raise ValueError(
-                f"basis_vectors last dimension ({N_u}) must match "
-                f"h1_majorana dimension ({N})"
-            )
+            raise ValueError(f"basis_vectors last dimension ({N_u}) must match h1_majorana dimension ({N})")
 
         if two_body_weights.ndim != 3:
             raise ValueError(f"two_body_weights must have shape [R, B, C], got {two_body_weights.shape}")

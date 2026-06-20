@@ -17,22 +17,73 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// REFLECT oracle: reflection about the zero state on the ancilla register.
     ///
+    /// Uses AND-ladder with measurement-based uncompute for n >= 2.
+    /// Cost: n-2 Toffoli for n qubits (vs 2n-5 for standard multi-controlled-Z).
+    ///
     /// $$
     ///     \mathrm{REFLECT} = 2|0\rangle\langle 0| - I
     /// $$
     operation Reflect(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {
-        let n = Length(ancillaRegister);
-        if n == 0 {
-            // No ancilla — reflection is a global phase (no-op).
-        } elif n == 1 {
-            Z(ancillaRegister[0]);
-        } else {
-            within {
-                ApplyToEachCA(X, ancillaRegister);
-            } apply {
-                Controlled Z(ancillaRegister[1...], ancillaRegister[0]);
+        body ... {
+            let n = Length(ancillaRegister);
+            if n == 0 {
+                // No ancilla — reflection is a global phase (no-op).
+            } elif n == 1 {
+                Z(ancillaRegister[0]);
+            } else {
+                ReflectImpl([], ancillaRegister);
             }
-            R(PauliI, 2.0 * PI(), ancillaRegister[0]);
+        }
+        adjoint self;
+        controlled (ctls, ...) {
+            let n = Length(ancillaRegister);
+            if n == 0 {
+                // No-op (global phase).
+            } elif n == 1 {
+                Controlled Z(ctls, ancillaRegister[0]);
+            } else {
+                ReflectImpl(ctls, ancillaRegister);
+            }
+        }
+        controlled adjoint self;
+    }
+
+    /// AND-ladder implementation of 2|0⟩⟨0| - I (measurement-based uncompute).
+    internal operation ReflectImpl(ctls : Qubit[], qs : Qubit[]) : Unit {
+        let n = Length(qs);
+        let nCtls = Length(ctls);
+        let allQubits = ctls + qs;
+        let nAll = nCtls + n;
+
+        ApplyToEachCA(X, qs);
+
+        if nAll == 2 {
+            Controlled Z([allQubits[0]], allQubits[1]);
+        } else {
+            let nAnc = nAll - 2;
+            use anc = Qubit[nAnc];
+
+            AND(allQubits[0], allQubits[1], anc[0]);
+            for i in 1..nAnc - 1 {
+                AND(anc[i - 1], allQubits[i + 1], anc[i]);
+            }
+
+            Controlled Z([anc[nAnc - 1]], allQubits[nAll - 1]);
+
+            for i in nAnc - 1..-1..1 {
+                Adjoint AND(anc[i - 1], allQubits[i + 1], anc[i]);
+            }
+            Adjoint AND(allQubits[0], allQubits[1], anc[0]);
+        }
+
+        ApplyToEachCA(X, qs);
+
+        if nCtls == 0 {
+            R(PauliI, 2.0 * PI(), qs[0]);
+        } elif nCtls == 1 {
+            Z(ctls[0]);
+        } else {
+            Controlled Z(ctls[1...], ctls[0]);
         }
     }
 

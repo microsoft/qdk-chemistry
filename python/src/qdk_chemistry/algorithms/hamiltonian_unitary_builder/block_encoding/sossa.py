@@ -112,9 +112,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         # Extract tensors and reshape from flat storage
         u_flat = np.array(factorized_hamiltonian.get_u_matrices())  # [R*B*N]
         w_flat = np.array(factorized_hamiltonian.get_w_matrices())  # [R*B*C]
-        wb = np.array(factorized_hamiltonian.get_wb_matrix())       # [R, C]
+        wb = np.array(factorized_hamiltonian.get_wb_matrix())  # [R, C]
 
-        basis_vectors = u_flat.reshape(R, B, N)     # U[r, b, p]
+        basis_vectors = u_flat.reshape(R, B, N)  # U[r, b, p]
         two_body_weights = w_flat.reshape(R, B, C)  # W[r, b, c]
 
         # Compute adjusted one-body matrix (Majorana representation)
@@ -137,15 +137,11 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             iw.append([float(wb[r, c]) for c in range(C)])
 
         # Compute PREPARE coefficients
-        outer_coeffs = self._compute_outer_coefficients(
-            w_plus.tolist(), w_minus.tolist(), tbw, iw, N, R, C
-        )
+        outer_coeffs = self._compute_outer_coefficients(w_plus.tolist(), w_minus.tolist(), tbw, iw, N, R, C)
         inner_coeffs = self._compute_inner_coefficients(tbw, iw, N, R, C, B)
 
         # Compute rotation angles
-        dq_angles, sf_angles = self._compute_rotation_angles(
-            u_plus.T, u_minus.T, basis_vectors, num_d1, N, R, B
-        )
+        dq_angles, sf_angles = self._compute_rotation_angles(u_plus.T, u_minus.T, basis_vectors, num_d1, N, R, B)
 
         # Compute free-rider data (G, r encoding for QROM)
         free_rider = self._compute_free_rider_data(num_d1, N, R, C)
@@ -331,15 +327,14 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 sf_angles: shape [R*(B+1)][N], SF Givens angles + bEqB flag.
 
         Reference: Appendix B.5, Eq. 115 in arXiv:2502.15882v1.
+
         """
         dq_angles: list[list[float]] = []
         for x_o in range(N):
             if x_o < num_one_body_plus:
                 angles = SOSSABuilder._vector_to_givens_angles(one_body_basis_plus[x_o])
             else:
-                angles = SOSSABuilder._vector_to_givens_angles(
-                    one_body_basis_minus[x_o - num_one_body_plus]
-                )
+                angles = SOSSABuilder._vector_to_givens_angles(one_body_basis_minus[x_o - num_one_body_plus])
             dq_angles.append(angles)
 
         sf_angles_3d: list[list[list[float]]] = []

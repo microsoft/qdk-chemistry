@@ -248,4 +248,24 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         }
         return signTable;
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
+    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Test wrapper: run QROM state preparation and leave state for dump_machine.
+    operation RunQROMStatePrep(
+        amplitudes : Double[],
+        rotationBitPrecision : Int,
+        numStateQubits : Int,
+    ) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(numStateQubits);
+        let params = new QROMStatePrepParams {
+            amplitudes = amplitudes,
+            rotationBitPrecision = rotationBitPrecision,
+            numStateQubits = numStateQubits,
+        };
+        QROMStatePrepare(params, qs);
+    }
 }

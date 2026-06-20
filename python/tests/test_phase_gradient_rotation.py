@@ -23,89 +23,8 @@ import qdk
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 
 
-# ---------------------------------------------------------------------------
-# Q# wrappers — allocate qubits via QIR.Runtime so they persist for dump_machine.
-# Qubit layout: target[0], angle[0..n-1], pg[0..n-1].
-# ---------------------------------------------------------------------------
-
-_RZ_WRAPPER = """
-operation TestRz(angleValue : Int, nBits : Int) : Unit {
-    let target = QIR.Runtime.AllocateQubitArray(1);
-    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
-    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
-
-    H(target[0]);
-
-    for k in 0..nBits - 1 {
-        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-    }
-
-    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-    QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-}
-"""
-
-_RZ_ROUNDTRIP_WRAPPER = """
-operation TestRzRoundtrip(angleValue : Int, nBits : Int) : Unit {
-    let target = QIR.Runtime.AllocateQubitArray(1);
-    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
-    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
-
-    H(target[0]);
-
-    for k in 0..nBits - 1 {
-        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-    }
-
-    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-    QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-}
-"""
-
-_RY_WRAPPER = """
-operation TestRy(angleValue : Int, nBits : Int) : Unit {
-    let target = QIR.Runtime.AllocateQubitArray(1);
-    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
-    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
-
-    for k in 0..nBits - 1 {
-        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-    }
-
-    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-    QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-}
-"""
-
-_RY_ROUNDTRIP_WRAPPER = """
-operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
-    let target = QIR.Runtime.AllocateQubitArray(1);
-    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
-    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
-
-    H(target[0]);
-
-    for k in 0..nBits - 1 {
-        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-    }
-
-    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-    QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
-    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
-}
-"""
-
-
-def _make_ctx(*wrappers: str) -> qdk.Context:
-    ctx = qdk.Context(project_root=str(_QS_DIR))
-    for w in wrappers:
-        ctx.eval(w)
-    return ctx
+def _make_ctx() -> qdk.Context:
+    return qdk.Context(project_root=str(_QS_DIR))
 
 
 def _reverse_bits(x: int, n: int) -> int:
@@ -152,8 +71,8 @@ class TestRzViaPhaseGradient:
         The CNOT-adder-CNOT pattern on the phase gradient eigenstate yields
         diag(e^{+2πix/2^n}, e^{-2πix/2^n}), which is Rz(-4πx/2^n).
         """
-        ctx = _make_ctx(_RZ_WRAPPER)
-        ctx.code.TestRz(x, n)
+        ctx = _make_ctx()
+        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRz(x, n)
         sv = np.array(ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
@@ -168,8 +87,8 @@ class TestRzViaPhaseGradient:
     @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (7, 4)])
     def test_adjoint_roundtrip(self, x, n):
         """Rz followed by Adjoint Rz returns target to |+⟩."""
-        ctx = _make_ctx(_RZ_ROUNDTRIP_WRAPPER)
-        ctx.code.TestRzRoundtrip(x, n)
+        ctx = _make_ctx()
+        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRzRoundtrip(x, n)
         sv = np.array(ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
@@ -194,8 +113,8 @@ class TestRyViaPhaseGradient:
     )
     def test_rotation_probabilities(self, x, n):
         """P(|0⟩) = cos²(θ/2), P(|1⟩) = sin²(θ/2) with θ = 4πx/2^n."""
-        ctx = _make_ctx(_RY_WRAPPER)
-        ctx.code.TestRy(x, n)
+        ctx = _make_ctx()
+        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRy(x, n)
         sv = np.array(ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
@@ -206,8 +125,8 @@ class TestRyViaPhaseGradient:
     @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (3, 4)])
     def test_adjoint_roundtrip(self, x, n):
         """Ry followed by Adjoint Ry returns target to |+⟩."""
-        ctx = _make_ctx(_RY_ROUNDTRIP_WRAPPER)
-        ctx.code.TestRyRoundtrip(x, n)
+        ctx = _make_ctx()
+        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRyRoundtrip(x, n)
         sv = np.array(ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 

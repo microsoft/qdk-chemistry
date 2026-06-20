@@ -69,10 +69,7 @@ class OuterPrepareMapper:
         """Validate algorithm name."""
         valid = {"alias_sampling", "dense_pure", "qrom"}
         if self.algorithm not in valid:
-            raise ValueError(
-                f"Unknown outer prepare algorithm '{self.algorithm}'. "
-                f"Must be one of: {sorted(valid)}"
-            )
+            raise ValueError(f"Unknown outer prepare algorithm '{self.algorithm}'. Must be one of: {sorted(valid)}")
 
     @property
     def needs_alias_reflection(self) -> bool:
@@ -133,10 +130,7 @@ class InnerPrepareMapper:
         """Validate algorithm name."""
         valid = {"controlled_alias_sampling", "direct"}
         if self.algorithm not in valid:
-            raise ValueError(
-                f"Unknown inner prepare algorithm '{self.algorithm}'. "
-                f"Must be one of: {sorted(valid)}"
-            )
+            raise ValueError(f"Unknown inner prepare algorithm '{self.algorithm}'. Must be one of: {sorted(valid)}")
 
     @property
     def needs_alias_reflection(self) -> bool:
@@ -192,8 +186,7 @@ class SelectMapper:
         valid = {"qrom_phase_gradient", "direct"}
         if self.multiplexed_rotation not in valid:
             raise ValueError(
-                f"Unknown multiplexed rotation '{self.multiplexed_rotation}'. "
-                f"Must be one of: {sorted(valid)}"
+                f"Unknown multiplexed rotation '{self.multiplexed_rotation}'. Must be one of: {sorted(valid)}"
             )
 
     @property
@@ -211,6 +204,12 @@ class SelectMapper:
             A Q# callable for the SELECT oracle (Givens rotations + Majorana).
 
         """
+        from math import ceil, log2
+
+        R = container.select.num_ranks
+        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_free_rider_bits = 2 + rank_bits  # isSF(1) + dvsq(1) + rank bits
+
         select_data = {
             "numOrbitals": container.select.num_orbitals,
             "numRanks": container.select.num_ranks,
@@ -220,6 +219,7 @@ class SelectMapper:
             "dqRotationAngles": container.select.rotation_angles.tolist(),
             "sfRotationAngles": container.select.sf_rotation_angles.tolist(),
             "rotationBitPrecision": self.rotation_bit_precision,
+            "numFreeRiderBits": num_free_rider_bits,
         }
         if self.multiplexed_rotation == "qrom_phase_gradient":
             return QSHARP_UTILS.SOSSAWalk.MakeSelectPhaseGradient(select_data)
@@ -249,6 +249,24 @@ class SOSSAMapperSettings(Settings):
             "int",
             10,
             "Number of bits for alias sampling coefficient precision.",
+        )
+        self._set_default(
+            "outer_prepare_algorithm",
+            "string",
+            "alias_sampling",
+            "Outer PREPARE algorithm: alias_sampling, dense_pure, or qrom.",
+        )
+        self._set_default(
+            "inner_prepare_algorithm",
+            "string",
+            "controlled_alias_sampling",
+            "Inner PREPARE algorithm: controlled_alias_sampling or direct.",
+        )
+        self._set_default(
+            "select_algorithm",
+            "string",
+            "qrom_phase_gradient",
+            "SELECT algorithm: qrom_phase_gradient or direct.",
         )
 
 
@@ -297,9 +315,39 @@ class SOSSAMapper(ControlledCircuitMapper):
         """
         super().__init__()
         self._settings = SOSSAMapperSettings()
-        self.outer_prepare_mapper = outer_prepare_mapper or OuterPrepareMapper()
-        self.inner_prepare_mapper = inner_prepare_mapper or InnerPrepareMapper()
-        self.select_mapper = select_mapper or SelectMapper()
+        self._explicit_outer = outer_prepare_mapper
+        self._explicit_inner = inner_prepare_mapper
+        self._explicit_select = select_mapper
+
+    @property
+    def outer_prepare_mapper(self) -> OuterPrepareMapper:
+        """Get the outer PREPARE mapper (explicit or from settings)."""
+        if self._explicit_outer is not None:
+            return self._explicit_outer
+        return OuterPrepareMapper(
+            algorithm=self._settings.get("outer_prepare_algorithm"),
+            coefficient_bit_precision=self._settings.get("coefficient_bit_precision"),
+        )
+
+    @property
+    def inner_prepare_mapper(self) -> InnerPrepareMapper:
+        """Get the inner PREPARE mapper (explicit or from settings)."""
+        if self._explicit_inner is not None:
+            return self._explicit_inner
+        return InnerPrepareMapper(
+            algorithm=self._settings.get("inner_prepare_algorithm"),
+            coefficient_bit_precision=self._settings.get("coefficient_bit_precision"),
+        )
+
+    @property
+    def select_mapper(self) -> SelectMapper:
+        """Get the SELECT mapper (explicit or from settings)."""
+        if self._explicit_select is not None:
+            return self._explicit_select
+        return SelectMapper(
+            multiplexed_rotation=self._settings.get("select_algorithm"),
+            rotation_bit_precision=self._settings.get("rotation_bit_precision"),
+        )
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -348,6 +396,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         num_inner_qubits = ceil(log2(unitary_container.select.num_bases + 1))
 
         # 3. Compose into the walk step via Q#.
+        # Only include the 7 parameters that match MakeControlledSOSSAWalkCircuit's signature.
         walk_params = {
             "outerPrepareOp": outer_prepare_op,
             "innerPrepareOp": inner_prepare_op,
@@ -356,10 +405,6 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numOuterQubits": num_outer_qubits,
             "numInnerQubits": num_inner_qubits,
             "power": power,
-            "outerReflectionIncludesKeep": self.outer_prepare_mapper.needs_alias_reflection,
-            "innerReflectionIncludesKeep": self.inner_prepare_mapper.needs_alias_reflection,
-            "needsPhaseGradient": self.select_mapper.needs_phase_gradient_register,
-            "phaseGradientBits": self.select_mapper.rotation_bit_precision,
         }
 
         qsharp_factory = QsharpFactoryData(
@@ -367,8 +412,13 @@ class SOSSAMapper(ControlledCircuitMapper):
             parameter=walk_params,
         )
         qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(
-            outer_prepare_op, inner_prepare_op, select_op,
-            num_system_qubits, num_outer_qubits, num_inner_qubits, power,
+            outer_prepare_op,
+            inner_prepare_op,
+            select_op,
+            num_system_qubits,
+            num_outer_qubits,
+            num_inner_qubits,
+            power,
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)

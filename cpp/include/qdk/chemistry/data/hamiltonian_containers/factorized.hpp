@@ -55,8 +55,8 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
       const Eigen::MatrixXd& wb_matrix, size_t num_ranks, size_t num_bases,
-      size_t num_copies, std::shared_ptr<Orbitals> orbitals,
-      double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
+      size_t num_copies, std::shared_ptr<Orbitals> orbitals, double core_energy,
+      const Eigen::MatrixXd& inactive_fock_matrix,
       double bliss_core_shift = 0.0, double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
@@ -169,7 +169,8 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double _bliss_core_shift;  ///< BLISS core energy shift
   double _energy_gap;        ///< E_gap for SOS block encoding
 
-  /// Lazily computed four-center integrals (shared for all channels, restricted)
+  /// Lazily computed four-center integrals (shared for all channels,
+  /// restricted)
   mutable std::shared_ptr<Eigen::VectorXd> _cached_two_body;
 
   void _build_two_body_cache() const;
