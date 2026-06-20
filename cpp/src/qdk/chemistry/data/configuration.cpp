@@ -64,7 +64,6 @@ void Configuration::_set_orbital(size_t pos, OccupationState value) {
 Configuration Configuration::from_spin_half_string(const std::string& str) {
   Configuration result;
   result._bits_per_mode = 2;
-  result._num_modes = str.size();
   result._packed_orbs.resize(_packed_bytes(str.size(), 2), 0);
 
   for (size_t i = 0; i < str.size(); ++i) {
@@ -95,7 +94,6 @@ Configuration Configuration::from_spin_half_string(const std::string& str) {
 Configuration Configuration::from_bitstring(const std::string& str) {
   Configuration result;
   result._bits_per_mode = 1;
-  result._num_modes = str.size();
   result._packed_orbs.resize(_packed_bytes(str.size(), 1), 0);
 
   for (size_t i = 0; i < str.size(); ++i) {
@@ -142,7 +140,9 @@ std::string Configuration::to_string() const {
 
 // ---- Generic accessors -----------------------------------------------------
 
-size_t Configuration::num_modes() const { return _num_modes; }
+size_t Configuration::num_modes() const {
+  return _packed_orbs.size() * (8 / _bits_per_mode);
+}
 
 uint8_t Configuration::bits_per_mode() const { return _bits_per_mode; }
 
@@ -169,23 +169,8 @@ size_t Configuration::total_occupation() const {
   return total;
 }
 
-std::vector<uint8_t> Configuration::to_bits() const {
-  size_t n = _num_modes;
-  if (_bits_per_mode == 1) {
-    std::vector<uint8_t> bits(n);
-    for (size_t i = 0; i < n; ++i) {
-      bits[i] = _get_mode_raw(i);
-    }
-    return bits;
-  }
-  // bits_per_mode == 2: alpha block then beta block
-  std::vector<uint8_t> bits(2 * n, 0);
-  for (size_t i = 0; i < n; ++i) {
-    OccupationState state = _get_orbital(i);
-    if (state == ALPHA || state == DOUBLY) bits[i] = 1;
-    if (state == BETA || state == DOUBLY) bits[n + i] = 1;
-  }
-  return bits;
+const std::vector<uint8_t>& Configuration::packed_data() const {
+  return _packed_orbs;
 }
 
 // ---- Spin-½ accessors (gated) ----------------------------------------------
@@ -320,7 +305,7 @@ void Configuration::to_hdf5(H5::Group& group) const {
     H5::Attribute orb_attr =
         dataset.createAttribute("orbital_capacity", H5::PredType::NATIVE_HSIZE,
                                 H5::DataSpace(H5S_SCALAR));
-    hsize_t capacity = _num_modes;
+    hsize_t capacity = num_modes();
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &capacity);
 
     H5::Attribute bpm_attr = dataset.createAttribute(
@@ -362,7 +347,6 @@ Configuration Configuration::from_hdf5(H5::Group& group) {
     Configuration result;
     result._packed_orbs = std::move(packed_data);
     result._bits_per_mode = bpm;
-    result._num_modes = orbital_capacity;
     return result;
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in Configuration::from_hdf5: " +
