@@ -78,9 +78,9 @@ QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.alg
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Class: ``QdkIterativeQpeCircuitBuilder`` (base) and ``QiskitIterativeQpeCircuitBuilder`` (Qiskit implementation)
+.. rubric:: Class: ``QdkIterativeQpeCircuitBuilder`` (QDK native) and ``QiskitIterativeQpeCircuitBuilder`` (Qiskit implementation)
 
-.. rubric:: Factory name: ``"qdk_iterative"`` (base), ``"qiskit_iterative"`` (Qiskit implementation)
+.. rubric:: Factory name: ``"qdk_iterative"`` (QDK native), ``"qiskit_iterative"`` (Qiskit implementation)
 
 Constructs circuits for Kitaev's iterative phase estimation algorithm, which extracts phase bits one at a time using single-ancilla feedback corrections.
 
@@ -110,11 +110,11 @@ Constructs circuits for Kitaev's iterative phase estimation algorithm, which ext
 Standard QFT-based Phase Estimation Circuit Builder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Class: ``QiskitStandardQpeCircuitBuilder`` (Qiskit implementation)
+.. rubric:: Class: ``QdkStandardQpeCircuitBuilder`` (QDK native) and ``QiskitStandardQpeCircuitBuilder`` (Qiskit implementation)
 
-.. rubric:: Factory name: ``"qiskit_standard"`` (Qiskit implementation)
+.. rubric:: Factory name: ``"qdk_standard"`` (QDK native), ``"qiskit_standard"`` (Qiskit implementation)
 
-Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously.
+Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously using ``num_bits`` ancilla qubits, applying controlled-:math:`U^{2^k}` for each ancilla and finishing with the inverse QFT.
 
 **Additional settings (Qiskit implementation):**
 
