@@ -63,7 +63,7 @@ class HadamardTestSettings(Settings):
         self._set_default(
             "controlled_circuit_mapper",
             "algorithm_ref",
-            None,
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         self._set_default(
             "circuit_executor",
@@ -111,6 +111,8 @@ class HadamardTest(Algorithm):
                 raise TypeError("circuit_executor must be an instance of AlgorithmRef.")
             self._settings.set("circuit_executor", circuit_executor)
         if controlled_circuit_mapper is not None:
+            if not isinstance(controlled_circuit_mapper, AlgorithmRef):
+                raise TypeError("controlled_circuit_mapper must be an instance of AlgorithmRef.")
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def type_name(self) -> str:
@@ -152,8 +154,7 @@ class HadamardTest(Algorithm):
         circuit_builder = create("hadamard_test_circuit_builder", "qdk")
         circuit_builder.settings().set("test_basis", test_basis.value)
         controlled_circuit_mapper = self._settings.get("controlled_circuit_mapper")
-        if controlled_circuit_mapper is not None:
-            circuit_builder.settings().set("controlled_circuit_mapper", controlled_circuit_mapper)
+        circuit_builder.settings().set("controlled_circuit_mapper", controlled_circuit_mapper)
 
         circuit = circuit_builder.run(
             state_preparation_circuit,
