@@ -16,6 +16,8 @@
 ///   c-W = c-Ref_{a,B} · U† · c-Ref_B · U
 namespace QDKChemistry.Utils.SOSSAWalk {
 
+    import Std.Arrays.Padded;
+    import Std.Arrays.Reversed;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
@@ -27,6 +29,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.StatePreparation.PreparePureStateD;
+    import Std.TableLookup.Select;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
@@ -91,17 +94,40 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     /// Build an inner PREPARE using direct controlled preparation.
+    /// Loads free-rider data (G, r) via Select QROM and prepares b superposition
+    /// via controlled PreparePureStateD.
     function MakeInnerPrepareDirect(
-        innerCoefficients : Double[][]
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        let nCoeffs = Length(innerCoefficients[0]);
+        let nIndexBits = Ceiling(Lg(IntAsDouble(if nCoeffs > 1 { nCoeffs } else { 2 })));
+        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
         (outerReg, innerReg) => {
+            let bReg = innerReg[0..nIndexBits - 1];
+            let freeRiderReg = if nFreeRider > 0 {
+                innerReg[nIndexBits..nIndexBits + nFreeRider - 1]
+            } else {
+                []
+            };
+
+            // Step 1: Load free-rider data (G, r) via QROM indexed by x_o.
+            if nFreeRider > 0 {
+                Select(freeRiderData, outerReg, freeRiderReg);
+            }
+
+            // Step 2: Controlled PreparePureStateD on b register, indexed by x_o.
+            // Only needed for SF terms where there's a nontrivial b-superposition.
             let xo = Length(innerCoefficients);
             for i in 0..xo - 1 {
+                let nPadded = 1 <<< nIndexBits;
+                let paddedAmps = Padded(-nPadded, 0.0, innerCoefficients[i]);
                 ApplyControlledOnInt(
                     i,
-                    PreparePureStateD(innerCoefficients[i], _),
+                    PreparePureStateD(paddedAmps, _),
                     outerReg,
-                    innerReg,
+                    Reversed(bReg),
                 );
             }
         }
@@ -235,7 +261,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     );
                 }
                 // Set bEqB flag: 1 when (isSF AND b == B)
-                // ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
+                ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
             } apply {
                 // Majorana operator (Fig. 4 / Appendix B.6)
                 MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
@@ -265,7 +291,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         systemReg : Qubit[],
     ) : Unit is Adj + Ctl {
         body ... {
-            // U: OuterPREP · within{InnerPREP + H(spinSF)} apply{SELECT}
+            // U: OuterPREP · H(spinDQ) · within{InnerPREP + H(spinSF)} apply{SELECT}
             outerPrepareOp(outerReg);
             H(spinReg[0]);
             within {
@@ -275,18 +301,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 selectOp(outerReg, innerReg, spinReg, systemReg);
             }
 
-            // Ref_B: inner reflection (includes spinReg so spinSF participates)
+            // Ref_B: inner reflection (includes spinSF so DQ/SF phase is detected)
             Reflect(innerReg + [spinReg[1]]);
 
-            // U†
-            Adjoint outerPrepareOp(outerReg);
-            H(spinReg[0]);
+            // U†: must undo inner BE first (needs outerReg superposition), then outer
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF)
             } apply {
                 Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
             }
+            H(spinReg[0]);
+            Adjoint outerPrepareOp(outerReg);
 
             // Ref_{a,B}: outer reflection
             Reflect(outerReg + innerReg + spinReg);
@@ -294,11 +320,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         adjoint auto;
         controlled (ctls, ...) {
             // Only reflections are controlled for QPE.
+            // U (uncontrolled)
             outerPrepareOp(outerReg);
             H(spinReg[0]);
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF)
             } apply {
                 selectOp(outerReg, innerReg, spinReg, systemReg);
             }
@@ -306,15 +333,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             // c-Ref_B
             Controlled Reflect(ctls, innerReg + [spinReg[1]]);
 
-            // U†
-            Adjoint outerPrepareOp(outerReg);
-            H(spinReg[0]);
+            // U† (uncontrolled): inner BE adjoint first, then outer
             within {
                 innerPrepareOp(outerReg, innerReg);
-                H(spinReg[1]); // H(spinSF): part of inner prep for reflection
+                H(spinReg[1]); // H(spinSF)
             } apply {
                 Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
             }
+            H(spinReg[0]);
+            Adjoint outerPrepareOp(outerReg);
 
             // c-Ref_{a,B}
             Controlled Reflect(ctls, outerReg + innerReg + spinReg);
@@ -591,9 +618,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             Controlled Z([sf_vs_dq, spin], system_reg_0);
         }
         // DQ Q1 sign flip: Z(spin) when sf_vs_dq=0 AND d_vs_q=1
-        // within { X(sf_vs_dq); } apply {
-        //     Controlled Z([sf_vs_dq, d_vs_q], spin);
-        // }
+        // Distinguishes a† (D1, d_vs_q=0) from a (Q1, d_vs_q=1)
+        within { X(sf_vs_dq); } apply {
+            Controlled Z([sf_vs_dq, d_vs_q], spin);
+        }
     }
 
     /// Apply a sequence of Givens rotations to target qubits (standalone, no CNOT sandwich).

@@ -157,7 +157,9 @@ class InnerPrepareMapper:
                 coefficients, fr_data, self.coefficient_bit_precision
             )
         # direct
-        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients)
+        fr = container.inner_prepare.free_rider_data
+        fr_data = fr.tolist() if fr is not None else []
+        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, fr_data)
 
 
 @dataclass(frozen=True)
@@ -393,7 +395,12 @@ class SOSSAMapper(ControlledCircuitMapper):
         num_system_qubits = 2 * num_orbitals
         x_o_dim = num_orbitals + unitary_container.select.num_ranks * unitary_container.select.num_copies
         num_outer_qubits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
-        num_inner_qubits = ceil(log2(unitary_container.select.num_bases + 1))
+        num_bases = unitary_container.select.num_bases
+        b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
+        R = unitary_container.select.num_ranks
+        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_free_rider_bits = 2 + rank_bits  # isSF(1) + dvsq(1) + rank bits
+        num_inner_qubits = b_bits + num_free_rider_bits
 
         # 3. Compose into the walk step via Q#.
         # Only include the 7 parameters that match MakeControlledSOSSAWalkCircuit's signature.

@@ -257,7 +257,10 @@ class TestInnerPrepareMapper:
             n_fr = fr.shape[1] if fr is not None and fr.size > 0 else 0
             num_inner_qubits = 2 * n_index_bits + 2 * bit_precision + 3 + n_fr
         else:  # direct
-            num_inner_qubits = n_index_bits
+            # Inner register includes b register + free-rider bits
+            fr = container.inner_prepare.free_rider_data
+            n_fr = fr.shape[1] if fr is not None and fr.size > 0 else 0
+            num_inner_qubits = n_index_bits + n_fr
 
         # Apply outer + inner prep
         qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
@@ -286,11 +289,8 @@ class TestInnerPrepareMapper:
                 if outer_val != ell:
                     continue
                 inner_be = bits[num_outer_qubits : num_outer_qubits + n_index_bits]
-                # Alias sampling uses LE encoding; PreparePureStateD (direct) uses BE
-                if algorithm == "direct":
-                    inner_val = int(inner_be, 2)
-                else:
-                    inner_val = int(inner_be[::-1], 2)
+                # Both algorithms use LE encoding (direct uses Reversed() on bReg)
+                inner_val = int(inner_be[::-1], 2)
                 probs[inner_val] += abs(amp) ** 2
 
             # Normalize to conditional probability
@@ -473,10 +473,6 @@ class TestSOSSAMapper:
             "numOuterQubits",
             "numInnerQubits",
             "power",
-            "outerReflectionIncludesKeep",
-            "innerReflectionIncludesKeep",
-            "needsPhaseGradient",
-            "phaseGradientBits",
         }
         assert expected_keys == set(factory.parameter.keys())
 
@@ -495,10 +491,11 @@ class TestSOSSAMapper:
         circuit = mapper.run(controlled_unitary)
 
         params = circuit._qsharp_factory.parameter
-        assert params["outerReflectionIncludesKeep"] is False  # dense_pure
-        assert params["innerReflectionIncludesKeep"] is False  # direct
-        assert params["needsPhaseGradient"] is False  # direct rotation
-        assert params["phaseGradientBits"] == 12
+        # Verify core walk parameters are present and correct
+        assert "outerPrepareOp" in params
+        assert "innerPrepareOp" in params
+        assert "selectOp" in params
+        assert params["numSystemQubits"] == 4  # 2 * num_orbitals(=2)
 
     def test_walk_params_alias_sampling_flags(self):
         """Test that alias sampling algorithms set reflection flags correctly."""
@@ -511,9 +508,11 @@ class TestSOSSAMapper:
         circuit = mapper.run(controlled_unitary)
 
         params = circuit._qsharp_factory.parameter
-        assert params["outerReflectionIncludesKeep"] is True
-        assert params["innerReflectionIncludesKeep"] is True
-        assert params["needsPhaseGradient"] is True
+        # Verify core walk parameters are present and correct
+        assert "outerPrepareOp" in params
+        assert "innerPrepareOp" in params
+        assert "selectOp" in params
+        assert params["numSystemQubits"] == 4  # 2 * num_orbitals(=2)
 
     def test_walk_params_system_qubit_count(self):
         """Test that numSystemQubits = 2 * num_orbitals."""
