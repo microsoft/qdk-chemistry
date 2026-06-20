@@ -93,11 +93,14 @@ A multi-determinant wavefunction from Complete Active Space methods (:term:`CASS
       :start-after: # start-cell-create-cas
       :end-before: # end-cell-create-cas
 
-MP2 wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Amplitude wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A wavefunction container for second-order Møller-Plesset perturbation theory (:term:`MP2`), which stores a reference wavefunction and Hamiltonian.
-From these, T1 and T2 amplitudes can be computed on demand.
+A single container, :class:`~qdk_chemistry.data.AmplitudeContainer`, represents amplitude-based correlated wavefunctions such as :term:`MP2` and coupled cluster.
+It stores a reference wavefunction together with T1/T2 excitation amplitudes, and records which correlated method produced them via :class:`~qdk_chemistry.data.AmplitudeType` (``MP2``, ``CCSD``, or ``Unspecified``).
+It is pure storage: the amplitudes are supplied by the producing algorithm and are not expanded into a determinant/coefficient representation, so determinant-, coefficient-, and :term:`RDM`-based accessors raise.
+
+The following example tags the amplitudes as :term:`MP2` (T1 is zero for MP2):
 
 .. tab:: C++ API
 
@@ -113,11 +116,7 @@ From these, T1 and T2 amplitudes can be computed on demand.
       :start-after: # start-cell-create-mp2
       :end-before: # end-cell-create-mp2
 
-Coupled cluster wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-The container supports reduced density matrices (:term:`RDM`), which are available if they are provided at construction or computed and stored; otherwise, :term:`RDM`-related operations are not available.
+The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
 
 .. tab:: C++ API
 

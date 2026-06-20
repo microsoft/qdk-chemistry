@@ -194,6 +194,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Three-center integrals (rank-3, slots @c [MO_row, MO_col, auxiliary];
   /// blocks are dense @c [orb_pair, naux] @c MatrixXd).
   std::shared_ptr<const SymmetryBlockedTensor<3>> _three_center;
