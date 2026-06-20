@@ -100,7 +100,17 @@ class HadamardTest(Algorithm):
         """
         super().__init__()
         self._settings = HadamardTestSettings()
-        self._settings.set("test_basis", test_basis.value)
+        if isinstance(test_basis, HadamardTestBasis):
+            test_basis_value = test_basis.value
+        elif isinstance(test_basis, str):
+            try:
+                test_basis_value = HadamardTestBasis(test_basis).value
+            except ValueError as err:
+                raise ValueError("test_basis must be one of {'X', 'Y', 'Z'}.") from err
+        else:
+            raise TypeError("test_basis must be an instance of HadamardTestBasis or a string.")
+
+        self._settings.set("test_basis", test_basis_value)
         if circuit_executor is not None:
             if not isinstance(circuit_executor, AlgorithmRef):
                 raise TypeError("circuit_executor must be an instance of AlgorithmRef.")
@@ -185,4 +195,4 @@ class HadamardTestFactory(AlgorithmFactory):
 
     def default_algorithm_name(self) -> str:
         """Return 'qdk_hadamard_test' as the default algorithm name."""
-        return "qdk_hadamard_test"
+        return "qdk"

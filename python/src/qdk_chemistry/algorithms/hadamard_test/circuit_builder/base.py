@@ -70,7 +70,18 @@ class HadamardTestCircuitBuilder(Algorithm):
             if not isinstance(controlled_circuit_mapper, AlgorithmRef):
                 raise TypeError("controlled_circuit_mapper must be an instance of AlgorithmRef.")
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
-        self._settings.set("test_basis", test_basis.value)
+
+        if isinstance(test_basis, HadamardTestBasis):
+            test_basis_value = test_basis.value
+        elif isinstance(test_basis, str):
+            try:
+                test_basis_value = HadamardTestBasis(test_basis).value
+            except ValueError as err:
+                raise ValueError("test_basis must be one of {'X', 'Y', 'Z'}.") from err
+        else:
+            raise TypeError("test_basis must be an instance of HadamardTestBasis or a string.")
+
+        self._settings.set("test_basis", test_basis_value)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test_circuit_builder."""
