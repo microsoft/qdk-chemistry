@@ -76,6 +76,8 @@ again.
 Supported formats
 -----------------
 
-Orbitals and Hamiltonians convert between JSON and HDF5 in either direction.
-Wavefunction conversion currently reads the JSON form; convert a wavefunction
-HDF5 file to JSON with the originating 1.x release first if needed.
+Every supported data type converts between JSON and HDF5 in either direction;
+the input and output formats are chosen independently from the file extensions.
+
+Complex coefficients and complex active RDMs are not yet handled; such files
+raise a ``migrate.MigrationError``.

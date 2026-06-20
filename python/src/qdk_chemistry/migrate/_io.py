@@ -90,7 +90,7 @@ def read_attr(obj, name: str, default=None):
     return value
 
 
-def subgroup_to_json(group: h5py.Group, data_class) -> dict:
+def subgroup_to_json(group: h5py.Group, data_class, type_token: str) -> dict:
     """Serialize an embedded, schema-unchanged sub-object to JSON.
 
     Copies ``group`` into a standalone temporary HDF5 file and loads it with the
@@ -99,14 +99,14 @@ def subgroup_to_json(group: h5py.Group, data_class) -> dict:
     (e.g. ``BasisSet``), so the migration need not know their internal layout.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        h5_path = Path(tmp) / "sub.h5"
+        h5_path = Path(tmp) / f"sub.{type_token}.h5"
         with h5py.File(h5_path, "w") as dst:
-            for key in group:
-                group.copy(group[key], dst, name=key)
-            for key, value in group.attrs.items():
-                dst.attrs[key] = value
+            # The standalone file wraps the payload in a "/<type_token>" group,
+            # whereas the embedded form stores it directly in ``group``.
+            dst.copy(group, type_token)
         obj = data_class.from_hdf5_file(str(h5_path))
-        json_path = Path(tmp) / "sub.json"
+        json_path = Path(tmp) / f"sub.{type_token}.json"
+        obj.to_json_file(str(json_path))
         obj.to_json_file(str(json_path))
         return json.loads(json_path.read_text(encoding="utf-8"))
 

@@ -13,6 +13,7 @@ the ``[rows, cols]`` HDF5 datasets written by ``save_matrix_to_group``).
 from __future__ import annotations
 
 import json
+import pathlib
 
 import h5py
 import numpy as np
@@ -453,3 +454,94 @@ def test_unknown_type_raises(tmp_path):
     bad.write_text("{}")
     with pytest.raises(migrate.MigrationError):
         migrate.convert_file(bad, tmp_path / "y.unknown.json")
+
+
+# --------------------------------------------------------------------------- #
+# Ground-truth regression tests against real H2/STO-3G files produced by
+# qdk-chemistry 1.0.0 (see test_data/migrate/README.md for provenance).
+# --------------------------------------------------------------------------- #
+_REAL_DATA = pathlib.Path(__file__).parent / "test_data" / "migrate"
+
+
+def _spot_ref():
+    return json.loads((_REAL_DATA / "reference.json").read_text())
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_orbitals_with_basis_set(tmp_path, out_fmt):
+    ref = _spot_ref()["orbitals"]
+    dst = tmp_path / f"h2.orbitals.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2.orbitals.h5", dst)
+    orb = Orbitals.from_file(str(dst), out_fmt)
+    assert orb.has_basis_set()
+    assert orb.get_num_molecular_orbitals() == ref["nmo"]
+    coeff = np.asarray(orb.get_coefficients()[0])
+    assert abs(coeff[0, 0] - ref["coeff_00"]) < 1e-9
+    assert abs(coeff[0, 1] - ref["coeff_01"]) < 1e-9
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_hamiltonian(tmp_path, out_fmt):
+    ref = _spot_ref()["hamiltonian"]
+    dst = tmp_path / f"h2.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2.hamiltonian.h5", dst)
+    ham = Hamiltonian.from_file(str(dst), out_fmt)
+    assert ham.get_container_type() == "canonical_four_center"
+    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
+    one_body = np.asarray(ham.get_one_body_integrals()[0])
+    assert abs(one_body[0, 0] - ref["one_body_00"]) < 1e-9
+    aaaa = np.asarray(ham.get_two_body_integrals()[0]).ravel()
+    assert np.allclose(aaaa[:4], ref["two_body_aaaa_head"])
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_cas_wavefunction_rdms(tmp_path, out_fmt):
+    ref = _spot_ref()["cas_rdm"]
+    dst = tmp_path / f"h2_cas.wavefunction.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2_cas_rdm.wavefunction.h5", dst)
+    wf = Wavefunction.from_file(str(dst), out_fmt)
+    assert wf.get_container_type() == "state_vector"
+    aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+    aaaa, aabb, bbbb = np.asarray(aaaa).ravel(), np.asarray(aabb).ravel(), np.asarray(bbbb).ravel()
+    assert np.allclose(aaaa[:4], ref["two_aaaa_head"])
+    assert np.allclose(aabb[:4], ref["two_aabb_head"])
+    # Closed-shell file omits the beta channels; they alias the alpha channels.
+    assert np.allclose(bbbb, aaaa)
+    oaa, obb = wf.get_active_one_rdm_spin_dependent()
+    assert np.allclose(np.asarray(oaa)[0], ref["one_aa_row0"])
+    assert np.allclose(np.asarray(obb), np.asarray(oaa))
+
+
+def test_cas_restricted_rdm_only_alpha(tmp_path):
+    # A closed-shell CAS file stores only the alpha/opposite-spin RDM channels.
+    norb = 2
+    coeff = np.array([[1.0, 0.2], [0.0, 0.9]])
+    orb = _old_orbitals_json(norb, norb, True, (coeff, coeff), active=[0, 1])
+    one_aa = np.array([[1.0, 0.1], [0.1, 0.5]])
+    t_aaaa = np.arange(16, dtype=float)
+    t_aabb = np.arange(16, dtype=float) + 50
+    container = {
+        "version": "0.1.0",
+        "container_type": "cas",
+        "wavefunction_type": "self_dual",
+        "is_complex": False,
+        "coefficients": [0.9, 0.1],
+        "configuration_set": {"orbitals": orb, "configurations": [_config("ud"), _config("du")]},
+        "rdms": {
+            "is_one_rdm_aa_complex": False,
+            "one_rdm_aa": one_aa.tolist(),
+            "is_two_rdm_aaaa_complex": False,
+            "two_rdm_aaaa": t_aaaa.tolist(),
+            "is_two_rdm_aabb_complex": False,
+            "two_rdm_aabb": t_aabb.tolist(),
+        },
+    }
+    src = tmp_path / "r.wavefunction.json"
+    dst = tmp_path / "r_new.wavefunction.json"
+    src.write_text(json.dumps({"version": "0.1.0", "container_type": "cas", "container": container}))
+    migrate.convert_file(src, dst)
+    wf = Wavefunction.from_json_file(str(dst))
+    aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+    assert np.allclose(np.asarray(aaaa).ravel(), t_aaaa)
+    assert np.allclose(np.asarray(aabb).ravel(), t_aabb)
+    assert np.allclose(np.asarray(bbbb).ravel(), t_aaaa)  # beta aliases alpha

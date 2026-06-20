@@ -58,7 +58,7 @@ def from_hdf5_group(group: h5py.Group) -> dict:
 
     basis_set = None
     if "basis_set" in group:
-        basis_set = _io.subgroup_to_json(group["basis_set"], BasisSet)
+        basis_set = _io.subgroup_to_json(group["basis_set"], BasisSet, "basis_set")
 
     return {
         "is_restricted": is_restricted,

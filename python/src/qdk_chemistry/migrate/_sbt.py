@@ -140,3 +140,27 @@ def sparse_rank4_dict(entries, norb: int) -> dict:
         [((_ALPHA, _ALPHA, _ALPHA, _ALPHA), block)],
     )
     return _serialize(sparse_map)
+
+
+def rank4_rdm_dict(aaaa, aabb, bbbb: np.ndarray | None = None) -> dict:
+    """Rank-4 SBT JSON for a spin-dependent active 2-RDM.
+
+    Unlike two-body integrals (where the restricted channels are equal), the
+    same-spin (``aaaa``) and opposite-spin (``aabb``) 2-RDM channels differ.
+    ``bbbb is None`` builds the restricted form: two distinct blocks aliased by
+    the restricted spin orbit (``bbbb`` from ``aaaa``, ``bbaa`` from ``aabb``).
+    """
+    a = _as_1d(aaaa)
+    n = round(a.shape[0] ** 0.25)
+    if n**4 != a.shape[0]:
+        raise ValueError(f"2-RDM block size {a.shape[0]} is not a perfect fourth power")
+    extents = [{_ALPHA: n, _BETA: n}] * 4
+    restricted = bbbb is None
+    syms = [_spin(restricted)] * 4
+    blocks = [
+        ((_ALPHA, _ALPHA, _ALPHA, _ALPHA), a),
+        ((_ALPHA, _ALPHA, _BETA, _BETA), _as_1d(aabb)),
+    ]
+    if not restricted:
+        blocks.append(((_BETA, _BETA, _BETA, _BETA), _as_1d(bbbb)))
+    return _serialize(_sym.SymmetryBlockedTensorRank4(syms, extents, blocks))
