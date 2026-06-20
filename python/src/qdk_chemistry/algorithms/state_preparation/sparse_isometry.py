@@ -39,7 +39,7 @@ import numpy as np
 
 import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
-from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data import Circuit, StateVectorContainer, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -116,7 +116,13 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
-        state_vector = [det.to_bits() for det in dets]
+        container = wavefunction.get_container()
+        if isinstance(container, StateVectorContainer):
+            config_set = container.get_configuration_set()
+        else:
+            raise ValueError("Sparse isometry state preparation requires a state vector container.")
+        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
+        state_vector = [det.to_bits(n_bits) for det in dets]
         n_qubits = len(state_vector[0])
 
         # Check for single determinant case after filtering
