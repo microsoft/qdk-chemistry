@@ -12,6 +12,8 @@ published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/2039350
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -22,7 +24,6 @@ from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     prepare_gate_based_data,
 )
 from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
-
 
 # =============================================================================
 # Test MPSWavefunction container
@@ -99,7 +100,7 @@ class TestBerryDecomposition:
     """Test the Berry CSD decomposition reconstructs the target matrix."""
 
     @pytest.mark.parametrize(
-        "chi_left,chi_right,seed",
+        ("chi_left", "chi_right", "seed"),
         [
             (2, 2, 42),
             (4, 2, 123),
@@ -168,7 +169,7 @@ class TestBerryDecomposition:
 
         # Reconstruct from layers
         reconstructed = np.eye(dim)
-        for angles, shifted in zip(layer_angles, layer_shifted):
+        for angles, shifted in zip(layer_angles, layer_shifted, strict=False):
             layer_mat = np.eye(dim)
             if shifted:
                 pairs = [(2 * k + 1, 2 * k + 2) for k in range((dim - 1) // 2)]
@@ -248,27 +249,11 @@ class TestPrepareGateBasedData:
 @pytest.fixture
 def qsharp_ctx():
     """Initialize Q# context with MPS Berry operations loaded."""
-    try:
-        import qdk
-        from qdk import qsharp
-    except ImportError:
-        pytest.skip("qdk package not available")
+    qdk = pytest.importorskip("qdk")
+    from qdk import qsharp  # noqa: PLC0415
 
-    from pathlib import Path
-
-    qs_dir = (
-        Path(__file__).parent.parent
-        / "src" / "qdk_chemistry" / "utils" / "qsharp"
-    )
-    qs_files = [
-        qs_dir / "PhaseGradient.qs",
-        qs_dir / "QroamStatePrep.qs",
-        qs_dir / "GivensDecomposition.qs",
-        qs_dir / "MPSPreparationBerry.qs",
-    ]
-
-    code = "\n".join(f.read_text() for f in qs_files)
-    qsharp.eval(code)
+    qs_project = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp" / "mps_berry"
+    qsharp.init(project_root=str(qs_project))
     return qdk, qsharp
 
 
@@ -276,7 +261,7 @@ class TestMPSBerryFidelity:
     """Test that MPS Berry state preparation produces high-fidelity states."""
 
     @pytest.mark.parametrize(
-        "num_sites,bond_dim,seed",
+        ("num_sites", "bond_dim", "seed"),
         [
             (2, 2, 42),
             (2, 4, 123),
@@ -325,7 +310,7 @@ class TestMPSBerryFidelity:
         qs_code = f"""{{
             use state = Qubit[{num_state_qubits}];
             use ancilla = Qubit[{num_ancilla_qubits}];
-            MPSPreparationBerry(
+            MPSPreparationBerry.MPSPreparationBerry(
                 [{initial_state_str}],
                 {num_sites},
                 {b_rot},
@@ -356,7 +341,7 @@ class TestMPSBerryFidelity:
             mutable ancillaClean = true;
             for i in 0..{num_ancilla_qubits - 1} {{
                 if M(ancilla[i]) == One {{
-                    set ancillaClean <- false;
+                    set ancillaClean = false;
                 }}
             }}
             ResetAll(state + ancilla);
@@ -386,15 +371,12 @@ class TestMPSBerryFidelity:
 
         # Should achieve high fidelity with b_rot=10
         assert fidelity_proxy > 0.95, (
-            f"Fidelity {fidelity_proxy:.4f} too low for "
-            f"num_sites={num_sites}, bond_dim={bond_dim}"
+            f"Fidelity {fidelity_proxy:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
         )
 
         # Ancilla should be clean (returned to |0>) most of the time
         ancilla_clean_rate = ancilla_clean_count / n_shots
-        assert ancilla_clean_rate > 0.90, (
-            f"Ancilla clean rate {ancilla_clean_rate:.4f} too low"
-        )
+        assert ancilla_clean_rate > 0.90, f"Ancilla clean rate {ancilla_clean_rate:.4f} too low"
 
 
 # =============================================================================
@@ -437,9 +419,9 @@ class TestMPSBerryGateCount:
         rng = np.random.default_rng(42)
 
         for bond_dim in [2, 4, 8]:
-            mps = MPSWavefunction.random(num_sites=3, bond_dim=bond_dim, rng=rng)
+            mps = MPSWavefunction.random(num_sites=5, bond_dim=bond_dim, rng=rng)
             data = prepare_gate_based_data(mps.tensors)
-            expected_bits = int(np.ceil(np.log2(bond_dim)))
+            expected_bits = int(np.ceil(np.log2(mps.max_bond_dim)))
             assert data["ancilla_bits"] >= expected_bits
 
 

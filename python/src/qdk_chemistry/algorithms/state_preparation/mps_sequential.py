@@ -15,10 +15,10 @@ QDK Chemistry library.
 
 References
 ----------
-1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by 
+1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by
 exploiting symmetry-induced block-sparsity." (2026). [https://arxiv.org/pdf/2605.28489].
 Zenodo: https://zenodo.org/records/20393500.
-2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of 
+2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of
 Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQuantum.6.020327]
 
 """
@@ -30,8 +30,11 @@ Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQ
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 import numpy as np
 
@@ -65,10 +68,10 @@ class MPSSequentialStatePreparation(StatePreparation):
 
     References
     ----------
-    1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by 
+    1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by
     exploiting symmetry-induced block-sparsity." (2026). [https://arxiv.org/pdf/2605.28489].
     Zenodo: https://zenodo.org/records/20393500.
-    2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of 
+    2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of
     Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQuantum.6.020327]
 
     """
@@ -82,6 +85,7 @@ class MPSSequentialStatePreparation(StatePreparation):
 
         Returns:
             str: The name ``"mps_sequential_state"``
+
         """
         return "mps_sequential_state"
 
@@ -96,11 +100,11 @@ class MPSSequentialStatePreparation(StatePreparation):
 
         Raises:
             TypeError: If wavefunction is not an MPSWavefunction instance.
+
         """
         if not isinstance(wavefunction, MPSWavefunction):
             raise TypeError(
-                f"MPSSequentialStatePreparation requires an MPSWavefunction, "
-                f"got {type(wavefunction).__name__}."
+                f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction).__name__}."
             )
 
         # Compute the gate-based decomposition data
@@ -142,28 +146,19 @@ class MPSSequentialStatePreparation(StatePreparation):
 # Q# integration
 # ---------------------------------------------------------------------------
 
-# Q# source files for MPS Berry state preparation (loaded via utils/qsharp)
-_MPS_QS_DIR = Path(__file__).parents[2] / "utils" / "qsharp"
-
-_MPS_QS_FILES = [
-    _MPS_QS_DIR / "PhaseGradient.qs",
-    _MPS_QS_DIR / "QroamStatePrep.qs",
-    _MPS_QS_DIR / "GivensDecomposition.qs",
-    _MPS_QS_DIR / "MPSPreparationBerry.qs",
-]
+_MPS_QS_PROJECT = Path(__file__).parents[2] / "utils" / "qsharp" / "mps_berry"
 
 
 def _get_mps_berry_op():
     """Lazily load the MPS Berry Q# operations."""
     import qdk  # noqa: PLC0415
-    from qdk import qsharp  # noqa: PLC0415
 
     try:
         return qdk.code.MPSPreparationBerry
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _MPS_QS_FILES)
-        qsharp.eval(code)
+        qdk.init(project_root=str(_MPS_QS_PROJECT))
         return qdk.code.MPSPreparationBerry
+
 
 # ---------------------------------------------------------------------------
 # Berry CSD preprocessing helpers
@@ -215,6 +210,7 @@ def compute_site_unitary_dense_data(
     Returns
     -------
     dict with keys: 'u', 'd_prime', 'w_0', 'w_1', 'v', 'ancilla_dim'
+
     """
     left, site_dim, right = tensor.shape
     dim = ancilla_dim
@@ -267,6 +263,7 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
     layer_angles : list[list[float]]
     layer_shifted : list[bool]
     phases : list[bool]
+
     """
     dim = matrix.shape[0]
     m = matrix.copy().astype(float)
@@ -295,9 +292,7 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
     return layer_angles, layer_shifted, phases
 
 
-def _organize_into_layers(
-    rotations: list[tuple[int, float]], dim: int
-) -> tuple[list[list[float]], list[bool]]:
+def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple[list[list[float]], list[bool]]:
     """Organize Givens rotations into parallel layers."""
     if not rotations:
         return [], []
@@ -316,9 +311,7 @@ def _organize_into_layers(
             if pair_latest[p] >= 0:
                 min_layer = max(min_layer, pair_latest[p] + 1)
 
-        if is_odd and min_layer % 2 == 0:
-            min_layer += 1
-        elif not is_odd and min_layer % 2 == 1:
+        if (is_odd and min_layer % 2 == 0) or (not is_odd and min_layer % 2 == 1):
             min_layer += 1
 
         layer_idx = min_layer
@@ -385,6 +378,7 @@ def decompose_unitary_to_givens(matrix: np.ndarray):
     layer_angles : list[list[float]]
     layer_shifted : list[bool]
     phases : list[bool]
+
     """
     try:
         from unitary_synthesis._givens_decomposition import decompose_real  # noqa: PLC0415
@@ -418,6 +412,7 @@ def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
     layer_angles : list[list[float]]
     layer_shifted : list[bool]
     phases : list[bool]
+
     """
     try:
         from unitary_synthesis._givens_decomposition import decompose_real  # noqa: PLC0415
@@ -458,6 +453,7 @@ def prepare_gate_based_data(tensors: Sequence[np.ndarray]) -> dict:
     Returns
     -------
     dict with all parameters needed by MPSPreparationBerry.
+
     """
     num_sites = len(tensors)
     d = tensors[0].shape[1]
@@ -513,14 +509,8 @@ def prepare_gate_based_data(tensors: Sequence[np.ndarray]) -> dict:
 
         # UCR rotation angles: 2*arcsin(d')
         rot0_angles = [2.0 * float(np.arcsin(np.clip(d_0_[k], -1, 1))) for k in range(dim)]
-        rot1_angles = [
-            2.0 * float(np.arcsin(np.clip(d_1_[k] if k < len(d_1_) else 0.0, -1, 1)))
-            for k in range(dim)
-        ]
-        rot2_angles = [
-            2.0 * float(np.arcsin(np.clip(d_2_[k] if k < len(d_2_) else 0.0, -1, 1)))
-            for k in range(dim)
-        ]
+        rot1_angles = [2.0 * float(np.arcsin(np.clip(d_1_[k] if k < len(d_1_) else 0.0, -1, 1))) for k in range(dim)]
+        rot2_angles = [2.0 * float(np.arcsin(np.clip(d_2_[k] if k < len(d_2_) else 0.0, -1, 1))) for k in range(dim)]
         site_rot0_angles.append(rot0_angles)
         site_rot1_angles.append(rot1_angles)
         site_rot2_angles.append(rot2_angles)

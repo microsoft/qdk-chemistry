@@ -12,9 +12,12 @@ MPS-based sequential state preparation algorithm.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 __all__ = ["MPSWavefunction"]
 
@@ -65,6 +68,7 @@ class MPSWavefunction:
         Raises:
             ValueError: If tensors are empty, have inconsistent dimensions,
                 or violate open boundary conditions.
+
         """
         if not tensors:
             raise ValueError("MPS tensors must not be empty.")
@@ -76,13 +80,9 @@ class MPSWavefunction:
         # Validate tensor shapes
         for i, t in enumerate(self.tensors):
             if t.ndim != 3:
-                raise ValueError(
-                    f"Tensor {i} must be 3-dimensional, got shape {t.shape}."
-                )
+                raise ValueError(f"Tensor {i} must be 3-dimensional, got shape {t.shape}.")
             if t.shape[1] != site_dim:
-                raise ValueError(
-                    f"Tensor {i} has site dimension {t.shape[1]}, expected {site_dim}."
-                )
+                raise ValueError(f"Tensor {i} has site dimension {t.shape[1]}, expected {site_dim}.")
 
         # Validate bond dimension consistency
         for i in range(self.num_sites - 1):
@@ -91,18 +91,14 @@ class MPSWavefunction:
             if chi_right != chi_left_next:
                 raise ValueError(
                     f"Bond dimension mismatch between site {i} (chi_right={chi_right}) "
-                    f"and site {i+1} (chi_left={chi_left_next})."
+                    f"and site {i + 1} (chi_left={chi_left_next})."
                 )
 
         # Validate open boundary conditions
         if self.tensors[0].shape[0] != 1:
-            raise ValueError(
-                f"First tensor must have chi_left=1 (open boundary), got {self.tensors[0].shape[0]}."
-            )
+            raise ValueError(f"First tensor must have chi_left=1 (open boundary), got {self.tensors[0].shape[0]}.")
         if self.tensors[-1].shape[2] != 1:
-            raise ValueError(
-                f"Last tensor must have chi_right=1 (open boundary), got {self.tensors[-1].shape[2]}."
-            )
+            raise ValueError(f"Last tensor must have chi_right=1 (open boundary), got {self.tensors[-1].shape[2]}.")
 
         self.bond_dims = [self.tensors[0].shape[0]]
         for t in self.tensors:
@@ -126,6 +122,7 @@ class MPSWavefunction:
         -------
         np.ndarray
             Normalized state vector of length ``site_dim ** num_sites``.
+
         """
         state = self.tensors[0]  # (1, d, chi_1)
         for tensor in self.tensors[1:]:
@@ -171,14 +168,12 @@ class MPSWavefunction:
         -------
         MPSWavefunction
             The MPS representation of the state vector.
+
         """
         state_vector = np.asarray(state_vector, dtype=np.float64)
-        total_dim = site_dim ** num_sites
+        total_dim = site_dim**num_sites
         if len(state_vector) != total_dim:
-            raise ValueError(
-                f"State vector length {len(state_vector)} doesn't match "
-                f"site_dim^num_sites = {total_dim}."
-            )
+            raise ValueError(f"State vector length {len(state_vector)} doesn't match site_dim^num_sites = {total_dim}.")
 
         # Normalize
         norm = np.linalg.norm(state_vector)
@@ -242,6 +237,7 @@ class MPSWavefunction:
         -------
         MPSWavefunction
             A random MPS wavefunction.
+
         """
         if rng is None:
             rng = np.random.default_rng()
@@ -283,7 +279,7 @@ def _make_right_canonical(tensors: list[np.ndarray]) -> list[np.ndarray]:
         mat = result[i].reshape(chi_l, d * chi_r)
         # SVD-based right canonicalization: mat = U @ S @ Vt
         # Vt becomes the new tensor, U @ S is absorbed left
-        q_mat, r_mat = np.linalg.qr(mat.T, mode='reduced')
+        q_mat, r_mat = np.linalg.qr(mat.T, mode="reduced")
         result[i] = q_mat.T.reshape(chi_l, d, chi_r)
         chi_l_prev, d_prev, _ = result[i - 1].shape
         left_mat = result[i - 1].reshape(chi_l_prev * d_prev, chi_l)
