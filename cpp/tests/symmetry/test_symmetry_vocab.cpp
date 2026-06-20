@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
+#include <unordered_map>
 
 using namespace qdk::chemistry::data;
 
@@ -87,6 +88,18 @@ TEST(SymmetryVocabTest, RoundTripSymmetryLabelJson) {
   SymmetryLabel label({axes::beta()});
   auto restored = SymmetryLabel::from_json(label.to_json());
   EXPECT_EQ(label, restored);
+}
+
+TEST(SymmetryVocabTest, RoundTripTrivialSymmetryLabelJson) {
+  SymmetryLabel label;
+  auto restored = SymmetryLabel::from_json(label.to_json());
+
+  EXPECT_EQ(label, restored);
+  EXPECT_EQ(label.hash(), restored.hash());
+
+  std::unordered_map<SymmetryLabel, std::size_t> extents;
+  extents.emplace(restored, 3u);
+  EXPECT_EQ(extents.at(label), 3u);
 }
 
 TEST(SymmetryVocabTest, UnknownKindThrows) {

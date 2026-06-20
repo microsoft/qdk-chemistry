@@ -165,6 +165,8 @@ Returns:
 
 )");
 
+  selector.def("hash", &ActiveSpaceSelector::hash, py::arg("wavefunction"));
+
   // Factory class binding - creates ActiveSpaceSelectorFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<
