@@ -514,7 +514,7 @@ class TestZassenhausPhaseEstimation:
         # Configure the Zassenhaus evolution builder reference
         evolution_time = 1.0
         zassenhaus_order = 2
-        zassenhaus_num_divisions = 2
+        zassenhaus_num_divisions = 10
         unitary_builder_ref = AlgorithmRef(
             "hamiltonian_unitary_builder",
             "zassenhaus",
@@ -531,7 +531,7 @@ class TestZassenhausPhaseEstimation:
             unitary_builder=unitary_builder_ref,
             controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
-        iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=1)
+        iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=3)
         iqpe.settings().set("qpe_circuit_builder", qpe_builder_ref)
         iqpe.settings().set(
             "circuit_executor",
