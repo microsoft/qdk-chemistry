@@ -1055,7 +1055,7 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
   for (std::uint64_t i = 0; i < V; ++i) {
     P.indices()[static_cast<Eigen::Index>(i)] = static_cast<int>(path[i]);
   }
-  Eigen::SparseMatrix<double> new_adj = P * adj * P.transpose();
+  Eigen::SparseMatrix<double> new_adj = P.transpose() * adj * P;
   new_adj.makeCompressed();
 
   std::vector<std::uint64_t> inv_p(V);
