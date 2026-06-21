@@ -1,25 +1,24 @@
-"""MPS Berry state preparation via sequential site unitaries.
+"""MPS Berry state preparation via sequential site unitary synthesis.
 
-Implements the Matrix Product State (MPS) sequential state preparation algorithm
-based on Berry et al. (arXiv:2409.11748). Each site unitary is decomposed using
-the 7-matrix CSD construction (Appendix B) and synthesized into a quantum circuit
-via Givens rotation layers with QROAM angle loading and phase gradient rotations.
+Implements the Matrix Product State (MPS) state preparation algorithm based on 
+:cite:`Berry2024`. Each site unitary is decomposed based on Appendix B in 
+:cite:`Rupprecht2026`.
 
 Attribution
 -----------
-The Berry decomposition and Givens rotation circuit synthesis is based on code
-originally published by Felix Rupprecht (DLR) on Zenodo:
-https://zenodo.org/records/20393500
-The implementation has been rewritten and adapted for integration into the
-QDK Chemistry library.
+The unitary synthesis is based on code originally published by Felix Rupprecht 
+on Zenodo :cite:`Rupprecht2026Zenodo` under Apache 2.0 license.
+The implementation has been rewritten for integration into QDK Chemistry.
 
 References
 ----------
-1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by
-exploiting symmetry-induced block-sparsity." (2026). [https://arxiv.org/pdf/2605.28489].
-Zenodo: https://zenodo.org/records/20393500.
-2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of
-Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQuantum.6.020327]
+    Felix Rupprecht and Sabine Wölk. (2026). Faster matrix product state preparation by
+    exploiting symmetry-induced block-sparsity. 
+    https://arxiv.org/pdf/2605.28489. Zenodo: https://zenodo.org/records/20393500.
+    
+    Dominic W. Berry et al. (2025). Rapid Initial-State Preparation for the Quantum Simulation of
+    Strongly Correlated Molecules. PRX Quantum 6, 020327.
+    https://doi.org/10.1103/PRXQuantum.6.020327
 
 """
 
@@ -47,33 +46,19 @@ __all__: list[str] = ["MPSSequentialStatePreparation"]
 
 
 class MPSSequentialStatePreparation(StatePreparation):
-    r"""MPS-based sequential state preparation using the Berry decomposition.
+    r"""MPS state preparation using sequential unitary synthesis.
 
-    Implements the Matrix Product State (MPS) sequential state preparation algorithm
-    based on Berry et al. (arXiv:2409.11748). Each site unitary is decomposed using
-    the 7-matrix CSD construction (Appendix B in https://arxiv.org/abs/2605.28489)
+    Prepare the Matrix Product State (MPS) sequentially, qubit-by-qubit (2 qubits
+    per site), using an ancilla register that stores the virtual bond dimension.
+    Each site unitary is decomposed based on Appendix B in :cite:`Rupprecht2026`,
     and synthesized into a quantum circuit via Givens rotation layers with QROAM
     angle loading and phase gradient rotations.
 
-    The algorithm prepares the state qubit-by-qubit (2 qubits per site), using
-    an ancilla register that stores the virtual bond dimension.
-
     Attribution
     -----------
-    The Berry decomposition and Givens rotation circuit synthesis is based on code
-    originally published by Felix Rupprecht (DLR) on Zenodo:
-    https://zenodo.org/records/20393500.
-    The implementation has been rewritten and adapted for integration into the
-    QDK Chemistry library.
-
-    References
-    ----------
-    1. Felix Rupprecht and Sabine Wölk. "Faster matrix product state preparation by
-    exploiting symmetry-induced block-sparsity." (2026). [https://arxiv.org/pdf/2605.28489].
-    Zenodo: https://zenodo.org/records/20393500.
-    2. Dominic W. Berry et al. "Rapid Initial-State Preparation for the Quantum Simulation of
-    Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQuantum.6.020327]
-
+    The unitary synthesis is based on code originally published by Felix Rupprecht 
+    on Zenodo :cite:`Rupprecht2026Zenodo` under Apache 2.0 license.
+    The implementation has been rewritten for integration into QDK Chemistry.
     """
 
     def __init__(self):
@@ -84,19 +69,19 @@ class MPSSequentialStatePreparation(StatePreparation):
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"mps_sequential_state"``
+            str: The name ``"mps_sequential"``
 
         """
-        return "mps_sequential_state"
+        return "mps_sequential"
 
     def _run_impl(self, wavefunction: MPSWavefunction) -> Circuit:
-        """Prepare a quantum circuit from an MPS Wavefunction.
+        """Return a circuit to prepare an MPS state.
 
         Args:
-            wavefunction: An MPSWavefunction containing MPS tensors.
+            wavefunction: An MPSWavefunction containing the tensors.
 
         Returns:
-            Circuit: A Circuit object implementing the MPS state preparation.
+            A Circuit object implementing the MPS state preparation.
 
         Raises:
             TypeError: If wavefunction is not an MPSWavefunction instance.
@@ -104,7 +89,7 @@ class MPSSequentialStatePreparation(StatePreparation):
         """
         if not isinstance(wavefunction, MPSWavefunction):
             raise TypeError(
-                f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction).__name__}."
+                f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}."
             )
 
         # Compute the gate-based decomposition data
