@@ -400,10 +400,20 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
           "Dimension mismatch in ConfigurationSet HDF5 data");
     }
 
+    // Read orbital_capacity and bits_per_mode for proper reconstruction.
+    hsize_t orbital_capacity = 0;
     uint8_t bpm = 2;
+    if (dataset.attrExists("orbital_capacity")) {
+      dataset.openAttribute("orbital_capacity")
+          .read(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
+    }
     if (dataset.attrExists("bits_per_mode")) {
       dataset.openAttribute("bits_per_mode")
           .read(H5::PredType::NATIVE_UINT8, &bpm);
+    }
+    // Legacy files lack orbital_capacity — infer from packed size and bpm.
+    if (orbital_capacity == 0 && packed_size > 0) {
+      orbital_capacity = packed_size * (8 / bpm);
     }
 
     // Pre-allocate flat_data vector before reading

@@ -7,7 +7,7 @@
 
 import numpy as np
 
-from qdk_chemistry.data import StateVectorContainer, Wavefunction
+from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -52,11 +52,7 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
-        container = wavefunction.get_container()
-        if isinstance(container, StateVectorContainer):
-            config_set = container.get_configuration_set()
-        else:
-            raise ValueError("Dense state preparation requires a state vector container.")
+        config_set = wavefunction.get_configuration_set()
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
         if np.iscomplexobj(coeffs):
