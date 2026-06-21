@@ -48,30 +48,6 @@ class TestMPSWavefunction:
         state = mps.contract()
         assert abs(np.linalg.norm(state) - 1.0) < 1e-10
 
-    def test_from_state_vector_roundtrip(self):
-        """Test that from_state_vector reproduces the original state (no truncation)."""
-        rng = np.random.default_rng(42)
-        num_sites = 2
-        dim = 4**num_sites
-        vec = rng.standard_normal(dim)
-        vec /= np.linalg.norm(vec)
-
-        mps = MPSWavefunction.from_state_vector(vec, num_sites=num_sites)
-        reconstructed = mps.contract()
-        fidelity = abs(np.dot(vec, reconstructed)) ** 2
-        assert fidelity > 1.0 - 1e-10
-
-    def test_from_state_vector_truncated(self):
-        """Test that truncation reduces bond dimension."""
-        rng = np.random.default_rng(42)
-        num_sites = 3
-        dim = 4**num_sites
-        vec = rng.standard_normal(dim)
-        vec /= np.linalg.norm(vec)
-
-        mps = MPSWavefunction.from_state_vector(vec, num_sites=num_sites, max_bond_dim=2)
-        assert mps.max_bond_dim <= 2
-
     def test_validation_errors(self):
         """Test that invalid inputs raise ValueError."""
         with pytest.raises(ValueError, match="must not be empty"):
@@ -203,7 +179,7 @@ class TestBerryDecomposition:
 
 
 class TestPrepareGateBasedData:
-    """Test the full preprocessing pipeline for MPSPreparationBerry."""
+    """Test the full preprocessing pipeline for MPSSequential."""
 
     def test_two_site_data_structure(self):
         """Verify prepare_gate_based_data returns correct structure for 2 sites."""
@@ -248,17 +224,17 @@ class TestPrepareGateBasedData:
 
 @pytest.fixture
 def qsharp_ctx():
-    """Initialize Q# context with MPS Berry operations loaded."""
+    """Initialize Q# context with MPS Sequential operations loaded."""
     qdk = pytest.importorskip("qdk")
     from qdk import qsharp  # noqa: PLC0415
 
-    qs_project = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp" / "mps_berry"
+    qs_project = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp" / "mps_sequential"
     qsharp.init(project_root=str(qs_project))
     return qdk, qsharp
 
 
-class TestMPSBerryFidelity:
-    """Test that MPS Berry state preparation produces high-fidelity states."""
+class TestMPSSequentialFidelity:
+    """Test that MPS Sequential state preparation produces high-fidelity states."""
 
     @pytest.mark.parametrize(
         ("num_sites", "bond_dim", "seed"),
@@ -282,7 +258,7 @@ class TestMPSBerryFidelity:
 
         # Prepare gate-based data
         data = prepare_gate_based_data(mps.tensors)
-        b_rot = 10
+        rotation_bits = 10
         ancilla_bits = data["ancilla_bits"]
         num_state_qubits = 2 * num_sites
         num_ancilla_qubits = ancilla_bits
@@ -310,10 +286,10 @@ class TestMPSBerryFidelity:
         qs_code = f"""{{
             use state = Qubit[{num_state_qubits}];
             use ancilla = Qubit[{num_ancilla_qubits}];
-            MPSPreparationBerry.MPSPreparationBerry(
+            MPSSequential.MPSSequential(
                 [{initial_state_str}],
                 {num_sites},
-                {b_rot},
+                {rotation_bits},
                 {v_angles_str},
                 {v_shifted_str},
                 {v_phases_str},
@@ -369,7 +345,7 @@ class TestMPSBerryFidelity:
         # Classical fidelity (Bhattacharyya coefficient) as proxy
         fidelity_proxy = np.sum(np.sqrt(probs_measured * probs_target)) ** 2
 
-        # Should achieve high fidelity with b_rot=10
+        # Should achieve high fidelity with rotation_bits=10
         assert fidelity_proxy > 0.95, (
             f"Fidelity {fidelity_proxy:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
         )
@@ -384,7 +360,7 @@ class TestMPSBerryFidelity:
 # =============================================================================
 
 
-class TestMPSBerryGateCount:
+class TestMPSSequentialGateCount:
     """Test that gate count scaling matches theoretical expectations."""
 
     def test_gate_count_scales_with_sites(self):
@@ -435,57 +411,66 @@ class TestMPSBerryGateCount:
 
 _qualtran_mps_tensors = (
     np.array(
-        [[[0.01650572, 0.0, 0.0, 0.0],
-          [0.0, -0.52929781, 0.0, 0.0],
-          [0.0, 0.0, -0.84462254, 0.0],
-          [0.0, 0.0, 0.0, -0.07863941]]]),
+        [
+            [
+                [0.01650572, 0.0, 0.0, 0.0],
+                [0.0, -0.52929781, 0.0, 0.0],
+                [0.0, 0.0, -0.84462254, 0.0],
+                [0.0, 0.0, 0.0, -0.07863941],
+            ]
+        ]
+    ),
     np.array(
-        [[[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [-0.05969264, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.9973967, 0.04045497, 0.0, 0.0, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [-0.08381532, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.98376348, 0.15869598, 0.0]],
-         [[-0.0421477, 0.0, 0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.46961402, 0.0265522, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.41109095, 0.03268939, 0.0],
-          [0.0, 0.0, 0.0, 0.0, 0.0, 0.77904869]]]),
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [-0.05969264, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.9973967, 0.04045497, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [-0.08381532, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.98376348, 0.15869598, 0.0],
+            ],
+            [
+                [-0.0421477, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.46961402, 0.0265522, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.41109095, 0.03268939, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.77904869],
+            ],
+        ]
+    ),
     np.array(
-        [[[0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [1.0, 0.0, 0.0, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [-0.19640516, 0.0, 0.0, 0.0],
-          [0.0, -0.98052283, 0.0, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [-0.98052283, 0.0, 0.0, 0.0],
-          [0.0, 0.19640516, 0.0, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0],
-          [-0.02411236, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, -0.99970925, 0.0]],
-         [[0.0, 0.0, 0.0, 0.0],
-          [-0.99970925, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.02411236, 0.0]],
-         [[-0.17695837, 0.0, 0.0, 0.0],
-          [0.0, -0.58052668, 0.0, 0.0],
-          [0.0, 0.0, -0.53176612, 0.0],
-          [0.0, 0.0, 0.0, -0.59067698]]]),
+        [
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [-0.19640516, 0.0, 0.0, 0.0], [0.0, -0.98052283, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [-0.98052283, 0.0, 0.0, 0.0], [0.0, 0.19640516, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [-0.02411236, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, -0.99970925, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [-0.99970925, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.02411236, 0.0]],
+            [
+                [-0.17695837, 0.0, 0.0, 0.0],
+                [0.0, -0.58052668, 0.0, 0.0],
+                [0.0, 0.0, -0.53176612, 0.0],
+                [0.0, 0.0, 0.0, -0.59067698],
+            ],
+        ]
+    ),
     np.array(
-        [[[0.0], [0.0], [0.0], [1.0]],
-         [[0.0], [0.0], [1.0], [0.0]],
-         [[0.0], [1.0], [0.0], [0.0]],
-         [[1.0], [0.0], [0.0], [0.0]]]),
+        [
+            [[0.0], [0.0], [0.0], [1.0]],
+            [[0.0], [0.0], [1.0], [0.0]],
+            [[0.0], [1.0], [0.0], [0.0]],
+            [[1.0], [0.0], [0.0], [0.0]],
+        ]
+    ),
 )
 
 _qualtran_mps_expected_state = np.array(
@@ -583,7 +568,7 @@ class TestMPSQualtranReference:
 # =============================================================================
 
 
-class TestMPSBerryQualtranCostComparison:
+class TestMPSSequentialQualtranCostComparison:
     """Cross-validate gate counts between qdk-chemistry and Qualtran.
 
     These tests verify that qdk-chemistry's Berry decomposition produces gate

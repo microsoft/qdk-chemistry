@@ -29,7 +29,7 @@ import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSPreparationBerry, SiteUnitaryBerry, ApplyUCR, ApplyControlledUCR;
+export MPSSequential, SiteUnitaryBerry, ApplyUCR, ApplyControlledUCR;
 
 // =============================================================================
 // Helper operations for the Berry et al. decomposition
@@ -162,23 +162,23 @@ operation SiteUnitaryBerry(
 ) : Unit {
     let q0 = newSite[0];
     let q1 = newSite[1];
-    let bRot = Length(phaseGradient);
+    let rotationBits = Length(phaseGradient);
     let ancillaDim = 1 <<< Length(ancilla);
     let numAddresses = ancillaDim / 2;
 
     // Quantize angles (fast classical computation done in Q#)
-    let vData = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, bRot), vLayerAngles);
+    let vData = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, rotationBits), vLayerAngles);
     let vPhaseData = PhaseFlipsAsSelectData(vPhases);
-    let rot0Data = QuantizeRyAngles(rot0Angles, bRot);
-    let rot1Data = QuantizeRyAngles(rot1Angles, bRot);
-    let rot2Data = QuantizeRyAngles(rot2Angles, bRot);
-    let w0Data = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, bRot), w0LayerAngles);
+    let rot0Data = QuantizeRyAngles(rot0Angles, rotationBits);
+    let rot1Data = QuantizeRyAngles(rot1Angles, rotationBits);
+    let rot2Data = QuantizeRyAngles(rot2Angles, rotationBits);
+    let w0Data = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, rotationBits), w0LayerAngles);
     let w0PhaseData = PhaseFlipsAsSelectData(w0Phases);
-    let w1Data = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, bRot), w1LayerAngles);
+    let w1Data = Mapped(layer -> QuantizeGivensAngles(layer, numAddresses, rotationBits), w1LayerAngles);
     let w1PhaseData = PhaseFlipsAsSelectData(w1Phases);
     // U address space is (4*dim)/2 = 2*dim
     let uNumAddresses = 2 * ancillaDim;
-    let uData = Mapped(layer -> QuantizeGivensAngles(layer, uNumAddresses, bRot), uLayerAngles);
+    let uData = Mapped(layer -> QuantizeGivensAngles(layer, uNumAddresses, rotationBits), uLayerAngles);
     let uPhaseData = PhaseFlipsAsSelectData(uPhases);
 
     // Single shared angle register for all UCR steps (reused sequentially)
@@ -245,7 +245,7 @@ operation SiteUnitaryBerry(
 /// Real amplitudes of the initial state.
 /// ## numSites
 /// Number of MPS sites.
-/// ## bRot
+/// ## rotationBits
 /// Phase gradient precision (number of bits).
 /// ## siteVLayerAngles, siteVLayerShifted, siteVPhases
 /// Per-site V Givens decomposition: Double[numSites-1][numLayers][numAngles],
@@ -262,10 +262,10 @@ operation SiteUnitaryBerry(
 /// State register.
 /// ## ancilla
 /// Ancilla register.
-operation MPSPreparationBerry(
+operation MPSSequential(
     initialStateVec : Double[],
     numSites : Int,
-    bRot : Int,
+    rotationBits : Int,
     siteVLayerAngles : Double[][][],
     siteVLayerShifted : Bool[][],
     siteVPhases : Bool[][],
@@ -285,11 +285,11 @@ operation MPSPreparationBerry(
     ancilla : Qubit[]
 ) : Unit {
     // Initialize phase gradient register
-    use phaseGradient = Qubit[bRot];
+    use phaseGradient = Qubit[rotationBits];
     PreparePhaseGradientState(phaseGradient);
 
     // Single shared angle register for QROM-loaded angles (reused by all operations)
-    use angleReg = Qubit[bRot];
+    use angleReg = Qubit[rotationBits];
 
     // Prepare initial state
     let initReg = ancilla + state[0..1];

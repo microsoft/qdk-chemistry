@@ -80,20 +80,20 @@ operation IncrementByOne(target : Qubit[]) : Unit is Adj + Ctl {
 /// Double[numAngles]: raw Givens rotation angles in radians.
 /// ## numAddresses
 /// The padded address space dimension (= dim/2 for a dim-qubit register).
-/// ## bRot
+/// ## rotationBits
 /// Phase gradient precision bits.
 ///
 /// # Output
-/// Bool[numAddresses][bRot]: quantized angle data for Select.
-function QuantizeGivensAngles(angles : Double[], numAddresses : Int, bRot : Int) : Bool[][] {
-    let scale = 1 <<< bRot;
+/// Bool[numAddresses][rotationBits]: quantized angle data for Select.
+function QuantizeGivensAngles(angles : Double[], numAddresses : Int, rotationBits : Int) : Bool[][] {
+    let scale = 1 <<< rotationBits;
     let scaleF = IntAsDouble(scale);
     mutable data : Bool[][] = [];
     for k in 0..numAddresses - 1 {
         let angle = k < Length(angles) ? angles[k] | 0.0;
         mutable xInt = Round(scaleF * angle / (2.0 * PI()));
         set xInt = ((xInt % scale) + scale) % scale;
-        set data += [IntAsBoolArray(xInt, bRot)];
+        set data += [IntAsBoolArray(xInt, rotationBits)];
     }
     return data;
 }
@@ -108,19 +108,19 @@ function QuantizeGivensAngles(angles : Double[], numAddresses : Int, bRot : Int)
 /// # Input
 /// ## angles
 /// Double[dim]: standard Ry rotation angles in radians.
-/// ## bRot
+/// ## rotationBits
 /// Phase gradient precision bits.
 ///
 /// # Output
-/// Bool[dim][bRot]: quantized angle data for Select.
-function QuantizeRyAngles(angles : Double[], bRot : Int) : Bool[][] {
-    let scale = 1 <<< bRot;
+/// Bool[dim][rotationBits]: quantized angle data for Select.
+function QuantizeRyAngles(angles : Double[], rotationBits : Int) : Bool[][] {
+    let scale = 1 <<< rotationBits;
     let scaleF = IntAsDouble(scale);
     mutable data : Bool[][] = [];
     for k in 0..Length(angles) - 1 {
         mutable xInt = Round(scaleF * angles[k] / (4.0 * PI()));
         set xInt = ((xInt % scale) + scale) % scale;
-        set data += [IntAsBoolArray(xInt, bRot)];
+        set data += [IntAsBoolArray(xInt, rotationBits)];
     }
     return data;
 }
@@ -242,8 +242,8 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 ///
 /// # Input
 /// ## angleData
-/// Bool[numAngles][bRot]: pre-quantized rotation angles. angleData[k] is the angle
-/// for the k-th pair, encoded as a b_rot-bit integer x such that θ = 4π·x/2^bRot.
+/// Bool[numAngles][rotationBits]: pre-quantized rotation angles. angleData[k] is the angle
+/// for the k-th pair, encoded as a rotationBits-bit integer x such that θ = 4π·x/2^rotationBits.
 /// ## isShifted
 /// If true, applies the shifted version (Berry eq. 24).
 /// ## target
@@ -300,7 +300,7 @@ operation ApplyGivensLayer(
 ///
 /// # Input
 /// ## angleData
-/// Bool[numAngles][bRot]: pre-quantized rotation angles.
+/// Bool[numAngles][rotationBits]: pre-quantized rotation angles.
 /// ## isShifted
 /// If true, applies the shifted version.
 /// ## target
@@ -319,11 +319,11 @@ operation ApplyControlledGivensLayer(
 ) : Unit {
     let n = Length(target);
     let numAngles = Length(angleData);
-    let bRot = Length(angleReg);
+    let rotationBits = Length(angleReg);
 
     // Build extended data: zeros (ctrl=0) ++ angleData (ctrl=1)
     // Control qubit is MSB of the address register.
-    let zeros = Repeated(Repeated(false, bRot), numAngles);
+    let zeros = Repeated(Repeated(false, rotationBits), numAngles);
     let extendedData = zeros + angleData;
 
     // Shifts are UNCONDITIONAL — saves Controlled IncrementByOne cost.
@@ -362,7 +362,7 @@ operation ApplyControlledGivensLayer(
 ///
 /// # Input
 /// ## layerAngleData
-/// Bool[numLayers][numAngles][bRot]: angle data for each Givens layer.
+/// Bool[numLayers][numAngles][rotationBits]: angle data for each Givens layer.
 /// ## layerIsShifted
 /// Bool[numLayers]: whether each layer is shifted.
 /// ## phaseFlipData
@@ -414,7 +414,7 @@ operation ApplyRealUnitaryViaGivens(
 ///
 /// # Input
 /// ## layerAngleData
-/// Bool[numLayers][numAngles][bRot]: angle data for each Givens layer.
+/// Bool[numLayers][numAngles][rotationBits]: angle data for each Givens layer.
 /// ## layerIsShifted
 /// Bool[numLayers]: whether each layer is shifted.
 /// ## phaseFlipData
@@ -475,7 +475,7 @@ operation ApplyControlledRealUnitaryViaGivens(
 ///
 /// # Input
 /// ## layerAngleData
-/// Bool[numLayers][numAngles][bRot]: angle data for the joint Givens decomposition.
+/// Bool[numLayers][numAngles][rotationBits]: angle data for the joint Givens decomposition.
 /// The address space covers both subspace and target upper bits.
 /// ## layerIsShifted
 /// Bool[numLayers]: whether each layer is shifted.

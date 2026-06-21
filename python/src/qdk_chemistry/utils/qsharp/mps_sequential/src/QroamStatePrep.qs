@@ -53,7 +53,7 @@ export QroamStatePrep, ComputeSBMAngles, ComputeSignBits;
 /// ## target
 /// State register, initialized to |0...0⟩.
 /// ## phaseGradient
-/// Phase-gradient ancilla register (b_rot qubits), pre-initialized.
+/// Phase-gradient ancilla register (rotationBits qubits), pre-initialized.
 ///
 /// # Remarks
 /// Qubit ordering: target[0] = MSB (first-allocated = highest bit of state index).
@@ -65,12 +65,12 @@ operation QroamStatePrep(
     angleReg : Qubit[]
 ) : Unit {
     let nQubits = Length(target);
-    let bRot = Length(phaseGradient);
+    let rotationBits = Length(phaseGradient);
     Fact(nQubits >= 1, "Need at least 1 target qubit.");
-    Fact(bRot >= 2, "Phase gradient register needs at least 2 qubits.");
+    Fact(rotationBits >= 2, "Phase gradient register needs at least 2 qubits.");
 
-    // Classical pre-computation: SBM angle tree quantized to b_rot bits.
-    let angleTree = ComputeSBMAngles(coefficients, nQubits, bRot);
+    // Classical pre-computation: SBM angle tree quantized to rotationBits bits.
+    let angleTree = ComputeSBMAngles(coefficients, nQubits, rotationBits);
 
     // Iterate from level 0 (MSB = target[0]) to level n-1 (LSB = target[nQubits-1]).
     // At level i, 2^i angles are conditioned on the i previously-prepared qubits.
@@ -83,7 +83,7 @@ operation QroamStatePrep(
 
         if level == 0 {
             // Root level: single unconditional rotation Ry(θ_root).
-            let angleBits = IntAsBoolArray(angleTree[1], bRot);
+            let angleBits = IntAsBoolArray(angleTree[1], rotationBits);
             within {
                 ApplyPauliFromBitString(PauliX, true, angleBits, angleReg);
             } apply {
@@ -94,8 +94,8 @@ operation QroamStatePrep(
             // so that Select's LE convention yields the correct tree node index.
             let address = Reversed(target[0..level - 1]);
 
-            // Build QROM data table: Bool[2^level][b_rot].
-            let data = ComputeQROMData(angleTree, startIdx, numAngles, bRot);
+            // Build QROM data table: Bool[2^level][rotationBits].
+            let data = ComputeQROMData(angleTree, startIdx, numAngles, rotationBits);
 
             within {
                 Select(data, address, angleReg);
@@ -138,12 +138,12 @@ operation QroamStatePrep(
 /// Real amplitudes (will be padded to length 2^nQubits).
 /// ## nQubits
 /// Number of target qubits.
-/// ## bRot
+/// ## rotationBits
 /// Phase-gradient precision (number of bits).
 ///
 /// # Output
 /// Int array of length 2^nQubits, indexed as a binary heap (root at index 1).
-function ComputeSBMAngles(coefficients : Double[], nQubits : Int, bRot : Int) : Int[] {
+function ComputeSBMAngles(coefficients : Double[], nQubits : Int, rotationBits : Int) : Int[] {
     let nCoeffs = 1 <<< nQubits;
 
     // Pad coefficients to 2^n.
@@ -164,7 +164,7 @@ function ComputeSBMAngles(coefficients : Double[], nQubits : Int, bRot : Int) : 
     }
 
     // Compute quantized angles.
-    let scale = IntAsDouble(1 <<< bRot);
+    let scale = IntAsDouble(1 <<< rotationBits);
     mutable angles = Repeated(0, nCoeffs);
 
     for level in 0..nQubits - 1 {
@@ -181,7 +181,7 @@ function ComputeSBMAngles(coefficients : Double[], nQubits : Int, bRot : Int) : 
             }
 
             // Quantize: x = 2^b · θ / (2π), so Ry(4π·x/2^b) = Ry(2θ) as desired.
-            let xInt = Round(scale * angle / (2.0 * PI())) % (1 <<< bRot);
+            let xInt = Round(scale * angle / (2.0 * PI())) % (1 <<< rotationBits);
             set angles w/= node <- xInt;
         }
     }
@@ -191,10 +191,10 @@ function ComputeSBMAngles(coefficients : Double[], nQubits : Int, bRot : Int) : 
 
 /// # Summary
 /// Converts a slice of the angle tree into QROM-compatible Bool[][] format.
-function ComputeQROMData(angleTree : Int[], startIdx : Int, count : Int, bRot : Int) : Bool[][] {
+function ComputeQROMData(angleTree : Int[], startIdx : Int, count : Int, rotationBits : Int) : Bool[][] {
     mutable data : Bool[][] = [];
     for i in 0..count - 1 {
-        set data += [IntAsBoolArray(angleTree[startIdx + i], bRot)];
+        set data += [IntAsBoolArray(angleTree[startIdx + i], rotationBits)];
     }
     return data;
 }

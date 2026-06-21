@@ -22,17 +22,17 @@ _QS_FILES = [
     Path(__file__).parent / "MeasurementBasis.qs",
 ]
 
-_MPS_BERRY_QS_FILES = [
-    Path(__file__).parent / "mps_berry" / "src" / "PhaseGradient.qs",
-    Path(__file__).parent / "mps_berry" / "src" / "GivensDecomposition.qs",
-    Path(__file__).parent / "mps_berry" / "src" / "QroamStatePrep.qs",
-    Path(__file__).parent / "mps_berry" / "src" / "MPSPreparationBerry.qs",
+_MPS_SEQUENTIAL_QS_FILES = [
+    Path(__file__).parent / "mps_sequential" / "src" / "PhaseGradient.qs",
+    Path(__file__).parent / "mps_sequential" / "src" / "GivensDecomposition.qs",
+    Path(__file__).parent / "mps_sequential" / "src" / "QroamStatePrep.qs",
+    Path(__file__).parent / "mps_sequential" / "src" / "MPSSequential.qs",
 ]
 
-# Sibling-module imports to strip when loading MPS Berry files via eval
+# Sibling-module imports to strip when loading MPS Sequential files via eval
 # (file-as-namespace imports only work with qsharp.json projects)
 _SIBLING_IMPORT_RE = re.compile(
-    r"^import\s+(PhaseGradient|GivensDecomposition|QroamStatePrep|MPSPreparationBerry)\b.*$",
+    r"^import\s+(PhaseGradient|GivensDecomposition|QroamStatePrep|MPSSequential)\b.*$",
     re.MULTILINE,
 )
 
@@ -47,15 +47,15 @@ def get_qsharp_utils():
         return qdk.code.QDKChemistry.Utils
 
 
-def _get_mps_berry_ns():
-    """Returns the MPS Berry Q# namespace (lazy-loaded via eval)."""
+def _get_mps_sequential_ns():
+    """Returns the MPS Sequential Q# namespace (lazy-loaded via eval)."""
     try:
-        return qdk.code.MPSPreparationBerry
+        return qdk.code.MPSSequential
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _MPS_BERRY_QS_FILES)
+        code = "\n".join(f.read_text() for f in _MPS_SEQUENTIAL_QS_FILES)
         code = _SIBLING_IMPORT_RE.sub("", code)
         qsharp.eval(code)
-        return qdk.code.MPSPreparationBerry
+        return qdk.code.MPSSequential
 
 
 class _QSharpUtilsProxy:
@@ -70,8 +70,8 @@ class _QSharpUtilsProxy:
             name: The name of the attribute being accessed on the Q# utilities namespace.
 
         """
-        if name == "MPSBerry":
-            return _get_mps_berry_ns()
+        if name == "MPSSequential":
+            return _get_mps_sequential_ns()
         utils = get_qsharp_utils()
         return getattr(utils, name)
 
