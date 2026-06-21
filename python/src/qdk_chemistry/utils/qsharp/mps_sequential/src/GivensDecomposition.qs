@@ -1,65 +1,129 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-// --------------------------------------------------------------------------------------------
-// Based on code originally published by Felix Rupprecht (DLR) on Zenodo:
-//   https://zenodo.org/records/15587498
-// Rewritten and adapted for integration into the QDK Chemistry library.
-// --------------------------------------------------------------------------------------------
-
-/// # Summary
-/// Gate-based unitary synthesis via Givens rotation layers.
-///
-/// # Description
-/// Applies arbitrary unitaries using QROAM-loaded angles + phase gradient rotations.
-/// Each unitary is pre-decomposed (classically) into layers of 2×2 Givens rotations.
-/// Each layer is applied as:
-///   1. QROAM loads the quantized angle for the current address state
-///   2. Ry via phase gradient applies the rotation to the active qubit
-///   3. Adjoint QROAM uncomputes the angle register
-///
-/// This replaces the simulation-only `ApplyUnitary` with actual gate decompositions.
-///
-/// # References
-/// - Berry et al. (arXiv:2409.11748): MPS state preparation
-/// - Clements et al. (arXiv:1603.08788): Optimal multiport interferometer design
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
 
 import Std.Math.*;
 import Std.Convert.*;
 import Std.Arrays.*;
 import Std.Canon.*;
 import Std.Diagnostics.*;
-import Std.Arithmetic.RippleCarryCGIncByLE;
+import Std.ResourceEstimation.*;
 import Std.TableLookup.Select;
 import PhaseGradient.RyViaPhaseGradient;
 import PhaseGradient.RzViaPhaseGradient;
 
 export ApplyGivensLayer, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, ApplyBlockDiagUnitaryViaGivens, IncrementByOne, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial, ComputePhasePolynomialCoeffs;
 
-// =============================================================================
-// Increment/Decrement helper
-// =============================================================================
-
 /// # Summary
 /// Increments a little-endian register by 1 (mod 2^n).
 ///
 /// # Input
 /// ## target
-/// Register in little-endian format (target[0] = LSB).
-operation IncrementByOne(target : Qubit[]) : Unit is Adj + Ctl {
+/// Register in little-endian (LE) format (target[0] = LSB (Least Significant Bit)).
+operation IncrementByOne(target : Qubit[]) : Unit {
+    AddConstant(1, target);
+}
+
+// =============================================================================
+// Classical constant addition (Sanders et al. Fig. 18)
+// =============================================================================
+
+/// # Summary
+/// Adds a classical constant `c` to a little-endian quantum register in place.
+///
+/// # Description
+/// Implements |x⟩ → |x + c (mod 2^n)⟩ using the ripple-carry structure from
+/// Sanders et al. (PRX Quantum 1, 020312, 2020), Fig. 18.
+///
+/// Resource cost:
+///   - n − 2 AND gates  → 4(n − 2) T-gates
+///   - n − 2 IAND gates → 0 T-gates (measurement-based)
+///   - O(n) Clifford gates
+///   - n − 1 ancilla qubits (borrowed, returned to |0⟩)
+///
+/// # Input
+/// ## c
+/// The classical integer to add.
+/// ## target
+/// Register in little-endian format (target[0] = LSB). Length n.
+///
+/// # References
+/// - Sanders, Y.R., et al. "Compilation of Fault-Tolerant Quantum Heuristics
+///   for Combinatorial Optimization." PRX Quantum 1, 020312 (2020).
+operation AddConstant(c : Int, target : Qubit[]) : Unit {
     let n = Length(target);
+    let cMod = ((c % (1 <<< n)) + (1 <<< n)) % (1 <<< n);
+    let cBits = IntAsBoolArray(cMod, n); // LE: cBits[0] = LSB
+
     if n == 1 {
-        X(target[0]);
+        if cBits[0] {
+            X(target[0]);
+        }
     } elif n == 2 {
-        // For 2-bit: |ab⟩ → |(a⊕b)(b⊕1)⟩. All Cliffords (0 Toffoli).
-        CNOT(target[0], target[1]);
-        X(target[0]);
+        // 2-bit: no Toffolis needed. Use Clifford-only circuit.
+        if cBits[1] {
+            if cBits[0] {
+                // +3 = -1 mod 4: decrement
+                X(target[0]);
+                CNOT(target[0], target[1]);
+            } else {
+                // +2: flip MSB
+                X(target[1]);
+            }
+        } else {
+            if cBits[0] {
+                // +1: increment
+                CNOT(target[0], target[1]);
+                X(target[0]);
+            }
+            // +0: identity
+        }
     } else {
-        use increment = Qubit[n];
-        within {
-            X(increment[0]);
-        } apply {
-            RippleCarryCGIncByLE(increment, target);
+        use ancillas = Qubit[n - 1];
+
+        // --- Forward pass: compute carry bits ---
+        if cBits[0] {
+            CNOT(target[0], ancillas[0]);
+        }
+
+        for i in 1..n - 2 {
+            let j = i - 1;
+            CNOT(ancillas[j], target[i]);
+            if cBits[i] {
+                X(ancillas[j]);
+            }
+            AND(ancillas[j], target[i], ancillas[i]);
+            if cBits[i] {
+                X(ancillas[j]);
+            }
+            CNOT(ancillas[j], ancillas[i]);
+        }
+
+        // --- MSB: XOR final carry ---
+        CNOT(ancillas[n - 2], target[n - 1]);
+
+        // --- Reverse pass: uncompute ancillas ---
+        for i in n - 2..-1..1 {
+            let j = i - 1;
+            CNOT(ancillas[j], ancillas[i]);
+            if cBits[i] {
+                X(ancillas[j]);
+            }
+            Adjoint AND(ancillas[j], target[i], ancillas[i]);
+            if cBits[i] {
+                X(ancillas[j]);
+            }
+        }
+
+        if cBits[0] {
+            CNOT(target[0], ancillas[0]);
+        }
+
+        // --- Final XOR: add constant bits ---
+        for i in 0..n - 1 {
+            if cBits[i] {
+                X(target[i]);
+            }
         }
     }
 }
@@ -69,7 +133,8 @@ operation IncrementByOne(target : Qubit[]) : Unit is Adj + Ctl {
 // =============================================================================
 
 /// # Summary
-/// Quantize Givens rotation angles to Bool[][] format for Select/QROAM.
+/// Quantize Givens rotation angles to Bool[][] format for Select/QROAM
+/// (Quantum Read-Only Access Memory).
 ///
 /// # Description
 /// For a Givens rotation with angle θ (where the 2×2 matrix is [[cos θ, -sin θ], [sin θ, cos θ]]):
@@ -99,7 +164,8 @@ function QuantizeGivensAngles(angles : Double[], numAddresses : Int, rotationBit
 }
 
 /// # Summary
-/// Quantize standard Ry angles to Bool[][] format for Select/QROAM.
+/// Quantize standard Ry angles to Bool[][] format for Select/QROAM
+/// (Quantum Read-Only Access Memory).
 ///
 /// # Description
 /// For a standard Ry(α) rotation: RyViaPhaseGradient applies Ry(4π·x/2^b).
@@ -182,7 +248,8 @@ function ComputePhasePolynomialCoeffs(phases : Bool[]) : Bool[] {
 /// Applies a phase correction D = diag(±1) using the Reed-Muller polynomial decomposition.
 ///
 /// # Description
-/// Decomposes the diagonal into Z, CZ, CCZ, etc. gates via the Möbius transform.
+/// Decomposes the diagonal into Z, CZ (Controlled-Z), CCZ (doubly-Controlled-Z),
+/// etc. gates via the Möbius transform.
 /// For n≤2 qubits: all Clifford (0 CCZ). For n=3: at most 1 CCZ. For n=4: at most 5 CCZ.
 /// This is more efficient than the Select-based approach for small registers.
 ///
@@ -190,7 +257,8 @@ function ComputePhasePolynomialCoeffs(phases : Bool[]) : Bool[] {
 /// ## phases
 /// Bool[2^n]: phases[i] = true if |i⟩ gets Z flip.
 /// ## register
-/// Qubit[n]: the register in LE order (register[0] = LSB).
+/// Qubit[n]: the register in LE (little-endian) order
+/// (register[0] = LSB (Least Significant Bit)).
 operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
     let n = Length(register);
     let dim = Length(phases);
@@ -206,7 +274,8 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
                     set qubits += [register[bit]];
                 }
             }
-            // Apply multi-controlled Z: degree 1 = Z, degree 2 = CZ, degree 3 = CCZ, etc.
+            // Apply multi-controlled Z: degree 1 = Z, degree 2 = CZ (Controlled-Z),
+            // degree 3 = CCZ (doubly-Controlled-Z), etc.
             if Length(qubits) == 1 {
                 Z(qubits[0]);
             } elif Length(qubits) == 2 {
@@ -224,21 +293,20 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 // =============================================================================
 
 /// # Summary
-/// Applies one Givens rotation layer to a target register.
+/// Gate-based unitary synthesis via Givens rotation layers.
 ///
 /// # Description
-/// A Givens layer applies dim/2 independent Ry rotations on pairs of adjacent
-/// basis states. For a non-shifted layer (Berry eq. 23):
-///   block_diag(Ry(θ₀), Ry(θ₁), ..., I)
-/// Acting on pairs (0,1), (2,3), (4,5), ...
+/// Applies arbitrary unitaries using QROAM (Quantum Read-Only Access Memory)
+/// loaded angles + phase gradient rotations.
+/// Each unitary is pre-decomposed (classically) into layers of 2×2 Givens rotations.
+/// Each layer is applied as:
+///   1. QROAM loads the quantized angle for the current address state
+///   2. Ry via phase gradient applies the rotation to the active qubit
+///   3. Adjoint QROAM uncomputes the angle register
 ///
-/// For a shifted layer (Berry eq. 24):
-///   block_diag(I₁, Ry(θ₀), Ry(θ₁), ..., I)
-/// Acting on pairs (1,2), (3,4), (5,6), ...
-///
-/// Implementation: the LSB (target[0]) selects between the two states in each pair.
-/// The remaining bits (target[1..n-1]) serve as the address for QROAM angle lookup.
-/// For shifted layers, we decrement the register by 1 first to align pairs with LSB.
+/// # References
+/// - Berry et al. (PRX Quantum 6, 020327): https://doi.org/10.1103/PRXQuantum.6.020327
+/// - Clements et al. (arXiv:1603.08788): https://arxiv.org/abs/1603.08788
 ///
 /// # Input
 /// ## angleData
@@ -247,7 +315,8 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 /// ## isShifted
 /// If true, applies the shifted version (Berry eq. 24).
 /// ## target
-/// Target register in MSB-first format (target[0] = MSB, target[n-1] = LSB).
+/// Target register in MSB (Most Significant Bit)-first format
+/// (target[0] = MSB, target[n-1] = LSB (Least Significant Bit)).
 /// State value = target[0]*2^(n-1) + ... + target[n-1]*2^0.
 /// ## phaseGradient
 /// Phase gradient ancilla register.
@@ -260,9 +329,9 @@ operation ApplyGivensLayer(
 ) : Unit {
     let n = Length(target);
 
-    // Reversed(target) gives LE view: index 0 = LSB of state value
+    // Reversed(target) gives LE (little-endian) view: index 0 = LSB of state value
     if isShifted {
-        Adjoint IncrementByOne(Reversed(target));
+        AddConstant(-1, Reversed(target));
     }
 
     // Active qubit = LSB of state = target[n-1].
@@ -278,7 +347,7 @@ operation ApplyGivensLayer(
     }
 
     if isShifted {
-        IncrementByOne(Reversed(target));
+        AddConstant(1, Reversed(target));
     }
 }
 
@@ -326,10 +395,10 @@ operation ApplyControlledGivensLayer(
     let zeros = Repeated(Repeated(false, rotationBits), numAngles);
     let extendedData = zeros + angleData;
 
-    // Shifts are UNCONDITIONAL — saves Controlled IncrementByOne cost.
+    // Shifts are UNCONDITIONAL — saves Controlled AddConstant cost.
     // When ctrl=0, QROAM loads zeros so Ry(0)=I, making shift/unshift cancel.
     if isShifted {
-        Adjoint IncrementByOne(Reversed(target));
+        AddConstant(-1, Reversed(target));
     }
 
     let activeQubit = target[n - 1];
@@ -342,7 +411,7 @@ operation ApplyControlledGivensLayer(
     }
 
     if isShifted {
-        IncrementByOne(Reversed(target));
+        AddConstant(1, Reversed(target));
     }
 }
 
@@ -383,8 +452,14 @@ operation ApplyRealUnitaryViaGivens(
     let numLayers = Length(layerAngleData);
 
     // Apply Givens layers in order
+    // All layers have the same circuit structure (same register sizes), only data differs.
+    // Cache by shifted/non-shifted variant to avoid re-tracing ~1000 identical layers.
     for i in 0..numLayers - 1 {
-        ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], target, phaseGradient, angleReg);
+        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        if BeginEstimateCaching("GivensLayer", variant) {
+            ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], target, phaseGradient, angleReg);
+            EndEstimateCaching();
+        }
     }
 
     // Phase correction: D = diag(±1) via Reed-Muller polynomial
@@ -437,9 +512,18 @@ operation ApplyControlledRealUnitaryViaGivens(
     let numLayers = Length(layerAngleData);
 
     for i in 0..numLayers - 1 {
-        ApplyControlledGivensLayer(
-            layerAngleData[i], layerIsShifted[i], target, phaseGradient, control, angleReg
-        );
+        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        if BeginEstimateCaching("ControlledGivensLayer", variant) {
+            ApplyControlledGivensLayer(
+                layerAngleData[i],
+                layerIsShifted[i],
+                target,
+                phaseGradient,
+                control,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
     }
 
     // Controlled phase correction: when ctrl=1, apply D on target.
@@ -503,7 +587,11 @@ operation ApplyBlockDiagUnitaryViaGivens(
     let numLayers = Length(layerAngleData);
 
     for i in 0..numLayers - 1 {
-        ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], jointReg, phaseGradient, angleReg);
+        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        if BeginEstimateCaching("BlockDiagGivensLayer", variant) {
+            ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], jointReg, phaseGradient, angleReg);
+            EndEstimateCaching();
+        }
     }
 
     // Phase correction on the joint register via Reed-Muller polynomial

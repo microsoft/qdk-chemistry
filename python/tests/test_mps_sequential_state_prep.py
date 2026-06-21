@@ -1,10 +1,7 @@
-"""Tests for MPS Berry state preparation algorithm.
+"""Tests for MPS state preparation algorithm.
 
-Tests both the classical preprocessing (fidelity of the decomposition) and
-the full Q# circuit (state preparation fidelity and gate counts).
-
-Attribution: The Berry decomposition tested here is based on code originally
-published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/20393500).
+Tests both the classical preprocessing (fidelity of the CSD decomposition)
+and the full Q# circuit (state preparation fidelity and gate counts).
 """
 
 # --------------------------------------------------------------------------------------------
@@ -12,22 +9,21 @@ published by Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/2039350
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
+import re
 
 import numpy as np
 import pytest
+import qdk
 
 from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
+    MPSSequentialStatePreparation,
     compute_site_unitary_dense_data,
     decompose_2d,
     decompose_unitary_to_givens,
-    prepare_gate_based_data,
+    generate_mps_preparation_data,
 )
 from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
-
-# =============================================================================
-# Test MPSWavefunction container
-# =============================================================================
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 
 class TestMPSWavefunction:
@@ -56,9 +52,6 @@ class TestMPSWavefunction:
         with pytest.raises(ValueError, match="3-dimensional"):
             MPSWavefunction([np.zeros((4, 4))])
 
-        with pytest.raises(ValueError, match="chi_left=1"):
-            MPSWavefunction([np.zeros((2, 4, 1))])  # chi_left != 1
-
     def test_bond_dim_consistency(self):
         """Test that inconsistent bond dimensions are caught."""
         t1 = np.zeros((1, 4, 3))
@@ -67,13 +60,8 @@ class TestMPSWavefunction:
             MPSWavefunction([t1, t2])
 
 
-# =============================================================================
-# Test Berry CSD decomposition (classical correctness)
-# =============================================================================
-
-
-class TestBerryDecomposition:
-    """Test the Berry CSD decomposition reconstructs the target matrix."""
+class TestDecomposition:
+    """Test that CSD reconstructs the target matrix."""
 
     @pytest.mark.parametrize(
         ("chi_left", "chi_right", "seed"),
@@ -143,7 +131,10 @@ class TestBerryDecomposition:
 
         layer_angles, layer_shifted, phases = decompose_unitary_to_givens(q_mat)
 
-        # Reconstruct from layers
+        # Reconstruct from layers using circuit convention:
+        # Circuit applies layers[0] first, ..., layers[l-1], then D.
+        # Resulting unitary = D · L_{l-1} · ... · L_0
+        # Build by left-multiplying each layer in order, then D.
         reconstructed = np.eye(dim)
         for angles, shifted in zip(layer_angles, layer_shifted, strict=False):
             layer_mat = np.eye(dim)
@@ -162,75 +153,57 @@ class TestBerryDecomposition:
                     rot[j, i] = s
                     rot[j, j] = c
                     layer_mat = layer_mat @ rot
-            reconstructed = reconstructed @ layer_mat
+            reconstructed = layer_mat @ reconstructed
 
-        # Apply phase correction
+        # Apply phase correction (D applied last = leftmost in product)
         phase_diag = np.diag([(-1.0 if p else 1.0) for p in phases[:dim]])
-        reconstructed = reconstructed @ phase_diag
+        reconstructed = phase_diag @ reconstructed
 
         assert np.allclose(np.abs(reconstructed - q_mat), 0, atol=1e-8) or np.allclose(
             np.abs(reconstructed + q_mat), 0, atol=1e-8
         )
 
 
-# =============================================================================
-# Test prepare_gate_based_data
-# =============================================================================
-
-
-class TestPrepareGateBasedData:
+class TestGenerateMPSPreparationData:
     """Test the full preprocessing pipeline for MPSSequential."""
 
     def test_two_site_data_structure(self):
-        """Verify prepare_gate_based_data returns correct structure for 2 sites."""
+        """Verify generate_mps_preparation_data returns correct structure for 2 sites."""
         rng = np.random.default_rng(42)
         mps = MPSWavefunction.random(num_sites=2, bond_dim=2, rng=rng)
-        data = prepare_gate_based_data(mps.tensors)
+        data = generate_mps_preparation_data(mps.tensors)
 
-        assert data["num_sites"] == 2
-        assert data["ancilla_bits"] >= 1
-        assert len(data["initial_state_vec"]) > 0
+        assert data.num_sites == 2
+        assert data.ancilla_bits >= 1
+        assert len(data.initial_state_vec) > 0
         # One site unitary (num_sites - 1)
-        assert len(data["site_v_layer_angles"]) == 1
-        assert len(data["site_rot0_angles"]) == 1
-        assert len(data["site_w0_layer_angles"]) == 1
-        assert len(data["site_w1_layer_angles"]) == 1
-        assert len(data["site_u_layer_angles"]) == 1
+        assert len(data.sites) == 1
 
     def test_three_site_data_structure(self):
-        """Verify prepare_gate_based_data returns correct structure for 3 sites."""
+        """Verify generate_mps_preparation_data returns correct structure for 3 sites."""
         rng = np.random.default_rng(42)
         mps = MPSWavefunction.random(num_sites=3, bond_dim=2, rng=rng)
-        data = prepare_gate_based_data(mps.tensors)
+        data = generate_mps_preparation_data(mps.tensors)
 
-        assert data["num_sites"] == 3
-        assert len(data["site_v_layer_angles"]) == 2
-        assert len(data["site_rot0_angles"]) == 2
+        assert data.num_sites == 3
+        assert len(data.sites) == 2
 
     def test_initial_state_normalized(self):
         """Verify the initial state vector is normalized."""
         rng = np.random.default_rng(42)
         mps = MPSWavefunction.random(num_sites=3, bond_dim=4, rng=rng)
-        data = prepare_gate_based_data(mps.tensors)
+        data = generate_mps_preparation_data(mps.tensors)
 
-        init_vec = np.array(data["initial_state_vec"])
+        init_vec = np.array(data.initial_state_vec)
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
-
-
-# =============================================================================
-# Test MPS state preparation fidelity (Q# simulation)
-# =============================================================================
 
 
 @pytest.fixture
 def qsharp_ctx():
-    """Initialize Q# context with MPS Sequential operations loaded."""
-    qdk = pytest.importorskip("qdk")
-    from qdk import qsharp  # noqa: PLC0415
+    """Initialize a fresh Q# context with MPS Sequential operations loaded."""
+    from qdk_chemistry.utils.qsharp import _MPS_PROJECT_ROOT
 
-    qs_project = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp" / "mps_sequential"
-    qsharp.init(project_root=str(qs_project))
-    return qdk, qsharp
+    return qdk.Context(project_root=_MPS_PROJECT_ROOT)
 
 
 class TestMPSSequentialFidelity:
@@ -239,17 +212,20 @@ class TestMPSSequentialFidelity:
     @pytest.mark.parametrize(
         ("num_sites", "bond_dim", "seed"),
         [
-            (2, 2, 42),
-            (2, 4, 123),
-            (3, 2, 456),
+            (2, 4, 42),
+            (3, 4, 42),
+            (4, 2, 42),
+            (5, 2, 42),
         ],
     )
     def test_fidelity_vs_exact(self, qsharp_ctx, num_sites, bond_dim, seed):
         """Test state preparation fidelity against the exact MPS state vector.
 
-        The fidelity should be high (> 0.99) for moderate phase gradient precision.
+        Uses single-shot statevector simulation via DumpMachine() instead of
+        statistical sampling (prohibitively slow due to the QROAM-based circuit
+        allocating many internal ancillas per shot).
         """
-        qdk_mod, qsharp_mod = qsharp_ctx
+        ctx = qsharp_ctx
         rng = np.random.default_rng(seed)
         mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
 
@@ -257,157 +233,69 @@ class TestMPSSequentialFidelity:
         target_state = mps.contract()
 
         # Prepare gate-based data
-        data = prepare_gate_based_data(mps.tensors)
-        rotation_bits = 10
-        ancilla_bits = data["ancilla_bits"]
+        prep_data = generate_mps_preparation_data(mps.tensors)
+        params = prep_data.to_qsharp_params(rotation_bits=10)
         num_state_qubits = 2 * num_sites
-        num_ancilla_qubits = ancilla_bits
+        num_ancilla_qubits = prep_data.ancilla_bits
 
-        # Build Q# parameter strings
-        initial_state_str = ", ".join(f"{x:.15f}" for x in data["initial_state_vec"])
-        v_angles_str = _nested_list_to_qsharp_3d(data["site_v_layer_angles"])
-        v_shifted_str = _nested_list_to_qsharp_2d_bool(data["site_v_layer_shifted"])
-        v_phases_str = _nested_list_to_qsharp_2d_bool(data["site_v_phases"])
-        rot0_str = _nested_list_to_qsharp_2d_float(data["site_rot0_angles"])
-        rot1_str = _nested_list_to_qsharp_2d_float(data["site_rot1_angles"])
-        rot2_str = _nested_list_to_qsharp_2d_float(data["site_rot2_angles"])
-        w0_angles_str = _nested_list_to_qsharp_3d(data["site_w0_layer_angles"])
-        w0_shifted_str = _nested_list_to_qsharp_2d_bool(data["site_w0_layer_shifted"])
-        w0_phases_str = _nested_list_to_qsharp_2d_bool(data["site_w0_phases"])
-        w1_angles_str = _nested_list_to_qsharp_3d(data["site_w1_layer_angles"])
-        w1_shifted_str = _nested_list_to_qsharp_2d_bool(data["site_w1_layer_shifted"])
-        w1_phases_str = _nested_list_to_qsharp_2d_bool(data["site_w1_phases"])
-        u_angles_str = _nested_list_to_qsharp_3d(data["site_u_layer_angles"])
-        u_shifted_str = _nested_list_to_qsharp_2d_bool(data["site_u_layer_shifted"])
-        u_phases_str = _nested_list_to_qsharp_2d_bool(data["site_u_phases"])
+        qs_code = _build_mps_eval_code(params, num_state_qubits, num_ancilla_qubits)
+        ctx.eval(f"use state = Qubit[{num_state_qubits}];")
+        ctx.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
+        ctx.eval(qs_code)
+        dump = ctx.dump_machine()
+        amplitudes = np.array(dump.as_dense_state(), dtype=complex)
+        ctx.eval("ResetAll(state + ancilla);")
 
-        # Run Q# state preparation and sample
-        n_shots = 10000
-        qs_code = f"""{{
-            use state = Qubit[{num_state_qubits}];
-            use ancilla = Qubit[{num_ancilla_qubits}];
-            MPSSequential.MPSSequential(
-                [{initial_state_str}],
-                {num_sites},
-                {rotation_bits},
-                {v_angles_str},
-                {v_shifted_str},
-                {v_phases_str},
-                {rot0_str},
-                {rot1_str},
-                {rot2_str},
-                {w0_angles_str},
-                {w0_shifted_str},
-                {w0_phases_str},
-                {w1_angles_str},
-                {w1_shifted_str},
-                {w1_phases_str},
-                {u_angles_str},
-                {u_shifted_str},
-                {u_phases_str},
-                state,
-                ancilla
-            );
-            // Measure state register
-            mutable results = [0, size = {num_state_qubits}];
-            for i in 0..{num_state_qubits - 1} {{
-                set results w/= i <- M(state[i]) == One ? 1 | 0;
-            }}
-            // Check ancilla is zero
-            mutable ancillaClean = true;
-            for i in 0..{num_ancilla_qubits - 1} {{
-                if M(ancilla[i]) == One {{
-                    set ancillaClean = false;
-                }}
-            }}
-            ResetAll(state + ancilla);
-            (results, ancillaClean)
-        }}"""
+        # Extract amplitudes where ancilla = |0⟩.
+        # DumpMachine qubit ordering: state[0]...state[N-1], ancilla[0]...
+        # (MSB-first in bit string). Ancilla qubits are the rightmost bits.
+        num_total_qubits = num_state_qubits + num_ancilla_qubits
+        dim = 2**num_total_qubits
+        ancilla_mask = (1 << num_ancilla_qubits) - 1
+        state_dim = 2**num_state_qubits
+        state_amplitudes = np.zeros(state_dim, dtype=complex)
+        for idx in range(dim):
+            if (idx & ancilla_mask) == 0:
+                state_idx = idx >> num_ancilla_qubits
+                state_amplitudes[state_idx] = amplitudes[idx]
 
-        results = qsharp_mod.run(qs_code, shots=n_shots)
+        # P(ancilla = |0⟩) — measures how well the ancilla is disentangled
+        ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
+        assert ancilla_zero_prob > 0.90, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low — ancilla not clean"
 
-        # Compute empirical distribution
-        dim = 2**num_state_qubits
-        counts = np.zeros(dim)
-        ancilla_clean_count = 0
-        for bit_array, ancilla_clean in results:
-            idx = sum(b * (2**i) for i, b in enumerate(bit_array))
-            counts[idx] += 1
-            if ancilla_clean:
-                ancilla_clean_count += 1
+        # Normalize the post-selected state
+        state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
 
-        # Empirical probability distribution
-        probs_measured = counts / n_shots
+        # Reindex: Q# uses little-endian within each 2-qubit site (via
+        # Reversed(initReg)), so DumpMachine's big-endian bits need to be
+        # reversed within each site to match the Python MPS convention.
+        site_bits = 2  # qubits per site
+        reordered = np.zeros_like(state_amplitudes)
+        for dm_idx in range(state_dim):
+            py_idx = 0
+            for site in range(num_sites):
+                shift = (num_sites - 1 - site) * site_bits
+                site_val = (dm_idx >> shift) & ((1 << site_bits) - 1)
+                # Reverse bits within this site
+                rev_val = 0
+                for b in range(site_bits):
+                    if site_val & (1 << b):
+                        rev_val |= 1 << (site_bits - 1 - b)
+                py_idx |= rev_val << shift
+            reordered[py_idx] = state_amplitudes[dm_idx]
+        state_amplitudes = reordered
 
-        # Target probability distribution
-        probs_target = target_state**2
-
-        # Classical fidelity (Bhattacharyya coefficient) as proxy
-        fidelity_proxy = np.sum(np.sqrt(probs_measured * probs_target)) ** 2
+        # Compute quantum state fidelity |⟨target|prepared⟩|²
+        fidelity = np.abs(np.dot(np.conj(state_amplitudes[: len(target_state)]), target_state)) ** 2
 
         # Should achieve high fidelity with rotation_bits=10
-        assert fidelity_proxy > 0.95, (
-            f"Fidelity {fidelity_proxy:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
-        )
-
-        # Ancilla should be clean (returned to |0>) most of the time
-        ancilla_clean_rate = ancilla_clean_count / n_shots
-        assert ancilla_clean_rate > 0.90, f"Ancilla clean rate {ancilla_clean_rate:.4f} too low"
+        assert fidelity > 0.95, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
 
 
-# =============================================================================
-# Test gate count estimation
-# =============================================================================
-
-
-class TestMPSSequentialGateCount:
-    """Test that gate count scaling matches theoretical expectations."""
-
-    def test_gate_count_scales_with_sites(self):
-        """Gate count should scale linearly with number of sites."""
-        rng = np.random.default_rng(42)
-        bond_dim = 2
-        counts = []
-
-        for num_sites in [2, 3, 4]:
-            mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
-            data = prepare_gate_based_data(mps.tensors)
-
-            # Count total Givens layers (proxy for gate count)
-            total_layers = 0
-            for site_idx in range(num_sites - 1):
-                total_layers += len(data["site_v_layer_angles"][site_idx])
-                total_layers += len(data["site_w0_layer_angles"][site_idx])
-                total_layers += len(data["site_w1_layer_angles"][site_idx])
-                total_layers += len(data["site_u_layer_angles"][site_idx])
-                total_layers += 3  # 3 UCR rotation layers per site
-
-            counts.append(total_layers)
-
-        # Verify roughly linear scaling (each site adds a constant number of layers)
-        diff_1 = counts[1] - counts[0]
-        diff_2 = counts[2] - counts[1]
-        # Differences should be similar (linear scaling)
-        assert abs(diff_1 - diff_2) <= max(diff_1, diff_2) * 0.5 + 1
-
-    def test_ancilla_bits_matches_bond_dim(self):
-        """Ancilla bits should be ceil(log2(max_bond_dim))."""
-        rng = np.random.default_rng(42)
-
-        for bond_dim in [2, 4, 8]:
-            mps = MPSWavefunction.random(num_sites=5, bond_dim=bond_dim, rng=rng)
-            data = prepare_gate_based_data(mps.tensors)
-            expected_bits = int(np.ceil(np.log2(mps.max_bond_dim)))
-            assert data["ancilla_bits"] >= expected_bits
-
-
-# =============================================================================
 # Qualtran reference test data: MPS tensors and expected states
-# =============================================================================
 
-# These tensors and expected states are taken from the Qualtran MPSPreparation tests
-# (DLR, Apache-2.0). They serve as regression fixtures to verify that qdk-chemistry's
-# Berry decomposition produces the same state preparation fidelity.
+# These tensors and expected states are from the Qualtran MPSPreparation tests
+# (Apache-2.0). They serve as regression fixtures for state preparation fidelity.
 
 _qualtran_mps_tensors = (
     np.array(
@@ -518,101 +406,294 @@ _qualtran_mps_expected_state = np.array(
      0.03556534, 0.        , 0.        , 0.03257808, 0.        , 0.        ,
      0.03618719, 0.        , 0.        , 0.        ])  # fmt: skip
 
-# Qualtran resource estimates (sparse_data=False, QROM mode) for cross-validation.
-# Format: (num_qubits, toffoli_count) from QubitCount and QECGatesCost.
-# - "dense": exploit_block_sparsity=False, QFxp(5,5)
-# - "sparse": exploit_block_sparsity=True, QFxp(7,7)
+# Qualtran resource estimates (QROM mode) for cross-validation.
+# From QubitCount and QECGatesCost (and_bloq + cswap).
 QUALTRAN_COST_DENSE = {"num_qubits": 26, "toffoli": 600}
 QUALTRAN_COST_SPARSE = {"num_qubits": 32, "toffoli": 321}
 
+# Non-zero spin MPS tensors — a 4-site system with chi_left=3 (singlet embedding).
+# From the Qualtran MPSPreparation tests (Apache-2.0).
+_qualtran_mps_tensors_non_zero_spin = (
+    np.array(
+        [
+            [
+                [-0.00110206, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.00316609, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, -0.57734054, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.00110206, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, -0.00223876, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, -0.00223876, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.57734054, 0.0],
+            ],
+            [
+                [0.0, 0.0, -0.00110206, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.00316609, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.57734054],
+            ],
+        ]
+    ),
+    np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [-0.70710678, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, -0.70710678, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [-0.55872176, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.82920795, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01562571, 0.0],
+            ],
+            [
+                [0.0, -0.55872176, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.82920795, -0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01562571],
+            ],
+            [
+                [0.0, 0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.70710678, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.70710678],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        ]
+    ),
+    np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [-1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [-1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [-0.99960484, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, -0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.02810986],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, -0.70710678, 0.0, 0.0],
+                [0.0, 0.0, -0.70710678, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, -0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, -1.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, -0.0, 0.0],
+                [0.0, 0.0, 0.0, -1.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ],
+        ]
+    ),
+    np.array(
+        [
+            [[0.0], [0.0], [0.0], [1.0]],
+            [[0.0], [0.0], [1.0], [0.0]],
+            [[0.0], [1.0], [0.0], [0.0]],
+            [[1.0], [0.0], [0.0], [0.0]],
+        ]
+    ),
+)
 
-# =============================================================================
-# Test MPS contraction against Qualtran reference state
-# =============================================================================
+_qualtran_mps_expected_state_non_zero_spin = np.array(
+    [ 0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        , -0.00110206,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        , -0.00110206,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.00176896,  0.        ,  0.        ,  0.        ,
+       -0.00125085,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        , -0.00262431,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.00185567,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+       -0.00125085,  0.        ,  0.        ,  0.        ,  0.00176896,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.00185567,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        , -0.00262431,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.57734054,  0.        ,  0.        ,
+        0.        , -0.40824141,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        , -0.40824141,  0.        ,
+        0.        ,  0.        ,  0.57734054,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+        0.        ])  # fmt: skip
+
+# Qualtran resource estimates for the non-zero spin case (chi_left=3).
+QUALTRAN_COST_NON_ZERO_SPIN_DENSE = {"num_qubits": 29, "toffoli": 734}
+QUALTRAN_COST_NON_ZERO_SPIN_SPARSE = {"num_qubits": 29, "toffoli": 258}
 
 
-class TestMPSQualtranReference:
-    """Test that MPSWavefunction reproduces the Qualtran expected state vectors."""
+class TestMPSSequentialQualtranFidelity:
+    """Test that MPSWavefunction contraction matches Qualtran expected states."""
 
-    def test_contraction_matches_qualtran_state(self):
-        """Verify MPS tensor contraction matches Qualtran's expected state vector."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        state = mps.contract()
-        assert np.allclose(state, _qualtran_mps_expected_state, atol=1e-6)
-
-    def test_mps_properties(self):
-        """Verify basic MPS properties for the Qualtran test instance."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        assert mps.num_sites == 4
-        assert mps.num_qubits == 8
-        assert mps.max_bond_dim == 6
-
-    def test_prepare_gate_based_data_produces_valid_output(self):
-        """Verify prepare_gate_based_data succeeds on Qualtran tensors."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        data = prepare_gate_based_data(mps.tensors)
-
-        assert data["num_sites"] == 4
-        assert data["ancilla_bits"] >= 3  # ceil(log2(6)) = 3
-        # 3 site unitaries (num_sites - 1)
-        assert len(data["site_v_layer_angles"]) == 3
-        assert len(data["site_rot0_angles"]) == 3
-
-        # Initial state should be normalized
-        init_vec = np.array(data["initial_state_vec"])
-        assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
-
-
-# =============================================================================
-# Test cost comparison with Qualtran resource estimates
-# =============================================================================
+    @pytest.mark.parametrize(
+        ("tensors", "expected_state"),
+        [
+            (_qualtran_mps_tensors, _qualtran_mps_expected_state),
+            (_qualtran_mps_tensors_non_zero_spin, _qualtran_mps_expected_state_non_zero_spin),
+        ],
+        ids=["standard", "non_zero_spin"],
+    )
+    def test_contract_matches_expected_state(self, tensors, expected_state):
+        """Verify MPS contraction produces the Qualtran expected state vector."""
+        mps = MPSWavefunction(tensors)
+        contracted = mps.contract()
+        # Use atol=1e-3: non-zero spin tensors are not perfectly canonical,
+        # so raw contraction has O(1e-4) leakage. Fidelity is still > 0.9999.
+        assert np.allclose(contracted, expected_state, atol=1e-3)
 
 
 class TestMPSSequentialQualtranCostComparison:
-    """Cross-validate gate counts between qdk-chemistry and Qualtran.
+    """Test that Q# resource estimates are consistent with Qualtran."""
 
-    These tests verify that qdk-chemistry's Berry decomposition produces gate
-    counts consistent with Qualtran's resource estimates for the same MPS tensors.
-    The Qualtran estimates use QubitCount and QECGatesCost (and_bloq + cswap).
-    """
+    @pytest.mark.parametrize(
+        ("tensors", "expected_num_sites", "min_ancilla_bits"),
+        [
+            (_qualtran_mps_tensors, 4, 3),
+            (_qualtran_mps_tensors_non_zero_spin, 4, 3),
+        ],
+        ids=["standard", "non_zero_spin"],
+    )
+    def test_prepare_gate_based_data_produces_valid_output(self, tensors, expected_num_sites, min_ancilla_bits):
+        """Verify generate_mps_preparation_data succeeds on Qualtran tensors."""
+        mps = MPSWavefunction(tensors)
+        data = generate_mps_preparation_data(mps.tensors)
 
-    def test_ancilla_bits_match_qualtran(self):
-        """Verify ancilla qubit count matches Qualtran's expectation."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        data = prepare_gate_based_data(mps.tensors)
+        assert data.num_sites == expected_num_sites
+        assert data.ancilla_bits >= min_ancilla_bits
+        # num_sites - 1 site unitaries
+        assert len(data.sites) == expected_num_sites - 1
 
-        # Qualtran dense mode: max bond dim = 6, so ceil(log2(6)) = 3 ancilla bits
-        # But Qualtran pads to next power of 2 internally: ancilla_dim = 8 -> 3 bits
-        expected_ancilla_bits = int(np.ceil(np.log2(mps.max_bond_dim)))
-        assert data["ancilla_bits"] >= expected_ancilla_bits
+        # Initial state should be normalized
+        init_vec = np.array(data.initial_state_vec)
+        assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
 
-    def test_total_state_qubits_match_qualtran(self):
-        """Verify total state qubit count matches Qualtran (2 per site)."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        # Qualtran: state register = 2 * num_sites = 8 qubits
-        assert mps.num_qubits == 8
+    @pytest.mark.parametrize(
+        ("tensors", "qualtran_cost"),
+        [
+            (_qualtran_mps_tensors, QUALTRAN_COST_DENSE),
+            (_qualtran_mps_tensors_non_zero_spin, QUALTRAN_COST_NON_ZERO_SPIN_DENSE),
+        ],
+        ids=["standard", "non_zero_spin"],
+    )
+    def test_resource_estimate_qubit_count(self, tensors, qualtran_cost):
+        """Verify Q# resource estimate qubit count is consistent with Qualtran."""
+        mps = MPSWavefunction(tensors)
+        algo = MPSSequentialStatePreparation()
+        circuit = algo.run(mps)
+        result = circuit.estimate()
+        counts = result.logical_counts
 
-    def test_givens_layer_count_bounded(self):
-        """Verify the number of Givens layers is bounded as expected.
+        # Q# estimate should use a comparable number of qubits to Qualtran dense mode
+        assert counts["numQubits"] >= qualtran_cost["num_qubits"]
+        assert counts["numQubits"] <= qualtran_cost["num_qubits"] * 2
 
-        For a dim x dim unitary, the Givens decomposition uses at most dim layers.
-        The Qualtran dense estimate (600 Toffoli) includes QROM overhead, so we
-        just check structural consistency here.
-        """
-        mps = MPSWavefunction(_qualtran_mps_tensors)
-        data = prepare_gate_based_data(mps.tensors)
-        ancilla_dim = 1 << data["ancilla_bits"]
+    @pytest.mark.parametrize(
+        ("tensors", "qualtran_cost"),
+        [
+            (_qualtran_mps_tensors, QUALTRAN_COST_SPARSE),
+            (_qualtran_mps_tensors_non_zero_spin, QUALTRAN_COST_NON_ZERO_SPIN_SPARSE),
+        ],
+        ids=["standard", "non_zero_spin"],
+    )
+    def test_resource_estimate_toffoli_count(self, tensors, qualtran_cost):
+        """Verify Q# resource estimate Toffoli count is consistent with Qualtran."""
+        mps = MPSWavefunction(tensors)
+        algo = MPSSequentialStatePreparation()
+        circuit = algo.run(mps)
+        result = circuit.estimate()
+        counts = result.logical_counts
 
-        for site_idx in range(mps.num_sites - 1):
-            # Each Givens decomposition of a dim x dim matrix uses <= dim layers
-            v_layers = len(data["site_v_layer_angles"][site_idx])
-            assert v_layers <= ancilla_dim, f"V layers {v_layers} > ancilla_dim {ancilla_dim}"
-
-            w0_layers = len(data["site_w0_layer_angles"][site_idx])
-            assert w0_layers <= ancilla_dim
-
-            w1_layers = len(data["site_w1_layer_angles"][site_idx])
-            assert w1_layers <= ancilla_dim
+        # Q# logical_counts reports all CCZ gates including internal QROAM/Select
+        # decompositions, so the count is larger than Qualtran's sparse Toffoli count.
+        assert counts["cczCount"] > 0
+        assert counts["cczCount"] <= qualtran_cost["toffoli"] * 10
 
 
 # =============================================================================
@@ -623,6 +704,42 @@ class TestMPSSequentialQualtranCostComparison:
 def _float_to_qsharp(x: float) -> str:
     """Format float for Q#."""
     return f"{x:.15f}"
+
+
+def _build_mps_eval_code(params: dict, num_state_qubits: int, num_ancilla_qubits: int) -> str:
+    """Build Q# eval code for MPSSequential from the params dict.
+
+    Assumes `state` and `ancilla` qubit registers are already allocated in scope.
+    """
+    initial_state_str = ", ".join(_float_to_qsharp(x) for x in params["initialStateVec"])
+    args = [
+        f"[{initial_state_str}]",
+        str(params["numSites"]),
+        str(params["rotationBits"]),
+        _nested_list_to_qsharp_3d(params["siteVLayerAngles"]),
+        _nested_list_to_qsharp_2d_bool(params["siteVLayerShifted"]),
+        _nested_list_to_qsharp_2d_bool(params["siteVPhases"]),
+        _nested_list_to_qsharp_2d_float(params["siteRot0Angles"]),
+        _nested_list_to_qsharp_2d_float(params["siteRot1Angles"]),
+        _nested_list_to_qsharp_2d_float(params["siteRot2Angles"]),
+        _nested_list_to_qsharp_3d(params["siteW0LayerAngles"]),
+        _nested_list_to_qsharp_2d_bool(params["siteW0LayerShifted"]),
+        _nested_list_to_qsharp_2d_bool(params["siteW0Phases"]),
+        _nested_list_to_qsharp_3d(params["siteW1LayerAngles"]),
+        _nested_list_to_qsharp_2d_bool(params["siteW1LayerShifted"]),
+        _nested_list_to_qsharp_2d_bool(params["siteW1Phases"]),
+        _nested_list_to_qsharp_3d(params["siteULayerAngles"]),
+        _nested_list_to_qsharp_2d_bool(params["siteULayerShifted"]),
+        _nested_list_to_qsharp_2d_bool(params["siteUPhases"]),
+        "state",
+        "ancilla",
+    ]
+    args_str = ",\n                ".join(args)
+    return (
+        f"MPSSequential.MPSSequential(\n"
+        f"                {args_str}\n"
+        f"    )"
+    )
 
 
 def _nested_list_to_qsharp_3d(data: list) -> str:

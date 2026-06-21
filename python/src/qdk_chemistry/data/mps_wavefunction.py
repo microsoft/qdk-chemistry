@@ -73,6 +73,10 @@ class MPSWavefunction:
             if t.shape[1] != site_dim:
                 raise ValueError(f"Tensor {i} has site dimension {t.shape[1]}, expected {site_dim}.")
 
+        # Note: chi_left > 1 on the first tensor is allowed for non-zero spin
+        # systems (singlet embedding), where the left boundary represents
+        # multiple spin projection states.
+
         # Validate bond dimension consistency
         for i in range(self.num_sites - 1):
             chi_right = self.tensors[i].shape[2]
@@ -107,9 +111,9 @@ class MPSWavefunction:
             Normalized state vector of length ``site_dim ** num_sites``.
 
         """
-        state = self.tensors[0]  # (1, d, chi_1)
+        state = self.tensors[0]  # (chi_left, d, chi_1)
         for tensor in self.tensors[1:]:
-            # state: (1, d^k, chi_prev), tensor: (chi_prev, d, chi_next)
+            # state: (chi_left, d^k, chi_prev), tensor: (chi_prev, d, chi_next)
             left = state.shape[0]
             num_states = state.shape[1]
             chi_prev = state.shape[2]
@@ -120,7 +124,10 @@ class MPSWavefunction:
             result = state_flat @ tensor_flat
             state = result.reshape(left, num_states * d, chi_next)
 
-        vec = state.flatten()
+        # Sum over the left boundary index (chi_left) and squeeze chi_right=1.
+        # For chi_left=1 this is equivalent to flatten; for chi_left > 1
+        # (non-zero spin) it sums the spin projection contributions.
+        vec = state.sum(axis=0).flatten()
         norm = np.linalg.norm(vec)
         if norm > 1e-15:
             vec = vec / norm

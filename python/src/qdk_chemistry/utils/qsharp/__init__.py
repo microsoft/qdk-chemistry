@@ -22,19 +22,9 @@ _QS_FILES = [
     Path(__file__).parent / "MeasurementBasis.qs",
 ]
 
-_MPS_SEQUENTIAL_QS_FILES = [
-    Path(__file__).parent / "mps_sequential" / "src" / "PhaseGradient.qs",
-    Path(__file__).parent / "mps_sequential" / "src" / "GivensDecomposition.qs",
-    Path(__file__).parent / "mps_sequential" / "src" / "QroamStatePrep.qs",
-    Path(__file__).parent / "mps_sequential" / "src" / "MPSSequential.qs",
-]
+_MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
 
-# Sibling-module imports to strip when loading MPS Sequential files via eval
-# (file-as-namespace imports only work with qsharp.json projects)
-_SIBLING_IMPORT_RE = re.compile(
-    r"^import\s+(PhaseGradient|GivensDecomposition|QroamStatePrep|MPSSequential)\b.*$",
-    re.MULTILINE,
-)
+_mps_context = None
 
 
 def get_qsharp_utils():
@@ -47,15 +37,17 @@ def get_qsharp_utils():
         return qdk.code.QDKChemistry.Utils
 
 
-def _get_mps_sequential_ns():
-    """Returns the MPS Sequential Q# namespace (lazy-loaded via eval)."""
-    try:
-        return qdk.code.MPSSequential
-    except AttributeError:
-        code = "\n".join(f.read_text() for f in _MPS_SEQUENTIAL_QS_FILES)
-        code = _SIBLING_IMPORT_RE.sub("", code)
-        qsharp.eval(code)
-        return qdk.code.MPSSequential
+def _get_mps_context():
+    """Returns a cached Q# Context with the MPS project loaded."""
+    global _mps_context
+    if _mps_context is None:
+        _mps_context = qdk.Context(project_root=_MPS_PROJECT_ROOT)
+    return _mps_context
+
+
+def _get_mps_namespace():
+    """Returns the MPS Q# namespace (lazy-loaded via project_root)."""
+    return _get_mps_context().code.MPSSequential
 
 
 class _QSharpUtilsProxy:
@@ -64,14 +56,14 @@ class _QSharpUtilsProxy:
     def __getattr__(self, name: str):
         """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
 
-        Falls through to MPS Berry namespace for names not found in QDKChemistry.Utils.
+        Falls through to MPS namespace for names not found in QDKChemistry.Utils.
 
         Args:
             name: The name of the attribute being accessed on the Q# utilities namespace.
 
         """
         if name == "MPSSequential":
-            return _get_mps_sequential_ns()
+            return _get_mps_namespace()
         utils = get_qsharp_utils()
         return getattr(utils, name)
 

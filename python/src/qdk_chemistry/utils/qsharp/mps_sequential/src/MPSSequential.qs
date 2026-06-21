@@ -1,38 +1,22 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-// --------------------------------------------------------------------------------------------
-// Based on code originally published by Felix Rupprecht (DLR) on Zenodo:
-//   https://zenodo.org/records/15587498
-// Rewritten and adapted for integration into the QDK Chemistry library.
-// --------------------------------------------------------------------------------------------
-
-/// # Summary
-/// MPS state preparation via Berry et al. 7-matrix CSD decomposition (Appendix B).
-///
-/// # Description
-/// Implements the site unitary decomposition from Berry et al. (arXiv:2409.11748,
-/// Figure 5) using structured quantum gates:
-///   V → UCR(rot2) → W₁ → UCR(rot1) → W₀ → UCR(rot0) → U
-///
-/// The 3 rotation layers use uniformly controlled Ry gates (parameterized by ancilla).
-/// V, W, U layers are applied via Givens rotation decomposition + QROAM.
 
 import Std.Math.*;
 import Std.Convert.*;
 import Std.Arrays.*;
 import Std.Canon.*;
 import Std.Diagnostics.*;
+import Std.ResourceEstimation.*;
 import Std.TableLookup.Select;
 import PhaseGradient.RyViaPhaseGradient;
 import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, SiteUnitaryBerry, ApplyUCR, ApplyControlledUCR;
+export MPSSequential, SiteUnitary, ApplyUCR, ApplyControlledUCR;
 
 // =============================================================================
-// Helper operations for the Berry et al. decomposition
+// Helper operations for the decomposition
 // =============================================================================
 
 /// Helper: Apply uniformly controlled Y-rotation (UCR).
@@ -81,7 +65,7 @@ operation ApplyControlledUCR(
 }
 
 // =============================================================================
-// Berry decomposition (Givens + QROAM + phase gradient)
+// CSD decomposition (Givens + QROAM + phase gradient)
 // =============================================================================
 
 /// # Summary
@@ -139,7 +123,7 @@ operation ApplyControlledUCR(
 /// The ancilla register.
 /// ## phaseGradient
 /// Phase gradient register (pre-initialized).
-operation SiteUnitaryBerry(
+operation SiteUnitary(
     vLayerAngles : Double[][],
     vLayerShifted : Bool[],
     vPhases : Bool[],
@@ -185,7 +169,7 @@ operation SiteUnitaryBerry(
     // (angleReg is now passed in from the caller)
 
     // Step 1: V on ancilla (gate-based via Givens)
-    // Reversed(ancilla) matches simulation's ApplyUnitary(V, Reversed(ancilla)) convention
+    // Reversed(ancilla) maps ancilla register to target with LSB=ancilla[0] as active qubit
     ApplyRealUnitaryViaGivens(vData, vLayerShifted, vPhaseData, Reversed(ancilla), phaseGradient, angleReg);
 
     // Step 2: UCR Ry on q0, addressed by ancilla
@@ -200,7 +184,13 @@ operation SiteUnitaryBerry(
 
     // Step 4: W₀ on ancilla, controlled by q0
     ApplyControlledRealUnitaryViaGivens(
-        w0Data, w0LayerShifted, w0PhaseData, Reversed(ancilla), phaseGradient, q0, angleReg
+        w0Data,
+        w0LayerShifted,
+        w0PhaseData,
+        Reversed(ancilla),
+        phaseGradient,
+        q0,
+        angleReg
     );
 
     // Step 5: Controlled UCR on q1, ctrl by q0
@@ -215,7 +205,13 @@ operation SiteUnitaryBerry(
 
     // Step 7: W₁ on ancilla, controlled by q1
     ApplyControlledRealUnitaryViaGivens(
-        w1Data, w1LayerShifted, w1PhaseData, Reversed(ancilla), phaseGradient, q1, angleReg
+        w1Data,
+        w1LayerShifted,
+        w1PhaseData,
+        Reversed(ancilla),
+        phaseGradient,
+        q1,
+        angleReg
     );
 
     // Step 8: Controlled UCR on q0, ctrl by q1
@@ -228,17 +224,33 @@ operation SiteUnitaryBerry(
     // Step 9: Multiplexed U on ancilla, selected by (q0, q1)
     // Joint register = [q1, q0] + Reversed(ancilla) so block index = q1*2+q0 (MSB)
     ApplyBlockDiagUnitaryViaGivens(
-        uData, uLayerShifted, uPhaseData, Reversed(ancilla), [q1, q0], phaseGradient, angleReg
+        uData,
+        uLayerShifted,
+        uPhaseData,
+        Reversed(ancilla),
+        [q1, q0],
+        phaseGradient,
+        angleReg
     );
 }
 
 /// # Summary
-/// MPS state preparation using Berry decomposition.
+/// MPS state preparation via CSD decomposition (Appendix B).
 ///
 /// # Description
-/// Calls SiteUnitaryBerry for each site. All matrices are pre-decomposed
+/// Implements the site unitary decomposition from Berry et al.
+/// (PRX Quantum 6, 020327, https://doi.org/10.1103/PRXQuantum.6.020327,
+/// Figure 5) using structured quantum gates:
+///   V → UCR(rot2) → W₁ → UCR(rot1) → W₀ → UCR(rot0) → U
+///
+/// # Description
+/// Calls SiteUnitary for each site. All matrices are pre-decomposed
 /// into Givens rotation layers. Angle quantization is handled internally by Q#.
 /// Requires a phase gradient register which is initialized and freed by this operation.
+///
+// Based on code originally published by Felix Rupprecht (DLR) on Zenodo:
+///   https://zenodo.org/records/20393500
+/// Rewritten and adapted for integration into the QDK Chemistry library.
 ///
 /// # Input
 /// ## initialStateVec
@@ -296,29 +308,34 @@ operation MPSSequential(
     QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
 
     // Apply site unitaries
+    // All sites share the same circuit structure (same bond dimension / qubit counts),
+    // so we cache the resource estimate from the first site and reuse it for the rest.
     for siteIdx in 0..numSites - 2 {
         let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
-        SiteUnitaryBerry(
-            siteVLayerAngles[siteIdx],
-            siteVLayerShifted[siteIdx],
-            siteVPhases[siteIdx],
-            siteRot0Angles[siteIdx],
-            siteRot1Angles[siteIdx],
-            siteRot2Angles[siteIdx],
-            siteW0LayerAngles[siteIdx],
-            siteW0LayerShifted[siteIdx],
-            siteW0Phases[siteIdx],
-            siteW1LayerAngles[siteIdx],
-            siteW1LayerShifted[siteIdx],
-            siteW1Phases[siteIdx],
-            siteULayerAngles[siteIdx],
-            siteULayerShifted[siteIdx],
-            siteUPhases[siteIdx],
-            newSite,
-            ancilla,
-            phaseGradient,
-            angleReg
-        );
+        if BeginEstimateCaching("SiteUnitary", SingleVariant()) {
+            SiteUnitary(
+                siteVLayerAngles[siteIdx],
+                siteVLayerShifted[siteIdx],
+                siteVPhases[siteIdx],
+                siteRot0Angles[siteIdx],
+                siteRot1Angles[siteIdx],
+                siteRot2Angles[siteIdx],
+                siteW0LayerAngles[siteIdx],
+                siteW0LayerShifted[siteIdx],
+                siteW0Phases[siteIdx],
+                siteW1LayerAngles[siteIdx],
+                siteW1LayerShifted[siteIdx],
+                siteW1Phases[siteIdx],
+                siteULayerAngles[siteIdx],
+                siteULayerShifted[siteIdx],
+                siteUPhases[siteIdx],
+                newSite,
+                ancilla,
+                phaseGradient,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
     }
 
     // Undo phase gradient state
