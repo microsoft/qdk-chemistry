@@ -30,7 +30,6 @@ Strongly Correlated Molecules." PRX Quantum 6, 020327 (2025). [DOI: 10.1103/PRXQ
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,10 +39,20 @@ import numpy as np
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation
+from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = ["MPSSequentialStatePreparation"]
+
+
+class MPSSequentialStatePreparationSettings(StatePreparationSettings):
+    """Settings for MPS sequential state preparation."""
+
+    def __init__(self):
+        """Initialize the MPSSequentialStatePreparationSettings."""
+        super().__init__()
+        self._set_default("bRot", "int", 10, "Phase gradient precision (number of bits).")
 
 
 class MPSSequentialStatePreparation(StatePreparation):
@@ -79,6 +88,7 @@ class MPSSequentialStatePreparation(StatePreparation):
     def __init__(self):
         """Initialize the MPS sequential state preparation algorithm."""
         super().__init__()
+        self._settings = MPSSequentialStatePreparationSettings()
 
     def name(self) -> str:
         """Return the algorithm name.
@@ -114,7 +124,7 @@ class MPSSequentialStatePreparation(StatePreparation):
         params = {
             "initialStateVec": data["initial_state_vec"],
             "numSites": data["num_sites"],
-            "bRot": 10,  # default phase gradient precision
+            "bRot": self._settings.get("bRot"),
             "siteVLayerAngles": data["site_v_layer_angles"],
             "siteVLayerShifted": data["site_v_layer_shifted"],
             "siteVPhases": data["site_v_phases"],
@@ -132,7 +142,7 @@ class MPSSequentialStatePreparation(StatePreparation):
             "siteUPhases": data["site_u_phases"],
         }
 
-        mps_ops = _get_mps_berry_op()
+        mps_ops = QSHARP_UTILS.MPSBerry
 
         qsharp_factory = QsharpFactoryData(
             program=mps_ops.MPSPreparationBerry,
@@ -143,32 +153,45 @@ class MPSSequentialStatePreparation(StatePreparation):
 
 
 # ---------------------------------------------------------------------------
-# Q# integration
-# ---------------------------------------------------------------------------
-
-_MPS_QS_PROJECT = Path(__file__).parents[2] / "utils" / "qsharp" / "mps_berry"
-
-
-def _get_mps_berry_op():
-    """Lazily load the MPS Berry Q# operations."""
-    import qdk  # noqa: PLC0415
-
-    try:
-        return qdk.code.MPSPreparationBerry
-    except AttributeError:
-        qdk.init(project_root=str(_MPS_QS_PROJECT))
-        return qdk.code.MPSPreparationBerry
-
-
-# ---------------------------------------------------------------------------
 # Berry CSD preprocessing helpers
 # ---------------------------------------------------------------------------
 
 
 def decompose_2d(a: np.ndarray, b: np.ndarray):
-    """Decompose [a; b] (orthonormal columns) as in Berry et al. Eq. 30.
+    """Decompose a 2-block column matrix into a CSD-like factorization.
 
-    Returns (u_1, u_2, d_1, d_2, v).
+    Given matrices ``a`` (shape x, y) and ``b`` (shape x, y) whose vertical
+    stack ``[a; b]`` has orthonormal columns, compute the decomposition from
+    Berry et al. Eq. 30 (PRX Quantum 6, 020327):
+
+        [a]   [u_1  0 ] [diag(d_1)] [v]
+        [b] = [0   u_2] [diag(d_2)] [v]
+
+    where u_1, u_2 are unitary (x, x), d_1, d_2 are real diagonal vectors
+    of length y, and v is unitary (y, y). This is used iteratively in the
+    7-matrix CSD decomposition of site unitaries (Appendix B of
+    Rupprecht & Wölk 2026, arXiv:2605.28489).
+
+    Parameters
+    ----------
+    a : np.ndarray of shape (x, y)
+        Upper block of the column matrix.
+    b : np.ndarray of shape (x, y)
+        Lower block of the column matrix.
+
+    Returns
+    -------
+    u_1 : np.ndarray of shape (x, x)
+        Left unitary for the upper block.
+    u_2 : np.ndarray of shape (x, x)
+        Left unitary for the lower block (from polar decomposition).
+    d_1 : np.ndarray of shape (y,)
+        Singular values of ``a`` (upper diagonal).
+    d_2 : np.ndarray of shape (y,)
+        Diagonal of the polar factor of ``b @ v^H`` (lower diagonal).
+    v : np.ndarray of shape (y, y)
+        Right unitary (shared by both blocks).
+
     """
     u_1, d_1, vt = np.linalg.svd(a, full_matrices=True)
     v = vt
@@ -185,7 +208,7 @@ def decompose_2d(a: np.ndarray, b: np.ndarray):
 
 
 def _pad_to_power_of_2(arr: np.ndarray, target_len: int) -> np.ndarray:
-    """Pad array with zeros to target length."""
+    """Pad or truncate a 1-D array to ``target_len`` (zero-padding)."""
     if len(arr) >= target_len:
         return arr[:target_len]
     return np.concatenate([arr, np.zeros(target_len - len(arr))])
@@ -196,20 +219,38 @@ def compute_site_unitary_dense_data(
     v_from_next: np.ndarray | None,
     ancilla_dim: int,
 ) -> dict:
-    """Compute the Berry 7-matrix CSD decomposition for one MPS site.
+    """Compute the 7-matrix CSD decomposition of a site unitary.
+
+    Decomposes the target matrix (formed from the MPS tensor) into the
+    factorization from Appendix B of Rupprecht & Wölk (arXiv:2605.28489)::
+
+        [a_0]       [u_0          ] [I        ] [I        ] [I       ] [I       ] [d_0  .  ] [v        ]
+        [a_1]       [   u_1       ] [  I      ] [  I      ] [ d_1  . ] [ w_1    ] [d_0' .  ] [  v      ]
+        [a_2]   =   [      u_2    ] [    d_0  ] [    w_0  ] [ d_1' . ] [    w_1 ] [    d_0 ] [    v    ]
+        [a_3]       [         u_3 ] [    d_0' ] [       w_0] [       I] [       I] [    d_0'] [       v ]
+
+    Each a_i is a (dim x width) block of the target matrix. The decomposition
+    is computed via three successive QR + ``decompose_2d`` steps that peel
+    off pairs of blocks from bottom to top.
 
     Parameters
     ----------
     tensor : np.ndarray of shape (left, d, right)
         The MPS tensor for this site (d=4 for two-qubit sites).
     v_from_next : np.ndarray or None
-        The V matrix from the next site's decomposition.
+        The V matrix from the next site's decomposition (applied to the
+        incoming ancilla register). None for the last site.
     ancilla_dim : int
-        The ancilla register dimension (power of 2).
+        The ancilla register dimension (must be a power of 2).
 
     Returns
     -------
-    dict with keys: 'u', 'd_prime', 'w_0', 'w_1', 'v', 'ancilla_dim'
+    dict
+        - ``'u'``: tuple (u_0, u_1, u_2, u_3) — block-diagonal unitaries.
+        - ``'d_prime'``: tuple (d_0', d_1', d_2') — Y-rotation diagonals.
+        - ``'w_0'``, ``'w_1'``: mixing unitaries on the ancilla register.
+        - ``'v'``: right unitary passed to the previous site.
+        - ``'ancilla_dim'``: the ancilla dimension used.
 
     """
     left, site_dim, right = tensor.shape
@@ -249,20 +290,35 @@ def compute_site_unitary_dense_data(
 
 
 def _decompose_unitary_to_givens_python(matrix: np.ndarray):
-    """Decompose a real unitary into Givens rotation layers (pure Python fallback).
+    """Decompose a real orthogonal matrix into parallel Givens rotation layers.
 
-    Uses column-by-column QR elimination, then organizes into parallel layers.
+    Implements the Clements et al. (Optica 3, 1460, 2016) decomposition used
+    in Berry et al. and Rupprecht & Wölk (Sec. 2, arXiv:2605.28489) for
+    fault-tolerant unitary synthesis via phase-gradient rotations.
+
+    The matrix is factored as ``U = D · L_l · ... · L_1`` where each layer
+    ``L_j`` consists of parallel 2x2 R_y(theta) Givens rotations acting on
+    neighboring pairs of rows, and ``D`` is a diagonal sign matrix (±1).
+    Layers alternate between "even" (pairs 0-1, 2-3, ...) and "odd"
+    (pairs 1-2, 3-4, ...) forms as in Eq. (3) of the paper.
+
+    This is a pure-Python fallback; the Rust ``unitary_synthesis`` library
+    is preferred for performance.
 
     Parameters
     ----------
     matrix : np.ndarray
-        Real orthogonal matrix (dim x dim).
+        Real orthogonal matrix of shape (dim, dim).
 
     Returns
     -------
     layer_angles : list[list[float]]
+        Per-layer R_y rotation angles for each parallel slot.
     layer_shifted : list[bool]
+        Whether each layer uses odd-indexed pairs (shifted=True) or
+        even-indexed pairs (shifted=False).
     phases : list[bool]
+        Diagonal sign flips: True where the residual diagonal entry is -1.
 
     """
     dim = matrix.shape[0]
@@ -293,7 +349,28 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
 
 
 def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple[list[list[float]], list[bool]]:
-    """Organize Givens rotations into parallel layers."""
+    """Assign Givens rotations to parallel layers (Clements layout).
+
+    Maps a sequence of (pair_index, angle) rotations into layers that
+    alternate between even and odd pair placements, ensuring no two
+    rotations in the same layer share a qubit index.
+
+    Parameters
+    ----------
+    rotations : list of (int, float)
+        Each entry is (pair_index, angle) where pair_index indicates the
+        rotation acts on rows pair_index and pair_index+1.
+    dim : int
+        Dimension of the unitary (determines number of slots per layer).
+
+    Returns
+    -------
+    layer_angles : list[list[float]]
+        Angles for each slot in each layer.
+    layer_shifted : list[bool]
+        Whether the layer uses odd-indexed pairs.
+
+    """
     if not rotations:
         return [], []
 
@@ -363,21 +440,28 @@ def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple
 
 
 def decompose_unitary_to_givens(matrix: np.ndarray):
-    """Decompose a real unitary matrix into Givens rotation layers.
+    """Decompose a real orthogonal matrix into parallel Givens rotation layers.
 
-    Attempts to use the Rust-based decomposition if available, falls back
-    to a pure Python implementation.
+    Produces the factorization ``U = D · L_l · ... · L_1`` (Eq. 7 in
+    Rupprecht & Wölk, arXiv:2605.28489) where each ``L_j`` is a layer of
+    parallel R_y rotations and ``D`` is a diagonal ±1 sign matrix.
+
+    Uses the Rust ``unitary_synthesis`` library when available for
+    performance; falls back to a pure-Python implementation.
 
     Parameters
     ----------
     matrix : np.ndarray
-        Real orthogonal matrix (dim x dim), dim must be a power of 2.
+        Real orthogonal matrix of shape (dim, dim). dim must be a power of 2.
 
     Returns
     -------
     layer_angles : list[list[float]]
+        Per-layer R_y rotation angles for each parallel slot.
     layer_shifted : list[bool]
+        Whether each layer uses odd-indexed pairs (True) or even (False).
     phases : list[bool]
+        Diagonal sign flips (True where entry is -1).
 
     """
     try:
@@ -402,16 +486,25 @@ def decompose_unitary_to_givens(matrix: np.ndarray):
 def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
     """Decompose a block-diagonal real unitary into merged Givens rotation layers.
 
+    For the block-diagonal matrix ``diag(u_0, u_1, u_2, u_3)`` from the CSD
+    decomposition, this exploits the block structure so that rotations within
+    each block can be scheduled in parallel across blocks, reducing the total
+    number of Givens layers compared to treating the full matrix as dense.
+    See Sec. 3 and Fig. 3 of Rupprecht & Wölk (arXiv:2605.28489).
+
     Parameters
     ----------
     blocks : list[np.ndarray]
-        List of real orthogonal matrices.
+        List of real orthogonal matrices forming the diagonal blocks.
 
     Returns
     -------
     layer_angles : list[list[float]]
+        Per-layer R_y rotation angles for each parallel slot.
     layer_shifted : list[bool]
+        Whether each layer uses odd-indexed pairs (True) or even (False).
     phases : list[bool]
+        Diagonal sign flips (True where entry is -1).
 
     """
     try:
