@@ -1,21 +1,21 @@
 """MPS Berry state preparation via sequential site unitary synthesis.
 
-Implements the Matrix Product State (MPS) state preparation algorithm based on 
-:cite:`Berry2024`. Each site unitary is decomposed based on Appendix B in 
+Implements the Matrix Product State (MPS) state preparation algorithm based on
+:cite:`Berry2025`. Each site unitary is decomposed based on Appendix B in
 :cite:`Rupprecht2026`.
 
 Attribution
 -----------
-The unitary synthesis is based on code originally published by Felix Rupprecht 
+The unitary synthesis is based on code originally published by Felix Rupprecht
 on Zenodo :cite:`Rupprecht2026Zenodo` under Apache 2.0 license.
 The implementation has been rewritten for integration into QDK Chemistry.
 
 References
 ----------
     Felix Rupprecht and Sabine Wölk. (2026). Faster matrix product state preparation by
-    exploiting symmetry-induced block-sparsity. 
+    exploiting symmetry-induced block-sparsity.
     https://arxiv.org/pdf/2605.28489. Zenodo: https://zenodo.org/records/20393500.
-    
+
     Dominic W. Berry et al. (2025). Rapid Initial-State Preparation for the Quantum Simulation of
     Strongly Correlated Molecules. PRX Quantum 6, 020327.
     https://doi.org/10.1103/PRXQuantum.6.020327
@@ -51,7 +51,7 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the MPSSequentialStatePreparationSettings."""
         super().__init__()
-        self._set_default("bRot", "int", 10, "Phase gradient precision (number of bits).")
+        self._set_default("rotation_bits", "int", 10, "Phase gradient precision (number of bits).")
 
 
 class MPSSequentialStatePreparation(StatePreparation):
@@ -65,7 +65,7 @@ class MPSSequentialStatePreparation(StatePreparation):
 
     Attribution
     -----------
-    The unitary synthesis is based on code originally published by Felix Rupprecht 
+    The unitary synthesis is based on code originally published by Felix Rupprecht
     on Zenodo :cite:`Rupprecht2026Zenodo` under Apache 2.0 license.
     The implementation has been rewritten for integration into QDK Chemistry.
     """
@@ -98,18 +98,16 @@ class MPSSequentialStatePreparation(StatePreparation):
 
         """
         if not isinstance(wavefunction, MPSWavefunction):
-            raise TypeError(
-                f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}."
-            )
+            raise TypeError(f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
 
-        # Compute the gate-based decomposition data
-        data = prepare_gate_based_data(wavefunction.tensors)
+        # Compute the unitary synthesis data
+        data = generate_mps_preparation_data(wavefunction.tensors)
 
         # Build Q# factory parameters
         params = {
             "initialStateVec": data["initial_state_vec"],
             "numSites": data["num_sites"],
-            "bRot": self._settings.get("bRot"),
+            "rotationBits": self._settings.get("rotation_bits"),
             "siteVLayerAngles": data["site_v_layer_angles"],
             "siteVLayerShifted": data["site_v_layer_shifted"],
             "siteVPhases": data["site_v_phases"],
@@ -127,10 +125,10 @@ class MPSSequentialStatePreparation(StatePreparation):
             "siteUPhases": data["site_u_phases"],
         }
 
-        mps_ops = QSHARP_UTILS.MPSBerry
+        mps_ops = QSHARP_UTILS.MPSSequential
 
         qsharp_factory = QsharpFactoryData(
-            program=mps_ops.MPSPreparationBerry,
+            program=mps_ops.MPSSequential,
             parameter=params,
         )
 
@@ -138,65 +136,146 @@ class MPSSequentialStatePreparation(StatePreparation):
 
 
 # ---------------------------------------------------------------------------
-# Berry CSD preprocessing helpers
+# Unitary synthesis helpers
 # ---------------------------------------------------------------------------
 
 
-def decompose_2d(a: np.ndarray, b: np.ndarray):
-    """Decompose a 2-block column matrix into a CSD-like factorization.
+def generate_mps_preparation_data(tensors: Sequence[np.ndarray]) -> dict:
+    """Compute all data needed for MPSSequential Q# operation.
 
-    Given matrices ``a`` (shape x, y) and ``b`` (shape x, y) whose vertical
-    stack ``[a; b]`` has orthonormal columns, compute the decomposition from
-    Berry et al. Eq. 30 (PRX Quantum 6, 020327):
-
-        [a]   [u_1  0 ] [diag(d_1)] [v]
-        [b] = [0   u_2] [diag(d_2)] [v]
-
-    where u_1, u_2 are unitary (x, x), d_1, d_2 are real diagonal vectors
-    of length y, and v is unitary (y, y). This is used iteratively in the
-    7-matrix CSD decomposition of site unitaries (Appendix B of
-    Rupprecht & Wölk 2026, arXiv:2605.28489).
+    Performs CSD decomposition + Givens layer decomposition for each site.
+    Returns raw angles (Double) and phases (Bool) — Q# handles angle
+    quantization internally.
 
     Parameters
     ----------
-    a : np.ndarray of shape (x, y)
-        Upper block of the column matrix.
-    b : np.ndarray of shape (x, y)
-        Lower block of the column matrix.
+    tensors : sequence of np.ndarray
+        MPS tensors. tensors[i] has shape (chi_left, d, chi_right).
 
     Returns
     -------
-    u_1 : np.ndarray of shape (x, x)
-        Left unitary for the upper block.
-    u_2 : np.ndarray of shape (x, x)
-        Left unitary for the lower block (from polar decomposition).
-    d_1 : np.ndarray of shape (y,)
-        Singular values of ``a`` (upper diagonal).
-    d_2 : np.ndarray of shape (y,)
-        Diagonal of the polar factor of ``b @ v^H`` (lower diagonal).
-    v : np.ndarray of shape (y, y)
-        Right unitary (shared by both blocks).
+    dict with all parameters needed by MPSSequential.
 
     """
-    u_1, d_1, vt = np.linalg.svd(a, full_matrices=True)
-    v = vt
+    num_sites = len(tensors)
+    d = tensors[0].shape[1]
 
-    bv = b @ vt.conj().T
-    w, s, vt2 = np.linalg.svd(bv, full_matrices=True)
-    width = a.shape[1]
-    u_2 = w.copy()
-    u_2[:width, :width] = w[:width, :width] @ vt2
-    d_2_matrix = (vt2.T.conj() * s) @ vt2
-    d_2 = np.diag(d_2_matrix).real
+    # Determine consistent ancilla size across all sites
+    max_ancilla_dim = 1
+    for i in range(1, num_sites):
+        chi_left, _, chi_right = tensors[i].shape
+        local_bits = int(np.ceil(np.log2(max(chi_left, chi_right)))) if max(chi_left, chi_right) > 1 else 1
+        max_ancilla_dim = max(max_ancilla_dim, 1 << local_bits)
+    chi_1 = tensors[0].shape[2]
+    init_bits = int(np.ceil(np.log2(max(1, chi_1)))) if chi_1 > 1 else 1
+    max_ancilla_dim = max(max_ancilla_dim, 1 << init_bits)
+    ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
+    ancilla_dim = 1 << ancilla_bits
 
-    return u_1, u_2, d_1, d_2, v
+    # Per-site decomposition data
+    site_v_layer_angles = []
+    site_v_layer_shifted = []
+    site_v_phases = []
+    site_rot0_angles = []
+    site_rot1_angles = []
+    site_rot2_angles = []
+    site_w0_layer_angles = []
+    site_w0_layer_shifted = []
+    site_w0_phases = []
+    site_w1_layer_angles = []
+    site_w1_layer_shifted = []
+    site_w1_phases = []
+    site_u_layer_angles = []
+    site_u_layer_shifted = []
+    site_u_phases = []
 
+    for i in range(1, num_sites):
+        tensor = tensors[i]
+        chi_left = tensor.shape[0]
+        dim = ancilla_dim
 
-def _pad_to_power_of_2(arr: np.ndarray, target_len: int) -> np.ndarray:
-    """Pad or truncate a 1-D array to ``target_len`` (zero-padding)."""
-    if len(arr) >= target_len:
-        return arr[:target_len]
-    return np.concatenate([arr, np.zeros(target_len - len(arr))])
+        data = compute_site_unitary_dense_data(tensor, v_from_next=None, ancilla_dim=dim)
+        d_0_, d_1_, d_2_ = data["d_prime"]
+        w_0 = data["w_0"]
+        w_1 = data["w_1"]
+        u_0, u_1, u_2, u_3 = data["u"]
+        v = data["v"]
+
+        # V: Givens decomposition
+        v_pad = np.eye(dim, dtype=np.float64)
+        v_pad[: v.shape[0], : v.shape[1]] = np.asarray(v).real
+        v_angles, v_shifted, v_phases_arr = decompose_unitary_to_givens(v_pad)
+        site_v_layer_angles.append(v_angles)
+        site_v_layer_shifted.append(v_shifted)
+        site_v_phases.append(v_phases_arr)
+
+        # UCR rotation angles: 2*arcsin(d')
+        rot0_angles = [2.0 * float(np.arcsin(np.clip(d_0_[k], -1, 1))) for k in range(dim)]
+        rot1_angles = [2.0 * float(np.arcsin(np.clip(d_1_[k] if k < len(d_1_) else 0.0, -1, 1))) for k in range(dim)]
+        rot2_angles = [2.0 * float(np.arcsin(np.clip(d_2_[k] if k < len(d_2_) else 0.0, -1, 1))) for k in range(dim)]
+        site_rot0_angles.append(rot0_angles)
+        site_rot1_angles.append(rot1_angles)
+        site_rot2_angles.append(rot2_angles)
+
+        # W0: Givens decomposition
+        w0_pad = np.eye(dim, dtype=np.float64)
+        w0_pad[: w_0.shape[0], : w_0.shape[1]] = np.asarray(w_0).real
+        w0_angles, w0_shifted, w0_phases = decompose_unitary_to_givens(w0_pad)
+        site_w0_layer_angles.append(w0_angles)
+        site_w0_layer_shifted.append(w0_shifted)
+        site_w0_phases.append(w0_phases)
+
+        # W1: Givens decomposition
+        w1_pad = np.eye(dim, dtype=np.float64)
+        w1_pad[: w_1.shape[0], : w_1.shape[1]] = np.asarray(w_1).real
+        w1_angles, w1_shifted, w1_phases = decompose_unitary_to_givens(w1_pad)
+        site_w1_layer_angles.append(w1_angles)
+        site_w1_layer_shifted.append(w1_shifted)
+        site_w1_phases.append(w1_phases)
+
+        # U (block-diagonal): decompose blocks
+        u_blocks = [u_0, u_1, u_2, u_3]
+        u_block_mats = []
+        for u_b in u_blocks:
+            u_block_pad = np.eye(dim, dtype=np.float64)
+            u_block_pad[: u_b.shape[0], : u_b.shape[1]] = np.asarray(u_b).real
+            u_block_mats.append(u_block_pad)
+        u_angles, u_shifted, u_phases_arr = decompose_block_diagonal_to_givens(u_block_mats)
+        site_u_layer_angles.append(u_angles)
+        site_u_layer_shifted.append(u_shifted)
+        site_u_phases.append(u_phases_arr)
+
+    # Initial state from first tensor
+    first_tensor = tensors[0]
+    chi_1 = first_tensor.shape[2]
+    init_state = first_tensor[0]  # (d, chi_right)
+    init_padded = np.zeros((d, ancilla_dim))
+    init_padded[:, :chi_1] = init_state
+    initial_state_vec = init_padded.flatten()
+    norm = np.linalg.norm(initial_state_vec)
+    if norm > 1e-15:
+        initial_state_vec = initial_state_vec / norm
+
+    return {
+        "initial_state_vec": initial_state_vec.tolist(),
+        "num_sites": num_sites,
+        "ancilla_bits": ancilla_bits,
+        "site_v_layer_angles": site_v_layer_angles,
+        "site_v_layer_shifted": site_v_layer_shifted,
+        "site_v_phases": site_v_phases,
+        "site_rot0_angles": site_rot0_angles,
+        "site_rot1_angles": site_rot1_angles,
+        "site_rot2_angles": site_rot2_angles,
+        "site_w0_layer_angles": site_w0_layer_angles,
+        "site_w0_layer_shifted": site_w0_layer_shifted,
+        "site_w0_phases": site_w0_phases,
+        "site_w1_layer_angles": site_w1_layer_angles,
+        "site_w1_layer_shifted": site_w1_layer_shifted,
+        "site_w1_phases": site_w1_phases,
+        "site_u_layer_angles": site_u_layer_angles,
+        "site_u_layer_shifted": site_u_layer_shifted,
+        "site_u_phases": site_u_phases,
+    }
 
 
 def compute_site_unitary_dense_data(
@@ -207,7 +286,7 @@ def compute_site_unitary_dense_data(
     """Compute the 7-matrix CSD decomposition of a site unitary.
 
     Decomposes the target matrix (formed from the MPS tensor) into the
-    factorization from Appendix B of Rupprecht & Wölk (arXiv:2605.28489)::
+    factorization from Appendix B of :cite:`Rupprecht2026`::
 
         [a_0]       [u_0          ] [I        ] [I        ] [I       ] [I       ] [d_0  .  ] [v        ]
         [a_1]       [   u_1       ] [  I      ] [  I      ] [ d_1  . ] [ w_1    ] [d_0' .  ] [  v      ]
@@ -238,7 +317,7 @@ def compute_site_unitary_dense_data(
         - ``'ancilla_dim'``: the ancilla dimension used.
 
     """
-    left, site_dim, right = tensor.shape
+    left, site_dim, _ = tensor.shape
     dim = ancilla_dim
     full_dim = site_dim * dim
 
@@ -331,6 +410,63 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
     # Organize into parallel layers
     layer_angles, layer_shifted = _organize_into_layers(rotations, dim)
     return layer_angles, layer_shifted, phases
+
+
+def decompose_2d(a: np.ndarray, b: np.ndarray):
+    """Decompose a 2-block column matrix into a CSD-like factorization.
+
+    Given matrices ``a`` (shape x, y) and ``b`` (shape x, y) whose vertical
+    stack ``[a; b]`` has orthonormal columns, compute the decomposition from
+    Berry et al. Eq. 30 (PRX Quantum 6, 020327):
+
+        [a]   [u_1  0 ] [diag(d_1)] [v]
+        [b] = [0   u_2] [diag(d_2)] [v]
+
+    where u_1, u_2 are unitary (x, x), d_1, d_2 are real diagonal vectors
+    of length y, and v is unitary (y, y). This is used iteratively in the
+    7-matrix CSD decomposition of site unitaries (Appendix B of
+    Rupprecht & Wölk 2026, arXiv:2605.28489).
+
+    Parameters
+    ----------
+    a : np.ndarray of shape (x, y)
+        Upper block of the column matrix.
+    b : np.ndarray of shape (x, y)
+        Lower block of the column matrix.
+
+    Returns
+    -------
+    u_1 : np.ndarray of shape (x, x)
+        Left unitary for the upper block.
+    u_2 : np.ndarray of shape (x, x)
+        Left unitary for the lower block (from polar decomposition).
+    d_1 : np.ndarray of shape (y,)
+        Singular values of ``a`` (upper diagonal).
+    d_2 : np.ndarray of shape (y,)
+        Diagonal of the polar factor of ``b @ v^H`` (lower diagonal).
+    v : np.ndarray of shape (y, y)
+        Right unitary (shared by both blocks).
+
+    """
+    u_1, d_1, vt = np.linalg.svd(a, full_matrices=True)
+    v = vt
+
+    bv = b @ vt.conj().T
+    w, s, vt2 = np.linalg.svd(bv, full_matrices=True)
+    width = a.shape[1]
+    u_2 = w.copy()
+    u_2[:width, :width] = w[:width, :width] @ vt2
+    d_2_matrix = (vt2.T.conj() * s) @ vt2
+    d_2 = np.diag(d_2_matrix).real
+
+    return u_1, u_2, d_1, d_2, v
+
+
+def _pad_to_power_of_2(arr: np.ndarray, target_len: int) -> np.ndarray:
+    """Pad or truncate a 1-D array to ``target_len`` (zero-padding)."""
+    if len(arr) >= target_len:
+        return arr[:target_len]
+    return np.concatenate([arr, np.zeros(target_len - len(arr))])
 
 
 def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple[list[list[float]], list[bool]]:
@@ -514,141 +650,3 @@ def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
 
         full_matrix = scipy_block_diag(*[b.astype(np.float64) for b in blocks])
         return _decompose_unitary_to_givens_python(full_matrix)
-
-
-def prepare_gate_based_data(tensors: Sequence[np.ndarray]) -> dict:
-    """Compute all data needed for MPSPreparationBerry Q# operation.
-
-    Performs CSD decomposition + Givens layer decomposition for each site.
-    Returns raw angles (Double) and phases (Bool) — Q# handles angle
-    quantization internally.
-
-    Parameters
-    ----------
-    tensors : sequence of np.ndarray
-        MPS tensors. tensors[i] has shape (chi_left, d, chi_right).
-
-    Returns
-    -------
-    dict with all parameters needed by MPSPreparationBerry.
-
-    """
-    num_sites = len(tensors)
-    d = tensors[0].shape[1]
-
-    # Determine consistent ancilla size across all sites
-    max_ancilla_dim = 1
-    for i in range(1, num_sites):
-        chi_left, _, chi_right = tensors[i].shape
-        local_bits = int(np.ceil(np.log2(max(chi_left, chi_right)))) if max(chi_left, chi_right) > 1 else 1
-        max_ancilla_dim = max(max_ancilla_dim, 1 << local_bits)
-    chi_1 = tensors[0].shape[2]
-    init_bits = int(np.ceil(np.log2(max(1, chi_1)))) if chi_1 > 1 else 1
-    max_ancilla_dim = max(max_ancilla_dim, 1 << init_bits)
-    ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
-    ancilla_dim = 1 << ancilla_bits
-
-    # Per-site decomposition data
-    site_v_layer_angles = []
-    site_v_layer_shifted = []
-    site_v_phases = []
-    site_rot0_angles = []
-    site_rot1_angles = []
-    site_rot2_angles = []
-    site_w0_layer_angles = []
-    site_w0_layer_shifted = []
-    site_w0_phases = []
-    site_w1_layer_angles = []
-    site_w1_layer_shifted = []
-    site_w1_phases = []
-    site_u_layer_angles = []
-    site_u_layer_shifted = []
-    site_u_phases = []
-
-    for i in range(1, num_sites):
-        tensor = tensors[i]
-        chi_left = tensor.shape[0]
-        dim = ancilla_dim
-
-        data = compute_site_unitary_dense_data(tensor, v_from_next=None, ancilla_dim=dim)
-        d_0_, d_1_, d_2_ = data["d_prime"]
-        w_0 = data["w_0"]
-        w_1 = data["w_1"]
-        u_0, u_1, u_2, u_3 = data["u"]
-        v = data["v"]
-
-        # V: Givens decomposition
-        v_pad = np.eye(dim, dtype=np.float64)
-        v_pad[: v.shape[0], : v.shape[1]] = np.asarray(v).real
-        v_angles, v_shifted, v_phases_arr = decompose_unitary_to_givens(v_pad)
-        site_v_layer_angles.append(v_angles)
-        site_v_layer_shifted.append(v_shifted)
-        site_v_phases.append(v_phases_arr)
-
-        # UCR rotation angles: 2*arcsin(d')
-        rot0_angles = [2.0 * float(np.arcsin(np.clip(d_0_[k], -1, 1))) for k in range(dim)]
-        rot1_angles = [2.0 * float(np.arcsin(np.clip(d_1_[k] if k < len(d_1_) else 0.0, -1, 1))) for k in range(dim)]
-        rot2_angles = [2.0 * float(np.arcsin(np.clip(d_2_[k] if k < len(d_2_) else 0.0, -1, 1))) for k in range(dim)]
-        site_rot0_angles.append(rot0_angles)
-        site_rot1_angles.append(rot1_angles)
-        site_rot2_angles.append(rot2_angles)
-
-        # W0: Givens decomposition
-        w0_pad = np.eye(dim, dtype=np.float64)
-        w0_pad[: w_0.shape[0], : w_0.shape[1]] = np.asarray(w_0).real
-        w0_angles, w0_shifted, w0_phases = decompose_unitary_to_givens(w0_pad)
-        site_w0_layer_angles.append(w0_angles)
-        site_w0_layer_shifted.append(w0_shifted)
-        site_w0_phases.append(w0_phases)
-
-        # W1: Givens decomposition
-        w1_pad = np.eye(dim, dtype=np.float64)
-        w1_pad[: w_1.shape[0], : w_1.shape[1]] = np.asarray(w_1).real
-        w1_angles, w1_shifted, w1_phases = decompose_unitary_to_givens(w1_pad)
-        site_w1_layer_angles.append(w1_angles)
-        site_w1_layer_shifted.append(w1_shifted)
-        site_w1_phases.append(w1_phases)
-
-        # U (block-diagonal): decompose blocks
-        u_blocks = [u_0, u_1, u_2, u_3]
-        u_block_mats = []
-        for u_b in u_blocks:
-            u_block_pad = np.eye(dim, dtype=np.float64)
-            u_block_pad[: u_b.shape[0], : u_b.shape[1]] = np.asarray(u_b).real
-            u_block_mats.append(u_block_pad)
-        u_angles, u_shifted, u_phases_arr = decompose_block_diagonal_to_givens(u_block_mats)
-        site_u_layer_angles.append(u_angles)
-        site_u_layer_shifted.append(u_shifted)
-        site_u_phases.append(u_phases_arr)
-
-    # Initial state from first tensor
-    first_tensor = tensors[0]
-    chi_1 = first_tensor.shape[2]
-    init_state = first_tensor[0]  # (d, chi_right)
-    init_padded = np.zeros((d, ancilla_dim))
-    init_padded[:, :chi_1] = init_state
-    initial_state_vec = init_padded.flatten()
-    norm = np.linalg.norm(initial_state_vec)
-    if norm > 1e-15:
-        initial_state_vec = initial_state_vec / norm
-
-    return {
-        "initial_state_vec": initial_state_vec.tolist(),
-        "num_sites": num_sites,
-        "ancilla_bits": ancilla_bits,
-        "site_v_layer_angles": site_v_layer_angles,
-        "site_v_layer_shifted": site_v_layer_shifted,
-        "site_v_phases": site_v_phases,
-        "site_rot0_angles": site_rot0_angles,
-        "site_rot1_angles": site_rot1_angles,
-        "site_rot2_angles": site_rot2_angles,
-        "site_w0_layer_angles": site_w0_layer_angles,
-        "site_w0_layer_shifted": site_w0_layer_shifted,
-        "site_w0_phases": site_w0_phases,
-        "site_w1_layer_angles": site_w1_layer_angles,
-        "site_w1_layer_shifted": site_w1_layer_shifted,
-        "site_w1_phases": site_w1_phases,
-        "site_u_layer_angles": site_u_layer_angles,
-        "site_u_layer_shifted": site_u_layer_shifted,
-        "site_u_phases": site_u_phases,
-    }

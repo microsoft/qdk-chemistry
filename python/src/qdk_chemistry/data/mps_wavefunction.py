@@ -1,9 +1,4 @@
-"""MPS Wavefunction container for Matrix Product State representations.
-
-This module provides a Python container for wavefunctions stored as Matrix Product
-States (MPS). The MPS tensors are stored directly and can be used with the
-MPS-based sequential state preparation algorithm.
-"""
+"""MPS Wavefunction container for Matrix Product State representations."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -50,12 +45,6 @@ class MPSWavefunction:
         Bond dimensions ``[chi_0, chi_1, ..., chi_N]`` where ``chi_0 = chi_N = 1``
         for open boundary conditions.
 
-    Notes
-    -----
-    The MPS tensors should be in right-canonical form for optimal circuit synthesis.
-    The first tensor should have ``chi_left = 1`` (open boundary on the left) and
-    the last tensor should have ``chi_right = 1`` (open boundary on the right).
-
     """
 
     def __init__(self, tensors: Sequence[np.ndarray], site_dim: int = 4):
@@ -93,12 +82,6 @@ class MPSWavefunction:
                     f"Bond dimension mismatch between site {i} (chi_right={chi_right}) "
                     f"and site {i + 1} (chi_left={chi_left_next})."
                 )
-
-        # Validate open boundary conditions
-        if self.tensors[0].shape[0] != 1:
-            raise ValueError(f"First tensor must have chi_left=1 (open boundary), got {self.tensors[0].shape[0]}.")
-        if self.tensors[-1].shape[2] != 1:
-            raise ValueError(f"Last tensor must have chi_right=1 (open boundary), got {self.tensors[-1].shape[2]}.")
 
         self.bond_dims = [self.tensors[0].shape[0]]
         for t in self.tensors:
@@ -142,72 +125,6 @@ class MPSWavefunction:
         if norm > 1e-15:
             vec = vec / norm
         return vec
-
-    @classmethod
-    def from_state_vector(
-        cls,
-        state_vector: np.ndarray,
-        num_sites: int,
-        max_bond_dim: int | None = None,
-        site_dim: int = 4,
-    ) -> MPSWavefunction:
-        """Construct an MPS from a full state vector via SVD truncation.
-
-        Parameters
-        ----------
-        state_vector : np.ndarray
-            Full state vector of length ``site_dim ** num_sites``.
-        num_sites : int
-            Number of MPS sites.
-        max_bond_dim : int or None
-            Maximum bond dimension. If None, no truncation is applied.
-        site_dim : int
-            Local site dimension (default 4).
-
-        Returns
-        -------
-        MPSWavefunction
-            The MPS representation of the state vector.
-
-        """
-        state_vector = np.asarray(state_vector, dtype=np.float64)
-        total_dim = site_dim**num_sites
-        if len(state_vector) != total_dim:
-            raise ValueError(f"State vector length {len(state_vector)} doesn't match site_dim^num_sites = {total_dim}.")
-
-        # Normalize
-        norm = np.linalg.norm(state_vector)
-        if norm > 1e-15:
-            state_vector = state_vector / norm
-
-        tensors = []
-        remaining = state_vector.copy()
-        chi_left = 1
-
-        for i in range(num_sites - 1):
-            dim_right = site_dim ** (num_sites - i - 1)
-            mat = remaining.reshape(chi_left * site_dim, dim_right)
-
-            u_svd, s_svd, vt_svd = np.linalg.svd(mat, full_matrices=False)
-
-            chi_right = len(s_svd)
-            if max_bond_dim is not None and chi_right > max_bond_dim:
-                chi_right = max_bond_dim
-                u_svd = u_svd[:, :chi_right]
-                s_svd = s_svd[:chi_right]
-                vt_svd = vt_svd[:chi_right, :]
-
-            tensor = u_svd.reshape(chi_left, site_dim, chi_right)
-            tensors.append(tensor)
-
-            remaining = (np.diag(s_svd) @ vt_svd).flatten()
-            chi_left = chi_right
-
-        # Last tensor: (chi_left, d, 1)
-        last_tensor = remaining.reshape(chi_left, site_dim, 1)
-        tensors.append(last_tensor)
-
-        return cls(tensors, site_dim=site_dim)
 
     @classmethod
     def random(
