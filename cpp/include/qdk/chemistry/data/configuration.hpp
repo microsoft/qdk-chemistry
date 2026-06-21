@@ -183,9 +183,8 @@ class Configuration : public DataClass {
   // ---- Generic (statistics-agnostic) accessors ----------------------------
 
   /**
-   * @brief Maximum number of single-particle modes the packed storage can
-   * hold (may include byte-alignment padding).
-   * @return Padded mode capacity (same as @ref get_orbital_capacity).
+   * @brief Number of single-particle modes in the configuration.
+   * @return Number of modes (same as @ref get_orbital_capacity).
    */
   size_t num_modes() const;
 

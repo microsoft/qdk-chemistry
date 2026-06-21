@@ -112,6 +112,19 @@ Examples:
 
 )");
 
+  bind_getter_as_property(configuration, "num_modes", &Configuration::num_modes,
+                          R"(
+Number of single-particle modes in the configuration.
+
+Returns:
+    int: Number of modes.
+
+Examples:
+    >>> qdk_chemistry.Configuration.from_bitstring("1010").num_modes
+    8
+
+)");
+
   bind_getter_as_property(configuration, "total_occupation",
                           &Configuration::total_occupation,
                           R"(

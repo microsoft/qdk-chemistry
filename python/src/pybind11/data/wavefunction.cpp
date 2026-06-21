@@ -266,11 +266,7 @@ It uses variant types to support both real and complex arithmetic.
            "Check if mutual information is available")
       .def("get_mutual_information",
            &WavefunctionContainer::get_mutual_information,
-           "Get mutual information matrix for active orbitals")
-      .def("get_configuration_set",
-           &WavefunctionContainer::get_configuration_set,
-           "Get the configuration set associated with this container",
-           py::return_value_policy::reference_internal);
+           "Get mutual information matrix for active orbitals");
 
   // Wavefunction class
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
