@@ -18,7 +18,11 @@ import re
 
 import numpy as np
 import pytest
-import qsharp
+
+try:
+    from qdk._native import Circuit as QdkCircuitType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
@@ -34,7 +38,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_test_orbitals
@@ -66,7 +70,7 @@ def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
     qsc = circuit.get_qsharp_circuit()
-    assert isinstance(qsc, qsharp._native.Circuit)
+    assert isinstance(qsc, QdkCircuitType)
     qsc_json_str = qsc.json()
     qsc_json = json.loads(qsc_json_str)
     num_qubits = len(qsc_json["qubits"])
@@ -101,11 +105,11 @@ def test_sparse_isometry_gf2x_single_reference_state():
     # Create a wavefunction with coefficients that will be filtered out
     test_orbitals = create_test_orbitals(2)
 
-    det = Configuration("du00")
+    det = Configuration.from_spin_half_string("du00")
     dets = [det]
     coeffs = [1.0]
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals)
     wavefunction = Wavefunction(container)
 
     prep = create("state_prep", "sparse_isometry_gf2x")
@@ -113,7 +117,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
     single_ref_qsc = single_ref_circuit.get_qsharp_circuit()
-    assert isinstance(single_ref_qsc, qsharp._native.Circuit)
+    assert isinstance(single_ref_qsc, QdkCircuitType)
     single_ref_qsc_json_str = single_ref_qsc.json()
     single_ref_qsc_json = json.loads(single_ref_qsc_json_str)
     num_qubits = len(single_ref_qsc_json["qubits"])
@@ -329,7 +333,7 @@ def test_asymmetric_active_space_error():
 
         def get_active_determinants(self):
             """Return mock determinants."""
-            return [Configuration("2020000"), Configuration("2200000")]
+            return [Configuration.from_spin_half_string("2020000"), Configuration.from_spin_half_string("2200000")]
 
         def get_coefficient(self, _):
             """Return mock coefficient."""

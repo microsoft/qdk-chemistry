@@ -30,7 +30,8 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
-from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
+from qdk_chemistry.data import Orbitals, Settings, StateVectorContainer, Wavefunction
+from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -69,9 +70,21 @@ class PyscfLocalizerSettings(Settings):
         """Initialize the localization object with default parameters."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("method", "string", "pipek-mezey")
+        self._set_default(
+            "method",
+            "string",
+            "pipek-mezey",
+            "Localization algorithm",
+            ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"],
+        )
         self._set_default("occupation_threshold", "double", 1e-10)
-        self._set_default("population_method", "string", "mulliken")
+        self._set_default(
+            "population_method",
+            "string",
+            "mulliken",
+            "Population analysis for Pipek-Mezey localization",
+            ["mulliken", "lowdin", "meta_lowdin", "becke"],
+        )
 
 
 class PyscfLocalizer(OrbitalLocalizer):
@@ -145,6 +158,18 @@ class PyscfLocalizer(OrbitalLocalizer):
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
 
+        # Localization rotates the (active) orbital basis. A single Slater determinant is
+        # invariant under such a rotation, but a multi-determinant CI expansion is not: its
+        # coefficients are defined in the original basis and would have to be re-expressed in
+        # the localized basis. Carrying them over unchanged would silently yield a different
+        # physical state, so only single-determinant wavefunctions are supported.
+        if len(wavefunction.get_active_determinants()) > 1:
+            raise NotImplementedError(
+                "Orbital localization is only supported for single-determinant wavefunctions; "
+                "localizing the orbitals of a multi-determinant expansion would invalidate its "
+                "CI coefficients."
+            )
+
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 
@@ -168,8 +193,6 @@ class PyscfLocalizer(OrbitalLocalizer):
             raise ValueError(f"Unknown localization method: {loc_method}")
 
         # Preserve active/inactive space indices from input orbitals if they exist
-        # For restricted: indices = (active, inactive)
-        # For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)
         if orbitals.has_active_space():
             active_alpha, active_beta = orbitals.get_active_space_indices()
             inactive_alpha, inactive_beta = orbitals.get_inactive_space_indices()
@@ -189,12 +212,18 @@ class PyscfLocalizer(OrbitalLocalizer):
             for i, idx in enumerate(loc_indices_a):
                 mo_loc[:, idx] = localized_mos[:, i]
 
+            nmo = mo_loc.shape[1]
             loc_orbitals = Orbitals(
                 coefficients=mo_loc,
                 energies=orbitals.get_energies()[0] if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(list(active_alpha), list(inactive_alpha)) if active_alpha is not None else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha))
+                if active_alpha is not None
+                else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha))
+                if active_alpha is not None
+                else None,
             )
         else:
             # Unrestricted case - handle alpha and beta separately
@@ -210,6 +239,7 @@ class PyscfLocalizer(OrbitalLocalizer):
             for i, idx in enumerate(loc_indices_b):
                 mo_b[:, idx] = localized_b[:, i]
 
+            nmo = mo_a.shape[1]
             energies_alpha, energies_beta = orbitals.get_energies() if orbitals.has_energies() else (None, None)
             loc_orbitals = Orbitals(
                 coefficients_alpha=mo_a,
@@ -218,19 +248,15 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies_beta=energies_beta,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(
-                    list(active_alpha),
-                    list(active_beta),
-                    list(inactive_alpha),
-                    list(inactive_beta),
-                )
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_beta), equivalent=False)
+                if active_alpha is not None
+                else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_beta), equivalent=False)
                 if active_alpha is not None
                 else None,
             )
-        if len(wavefunction.get_active_determinants()) == 1:
-            # Single determinant case - return new wavefunction with localized orbitals
-            return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], loc_orbitals))
-        return Wavefunction(SciWavefunctionContainer(wavefunction.get_active_determinants(), loc_orbitals))
+        # Only single-determinant wavefunctions reach this point (guarded above).
+        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals, "electrons"))
 
     def name(self) -> str:
         """Return the settings for the localizer."""

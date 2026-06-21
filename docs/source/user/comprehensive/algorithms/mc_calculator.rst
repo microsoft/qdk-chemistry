@@ -116,6 +116,10 @@ All implementations share a common base set of settings from ``MultiConfiguratio
      - bool
      - ``False``
      - Calculate two-electron reduced density matrix
+   * - ``iterative_solver_dimension_cutoff``
+     - int
+     - ``2000``
+     - Matrix size cutoff for using dense vs iterative (Davidson) eigensolver
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
@@ -146,7 +150,20 @@ MACIS CAS
 
 The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
 
-This implementation uses only the common settings described above.
+This implementation uses only the common settings described above, plus the following MACIS-specific setting. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ci_matel_tol``
+     - float
+     - ``~2.2e-16`` (machine epsilon)
+     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
 .. _macis-asci:
 

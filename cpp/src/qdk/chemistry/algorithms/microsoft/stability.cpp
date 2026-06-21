@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <random>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -329,45 +330,22 @@ class StabilityOperator {
 };
 
 /**
- * @brief Construct an initial eigenvector for the Davidson heuristic. Uses the
- * inverse of the orbital energy differences as a preconditioned guess and
- * enforces single dominant components in each occupied block. Safeguards of
- * 1e4/1e-4 avoid division by zero when the energy differences are extremely
- * small.
+ * @brief Initialize eigenvector with a random Gaussian guess (N(0,1), seed 42,
+ * normalized) to avoid trapping in a subspace.
  *
- * The Davidson algorithm is highly sensitive to the choice of the initial
- * vector. Mixing the two initialization strategies reduces the risk of
- * Davidson failing to converge.
- *
- * @param eigen_diff Flattened array of orbital energy differences.
- * @param n_alpha_electrons Number of occupied alpha orbitals.
- * @param n_beta_electrons Number of occupied beta orbitals.
- * @param num_virtual_alpha_orbitals Number of virtual alpha orbitals.
- * @param num_virtual_beta_orbitals Number of virtual beta orbitals.
- * @param unrestricted True when the reference wavefunction is UHF.
  * @param eigenvector [in, out] Output vector that stores the initialized guess.
  */
-void initialize_eigenvector(const Eigen::VectorXd& eigen_diff,
-                            size_t n_alpha_electrons, size_t n_beta_electrons,
-                            size_t num_virtual_alpha_orbitals,
-                            size_t num_virtual_beta_orbitals, bool unrestricted,
-                            Eigen::VectorXd& eigenvector) {
+void initialize_eigenvector(Eigen::VectorXd& eigenvector) {
   QDK_LOG_TRACE_ENTERING();
   int eigensize = eigenvector.size();
-  auto nova = num_virtual_alpha_orbitals * n_alpha_electrons;
-  double min_abs_eigen_diff = 1e-4;
-  eigenvector = Eigen::VectorXd::Constant(eigensize, 1.0 / min_abs_eigen_diff);
-  for (int i = 0; i < eigen_diff.size(); ++i) {
-    if (std::abs(eigen_diff(i)) > min_abs_eigen_diff) {
-      eigenvector(i) = 1.0 / eigen_diff(i);
-    }
+
+  // Use a random Gaussian initial guess to avoid being trapped in a symmetric
+  // subspace when the rotation space has limited degrees of freedom.
+  std::mt19937 gen(42);
+  std::normal_distribution<double> dist(0.0, 1.0);
+  for (int i = 0; i < eigensize; ++i) {
+    eigenvector(i) = dist(gen);
   }
-  eigenvector.normalize();
-  if (n_alpha_electrons > 0)
-    eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
-  if (unrestricted && n_beta_electrons > 0)
-    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
-        1.0;
   eigenvector.normalize();
 }
 
@@ -416,8 +394,13 @@ StabilityChecker::_run_impl(
   // Extract needed components, orbitals, basis set, coefficients, eigenvalues
   const auto orbitals = wavefunction->get_orbitals();
   const auto basis_set_qdk = orbitals->get_basis_set();
-  const auto [Ca, Cb] = orbitals->get_coefficients();
-  const auto [energies_alpha, energies_beta] = orbitals->get_energies();
+  const auto& Ca = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& Cb =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
+  const auto& energies_alpha =
+      orbitals->energies()->block({data::axes::alpha()});
+  const auto& energies_beta = orbitals->energies()->block({data::axes::beta()});
   const auto num_atomic_orbitals = basis_set_qdk->get_num_atomic_orbitals();
   const auto num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   auto [n_alpha_electrons, n_beta_electrons] =
@@ -540,10 +523,7 @@ StabilityChecker::_run_impl(
   }
 
   Eigen::VectorXd eigenvector = Eigen::VectorXd::Zero(eigensize);
-  detail::initialize_eigenvector(eigen_diff, n_alpha_electrons,
-                                 n_beta_electrons, num_virtual_alpha_orbitals,
-                                 num_virtual_beta_orbitals, unrestricted,
-                                 eigenvector);
+  detail::initialize_eigenvector(eigenvector);
 
   const int64_t max_subspace =
       std::min(davidson_max_subspace, static_cast<int64_t>(eigensize));

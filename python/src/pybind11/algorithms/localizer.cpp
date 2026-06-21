@@ -156,6 +156,9 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  localizer.def("hash", &Localizer::hash, py::arg("wavefunction"),
+                py::arg("loc_indices_a"), py::arg("loc_indices_b"));
+
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
@@ -165,6 +168,8 @@ Returns:
   localizer.def("__repr__", [](const Localizer &) {
     return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
+
+  qdk::chemistry::python::bind_create_nested(localizer);
 
   // Bind concrete microsoft::PipekMezeyLocalizer implementation
   py::class_<microsoft::PipekMezeyLocalizer, Localizer, py::smart_holder>(

@@ -10,6 +10,7 @@ from typing import Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
@@ -56,6 +57,18 @@ class EnergyExpectationResult(DataClass):
         self.expvals_each_term = expvals_each_term
         self.variances_each_term = variances_each_term
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "energy_expectation_result")
+        _hash_float(h, self.energy_expectation_value)
+        _hash_float(h, self.energy_variance)
+        _hash_uint(h, len(self.expvals_each_term))
+        for arr in self.expvals_each_term:
+            _hash_array(h, arr)
+        _hash_uint(h, len(self.variances_each_term))
+        for arr in self.variances_each_term:
+            _hash_array(h, arr)
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the energy expectation result.
@@ -203,6 +216,26 @@ class MeasurementData(DataClass):
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "measurement_data")
+        _hash_uint(h, len(self.hamiltonians))
+        for ham in self.hamiltonians:
+            _hash_str(h, ham.content_hash())
+        _hash_uint(h, len(self.bitstring_counts))
+        for bc in self.bitstring_counts:
+            if bc is None:
+                h.update(b"\x00")
+            else:
+                h.update(b"\x01")
+                _hash_uint(h, len(bc))
+                for k in sorted(bc.keys()):
+                    _hash_str(h, k)
+                    _hash_int(h, bc[k])
+        _hash_uint(h, len(self.shots_list))
+        for s in self.shots_list:
+            _hash_int(h, s)
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the measurement data.

@@ -48,9 +48,9 @@ class TestRegistryShowDefault:
             "state_prep",
             "qubit_mapper",
             "circuit_executor",
-            "controlled_evolution_circuit_mapper",
+            "controlled_circuit_mapper",
             "phase_estimation",
-            "time_evolution_builder",
+            "hamiltonian_unitary_builder",
             "circuit_executor",
         ]
 
@@ -100,17 +100,17 @@ class TestRegistryShowDefault:
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")
         assert isinstance(default_phase_estimation, str)
-        assert default_phase_estimation == "iterative"
+        assert default_phase_estimation == "qdk_iterative"
 
         # Test for time evolution builder
-        default_time_evolution_builder = registry.show_default("time_evolution_builder")
-        assert isinstance(default_time_evolution_builder, str)
-        assert default_time_evolution_builder == "trotter"
+        default_unitary_builder = registry.show_default("hamiltonian_unitary_builder")
+        assert isinstance(default_unitary_builder, str)
+        assert default_unitary_builder == "trotter"
 
         # Test for controlled evolution circuit mapper
-        default_controlled_evolution_circuit_mapper = registry.show_default("controlled_evolution_circuit_mapper")
-        assert isinstance(default_controlled_evolution_circuit_mapper, str)
-        assert default_controlled_evolution_circuit_mapper == "pauli_sequence"
+        default_controlled_circuit_mapper = registry.show_default("controlled_circuit_mapper")
+        assert isinstance(default_controlled_circuit_mapper, str)
+        assert default_controlled_circuit_mapper == "pauli_sequence"
 
     def test_show_default_returns_empty_string_for_unknown_type(self):
         """Test that show_default returns empty string for unknown algorithm type."""
@@ -219,6 +219,41 @@ class TestRegistryCreate:
         mapper = registry.create("qubit_mapper", "qdk")
         assert mapper is not None
         assert mapper.type_name() == "qubit_mapper"
+
+
+class TestRegistryCachingWarnings:
+    """Test cache fallback warnings emitted by the algorithm wrapper."""
+
+    def test_cache_fallback_warns_when_hash_is_missing(self, tmp_path):
+        """A missing hash method falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithoutHash:
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithoutHash())
+
+        with pytest.warns(UserWarning, match="does not expose a compatible hash method"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
+
+    def test_cache_fallback_warns_when_hash_signature_rejects_arguments(self, tmp_path):
+        """A hash TypeError falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithNarrowHash:
+            def hash(self):
+                return "hash"
+
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithNarrowHash())
+
+        with pytest.warns(UserWarning, match="with the provided arguments"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
 
 
 class TestRegistryAvailable:
@@ -356,6 +391,90 @@ class TestRegistryInspectSettings:
             if limits is not None:
                 # Limits can be tuple (for ranges) or list (for allowed values)
                 assert isinstance(limits, tuple | list), f"Unexpected limits type for {name}: {type(limits)}"
+
+
+def _all_registered_pairs() -> list[tuple[str, str]]:
+    """All (algorithm_type, algorithm_name) pairs known to the registry."""
+    pairs: list[tuple[str, str]] = []
+    available = registry.available()
+    assert isinstance(available, dict)
+    for atype, names in available.items():
+        for name in names:
+            pairs.append((atype, name))
+    return pairs
+
+
+_REGISTERED_PAIRS = _all_registered_pairs()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
+class TestStringSettingsHaveGuidance:
+    """Every string-typed setting must expose a description or an allowed-values list."""
+
+    def test_string_settings_have_description_or_allowed_values(self, algorithm_type: str, algorithm_name: str):
+        try:
+            info = registry.inspect_settings(algorithm_type, algorithm_name)
+        except (ImportError, RuntimeError) as exc:
+            pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+        offenders: list[str] = []
+        for sname, ptype, _default, desc, limits in info:
+            if ptype != "str":
+                continue
+            has_desc = isinstance(desc, str) and bool(desc.strip())
+            has_allowed_list = isinstance(limits, list) and len(limits) > 0
+            if not (has_desc or has_allowed_list):
+                offenders.append(f"  {sname!r}: description={desc!r}, limits={limits!r} (type={type(limits).__name__})")
+
+        assert not offenders, (
+            f"String-typed settings in {algorithm_type}/{algorithm_name} must expose either "
+            f"a description or an allowed-values list (was a tuple used instead of a list?):\n" + "\n".join(offenders)
+        )
+
+
+def _string_settings_with_allowed_values() -> list[tuple[str, str, str, list[str]]]:
+    """Collect (algorithm_type, algorithm_name, setting_name, allowed_values) for all string settings with options."""
+    cases: list[tuple[str, str, str, list[str]]] = []
+    for atype, aname in _REGISTERED_PAIRS:
+        try:
+            info = registry.inspect_settings(atype, aname)
+        except (ImportError, RuntimeError):
+            continue
+        for sname, ptype, _default, _desc, limits in info:
+            if ptype == "str" and isinstance(limits, list) and len(limits) > 0:
+                cases.append((atype, aname, sname, limits))
+    return cases
+
+
+_STRING_SETTINGS_WITH_OPTIONS = _string_settings_with_allowed_values()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name", "setting_name", "allowed_values"),
+    _STRING_SETTINGS_WITH_OPTIONS,
+    ids=[f"{t}/{n}.{s}" for t, n, s, _ in _STRING_SETTINGS_WITH_OPTIONS],
+)
+class TestAllowedStringValuesAccepted:
+    """Every advertised string option must be accepted by the algorithm's settings without error."""
+
+    def test_each_allowed_value_can_be_set(
+        self, algorithm_type: str, algorithm_name: str, setting_name: str, allowed_values: list[str]
+    ):
+        try:
+            algo = registry.create(algorithm_type, algorithm_name)
+        except (ImportError, RuntimeError) as exc:
+            pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+        for value in allowed_values:
+            algo.settings().set(setting_name, value)
+            assert algo.settings().get(setting_name) == value, (
+                f"{algorithm_type}/{algorithm_name}: setting {setting_name!r} to {value!r} "
+                f"did not persist (got {algo.settings().get(setting_name)!r})"
+            )
 
 
 class TestRegistryRegisterUnregister:

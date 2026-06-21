@@ -19,6 +19,9 @@ fi
 
 # Download libflame
 echo "Downloading libflame ${LIBFLAME_VERSION}..."
+# Clean up any leftover state from a previous (possibly failed) attempt on
+# this self-hosted agent — the workspace persists across builds and retries.
+rm -rf libflame libflame-${LIBFLAME_VERSION} libflame.zip
 export LIBFLAME_CHECKSUM=e120f559758c21392448f45301918f45760f5ab59d246e4d144079c664d5b64b
 wget -q https://github.com/flame/libflame/archive/refs/tags/${LIBFLAME_VERSION}.zip -O libflame.zip
 echo "${LIBFLAME_CHECKSUM}  libflame.zip" | shasum -a 256 -c || exit 1

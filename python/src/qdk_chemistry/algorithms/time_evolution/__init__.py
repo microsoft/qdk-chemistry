@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution algorithms module."""
+"""Subpackage for local time-evolution algorithm extensions (hamiltonian_simulation)."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

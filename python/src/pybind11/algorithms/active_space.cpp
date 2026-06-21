@@ -165,6 +165,8 @@ Returns:
 
 )");
 
+  selector.def("hash", &ActiveSpaceSelector::hash, py::arg("wavefunction"));
+
   // Factory class binding - creates ActiveSpaceSelectorFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<
@@ -174,6 +176,8 @@ Returns:
   selector.def("__repr__", [](const ActiveSpaceSelector&) {
     return "<qdk_chemistry.algorithms.ActiveSpaceSelector>";
   });
+
+  qdk::chemistry::python::bind_create_nested(selector);
 
   // Bind concrete microsoft::OccupationActiveSpaceSelector implementation
   py::class_<microsoft::OccupationActiveSpaceSelector, ActiveSpaceSelector,

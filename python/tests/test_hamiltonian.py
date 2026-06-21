@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     Orbitals,
 )
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
@@ -106,9 +107,9 @@ class TestHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2
@@ -327,9 +328,9 @@ class TestHamiltonian:
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
         assert data["container"]["core_energy"] == 0.0
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 1
         assert h2.get_core_energy() == 0.0
@@ -550,7 +551,7 @@ class TestHamiltonian:
     def test_active_space_consistency(self):
         """Test that active space handling works correctly for both restricted and unrestricted."""
         # Test restricted case with active space
-        model_orbitals_restricted = ModelOrbitals(4, True)
+        model_orbitals_restricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
         assert model_orbitals_restricted.is_restricted()
         assert model_orbitals_restricted.has_active_space()
 
@@ -563,7 +564,7 @@ class TestHamiltonian:
         assert h_restricted.is_restricted()
 
         # Test unrestricted case with active space
-        model_orbitals_unrestricted = ModelOrbitals(4, False)
+        model_orbitals_unrestricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))
         assert not model_orbitals_unrestricted.is_restricted()
         assert model_orbitals_unrestricted.is_unrestricted()
         assert model_orbitals_unrestricted.has_active_space()
@@ -694,9 +695,9 @@ class TestCholeskyHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "three_center_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2

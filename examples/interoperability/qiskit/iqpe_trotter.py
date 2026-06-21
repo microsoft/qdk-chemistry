@@ -25,7 +25,7 @@ except ImportError as ex:
 from qdk_chemistry.algorithms import (
     create,
 )
-from qdk_chemistry.data import Circuit, Structure
+from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -80,8 +80,11 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 ########################################################################################
 # 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
 ########################################################################################
-qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+qubit_mapper = create("qubit_mapper", "qiskit")
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_hamiltonian = qubit_mapper.run(
+    active_hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 qubit_pauli_op = SparsePauliOp(
     qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients
@@ -113,14 +116,27 @@ Logger.info(
 ########################################################################################
 iqpe = create(
     "phase_estimation",
-    "iterative",
-    num_bits=M_PRECISION,
-    evolution_time=T_TIME,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT,
 )
-aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
-evolution_builder = create("time_evolution_builder", "trotter")
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+iqpe.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=M_PRECISION,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=T_TIME
+        ),
+    ),
+)
+iqpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
+)
 
 
 Logger.info("\n=== Running iterative phase estimation (Trotterized) ===")
@@ -131,9 +147,6 @@ Logger.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 result = iqpe.run(
     state_preparation=Circuit(qasm3.dumps(state_prep)),
     qubit_hamiltonian=qubit_hamiltonian,
-    circuit_executor=aer_simulator,
-    evolution_builder=evolution_builder,
-    circuit_mapper=circuit_mapper,
 )
 
 ########################################################################################

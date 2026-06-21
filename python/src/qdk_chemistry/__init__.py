@@ -17,7 +17,7 @@ except _PackageNotFoundError:
         __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
     except (OSError, UnicodeDecodeError):
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
-        __version__ = "0.0.0.dev0"
+        __version__ = "0.0.0+local"
 
 import contextlib
 import os
@@ -28,7 +28,11 @@ import warnings
 
 from qdk import TargetProfile
 from qdk import init as qdk_init
-from qsharp._qsharp import get_config as get_qdk_profile_config
+
+try:
+    from qdk._interpreter import get_config as get_qdk_profile_config
+except ImportError:
+    from qsharp._qsharp import get_config as get_qdk_profile_config
 
 # Import some tools for convenience
 import qdk_chemistry.constants
@@ -126,6 +130,10 @@ def _import_plugins() -> None:
         import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
 
         openfermion_plugin.load()
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.networkx as networkx_plugin  # noqa: PLC0415
+
+        networkx_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:

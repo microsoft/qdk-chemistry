@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <macis/asci/determinant_search.hpp>
-#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
 
 #include "macis_base.hpp"
@@ -14,49 +12,15 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 /**
  * @class MacisPmcSettings
- * @brief Settings class specific to MACIS PMC calculations
+ * @brief Settings class for MACIS PMC calculations.
  *
- * This class extends the base ProjectedMultiConfigurationSettings class with
- * parameters specific to Projected Multi-Configuration (PMC) calculations using
- * the MACIS library. It provides default values for PMC-specific settings such
- * as determinant limits, tolerances, and algorithm control parameters.
+ * Inherits all solver settings from MacisSettings.
  *
- * @see ProjectedMultiConfigurationSettings
+ * @see MacisSettings
  */
-class MacisPmcSettings : public ProjectedMultiConfigurationSettings {
+class MacisPmcSettings : public MacisSettings {
  public:
-  /**
-   * @brief Default constructor
-   *
-   * Creates PMC settings object with default parameter values taken directly
-   * from the MACIS library's ASCISettings struct to ensure consistency.
-   *
-   * iterative_solver_dimension_cutoff: matrix size cutoff for using iterative
-   * eigensolver. If the number of determinants is below this value, dense
-   * diagonalization is used instead.
-   * H_thresh: Hamiltonian matrix entries threshold for dense diagonalization
-   * h_el_tol: electron interaction tolerance, used for Hamiltonian-wavefunction
-   * product in iterative solver
-   * davidson_res_tol: Residual tolerance for Davidson solver convergence
-   * davidson_max_m: Maximum subspace size for Davidson solver
-   */
-  MacisPmcSettings() {
-    // Use MACIS library defaults directly
-    macis::ASCISettings macis_defaults;
-
-    // Tolerance parameters
-    set_default<int64_t>(
-        "iterative_solver_dimension_cutoff", 100,
-        "Matrix size cutoff for using iterative eigensolver",
-        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
-    set_default<double>("H_thresh", 1e-16);
-    set_default<double>("h_el_tol", macis_defaults.h_el_tol);
-    set_default<double>("davidson_res_tol", 1e-8);
-    set_default<int64_t>(
-        "davidson_max_m", 200,
-        "Maximum allowed subspace size for Davidson solver",
-        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
-  }
+  MacisPmcSettings() = default;
 
   /**
    * @brief Virtual destructor

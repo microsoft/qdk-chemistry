@@ -155,6 +155,6 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/qpe_result.py>`_ script.
 - :doc:`PhaseEstimation <../algorithms/phase_estimation>`: Phase estimation algorithms
-- :doc:`TimeEvolutionBuilder <../algorithms/time_evolution_builder>`: Hamiltonian simulation methods
+- :doc:`HamiltonianUnitaryBuilder <../algorithms/hamiltonian_unitary_builder>`: Hamiltonian simulation or block encoding methods
 - :doc:`Serialization <serialization>`: Data persistence formats
 - See the ``examples/qpe_stretched_n2.ipynb`` notebook for an end-to-end :term:`QPE` workflow

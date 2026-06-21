@@ -6,6 +6,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
@@ -13,7 +14,7 @@ namespace qdk::chemistry::data {
 
 ConfigurationSet::ConfigurationSet(
     const std::vector<Configuration>& configurations,
-    std::shared_ptr<Orbitals> orbitals)
+    std::shared_ptr<Orbitals> orbitals, std::string sector)
     : _configurations(configurations), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -21,11 +22,13 @@ ConfigurationSet::ConfigurationSet(
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
   }
+  _sector_layout = {{std::move(sector), _orbitals}};
   _validate_configurations();
 }
 
 ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
-                                   std::shared_ptr<Orbitals> orbitals)
+                                   std::shared_ptr<Orbitals> orbitals,
+                                   std::string sector)
     : _configurations(std::move(configurations)), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -33,6 +36,7 @@ ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
   }
+  _sector_layout = {{std::move(sector), _orbitals}};
   _validate_configurations();
 }
 
@@ -46,6 +50,13 @@ std::shared_ptr<Orbitals> ConfigurationSet::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
 
   return _orbitals;
+}
+
+const std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>>&
+ConfigurationSet::sector_layout() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _sector_layout;
 }
 
 size_t ConfigurationSet::size() const {
@@ -113,24 +124,14 @@ void ConfigurationSet::_validate_configurations() const {
   QDK_LOG_TRACE_ENTERING();
 
   if (_configurations.empty()) {
-    // Empty set is valid
     return;
   }
 
-  // Validate internal consistency by checking that all configurations
-  // in the set have the same number of orbitals.
-  // Access _num_orbitals directly through friend class relationship.
-
+  // Structural check: all configurations must have the same orbital capacity.
   size_t first_config_orbitals = _configurations[0].get_orbital_capacity();
-
-  // Check that all configurations have the same electron count
-  auto [first_n_alpha, first_n_beta] = _configurations[0].get_n_electrons();
-  size_t first_total_electrons = first_n_alpha + first_n_beta;
 
   for (size_t i = 1; i < _configurations.size(); ++i) {
     size_t config_num_orbitals = _configurations[i].get_orbital_capacity();
-
-    // Check consistency within the set - all configs should have same size
     if (config_num_orbitals != first_config_orbitals) {
       throw std::invalid_argument(
           "ConfigurationSet: configuration at index " + std::to_string(i) +
@@ -139,36 +140,19 @@ void ConfigurationSet::_validate_configurations() const {
           std::to_string(first_config_orbitals) + " orbitals. " +
           "All configurations in a set must have the same number of orbitals.");
     }
-
-    // Check that all configurations have the same electron count
-    auto [n_alpha, n_beta] = _configurations[i].get_n_electrons();
-    size_t total_electrons = n_alpha + n_beta;
-    if (total_electrons != first_total_electrons) {
-      throw std::invalid_argument(
-          "ConfigurationSet: configuration at index " + std::to_string(i) +
-          " has " + std::to_string(total_electrons) +
-          " electrons (α=" + std::to_string(n_alpha) +
-          ", β=" + std::to_string(n_beta) + "), but configuration 0 has " +
-          std::to_string(first_total_electrons) +
-          " electrons (α=" + std::to_string(first_n_alpha) +
-          ", β=" + std::to_string(first_n_beta) +
-          "). All configurations in a set must have the same number of "
-          "electrons.");
-    }
   }
 
-  // If orbitals are provided with active space, validate configurations against
-  // active space requirements Note: Configurations only represent the active
-  // space, not the full orbital space (inactive and virtual orbitals are not
-  // included in the configuration representation)
+  // If orbitals define an active space, validate that configurations fit
+  // within it (capacity sufficient, no occupation beyond the active window).
+  // NOTE: particle-number and spin-conservation checks are intentionally
+  // omitted here — they are many-body symmetry constraints that will be
+  // enforced by an optional many-body SymmetryProduct parameter in a future
+  // PR.  Keeping them out avoids baking Sz assumptions into the structural
+  // validation layer.
   if (_orbitals && _orbitals->has_active_space()) {
     auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
-
-    // For restricted calculations, use alpha indices (they should be the same)
     const auto& active_indices = alpha_active;
 
-    // Validate that configuration has sufficient orbital capacity for the
-    // active space
     if (!active_indices.empty()) {
       size_t active_space_size = active_indices.size();
 
@@ -176,8 +160,6 @@ void ConfigurationSet::_validate_configurations() const {
         const auto& config = _configurations[i];
         const std::string config_str = config.to_string();
 
-        // The configuration must have at least as many orbitals as the active
-        // space size
         if (config.get_orbital_capacity() < active_space_size) {
           throw std::invalid_argument(
               "ConfigurationSet: configuration at index " + std::to_string(i) +
@@ -187,8 +169,6 @@ void ConfigurationSet::_validate_configurations() const {
               std::to_string(active_space_size) + " orbitals).");
         }
 
-        // Validate that any orbitals beyond the active space size are
-        // unoccupied (no "overhanging" electrons)
         for (size_t orbital_idx = active_space_size;
              orbital_idx < config.get_orbital_capacity(); ++orbital_idx) {
           if (orbital_idx < config_str.length() &&
@@ -224,6 +204,9 @@ nlohmann::json ConfigurationSet::to_json() const {
   // Store orbitals
   j["orbitals"] = _orbitals->to_json();
 
+  // Store the sector name (single-particle sector the orbitals belong to)
+  j["sector"] = _sector_layout.front().first;
+
   // Store configurations array
   j["configurations"] = nlohmann::json::array();
   for (const auto& config : _configurations) {
@@ -242,6 +225,10 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
     orbs = Orbitals::from_json(j["orbitals"]);
   }
 
+  // Sector name; legacy files predating sectors are migrated as electronic.
+  std::string sector =
+      j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
+
   std::vector<Configuration> configurations;
   if (!j.contains("configurations")) {
     throw std::runtime_error("JSON missing required 'configurations' field");
@@ -255,7 +242,7 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
     configurations.push_back(std::move(config));
   }
 
-  return ConfigurationSet(std::move(configurations), orbs);
+  return ConfigurationSet(std::move(configurations), orbs, std::move(sector));
 }
 
 void ConfigurationSet::to_hdf5(H5::Group& group) const {
@@ -266,6 +253,12 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
     H5::Group orbitals_group = group.createGroup("orbitals");
     _orbitals->to_hdf5(orbitals_group);
     orbitals_group.close();
+
+    // Store the sector name (single-particle sector the orbitals belong to)
+    H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::Attribute sector_attr = group.createAttribute(
+        "sector", sector_str_type, H5::DataSpace(H5S_SCALAR));
+    sector_attr.write(sector_str_type, _sector_layout.front().first);
 
     if (_configurations.empty()) {
       // Store empty flag
@@ -318,13 +311,19 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
     hsize_t packed_size_val = packed_size;
     packed_attr.write(H5::PredType::NATIVE_HSIZE, &packed_size_val);
 
-    // Store orbital capacity (number of orbitals each configuration can
+    // Store orbital capacity (number of modes each configuration can
     // represent)
     hsize_t orbital_capacity = _configurations[0].get_orbital_capacity();
     H5::Attribute orb_attr =
         dataset.createAttribute("orbital_capacity", H5::PredType::NATIVE_HSIZE,
                                 H5::DataSpace(H5S_SCALAR));
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
+
+    // Store bits_per_mode for statistics-generic reconstruction.
+    uint8_t bpm = _configurations[0].bits_per_mode();
+    H5::Attribute bpm_attr = dataset.createAttribute(
+        "bits_per_mode", H5::PredType::NATIVE_UINT8, H5::DataSpace(H5S_SCALAR));
+    bpm_attr.write(H5::PredType::NATIVE_UINT8, &bpm);
 
     dataset.close();
   } catch (const H5::Exception& e) {
@@ -345,13 +344,20 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
       orbitals_group.close();
     }
 
+    // Sector name; legacy files predating sectors are migrated as electronic.
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
+    if (group.attrExists("sector")) {
+      H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
+      group.openAttribute("sector").read(sector_str_type, sector);
+    }
+
     // Check for empty set
     if (group.attrExists("is_empty")) {
       H5::Attribute empty_attr = group.openAttribute("is_empty");
       hbool_t empty_flag;
       empty_attr.read(H5::PredType::NATIVE_HBOOL, &empty_flag);
       if (empty_flag) {
-        return ConfigurationSet(std::vector<Configuration>(), orbs);
+        return ConfigurationSet(std::vector<Configuration>(), orbs, sector);
       }
     }
 
@@ -377,6 +383,22 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
           "Dimension mismatch in ConfigurationSet HDF5 data");
     }
 
+    // Read orbital_capacity and bits_per_mode for proper reconstruction.
+    hsize_t orbital_capacity = 0;
+    uint8_t bpm = 2;
+    if (dataset.attrExists("orbital_capacity")) {
+      dataset.openAttribute("orbital_capacity")
+          .read(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
+    }
+    if (dataset.attrExists("bits_per_mode")) {
+      dataset.openAttribute("bits_per_mode")
+          .read(H5::PredType::NATIVE_UINT8, &bpm);
+    }
+    // Legacy files lack orbital_capacity — infer from packed size and bpm.
+    if (orbital_capacity == 0 && packed_size > 0) {
+      orbital_capacity = packed_size * (8 / bpm);
+    }
+
     // Pre-allocate flat_data vector before reading
     std::vector<uint8_t> flat_data;
     flat_data.resize(num_configs * packed_size);
@@ -385,17 +407,16 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
 
     // Reconstruct configurations from flat data
     std::vector<Configuration> configurations;
-    configurations.reserve(num_configs);  // Pre-allocate
+    configurations.reserve(num_configs);
     for (size_t i = 0; i < num_configs; ++i) {
       Configuration config;
-      // Access _packed_orbs through friend relationship
-      config._packed_orbs.resize(packed_size);
       config._packed_orbs.assign(flat_data.begin() + i * packed_size,
                                  flat_data.begin() + (i + 1) * packed_size);
+      config._bits_per_mode = bpm;
       configurations.push_back(std::move(config));
     }
 
-    return ConfigurationSet(std::move(configurations), orbs);
+    return ConfigurationSet(std::move(configurations), orbs, sector);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in ConfigurationSet::from_hdf5: " +
                              std::string(e.getCDetailMsg()));
@@ -536,6 +557,25 @@ ConfigurationSet ConfigurationSet::from_hdf5_file(const std::string& filename) {
     throw std::runtime_error(
         "Unable to read ConfigurationSet data from HDF5 file '" + filename +
         "'. " + "HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void ConfigurationSet::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, static_cast<uint64_t>(_configurations.size()));
+  for (const auto& config : _configurations) {
+    hash_value(ctx, config.content_hash());
+  }
+  hash_value(ctx, static_cast<uint64_t>(_sector_layout.size()));
+  for (const auto& [name, orbs] : _sector_layout) {
+    hash_value(ctx, name);
+    if (orbs) {
+      hash_field_presence(ctx, true);
+      hash_value(ctx, orbs->content_hash());
+    } else {
+      hash_field_presence(ctx, false);
+    }
   }
 }
 

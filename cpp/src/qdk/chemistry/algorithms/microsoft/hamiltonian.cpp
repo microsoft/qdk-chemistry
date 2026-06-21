@@ -89,7 +89,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
-  const auto& [Ca, Cb] = orbitals->get_coefficients();
+  const auto& Ca = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& Cb =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
@@ -138,9 +141,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Create internal Molecule
   auto structure = basis_set->get_structure();
-  auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
-  // Create internal BasisSet
+  // Create internal BasisSet (includes ECP-adjusted nuclear charges)
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   // Create dummy SCFConfig
@@ -169,7 +171,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), mol.get(), scf_config->mpi);
+      internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
 
   // Compute Core Hamiltonian in AO basis
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
@@ -177,6 +179,14 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
+
+  // Add ECP integrals if present
+  if (internal_basis_set->ecp_shells.size() > 0) {
+    Eigen::MatrixXd ECP_full =
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    int1e->ecp_integral(ECP_full.data());
+    H_full += ECP_full;
+  }
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
@@ -214,18 +224,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Initialize MOERI
   qcs::MOERI moeri_c(eri);
 
-  // Determine SCF type from settings
-  std::string scf_type = _settings->get<std::string>("scf_type");
-
-  bool is_restricted_calc;
-  if (scf_type == "restricted") {
-    is_restricted_calc = true;
-  } else if (scf_type == "unrestricted") {
-    is_restricted_calc = false;
-  } else {  // "auto"
-    is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
-                         orbitals->is_restricted();
-  }
+  // Determine restricted/unrestricted from orbitals (auto behavior)
+  bool is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
+                            orbitals->is_restricted();
 
   // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
   // construction, so we only use Restricted in restricted case

@@ -10,31 +10,48 @@
 from qdk_chemistry.algorithms import create
 
 # Create the default (iterative) phase estimation algorithm
-iqpe = create("phase_estimation", "iterative")
+iqpe = create("phase_estimation", "qdk_iterative")
 
-# Or create the standard QFT-based variant (requires Qiskit)
-qpe = create("phase_estimation", "qiskit_standard")
+# Or create the standard QFT-based variant
+qpe = create("phase_estimation", "qdk_standard")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure-iqpe
 # Configure iterative phase estimation
-iqpe = create("phase_estimation", "iterative")
-iqpe.settings().set("num_bits", 10)
-iqpe.settings().set("evolution_time", 0.1)
-iqpe.settings().set("shots_per_bit", 10)
+from qdk_chemistry.data import AlgorithmRef
+
+# Create iterative qpe circuit builder
+iqpe_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_iterative",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
+    ),
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
+)
+iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=10)
+iqpe.settings().set("qpe_circuit_builder", iqpe_circuit_builder)
 # end-cell-configure-iqpe
 ################################################################################
 
 ################################################################################
 # start-cell-configure-standard
 # Configure standard QFT-based phase estimation
-qpe = create("phase_estimation", "qiskit_standard")
-qpe.settings().set("num_bits", 10)
-qpe.settings().set("evolution_time", 0.1)
+qpe_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_standard",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
+    ),
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
+)
+qpe = create("phase_estimation", "qdk_standard")
 qpe.settings().set("shots", 100)
-qpe.settings().set("qft_do_swaps", True)
+qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
 ################################################################################
 
@@ -64,28 +81,47 @@ cas_solver = create("multi_configuration_calculator")
 E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 
 # 5. Qubit mapping
-qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
-qubit_ham = qubit_mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_mapper = create("qubit_mapper")
+qubit_ham = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 # 6. State preparation
 state_prep = create("state_prep", "sparse_isometry_gf2x")
 circuit = state_prep.run(wfn_cas)
 
-# 7. Create QPE dependencies
-evolution_builder = create("time_evolution_builder", "trotter", order=2)
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-circuit_executor = create("circuit_executor", "qiskit_aer_simulator", seed=42)
+# 7. Create and run IQPE with nested algorithm settings
+from qdk_chemistry.data import AlgorithmRef
 
-# 8. Create and run IQPE
-iqpe = create(
-    "phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10
+iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=3)
+
+# 8. Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
+iqpe_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_iterative",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
+    ),
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "trotter", order=2, time=0.1
+    ),
 )
+iqpe.settings().set(
+    "qpe_circuit_builder",
+    iqpe_circuit_builder,
+)
+iqpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
+)
+
 result = iqpe.run(
     state_preparation=circuit,
     qubit_hamiltonian=qubit_ham,
-    evolution_builder=evolution_builder,
-    circuit_mapper=circuit_mapper,
-    circuit_executor=circuit_executor,
 )
 
 # 9. Inspect results
@@ -99,6 +135,6 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['iterative', 'qiskit_standard']
+print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
 # end-cell-list-implementations
 ################################################################################

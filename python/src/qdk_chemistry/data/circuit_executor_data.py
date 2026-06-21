@@ -10,6 +10,7 @@ from typing import Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_arg, _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 
@@ -54,6 +55,17 @@ class CircuitExecutorData(DataClass):
         self._executor_metadata = executor_metadata
         self.loss_bitstrings = loss_bitstrings
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "circuit_executor_data")
+        _hash_uint(h, len(self.bitstring_counts))
+        for k in sorted(self.bitstring_counts.keys()):
+            _hash_str(h, k)
+            _hash_int(h, self.bitstring_counts[k])
+        _hash_int(h, self.total_shots)
+        _hash_str(h, self.executor)
+        _hash_arg(h, self._executor_metadata)
 
     def get_executor_metadata(self) -> Any | None:
         """Get the executor metadata.

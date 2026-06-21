@@ -2,13 +2,14 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <cstdint>
 #include <optional>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <unordered_map>
 #include <variant>
 
 #include "microsoft/active_space/autocas_active_space.hpp"
@@ -19,6 +20,27 @@
 namespace qdk::chemistry::algorithms {
 
 namespace detail {
+
+static std::shared_ptr<const data::SymmetryBlockedIndexSet>
+make_orbital_index_set(const std::shared_ptr<data::Orbitals>& orbitals,
+                       const std::vector<size_t>& alpha,
+                       const std::vector<size_t>& beta) {
+  auto to_u32 = [](const std::vector<size_t>& v) {
+    return std::vector<std::uint32_t>(v.begin(), v.end());
+  };
+
+  std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>> indices;
+  auto symmetries = orbitals->symmetries();
+  if (symmetries && symmetries->has_axis(data::AxisName::Spin)) {
+    indices[data::axes::alpha()] = to_u32(alpha);
+    indices[data::axes::beta()] = to_u32(beta);
+  } else {
+    indices[data::SymmetryLabel{}] = to_u32(alpha);
+  }
+
+  return std::make_shared<const data::SymmetryBlockedIndexSet>(
+      symmetries, orbitals->mo_extents(), std::move(indices));
+}
 
 std::tuple<double, std::vector<size_t>, Eigen::VectorXd>
 _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
@@ -120,11 +142,6 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     // Restricted case
-    std::optional<Eigen::VectorXd> energies;
-    if (orbitals->has_energies()) {
-      energies = orbitals->get_energies().first;
-    }
-
     std::optional<Eigen::MatrixXd> ao_overlap;
     if (orbitals->has_overlap_matrix()) {
       ao_overlap = orbitals->get_overlap_matrix();
@@ -136,8 +153,12 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     return std::make_shared<data::Orbitals>(
-        orbitals->get_coefficients().first, energies, ao_overlap, basis_set,
-        std::make_tuple(active_space_indices_a, inactive_indices));
+        orbitals->coefficients(),
+        orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
+        basis_set,
+        make_orbital_index_set(orbitals, active_space_indices_a,
+                               active_space_indices_a),
+        make_orbital_index_set(orbitals, inactive_indices, inactive_indices));
   } else {
     // get inactive indices
     size_t nelec_a = wavefunction->get_total_num_electrons().first;
@@ -170,15 +191,6 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     // Unrestricted case
-    auto coeffs_pair = orbitals->get_coefficients();
-    std::optional<Eigen::VectorXd> alpha_energies, beta_energies;
-
-    if (orbitals->has_energies()) {
-      auto energies_pair = orbitals->get_energies();
-      alpha_energies = energies_pair.first;
-      beta_energies = energies_pair.second;
-    }
-
     std::optional<Eigen::MatrixXd> ao_overlap;
     if (orbitals->has_overlap_matrix()) {
       ao_overlap = orbitals->get_overlap_matrix();
@@ -189,10 +201,13 @@ std::shared_ptr<data::Orbitals> new_orbitals(
       basis_set = orbitals->get_basis_set();
     }
     return std::make_shared<data::Orbitals>(
-        coeffs_pair.first, coeffs_pair.second, alpha_energies, beta_energies,
-        ao_overlap, basis_set,
-        std::make_tuple(active_space_indices_a, active_space_indices_b.value(),
-                        inactive_indices_a, inactive_indices_b));
+        orbitals->coefficients(),
+        orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
+        basis_set,
+        make_orbital_index_set(orbitals, active_space_indices_a,
+                               active_space_indices_b.value()),
+        make_orbital_index_set(orbitals, inactive_indices_a,
+                               inactive_indices_b));
   }
 }
 
@@ -296,7 +311,7 @@ data::Configuration _extract_active_orbitals(
     }
   }
 
-  return data::Configuration(active_det_string);
+  return data::Configuration::from_spin_half_string(active_det_string);
 }
 
 std::shared_ptr<data::Wavefunction> new_wavefunction(
@@ -364,7 +379,7 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
       }
     }
 
-    data::Configuration aufbau_det(aufbau_string);
+    auto aufbau_det = data::Configuration::from_spin_half_string(aufbau_string);
     // Now truncate the aufbau determinant to the new active space
     truncated_det = _extract_active_orbitals(aufbau_det, old_active_indices_a,
                                              new_active_indices_a);
@@ -372,8 +387,8 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
 
   // Create a new container with the truncated/aufbau determinant
   std::unique_ptr<data::WavefunctionContainer> new_container;
-  new_container = std::make_unique<data::SlaterDeterminantContainer>(
-      truncated_det, new_orbitals, wavefunction_type);
+  new_container = std::make_unique<data::StateVectorContainer>(
+      truncated_det, new_orbitals, "electrons", wavefunction_type);
 
   return std::make_shared<data::Wavefunction>(std::move(new_container));
 }
