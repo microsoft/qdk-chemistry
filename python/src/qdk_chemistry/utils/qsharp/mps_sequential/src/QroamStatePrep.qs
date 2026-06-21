@@ -1,11 +1,5 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-// --------------------------------------------------------------------------------------------
-// Based on code originally published by Felix Rupprecht (DLR) on Zenodo:
-//   https://zenodo.org/records/15587498
-// Rewritten and adapted for integration into the QDK Chemistry library.
-// --------------------------------------------------------------------------------------------
 
 /// # Summary
 /// Dense state preparation using QROM + phase-gradient Ry rotations.

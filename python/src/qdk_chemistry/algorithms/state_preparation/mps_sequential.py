@@ -1,6 +1,6 @@
-"""MPS Berry state preparation via sequential site unitary synthesis.
+"""MPS (Matrix Product State) state preparation via sequential site unitary synthesis.
 
-Implements the Matrix Product State (MPS) state preparation algorithm based on
+Implements the MPS state preparation algorithm based on
 :cite:`Berry2025`. Each site unitary is decomposed based on Appendix B in
 :cite:`Rupprecht2026`.
 
@@ -18,7 +18,10 @@ References
 
     Dominic W. Berry et al. (2025). Rapid Initial-State Preparation for the Quantum Simulation of
     Strongly Correlated Molecules. PRX Quantum 6, 020327.
-    https://doi.org/10.1103/PRXQuantum.6.020327
+    https://doi.org/10.1103/PRXQuantum.6.020327.
+
+    William R. Clements et al. (2017). An Optimal Design for Universal Multiport Interferometers.
+    https://arxiv.org/abs/1603.08788.
 
 """
 
@@ -29,6 +32,7 @@ References
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -42,7 +46,10 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation, StatePreparationSettings
 
-__all__: list[str] = ["MPSSequentialStatePreparation"]
+__all__: list[str] = [
+    "MPSPreparationData",
+    "MPSSequentialStatePreparation",
+]
 
 
 class MPSSequentialStatePreparationSettings(StatePreparationSettings):
@@ -52,16 +59,23 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
         """Initialize the MPSSequentialStatePreparationSettings."""
         super().__init__()
         self._set_default("rotation_bits", "int", 10, "Phase gradient precision (number of bits).")
+        self._set_default(
+            "fast_resource_estimation",
+            "bool",
+            False,
+            "Only synthesize one site unitary and replicate it for all sites. "
+            "Valid for resource estimation (with BeginEstimateCaching) but not simulation.",
+        )
 
 
 class MPSSequentialStatePreparation(StatePreparation):
-    r"""MPS state preparation using sequential unitary synthesis.
+    r"""MPS (Matrix Product State) state preparation using sequential unitary synthesis.
 
-    Prepare the Matrix Product State (MPS) sequentially, qubit-by-qubit (2 qubits
-    per site), using an ancilla register that stores the virtual bond dimension.
-    Each site unitary is decomposed based on Appendix B in :cite:`Rupprecht2026`,
-    and synthesized into a quantum circuit via Givens rotation layers with QROAM
-    angle loading and phase gradient rotations.
+    Prepare the state sequentially, qubit-by-qubit (2 qubits per site), using an
+    ancilla register that stores the virtual bond dimension. Each site unitary
+    is decomposed based on Appendix B in :cite:`Rupprecht2026`, and synthesized
+    into a quantum circuit via Givens rotation layers with QROAM (Quantum
+    Read-Only Access Memory) angle loading and phase gradient rotations.
 
     Attribution
     -----------
@@ -100,61 +114,160 @@ class MPSSequentialStatePreparation(StatePreparation):
         if not isinstance(wavefunction, MPSWavefunction):
             raise TypeError(f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
 
-        # Compute the unitary synthesis data
-        data = generate_mps_preparation_data(wavefunction.tensors)
+        fast_re = self._settings.get("fast_resource_estimation")
+        data = generate_mps_preparation_data(wavefunction.tensors, fast_resource_estimation=fast_re)
+        params = data.to_qsharp_params(self._settings.get("rotation_bits"))
 
-        # Build Q# factory parameters
-        params = {
-            "initialStateVec": data["initial_state_vec"],
-            "numSites": data["num_sites"],
-            "rotationBits": self._settings.get("rotation_bits"),
-            "siteVLayerAngles": data["site_v_layer_angles"],
-            "siteVLayerShifted": data["site_v_layer_shifted"],
-            "siteVPhases": data["site_v_phases"],
-            "siteRot0Angles": data["site_rot0_angles"],
-            "siteRot1Angles": data["site_rot1_angles"],
-            "siteRot2Angles": data["site_rot2_angles"],
-            "siteW0LayerAngles": data["site_w0_layer_angles"],
-            "siteW0LayerShifted": data["site_w0_layer_shifted"],
-            "siteW0Phases": data["site_w0_phases"],
-            "siteW1LayerAngles": data["site_w1_layer_angles"],
-            "siteW1LayerShifted": data["site_w1_layer_shifted"],
-            "siteW1Phases": data["site_w1_phases"],
-            "siteULayerAngles": data["site_u_layer_angles"],
-            "siteULayerShifted": data["site_u_layer_shifted"],
-            "siteUPhases": data["site_u_phases"],
-        }
+        from qdk_chemistry.utils.qsharp import _get_mps_context
 
-        mps_ops = QSHARP_UTILS.MPSSequential
+        mps_ctx = _get_mps_context()
+        mps_ops = mps_ctx.code.MPSSequential
+
+        num_state_qubits = 2 * len(wavefunction.tensors)
+        num_ancilla_qubits = data.ancilla_bits
+        estimate_expr = _build_mps_estimate_expr(params, num_state_qubits, num_ancilla_qubits)
 
         qsharp_factory = QsharpFactoryData(
             program=mps_ops.MPSSequential,
             parameter=params,
+            estimate_expr=estimate_expr,
+            context=mps_ctx,
         )
 
         return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
+# ---------------------------------------------------------------------------
+# Data containers for structured decomposition results
+# ---------------------------------------------------------------------------
 
+
+@dataclass
+class GivensLayerData:
+    """Result of decomposing a unitary into Givens rotation layers.
+
+    Stores the factorization ``U = D · L_l · ... · L_1`` where each ``L_j``
+    is a layer of parallel R_y rotations and ``D`` is a ±1 sign matrix.
+    """
+
+    layer_angles: list[list[float]]
+    """Per-layer R_y rotation angles for each parallel slot."""
+
+    layer_shifted: list[bool]
+    """Whether each layer uses odd-indexed pairs (True) or even (False)."""
+
+    phases: list[bool]
+    """Diagonal sign flips (True where entry is -1)."""
+
+
+@dataclass
+class SiteUnitaryData:
+    r"""Decomposition data for a single MPS site unitary.
+
+    Holds the 7-matrix CSD (Cosine-Sine Decomposition) from Appendix B of
+    :cite:`Rupprecht2026` and the Givens-layer synthesis of each component.
+
+    The circuit applies these components in order (see Fig. 5 of the paper)::
+
+        V -> UCR(d_0') -> CNOT -> W_0 -> UCR(d_1') -> CNOT -> W_1 -> UCR(d_2') -> U
+
+    where each UCR (Uniformly Controlled Rotation) is a multiplexed R_y
+    rotation addressed by the ancilla register, CNOT is a Controlled-NOT
+    gate, and U = diag(u_0, u_1, u_2, u_3) is block-diagonal.
+    """
+
+    v: GivensLayerData
+    """Givens layers for V (right unitary, pushed from next site)."""
+
+    rot_angles: list[list[float]]
+    """UCR (Uniformly Controlled Rotation) angles for each of the 3 rotation steps.
+
+    Format: ``[rot0, rot1, rot2]``.
+    """
+
+    w0: GivensLayerData
+    """Givens layers for W_0 (mixing unitary, controlled by site[0])."""
+
+    w1: GivensLayerData
+    """Givens layers for W_1 (mixing unitary, controlled by site[1])."""
+
+    u: GivensLayerData
+    """Givens layers for U (block-diagonal unitary on ancilla+site)."""
+
+
+@dataclass
+class MPSPreparationData:
+    """All data needed to drive the MPSSequential Q# operation.
+
+    Produced by :func:`generate_mps_preparation_data` and consumed by
+    :meth:`MPSSequentialStatePreparation._run_impl`.
+    """
+
+    initial_state_vec: list[float]
+    """Flattened initial state vector for the first site (state-preparation)."""
+
+    num_sites: int
+    """Number of MPS sites."""
+
+    ancilla_bits: int
+    """Number of ancilla qubits (log2 of ancilla dimension)."""
+
+    sites: list[SiteUnitaryData] = field(default_factory=list)
+    """Per-site decomposition data (one entry per site 1..num_sites-1)."""
+
+    def to_qsharp_params(self, rotation_bits: int) -> dict:
+        """Flatten into the dict expected by the MPSSequential Q# operation."""
+        params: dict = {
+            "initialStateVec": self.initial_state_vec,
+            "numSites": self.num_sites,
+            "rotationBits": rotation_bits,
+            "siteVLayerAngles": [s.v.layer_angles for s in self.sites],
+            "siteVLayerShifted": [s.v.layer_shifted for s in self.sites],
+            "siteVPhases": [s.v.phases for s in self.sites],
+            "siteRot0Angles": [s.rot_angles[0] for s in self.sites],
+            "siteRot1Angles": [s.rot_angles[1] for s in self.sites],
+            "siteRot2Angles": [s.rot_angles[2] for s in self.sites],
+            "siteW0LayerAngles": [s.w0.layer_angles for s in self.sites],
+            "siteW0LayerShifted": [s.w0.layer_shifted for s in self.sites],
+            "siteW0Phases": [s.w0.phases for s in self.sites],
+            "siteW1LayerAngles": [s.w1.layer_angles for s in self.sites],
+            "siteW1LayerShifted": [s.w1.layer_shifted for s in self.sites],
+            "siteW1Phases": [s.w1.phases for s in self.sites],
+            "siteULayerAngles": [s.u.layer_angles for s in self.sites],
+            "siteULayerShifted": [s.u.layer_shifted for s in self.sites],
+            "siteUPhases": [s.u.phases for s in self.sites],
+        }
+        return params
+    
 # ---------------------------------------------------------------------------
 # Unitary synthesis helpers
 # ---------------------------------------------------------------------------
 
 
-def generate_mps_preparation_data(tensors: Sequence[np.ndarray]) -> dict:
-    """Compute all data needed for MPSSequential Q# operation.
+def generate_mps_preparation_data(
+    tensors: Sequence[np.ndarray],
+    fast_resource_estimation: bool = False,
+) -> MPSPreparationData:
+    """Compute all data needed for the MPSSequential Q# operation.
 
-    Performs CSD decomposition + Givens layer decomposition for each site.
-    Returns raw angles (Double) and phases (Bool) — Q# handles angle
-    quantization internally.
+    Performs CSD + Givens layer decomposition for each site.
+    Returns structured data with raw angles (Double) and phases (Bool) --
+    Q# handles angle quantization internally.
 
     Parameters
     ----------
     tensors : sequence of np.ndarray
-        MPS tensors. tensors[i] has shape (chi_left, d, chi_right).
+        MPS tensors. ``tensors[i]`` has shape ``(chi_left, d, chi_right)``.
+    fast_resource_estimation : bool
+        If True, only decompose a single representative site unitary and
+        replicate its data for all sites.  This is valid for resource
+        estimation (where ``BeginEstimateCaching`` caches the first site
+        and reuses its cost) but NOT for simulation.
 
     Returns
     -------
-    dict with all parameters needed by MPSSequential.
+    MPSPreparationData
+        Structured preparation data. Call ``.to_qsharp_params(rotation_bits)``
+        to flatten into the dict expected by the Q# operation.
 
     """
     num_sites = len(tensors)
@@ -172,83 +285,25 @@ def generate_mps_preparation_data(tensors: Sequence[np.ndarray]) -> dict:
     ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
     ancilla_dim = 1 << ancilla_bits
 
-    # Per-site decomposition data
-    site_v_layer_angles = []
-    site_v_layer_shifted = []
-    site_v_phases = []
-    site_rot0_angles = []
-    site_rot1_angles = []
-    site_rot2_angles = []
-    site_w0_layer_angles = []
-    site_w0_layer_shifted = []
-    site_w0_phases = []
-    site_w1_layer_angles = []
-    site_w1_layer_shifted = []
-    site_w1_phases = []
-    site_u_layer_angles = []
-    site_u_layer_shifted = []
-    site_u_phases = []
-
-    for i in range(1, num_sites):
-        tensor = tensors[i]
-        chi_left = tensor.shape[0]
-        dim = ancilla_dim
-
-        data = compute_site_unitary_dense_data(tensor, v_from_next=None, ancilla_dim=dim)
-        d_0_, d_1_, d_2_ = data["d_prime"]
-        w_0 = data["w_0"]
-        w_1 = data["w_1"]
-        u_0, u_1, u_2, u_3 = data["u"]
-        v = data["v"]
-
-        # V: Givens decomposition
-        v_pad = np.eye(dim, dtype=np.float64)
-        v_pad[: v.shape[0], : v.shape[1]] = np.asarray(v).real
-        v_angles, v_shifted, v_phases_arr = decompose_unitary_to_givens(v_pad)
-        site_v_layer_angles.append(v_angles)
-        site_v_layer_shifted.append(v_shifted)
-        site_v_phases.append(v_phases_arr)
-
-        # UCR rotation angles: 2*arcsin(d')
-        rot0_angles = [2.0 * float(np.arcsin(np.clip(d_0_[k], -1, 1))) for k in range(dim)]
-        rot1_angles = [2.0 * float(np.arcsin(np.clip(d_1_[k] if k < len(d_1_) else 0.0, -1, 1))) for k in range(dim)]
-        rot2_angles = [2.0 * float(np.arcsin(np.clip(d_2_[k] if k < len(d_2_) else 0.0, -1, 1))) for k in range(dim)]
-        site_rot0_angles.append(rot0_angles)
-        site_rot1_angles.append(rot1_angles)
-        site_rot2_angles.append(rot2_angles)
-
-        # W0: Givens decomposition
-        w0_pad = np.eye(dim, dtype=np.float64)
-        w0_pad[: w_0.shape[0], : w_0.shape[1]] = np.asarray(w_0).real
-        w0_angles, w0_shifted, w0_phases = decompose_unitary_to_givens(w0_pad)
-        site_w0_layer_angles.append(w0_angles)
-        site_w0_layer_shifted.append(w0_shifted)
-        site_w0_phases.append(w0_phases)
-
-        # W1: Givens decomposition
-        w1_pad = np.eye(dim, dtype=np.float64)
-        w1_pad[: w_1.shape[0], : w_1.shape[1]] = np.asarray(w_1).real
-        w1_angles, w1_shifted, w1_phases = decompose_unitary_to_givens(w1_pad)
-        site_w1_layer_angles.append(w1_angles)
-        site_w1_layer_shifted.append(w1_shifted)
-        site_w1_phases.append(w1_phases)
-
-        # U (block-diagonal): decompose blocks
-        u_blocks = [u_0, u_1, u_2, u_3]
-        u_block_mats = []
-        for u_b in u_blocks:
-            u_block_pad = np.eye(dim, dtype=np.float64)
-            u_block_pad[: u_b.shape[0], : u_b.shape[1]] = np.asarray(u_b).real
-            u_block_mats.append(u_block_pad)
-        u_angles, u_shifted, u_phases_arr = decompose_block_diagonal_to_givens(u_block_mats)
-        site_u_layer_angles.append(u_angles)
-        site_u_layer_shifted.append(u_shifted)
-        site_u_phases.append(u_phases_arr)
+    # Per-site decomposition
+    sites: list[SiteUnitaryData] = []
+    if fast_resource_estimation and num_sites > 2:
+        # Only decompose one site; replicate for all others.
+        # Pick the site with the largest tensor (most representative cost).
+        representative_idx = max(range(1, num_sites), key=lambda i: tensors[i].size)
+        site_data = _decompose_site(tensors[representative_idx], ancilla_dim)
+        sites = [site_data] * (num_sites - 1)
+    else:
+        for i in range(1, num_sites):
+            site_data = _decompose_site(tensors[i], ancilla_dim)
+            sites.append(site_data)
 
     # Initial state from first tensor
     first_tensor = tensors[0]
+    chi_left_0 = first_tensor.shape[0]
     chi_1 = first_tensor.shape[2]
-    init_state = first_tensor[0]  # (d, chi_right)
+    # Transpose to (d, chi_right, chi_left) then sum over chi_left → (d, chi_right)
+    init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
     init_padded = np.zeros((d, ancilla_dim))
     init_padded[:, :chi_1] = init_state
     initial_state_vec = init_padded.flatten()
@@ -256,26 +311,72 @@ def generate_mps_preparation_data(tensors: Sequence[np.ndarray]) -> dict:
     if norm > 1e-15:
         initial_state_vec = initial_state_vec / norm
 
-    return {
-        "initial_state_vec": initial_state_vec.tolist(),
-        "num_sites": num_sites,
-        "ancilla_bits": ancilla_bits,
-        "site_v_layer_angles": site_v_layer_angles,
-        "site_v_layer_shifted": site_v_layer_shifted,
-        "site_v_phases": site_v_phases,
-        "site_rot0_angles": site_rot0_angles,
-        "site_rot1_angles": site_rot1_angles,
-        "site_rot2_angles": site_rot2_angles,
-        "site_w0_layer_angles": site_w0_layer_angles,
-        "site_w0_layer_shifted": site_w0_layer_shifted,
-        "site_w0_phases": site_w0_phases,
-        "site_w1_layer_angles": site_w1_layer_angles,
-        "site_w1_layer_shifted": site_w1_layer_shifted,
-        "site_w1_phases": site_w1_phases,
-        "site_u_layer_angles": site_u_layer_angles,
-        "site_u_layer_shifted": site_u_layer_shifted,
-        "site_u_phases": site_u_phases,
-    }
+    return MPSPreparationData(
+        initial_state_vec=initial_state_vec.tolist(),
+        num_sites=num_sites,
+        ancilla_bits=ancilla_bits,
+        sites=sites,
+    )
+
+
+def _pad_and_givens(mat: np.ndarray, dim: int) -> GivensLayerData:
+    """Pad a real unitary to ``dim x dim`` and decompose into Givens layers."""
+    padded = np.eye(dim, dtype=np.float64)
+    padded[: mat.shape[0], : mat.shape[1]] = np.asarray(mat).real
+    angles, shifted, phases = decompose_unitary_to_givens(padded)
+    return GivensLayerData(layer_angles=angles, layer_shifted=shifted, phases=phases)
+
+
+def _d_prime_to_ucr_angles(d_prime: np.ndarray, dim: int) -> list[float]:
+    """Convert a sin-component diagonal to UCR R_y angles.
+
+    Each angle is ``2*arcsin(d'[k])``.
+    """
+    return [2.0 * float(np.arcsin(np.clip(d_prime[k] if k < len(d_prime) else 0.0, -1, 1))) for k in range(dim)]
+
+
+def _decompose_site(tensor: np.ndarray, ancilla_dim: int) -> SiteUnitaryData:
+    """CSD-decompose one MPS site tensor and Givens-decompose all components.
+
+    Combines ``compute_site_unitary_dense_data``
+    (CSD = Cosine-Sine Decomposition) with Givens decomposition of each
+    resulting unitary, returning a single ``SiteUnitaryData`` ready for
+    circuit synthesis.
+    """
+    dim = ancilla_dim
+    data = compute_site_unitary_dense_data(tensor, v_from_next=None, ancilla_dim=dim)
+
+    d_0_, d_1_, d_2_ = data["d_prime"]
+    u_0, u_1, u_2, u_3 = data["u"]
+
+    # Givens decompositions of V, W_0, W_1
+    v_givens = _pad_and_givens(data["v"], dim)
+    w0_givens = _pad_and_givens(data["w_0"], dim)
+    w1_givens = _pad_and_givens(data["w_1"], dim)
+
+    # UCR (Uniformly Controlled Rotation) angles from the 3 sin-component diagonals
+    rot_angles = [
+        _d_prime_to_ucr_angles(d_0_, dim),
+        _d_prime_to_ucr_angles(d_1_, dim),
+        _d_prime_to_ucr_angles(d_2_, dim),
+    ]
+
+    # U: block-diagonal Givens decomposition
+    u_block_mats = []
+    for u_b in [u_0, u_1, u_2, u_3]:
+        u_pad = np.eye(dim, dtype=np.float64)
+        u_pad[: u_b.shape[0], : u_b.shape[1]] = np.asarray(u_b).real
+        u_block_mats.append(u_pad)
+    u_angles, u_shifted, u_phases = decompose_block_diagonal_to_givens(u_block_mats)
+    u_givens = GivensLayerData(layer_angles=u_angles, layer_shifted=u_shifted, phases=u_phases)
+
+    return SiteUnitaryData(
+        v=v_givens,
+        rot_angles=rot_angles,
+        w0=w0_givens,
+        w1=w1_givens,
+        u=u_givens,
+    )
 
 
 def compute_site_unitary_dense_data(
@@ -283,24 +384,52 @@ def compute_site_unitary_dense_data(
     v_from_next: np.ndarray | None,
     ancilla_dim: int,
 ) -> dict:
-    """Compute the 7-matrix CSD decomposition of a site unitary.
+    r"""Compute the 7-matrix CSD of a site unitary.
 
-    Decomposes the target matrix (formed from the MPS tensor) into the
-    factorization from Appendix B of :cite:`Rupprecht2026`::
+    Given the MPS tensor ``M_i`` of shape (left, 4, right), the target
+    isometry is ``U' = [A_0; A_1; A_2; A_3]`` where ``A_j = (M_i^j)^T``
+    (each block is dim x width). This function decomposes ``U'`` into the
+    7-matrix factorization from Appendix B of :cite:`Rupprecht2026` (Fig. 5)::
 
-        [a_0]       [u_0          ] [I        ] [I        ] [I       ] [I       ] [d_0  .  ] [v        ]
-        [a_1]       [   u_1       ] [  I      ] [  I      ] [ d_1  . ] [ w_1    ] [d_0' .  ] [  v      ]
-        [a_2]   =   [      u_2    ] [    d_0  ] [    w_0  ] [ d_1' . ] [    w_1 ] [    d_0 ] [    v    ]
-        [a_3]       [         u_3 ] [    d_0' ] [       w_0] [       I] [       I] [    d_0'] [       v ]
+        U' = diag(U_0..U_3)              -- block-diagonal unitary
+           · [[I,0,0,0],[0,I,0,0],       -- rotation with D_2/D_2'
+              [0,0,D_2,·],[0,0,D_2',·]]
+           · [[I,0,0,0],[0,I,0,0],       -- W_1 (controlled by site[0])
+              [0,0,W_1,0],[0,0,0,W_1]]
+           · [[I,0,0,0],[0,D_1,·,0],     -- rotation with D_1/D_1'
+              [0,D_1',·,0],[0,0,0,I]]
+           · [[I,0,0,0],[0,W_0,0,0],     -- W_0 (controlled by site[1])
+              [0,0,W_0,0],[0,0,0,I]]
+           · [[D_0,·,0,0],[D_0',·,0,0],  -- rotation with D_0/D_0'
+              [0,0,D_0,·],[0,0,D_0',·]]
+           · diag(V, V, V, V)            -- V (pushed to prior site)
 
-    Each a_i is a (dim x width) block of the target matrix. The decomposition
-    is computed via three successive QR + ``decompose_2d`` steps that peel
-    off pairs of blocks from bottom to top.
+    The circuit (Fig. 5) applies these right-to-left::
+
+        V -> UCR(D_0') -> CNOT -> W_0 -> UCR(D_1') -> CNOT -> W_1 -> UCR(D_2') -> U
+
+    **Algorithm (three peeling steps):**
+
+    1. QR-decompose the lower 3
+       blocks ``[A_1; A_2; A_3]`` = ``[B_2; B_3; B_4] * R``.
+    2. QR-decompose the lower 2 of those: ``[B_3; B_4]`` = ``[C_3; C_4] * S``.
+    3. Apply ``decompose_2d`` three times (bottom-to-top) to peel off pairs:
+
+       - ``[C_3; C_4]`` → ``(U_2, U_3, D_2, D_2', V'')``
+       - ``[B_2; S]``   → ``(U_1, _, D_1, D_1', V')``
+       - ``[A_0; R]``   → ``(U_0, _, D_0, D_0', V)``
+
+    Each ``decompose_2d`` call returns *both* diagonals ``(D, D')`` of the
+    rotation block ``[[D, -D'], [D', D]]`` (see ``decompose_2d`` docs). Only
+    the ``D'`` values (the sine components) are needed for the circuit's
+    R_y rotation angles ``theta = 2·arcsin(D'[k])``. The mixing unitaries
+    are ``W_0 = V' @ _`` and ``W_1 = V'' @ _`` (products of the intermediate
+    V and U factors from adjacent peeling steps).
 
     Parameters
     ----------
     tensor : np.ndarray of shape (left, d, right)
-        The MPS tensor for this site (d=4 for two-qubit sites).
+        The tensor for this site (d=4 for two-qubit sites).
     v_from_next : np.ndarray or None
         The V matrix from the next site's decomposition (applied to the
         incoming ancilla register). None for the last site.
@@ -310,36 +439,52 @@ def compute_site_unitary_dense_data(
     Returns
     -------
     dict
-        - ``'u'``: tuple (u_0, u_1, u_2, u_3) — block-diagonal unitaries.
-        - ``'d_prime'``: tuple (d_0', d_1', d_2') — Y-rotation diagonals.
+        - ``'u'``: tuple ``(u_0, u_1, u_2, u_3)`` — block-diagonal unitaries.
+        - ``'d_prime'``: tuple ``(d_0', d_1', d_2')`` — sin-component diagonals
+          for the 3 UCR layers.
         - ``'w_0'``, ``'w_1'``: mixing unitaries on the ancilla register.
-        - ``'v'``: right unitary passed to the previous site.
+        - ``'v'``: right unitary to be pushed to the previous site's circuit.
         - ``'ancilla_dim'``: the ancilla dimension used.
 
     """
     left, site_dim, _ = tensor.shape
     dim = ancilla_dim
-    full_dim = site_dim * dim
 
+    # Build target isometry U' = [A_0; A_1; A_2; A_3] of shape (4·dim, left).
+    # Each A_j block has shape (dim, left).
     target = tensor.transpose(1, 2, 0)  # (d, right, left)
     if v_from_next is not None:
         target = np.einsum("ij,djk->dik", v_from_next, target)
-
     padded = np.pad(target, ((0, 0), (0, dim - target.shape[1]), (0, 0)))
-    matrix = padded.reshape(full_dim, left)
+    matrix = padded.reshape(site_dim * dim, left)
 
-    # Berry decomposition via QR + CSD
+    # --- Step 1: QR on lower 3 blocks [A_1; A_2; A_3] ---
+    # b_full (3*dim x 3*dim) has orthonormal columns, r (3*dim x left) is upper triangular.
+    # Split b_full into B_2 = b_full[:dim], and [B_3; B_4] = b_full[dim:].
     b_full, r = np.linalg.qr(matrix[dim:, :], mode="complete")
+
+    # --- Step 2: QR on lower 2 of B: [B_3; B_4] ---
+    # c (2*dim x 2*dim) -> C_3 = c[:dim], C_4 = c[dim:].
+    # s (2*dim x dim) is upper triangular.
     c, s = np.linalg.qr(b_full[dim:, :dim], mode="complete")
 
-    u_2, u_3, d_2, d_2_, v__ = decompose_2d(c[:dim, :dim], c[dim:, :dim])
-    u_1, u_dummy, d_1, d_1_, v_ = decompose_2d(b_full[:dim, :dim], s[:dim, :])
-    u_0, u_top, d_0, d_0_, v = decompose_2d(matrix[:dim, :], r[:dim, :])
+    # --- Step 3: Three peeling decompositions (bottom → top) ---
+    # Peel [C_3; C_4] → rotation D_2/D_2' and unitaries U_2, U_3
+    u_2, u_3, _d_2, d_2_, v__ = decompose_2d(c[:dim, :dim], c[dim:, :dim])
+
+    # Peel [B_2; S] → rotation D_1/D_1' and unitary U_1
+    u_1, u_dummy, _d_1, d_1_, v_ = decompose_2d(b_full[:dim, :dim], s[:dim, :])
+
+    # Peel [A_0; R] → rotation D_0/D_0' and unitary U_0
+    u_0, u_top, _d_0, d_0_, v = decompose_2d(matrix[:dim, :], r[:dim, :])
 
     d_0_ = _pad_to_power_of_2(np.asarray(d_0_).real, dim)
     d_1_ = np.asarray(d_1_).real
     d_2_ = np.asarray(d_2_).real
 
+    # Mixing unitaries: W_0 = V' @ U_top,  W_1 = V'' @ U_dummy
+    # (products of the intermediate right-unitary and leftover factor from
+    # the adjacent peeling step)
     w_0 = v_ @ u_top
     w_1 = v__ @ u_dummy
 
@@ -356,18 +501,23 @@ def compute_site_unitary_dense_data(
 def _decompose_unitary_to_givens_python(matrix: np.ndarray):
     """Decompose a real orthogonal matrix into parallel Givens rotation layers.
 
-    Implements the Clements et al. (Optica 3, 1460, 2016) decomposition used
-    in Berry et al. and Rupprecht & Wölk (Sec. 2, arXiv:2605.28489) for
-    fault-tolerant unitary synthesis via phase-gradient rotations.
+    Implements the :cite:`Clements2017` decomposition used
+    for fault-tolerant unitary synthesis via phase-gradient rotations.
 
     The matrix is factored as ``U = D · L_l · ... · L_1`` where each layer
-    ``L_j`` consists of parallel 2x2 R_y(theta) Givens rotations acting on
-    neighboring pairs of rows, and ``D`` is a diagonal sign matrix (±1).
+    ``L_j`` consists of parallel 2x2 R_y(theta) (Y-axis rotation) Givens
+    rotations acting on neighboring pairs of columns, and ``D`` is a diagonal
+    sign matrix (±1).
     Layers alternate between "even" (pairs 0-1, 2-3, ...) and "odd"
     (pairs 1-2, 3-4, ...) forms as in Eq. (3) of the paper.
 
     This is a pure-Python fallback; the Rust ``unitary_synthesis`` library
     is preferred for performance.
+
+    The decomposition uses right-multiplication (column elimination):
+    ``M · G†_1 · ... · G†_N = D``, giving ``M = D · G_N · ... · G_1``.
+    Layers are stored in decomposition order so that the Q# circuit
+    (which applies layers sequentially then D) produces the correct unitary.
 
     Parameters
     ----------
@@ -390,19 +540,24 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
 
     rotations: list[tuple[int, float]] = []
 
-    for col in range(dim - 1):
-        for row in range(dim - 1, col, -1):
-            a_val = m[row - 1, col]
+    # Right-multiplication: zero off-diagonal elements column by column.
+    # For each row, eliminate elements to the right of the diagonal using
+    # Givens rotations on neighboring column pairs.
+    # M · G(θ_1) · ... · G(θ_N) = D  =>  M = D · G(-θ_N) · ... · G(-θ_1)
+    # We store -θ so the circuit can directly apply G(stored_angle).
+    for row in range(dim - 1):
+        for col in range(dim - 1, row, -1):
+            a_val = m[row, col - 1]
             b_val = m[row, col]
             if abs(b_val) < 1e-15:
                 continue
             theta = np.arctan2(b_val, a_val)
             c, s = np.cos(theta), np.sin(theta)
-            row_i = m[row - 1, :].copy()
-            row_j = m[row, :].copy()
-            m[row - 1, :] = c * row_i + s * row_j
-            m[row, :] = -s * row_i + c * row_j
-            rotations.append((row - 1, theta))
+            col_i = m[:, col - 1].copy()
+            col_j = m[:, col].copy()
+            m[:, col - 1] = c * col_i + s * col_j
+            m[:, col] = -s * col_i + c * col_j
+            rotations.append((col - 1, -theta))
 
     diag_vals = np.diag(m)
     phases = [bool(d < 0) for d in diag_vals]
@@ -413,38 +568,50 @@ def _decompose_unitary_to_givens_python(matrix: np.ndarray):
 
 
 def decompose_2d(a: np.ndarray, b: np.ndarray):
-    """Decompose a 2-block column matrix into a CSD-like factorization.
+    r"""Decompose a 2-block column matrix via SVD + polar decomposition.
 
-    Given matrices ``a`` (shape x, y) and ``b`` (shape x, y) whose vertical
-    stack ``[a; b]`` has orthonormal columns, compute the decomposition from
-    Berry et al. Eq. 30 (PRX Quantum 6, 020327):
+    Given matrices ``a`` (shape m, k) and ``b`` (shape m, k) whose vertical
+    stack ``[a; b]`` has orthonormal columns, compute the factorization from
+    Eq. (30) of :cite:`Berry2025` and the Lemma in
+    Appendix B of :cite:`Rupprecht2026`::
 
-        [a]   [u_1  0 ] [diag(d_1)] [v]
-        [b] = [0   u_2] [diag(d_2)] [v]
+        [a]   [u_1   0 ] [D_1] [v]
+        [b] = [ 0   u_2] [D_2] [v]
 
-    where u_1, u_2 are unitary (x, x), d_1, d_2 are real diagonal vectors
-    of length y, and v is unitary (y, y). This is used iteratively in the
-    7-matrix CSD decomposition of site unitaries (Appendix B of
-    Rupprecht & Wölk 2026, arXiv:2605.28489).
+    where ``u_1``, ``u_2`` are unitary (m x m), ``v`` is unitary (k x k),
+    and ``D_1``, ``D_2`` are real diagonal (m x k) matrices satisfying
+    ``D_1^2 + D_2^2 = I``.
+
+    **Why two diagonal vectors are returned:** The full middle block
+    ``[[D_1, -D_2], [D_2, D_1]]`` has orthonormal columns and encodes a
+    rotation: each pair ``(D_1[j], D_2[j])`` satisfies ``cos^2 + sin^2 = 1``.
+    On the quantum circuit, only ``D_2`` (= sin component) is needed to set
+    the R_y rotation angle ``theta = 2*arcsin(D_2[j])``; ``D_1`` (= cos) is
+    implied. Both are returned so callers can verify the decomposition.
+
+    **Algorithm:** ``D_1`` and ``v`` come from the SVD of ``a``. Then ``D_2``
+    and ``u_2`` come from the polar decomposition of ``b @ v^H``, which
+    yields a guaranteed-diagonal ``D_2`` (unlike a QR decomposition which
+    can fail when ``b`` is rank-deficient).
 
     Parameters
     ----------
-    a : np.ndarray of shape (x, y)
+    a : np.ndarray of shape (m, k)
         Upper block of the column matrix.
-    b : np.ndarray of shape (x, y)
+    b : np.ndarray of shape (m, k)
         Lower block of the column matrix.
 
     Returns
     -------
-    u_1 : np.ndarray of shape (x, x)
-        Left unitary for the upper block.
-    u_2 : np.ndarray of shape (x, x)
+    u_1 : np.ndarray of shape (m, m)
+        Left unitary for the upper block (from SVD of ``a``).
+    u_2 : np.ndarray of shape (m, m)
         Left unitary for the lower block (from polar decomposition).
-    d_1 : np.ndarray of shape (y,)
-        Singular values of ``a`` (upper diagonal).
-    d_2 : np.ndarray of shape (y,)
-        Diagonal of the polar factor of ``b @ v^H`` (lower diagonal).
-    v : np.ndarray of shape (y, y)
+    d_1 : np.ndarray of shape (k,)
+        Singular values of ``a``; the cos-like diagonal.
+    d_2 : np.ndarray of shape (k,)
+        Polar factor diagonal of ``b @ v^H``; the sin-like diagonal.
+    v : np.ndarray of shape (k, k)
         Right unitary (shared by both blocks).
 
     """
@@ -564,7 +731,7 @@ def decompose_unitary_to_givens(matrix: np.ndarray):
     """Decompose a real orthogonal matrix into parallel Givens rotation layers.
 
     Produces the factorization ``U = D · L_l · ... · L_1`` (Eq. 7 in
-    Rupprecht & Wölk, arXiv:2605.28489) where each ``L_j`` is a layer of
+    :cite:`Rupprecht2026`) where each ``L_j`` is a layer of
     parallel R_y rotations and ``D`` is a diagonal ±1 sign matrix.
 
     Uses the Rust ``unitary_synthesis`` library when available for
@@ -611,7 +778,7 @@ def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
     decomposition, this exploits the block structure so that rotations within
     each block can be scheduled in parallel across blocks, reducing the total
     number of Givens layers compared to treating the full matrix as dense.
-    See Sec. 3 and Fig. 3 of Rupprecht & Wölk (arXiv:2605.28489).
+    See Sec. 3 and Fig. 3 of :cite:`Rupprecht2026`.
 
     Parameters
     ----------
