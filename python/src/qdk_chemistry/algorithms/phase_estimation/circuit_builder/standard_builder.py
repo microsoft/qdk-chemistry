@@ -98,7 +98,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         ctrl_unitary_circuits = []
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            ctrl_unitary_circuits.append(self._create_controlled_circuit(qubit_hamiltonian, power=power))
+            circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(

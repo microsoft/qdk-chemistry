@@ -184,7 +184,7 @@ class TestDensePureStatePreparation:
 
         # Build expected statevector for 1-bit-per-mode config using to_bits().
         # dump_machine uses big-endian: MSB interpretation of bits.
-        n_bits = test_orbitals.num_modes() * det.bits_per_mode
+        n_bits = test_orbitals.num_modes() * det.bits_per_mode()
         bits = det.to_bits(n_bits)
         n_qubits = len(bits)
         index = 0

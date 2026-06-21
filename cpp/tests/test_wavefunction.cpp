@@ -1011,7 +1011,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantsMultiple) {
   // Verify all have correct orbital capacity
   for (const auto& det : total_dets) {
     EXPECT_EQ(det.get_orbital_capacity(),
-              10);  // 10 total orbitals
+              12);  // 10 total orbitals (padded to 4)
   }
 }
 
