@@ -460,7 +460,9 @@ class TestInnerPrepareQSharp:
         # Test x_o=0: inner should be proportional to [0.8, 0.6]
         qsharp.eval(f"use outer = Qubit[{n_outer}];")
         qsharp.eval(f"use inner = Qubit[{n_inner}];")
-        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);")
+        qsharp.eval(
+            f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);"
+        )
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
@@ -491,15 +493,16 @@ class TestSelectQSharp:
         _ = QSHARP_UTILS.SOSSAWalk
 
     def test_givens_sequence_single_angle(self):
-        """Test ApplyGivensSequence with a single angle applies Ry(2θ)."""
+        """Test ApplyGivensSequence with a single angle rotates |10⟩ into superposition."""
         theta = 0.3
-        qsharp.eval("use q = Qubit[1];")
-        qsharp.eval(f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta:.16f}], q);")
+        qsharp.eval("use q = Qubit[2];")
+        qsharp.eval(f"X(q[0]); QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta:.16f}], q);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
-        # Ry(2θ)|0⟩ = cos(θ)|0⟩ + sin(θ)|1⟩
-        expected = [np.cos(theta), np.sin(theta)]
+        # Givens rotation on |10⟩: CNOT(q0,q1)|10⟩=|11⟩, Ry(-2θ,q0)|11⟩, CNOT(q0,q1)
+        # Result: cos(θ)|10⟩ + sin(θ)|01⟩
+        expected = [0.0, np.sin(theta), np.cos(theta), 0.0]
         assert np.allclose(
             np.abs(amplitudes),
             np.abs(expected),
@@ -508,25 +511,56 @@ class TestSelectQSharp:
         qsharp.eval("ResetAll(q)")
 
     def test_givens_sequence_two_angles(self):
-        """Test ApplyGivensSequence with two angles on 2 qubits."""
+        """Test ApplyGivensSequence with two angles on 3 qubits starting from |100⟩."""
         theta0, theta1 = 0.3, 0.5
-        qsharp.eval("use q = Qubit[2];")
-        qsharp.eval(f"QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta0:.16f}, {theta1:.16f}], q);")
+        qsharp.eval("use q = Qubit[3];")
+        qsharp.eval(f"X(q[0]); QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta0:.16f}, {theta1:.16f}], q);")
         state = qsharp.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
-        # Ry(2θ₁) on q[1], then Ry(2θ₀) on q[0], applied to |00⟩
-        # q[0]: cos(θ₀)|0⟩ + sin(θ₀)|1⟩
-        # q[1]: cos(θ₁)|0⟩ + sin(θ₁)|1⟩
-        # State: cos(θ₀)cos(θ₁)|00⟩ + cos(θ₀)sin(θ₁)|01⟩ + sin(θ₀)cos(θ₁)|10⟩ + sin(θ₀)sin(θ₁)|11⟩
-        expected = np.array(
-            [
-                np.cos(theta0) * np.cos(theta1),
-                np.cos(theta0) * np.sin(theta1),
-                np.sin(theta0) * np.cos(theta1),
-                np.sin(theta0) * np.sin(theta1),
-            ]
-        )
+        # Build expected state by simulating the exact gate sequence classically.
+        # Q# dump_machine uses big-endian ordering for qubit indices.
+        n = 3
+        dim = 2**n
+
+        def _bit(b, qubit):
+            return (b >> (n - 1 - qubit)) & 1
+
+        def _flip(b, qubit):
+            return b ^ (1 << (n - 1 - qubit))
+
+        def _cnot(ctrl, tgt):
+            """CNOT matrix (big-endian qubit ordering)."""
+            u = np.zeros((dim, dim), dtype=complex)
+            for b in range(dim):
+                if _bit(b, ctrl):
+                    u[_flip(b, tgt), b] = 1.0
+                else:
+                    u[b, b] = 1.0
+            return u
+
+        def _ry(qubit, angle):
+            """Ry(angle) matrix (big-endian qubit ordering)."""
+            c, s = np.cos(angle / 2), np.sin(angle / 2)
+            ry2 = np.array([[c, -s], [s, c]], dtype=complex)
+            u = np.zeros((dim, dim), dtype=complex)
+            for b in range(dim):
+                bit = _bit(b, qubit)
+                b0 = b & ~(1 << (n - 1 - qubit))  # same state with qubit=0
+                for out_bit in range(2):
+                    out_idx = b0 | (out_bit << (n - 1 - qubit))
+                    u[out_idx, b] += ry2[out_bit, bit]
+            return u
+
+        # G(j,θ) = CNOT(j,j+1) @ Ry(-2θ,j) @ CNOT(j,j+1)
+        g0 = _cnot(0, 1) @ _ry(0, -2 * theta0) @ _cnot(0, 1)
+        g1 = _cnot(1, 2) @ _ry(1, -2 * theta1) @ _cnot(1, 2)
+
+        # X(q[0]) → index 2^(n-1) = 4
+        psi = np.zeros(dim, dtype=complex)
+        psi[2 ** (n - 1)] = 1.0
+        expected = g1 @ g0 @ psi
+
         assert np.allclose(
             np.abs(amplitudes),
             np.abs(expected),

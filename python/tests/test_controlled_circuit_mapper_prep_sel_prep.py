@@ -100,6 +100,10 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(controlled_unitary)
 
+    @pytest.mark.xfail(
+        reason="QIR-to-Qiskit converter does not support dynamic qubit references from Adaptive_RIFLA profile",
+        raises=Exception,
+    )
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
@@ -148,6 +152,10 @@ class TestPrepareSelectMapper:
             h_over_lam, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         ), f"Block encoding identity failed for: {description}"
 
+    @pytest.mark.xfail(
+        reason="QIR-to-Qiskit converter does not support dynamic qubit references from Adaptive_RIFLA profile",
+        raises=Exception,
+    )
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_quantum_walk_eigenvalues(self):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.

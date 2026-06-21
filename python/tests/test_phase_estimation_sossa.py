@@ -216,8 +216,23 @@ def _python_to_qsharp_permutation(num_orbitals):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _sossa_qpe_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
+def _sossa_qpe_circuit_builder_ref(
+    num_bits: int = 4,
+    *,
+    outer_prepare_algorithm: str = "dense_pure",
+    inner_prepare_algorithm: str = "direct",
+    select_algorithm: str = "direct",
+    coefficient_bit_precision: int = 10,
+    rotation_bit_precision: int = 10,
+) -> AlgorithmRef:
     """Return an AlgorithmRef for iterative QPE with SOSSA."""
+    mapper_kwargs = dict(
+        outer_prepare_algorithm=outer_prepare_algorithm,
+        inner_prepare_algorithm=inner_prepare_algorithm,
+        select_algorithm=select_algorithm,
+        coefficient_bit_precision=coefficient_bit_precision,
+        rotation_bit_precision=rotation_bit_precision,
+    )
     return AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_iterative",
@@ -225,9 +240,7 @@ def _sossa_qpe_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
         controlled_circuit_mapper=AlgorithmRef(
             "controlled_circuit_mapper",
             "sossa",
-            outer_prepare_algorithm="dense_pure",
-            inner_prepare_algorithm="direct",
-            select_algorithm="direct",  # Use direct for simulation (phase_gradient needs too many qubits)
+            **mapper_kwargs,
         ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa", quantum_walk=True),
     )
@@ -241,6 +254,105 @@ def _energy_to_qpe_phase(energy_gap, lambda_sos):
     cos_val = 1.0 - energy_gap / lambda_sos
     cos_val = max(-1.0, min(1.0, cos_val))
     return math.acos(cos_val) / (2 * math.pi)
+
+
+def _energy_to_k_sos(E_gap, num_bits, lambda_sos):
+    """Predict the most likely QPE integer for a given E_gap (SOS walk).
+
+    Inverts: E_gap = Λ(1 - cos(2πφ))  →  φ = arccos(1 - E_gap/Λ) / (2π)
+    Returns (k, conjugate_k) where k = round(φ · 2^n).
+    """
+    phi = _energy_to_qpe_phase(E_gap, lambda_sos)
+    total_states = 2**num_bits
+    k = round(phi * total_states)
+    conjugate_k = total_states - k if k != 0 else 0
+    return k, conjugate_k
+
+
+def _run_sossa_qpe(num_bits, mapper_kwargs=None):
+    """Helper: run SOSSA QPE on H2 data and assert measured phase matches expected.
+
+    Uses IQPE with the given mapper configuration, computes k_measured from the
+    result phase, and asserts it matches k_expect from exact diagonalization.
+    """
+    try:
+        from qdk_chemistry.data import FactorizedHamiltonianContainer
+    except ImportError:
+        pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
+
+    from .test_helpers import create_test_orbitals
+
+    data = _build_h2_dfthc_data()
+    N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+
+    # Build reference Hamiltonian matrix and diagonalize
+    H_matrix = _build_dfthc_hamiltonian_matrix(
+        data["h1"], data["basis_vectors"], data["two_body_weights"], data["identity_weight"]
+    )
+    gs_energy, gs_vec = _get_ground_state_and_energy(H_matrix, N, nalpha=1, nbeta=1)
+
+    # Create FactorizedHamiltonianContainer
+    orbitals = create_test_orbitals(N)
+    inactive_fock = np.zeros((N, N))
+    fh = FactorizedHamiltonianContainer(
+        data["h1"],
+        data["basis_vectors"].flatten(),
+        data["two_body_weights"].flatten(),
+        data["identity_weight"],
+        R, B, C,
+        orbitals, 0.0, inactive_fock,
+    )
+
+    # Build SOSSA unitary and get normalization
+    builder = SOSSABuilder(quantum_walk=True)
+    unitary_rep = builder.run(fh)
+    container = unitary_rep.get_container()
+    lambda_sos = container.normalization
+
+    # Expected QPE integer
+    k_expect, _ = _energy_to_k_sos(gs_energy, num_bits, lambda_sos)
+
+    # Prepare ground state
+    num_system_qubits = 2 * N
+    state_prep_params = {
+        "rowMap": list(range(num_system_qubits - 1, -1, -1)),
+        "stateVector": gs_vec.real.tolist(),
+        "expansionOps": [],
+        "numQubits": num_system_qubits,
+    }
+    qsharp_factory = QsharpFactoryData(
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+        parameter=state_prep_params,
+    )
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+    state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    # Run IQPE
+    mkw = mapper_kwargs or {}
+    iqpe = IterativePhaseEstimation(shots_per_bit=5)
+    iqpe.settings().set("qpe_circuit_builder", _sossa_qpe_circuit_builder_ref(num_bits=num_bits, **mkw))
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+    )
+
+    result = iqpe.run(
+        state_preparation=state_prep,
+        factorized_hamiltonian=fh,
+    )
+
+    # Convert measured phase to k
+    total_states = 2**num_bits
+    k_raw = round(result.phase_fraction * total_states)
+    k_measured = min(k_raw % total_states, (total_states - k_raw) % total_states)
+    k_expect_sym = min(k_expect, total_states - k_expect) if k_expect != 0 else 0
+
+    assert k_measured == k_expect_sym, (
+        f"Expected k={k_expect_sym}, got k={k_measured}, "
+        f"phase_fraction={result.phase_fraction:.6f}, "
+        f"raw_energy={result.raw_energy:.6f}, "
+        f"gs_energy={gs_energy:.6f}, lambda={lambda_sos:.6f}"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -515,3 +627,26 @@ class TestSOSSAQPEIntegration:
         assert np.all(eigenvalues <= 2 * lambda_sos + 1e-10), (
             f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2 * lambda_sos:.6f}"
         )
+
+    @pytest.mark.parametrize("num_bits", [3, 5])
+    def test_sossa_qpe(self, num_bits):
+        """QPE with direct (non-alias) config should match expected phase index."""
+        _run_sossa_qpe(num_bits)
+
+    @pytest.mark.parametrize(
+        "mapper_overrides",
+        [
+            {
+                "outer_prepare_algorithm": "alias_sampling",
+                "coefficient_bit_precision": 4,
+            },
+            {
+                "inner_prepare_algorithm": "controlled_alias_sampling",
+                "coefficient_bit_precision": 4,
+            },
+        ],
+        ids=["alias_outer", "alias_inner"],
+    )
+    def test_sossa_qpe_features(self, mapper_overrides):
+        """QPE with individual features enabled (3 phase bits, H2 data)."""
+        _run_sossa_qpe(num_bits=3, mapper_kwargs=mapper_overrides)
