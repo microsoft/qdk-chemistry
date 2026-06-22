@@ -769,6 +769,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
         QdkIterativeQpeCircuitBuilder,
     )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (  # noqa: PLC0415
+        QdkStandardQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
@@ -808,6 +811,7 @@ def _register_python_algorithms():
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
     register(lambda: QdkIterativeQpeCircuitBuilder())
+    register(lambda: QdkStandardQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
     register(lambda: StandardPhaseEstimation())
 

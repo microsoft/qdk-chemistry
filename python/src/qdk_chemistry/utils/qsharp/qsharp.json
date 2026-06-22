@@ -4,10 +4,11 @@
     "files": [
         "src/BinaryEncoding.qs",
         "src/CircuitComposition.qs",
-        "src/StatePreparation.qs",
-        "src/IterativePhaseEstimation.qs",
         "src/ControlledPauliExp.qs",
+        "src/IterativePhaseEstimation.qs",
         "src/MeasurementBasis.qs",
-        "src/PauliExp.qs"
+        "src/PauliExp.qs",
+        "src/StandardPhaseEstimation.qs",
+        "src/StatePreparation.qs"
     ]
 }
