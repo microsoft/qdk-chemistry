@@ -22,7 +22,6 @@ H2 / STO-3G from 1.0.0:
   vectors); the converter migrates it to a four-center container.
 - `h2_v1_1_0_sparse.hamiltonian.h5` — a sparse lattice-model Hamiltonian
   (HDF5 packs the sparse indices into the bytes of a double via `pack_indices`).
-- `reference.json` — spot-check values extracted with the 1.0.0 / 1.1.0 readers.
 
 These were produced by running an SCF -> valence active space -> CASCI workflow
 on H2 with the 1.0.0 Python package (the CAS wavefunction's spin-dependent RDMs

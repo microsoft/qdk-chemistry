@@ -472,96 +472,86 @@ def test_unknown_type_raises(tmp_path):
 _REAL_DATA = pathlib.Path(__file__).parent / "test_data" / "migrate"
 
 
-def _spot_ref():
-    return json.loads((_REAL_DATA / "reference.json").read_text())
-
-
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_orbitals_with_basis_set(tmp_path, out_fmt):
-    ref = _spot_ref()["orbitals"]
     dst = tmp_path / f"h2.orbitals.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_0_0.orbitals.h5", dst)
     orb = Orbitals.from_file(str(dst), out_fmt)
     assert orb.has_basis_set()
-    assert orb.get_num_molecular_orbitals() == ref["nmo"]
+    assert orb.get_num_molecular_orbitals() == 2
     coeff = np.asarray(orb.get_coefficients()[0])
-    assert abs(coeff[0, 0] - ref["coeff_00"]) < 1e-9
-    assert abs(coeff[0, 1] - ref["coeff_01"]) < 1e-9
+    assert abs(coeff[0, 0] - -0.5488422751996661) < 1e-9
+    assert abs(coeff[0, 1] - 1.2124519189832008) < 1e-9
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_hamiltonian(tmp_path, out_fmt):
-    ref = _spot_ref()["hamiltonian"]
     dst = tmp_path / f"h2.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_0_0.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "canonical_four_center"
-    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
+    assert abs(ham.get_core_energy() - 0.7151043385729731) < 1e-9
     one_body = np.asarray(ham.get_one_body_integrals()[0])
-    assert abs(one_body[0, 0] - ref["one_body_00"]) < 1e-9
+    assert abs(one_body[0, 0] - -1.2533097870990613) < 1e-9
     aaaa = np.asarray(ham.get_two_body_integrals()[0]).ravel()
-    assert np.allclose(aaaa[:4], ref["two_body_aaaa_head"])
+    assert np.allclose(aaaa[:4], [0.67475592814505, 0.0, 0.0, 0.6637114001724023], atol=1e-9)
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_cholesky_to_four_center(tmp_path, out_fmt):
     # The v1 cholesky container stored the full four-center two-body tensor (not
     # MO three-center vectors), so it migrates to a four-center container.
-    ref = _spot_ref()["cholesky"]
     dst = tmp_path / f"chol.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_1_0_chol.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "canonical_four_center"
-    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
-    assert abs(np.asarray(ham.get_one_body_integrals()[0])[0, 0] - ref["one_body_00"]) < 1e-9
+    assert abs(ham.get_core_energy() - 0.7151043385729731) < 1e-9
+    assert abs(np.asarray(ham.get_one_body_integrals()[0])[0, 0] - -1.2533097870990613) < 1e-9
     aaaa = np.asarray(ham.get_two_body_integrals()[0]).ravel()
-    assert np.allclose(aaaa[:4], ref["two_body_aaaa_head"])
+    assert np.allclose(aaaa[:4], [0.6747559281450501, 0.0, 0.0, 0.6637114001724024], atol=1e-9)
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_sparse(tmp_path, out_fmt):
-    ref = _spot_ref()["sparse"]
     dst = tmp_path / f"sparse.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_1_0_sparse.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "sparse"
-    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
+    assert abs(ham.get_core_energy() - 0.5) < 1e-9
     norb = 4
     two_body = np.asarray(ham.get_two_body_integrals()[0]).reshape(norb, norb, norb, norb)
-    assert abs(two_body[0, 0, 0, 0] - ref["two_body_0000"]) < 1e-9
-    assert abs(two_body[1, 1, 1, 1] - ref["two_body_1111"]) < 1e-9
+    assert abs(two_body[0, 0, 0, 0] - 2.0) < 1e-9
+    assert abs(two_body[1, 1, 1, 1] - 2.0) < 1e-9
     one_body = np.asarray(ham.get_one_body_integrals()[0]).reshape(norb, norb)
-    assert abs(one_body[0, 1] - ref["one_body_01"]) < 1e-9
+    assert abs(one_body[0, 1] - 1.0) < 1e-9
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_cas_wavefunction_rdms(tmp_path, out_fmt):
-    ref = _spot_ref()["cas_rdm"]
     dst = tmp_path / f"h2_cas.wavefunction.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_0_0_cas_rdm.wavefunction.h5", dst)
     wf = Wavefunction.from_file(str(dst), out_fmt)
     assert wf.get_container_type() == "state_vector"
     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
     aaaa, aabb, bbbb = np.asarray(aaaa).ravel(), np.asarray(aabb).ravel(), np.asarray(bbbb).ravel()
-    assert np.allclose(aaaa[:4], ref["two_aaaa_head"])
-    assert np.allclose(aabb[:4], ref["two_aabb_head"])
+    assert np.allclose(aaaa[:4], [-0.7037352358069926, -1.2654214710460525, -0.6232744625373522, 0.0413259793472436])
+    assert np.allclose(aabb[:4], [0.9034701816518086, 0.09401229776087457, -0.7434992493538084, -0.9217253762584194])
     # Closed-shell file omits the beta channels; they alias the alpha channels.
     assert np.allclose(bbbb, aaaa)
     oaa, obb = wf.get_active_one_rdm_spin_dependent()
-    assert np.allclose(np.asarray(oaa)[0], ref["one_aa_row0"])
+    assert np.allclose(np.asarray(oaa)[0], [0.1257302210933933, -0.1321048632913019])
     assert np.allclose(np.asarray(obb), np.asarray(oaa))
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_ansatz(tmp_path, out_fmt):
     # Ansatz embeds a Hamiltonian and a Wavefunction; both must be migrated.
-    ref = _spot_ref()["ansatz"]
     dst = tmp_path / f"h2.ansatz.{'json' if out_fmt == 'json' else 'h5'}"
     migrate.convert_file(_REAL_DATA / "h2_v1_0_0.ansatz.h5", dst)
     ansatz = Ansatz.from_file(str(dst), out_fmt)
-    assert ansatz.get_wavefunction().get_container_type() == ref["wfn_container"]
+    assert ansatz.get_wavefunction().get_container_type() == "state_vector"
     one_body = np.asarray(ansatz.get_hamiltonian().get_one_body_integrals()[0])
-    assert abs(one_body[0, 0] - ref["ham_one_body_00"]) < 1e-9
+    assert abs(one_body[0, 0] - -1.2533097870990613) < 1e-9
 
 
 def test_cas_restricted_rdm_only_alpha(tmp_path):
