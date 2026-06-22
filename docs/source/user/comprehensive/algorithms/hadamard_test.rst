@@ -20,7 +20,7 @@ For shot-based execution, the expectation estimate from measured counts is:
 
 .. math::
 
-	\langle M \rangle \approx \frac{N_0 - N_1}{N_0 + N_1}
+   \langle M \rangle \approx \frac{N_0 - N_1}{N_0 + N_1}
 
 where :math:`N_0` and :math:`N_1` are the observed counts for outcomes ``"0"`` and ``"1"``.
 
@@ -41,7 +41,7 @@ Using the HadamardTest
 ----------------------
 
 .. note::
-	This algorithm is currently available only in the Python API.
+   This algorithm is currently available only in the Python API.
 
 This section demonstrates how to create, configure, and run a Hadamard test calculation.
 
@@ -51,52 +51,52 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.HadamardTest` requires the following inputs:
 
 State preparation circuit
-	A :class:`~qdk_chemistry.data.Circuit` that prepares the target system state.
+   A :class:`~qdk_chemistry.data.Circuit` that prepares the target system state.
 
 UnitaryRepresentation
-	A :class:`~qdk_chemistry.data.UnitaryRepresentation` describing the unitary to apply under control.
-	This is often generated from a qubit Hamiltonian via :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
+   A :class:`~qdk_chemistry.data.UnitaryRepresentation` describing the unitary to apply under control.
+   This is often generated from a qubit Hamiltonian via :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
 
 Shots
-	A positive integer number of circuit executions used to estimate expectation values from counts.
+   A positive integer number of circuit executions used to estimate expectation values from counts.
 
 Settings
-	The :class:`~qdk_chemistry.algorithms.HadamardTest` is configured via its settings object, which includes:
+   The :class:`~qdk_chemistry.algorithms.HadamardTest` is configured via its settings object, which includes:
 
-	- ``test_basis`` - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``.
-	- ``controlled_circuit_mapper`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`ControlledCircuitMapper <circuit_mapper>` implementation used to synthesize controlled-:math:`U`.
-	- ``circuit_executor`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`CircuitExecutor <circuit_executor>` implementation used to run the final circuit.
+   - ``test_basis`` - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``.
+   - ``controlled_circuit_mapper`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`ControlledCircuitMapper <circuit_mapper>` implementation used to synthesize controlled-:math:`U`.
+   - ``circuit_executor`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`CircuitExecutor <circuit_executor>` implementation used to run the final circuit.
 
 .. note::
 
-	The state preparation circuit and unitary should be qubit-compatible and represent the same target system.
+   The state preparation circuit and unitary should be qubit-compatible and represent the same target system.
 
 .. rubric:: Creating a Hadamard test algorithm
 
 .. tab:: Python API
 
-	.. literalinclude:: ../../../_static/examples/python/hadamard_test.py
-		:language: python
-		:start-after: # start-cell-create
-		:end-before: # end-cell-create
+   .. literalinclude:: ../../../_static/examples/python/hadamard_test.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 .. rubric:: Configuring settings
 
 .. tab:: Python API
 
-	.. literalinclude:: ../../../_static/examples/python/hadamard_test.py
-		:language: python
-		:start-after: # start-cell-configure
-		:end-before: # end-cell-configure
+   .. literalinclude:: ../../../_static/examples/python/hadamard_test.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 .. rubric:: Running the calculation
 
 .. tab:: Python API
 
-	.. literalinclude:: ../../../_static/examples/python/hadamard_test.py
-		:language: python
-		:start-after: # start-cell-run
-		:end-before: # end-cell-run
+   .. literalinclude:: ../../../_static/examples/python/hadamard_test.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 Available implementations
 -------------------------
@@ -106,10 +106,10 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-	.. literalinclude:: ../../../_static/examples/python/hadamard_test.py
-		:language: python
-		:start-after: # start-cell-list-implementations
-		:end-before: # end-cell-list-implementations
+   .. literalinclude:: ../../../_static/examples/python/hadamard_test.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 .. rubric:: Factory name: ``"qdk"``
 
@@ -118,21 +118,21 @@ You can discover available implementations programmatically:
 Direct settings on :class:`~qdk_chemistry.algorithms.hadamard_test.hadamard_test.HadamardTest`:
 
 .. list-table::
-	:header-rows: 1
-	:widths: 25 15 60
+   :header-rows: 1
+   :widths: 25 15 60
 
-	* - Setting
-	  - Type
-	  - Description
-	* - ``test_basis``
-	  - string
-	  - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``. Default is ``"X"``.
-	* - ``controlled_circuit_mapper``
-	  - AlgorithmRef
-	  - Nested :doc:`ControlledCircuitMapper <circuit_mapper>` used to synthesize controlled-:math:`U`.
-	* - ``circuit_executor``
-	  - AlgorithmRef
-	  - Nested :doc:`CircuitExecutor <circuit_executor>` used to execute the generated circuit.
+   * - Setting
+     - Type
+     - Description
+   * - ``test_basis``
+     - string
+     - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``. Default is ``"X"``.
+   * - ``controlled_circuit_mapper``
+     - AlgorithmRef
+     - Nested :doc:`ControlledCircuitMapper <circuit_mapper>` used to synthesize controlled-:math:`U`.
+   * - ``circuit_executor``
+     - AlgorithmRef
+     - Nested :doc:`CircuitExecutor <circuit_executor>` used to execute the generated circuit.
 
 
 Interpreting results
@@ -142,7 +142,7 @@ The algorithm returns :class:`~qdk_chemistry.data.CircuitExecutorData`, whose ``
 
 .. math::
 
-	\hat{m} = \frac{N_0 - N_1}{\text{shots}}
+   \hat{m} = \frac{N_0 - N_1}{\text{shots}}
 
 Finite shots introduce statistical uncertainty, so increasing ``shots`` improves estimator stability.
 
