@@ -31,6 +31,7 @@ from qdk_chemistry.data.unitary_representation.containers.block_encoding import 
     LCUContainer,
     Select,
 )
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
 __all__: list[str] = ["LCUBuilder", "LCUSettings"]
 
@@ -126,12 +127,13 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         prepare_wfn = self._build_prepare(qubit_hamiltonian, num_prepare_ancillas, self._settings.get("tolerance"))
         select = self._build_select(qubit_hamiltonian, num_prepare_ancillas)
 
-        container = LCUContainer(
+        lcu_container = LCUContainer(
             power=power,
             prepare=prepare_wfn,
             select=select,
-            quantum_walk=quantum_walk,
         )
+
+        container = LCUWalkContainer(block_encoding=lcu_container, power=power) if quantum_walk else lcu_container
 
         return UnitaryRepresentation(container=container)
 
