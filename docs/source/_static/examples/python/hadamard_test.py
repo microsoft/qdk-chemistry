@@ -84,7 +84,7 @@ unitary = unitary_builder.run(qubit_hamiltonian)
 shots = 100
 result = hadamard_test.run(state_preparation, unitary, shots=shots)
 counts = result.bitstring_counts
-observable_value = (counts.get("0", 0) - counts.get("1", 0)) / shots
+observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
 print("bitstring_counts:", counts)
 print("estimated expectation:", observable_value)

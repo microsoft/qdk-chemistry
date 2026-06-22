@@ -142,9 +142,11 @@ The algorithm returns :class:`~qdk_chemistry.data.CircuitExecutorData`, whose ``
 
 .. math::
 
-   \hat{m} = \frac{N_0 - N_1}{\text{shots}}
+   \hat{m} = \frac{N_0 - N_1}{N_0 + N_1}
 
-Finite shots introduce statistical uncertainty, so increasing ``shots`` improves estimator stability.
+Here :math:`N_0 + N_1` is the number of clean measurement outcomes recorded in ``bitstring_counts``.
+This can differ from requested ``shots`` (or ``total_shots``) when an executor tracks loss separately.
+Finite sampling still introduces statistical uncertainty, so increasing shots typically improves estimator stability.
 
 
 Related classes
