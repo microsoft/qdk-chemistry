@@ -42,9 +42,8 @@ iqpe.settings().set("qpe_circuit_builder", iqpe_circuit_builder)
 # Configure standard QFT-based phase estimation
 qpe_circuit_builder = AlgorithmRef(
     "qpe_circuit_builder",
-    "qiskit_standard",
+    "qdk_standard",
     num_bits=10,
-    qft_do_swaps=True,
     controlled_circuit_mapper=AlgorithmRef(
         "controlled_circuit_mapper", "pauli_sequence"
     ),
