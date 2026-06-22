@@ -608,8 +608,7 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
   }
 
   bool has_header = false;
-  unsigned expected_num_atoms = 0;
-  if (parse_count_line(first_line, expected_num_atoms)) {
+  size_t expected_num_atoms = 0;
     has_header = true;
     // The line immediately following the count is the comment line and is
     // skipped regardless of its content.
