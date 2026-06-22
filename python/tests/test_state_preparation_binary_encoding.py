@@ -12,9 +12,18 @@ from qdk.estimator import EstimatorResult
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncodingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
-from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    Configuration,
+    QubitHamiltonian,
+    StateVectorContainer,
+    Wavefunction,
+)
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionType, _dense_qubits_size
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
+from qdk_chemistry.utils.phase import energy_from_phase
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -288,4 +297,204 @@ class TestSparseIsometryBinaryEncoding:
         overlap = np.abs(np.vdot(expected_sv, system_sv))
         assert np.isclose(
             overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+
+class TestBinaryEncodingWithQPE:
+    """Tests for binary encoding state preparation integrated with QPE circuit builders."""
+
+    def test_ancilla_overflow_iterative_qpe_qubit_allocation(self):
+        """Verify QPE qubit allocation when binary encoding state prep has extra ancilla.
+
+        Uses a 6e6o 20-determinant wavefunction where the binary encoding needs 3 ancilla
+        qubits beyond the idle pool. The state prep alone uses 15 qubits (12 system + 3
+        extra ancilla). When composed with iterative QPE, the total qubit count should be
+        1 (QPE control) + 15 (state prep total) = 16, because QPE only manages the system
+        register mapping but the state prep independently allocates its own ancilla.
+        """
+        wf = create_random_wavefunction(n_electrons=6, n_orbitals=6, n_dets=20, seed=42)
+
+        # Build binary encoding state prep — requires ancilla beyond the pool
+        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
+        num_system_qubits = 2 * 6  # 12 system qubits
+        state_prep_total_qubits = sp_lc["numQubits"]
+        extra_ancilla = state_prep_total_qubits - num_system_qubits
+        assert extra_ancilla > 0, "This test requires a case with ancilla overflow"
+
+        # Create a 12-qubit Hamiltonian matching the system size
+        qubit_hamiltonian = QubitHamiltonian(
+            pauli_strings=["Z" + "I" * (num_system_qubits - 1), "I" * (num_system_qubits - 1) + "Z"],
+            coefficients=np.array([0.5, 0.25]),
+        )
+
+        # Build iterative QPE circuits
+        num_bits = 4
+        circuit_builder = create(
+            "qpe_circuit_builder",
+            "qdk_iterative",
+            num_bits=num_bits,
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        iqpe_circuits = circuit_builder.run(
+            state_preparation=state_prep_circuit,
+            qubit_hamiltonian=qubit_hamiltonian,
+        )
+
+        # Iterative QPE: 1 control + state_prep_total_qubits
+        # QPE maps systems=[1..12] but state prep internally allocates 3 more ancilla
+        # beyond the system register, so total = 1 + 15 = 16
+        expected_qpe_qubits = 1 + state_prep_total_qubits
+        for i, qpe_circuit in enumerate(iqpe_circuits):
+            lc = qpe_circuit.estimate()["logicalCounts"]
+            assert lc["numQubits"] == expected_qpe_qubits, (
+                f"Iteration {i}: expected {expected_qpe_qubits} qubits "
+                f"(1 control + {state_prep_total_qubits} state_prep), got {lc['numQubits']}. "
+                f"State prep has {extra_ancilla} extra ancilla beyond {num_system_qubits} system qubits."
+            )
+
+    def test_ancilla_overflow_standard_qpe_qubit_allocation(self):
+        """Verify QPE qubit allocation with standard QPE when state prep has extra ancilla.
+
+        Uses the same 6e6o wavefunction with ancilla overflow. Standard QPE uses num_bits
+        phase qubits. The total should be num_bits + state_prep_total_qubits because the
+        state prep's ancilla are allocated independently of QPE's system qubit mapping.
+        """
+        wf = create_random_wavefunction(n_electrons=6, n_orbitals=6, n_dets=20, seed=42)
+
+        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
+        num_system_qubits = 12
+        state_prep_total_qubits = sp_lc["numQubits"]
+        extra_ancilla = state_prep_total_qubits - num_system_qubits
+        assert extra_ancilla > 0, "This test requires a case with ancilla overflow"
+
+        qubit_hamiltonian = QubitHamiltonian(
+            pauli_strings=["Z" + "I" * (num_system_qubits - 1), "I" * (num_system_qubits - 1) + "Z"],
+            coefficients=np.array([0.5, 0.25]),
+        )
+
+        # Build standard QPE circuit
+        num_bits = 4
+        circuit_builder = create(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=num_bits,
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        qpe_circuits = circuit_builder.run(
+            state_preparation=state_prep_circuit,
+            qubit_hamiltonian=qubit_hamiltonian,
+        )
+
+        # Standard QPE: num_bits phase qubits + state_prep_total_qubits
+        # = 4 + 15 = 19
+        expected_qpe_qubits = num_bits + state_prep_total_qubits
+        lc = qpe_circuits[0].estimate()["logicalCounts"]
+        assert lc["numQubits"] == expected_qpe_qubits, (
+            f"Expected {expected_qpe_qubits} qubits "
+            f"(num_bits={num_bits} + state_prep={state_prep_total_qubits}), got {lc['numQubits']}. "
+            f"State prep has {extra_ancilla} extra ancilla beyond {num_system_qubits} system qubits."
+        )
+
+    def test_model_hamiltonian_iqpe_with_ancilla(self):
+        """End-to-end iterative QPE with binary encoding state prep that requires ancilla.
+
+        Uses a disordered Heisenberg model (8 qubits, open boundary, local Z fields)
+        whose ground state is truncated to 26 determinants — enough to require 3 extra
+        ancilla qubits in binary encoding (state prep uses 11 total qubits).
+
+        Validates that:
+        1. The state prep circuit needs ancilla beyond the system register.
+        2. Iterative QPE runs successfully with the enlarged qubit space.
+        3. The recovered energy is within the QPE resolution of the exact ground energy.
+        """
+        # --- Model Hamiltonian: disordered Heisenberg (XX + ZZ) + local Z fields ---
+        n = 8
+        n_orbitals = 4
+        pauli_strings: list[str] = []
+        coefficients_list: list[float] = []
+        for i in range(n - 1):  # open boundary
+            j_coupling = 1.0 + 0.3 * (i % 3 - 1)
+            for pauli in ["X", "Z"]:
+                s = ["I"] * n
+                s[i] = pauli
+                s[i + 1] = pauli
+                pauli_strings.append("".join(s))
+                coefficients_list.append(j_coupling)
+        for i in range(n):
+            s = ["I"] * n
+            s[i] = "Z"
+            pauli_strings.append("".join(s))
+            coefficients_list.append(0.3 * (i - n / 2))
+        coefficients_arr = np.array(coefficients_list)
+
+        # Exact diagonalization
+        h_dense = pauli_to_dense_matrix(pauli_strings, coefficients_arr)
+        eigenvalues, eigenvectors = np.linalg.eigh(h_dense)
+        gs = eigenvectors[:, 0].real
+        gs_energy = float(eigenvalues[0])
+
+        # Truncate to top 26 determinants (~94% overlap with ground state)
+        sorted_indices = np.argsort(-np.abs(gs))
+        n_dets = 26
+        top_indices = sorted_indices[:n_dets]
+        top_amps = gs[top_indices]
+        top_amps = top_amps / np.linalg.norm(top_amps)
+
+        # Build wavefunction from bitstrings
+        mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}
+        configs = []
+        for idx in top_indices:
+            bits = format(idx, f"0{n}b")
+            alpha_bits = [int(bits[n - 1 - i]) for i in range(n_orbitals)]
+            beta_bits = [int(bits[n - 1 - i]) for i in range(n_orbitals, n)]
+            config_str = "".join(mapping[alpha_bits[k], beta_bits[k]] for k in range(n_orbitals))
+            configs.append(Configuration.from_spin_half_string(config_str))
+        from .test_helpers import create_test_orbitals  # noqa: PLC0415
+
+        orbitals = create_test_orbitals(n_orbitals)
+        wf = Wavefunction(StateVectorContainer(top_amps, configs, orbitals))
+
+        # Binary encoding state prep — must require ancilla
+        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
+        state_prep_qubits = sp_lc["numQubits"]
+        extra_ancilla = state_prep_qubits - n
+        assert extra_ancilla > 0, f"Expected ancilla overflow but state prep uses only {state_prep_qubits} qubits"
+
+        # QubitHamiltonian
+        qubit_hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients_arr)
+
+        # Run iterative QPE
+        num_bits = 8
+        evolution_time = float(np.pi / qubit_hamiltonian.schatten_norm)
+        iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=5)
+        iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42))
+        iqpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_iterative",
+                num_bits=num_bits,
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            ),
+        )
+
+        result = iqpe.run(state_preparation=state_prep_circuit, qubit_hamiltonian=qubit_hamiltonian)
+
+        # Resolve phase ambiguity and verify energy
+        phase_candidates = [result.phase_fraction % 1.0, (1.0 - result.phase_fraction) % 1.0]
+        energies = [energy_from_phase(p, evolution_time=evolution_time) for p in phase_candidates]
+        resolved_energy = energies[int(np.argmin([abs(e - gs_energy) for e in energies]))]
+
+        # Energy resolution with num_bits: 2*pi / (t * 2^num_bits)
+        energy_resolution = 2 * np.pi / (evolution_time * 2**num_bits)
+        assert abs(resolved_energy - gs_energy) < energy_resolution, (
+            f"QPE energy {resolved_energy:.6f} deviates from ground energy {gs_energy:.6f} "
+            f"by more than the {num_bits}-bit resolution ({energy_resolution:.4f}). "
+            f"State prep used {state_prep_qubits} qubits ({extra_ancilla} ancilla)."
         )
