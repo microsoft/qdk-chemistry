@@ -12,17 +12,18 @@ Given a prepared system state :math:`\vert \psi\rangle` and a unitary :math:`U`,
 
 1. Prepare the system in :math:`\vert \psi\rangle`
 2. Apply :math:`U` to the control qubit
-3. Apply controlled-:math:`U`
+3. Apply controlled-:math:`U` to the system register (controlled on the control qubit)
 4. Measure the control qubit in a selected basis
 
 QDK/Chemistry supports control-qubit measurement in ``X``, ``Y``, and ``Z`` bases through the ``test_basis`` setting.
-For shot-based execution, the expectation estimate from measured counts is:
+For shot-based execution, the control-qubit expectation estimate from measured counts is:
 
 .. math::
 
    \langle \psi \vert U \vert \psi \rangle \approx \frac{N_0 - N_1}{N_0 + N_1}
 
 where :math:`N_0` and :math:`N_1` are the observed counts for outcomes ``"0"`` and ``"1"``.
+For the standard Hadamard-test circuit, ``test_basis="X"`` estimates :math:`\mathrm{Re}\langle \psi \vert U \vert \psi \rangle` and ``test_basis="Y"`` estimates :math:`-\mathrm{Im}\langle \psi \vert U \vert \psi \rangle`.
 
 
 Typical workflow

@@ -65,11 +65,11 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
         state_prep_op = state_preparation_circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
-            raise ValueError("Input state_preparation_circuit cannot be used for QdkHadamardTestCircuitBuilder.")
+            raise ValueError("Input state_preparation_circuit cannot is not a Q# callable circuit.")
 
         ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
         if ctrl_evol_op is None:
-            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QdkHadamardTestCircuitBuilder.")
+            raise ValueError("Input ctrl_time_evol_unitary_circuit is not a Q# callable circuit.")
 
         hadamard_parameters = {
             "statePrep": state_prep_op,
