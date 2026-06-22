@@ -8,10 +8,10 @@ Overview
 --------
 
 The Hadamard test is a standard primitive for extracting overlap information from a controlled unitary application.
-Given a prepared system state :math:`|\psi\rangle` and a unitary :math:`U`, the algorithm builds a circuit with one control qubit and the system register:
+Given a prepared system state :math:`\vert \psi\rangle` and a unitary :math:`U`, the algorithm builds a circuit with one control qubit and the system register:
 
-1. Prepare the system in :math:`|\psi\rangle`
-2. Apply :math:`H` to the control qubit
+1. Prepare the system in :math:`\vert \psi\rangle`
+2. Apply :math:`U` to the control qubit
 3. Apply controlled-:math:`U`
 4. Measure the control qubit in a selected basis
 
@@ -20,7 +20,7 @@ For shot-based execution, the expectation estimate from measured counts is:
 
 .. math::
 
-   \langle M \rangle \approx \frac{N_0 - N_1}{N_0 + N_1}
+   \langle \psi \vert U \vert \psi \rangle \approx \frac{N_0 - N_1}{N_0 + N_1}
 
 where :math:`N_0` and :math:`N_1` are the observed counts for outcomes ``"0"`` and ``"1"``.
 
@@ -145,7 +145,7 @@ The algorithm returns :class:`~qdk_chemistry.data.CircuitExecutorData`, whose ``
    \hat{m} = \frac{N_0 - N_1}{N_0 + N_1}
 
 Here :math:`N_0 + N_1` is the number of clean measurement outcomes recorded in ``bitstring_counts``.
-This can differ from requested ``shots`` (or ``total_shots``) when an executor tracks loss separately.
+This can differ from requested ``shots`` when an executor tracks loss separately.
 Finite sampling still introduces statistical uncertainty, so increasing shots typically improves estimator stability.
 
 
