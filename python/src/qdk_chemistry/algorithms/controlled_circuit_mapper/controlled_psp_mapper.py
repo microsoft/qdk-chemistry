@@ -9,41 +9,41 @@ from qdk import qsharp
 
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, Select
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["PrepSelPrepMapper", "PrepSelPrepSettings"]
+__all__: list[str] = ["ControlledPSPMapper", "ControlledPSPMapperSettings"]
 
 
-class PrepSelPrepSettings(Settings):
-    """Settings for the PrepSelPrepMapper.
+class ControlledPSPMapperSettings(Settings):
+    """Settings for the ControlledPSPMapper.
 
     Attributes:
-        state_prep: Algorithm reference for the PREPARE oracle state preparation.
+        prepare: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
 
     """
 
     def __init__(self):
-        """Initialize the settings for PrepSelPrepMapper."""
+        """Initialize the settings for ControlledPSPMapper."""
         super().__init__()
         self._set_default(
-            "state_prep",
+            "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
         )
 
 
-class PrepSelPrepMapper(ControlledCircuitMapper):
+class ControlledPSPMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
     Composes a controlled block encoding from:
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
-       the ``state_prep`` setting.  Defaults to ``DensePureStatePreparation``.
+       the ``prepare`` setting.  Defaults to ``DensePureStatePreparation``.
     2. **SELECT** — Pauli SELECT oracle applied on the system register,
        constructed directly from the block-encoding container's SELECT data.
 
@@ -63,9 +63,9 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
     """
 
     def __init__(self):
-        """Initialize the PrepSelPrepMapper."""
+        """Initialize the ControlledPSPMapper."""
         super().__init__()
-        self._settings = PrepSelPrepSettings()
+        self._settings = ControlledPSPMapperSettings()
 
     def name(self) -> str:
         """Return the algorithm name.
@@ -85,7 +85,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         """
         return "controlled_circuit_mapper"
 
-    def _run_impl(self, controlled_unitary: ControlledUnitary) -> Circuit:
+    def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled block-encoding circuit.
 
         The method proceeds in three stages:
@@ -99,22 +99,24 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
            Q# ``PrepSelPrep`` / ``QuantumWalkStep`` operations.
 
         Args:
-            controlled_unitary: The controlled unitary containing the block-encoding
-                decomposition (PREPARE and SELECT data).
+            unitary: The unitary representation containing the block-encoding
+                decomposition (PREPARE and SELECT data). Control and target
+                indices are read from settings.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled block encoding.
 
         """
-        unitary_container = controlled_unitary.unitary.get_container()
+        unitary_container = unitary.get_container()
         if not isinstance(unitary_container, BlockEncodingContainer):
             raise ValueError(
-                f"The {controlled_unitary.get_unitary_container_type()} container type is not supported. "
-                "PrepSelPrepMapper only supports BlockEncodingContainer."
+                f"The {unitary.get_container_type()} container type is not supported. "
+                "ControlledPSPMapper only supports BlockEncodingContainer."
             )
 
-        if len(controlled_unitary.control_indices) != 1:
-            raise ValueError("PrepSelPrepMapper currently only supports a single control qubit.")
+        control_indices = self._get_control_indices()
+        if len(control_indices) != 1:
+            raise ValueError("ControlledPSPMapper currently only supports a single control qubit.")
 
         power = unitary_container.power
         prepare_wavefunction = unitary_container.prepare
@@ -124,7 +126,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         #    For the 0-ancilla case the wavefunction has 0 modes, producing a
         #    no-op circuit.
         if prepare_wavefunction is not None:
-            prepare_algorithm = self._create_nested("state_prep")
+            prepare_algorithm = self._create_nested("prepare")
             prepare_circuit = prepare_algorithm.run(prepare_wavefunction)
             prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
         else:

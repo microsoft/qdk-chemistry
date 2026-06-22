@@ -47,11 +47,9 @@ trotter = create("hamiltonian_unitary_builder", "trotter", order=2, time=0.1)
 evolution = trotter.run(qubit_ham)
 
 # 5. Create a controlled version and map to a circuit
-from qdk_chemistry.data import ControlledUnitary
-
-controlled = ControlledUnitary(evolution, control_indices=[0])
 mapper = create("controlled_circuit_mapper", "pauli_sequence")
-circuit = mapper.run(controlled)
+mapper.settings().set("control_indices", [0])
+circuit = mapper.run(evolution)
 print("Controlled evolution circuit generated")
 # end-cell-run
 ################################################################################
