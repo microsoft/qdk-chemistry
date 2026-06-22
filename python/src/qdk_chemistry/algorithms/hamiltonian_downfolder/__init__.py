@@ -11,8 +11,6 @@ from external orbitals.
 
 Available implementations:
 
-- ``"native_ducc"``: Pure Python/NumPy implementation using PySCF for CCSD amplitudes.
-  No external binary required.
 - ``"reference_ducc"``: OpenFermion-based symbolic BCH implementation using PySCF for CCSD amplitudes.
   Algebraically exact but limited to small systems (~20 spatial MOs) due to OpenFermion memory scaling.
 - ``"exachem_ducc"``: CLI-based integration with ExaChem's MPI DUCC solver.
@@ -32,26 +30,16 @@ def load():
     from qdk_chemistry.algorithms import register
     from qdk_chemistry.algorithms.registry import register_factory
 
-    from qdk_chemistry.algorithms.hamiltonian_downfolder.native_ducc import (
-        NativeDuccFactory,
-        NativeDuccSolver,
-    )
     from qdk_chemistry.algorithms.hamiltonian_downfolder.reference_ducc import (
         ReferenceDuccFactory,
         ReferenceDuccSolver,
     )
 
-    # Register the factory. If ExaChem plugin already registered one, this will
-    # raise ValueError — catch it and just register the algorithm.
-    try:
-        register_factory(NativeDuccFactory())
-    except ValueError:
-        pass  # Factory already registered by ExaChem plugin
-
+    # Register the factory. If the ExaChem plugin already registered one, this
+    # will raise ValueError — catch it and just register the algorithm.
     try:
         register_factory(ReferenceDuccFactory())
     except ValueError:
-        pass
+        pass  # Factory already registered by ExaChem plugin
 
-    register(lambda: NativeDuccSolver())
     register(lambda: ReferenceDuccSolver())

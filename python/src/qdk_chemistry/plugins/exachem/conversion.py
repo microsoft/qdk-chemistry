@@ -166,6 +166,41 @@ def parse_ducc_results(results_path: str | Path, json_path: str | Path) -> Fcidu
     )
 
 
+def parse_energy_shift(stdout: str) -> float | None:
+    """Extract the DUCC energy shift from ExaChem stdout.
+
+    Mirrors ExaChem's ``grab_data`` converter: prefer the explicit
+    ``Total Energy Shift`` line; if it is absent (e.g. at ``ducc_lvl=0``,
+    where no DUCC scalar correction is printed), fall back to
+    ``Full SCF Energy - Bare Active Space SCF Energy``.
+
+    The shift excludes nuclear repulsion. The qdk Hamiltonian core energy is
+    ``core_energy = energy_shift + V_nuc`` so that
+    ``E_total = E_CI_active + core_energy``.
+
+    Args:
+        stdout: Captured ExaChem stdout text.
+
+    Returns:
+        The energy shift in Hartree, or ``None`` if it cannot be determined.
+
+    """
+    shift = None
+    full_scf = None
+    bare_scf = None
+    for line in stdout.split("\n"):
+        seg = line.split()
+        if seg[:3] == ["Total", "Energy", "Shift:"]:
+            shift = float(seg[3])
+        elif seg[:3] == ["Full", "SCF", "Energy:"]:
+            full_scf = float(seg[3])
+        elif seg[:5] == ["Bare", "Active", "Space", "SCF", "Energy:"]:
+            bare_scf = float(seg[5])
+    if shift is None and full_scf is not None and bare_scf is not None:
+        shift = full_scf - bare_scf
+    return shift
+
+
 def _parse_ducc_blocks(text: str) -> dict[str, list[tuple]]:
     """Parse block-labeled DUCC results into a dict of integral lists."""
     blocks: dict[str, list[tuple]] = {}

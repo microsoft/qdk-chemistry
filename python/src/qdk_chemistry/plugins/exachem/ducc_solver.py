@@ -32,6 +32,7 @@ from qdk_chemistry.plugins.exachem.cli import DuccInputConfig, ExachemResult, ru
 from qdk_chemistry.plugins.exachem.conversion import (
     fcidump_to_hamiltonian,
     parse_ducc_results,
+    parse_energy_shift,
     parse_fcidump,
 )
 from qdk_chemistry.plugins.exachem.scf_export import export_scf_files
@@ -110,6 +111,7 @@ class ExachemDuccSolver(Algorithm):
         s._set_default("timeout", "int", 3600)
         s._set_default("scf_type", "string", "restricted")
         s._set_default("ccsd_threshold", "double", 1e-6)
+        s._set_default("cd_diagtol", "double", 1e-5)
 
     def type_name(self) -> str:
         """Return ``"hamiltonian_downfolder"``."""
@@ -174,6 +176,7 @@ class ExachemDuccSolver(Algorithm):
             nactive_vb=s.get("nactive_vb"),
             ducc_level=s.get("ducc_level"),
             ccsd_threshold=s.get("ccsd_threshold"),
+            cd_diagtol=s.get("cd_diagtol"),
             scf_type=s.get("scf_type"),
             noscf=True,
         )
@@ -247,25 +250,19 @@ class ExachemDuccSolver(Algorithm):
                 f"ExaChem completed but no DUCC output files were produced. Check {result.work_dir} for output files."
             )
 
-        # Extract the DUCC energy shift from ExaChem's stdout.
-        # ExaChem's "Total Energy Shift" is initialized as (E_SCF - V_nuc) then
-        # modified by fully contracted DUCC corrections. It excludes nuclear
-        # repulsion. The correct core_energy for a qdk Hamiltonian is:
-        #   core_energy = Total_Energy_Shift + V_nuc
-        # so that E_total = E_CI_active(from MACIS) + core_energy.
-        total_energy_shift = None
-        for line in result.stdout.split("\n"):
-            if "Total Energy Shift" in line:
-                try:
-                    total_energy_shift = float(line.split(":")[1].strip())
-                except (ValueError, IndexError):
-                    pass
+        # Extract the DUCC energy shift from ExaChem's stdout (see
+        # conversion.parse_energy_shift). The shift excludes nuclear repulsion;
+        # at ducc_lvl=0 ExaChem prints no "Total Energy Shift" line, so the
+        # helper falls back to (Full SCF - Bare Active Space SCF). The correct
+        # qdk core_energy is core_energy = energy_shift + V_nuc, so that
+        # E_total = E_CI_active(from MACIS) + core_energy.
+        total_energy_shift = parse_energy_shift(result.stdout)
 
         if total_energy_shift is not None:
             core_energy = total_energy_shift + fcidump.nuclear_repulsion
         else:
             core_energy = fcidump.nuclear_repulsion
-            logger.warning("Could not extract Total Energy Shift from ExaChem stdout; using nuc_rep only")
+            logger.warning("Could not extract energy shift from ExaChem stdout; using nuc_rep only")
 
         # Convert to Hamiltonian
         hamiltonian = fcidump_to_hamiltonian(
