@@ -294,6 +294,13 @@ extends:
           fetchDepth: 1
           retryCountOnTaskFailure: 3
 
+        - task: PipAuthenticate@1
+          displayName: Pip Authenticate
+          inputs:
+            artifactFeeds: AzureQuantum/quantum-apps-dependencies
+            onlyAddExtraIndex: false
+
+
         # Heavy env setup + CMake configure run BEFORE CodeQL Init so the
         # database is not polluted by configure-time toolchain probes.
         - script: |
