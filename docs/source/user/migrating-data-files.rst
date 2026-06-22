@@ -60,6 +60,12 @@ What is converted
   complete-active-space, and selected-CI containers upgrade to the
   state-vector container; the MP2 and coupled-cluster containers upgrade to the
   amplitude container.
+- :class:`~qdk_chemistry.data.Ansatz` — the embedded Hamiltonian and
+  Wavefunction are each migrated in place.
+
+Other data types (for example :class:`~qdk_chemistry.data.Structure`,
+:class:`~qdk_chemistry.data.BasisSet`, and the qubit-level classes) did not
+change format and load directly without conversion.
 
 Cholesky Hamiltonians become four-center
 ----------------------------------------

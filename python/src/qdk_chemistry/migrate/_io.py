@@ -23,7 +23,7 @@ import numpy as np
 _JSON_SUFFIXES = {".json"}
 _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 
-_TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction")
+_TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz")
 
 
 def detect_format(path: Path) -> str:

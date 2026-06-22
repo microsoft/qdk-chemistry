@@ -34,9 +34,9 @@ from pathlib import Path
 
 import h5py
 
-from qdk_chemistry.data import Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.data import Ansatz, Hamiltonian, Orbitals, Wavefunction
 
-from . import _hamiltonian, _io, _orbitals, _wavefunction
+from . import _ansatz, _hamiltonian, _io, _orbitals, _wavefunction
 
 __all__ = ["MigrationError", "convert_file"]
 
@@ -51,12 +51,14 @@ _MODULES = {
     "orbitals": _orbitals,
     "hamiltonian": _hamiltonian,
     "wavefunction": _wavefunction,
+    "ansatz": _ansatz,
 }
 
 _CLASSES = {
     "orbitals": Orbitals,
     "hamiltonian": Hamiltonian,
     "wavefunction": Wavefunction,
+    "ansatz": Ansatz,
 }
 
 

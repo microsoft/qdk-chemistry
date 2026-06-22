@@ -49,6 +49,11 @@ def from_hdf5_file(path) -> dict:
         return _read_wavefunction_group(handle["wavefunction"])
 
 
+def from_hdf5_group(group) -> dict:
+    """Read a v1 Wavefunction HDF5 group (the ``wavefunction`` group) into an old-doc."""
+    return _read_wavefunction_group(group)
+
+
 def to_new_json(old: dict) -> dict:
     """Build the v2 Wavefunction JSON object from a normalized old-doc."""
     container = _convert_container(old["container"], old["tag"])

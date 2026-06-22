@@ -39,11 +39,16 @@ def from_json_doc(doc: dict) -> dict:
 def from_hdf5_file(path) -> dict:
     """Normalize a v1 Hamiltonian HDF5 file into a container old-doc."""
     with h5py.File(path, "r") as handle:
-        container = handle["container"]
-        container_type = _io.read_attr(container, "container_type")
-        if container_type == "sparse":
-            return _sparse.from_hdf5_group(container)
-        return _four_center_from_hdf5(container)
+        return from_hdf5_group(handle)
+
+
+def from_hdf5_group(group) -> dict:
+    """Normalize a v1 Hamiltonian HDF5 group (with a ``container`` subgroup)."""
+    container = group["container"]
+    container_type = _io.read_attr(container, "container_type")
+    if container_type == "sparse":
+        return _sparse.from_hdf5_group(container)
+    return _four_center_from_hdf5(container)
 
 
 def to_new_json(old: dict) -> dict:

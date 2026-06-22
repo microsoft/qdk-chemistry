@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import migrate
-from qdk_chemistry.data import Configuration, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, Wavefunction
 
 RNG = np.random.default_rng(20240101)
 
@@ -288,6 +288,14 @@ def test_sparse(tmp_path, fmt):
         }
         src.write_text(json.dumps({"version": "0.1.0", "container": container}))
     else:
+        # The v1 HDF5 sparse format packs index pairs into the bytes of a double
+        # (uint32[2] -> double), so one-body rows are [pack(row, col), value] and
+        # two-body rows are [pack(p, q), pack(r, s), value].
+        def pack(a, b):
+            return np.array([a, b], dtype=np.uint32).view(np.float64)[0]
+
+        ob_packed = np.array([[pack(r, c), v] for r, c, v in one_body], dtype=np.float64)
+        tb_packed = np.array([[pack(p, q), pack(r, s), v] for p, q, r, s, v in two_body], dtype=np.float64)
         with h5py.File(src, "w") as handle:
             handle.attrs["version"] = "0.1.0"
             group = handle.create_group("container")
@@ -297,9 +305,9 @@ def test_sparse(tmp_path, fmt):
             metadata.attrs["core_energy"] = 2.5
             metadata.attrs["type"] = "Hermitian"
             metadata.attrs["is_restricted"] = True
-            ob = group.create_dataset("one_body_integrals_alpha_sparse", data=np.array(one_body, dtype=np.float64))
+            ob = group.create_dataset("one_body_integrals_alpha_sparse", data=ob_packed)
             ob.attrs["num_orbitals"] = np.int32(norb)
-            group.create_dataset("two_body_integrals_sparse", data=np.array(two_body, dtype=np.float64))
+            group.create_dataset("two_body_integrals_sparse", data=tb_packed)
 
     migrate.convert_file(src, dst)
     ham = Hamiltonian.from_file(str(dst), fmt)
@@ -495,6 +503,37 @@ def test_real_hamiltonian(tmp_path, out_fmt):
 
 
 @pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_cholesky_to_four_center(tmp_path, out_fmt):
+    # The v1 cholesky container stored the full four-center two-body tensor (not
+    # MO three-center vectors), so it migrates to a four-center container.
+    ref = _spot_ref()["cholesky"]
+    dst = tmp_path / f"chol.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2_chol.hamiltonian.h5", dst)
+    ham = Hamiltonian.from_file(str(dst), out_fmt)
+    assert ham.get_container_type() == "canonical_four_center"
+    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
+    assert abs(np.asarray(ham.get_one_body_integrals()[0])[0, 0] - ref["one_body_00"]) < 1e-9
+    aaaa = np.asarray(ham.get_two_body_integrals()[0]).ravel()
+    assert np.allclose(aaaa[:4], ref["two_body_aaaa_head"])
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_sparse(tmp_path, out_fmt):
+    ref = _spot_ref()["sparse"]
+    dst = tmp_path / f"sparse.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2_sparse.hamiltonian.h5", dst)
+    ham = Hamiltonian.from_file(str(dst), out_fmt)
+    assert ham.get_container_type() == "sparse"
+    assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
+    norb = 4
+    two_body = np.asarray(ham.get_two_body_integrals()[0]).reshape(norb, norb, norb, norb)
+    assert abs(two_body[0, 0, 0, 0] - ref["two_body_0000"]) < 1e-9
+    assert abs(two_body[1, 1, 1, 1] - ref["two_body_1111"]) < 1e-9
+    one_body = np.asarray(ham.get_one_body_integrals()[0]).reshape(norb, norb)
+    assert abs(one_body[0, 1] - ref["one_body_01"]) < 1e-9
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
 def test_real_cas_wavefunction_rdms(tmp_path, out_fmt):
     ref = _spot_ref()["cas_rdm"]
     dst = tmp_path / f"h2_cas.wavefunction.{'json' if out_fmt == 'json' else 'h5'}"
@@ -510,6 +549,18 @@ def test_real_cas_wavefunction_rdms(tmp_path, out_fmt):
     oaa, obb = wf.get_active_one_rdm_spin_dependent()
     assert np.allclose(np.asarray(oaa)[0], ref["one_aa_row0"])
     assert np.allclose(np.asarray(obb), np.asarray(oaa))
+
+
+@pytest.mark.parametrize("out_fmt", ["json", "hdf5"])
+def test_real_ansatz(tmp_path, out_fmt):
+    # Ansatz embeds a Hamiltonian and a Wavefunction; both must be migrated.
+    ref = _spot_ref()["ansatz"]
+    dst = tmp_path / f"h2.ansatz.{'json' if out_fmt == 'json' else 'h5'}"
+    migrate.convert_file(_REAL_DATA / "h2.ansatz.h5", dst)
+    ansatz = Ansatz.from_file(str(dst), out_fmt)
+    assert ansatz.get_wavefunction().get_container_type() == ref["wfn_container"]
+    one_body = np.asarray(ansatz.get_hamiltonian().get_one_body_integrals()[0])
+    assert abs(one_body[0, 0] - ref["ham_one_body_00"]) < 1e-9
 
 
 def test_cas_restricted_rdm_only_alpha(tmp_path):

@@ -37,6 +37,17 @@ def from_json_doc(container: dict) -> dict:
     }
 
 
+def _unpack_indices(packed_column) -> tuple:
+    """Decode a column of ``pack_indices`` doubles into two integer arrays.
+
+    The v1 HDF5 sparse format packs an ``(a, b)`` uint32 index pair into the
+    bytes of a ``double`` (``uint32[2] = {a, b}`` memcpy'd to a ``double``). On a
+    little-endian host this is recovered by viewing the double as two uint32s.
+    """
+    pairs = np.ascontiguousarray(packed_column, dtype=np.float64).view(np.uint32).reshape(-1, 2)
+    return pairs[:, 0], pairs[:, 1]
+
+
 def from_hdf5_group(container: h5py.Group) -> dict:
     """Normalize a v1 sparse container HDF5 group into an old-doc."""
     metadata = container["metadata"]
@@ -51,13 +62,31 @@ def from_hdf5_group(container: h5py.Group) -> dict:
     if num_orbitals is None:
         raise ValueError("Sparse container is missing num_orbitals metadata")
 
+    one_body = None
+    if one_body_ds is not None:
+        # Each row is [pack_indices(row, col), value].
+        arr = np.asarray(one_body_ds, dtype=np.float64)
+        rows, cols = _unpack_indices(arr[:, 0])
+        one_body = [[int(r), int(c), float(v)] for r, c, v in zip(rows, cols, arr[:, 1], strict=True)]
+
+    two_body = None
+    if two_body_ds is not None:
+        # Each row is [pack_indices(p, q), pack_indices(r, s), value].
+        arr = np.asarray(two_body_ds, dtype=np.float64)
+        p, q = _unpack_indices(arr[:, 0])
+        r, s = _unpack_indices(arr[:, 1])
+        two_body = [
+            [int(pp), int(qq), int(rr), int(ss), float(v)]
+            for pp, qq, rr, ss, v in zip(p, q, r, s, arr[:, 2], strict=True)
+        ]
+
     return {
         "container_type": "sparse",
         "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
         "type": _io.read_attr(metadata, "type", "Hermitian"),
         "num_orbitals": num_orbitals,
-        "one_body_sparse": None if one_body_ds is None else [list(row) for row in np.asarray(one_body_ds)],
-        "two_body_sparse": None if two_body_ds is None else [list(row) for row in np.asarray(two_body_ds)],
+        "one_body_sparse": one_body,
+        "two_body_sparse": two_body,
     }
 
 
