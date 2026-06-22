@@ -660,6 +660,12 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
       continue;
     }
     parse_atom_line(line, atom_index++);
+    if (has_header && symbols.size() > expected_num_atoms) {
+      throw std::runtime_error("Invalid XYZ format: declared atom count (" +
+                               std::to_string(expected_num_atoms) +
+                               ") does not match number of atom lines (" +
+                               std::to_string(symbols.size()) + ")");
+    }
   }
 
   // When a header is present, validate that the declared atom count matches the
