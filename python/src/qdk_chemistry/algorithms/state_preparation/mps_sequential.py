@@ -38,6 +38,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+from collections import deque
+
 import numpy as np
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
@@ -115,26 +117,28 @@ class MPSSequentialStatePreparation(StatePreparation):
             raise TypeError(f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
 
         fast_re = self._settings.get("fast_resource_estimation")
+
         data = generate_mps_preparation_data(wavefunction.tensors, fast_resource_estimation=fast_re)
-        params = data.to_qsharp_params(self._settings.get("rotation_bits"))
 
-        from qdk_chemistry.utils.qsharp import _get_mps_context
+        rotation_bits = self._settings.get("rotation_bits")
 
-        mps_ctx = _get_mps_context()
-        mps_ops = mps_ctx.code.MPSSequential
-
-        num_state_qubits = 2 * len(wavefunction.tensors)
-        num_ancilla_qubits = data.ancilla_bits
-        estimate_expr = _build_mps_estimate_expr(params, num_state_qubits, num_ancilla_qubits)
+        if fast_re:
+            # Use the uniform Q# operation that accepts only 1 site's data.
+            # This avoids marshaling N-1 identical copies of large angle arrays
+            # into the Q# runtime, giving ~(N-1)x speedup on estimate().
+            params = data.to_qsharp_params_uniform(rotation_bits)
+            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitUniform
+        else:
+            params = data.to_qsharp_params(rotation_bits)
+            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
 
         qsharp_factory = QsharpFactoryData(
-            program=mps_ops.MPSSequential,
+            program=program,
             parameter=params,
-            estimate_expr=estimate_expr,
-            context=mps_ctx,
         )
 
         return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
+
 
 # ---------------------------------------------------------------------------
 # Data containers for structured decomposition results
@@ -215,11 +219,12 @@ class MPSPreparationData:
     """Per-site decomposition data (one entry per site 1..num_sites-1)."""
 
     def to_qsharp_params(self, rotation_bits: int) -> dict:
-        """Flatten into the dict expected by the MPSSequential Q# operation."""
+        """Flatten into the dict expected by the MakeMPSSequentialCircuit Q# operation."""
         params: dict = {
             "initialStateVec": self.initial_state_vec,
             "numSites": self.num_sites,
             "rotationBits": rotation_bits,
+            "numAncillaQubits": self.ancilla_bits,
             "siteVLayerAngles": [s.v.layer_angles for s in self.sites],
             "siteVLayerShifted": [s.v.layer_shifted for s in self.sites],
             "siteVPhases": [s.v.phases for s in self.sites],
@@ -237,7 +242,39 @@ class MPSPreparationData:
             "siteUPhases": [s.u.phases for s in self.sites],
         }
         return params
-    
+
+    def to_qsharp_params_uniform(self, rotation_bits: int) -> dict:
+        """Flatten into the dict expected by MakeMPSSequentialCircuitUniform.
+
+        Only passes a single site's decomposition data (the first/representative site).
+        Used with fast_resource_estimation=True to avoid marshaling N-1 copies of
+        identical angle arrays into the Q# runtime.
+        """
+        s = self.sites[0]
+        params: dict = {
+            "initialStateVec": self.initial_state_vec,
+            "numSites": self.num_sites,
+            "rotationBits": rotation_bits,
+            "numAncillaQubits": self.ancilla_bits,
+            "vLayerAngles": s.v.layer_angles,
+            "vLayerShifted": s.v.layer_shifted,
+            "vPhases": s.v.phases,
+            "rot0Angles": s.rot_angles[0],
+            "rot1Angles": s.rot_angles[1],
+            "rot2Angles": s.rot_angles[2],
+            "w0LayerAngles": s.w0.layer_angles,
+            "w0LayerShifted": s.w0.layer_shifted,
+            "w0Phases": s.w0.phases,
+            "w1LayerAngles": s.w1.layer_angles,
+            "w1LayerShifted": s.w1.layer_shifted,
+            "w1Phases": s.w1.phases,
+            "uLayerAngles": s.u.layer_angles,
+            "uLayerShifted": s.u.layer_shifted,
+            "uPhases": s.u.phases,
+        }
+        return params
+
+
 # ---------------------------------------------------------------------------
 # Unitary synthesis helpers
 # ---------------------------------------------------------------------------
@@ -285,27 +322,39 @@ def generate_mps_preparation_data(
     ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
     ancilla_dim = 1 << ancilla_bits
 
-    # Per-site decomposition
+    # Per-site decomposition — process in reverse order to propagate V matrices.
+    # Each site's V is absorbed into the previous site's target matrix (via v_from_next),
+    # eliminating the explicit V unitary application. This mirrors Qualtran's approach.
     sites: list[SiteUnitaryData] = []
+    v_from_next: np.ndarray | None = None
     if fast_resource_estimation and num_sites > 2:
         # Only decompose one site; replicate for all others.
         # Pick the site with the largest tensor (most representative cost).
         representative_idx = max(range(1, num_sites), key=lambda i: tensors[i].size)
-        site_data = _decompose_site(tensors[representative_idx], ancilla_dim)
+        site_data = _decompose_site(tensors[representative_idx], ancilla_dim, v_from_next=None)
         sites = [site_data] * (num_sites - 1)
     else:
-        for i in range(1, num_sites):
-            site_data = _decompose_site(tensors[i], ancilla_dim)
-            sites.append(site_data)
+        # Reverse-order decomposition: last site first, propagating V backwards.
+        sites_reversed: list[SiteUnitaryData] = []
+        for i in range(num_sites - 1, 0, -1):
+            site_data, v_mat = _decompose_site_with_v(tensors[i], ancilla_dim, v_from_next=v_from_next)
+            sites_reversed.append(site_data)
+            v_from_next = v_mat
+        sites = list(reversed(sites_reversed))
 
-    # Initial state from first tensor
+    # Initial state from first tensor, absorbing V from site 1's decomposition.
     first_tensor = tensors[0]
-    chi_left_0 = first_tensor.shape[0]
     chi_1 = first_tensor.shape[2]
     # Transpose to (d, chi_right, chi_left) then sum over chi_left → (d, chi_right)
     init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
     init_padded = np.zeros((d, ancilla_dim))
     init_padded[:, :chi_1] = init_state
+    # Absorb the V matrix from site 1 into the initial state
+    if v_from_next is not None and not fast_resource_estimation:
+        v_pad = np.eye(ancilla_dim, dtype=np.float64)
+        v_pad[: v_from_next.shape[0], : v_from_next.shape[1]] = np.asarray(v_from_next).real
+        # V acts on the ancilla (right) dimension of init_padded
+        init_padded = init_padded @ v_pad.T
     initial_state_vec = init_padded.flatten()
     norm = np.linalg.norm(initial_state_vec)
     if norm > 1e-15:
@@ -335,7 +384,7 @@ def _d_prime_to_ucr_angles(d_prime: np.ndarray, dim: int) -> list[float]:
     return [2.0 * float(np.arcsin(np.clip(d_prime[k] if k < len(d_prime) else 0.0, -1, 1))) for k in range(dim)]
 
 
-def _decompose_site(tensor: np.ndarray, ancilla_dim: int) -> SiteUnitaryData:
+def _decompose_site(tensor: np.ndarray, ancilla_dim: int, v_from_next: np.ndarray | None = None) -> SiteUnitaryData:
     """CSD-decompose one MPS site tensor and Givens-decompose all components.
 
     Combines ``compute_site_unitary_dense_data``
@@ -343,14 +392,30 @@ def _decompose_site(tensor: np.ndarray, ancilla_dim: int) -> SiteUnitaryData:
     resulting unitary, returning a single ``SiteUnitaryData`` ready for
     circuit synthesis.
     """
+    site_data, _ = _decompose_site_with_v(tensor, ancilla_dim, v_from_next=v_from_next)
+    return site_data
+
+
+def _decompose_site_with_v(
+    tensor: np.ndarray, ancilla_dim: int, v_from_next: np.ndarray | None = None
+) -> tuple[SiteUnitaryData, np.ndarray]:
+    """CSD-decompose one MPS site tensor, returning both SiteUnitaryData and raw V.
+
+    When ``v_from_next`` is provided (from the next site's decomposition), it is
+    absorbed into this site's target matrix. The returned V is for propagation to
+    the previous site (or initial state). The V in the returned SiteUnitaryData
+    is always set to identity since V is never applied in the circuit — it's
+    always absorbed by the previous entity (another site or the initial state).
+    """
     dim = ancilla_dim
-    data = compute_site_unitary_dense_data(tensor, v_from_next=None, ancilla_dim=dim)
+
+    data = compute_site_unitary_dense_data(tensor, v_from_next=v_from_next, ancilla_dim=dim)
 
     d_0_, d_1_, d_2_ = data["d_prime"]
     u_0, u_1, u_2, u_3 = data["u"]
 
-    # Givens decompositions of V, W_0, W_1
-    v_givens = _pad_and_givens(data["v"], dim)
+    # V is never applied in the circuit — always propagated to the previous site.
+    v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
     w0_givens = _pad_and_givens(data["w_0"], dim)
     w1_givens = _pad_and_givens(data["w_1"], dim)
 
@@ -370,13 +435,14 @@ def _decompose_site(tensor: np.ndarray, ancilla_dim: int) -> SiteUnitaryData:
     u_angles, u_shifted, u_phases = decompose_block_diagonal_to_givens(u_block_mats)
     u_givens = GivensLayerData(layer_angles=u_angles, layer_shifted=u_shifted, phases=u_phases)
 
-    return SiteUnitaryData(
+    site_data = SiteUnitaryData(
         v=v_givens,
         rot_angles=rot_angles,
         w0=w0_givens,
         w1=w1_givens,
         u=u_givens,
     )
+    return site_data, data["v"]
 
 
 def compute_site_unitary_dense_data(
@@ -496,75 +562,6 @@ def compute_site_unitary_dense_data(
         "v": v,
         "ancilla_dim": dim,
     }
-
-
-def _decompose_unitary_to_givens_python(matrix: np.ndarray):
-    """Decompose a real orthogonal matrix into parallel Givens rotation layers.
-
-    Implements the :cite:`Clements2017` decomposition used
-    for fault-tolerant unitary synthesis via phase-gradient rotations.
-
-    The matrix is factored as ``U = D · L_l · ... · L_1`` where each layer
-    ``L_j`` consists of parallel 2x2 R_y(theta) (Y-axis rotation) Givens
-    rotations acting on neighboring pairs of columns, and ``D`` is a diagonal
-    sign matrix (±1).
-    Layers alternate between "even" (pairs 0-1, 2-3, ...) and "odd"
-    (pairs 1-2, 3-4, ...) forms as in Eq. (3) of the paper.
-
-    This is a pure-Python fallback; the Rust ``unitary_synthesis`` library
-    is preferred for performance.
-
-    The decomposition uses right-multiplication (column elimination):
-    ``M · G†_1 · ... · G†_N = D``, giving ``M = D · G_N · ... · G_1``.
-    Layers are stored in decomposition order so that the Q# circuit
-    (which applies layers sequentially then D) produces the correct unitary.
-
-    Parameters
-    ----------
-    matrix : np.ndarray
-        Real orthogonal matrix of shape (dim, dim).
-
-    Returns
-    -------
-    layer_angles : list[list[float]]
-        Per-layer R_y rotation angles for each parallel slot.
-    layer_shifted : list[bool]
-        Whether each layer uses odd-indexed pairs (shifted=True) or
-        even-indexed pairs (shifted=False).
-    phases : list[bool]
-        Diagonal sign flips: True where the residual diagonal entry is -1.
-
-    """
-    dim = matrix.shape[0]
-    m = matrix.copy().astype(float)
-
-    rotations: list[tuple[int, float]] = []
-
-    # Right-multiplication: zero off-diagonal elements column by column.
-    # For each row, eliminate elements to the right of the diagonal using
-    # Givens rotations on neighboring column pairs.
-    # M · G(θ_1) · ... · G(θ_N) = D  =>  M = D · G(-θ_N) · ... · G(-θ_1)
-    # We store -θ so the circuit can directly apply G(stored_angle).
-    for row in range(dim - 1):
-        for col in range(dim - 1, row, -1):
-            a_val = m[row, col - 1]
-            b_val = m[row, col]
-            if abs(b_val) < 1e-15:
-                continue
-            theta = np.arctan2(b_val, a_val)
-            c, s = np.cos(theta), np.sin(theta)
-            col_i = m[:, col - 1].copy()
-            col_j = m[:, col].copy()
-            m[:, col - 1] = c * col_i + s * col_j
-            m[:, col] = -s * col_i + c * col_j
-            rotations.append((col - 1, -theta))
-
-    diag_vals = np.diag(m)
-    phases = [bool(d < 0) for d in diag_vals]
-
-    # Organize into parallel layers
-    layer_angles, layer_shifted = _organize_into_layers(rotations, dim)
-    return layer_angles, layer_shifted, phases
 
 
 def decompose_2d(a: np.ndarray, b: np.ndarray):
@@ -730,12 +727,21 @@ def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple
 def decompose_unitary_to_givens(matrix: np.ndarray):
     """Decompose a real orthogonal matrix into parallel Givens rotation layers.
 
-    Produces the factorization ``U = D · L_l · ... · L_1`` (Eq. 7 in
+    Implements the Clements double-sided decomposition
+    (:cite:`Clements2017`) which guarantees exactly ``dim`` layers for a
+    ``dim x dim`` orthogonal matrix by alternating right-column and
+    left-row Givens eliminations.
+
+    The matrix is factored as ``U = D · L_d · ... · L_1`` where each layer
+    ``L_j`` consists of parallel 2x2 R_y(theta) (Y-axis rotation) Givens
+    rotations acting on neighboring pairs of columns, and ``D`` is a diagonal
+    sign matrix (±1).
+    Layers alternate between "even" (pairs 0-1, 2-3, ...) and "odd"
+    (pairs 1-2, 3-4, ...) forms as in Eq. (3) of the paper.
+
+    Produces the factorization ``U = D · L_d · ... · L_1`` (Eq. 7 in
     :cite:`Rupprecht2026`) where each ``L_j`` is a layer of
     parallel R_y rotations and ``D`` is a diagonal ±1 sign matrix.
-
-    Uses the Rust ``unitary_synthesis`` library when available for
-    performance; falls back to a pure-Python implementation.
 
     Parameters
     ----------
@@ -752,23 +758,99 @@ def decompose_unitary_to_givens(matrix: np.ndarray):
         Diagonal sign flips (True where entry is -1).
 
     """
-    try:
-        from unitary_synthesis._givens_decomposition import decompose_real  # noqa: PLC0415
+    dim = matrix.shape[0]
+    m = matrix.copy().astype(float)
 
-        dim = matrix.shape[0]
-        phases_raw, layers = decompose_real([matrix.astype(np.float64)])
+    if dim <= 1:
+        return [], [], [bool(m[0, 0] < 0)] if dim == 1 else []
 
-        layer_angles = []
-        layer_shifted = []
-        for layer in layers:
-            layer_angles.append(list(layer.angles_ry))
-            layer_shifted.append(layer.shifted)
+    # Clements double-sided elimination.
+    # Layer i is shifted=(i%2==1): even layers have even pairs, odd layers odd pairs.
+    num_layers = 1 if dim == 2 else dim
+    # upper_rots[i] collects right-side rotations for layer i
+    upper_rots: list[list[tuple[int, float]]] = [[] for _ in range(num_layers)]
+    # lower_rots[col_idx] collects left-side rotations (combined into layers later)
+    lower_rots: list[list[tuple[int, float]]] = [[] for _ in range(num_layers)]
 
-        phases = [bool(p) for p in phases_raw]
-        phases += [False] * (dim - len(phases))
-        return layer_angles, layer_shifted, phases
-    except ImportError:
-        return _decompose_unitary_to_givens_python(matrix)
+    for k in range(dim - 1):
+        if k % 2 == 0:
+            # Right column elimination: zero M[row_idx, col_idx] for decreasing col_idx
+            for i, col_idx in enumerate(range(k, -1, -1)):
+                row_idx = dim - 1 - i
+                a_val = m[row_idx, col_idx + 1]
+                b_val = m[row_idx, col_idx]
+                if abs(b_val) < 1e-15:
+                    continue
+                theta = np.arctan2(b_val, a_val)
+                c, s = np.cos(theta), np.sin(theta)
+                col_i = m[:, col_idx].copy()
+                col_j = m[:, col_idx + 1].copy()
+                # Zero col_idx: [[c, s], [-s, c]] right-multiplied on cols (col_idx, col_idx+1)
+                m[:, col_idx] = c * col_i - s * col_j
+                m[:, col_idx + 1] = s * col_i + c * col_j
+                upper_rots[i].append((col_idx, theta))
+        else:
+            # Left row elimination: zero M[row_idx, col_idx] for increasing row_idx
+            for col_idx, row_idx in enumerate(range(dim - k - 1, dim)):
+                a_val = m[row_idx - 1, col_idx]
+                b_val = m[row_idx, col_idx]
+                if abs(b_val) < 1e-15:
+                    continue
+                theta = np.arctan2(b_val, a_val)
+                c, s = np.cos(theta), np.sin(theta)
+                row_i = m[row_idx - 1, :].copy()
+                row_j = m[row_idx, :].copy()
+                m[row_idx - 1, :] = c * row_i + s * row_j
+                m[row_idx, :] = -s * row_i + c * row_j
+                lower_rots[col_idx].append((row_idx - 1, theta))
+
+    # Extract diagonal (±1 for orthogonal matrices)
+    diag_vals = np.diag(m)
+    phases = [bool(d < 0) for d in diag_vals]
+
+    # Combine upper and lower rotations into exactly dim layers.
+    # Lower rotations (left-side) are commuted past the diagonal D to become
+    # right-side rotations: angle is adjusted by sign(D[p]*D[p+1]).
+    # lower_rots[col_idx] maps to layer (num_layers - 1 - col_idx).
+    num_even_slots = dim // 2
+    num_odd_slots = (dim - 1) // 2
+
+    result_angles: list[list[float]] = []
+    result_shifted: list[bool] = []
+
+    for layer_idx in range(num_layers):
+        shifted = layer_idx % 2 == 1
+        if shifted:
+            num_slots = num_odd_slots
+            slot_pairs = [2 * k + 1 for k in range(num_slots)]
+        else:
+            num_slots = num_even_slots
+            slot_pairs = [2 * k for k in range(num_slots)]
+
+        pair_to_slot = {p: i for i, p in enumerate(slot_pairs)}
+        angles = [0.0] * num_slots
+
+        # Add upper (right-side) rotations for this layer
+        for pair, angle in upper_rots[layer_idx]:
+            if pair in pair_to_slot:
+                angles[pair_to_slot[pair]] = angle
+
+        # Add lower (left-side) rotations, adjusted by diagonal signs.
+        # lower_rots[col_idx] → combined into layer (num_layers - 1 - col_idx)
+        lower_col_idx = num_layers - 1 - layer_idx
+        if lower_col_idx < len(lower_rots):
+            for pair, angle in reversed(lower_rots[lower_col_idx]):
+                sign = 1.0 if diag_vals[pair] * diag_vals[pair + 1] > 0 else -1.0
+                adjusted_angle = angle * sign
+                if pair in pair_to_slot:
+                    angles[pair_to_slot[pair]] = adjusted_angle
+
+        # Only include non-trivial layers
+        if any(abs(a) > 1e-15 for a in angles):
+            result_angles.append(angles)
+            result_shifted.append(shifted)
+
+    return result_angles, result_shifted, phases
 
 
 def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
@@ -779,6 +861,11 @@ def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
     each block can be scheduled in parallel across blocks, reducing the total
     number of Givens layers compared to treating the full matrix as dense.
     See Sec. 3 and Fig. 3 of :cite:`Rupprecht2026`.
+
+    Each block is decomposed independently using the Clements double-sided
+    algorithm (guaranteed ``block_dim`` layers per block), then layers from
+    different blocks are merged into global layers of the full register.
+    This matches the Qualtran Rust implementation's ``normal_form_blocks``.
 
     Parameters
     ----------
@@ -795,25 +882,101 @@ def decompose_block_diagonal_to_givens(blocks: list[np.ndarray]):
         Diagonal sign flips (True where entry is -1).
 
     """
-    try:
-        from unitary_synthesis._givens_decomposition import decompose_real  # noqa: PLC0415
+    total_dim = sum(b.shape[0] for b in blocks)
+    num_even_slots = total_dim // 2
+    num_odd_slots = (total_dim - 1) // 2
 
-        block_mats = tuple(b.astype(np.float64) for b in blocks)
-        total_dim = sum(b.shape[0] for b in blocks)
-        phases_raw, layers = decompose_real(block_mats)
+    # Decompose each block independently using Clements decomposition.
+    block_starts: list[int] = []
+    block_decomps: list[list[tuple[bool, list[tuple[int, float]]]]] = []
+    all_phases: list[bool] = [False] * total_dim
 
-        layer_angles = []
-        layer_shifted = []
-        for layer in layers:
-            layer_angles.append(list(layer.angles_ry))
-            layer_shifted.append(layer.shifted)
+    offset = 0
+    for block in blocks:
+        block_starts.append(offset)
+        block_dim = block.shape[0]
+        angles, shifted, phases = decompose_unitary_to_givens(block)
 
-        phases = [bool(p) for p in phases_raw]
-        phases += [False] * (total_dim - len(phases))
-        return layer_angles, layer_shifted, phases
-    except ImportError:
-        # Fallback: decompose full block-diagonal matrix
-        from scipy.linalg import block_diag as scipy_block_diag  # noqa: PLC0415
+        # Convert layer data back to (pair, angle) tuples remapped to full register
+        layers: list[tuple[bool, list[tuple[int, float]]]] = []
+        for layer_angles_l, layer_shifted_l in zip(angles, shifted, strict=False):
+            rots: list[tuple[int, float]] = []
+            if layer_shifted_l:
+                slot_pairs = [2 * k + 1 for k in range((block_dim - 1) // 2)]
+            else:
+                slot_pairs = [2 * k for k in range(block_dim // 2)]
+            for slot_idx, angle in enumerate(layer_angles_l):
+                if abs(angle) > 1e-15:
+                    rots.append((offset + slot_pairs[slot_idx], angle))
+            if rots:
+                layers.append((layer_shifted_l, rots))
 
-        full_matrix = scipy_block_diag(*[b.astype(np.float64) for b in blocks])
-        return _decompose_unitary_to_givens_python(full_matrix)
+        block_decomps.append(layers)
+
+        # Store phases remapped to full register
+        for k, p in enumerate(phases):
+            all_phases[offset + k] = p
+
+        offset += block_dim
+
+    # Merge layers across blocks into global layers.
+    # A block's layer with local shifted=S at block offset O fits in a global
+    # layer with global_shifted=G if (O + S) and G have the same parity
+    # (i.e., the local pair indices map to global pairs of the correct type).
+    # Determine initial global_shifted from the largest block's first layer.
+    max_block_idx = max(range(len(blocks)), key=lambda i: blocks[i].shape[0])
+    if block_decomps[max_block_idx]:
+        first_local_shifted = block_decomps[max_block_idx][0][0]
+        # A locally shifted layer at offset O produces pairs O+1, O+3, ...
+        # These fit in a global shifted layer if O is even, or unshifted if O is odd.
+        global_shifted = first_local_shifted ^ (block_starts[max_block_idx] % 2 == 1)
+    else:
+        global_shifted = False
+
+    # Convert block_decomps to deques for popping from front
+    block_queues = [deque(layers) for layers in block_decomps]
+
+    result_angles: list[list[float]] = []
+    result_shifted: list[bool] = []
+
+    while any(q for q in block_queues):
+        current_offset = 1 if global_shifted else 0
+
+        # Collect rotations from blocks whose front layer aligns with current global layer
+        layer_rots: list[tuple[int, float]] = []
+        for blk_idx, q in enumerate(block_queues):
+            if not q:
+                continue
+            local_shifted, rots = q[0]
+            # Check alignment: a locally shifted layer at block start O
+            # produces global pairs at O+1, O+3, ... which are all odd if O is even.
+            # These fit in global_shifted=True layer.
+            block_offset = block_starts[blk_idx]
+            local_parity = (block_offset + (1 if local_shifted else 0)) % 2
+            global_parity = current_offset % 2
+            if local_parity == global_parity:
+                q.popleft()
+                layer_rots.extend(rots)
+
+        # Build the global layer
+        if global_shifted:
+            num_slots = num_odd_slots
+            slot_pairs = [2 * k + 1 for k in range(num_slots)]
+        else:
+            num_slots = num_even_slots
+            slot_pairs = [2 * k for k in range(num_slots)]
+
+        pair_to_slot = {p: i for i, p in enumerate(slot_pairs)}
+        angles_layer = [0.0] * num_slots
+
+        for pair, angle in layer_rots:
+            if pair in pair_to_slot:
+                angles_layer[pair_to_slot[pair]] = angle
+
+        if any(abs(a) > 1e-15 for a in angles_layer):
+            result_angles.append(angles_layer)
+            result_shifted.append(global_shifted)
+
+        global_shifted = not global_shifted
+
+    return result_angles, result_shifted, all_phases

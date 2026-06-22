@@ -8,7 +8,8 @@ import Std.Arrays.*;
 import Std.Canon.*;
 import Std.Diagnostics.*;
 import Std.ResourceEstimation.*;
-import Std.TableLookup.Select;
+import QDKChemistry.Utils.SelectSwap.ControlledQroamCleanRotation;
+import QDKChemistry.Utils.SelectSwap.QroamCleanRotation;
 import PhaseGradient.RyViaPhaseGradient;
 import PhaseGradient.RzViaPhaseGradient;
 
@@ -339,12 +340,8 @@ operation ApplyGivensLayer(
     let activeQubit = target[n - 1];
     let address = target[0..n - 2];
 
-    // QROAM load → Ry → uncompute (deterministic via within/apply)
-    within {
-        Select(angleData, Reversed(address), angleReg);
-    } apply {
-        RyViaPhaseGradient(activeQubit, angleReg, phaseGradient);
-    }
+    // QROAM-clean: forward-only Select+Swap + Ry + Unlookup for half the cost
+    QroamCleanRotation(angleData, Reversed(address), activeQubit, phaseGradient);
 
     if isShifted {
         AddConstant(1, Reversed(target));
@@ -358,14 +355,16 @@ operation ApplyGivensLayer(
 /// When control = |1⟩, applies the Givens rotation layer.
 /// When control = |0⟩, does nothing (identity).
 ///
-/// Optimization: The control qubit is folded into the QROAM address as MSB.
-/// The data table is extended with zeros for the ctrl=0 case, so:
-///   - ctrl=0: QROAM loads zeros → Ry(0) = I (identity)
-///   - ctrl=1: QROAM loads actual angles → rotation applied
+/// Uses QROAMClean pattern (Berry et al. arXiv:1902.02134):
+///   1. Controlled Select loads N data entries (NOT 2N extended data).
+///      Cost: N-1 AND gates (vs 2N-2 for data-doubling approach).
+///   2. Ry rotation via phase gradient.
+///   3. Measurement-based uncomputation (Unlookup) on 2N extended data
+///      to correctly handle the ctrl=0 branch.
 ///
 /// The IncrementByOne shift is applied UNCONDITIONALLY (not controlled).
-/// This is correct because when ctrl=0, Ry(0)=I makes the shift/unshift pair
-/// cancel out, producing identity on the target register.
+/// This is correct because when ctrl=0, Select loads nothing, so
+/// Ry(0)=I makes the shift/unshift pair cancel out.
 ///
 /// # Input
 /// ## angleData
@@ -390,13 +389,8 @@ operation ApplyControlledGivensLayer(
     let numAngles = Length(angleData);
     let rotationBits = Length(angleReg);
 
-    // Build extended data: zeros (ctrl=0) ++ angleData (ctrl=1)
-    // Control qubit is MSB of the address register.
-    let zeros = Repeated(Repeated(false, rotationBits), numAngles);
-    let extendedData = zeros + angleData;
-
-    // Shifts are UNCONDITIONAL — saves Controlled AddConstant cost.
-    // When ctrl=0, QROAM loads zeros so Ry(0)=I, making shift/unshift cancel.
+    // Shifts are UNCONDITIONAL.
+    // When ctrl=0, Select loads nothing so Ry(0)=I, making shift/unshift cancel.
     if isShifted {
         AddConstant(-1, Reversed(target));
     }
@@ -404,11 +398,9 @@ operation ApplyControlledGivensLayer(
     let activeQubit = target[n - 1];
     let address = target[0..n - 2];
 
-    within {
-        Select(extendedData, Reversed(address) + [control], angleReg);
-    } apply {
-        RyViaPhaseGradient(activeQubit, angleReg, phaseGradient);
-    }
+    // QROAMClean with SelectSwap blocking: uses forward-only Controlled Select
+    // with blocking + measurement-based Unlookup for reduced T-count.
+    ControlledQroamCleanRotation(angleData, Reversed(address), control, activeQubit, phaseGradient);
 
     if isShifted {
         AddConstant(1, Reversed(target));

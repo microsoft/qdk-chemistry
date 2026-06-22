@@ -24,30 +24,20 @@ _QS_FILES = [
 
 _MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
 
-_mps_context = None
-
 
 def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
+    """Returns the Q# namespace for chemistry operations (lazy-loaded).
+
+    Initializes the global Q# interpreter with the MPS project on first call,
+    then loads additional Q# utility files via eval.
+    """
     try:
         return qdk.code.QDKChemistry.Utils
     except AttributeError:
+        qsharp.init(project_root=_MPS_PROJECT_ROOT)
         code = "\n".join(f.read_text() for f in _QS_FILES)
         qsharp.eval(code)
         return qdk.code.QDKChemistry.Utils
-
-
-def _get_mps_context():
-    """Returns a cached Q# Context with the MPS project loaded."""
-    global _mps_context
-    if _mps_context is None:
-        _mps_context = qdk.Context(project_root=_MPS_PROJECT_ROOT)
-    return _mps_context
-
-
-def _get_mps_namespace():
-    """Returns the MPS Q# namespace (lazy-loaded via project_root)."""
-    return _get_mps_context().code.MPSSequential
 
 
 class _QSharpUtilsProxy:
@@ -63,7 +53,8 @@ class _QSharpUtilsProxy:
 
         """
         if name == "MPSSequential":
-            return _get_mps_namespace()
+            get_qsharp_utils()  # ensure initialized
+            return qdk.code.MPSSequential
         utils = get_qsharp_utils()
         return getattr(utils, name)
 

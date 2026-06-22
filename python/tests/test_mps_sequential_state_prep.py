@@ -9,11 +9,10 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 
 import numpy as np
 import pytest
-import qdk
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     MPSSequentialStatePreparation,
@@ -23,7 +22,7 @@ from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     generate_mps_preparation_data,
 )
 from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 
 class TestMPSWavefunction:
@@ -112,7 +111,7 @@ class TestDecomposition:
         a = q_mat[:dim, :]
         b = q_mat[dim:, :]
 
-        u_1, u_2, d_1, d_2, v = decompose_2d(a, b)
+        u_1, u_2, d_1, _d_2, v = decompose_2d(a, b)
 
         assert u_1.shape == (dim, dim)
         assert u_2.shape == (dim, dim)
@@ -198,14 +197,6 @@ class TestGenerateMPSPreparationData:
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
 
 
-@pytest.fixture
-def qsharp_ctx():
-    """Initialize a fresh Q# context with MPS Sequential operations loaded."""
-    from qdk_chemistry.utils.qsharp import _MPS_PROJECT_ROOT
-
-    return qdk.Context(project_root=_MPS_PROJECT_ROOT)
-
-
 class TestMPSSequentialFidelity:
     """Test that MPS Sequential state preparation produces high-fidelity states."""
 
@@ -218,14 +209,16 @@ class TestMPSSequentialFidelity:
             (5, 2, 42),
         ],
     )
-    def test_fidelity_vs_exact(self, qsharp_ctx, num_sites, bond_dim, seed):
+    def test_fidelity_vs_exact(self, num_sites, bond_dim, seed):
         """Test state preparation fidelity against the exact MPS state vector.
 
         Uses single-shot statevector simulation via DumpMachine() instead of
         statistical sampling (prohibitively slow due to the QROAM-based circuit
         allocating many internal ancillas per shot).
         """
-        ctx = qsharp_ctx
+        # Ensure MPS Q# project is loaded into the global interpreter
+        get_qsharp_utils()
+
         rng = np.random.default_rng(seed)
         mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
 
@@ -238,13 +231,13 @@ class TestMPSSequentialFidelity:
         num_state_qubits = 2 * num_sites
         num_ancilla_qubits = prep_data.ancilla_bits
 
-        qs_code = _build_mps_eval_code(params, num_state_qubits, num_ancilla_qubits)
-        ctx.eval(f"use state = Qubit[{num_state_qubits}];")
-        ctx.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
-        ctx.eval(qs_code)
-        dump = ctx.dump_machine()
+        qs_code = _build_mps_eval_code(params)
+        qsharp.eval(f"use state = Qubit[{num_state_qubits}];")
+        qsharp.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
+        qsharp.eval(qs_code)
+        dump = qsharp.dump_machine()
         amplitudes = np.array(dump.as_dense_state(), dtype=complex)
-        ctx.eval("ResetAll(state + ancilla);")
+        qsharp.eval("ResetAll(state + ancilla);")
 
         # Extract amplitudes where ancilla = |0⟩.
         # DumpMachine qubit ordering: state[0]...state[N-1], ancilla[0]...
@@ -266,9 +259,9 @@ class TestMPSSequentialFidelity:
         # Normalize the post-selected state
         state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
 
-        # Reindex: Q# uses little-endian within each 2-qubit site (via
-        # Reversed(initReg)), so DumpMachine's big-endian bits need to be
-        # reversed within each site to match the Python MPS convention.
+        # Reindex: the Q# circuit uses little-endian ordering within each
+        # 2-qubit site, so DumpMachine's big-endian bits need to be reversed
+        # within each site to match the Python MPS convention.
         site_bits = 2  # qubits per site
         reordered = np.zeros_like(state_amplitudes)
         for dm_idx in range(state_dim):
@@ -706,7 +699,7 @@ def _float_to_qsharp(x: float) -> str:
     return f"{x:.15f}"
 
 
-def _build_mps_eval_code(params: dict, num_state_qubits: int, num_ancilla_qubits: int) -> str:
+def _build_mps_eval_code(params: dict) -> str:
     """Build Q# eval code for MPSSequential from the params dict.
 
     Assumes `state` and `ancilla` qubit registers are already allocated in scope.
@@ -735,11 +728,7 @@ def _build_mps_eval_code(params: dict, num_state_qubits: int, num_ancilla_qubits
         "ancilla",
     ]
     args_str = ",\n                ".join(args)
-    return (
-        f"MPSSequential.MPSSequential(\n"
-        f"                {args_str}\n"
-        f"    )"
-    )
+    return f"MPSSequential.MPSSequential(\n                {args_str}\n    )"
 
 
 def _nested_list_to_qsharp_3d(data: list) -> str:
