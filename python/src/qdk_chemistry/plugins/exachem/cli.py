@@ -114,6 +114,7 @@ class DuccInputConfig:
     ducc_level: int = 2
     ccsd_threshold: float = 1e-6
     ccsd_maxiter: int = 100
+    cd_diagtol: float = 1e-5
     scf_type: str = "restricted"
     noscf: bool = False
     extra_cc_options: dict = field(default_factory=dict)
@@ -142,7 +143,7 @@ class DuccInputConfig:
                 **self.extra_scf_options,
             },
             "CD": {
-                "diagtol": 1e-5,
+                "diagtol": self.cd_diagtol,
             },
             "CC": {
                 "threshold": self.ccsd_threshold,
