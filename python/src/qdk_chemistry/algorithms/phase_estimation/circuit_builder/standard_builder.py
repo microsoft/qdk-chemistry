@@ -117,22 +117,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         ctrl_unitary_circuits = []
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            ctrl_unitary_circuits.append(self._create_controlled_circuit(hamiltonian, power=power))
-
-        # For SOSSA, extract the actual ancilla count from the mapper's output
-        # (the mapper computes register sizes that depend on the algorithm choice).
-        if not isinstance(hamiltonian, QubitHamiltonian) and ctrl_unitary_circuits:
-            factory = ctrl_unitary_circuits[0]._qsharp_factory  # noqa: SLF001
-            if factory is not None and factory.parameter is not None:
-                params = factory.parameter
-                if "numSystemQubits" in params:
-                    total = (
-                        params["numSystemQubits"]
-                        + params["numOuterQubits"]
-                        + params["numInnerQubits"]
-                        + 2  # spin register
-                    )
-                    num_be_ancillas = total - num_bare_system_qubits
+            circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(

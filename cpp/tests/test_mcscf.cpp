@@ -34,7 +34,7 @@ class TestMultiConfigurationScfSolver : public MultiConfigurationScf {
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
     Wavefunction::DeterminantVector dets{
-        Configuration::from_spin_half_string("20")};
+        Configuration::from_spin_half_string("2")};
     auto container =
         std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
     Wavefunction wfn(std::move(container));

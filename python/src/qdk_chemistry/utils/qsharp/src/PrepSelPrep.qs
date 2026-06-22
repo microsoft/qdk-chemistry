@@ -15,6 +15,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.Math.PI;
     import Std.Intrinsic.R;
 
+    /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
+    operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
+
     /// REFLECT oracle: reflection about the zero state on the ancilla register.
     ///
     /// Uses AND-ladder with measurement-based uncompute for n >= 2.

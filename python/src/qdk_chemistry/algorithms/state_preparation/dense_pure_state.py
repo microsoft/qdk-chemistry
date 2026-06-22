@@ -52,17 +52,23 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
+        config_set = wavefunction.get_configuration_set()
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
-        n_qubits = len(dets[0].to_bits())
-        statevector = np.zeros(2**n_qubits, dtype=float)
+        if np.iscomplexobj(coeffs):
+            if not np.allclose(coeffs.imag, 0.0):
+                raise ValueError("Dense state preparation requires real coefficients (imaginary part must be zero).")
+            coeffs = coeffs.real
+        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
+        n_qubits = n_bits
         if n_qubits > 32:
             raise ValueError("Dense state preparation is only supported for up to 32 qubits.")
+        statevector = np.zeros(2**n_qubits, dtype=float)
         for coeff, det in zip(coeffs, dets, strict=True):
-            bits = det.to_bits()
+            bits = det.to_bits(n_bits)
             idx = 0
-            for b in bits:
-                idx = (idx << 1) | b
+            for i, b in enumerate(bits):
+                idx |= b << i
             statevector[idx] += coeff
 
         row_map = list(range(n_qubits - 1, -1, -1))
