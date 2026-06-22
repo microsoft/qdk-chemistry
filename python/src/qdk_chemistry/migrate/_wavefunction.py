@@ -31,9 +31,27 @@ WAVEFUNCTION_VERSION = "0.2.0"
 CONTAINER_VERSION = "0.2.0"
 AMPLITUDE_CONTAINER_VERSION = "0.1.0"
 
-_STATE_VECTOR_TYPES = {"sd", "cas", "sci", "state_vector"}
-_AMPLITUDE_TYPES = {"mp2", "coupled_cluster", "cc", "amplitude"}
+_STATE_VECTOR_TYPES = {"sd", "cas", "sci"}
+_AMPLITUDE_TYPES = {"mp2", "coupled_cluster", "cc"}
+_LEGACY_CONTAINER_TYPES = _STATE_VECTOR_TYPES | _AMPLITUDE_TYPES
 _SPIN_HALF_CHARS = "0ud2"
+
+
+def assert_legacy(doc: dict) -> None:
+    """Raise if ``doc`` is not a migratable v1 Wavefunction JSON object.
+
+    The v1 containers (``sd``/``cas``/``sci``/``mp2``/``coupled_cluster``) were
+    flattened into ``state_vector``/``amplitude`` in v2; a v2 document is rejected
+    so it is not silently re-processed (which would drop v2-only fields).
+    """
+    container = doc.get("container", doc)
+    tag = container.get("container_type", container.get("type"))
+    if tag not in _LEGACY_CONTAINER_TYPES:
+        raise ValueError(
+            f"Wavefunction container type {tag!r} is not a migratable v1 container "
+            "(expected one of sd/cas/sci/mp2/coupled_cluster); the file may already be "
+            "in the current schema (state_vector/amplitude)."
+        )
 
 
 def from_json_doc(doc: dict) -> dict:
@@ -212,10 +230,27 @@ def _decode_configuration(packed, orbital_capacity: int, bits_per_mode: int) -> 
     return {"bits_per_mode": bits_per_mode, "configuration": occ}
 
 
+def _decode_configuration_dataset(dataset) -> dict:
+    """Decode a single packed v1 ``Configuration`` dataset using its stored attrs.
+
+    The v1 ``Configuration`` HDF5 dataset stores ``orbital_capacity`` (and, when
+    present, ``bits_per_mode``) as attributes; legacy files omit ``bits_per_mode``
+    and default to 2 (spin-1/2). Inferring the capacity from the packed byte count
+    would over-decode trailing orbitals when it is not a multiple of the modes per
+    byte, so the attributes are authoritative.
+    """
+    capacity = int(np.asarray(dataset.attrs["orbital_capacity"]).ravel()[0])
+    bits_per_mode = (
+        int(np.asarray(dataset.attrs["bits_per_mode"]).ravel()[0]) if "bits_per_mode" in dataset.attrs else 2
+    )
+    return _decode_configuration(dataset, capacity, bits_per_mode)
+
+
 def _decode_configurations(dataset) -> list:
     capacity = int(np.asarray(dataset.attrs["orbital_capacity"]).ravel()[0])
-    packed_size = int(np.asarray(dataset.attrs["packed_size"]).ravel()[0])
-    bits_per_mode = (packed_size * 8) // capacity
+    bits_per_mode = (
+        int(np.asarray(dataset.attrs["bits_per_mode"]).ravel()[0]) if "bits_per_mode" in dataset.attrs else 2
+    )
     return [_decode_configuration(row, capacity, bits_per_mode) for row in np.asarray(dataset)]
 
 
@@ -228,9 +263,7 @@ def _read_state_vector_hdf5(container_group: h5py.Group, tag: str) -> dict:
     }
     if tag == "sd":
         new["orbitals"] = _orbitals_to_new(container_group["orbitals"])
-        det = container_group["determinant"]["configuration"]
-        capacity = int(np.asarray(det).ravel().shape[0]) * 4
-        new["determinant"] = _decode_configuration(det, capacity, 2)
+        new["determinant"] = _decode_configuration_dataset(container_group["determinant"]["configuration"])
         return new
 
     config_set = container_group["configuration_set"]

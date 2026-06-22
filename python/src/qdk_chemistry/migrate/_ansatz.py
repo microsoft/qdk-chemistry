@@ -20,6 +20,20 @@ from . import _hamiltonian, _wavefunction
 ANSATZ_VERSION = "0.1.0"
 
 
+def assert_legacy(doc: dict) -> None:
+    """Raise if ``doc`` embeds a Hamiltonian or Wavefunction that is not v1.
+
+    The Ansatz envelope version is unchanged between v1 and v2; only the embedded
+    payloads carry the schema bump, so they are what is checked.
+    """
+    hamiltonian = doc.get("hamiltonian")
+    wavefunction = doc.get("wavefunction")
+    if hamiltonian:
+        _hamiltonian.assert_legacy(hamiltonian)
+    if wavefunction:
+        _wavefunction.assert_legacy(wavefunction)
+
+
 def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed v1 Ansatz JSON object into an old-doc."""
     hamiltonian = doc.get("hamiltonian")

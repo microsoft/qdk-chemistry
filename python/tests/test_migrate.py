@@ -21,6 +21,7 @@ import pytest
 
 from qdk_chemistry import migrate
 from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.migrate import _wavefunction
 
 RNG = np.random.default_rng(20240101)
 
@@ -596,3 +597,58 @@ def test_cas_restricted_rdm_only_alpha(tmp_path):
     assert np.allclose(np.asarray(aaaa).ravel(), t_aaaa)
     assert np.allclose(np.asarray(aabb).ravel(), t_aabb)
     assert np.allclose(np.asarray(bbbb).ravel(), t_aaaa)  # beta aliases alpha
+
+
+# --------------------------------------------------------------------------- #
+# Regression tests for PR review fixes: reject already-migrated inputs and read
+# the determinant orbital capacity / statistics from the stored HDF5 attributes.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("fixture", "type_token"),
+    [
+        ("h2_v1_0_0.orbitals.h5", "orbitals"),
+        ("h2_v1_0_0.hamiltonian.h5", "hamiltonian"),
+        ("h2_v1_0_0_cas_rdm.wavefunction.h5", "wavefunction"),
+        ("h2_v1_0_0.ansatz.h5", "ansatz"),
+    ],
+)
+def test_already_v2_input_raises(tmp_path, fixture, type_token):
+    v2_file = tmp_path / f"v2.{type_token}.json"
+    migrate.convert_file(_REAL_DATA / fixture, v2_file)
+    with pytest.raises(migrate.MigrationError):
+        migrate.convert_file(v2_file, tmp_path / f"again.{type_token}.json")
+
+
+def test_already_v2_wavefunction_does_not_drop_rdms(tmp_path):
+    # The v2 schema renamed the active-RDM fields; re-running the converter on a
+    # v2 file would silently drop them, so it must fail fast instead.
+    v2_file = tmp_path / "v2.wavefunction.json"
+    migrate.convert_file(_REAL_DATA / "h2_v1_0_0_cas_rdm.wavefunction.h5", v2_file)
+    assert "rdms" in json.loads(v2_file.read_text())["container"]
+    with pytest.raises(migrate.MigrationError, match="current schema"):
+        migrate.convert_file(v2_file, tmp_path / "again.wavefunction.json")
+
+
+def test_sd_determinant_capacity_read_from_attribute(tmp_path):
+    # "ud0000" (6 orbitals) packs into 2 bytes; inferring capacity as bytes * 4
+    # would over-decode to 8 modes. The orbital_capacity attribute is authoritative.
+    path = tmp_path / "det.h5"
+    with h5py.File(path, "w") as handle:
+        dataset = handle.create_dataset("configuration", data=np.array([0x09, 0x00], dtype=np.uint8))
+        dataset.attrs["orbital_capacity"] = 6
+    with h5py.File(path, "r") as handle:
+        decoded = _wavefunction._decode_configuration_dataset(handle["configuration"])
+    assert decoded["configuration"] == "ud0000"
+
+
+def test_sd_determinant_spinless_bits_per_mode(tmp_path):
+    # A spinless determinant stores bits_per_mode=1; the decoder must honor it.
+    path = tmp_path / "det.h5"
+    with h5py.File(path, "w") as handle:
+        dataset = handle.create_dataset("configuration", data=np.array([0b00000101], dtype=np.uint8))
+        dataset.attrs["orbital_capacity"] = 3
+        dataset.attrs["bits_per_mode"] = 1
+    with h5py.File(path, "r") as handle:
+        decoded = _wavefunction._decode_configuration_dataset(handle["configuration"])
+    assert decoded["bits_per_mode"] == 1
+    assert decoded["configuration"] == "101"

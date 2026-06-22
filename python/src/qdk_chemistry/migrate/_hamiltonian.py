@@ -27,6 +27,22 @@ CONTAINER_VERSION = "0.2.0"
 _FOUR_CENTER = "canonical_four_center"
 
 
+def assert_legacy(doc: dict) -> None:
+    """Raise if ``doc`` is not a migratable v1 Hamiltonian JSON object.
+
+    The Hamiltonian envelope version is unchanged between v1 and v2, so the
+    container's schema version is what distinguishes them.
+    """
+    container = doc.get("container")
+    if not isinstance(container, dict):
+        raise ValueError("Hamiltonian JSON has no 'container' object; cannot migrate.")
+    if _io.major_minor(container.get("version")) != (0, 1):
+        raise ValueError(
+            f"Hamiltonian container schema version {container.get('version')!r} is not the migratable "
+            "v1 schema (expected 0.1.x); the file may already be in the current schema."
+        )
+
+
 def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed v1 Hamiltonian JSON object into a container old-doc."""
     container = doc["container"]

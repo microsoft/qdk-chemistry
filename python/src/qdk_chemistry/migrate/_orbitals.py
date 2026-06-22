@@ -28,6 +28,15 @@ NEW_VERSION = "0.2.0"
 OLD_VERSION = "0.1.0"
 
 
+def assert_legacy(doc: dict) -> None:
+    """Raise if ``doc`` is not a migratable v1 Orbitals JSON object."""
+    if _io.major_minor(doc.get("version")) != (0, 1):
+        raise ValueError(
+            f"Orbitals schema version {doc.get('version')!r} is not the migratable v1 schema "
+            "(expected 0.1.x); the file may already be in the current schema."
+        )
+
+
 def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed v1 orbitals JSON object into the internal old-doc."""
     coeff = doc["coefficients"]

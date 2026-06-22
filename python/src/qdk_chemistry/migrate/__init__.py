@@ -103,6 +103,7 @@ def _read_old(module, data_type: str, src: Path, src_format: str):
     """Read a v1 file into a normalized old-doc for ``data_type``."""
     if src_format == "json":
         doc = json.loads(src.read_text(encoding="utf-8"))
+        module.assert_legacy(doc)
         return module.from_json_doc(doc)
 
     if data_type == "orbitals":

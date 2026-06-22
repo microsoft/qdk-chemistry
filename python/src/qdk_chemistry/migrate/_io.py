@@ -26,6 +26,15 @@ _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 _TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz")
 
 
+def major_minor(version) -> tuple[int, int]:
+    """Parse a ``"major.minor.patch"`` schema version string into ``(major, minor)``."""
+    parts = str(version).split(".")
+    try:
+        return int(parts[0]), int(parts[1])
+    except (IndexError, ValueError) as error:
+        raise ValueError(f"Missing or malformed schema version: {version!r}") from error
+
+
 def detect_format(path: Path) -> str:
     """Return ``"json"`` or ``"hdf5"`` for a path, based on its suffix."""
     suffix = path.suffix.lower()
@@ -106,7 +115,6 @@ def subgroup_to_json(group: h5py.Group, data_class, type_token: str) -> dict:
             dst.copy(group, type_token)
         obj = data_class.from_hdf5_file(str(h5_path))
         json_path = Path(tmp) / f"sub.{type_token}.json"
-        obj.to_json_file(str(json_path))
         obj.to_json_file(str(json_path))
         return json.loads(json_path.read_text(encoding="utf-8"))
 
