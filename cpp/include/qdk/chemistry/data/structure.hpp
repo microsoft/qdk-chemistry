@@ -301,6 +301,11 @@ class Structure : public DataClass,
 
   /**
    * @brief Load structure from XYZ format string
+   *
+   * Accepts either a standard XYZ string (atom-count + comment header followed
+   * by `symbol x y z` lines) or a bare coordinate block (atom lines only).
+   * Blank lines are ignored.
+   *
    * @param xyz_string XYZ format string with coordinates in Angstrom
    * @return Structure object created from XYZ string
    * @throws std::runtime_error if XYZ format is invalid

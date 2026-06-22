@@ -89,6 +89,50 @@ TEST_F(StructureBasicTest, XYZSerialization) {
   EXPECT_EQ(s2->get_atom_symbol(1), "H");
 }
 
+// Test XYZ parsing of a bare coordinate block (no atom-count/comment header)
+TEST_F(StructureBasicTest, XYZCoordinateBlock) {
+  // No header: just `symbol x y z` lines.
+  std::string block = "O 0.0 0.0 0.0\nH 0.0 0.0 0.96\nH 0.93 0.0 -0.26";
+
+  auto s = Structure::from_xyz(block);
+  EXPECT_EQ(s->get_num_atoms(), 3);
+  EXPECT_EQ(s->get_atom_symbol(0), "O");
+  EXPECT_EQ(s->get_atom_symbol(1), "H");
+  EXPECT_EQ(s->get_atom_symbol(2), "H");
+
+  // A single-atom block (which could be confused with a count line) is parsed
+  // correctly because the line has trailing coordinate tokens.
+  auto single = Structure::from_xyz("H 0.0 0.0 0.0");
+  EXPECT_EQ(single->get_num_atoms(), 1);
+  EXPECT_EQ(single->get_atom_symbol(0), "H");
+
+  // Blank lines are ignored, including leading and trailing ones.
+  auto padded = Structure::from_xyz("\n\nH 0.0 0.0 0.0\n\nH 0.0 0.0 0.74\n\n");
+  EXPECT_EQ(padded->get_num_atoms(), 2);
+}
+
+// Test that the declared atom count is validated when a header is present
+TEST_F(StructureBasicTest, XYZHeaderCountValidation) {
+  // Matching count parses successfully.
+  std::string ok = "2\nH2 molecule\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74";
+  auto s = Structure::from_xyz(ok);
+  EXPECT_EQ(s->get_num_atoms(), 2);
+
+  // Too few atom lines for the declared count.
+  std::string too_few = "3\nthree atoms\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74";
+  EXPECT_THROW(Structure::from_xyz(too_few), std::runtime_error);
+
+  // Too many atom lines for the declared count.
+  std::string too_many =
+      "1\none atom\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74\nH 0.0 0.0 1.48";
+  EXPECT_THROW(Structure::from_xyz(too_many), std::runtime_error);
+
+  // Header with blank padding still validates against the declared count.
+  std::string padded = "2\ncomment\n\nH 0.0 0.0 0.0\n\nH 0.0 0.0 0.74\n";
+  auto padded_structure = Structure::from_xyz(padded);
+  EXPECT_EQ(padded_structure->get_num_atoms(), 2);
+}
+
 // Test JSON serialization
 TEST_F(StructureBasicTest, JSONSerialization) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.74}};

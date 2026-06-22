@@ -570,54 +570,105 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
   std::istringstream iss(xyz_string);
   std::string line;
 
-  // Read number of atoms
-  if (!std::getline(iss, line)) {
-    throw std::runtime_error("Invalid XYZ format: missing number of atoms");
+  // A line is considered blank if it contains no non-whitespace characters.
+  auto is_blank = [](const std::string& s) {
+    return s.find_first_not_of(" \t\r\n\f\v") == std::string::npos;
+  };
+
+  // A line is a header (atom count) line if it parses fully as a single
+  // non-negative integer with no trailing tokens.
+  auto parse_count_line = [](const std::string& s, unsigned& count) {
+    std::istringstream ss(s);
+    long long value;
+    if (!(ss >> value) || value < 0) {
+      return false;
+    }
+    std::string extra;
+    if (ss >> extra) {
+      return false;  // additional tokens => not a pure count line
+    }
+    count = static_cast<unsigned>(value);
+    return true;
+  };
+
+  // Find the first non-blank line to determine the input format. This supports
+  // both the standard XYZ format (atom count + comment header) and a bare
+  // coordinate block (atom lines only).
+  std::string first_line;
+  bool have_first_line = false;
+  while (std::getline(iss, line)) {
+    if (!is_blank(line)) {
+      first_line = line;
+      have_first_line = true;
+      break;
+    }
+  }
+  if (!have_first_line) {
+    throw std::runtime_error("Invalid XYZ format: empty input");
   }
 
-  unsigned num_atoms;
-  try {
-    num_atoms = std::stoul(line);
-  } catch (const std::exception&) {
-    throw std::runtime_error(
-        "Invalid XYZ format: cannot parse number of atoms");
+  bool has_header = false;
+  unsigned expected_num_atoms = 0;
+  if (parse_count_line(first_line, expected_num_atoms)) {
+    has_header = true;
+    // The line immediately following the count is the comment line and is
+    // skipped regardless of its content.
+    if (!std::getline(iss, line)) {
+      throw std::runtime_error("Invalid XYZ format: missing comment line");
+    }
   }
 
-  // Skip comment line
-  if (!std::getline(iss, line)) {
-    throw std::runtime_error("Invalid XYZ format: missing comment line");
-  }
-
-  // Prepare data for construction
+  // Prepare data for construction.
   std::vector<Eigen::Vector3d> coordinates;
   std::vector<std::string> symbols;
-  coordinates.reserve(num_atoms);
-  symbols.reserve(num_atoms);
+  if (has_header) {
+    coordinates.reserve(expected_num_atoms);
+    symbols.reserve(expected_num_atoms);
+  }
 
-  // Read atom data (XYZ expected in Angstrom)
-  for (unsigned i = 0; i < num_atoms; ++i) {
-    if (!std::getline(iss, line)) {
-      throw std::runtime_error(
-          "Invalid XYZ format: missing atom data for atom " +
-          std::to_string(i));
-    }
+  // Reuse a single stream across lines to avoid per-line allocations.
+  std::istringstream line_stream;
 
-    std::istringstream line_stream(line);
+  // Parse a single atom line (XYZ expected in Angstrom) and append the result.
+  auto parse_atom_line = [&](const std::string& atom_line, size_t atom_index) {
+    line_stream.clear();
+    line_stream.str(atom_line);
+
     std::string symbol;
     double x, y, z;
-
     if (!(line_stream >> symbol >> x >> y >> z)) {
       throw std::runtime_error(
           "Invalid XYZ format: cannot parse atom data for atom " +
-          std::to_string(i));
+          std::to_string(atom_index));
     }
 
     Eigen::Vector3d coords_ang(x, y, z);
-    Eigen::Vector3d coords_bohr =
-        coords_ang * qdk::chemistry::constants::angstrom_to_bohr;
-
-    coordinates.push_back(coords_bohr);
+    coordinates.push_back(coords_ang *
+                          qdk::chemistry::constants::angstrom_to_bohr);
     symbols.push_back(symbol);
+  };
+
+  size_t atom_index = 0;
+  // When there is no header, the first non-blank line is already an atom line.
+  if (!has_header) {
+    parse_atom_line(first_line, atom_index++);
+  }
+
+  // Read the remaining atom lines, skipping any blank lines.
+  while (std::getline(iss, line)) {
+    if (is_blank(line)) {
+      continue;
+    }
+    parse_atom_line(line, atom_index++);
+  }
+
+  // When a header is present, validate that the declared atom count matches the
+  // number of parsed atom lines.
+  if (has_header && symbols.size() != expected_num_atoms) {
+    throw std::runtime_error("Invalid XYZ format: declared atom count (" +
+                             std::to_string(expected_num_atoms) +
+                             ") does not match number of atom lines (" +
+                             std::to_string(symbols.size()) + ")");
   }
 
   return std::make_shared<Structure>(coordinates, symbols);

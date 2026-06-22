@@ -585,6 +585,17 @@ Examples:
                        R"(
 Load structure from XYZ format string (static method).
 
+Accepts two input layouts:
+
+* Standard XYZ: an atom-count line followed by a comment line, then one
+  ``symbol x y z`` line per atom. When this header is present, the declared
+  atom count must match the number of atom lines.
+* Bare coordinate block: ``symbol x y z`` lines only, with no leading
+  atom-count and comment lines.
+
+The format is detected automatically based on whether the first non-blank
+line parses as a single non-negative integer. Blank lines are ignored.
+
 Args:
     xyz_string (str): XYZ format string with coordinates in Angstrom
 
@@ -601,6 +612,11 @@ Examples:
     ... H  0.757000  0.586000  0.000000
     ... H -0.757000  0.586000  0.000000'''
     >>> water = Structure.from_xyz(xyz_str)
+    >>> # A bare coordinate block (no header) is also accepted
+    >>> block = '''O  0.000000  0.000000  0.000000
+    ... H  0.757000  0.586000  0.000000
+    ... H -0.757000  0.586000  0.000000'''
+    >>> water = Structure.from_xyz(block)
 )",
                        py::arg("xyz_string"));
 

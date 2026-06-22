@@ -125,6 +125,39 @@ class TestStructure:
                 atol=xyz_file_structure_tolerance,
             )
 
+    def test_xyz_coordinate_block(self):
+        """Test parsing a bare coordinate block without an XYZ header."""
+        block = "O 0.0 0.0 0.0\nH 0.0 0.0 0.96\nH 0.93 0.0 -0.26"
+        structure = Structure.from_xyz(block)
+        assert structure.get_num_atoms() == 3
+        assert structure.get_atom_symbol(0) == "O"
+        assert structure.get_atom_symbol(1) == "H"
+        assert structure.get_atom_symbol(2) == "H"
+
+        # Single-atom block is parsed as coordinates, not as a count line.
+        single = Structure.from_xyz("H 0.0 0.0 0.0")
+        assert single.get_num_atoms() == 1
+        assert single.get_atom_symbol(0) == "H"
+
+        # Blank lines are ignored.
+        padded = Structure.from_xyz("\n\nH 0.0 0.0 0.0\n\nH 0.0 0.0 0.74\n\n")
+        assert padded.get_num_atoms() == 2
+
+    def test_xyz_header_count_validation(self):
+        """Test that the declared atom count is validated when a header is present."""
+        # Matching count parses successfully.
+        ok = "2\nH2 molecule\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74"
+        structure = Structure.from_xyz(ok)
+        assert structure.get_num_atoms() == 2
+
+        # Too few atom lines for the declared count.
+        with pytest.raises(RuntimeError):
+            Structure.from_xyz("3\nthree atoms\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74")
+
+        # Too many atom lines for the declared count.
+        with pytest.raises(RuntimeError):
+            Structure.from_xyz("1\none atom\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74")
+
     def test_xyz_file_io(self):
         """Test XYZ file I/O."""
         coordinates = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
