@@ -394,16 +394,31 @@ class SOSSAMapper(ControlledCircuitMapper):
         num_orbitals = unitary_container.select.num_orbitals
         num_system_qubits = 2 * num_orbitals
         x_o_dim = num_orbitals + unitary_container.select.num_ranks * unitary_container.select.num_copies
-        num_outer_qubits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
+        xo_bits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
         num_bases = unitary_container.select.num_bases
         b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
         R = unitary_container.select.num_ranks
         rank_bits = ceil(log2(R)) if R > 1 else 0
         num_free_rider_bits = 2 + rank_bits  # isSF(1) + dvsq(1) + rank bits
-        num_inner_qubits = b_bits + num_free_rider_bits
+
+        # Outer register: alias sampling needs index + uniform + flag + qromOutput
+        if self.outer_prepare_mapper.needs_alias_reflection:
+            mu_outer = self.outer_prepare_mapper.coefficient_bit_precision
+            num_outer_qubits = 2 * xo_bits + 2 * mu_outer + 1
+        else:
+            num_outer_qubits = xo_bits
+
+        # Inner register: controlled alias sampling needs index + uniform + flag + qromOutput + freeRider
+        if self.inner_prepare_mapper.needs_alias_reflection:
+            mu_inner = self.inner_prepare_mapper.coefficient_bit_precision
+            num_inner_qubits = 2 * b_bits + 2 * mu_inner + 3 + num_free_rider_bits
+            # Reflection covers indexReg + uniformReg + flagQubit (excl. qromOut + freeRider)
+            num_reflect_inner = b_bits + mu_inner + 1
+        else:
+            num_inner_qubits = b_bits + num_free_rider_bits
+            num_reflect_inner = b_bits
 
         # 3. Compose into the walk step via Q#.
-        # Only include the 7 parameters that match MakeControlledSOSSAWalkCircuit's signature.
         walk_params = {
             "outerPrepareOp": outer_prepare_op,
             "innerPrepareOp": inner_prepare_op,
@@ -411,6 +426,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numSystemQubits": num_system_qubits,
             "numOuterQubits": num_outer_qubits,
             "numInnerQubits": num_inner_qubits,
+            "numReflectInner": num_reflect_inner,
             "power": power,
         }
 
@@ -425,7 +441,75 @@ class SOSSAMapper(ControlledCircuitMapper):
             num_system_qubits,
             num_outer_qubits,
             num_inner_qubits,
+            num_reflect_inner,
             power,
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    def build_estimate_circuit(
+        self,
+        container: "SOSSAContainer",
+        num_queries: int,
+    ) -> "Circuit":
+        """Build a resource-estimation circuit using RepeatEstimates.
+
+        Instead of tracing through each walk step individually (expensive
+        for large query counts), this evaluates a single controlled walk step
+        and multiplies the cost by ``num_queries`` via ``RepeatEstimates``.
+
+        Args:
+            container: The SOSSA container with decomposition data.
+            num_queries: Total number of walk operator queries
+                (e.g. ceil(pi * lambda / (2 * sigma)) for Heisenberg-limited QPE).
+
+        Returns:
+            Circuit with a ``qsharp_factory`` targeting
+            ``EstimateSOSSAWalkCircuit``.
+
+        """
+        outer_prepare_op = self.outer_prepare_mapper.build_op(container)
+        inner_prepare_op = self.inner_prepare_mapper.build_op(container)
+        select_op = self.select_mapper.build_op(container)
+
+        num_orbitals = container.select.num_orbitals
+        num_system_qubits = 2 * num_orbitals
+        x_o_dim = num_orbitals + container.select.num_ranks * container.select.num_copies
+        xo_bits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
+        num_bases = container.select.num_bases
+        b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
+        R = container.select.num_ranks
+        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_free_rider_bits = 2 + rank_bits
+
+        if self.outer_prepare_mapper.needs_alias_reflection:
+            mu_outer = self.outer_prepare_mapper.coefficient_bit_precision
+            num_outer_qubits = 2 * xo_bits + 2 * mu_outer + 1
+        else:
+            num_outer_qubits = xo_bits
+
+        if self.inner_prepare_mapper.needs_alias_reflection:
+            mu_inner = self.inner_prepare_mapper.coefficient_bit_precision
+            num_inner_qubits = 2 * b_bits + 2 * mu_inner + 3 + num_free_rider_bits
+            num_reflect_inner = b_bits + mu_inner + 1
+        else:
+            num_inner_qubits = b_bits + num_free_rider_bits
+            num_reflect_inner = b_bits
+
+        estimate_params = {
+            "outerPrepareOp": outer_prepare_op,
+            "innerPrepareOp": inner_prepare_op,
+            "selectOp": select_op,
+            "numSystemQubits": num_system_qubits,
+            "numOuterQubits": num_outer_qubits,
+            "numInnerQubits": num_inner_qubits,
+            "numReflectInner": num_reflect_inner,
+            "numQueries": num_queries,
+        }
+
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.SOSSAWalk.EstimateSOSSAWalkCircuit,
+                parameter=estimate_params,
+            )
+        )

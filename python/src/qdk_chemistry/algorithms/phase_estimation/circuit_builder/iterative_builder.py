@@ -173,6 +173,19 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         ctrl_unitary_circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
 
+        # Update ancilla count from mapper output when available (alias sampling needs more qubits)
+        factory = ctrl_unitary_circuit._qsharp_factory  # noqa: SLF001
+        if factory is not None and factory.parameter is not None:
+            params = factory.parameter
+            if "numSystemQubits" in params:
+                total = (
+                    params["numSystemQubits"]
+                    + params["numOuterQubits"]
+                    + params["numInnerQubits"]
+                    + 2  # spin register
+                )
+                num_ancilla_qubits = total - num_system_qubits
+
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
                 state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits, num_ancilla_qubits
