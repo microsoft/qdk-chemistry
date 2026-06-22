@@ -47,21 +47,6 @@ class QsharpFactoryData:
     parameter: dict[str, Any]
     """The parameter to be passed to the Q# Callable when creating the circuit."""
 
-    context: Any = None
-    """Optional Q# context (qdk.Context) associated with the program."""
-
-
-class _LogicalCountsResult:
-    """Lightweight wrapper around logical counts dict to match EstimatorResult interface."""
-
-    def __init__(self, counts: dict[str, Any]):
-        self._counts = counts
-
-    @property
-    def logical_counts(self) -> dict[str, Any]:
-        """Return the logical counts dictionary."""
-        return self._counts
-
 
 class Circuit(DataClass):
     """Data class for a quantum circuit."""
@@ -233,10 +218,6 @@ class Circuit(DataClass):
 
         """
         if self._qsharp_factory is not None:
-            if self._qsharp_factory.estimate_expr is not None and self._qsharp_factory.context is not None:
-                ctx = self._qsharp_factory.context
-                counts = ctx.logical_counts(self._qsharp_factory.estimate_expr)
-                return _LogicalCountsResult(dict(counts))
             return qsharp.estimate(
                 self._qsharp_factory.program,
                 params,

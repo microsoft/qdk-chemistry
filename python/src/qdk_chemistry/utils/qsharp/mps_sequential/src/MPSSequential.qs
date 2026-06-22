@@ -7,13 +7,14 @@ import Std.Arrays.*;
 import Std.Canon.*;
 import Std.Diagnostics.*;
 import Std.ResourceEstimation.*;
-import Std.TableLookup.Select;
+import QDKChemistry.Utils.SelectSwap.ControlledQroamCleanRotation;
+import QDKChemistry.Utils.SelectSwap.QroamCleanRotation;
 import PhaseGradient.RyViaPhaseGradient;
 import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, SiteUnitary, ApplyUCR, ApplyControlledUCR;
+export MPSSequential, MakeMPSSequentialCircuit, SiteUnitary, ApplyUCR, ApplyControlledUCR;
 
 // =============================================================================
 // Helper operations for the decomposition
@@ -173,11 +174,8 @@ operation SiteUnitary(
     ApplyRealUnitaryViaGivens(vData, vLayerShifted, vPhaseData, Reversed(ancilla), phaseGradient, angleReg);
 
     // Step 2: UCR Ry on q0, addressed by ancilla
-    within {
-        Select(rot0Data, ancilla, angleReg);
-    } apply {
-        RyViaPhaseGradient(q0, angleReg, phaseGradient);
-    }
+    // QROAMClean: forward-only Select+Swap + Ry + Unlookup
+    QroamCleanRotation(rot0Data, ancilla, q0, phaseGradient);
 
     // Step 3: CNOT(q1, q0)
     CNOT(q1, q0);
@@ -194,11 +192,8 @@ operation SiteUnitary(
     );
 
     // Step 5: Controlled UCR on q1, ctrl by q0
-    within {
-        Controlled Select([q0], (rot1Data, ancilla, angleReg));
-    } apply {
-        RyViaPhaseGradient(q1, angleReg, phaseGradient);
-    }
+    // QROAMClean with SelectSwap blocking for reduced T-count.
+    ControlledQroamCleanRotation(rot1Data, ancilla, q0, q1, phaseGradient);
 
     // Step 6: CNOT(q1, q0) — undo
     CNOT(q1, q0);
@@ -215,11 +210,8 @@ operation SiteUnitary(
     );
 
     // Step 8: Controlled UCR on q0, ctrl by q1
-    within {
-        Controlled Select([q1], (rot2Data, ancilla, angleReg));
-    } apply {
-        RyViaPhaseGradient(q0, angleReg, phaseGradient);
-    }
+    // QROAMClean with SelectSwap blocking for reduced T-count.
+    ControlledQroamCleanRotation(rot2Data, ancilla, q1, q0, phaseGradient);
 
     // Step 9: Multiplexed U on ancilla, selected by (q0, q1)
     // Joint register = [q1, q0] + Reversed(ancilla) so block index = q1*2+q0 (MSB)
@@ -329,6 +321,128 @@ operation MPSSequential(
                 siteULayerAngles[siteIdx],
                 siteULayerShifted[siteIdx],
                 siteUPhases[siteIdx],
+                newSite,
+                ancilla,
+                phaseGradient,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
+    }
+
+    // Undo phase gradient state
+    Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+/// Circuit wrapper for resource estimation — allocates qubits internally.
+operation MakeMPSSequentialCircuit(
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteVLayerAngles : Double[][][],
+    siteVLayerShifted : Bool[][],
+    siteVPhases : Bool[][],
+    siteRot0Angles : Double[][],
+    siteRot1Angles : Double[][],
+    siteRot2Angles : Double[][],
+    siteW0LayerAngles : Double[][][],
+    siteW0LayerShifted : Bool[][],
+    siteW0Phases : Bool[][],
+    siteW1LayerAngles : Double[][][],
+    siteW1LayerShifted : Bool[][],
+    siteW1Phases : Bool[][],
+    siteULayerAngles : Double[][][],
+    siteULayerShifted : Bool[][],
+    siteUPhases : Bool[][]
+) : Unit {
+    use state = Qubit[2 * numSites];
+    use ancilla = Qubit[numAncillaQubits];
+    MPSSequential(
+        initialStateVec,
+        numSites,
+        rotationBits,
+        siteVLayerAngles,
+        siteVLayerShifted,
+        siteVPhases,
+        siteRot0Angles,
+        siteRot1Angles,
+        siteRot2Angles,
+        siteW0LayerAngles,
+        siteW0LayerShifted,
+        siteW0Phases,
+        siteW1LayerAngles,
+        siteW1LayerShifted,
+        siteW1Phases,
+        siteULayerAngles,
+        siteULayerShifted,
+        siteUPhases,
+        state,
+        ancilla
+    );
+}
+
+/// Circuit wrapper for fast resource estimation — accepts only a single site's data.
+///
+/// When all sites use the same decomposition (uniform bond dimension), this avoids
+/// passing N-1 copies of identical angle arrays. The Q# resource estimator caches
+/// the first SiteUnitary call and reuses it for all subsequent sites.
+operation MakeMPSSequentialCircuitUniform(
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    vLayerAngles : Double[][],
+    vLayerShifted : Bool[],
+    vPhases : Bool[],
+    rot0Angles : Double[],
+    rot1Angles : Double[],
+    rot2Angles : Double[],
+    w0LayerAngles : Double[][],
+    w0LayerShifted : Bool[],
+    w0Phases : Bool[],
+    w1LayerAngles : Double[][],
+    w1LayerShifted : Bool[],
+    w1Phases : Bool[],
+    uLayerAngles : Double[][],
+    uLayerShifted : Bool[],
+    uPhases : Bool[]
+) : Unit {
+    use state = Qubit[2 * numSites];
+    use ancilla = Qubit[numAncillaQubits];
+
+    // Initialize phase gradient register
+    use phaseGradient = Qubit[rotationBits];
+    PreparePhaseGradientState(phaseGradient);
+
+    // Single shared angle register for QROM-loaded angles (reused by all operations)
+    use angleReg = Qubit[rotationBits];
+
+    // Prepare initial state
+    let initReg = ancilla + state[0..1];
+    QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
+
+    // Apply site unitaries — all sites use the same single set of angles.
+    // BeginEstimateCaching ensures the first site is analyzed and the rest are cached.
+    for siteIdx in 0..numSites - 2 {
+        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        if BeginEstimateCaching("SiteUnitary", SingleVariant()) {
+            SiteUnitary(
+                vLayerAngles,
+                vLayerShifted,
+                vPhases,
+                rot0Angles,
+                rot1Angles,
+                rot2Angles,
+                w0LayerAngles,
+                w0LayerShifted,
+                w0Phases,
+                w1LayerAngles,
+                w1LayerShifted,
+                w1Phases,
+                uLayerAngles,
+                uLayerShifted,
+                uPhases,
                 newSite,
                 ancilla,
                 phaseGradient,
