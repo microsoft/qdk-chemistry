@@ -577,9 +577,9 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
 
   // A line is a header (atom count) line if it parses fully as a single
   // non-negative integer with no trailing tokens.
-  auto parse_count_line = [](const std::string& s, unsigned& count) {
+  auto parse_count_line = [](const std::string& s, size_t& count) {
     std::istringstream ss(s);
-    unsigned value;
+    size_t value;
     if (!(ss >> value)) {
       return false;
     }
