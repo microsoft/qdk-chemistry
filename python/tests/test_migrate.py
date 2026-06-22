@@ -479,7 +479,7 @@ def _spot_ref():
 def test_real_orbitals_with_basis_set(tmp_path, out_fmt):
     ref = _spot_ref()["orbitals"]
     dst = tmp_path / f"h2.orbitals.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2.orbitals.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_0_0.orbitals.h5", dst)
     orb = Orbitals.from_file(str(dst), out_fmt)
     assert orb.has_basis_set()
     assert orb.get_num_molecular_orbitals() == ref["nmo"]
@@ -492,7 +492,7 @@ def test_real_orbitals_with_basis_set(tmp_path, out_fmt):
 def test_real_hamiltonian(tmp_path, out_fmt):
     ref = _spot_ref()["hamiltonian"]
     dst = tmp_path / f"h2.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2.hamiltonian.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_0_0.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "canonical_four_center"
     assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
@@ -508,7 +508,7 @@ def test_real_cholesky_to_four_center(tmp_path, out_fmt):
     # MO three-center vectors), so it migrates to a four-center container.
     ref = _spot_ref()["cholesky"]
     dst = tmp_path / f"chol.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2_chol.hamiltonian.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_1_0_chol.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "canonical_four_center"
     assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
@@ -521,7 +521,7 @@ def test_real_cholesky_to_four_center(tmp_path, out_fmt):
 def test_real_sparse(tmp_path, out_fmt):
     ref = _spot_ref()["sparse"]
     dst = tmp_path / f"sparse.hamiltonian.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2_sparse.hamiltonian.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_1_0_sparse.hamiltonian.h5", dst)
     ham = Hamiltonian.from_file(str(dst), out_fmt)
     assert ham.get_container_type() == "sparse"
     assert abs(ham.get_core_energy() - ref["core"]) < 1e-9
@@ -537,7 +537,7 @@ def test_real_sparse(tmp_path, out_fmt):
 def test_real_cas_wavefunction_rdms(tmp_path, out_fmt):
     ref = _spot_ref()["cas_rdm"]
     dst = tmp_path / f"h2_cas.wavefunction.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2_cas_rdm.wavefunction.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_0_0_cas_rdm.wavefunction.h5", dst)
     wf = Wavefunction.from_file(str(dst), out_fmt)
     assert wf.get_container_type() == "state_vector"
     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
@@ -556,7 +556,7 @@ def test_real_ansatz(tmp_path, out_fmt):
     # Ansatz embeds a Hamiltonian and a Wavefunction; both must be migrated.
     ref = _spot_ref()["ansatz"]
     dst = tmp_path / f"h2.ansatz.{'json' if out_fmt == 'json' else 'h5'}"
-    migrate.convert_file(_REAL_DATA / "h2.ansatz.h5", dst)
+    migrate.convert_file(_REAL_DATA / "h2_v1_0_0.ansatz.h5", dst)
     ansatz = Ansatz.from_file(str(dst), out_fmt)
     assert ansatz.get_wavefunction().get_container_type() == ref["wfn_container"]
     one_body = np.asarray(ansatz.get_hamiltonian().get_one_body_integrals()[0])
