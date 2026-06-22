@@ -109,11 +109,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         else:
             # FactorizedHamiltonianContainer (SOSSA): bare system = 2*N spin-orbitals
             num_bare_system_qubits = 2 * hamiltonian.get_num_orbitals()
-            # Total walk operator qubits from unitary representation
-            probe_builder = self._create_nested("unitary_builder")
-            probe_builder.settings().update("power", 1)
-            probe_rep = probe_builder.run(hamiltonian)
-            num_be_ancillas = probe_rep.get_num_qubits() - num_bare_system_qubits
+            num_be_ancillas = 0  # will be updated after building circuits
 
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").
@@ -122,6 +118,21 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
             ctrl_unitary_circuits.append(self._create_controlled_circuit(hamiltonian, power=power))
+
+        # For SOSSA, extract the actual ancilla count from the mapper's output
+        # (the mapper computes register sizes that depend on the algorithm choice).
+        if not isinstance(hamiltonian, QubitHamiltonian) and ctrl_unitary_circuits:
+            factory = ctrl_unitary_circuits[0]._qsharp_factory  # noqa: SLF001
+            if factory is not None and factory.parameter is not None:
+                params = factory.parameter
+                if "numSystemQubits" in params:
+                    total = (
+                        params["numSystemQubits"]
+                        + params["numOuterQubits"]
+                        + params["numInnerQubits"]
+                        + 2  # spin register
+                    )
+                    num_be_ancillas = total - num_bare_system_qubits
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
