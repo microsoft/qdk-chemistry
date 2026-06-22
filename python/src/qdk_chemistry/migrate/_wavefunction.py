@@ -281,8 +281,9 @@ def _read_state_vector_hdf5(container_group: h5py.Group, tag: str) -> dict:
 def _read_rdms_hdf5(group: h5py.Group) -> dict:
     rdms: dict = {}
     for name in ("one_rdm_spin_traced", "one_rdm_aa", "one_rdm_bb"):
-        if name in group:
-            rdms[name] = _io.read_matrix(group, name).tolist()
+        matrix = _io.read_matrix(group, name)
+        if matrix is not None:
+            rdms[name] = matrix.tolist()
     for name in ("two_rdm_spin_traced", "two_rdm_aaaa", "two_rdm_aabb", "two_rdm_bbbb"):
         if name in group:
             rdms[name] = _read_real_vector(group, name)
