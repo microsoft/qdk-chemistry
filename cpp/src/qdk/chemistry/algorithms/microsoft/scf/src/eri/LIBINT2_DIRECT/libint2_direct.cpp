@@ -856,7 +856,7 @@ QDK_OMP_ATOMIC_UPDATE_RELAXED
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),
 // then cut half due to s12_34_deg
 #ifdef _OPENMP
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
 #endif
     for (size_t i = 0; i < num_atomic_orbitals; ++i)
       for (size_t j = 0; j <= i; ++j) {
