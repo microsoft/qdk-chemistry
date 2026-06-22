@@ -391,7 +391,9 @@ def create_random_wavefunction(
 
     mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}
     configs = [
-        Configuration("".join(mapping[int(row[i]), int(row[n_orbitals + i])] for i in range(n_orbitals)))
+        Configuration.from_spin_half_string(
+            "".join(mapping[int(row[i]), int(row[n_orbitals + i])] for i in range(n_orbitals))
+        )
         for row in det_matrix
     ]
 
