@@ -9,9 +9,6 @@ from .base import ControlledCircuitMapperFactory
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .prep_sel_prep_mapper import PrepSelPrepMapper, PrepSelPrepSettings
 from .sossa_mapper import (
-    InnerPrepareMapper,
-    OuterPrepareMapper,
-    SelectMapper,
     SOSSAMapper,
     SOSSAMapperSettings,
 )
@@ -19,11 +16,8 @@ from .sossa_mapper import (
 __all__ = [
     "ControlledCircuitMapperFactory",
     "ControlledPauliSequenceMapper",
-    "InnerPrepareMapper",
-    "OuterPrepareMapper",
     "PrepSelPrepMapper",
     "PrepSelPrepSettings",
     "SOSSAMapper",
     "SOSSAMapperSettings",
-    "SelectMapper",
 ]

@@ -16,6 +16,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `ancillas`: An array of indices representing the phase ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits (state prep target).
     /// - `numBlockEncodingAncillas`: Number of extra ancillas needed by block encoding (0 for LCU/Trotter).
+    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas (e.g., phase gradient state).
+    ///   Called once before the walk steps; adjoint is applied after measurements. No-op when not needed.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         controlledEvolutions : ((Qubit, Qubit[]) => Unit)[],
@@ -24,6 +26,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         ancillas : Int[],
         systems : Int[],
         numBlockEncodingAncillas : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -47,6 +50,9 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
         // Step 1: Prepare the initial state on system qubits only
         params.statePrep(systems);
+
+        // Step 1.5: Prepare persistent block-encoding ancillas (e.g., phase gradient)
+        params.ancillaPrep(beAncillas);
 
         // Step 2: Prepare phase (ancilla) qubits
         params.phaseQubitPrep(phaseAncillas);
@@ -80,6 +86,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `systems`: An array of indices for the system qubits (state prep target).
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// - `numBlockEncodingAncillas`: Number of extra ancillas for block encoding (0 for LCU/Trotter).
+    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas.
     /// # Returns
     /// The measurement results of the phase ancilla qubits.
     operation MakeStandardQPECircuit(
@@ -90,6 +97,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit,
         numBlockEncodingAncillas : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
     ) : Result[] {
         return RunStandardQPE(new StandardPhaseEstimationParams {
             statePrep = statePrep,
@@ -99,6 +107,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             ancillas = ancillas,
             systems = systems,
             numBlockEncodingAncillas = numBlockEncodingAncillas,
+            ancillaPrep = ancillaPrep,
         });
     }
 }

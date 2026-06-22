@@ -14,6 +14,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.Core.Length;
     import Std.Math.PI;
     import Std.Intrinsic.R;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -180,7 +183,10 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
-                Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                if BeginEstimateCaching("Controlled_PrepSelPrepOp", SingleVariant()) {
+                    Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                    EndEstimateCaching();
+                }
             }
         }
     }
@@ -201,7 +207,10 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
-                Controlled QuantumWalkStep([control], (prepareOp, selectOp, systems, ancilla));
+                if BeginEstimateCaching("Controlled_QuantumWalkOp", SingleVariant()) {
+                    Controlled QuantumWalkStep([control], (prepareOp, selectOp, systems, ancilla));
+                    EndEstimateCaching();
+                }
             }
         }
     }

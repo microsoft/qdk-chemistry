@@ -13,7 +13,7 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 
 from typing import Any
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -70,9 +70,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | Any = None,
-        *,
-        factorized_hamiltonian: Any = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -81,9 +79,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
-            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
-                Mutually exclusive with qubit_hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to build the circuit.
 
         Returns:
             A single-element list containing the standard QPE circuit.
@@ -92,10 +89,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             ValueError: If ``num_bits`` is not a positive integer.
 
         """
-        hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
-        if hamiltonian is None:
-            raise ValueError("Either qubit_hamiltonian or factorized_hamiltonian must be provided.")
-
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
@@ -103,26 +96,34 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # Determine system and block-encoding ancilla qubit counts.
         # - num_bare_system_qubits: qubits where state_prep is applied
         # - num_be_ancillas: extra ancillas needed by block encoding (0 for LCU/Trotter)
-        if isinstance(hamiltonian, QubitHamiltonian):
-            num_bare_system_qubits = hamiltonian.num_qubits
+        if isinstance(qubit_hamiltonian, QubitHamiltonian):
+            num_bare_system_qubits = qubit_hamiltonian.num_qubits
             num_be_ancillas = 0
         else:
             # FactorizedHamiltonianContainer (SOSSA): bare system = 2*N spin-orbitals
-            num_bare_system_qubits = 2 * hamiltonian.get_num_orbitals()
+            num_bare_system_qubits = 2 * qubit_hamiltonian.get_num_orbitals()
             num_be_ancillas = 0  # will be updated after building circuits
 
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
+        ancilla_prep_op = QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            circuit, num_anc, prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
             ctrl_unitary_circuits.append(circuit)
+            num_be_ancillas = max(num_be_ancillas, num_anc)
+            ancilla_prep_op = prep_op
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuits, num_bits, num_bare_system_qubits, num_be_ancillas
+                state_preparation,
+                ctrl_unitary_circuits,
+                num_bits,
+                num_bare_system_qubits,
+                num_be_ancillas,
+                ancilla_prep_op,
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
@@ -139,6 +140,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits: int,
         num_system_qubits: int,
         num_be_ancillas: int = 0,
+        ancilla_prep_op: Any = None,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
@@ -157,6 +159,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        if ancilla_prep_op is None:
+            ancilla_prep_op = QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
@@ -167,6 +171,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
             "numBlockEncodingAncillas": num_be_ancillas,
+            "ancillaPrep": ancilla_prep_op,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

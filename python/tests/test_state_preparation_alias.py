@@ -14,6 +14,7 @@ import qdk
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
+from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
@@ -63,6 +64,21 @@ def _compute_marginal_probs(
     return probs
 
 
+def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
+    """Create a Wavefunction from a list of amplitudes."""
+    num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
+    coeffs_list: list[float] = []
+    dets: list[Configuration] = []
+    for idx, amp in enumerate(amplitudes):
+        if amp != 0.0:
+            bitstring = format(idx, f"0{num_qubits}b")
+            dets.append(Configuration.from_bitstring(bitstring))
+            coeffs_list.append(float(amp))
+    orbitals = ModelOrbitals(num_qubits)
+    container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
+    return Wavefunction(container)
+
+
 class TestAliasSamplingStatePreparation:
     """Tests for the alias sampling state preparation algorithm."""
 
@@ -86,15 +102,11 @@ class TestAliasSamplingStatePreparation:
         prep = registry.create("state_prep", "alias_sampling")
         assert isinstance(prep, AliasSamplingStatePreparation)
 
-    def test_prepare_from_statevector_returns_circuit(self):
-        """Test that prepare_from_statevector returns a Circuit with ops set."""
+    def test_run_returns_circuit(self):
+        """Test that run() returns a Circuit with ops set."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
-        statevector = np.array([0.5, 0.3, 0.7, 0.1])
-        circuit = prep.prepare_from_statevector(
-            statevector=statevector,
-            num_qubits=2,
-            qubit_indices=[0, 1],
-        )
+        wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
+        circuit = prep.run(wf)
         assert circuit is not None
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None

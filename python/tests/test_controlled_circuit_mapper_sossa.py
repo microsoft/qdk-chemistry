@@ -12,14 +12,9 @@ import numpy as np
 import pytest
 from qdk import qsharp
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import (
-    InnerPrepareMapper,
-    OuterPrepareMapper,
-    SelectMapper,
-    SOSSAMapper,
-)
+from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
@@ -27,6 +22,13 @@ from .test_helpers import create_test_orbitals
 
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
+
+# Short name → registry name for outer_prepare AlgorithmRef
+_OUTER_PREP_MAP = {
+    "alias_sampling": "alias_sampling",
+    "dense_pure": "dense_pure_state",
+    "qrom": "qrom_state_prep",
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
@@ -97,51 +99,57 @@ def _build_controlled_unitary(
     return ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
 
+def _make_sossa_mapper(
+    outer_algorithm: str = "alias_sampling",
+    inner_algorithm: str = "controlled_alias_sampling",
+    select_algorithm: str = "qrom_phase_gradient",
+    coefficient_bit_precision: int = 10,
+    rotation_bit_precision: int = 10,
+) -> SOSSAMapper:
+    """Create a SOSSAMapper with the given algorithm settings."""
+    mapper = SOSSAMapper()
+    ref_name = _OUTER_PREP_MAP.get(outer_algorithm, outer_algorithm)
+    mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", ref_name))
+    mapper.settings().set("inner_prepare_algorithm", inner_algorithm)
+    mapper.settings().set("select_algorithm", select_algorithm)
+    mapper.settings().set("coefficient_bit_precision", coefficient_bit_precision)
+    mapper.settings().set("rotation_bit_precision", rotation_bit_precision)
+    return mapper
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# Sub-operation mapper tests
+# Sub-operation builder tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestOuterPrepareMapper:
-    """Tests for the OuterPrepareMapper dataclass."""
+class TestOuterPrep:
+    """Tests for SOSSAMapper.build_outer_prep."""
 
     @pytest.mark.parametrize("algorithm", ["alias_sampling", "dense_pure", "qrom"])
-    def test_valid_algorithms(self, algorithm):
-        """Test all valid algorithms are accepted."""
-        mapper = OuterPrepareMapper(algorithm=algorithm)
-        assert mapper.algorithm == algorithm
-
-    @pytest.mark.parametrize("algorithm", ["alias_sampling", "dense_pure", "qrom"])
-    def test_build_op_returns_callable(self, algorithm):
-        """Verify build_op produces a Q# callable for each algorithm.
-
-        The returned op is delegated to the corresponding state preparation
-        algorithm (alias_sampling, dense_pure_state, qrom_state_prep), which
-        are individually validated in test_state_preparation_*.py.
-        """
+    def test_build_outer_prep_returns_callable(self, algorithm):
+        """Verify build_outer_prep produces a Q# callable for each algorithm."""
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.unitary.get_container()
-        mapper = OuterPrepareMapper(algorithm=algorithm)
-        op = mapper.build_op(container)
+        mapper = _make_sossa_mapper(outer_algorithm=algorithm)
+        op = mapper.build_outer_prep(container)
         assert op is not None
 
     @pytest.mark.parametrize("algorithm", ["dense_pure", "qrom"])
-    def test_build_op_fidelity(self, algorithm):
-        """Verify build_op's callable prepares the correct statevector.
+    def test_build_outer_prep_fidelity(self, algorithm):
+        """Verify build_outer_prep's callable prepares the correct statevector.
 
-        Simulates the Q# callable returned by build_op in the global Q#
-        session and checks fidelity against the expected normalized state:
+        Simulates the Q# callable in the global Q# session and checks fidelity
+        against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
         """
         import qdk
 
-        # Fresh session to avoid leftover qubits from prior tests
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.unitary.get_container()
-        mapper = OuterPrepareMapper(algorithm=algorithm)
-        op = mapper.build_op(container)
+        mapper = _make_sossa_mapper(outer_algorithm=algorithm)
+        op = mapper.build_outer_prep(container)
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -150,24 +158,18 @@ class TestOuterPrepareMapper:
         state = qsharp.dump_machine()
         actual_sv = np.array(state.as_dense_state())
 
-        # Expected: normalized amplitudes zero-padded to 2^num_qubits
-        # dense_pure reverses qubit ordering via row_map; qrom uses direct ordering
         n_states = 2**num_qubits
         expected = np.zeros(n_states)
         for j, amp in enumerate(coefficients):
             if j < n_states:
-                if algorithm == "dense_pure":
-                    rev_j = int(f"{j:0{num_qubits}b}"[::-1], 2)
-                    expected[rev_j] = amp
-                else:
-                    expected[j] = amp
+                expected[j] = amp
         expected /= np.linalg.norm(expected)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
-    def test_build_op_alias_sampling_marginal_probs(self):
-        """Verify alias sampling build_op prepares the correct marginal probabilities.
+    def test_build_outer_prep_alias_sampling_marginal_probs(self):
+        """Verify alias sampling prepares the correct marginal probabilities.
 
         The alias sampling op produces |ψ⟩ = Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩.
         We check that the marginal probabilities on the index register match
@@ -180,8 +182,8 @@ class TestOuterPrepareMapper:
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.unitary.get_container()
         bit_precision = 10
-        mapper = OuterPrepareMapper(algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
-        op = mapper.build_op(container)
+        mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
+        op = mapper.build_outer_prep(container)
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -207,17 +209,11 @@ class TestOuterPrepareMapper:
         np.testing.assert_allclose(probs[: len(coefficients)], expected_probs, atol=atol)
 
 
-class TestInnerPrepareMapper:
-    """Tests for the InnerPrepareMapper dataclass."""
+class TestInnerPrep:
+    """Tests for SOSSAMapper.build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_valid_algorithms(self, algorithm):
-        """Test all valid algorithms are accepted."""
-        mapper = InnerPrepareMapper(algorithm=algorithm)
-        assert mapper.algorithm == algorithm
-
-    @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_op_fidelity(self, algorithm):
+    def test_build_inner_prep_fidelity(self, algorithm):
         """Verify inner prep conditional marginals when combined with outer prep.
 
         Applies outer prep (dense_pure, exact) then inner prep on the combined
@@ -225,7 +221,6 @@ class TestInnerPrepareMapper:
         that the conditional marginal probabilities on the inner index register
         match:
             P(b|ℓ) ≈ |c_{ℓ,b}|² / Σ_j |c_{ℓ,j}|²
-        Similar to test_conditional_alias_sampling.py.
         """
         import qdk
 
@@ -236,13 +231,13 @@ class TestInnerPrepareMapper:
         container = controlled_unitary.unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
-        outer_mapper = OuterPrepareMapper(algorithm="dense_pure")
-        outer_op = outer_mapper.build_op(container)
+        outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure")
+        outer_op = outer_mapper.build_outer_prep(container)
 
         # Build inner prep
         bit_precision = 6
-        inner_mapper = InnerPrepareMapper(algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        inner_op = inner_mapper.build_op(container)
+        inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
+        inner_op = inner_mapper.build_inner_prep(container)
 
         # Compute register sizes
         outer_coeffs = np.asarray(container.outer_prepare.get_coefficients())
@@ -257,7 +252,6 @@ class TestInnerPrepareMapper:
             n_fr = fr.shape[1] if fr is not None and fr.size > 0 else 0
             num_inner_qubits = 2 * n_index_bits + 2 * bit_precision + 3 + n_fr
         else:  # direct
-            # Inner register includes b register + free-rider bits
             fr = container.inner_prepare.free_rider_data
             n_fr = fr.shape[1] if fr is not None and fr.size > 0 else 0
             num_inner_qubits = n_index_bits + n_fr
@@ -289,7 +283,6 @@ class TestInnerPrepareMapper:
                 if outer_val != ell:
                     continue
                 inner_be = bits[num_outer_qubits : num_outer_qubits + n_index_bits]
-                # Both algorithms use LE encoding (direct uses Reversed() on bReg)
                 inner_val = int(inner_be[::-1], 2)
                 probs[inner_val] += abs(amp) ** 2
 
@@ -309,20 +302,21 @@ class TestInnerPrepareMapper:
             )
 
 
-class TestSelectMapper:
-    """Tests for the SelectMapper dataclass."""
+class TestSelectSettings:
+    """Tests for SELECT algorithm settings on SOSSAMapper."""
 
     def test_default_algorithm(self):
         """Test default algorithm is qrom_phase_gradient."""
-        mapper = SelectMapper()
-        assert mapper.multiplexed_rotation == "qrom_phase_gradient"
-        assert mapper.rotation_bit_precision == 10
+        mapper = SOSSAMapper()
+        assert mapper.settings().get("select_algorithm") == "qrom_phase_gradient"
+        assert mapper.settings().get("rotation_bit_precision") == 10
 
     @pytest.mark.parametrize("algorithm", ["qrom_phase_gradient", "direct"])
     def test_valid_algorithms(self, algorithm):
         """Test all valid algorithms are accepted."""
-        mapper = SelectMapper(multiplexed_rotation=algorithm)
-        assert mapper.multiplexed_rotation == algorithm
+        mapper = SOSSAMapper()
+        mapper.settings().set("select_algorithm", algorithm)
+        assert mapper.settings().get("select_algorithm") == algorithm
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -339,29 +333,25 @@ class TestSOSSAMapper:
         assert mapper.name() == "sossa"
         assert mapper.type_name() == "controlled_circuit_mapper"
 
-    def test_default_sub_mappers(self):
-        """Test default sub-mapper types are created."""
+    def test_default_settings(self):
+        """Test default settings are correct."""
         mapper = SOSSAMapper()
-        assert isinstance(mapper.outer_prepare_mapper, OuterPrepareMapper)
-        assert isinstance(mapper.inner_prepare_mapper, InnerPrepareMapper)
-        assert isinstance(mapper.select_mapper, SelectMapper)
-        assert mapper.outer_prepare_mapper.algorithm == "alias_sampling"
-        assert mapper.inner_prepare_mapper.algorithm == "controlled_alias_sampling"
-        assert mapper.select_mapper.multiplexed_rotation == "qrom_phase_gradient"
+        assert mapper.outer_prepare_needs_alias_reflection is True
+        assert mapper.inner_prepare_needs_alias_reflection is True
+        assert mapper.select_needs_phase_gradient is True
+        assert mapper.settings().get("rotation_bit_precision") == 10
+        assert mapper.settings().get("coefficient_bit_precision") == 10
 
-    def test_custom_sub_mappers(self):
-        """Test custom sub-mappers are accepted."""
-        outer = OuterPrepareMapper(algorithm="dense_pure")
-        inner = InnerPrepareMapper(algorithm="direct")
-        select = SelectMapper(multiplexed_rotation="direct")
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=outer,
-            inner_prepare_mapper=inner,
-            select_mapper=select,
+    def test_custom_settings(self):
+        """Test custom settings are accepted."""
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
         )
-        assert mapper.outer_prepare_mapper.algorithm == "dense_pure"
-        assert mapper.inner_prepare_mapper.algorithm == "direct"
-        assert mapper.select_mapper.multiplexed_rotation == "direct"
+        assert mapper.outer_prepare_needs_alias_reflection is False
+        assert mapper.inner_prepare_needs_alias_reflection is False
+        assert mapper.select_needs_phase_gradient is False
 
     def test_basic_mapping_produces_circuit_with_factory(self):
         """Test that mapping produces a Circuit with both qsharp_op and qsharp_factory."""
@@ -419,10 +409,10 @@ class TestSOSSAMapper:
     def test_all_algorithm_combinations_produce_circuit(self, outer_alg, inner_alg, select_alg):
         """Test that all valid algorithm combinations produce a Circuit."""
         controlled_unitary = _build_controlled_unitary()
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm=outer_alg),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm=inner_alg),
-            select_mapper=SelectMapper(multiplexed_rotation=select_alg),
+        mapper = _make_sossa_mapper(
+            outer_algorithm=outer_alg,
+            inner_algorithm=inner_alg,
+            select_algorithm=select_alg,
         )
         circuit = mapper.run(controlled_unitary)
 
@@ -464,7 +454,6 @@ class TestSOSSAMapper:
         assert factory.program is not None
         assert isinstance(factory.parameter, dict)
 
-        # Verify expected keys in walk_params
         expected_keys = {
             "outerPrepareOp",
             "innerPrepareOp",
@@ -472,26 +461,23 @@ class TestSOSSAMapper:
             "numSystemQubits",
             "numOuterQubits",
             "numInnerQubits",
+            "numReflectInner",
             "power",
         }
         assert expected_keys == set(factory.parameter.keys())
 
     def test_walk_params_reflect_mapper_settings(self):
-        """Test that walk_params correctly reflect sub-mapper settings."""
-        outer = OuterPrepareMapper(algorithm="dense_pure")
-        inner = InnerPrepareMapper(algorithm="direct")
-        select = SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=12)
-
+        """Test that walk_params correctly reflect mapper settings."""
         controlled_unitary = _build_controlled_unitary()
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=outer,
-            inner_prepare_mapper=inner,
-            select_mapper=select,
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=12,
         )
         circuit = mapper.run(controlled_unitary)
 
         params = circuit._qsharp_factory.parameter
-        # Verify core walk parameters are present and correct
         assert "outerPrepareOp" in params
         assert "innerPrepareOp" in params
         assert "selectOp" in params
@@ -500,15 +486,14 @@ class TestSOSSAMapper:
     def test_walk_params_alias_sampling_flags(self):
         """Test that alias sampling algorithms set reflection flags correctly."""
         controlled_unitary = _build_controlled_unitary()
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="alias_sampling"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="controlled_alias_sampling"),
-            select_mapper=SelectMapper(multiplexed_rotation="qrom_phase_gradient"),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="alias_sampling",
+            inner_algorithm="controlled_alias_sampling",
+            select_algorithm="qrom_phase_gradient",
         )
         circuit = mapper.run(controlled_unitary)
 
         params = circuit._qsharp_factory.parameter
-        # Verify core walk parameters are present and correct
         assert "outerPrepareOp" in params
         assert "innerPrepareOp" in params
         assert "selectOp" in params
@@ -728,9 +713,6 @@ class TestSelectSpinsFidelity:
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
-        # Initial: spinDQ=1 (pos 1), sysDown[0]=1 (pos 4)
-        # After SelectSpins: spin=1 (via CCNOT), SWAP moves sysDown[0]→sysUp[0]
-        # Expected: spinDQ=1 (pos 1), spin=1 (pos 3), sysUp[0]=1 (pos 4+N=6)
         spinDQ_bit = self._bit_of(1, total)  # bit 6
         spin_bit = self._bit_of(3, total)  # bit 4
         sysUp0_bit = self._bit_of(4 + N, total)  # bit 1
@@ -751,9 +733,6 @@ class TestSelectSpinsFidelity:
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
-        # Initial: isSF=1 (pos 0), spinSF=1 (pos 2), sysDown[0]=1 (pos 4)
-        # After SelectSpins: spin=1 (via CCNOT on isSF,spinSF), SWAP
-        # Expected: isSF=1 (pos 0), spinSF=1 (pos 2), spin=1 (pos 3), sysUp[0]=1 (pos 4+N=6)
         isSF_bit = self._bit_of(0, total)  # bit 7
         spinSF_bit = self._bit_of(2, total)  # bit 5
         spin_bit = self._bit_of(3, total)  # bit 4
@@ -769,11 +748,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_round_trip(self, N):
-        """Verify SELECT†·SELECT = Identity (unitarity check).
-
-        The SELECT operator is built from within{compute}apply{action}
-        patterns. This test confirms the adjoint correctly inverts the operation.
-        """
+        """Verify SELECT†·SELECT = Identity (unitarity check)."""
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
@@ -807,7 +782,6 @@ class TestSelectFullFidelity:
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
-        # After SELECT†·SELECT, only one state should have amplitude 1
         max_amp = np.max(np.abs(sv))
         num_nonzero = np.sum(np.abs(sv) > 1e-10)
         assert max_amp > 1 - 1e-10, f"Round trip max amp = {max_amp} (expected ~1)"
@@ -815,11 +789,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_givens_fidelity(self, N):
-        """Verify SELECT with a DQ entry produces a non-trivial rotation.
-
-        Sets up a specific xo value (D1 entry) with H(spinDQ) and applies SELECT.
-        Checks normalization and non-triviality (entangled output).
-        """
+        """Verify SELECT with a DQ entry produces a non-trivial rotation."""
         import qdk
 
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
@@ -891,21 +861,7 @@ class TestSOSSAWalkLogicalCounts:
         ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
     def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Verify numQubits = 2N + n_Xo + n_B' + 2(spin) + 1(control) + O(ancilla).
-
-        The persistent registers are:
-          - systemReg: 2N qubits (spin-up + spin-down)
-          - outerReg: ceil(log2(Xo)) qubits for x_o index
-          - innerReg: ceil(log2(B+1)) qubits for b index
-          - spinReg: 2 qubits (spinSF + spin)
-          - control: 1 qubit for QPE control
-
-        Additional ancilla qubits are allocated for:
-          - isSF, dvsq, bEqB flags (3 qubits) in SelectImpl
-          - State preparation ancilla (algorithm-dependent)
-
-        Reference: arXiv:2502.15882v1, Section IV.A (register layout).
-        """
+        """Verify numQubits matches the paper formula bounds."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
         controlled_unitary = _build_controlled_unitary(
@@ -914,10 +870,11 @@ class TestSOSSAWalkLogicalCounts:
             num_bases=num_bases,
             num_copies=num_copies,
         )
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
         circuit = mapper.run(controlled_unitary)
 
@@ -926,22 +883,18 @@ class TestSOSSAWalkLogicalCounts:
 
         actual_qubits = lc["numQubits"]
 
-        # Paper formula for minimum persistent registers
         N = num_orbitals
         R, B, C = num_ranks, num_bases, num_copies
         Xo = N + R * C
         n_xo = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         n_b = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
-        # Minimum: 2N(system) + n_xo(outer) + n_b(inner) + 2(spin) + 1(control)
         min_qubits = 2 * N + n_xo + n_b + 2 + 1
-        # SelectImpl ancilla: isSF + dvsq + bEqB = 3
         select_ancilla = 3
 
         assert actual_qubits >= min_qubits + select_ancilla, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} < min={min_qubits}+select_anc={select_ancilla}"
         )
-        # Upper bound: ancilla should be bounded by O(n_xo + n_b + N)
-        max_overhead = n_xo + n_b + N + 10  # generous bound for MCX decomp
+        max_overhead = n_xo + n_b + N + 10
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
@@ -956,22 +909,7 @@ class TestSOSSAWalkLogicalCounts:
         ids=["N2R1B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
     def test_toffoli_scaling_with_problem_size(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Verify Toffoli count scales as O(Xo * (N-1) * (Xo + R*(B+1))) for direct SELECT.
-
-        For the direct rotation implementation (ApplyControlledOnInt + Ry),
-        each Givens rotation step j in [0, N-2] has:
-          - N controlled-Ry gates for DQ terms (each controlled on xoBits qubits)
-          - numSF * (B+1) controlled-Ry gates for SF terms (on xoBits+bBits qubits)
-
-        The dominant cost comes from multi-controlled gate decomposition into
-        Toffoli gates. The total walk step (Eq. 77) applies SELECT twice
-        (forward + adjoint within outer block encoding), so the cost is 2x.
-
-        The total Toffoli count per walk step scales as:
-          T ~ 2 * (N-1) * (N + R*C*(B+1)) * decomp_cost(xoBits + bBits)
-
-        Reference: arXiv:2502.15882v1, Appendix B.5 (Givens chain structure).
-        """
+        """Verify Toffoli count scales correctly with problem size for direct SELECT."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
         controlled_unitary = _build_controlled_unitary(
@@ -980,10 +918,11 @@ class TestSOSSAWalkLogicalCounts:
             num_bases=num_bases,
             num_copies=num_copies,
         )
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
         circuit = mapper.run(controlled_unitary)
 
@@ -992,44 +931,33 @@ class TestSOSSAWalkLogicalCounts:
 
         tof = lc["cczCount"]
 
-        # The dominant term: (N-1) rotations * (N + R*C*(B+1)) controlled gates * 2 (fwd+adj)
         N = num_orbitals
         R, B, C = num_ranks, num_bases, num_copies
         num_sf = R * C
         num_rotations = N - 1
         gates_per_rotation = N + num_sf * (B + 1)
-        # Walk applies SELECT 2x (in U and U-adj), plus inner prep 2x each
         dominant_term = 2 * num_rotations * gates_per_rotation
 
-        # Toffoli should be at least proportional to dominant term
-        # (each multi-controlled gate costs >=1 Toffoli for non-trivial control)
         assert tof >= dominant_term, f"N={N},R={R},B={B},C={C}: tof={tof} < dominant={dominant_term}"
-        # Upper bound: each controlled gate costs at most O(control_bits) Toffolis
         Xo = N + num_sf
         xo_bits = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         b_bits = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
-        max_ctrl_cost = xo_bits + b_bits + 5  # MCX decomposition overhead
-        # Include reflections and state prep overhead (generous 10x bound)
+        max_ctrl_cost = xo_bits + b_bits + 5
         max_tof = 10 * dominant_term * max_ctrl_cost
         assert tof <= max_tof, f"N={N},R={R},B={B},C={C}: tof={tof} > max={max_tof}"
 
     def test_power_multiplies_toffoli_linearly(self):
-        """Verify that power=p multiplies the walk step Toffoli cost by p.
-
-        The walk operator W^p applies the walk step p times (Eq. 77).
-        The controlled version c-W^p should have T(p) = p * T(1) exactly.
-
-        Reference: arXiv:2502.15882v1, Eq. 11 (QPE uses W^{2^k} powers).
-        """
+        """Verify that power=p multiplies the walk step Toffoli cost by p."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
         N, R, B, C = 2, 1, 1, 1
         fh = _make_random_factorized_hamiltonian(num_orbitals=N, num_ranks=R, num_bases=B, num_copies=C, seed=42)
 
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
 
         # Build with power=1
@@ -1052,7 +980,6 @@ class TestSOSSAWalkLogicalCounts:
         tof_3 = lc3["cczCount"]
 
         assert tof_3 == 3 * tof_1, f"power=3 Toffoli={tof_3} != 3 * power=1 Toffoli={tof_1}"
-        # Qubit count should be the same (registers reused)
         assert lc3["numQubits"] == lc1["numQubits"], (
             f"power=3 qubits={lc3['numQubits']} != power=1 qubits={lc1['numQubits']}"
         )
@@ -1066,21 +993,9 @@ class TestSOSSAWalkLogicalCounts:
         ids=["N2R1B1C1", "N3R2B2C1"],
     )
     def test_majorana_op_contributes_14_toffoli_per_walk(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Verify MajoranaOp contributes exactly 2*7 = 14 Toffoli per walk step.
-
-        The MajoranaOp (arXiv:2502.15882v1, Appendix B.6, Fig. 4) uses 7 CCZ
-        gates per invocation. The walk step calls it twice (in U and U-adj),
-        contributing 14 Toffoli total.
-
-        This is verified by comparing the walk Toffoli with a hypothetical walk
-        that has zero-angle rotations (making Givens rotations trivial) --
-        the difference isolates the rotation-dependent cost.
-
-        Reference: arXiv:2502.15882v1, Appendix B.6 (Majorana operator).
-        """
+        """Verify MajoranaOp contributes at least 2*7 = 14 Toffoli per walk step."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
-        # Build with non-trivial angles
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,
             num_ranks=num_ranks,
@@ -1088,20 +1003,16 @@ class TestSOSSAWalkLogicalCounts:
             num_copies=num_copies,
         )
 
-        # The MajoranaOp cost is 7 CCZ per call, 2 calls per walk step = 14
-        # This is a structural property of the circuit, independent of angles.
-        # We verify the total tof is at least 14 (the minimum contribution).
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
         circuit = mapper.run(controlled_unitary)
         factory = circuit._qsharp_factory
         lc = qsharp.logical_counts(factory.program, *factory.parameter.values())
 
-        # MajoranaOp has exactly 7 CCZ (3 Controlled-Z decompose to Toffoli)
-        # Called 2x per walk step (once in U, once in U-adj)
         majorana_min_tof = 2 * 7
         assert lc["cczCount"] >= majorana_min_tof, f"Total tof={lc['cczCount']} < majorana_min={majorana_min_tof}"
 
@@ -1115,16 +1026,7 @@ class TestSOSSAWalkLogicalCounts:
         ids=["N2R2B1C1", "N3R2B2C1", "N4R3B2C2"],
     )
     def test_spin_copy_contributes_2n_toffoli(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Verify SelectSpins contributes at least 2*N Toffoli per walk step.
-
-        SelectSpins (arXiv:2502.15882v1, Step 4) applies N controlled-SWAP
-        gates to exchange sysDown <-> sysUp. Each controlled-SWAP (Fredkin)
-        decomposes into 1 Toffoli. Called twice per walk step (U and U-adj).
-
-        Total SpinCopy contribution: 2 * N Toffoli.
-
-        Reference: arXiv:2502.15882v1, Appendix B.5 (spin register management).
-        """
+        """Verify SelectSpins contributes at least 2*N Toffoli per walk step."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
         controlled_unitary = _build_controlled_unitary(
@@ -1133,16 +1035,16 @@ class TestSOSSAWalkLogicalCounts:
             num_bases=num_bases,
             num_copies=num_copies,
         )
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
         circuit = mapper.run(controlled_unitary)
         factory = circuit._qsharp_factory
         lc = qsharp.logical_counts(factory.program, *factory.parameter.values())
 
-        # SpinCopy: N Fredkin gates (each = 1 Toffoli), called 2x
         N = num_orbitals
         spin_copy_tof = 2 * N
         assert lc["cczCount"] >= spin_copy_tof, f"N={N}: total tof={lc['cczCount']} < spin_copy_min={spin_copy_tof}"
@@ -1157,17 +1059,7 @@ class TestSOSSAWalkLogicalCounts:
         ids=["N2R1B1C1", "N3R2B1C1", "N4R2B2C2"],
     )
     def test_reflection_qubit_count(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Verify reflections act on the correct number of qubits.
-
-        The walk step has two reflections (Eq. 77):
-          - Ref_B (inner): acts on innerReg + spinReg = n_B' + 2 qubits
-          - Ref_{a,B} (outer): acts on outerReg + innerReg + spinReg = n_Xo + n_B' + 2 qubits
-
-        The controlled reflections require multi-controlled Z, which decomposes
-        into O(n) Toffoli gates. The outer reflection dominates.
-
-        Reference: arXiv:2502.15882v1, Eq. 77 (walk operator structure).
-        """
+        """Verify reflections act on the correct number of qubits."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
         controlled_unitary = _build_controlled_unitary(
@@ -1176,10 +1068,11 @@ class TestSOSSAWalkLogicalCounts:
             num_bases=num_bases,
             num_copies=num_copies,
         )
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct", rotation_bit_precision=10),
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+            rotation_bit_precision=10,
         )
         circuit = mapper.run(controlled_unitary)
 
@@ -1192,13 +1085,8 @@ class TestSOSSAWalkLogicalCounts:
         n_xo = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         n_b = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
 
-        # Outer reflection on (n_xo + n_b + 2) qubits requires >=(n_xo + n_b) Toffoli
-        # for multi-controlled Z decomposition (each MCZ on n qubits -> n-2 Toffoli).
-        # Inner reflection on (n_b + 2) qubits requires >= max(0, n_b) Toffoli.
-        # Both are controlled by QPE control qubit, adding 1 more control.
         outer_ref_qubits = n_xo + n_b + 2
         inner_ref_qubits = n_b + 2
-        # MCZ on n qubits (controlled by 1 QPE qubit) -> n-1 Toffoli
         min_ref_tof = max(0, outer_ref_qubits - 1) + max(0, inner_ref_qubits - 1)
         assert lc["cczCount"] >= min_ref_tof, (
             f"N={N},R={R},B={B},C={C}: tof={lc['cczCount']} < min_reflection_tof={min_ref_tof}"

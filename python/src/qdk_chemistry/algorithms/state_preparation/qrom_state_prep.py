@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 
 from qdk_chemistry.data import Wavefunction
@@ -53,43 +55,27 @@ class QROMStatePreparation(StatePreparation):
         return "qrom_state_prep"
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        """Not directly applicable -- use prepare_from_statevector instead.
+        r"""Prepare a PREPARE circuit using QROM-based SBM decomposition from a Wavefunction.
 
-        Raises:
-            NotImplementedError: Use prepare_from_statevector for block encoding PREPARE.
-
-        """
-        raise NotImplementedError(
-            "QROMStatePreparation does not support direct Wavefunction input. "
-            "Use prepare_from_statevector() for block encoding PREPARE oracles."
-        )
-
-    def prepare_from_statevector(
-        self,
-        statevector: np.ndarray,
-        num_qubits: int,
-        qubit_indices: list[int],
-    ) -> Circuit:
-        r"""Create a PREPARE circuit using QROM-based SBM decomposition.
-
-        The SBM (Shende-Bullock-Markov) decomposition splits the state preparation
-        into n layers of multiplexed Ry rotations. Each rotation angle is computed
-        from the ratio of sub-tree norms.
-
-        This method uses only n qubits (no ancilla), making it suitable for
-        minimum-qubit scenarios.
+        Extracts amplitudes from the wavefunction and builds a QROM state prep
+        circuit using n layers of multiplexed Ry rotations.
 
         Args:
-            statevector: A 1-D array of real amplitudes to load (length L).
-            num_qubits: Number of qubits in the state register.
-            qubit_indices: Qubit indices for the state register (used for layout).
+            wavefunction: The target wavefunction whose coefficients define
+                the amplitudes for QROM state preparation.
 
         Returns:
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         """
-        amplitudes = statevector.tolist()
-        num_state_qubits = num_qubits
+        coeffs = np.asarray(wavefunction.get_coefficients())
+        if np.iscomplexobj(coeffs):
+            if not np.allclose(coeffs.imag, 0.0):
+                raise ValueError("QROM state preparation requires real coefficients.")
+            coeffs = coeffs.real
+
+        amplitudes = coeffs.tolist()
+        num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
 
         params = QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
             amplitudes=amplitudes,

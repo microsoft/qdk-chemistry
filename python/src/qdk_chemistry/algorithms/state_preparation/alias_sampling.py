@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 
 from qdk_chemistry.data import Wavefunction
@@ -55,40 +57,27 @@ class AliasSamplingStatePreparation(StatePreparation):
         return "alias_sampling"
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        """Not directly applicable -- use prepare_from_statevector instead.
+        r"""Prepare a PREPARE circuit using alias sampling from a Wavefunction.
 
-        Raises:
-            NotImplementedError: Use prepare_from_statevector for block encoding PREPARE.
-
-        """
-        raise NotImplementedError(
-            "AliasSamplingStatePreparation does not support direct Wavefunction input. "
-            "Use prepare_from_statevector() for block encoding PREPARE oracles."
-        )
-
-    def prepare_from_statevector(
-        self,
-        statevector: np.ndarray,
-        num_qubits: int,
-        qubit_indices: list[int],
-    ) -> Circuit:
-        r"""Create a PREPARE circuit using alias sampling.
-
-        The input statevector contains amplitudes :math:`\sqrt{p_\ell}` for each term.
-        The alias sampling circuit prepares this state using O(L) Toffoli gates.
+        Extracts coefficients from the wavefunction and builds an alias sampling
+        circuit that prepares the state using O(L) Toffoli gates.
 
         Args:
-            statevector: A 1-D array of real amplitudes to load (length L).
-                The squared magnitudes are used as the probability distribution.
-            num_qubits: Number of qubits in the index (prepare) register.
-            qubit_indices: Qubit indices for the prepare register (used for layout).
+            wavefunction: The target wavefunction whose coefficients define the
+                probability distribution for alias sampling.
 
         Returns:
             Circuit: A Circuit wrapping the Q# alias sampling callable and factory.
 
         """
-        coefficients = statevector.tolist()
-        num_index_qubits = num_qubits
+        coeffs = np.asarray(wavefunction.get_coefficients())
+        if np.iscomplexobj(coeffs):
+            if not np.allclose(coeffs.imag, 0.0):
+                raise ValueError("Alias sampling state preparation requires real coefficients.")
+            coeffs = coeffs.real
+
+        coefficients = coeffs.tolist()
+        num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
         # Total qubits: index + uniform + flag + qrom_output
         total_qubits = 2 * num_index_qubits + 2 * self._bits_precision + 1
 
