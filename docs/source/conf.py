@@ -218,7 +218,10 @@ nitpick_ignore_regex = [
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
     (r"py:class", r"^PlanTerm$"),
     (r"py:class", r"^CommutatorPlan$"),
-    (r"py:class", r"^qdk_chemistry\.utils\.zassenhaus_generation\.(PlanExpr|PlanTerm|CommutatorPlan)$"),
+    (
+        r"py:class",
+        r"^qdk_chemistry\.utils\.zassenhaus_generation\.(PlanExpr|PlanTerm|CommutatorPlan)$",
+    ),
     (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
 
