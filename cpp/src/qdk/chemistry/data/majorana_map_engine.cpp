@@ -432,8 +432,15 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     return cache;
   };
 
+  const std::size_t num_spin_species =
+      (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
+  const bool use_spin_symmetric = spin_symmetric && (num_spin_species == 2);
+
   auto ppair_alpha = build_pair_cache(alpha_offset);
-  auto ppair_beta = build_pair_cache(beta_offset);
+  std::vector<PackedPairProduct> ppair_beta;
+  if (num_spin_species == 2) {
+    ppair_beta = build_pair_cache(beta_offset);
+  }
 
   auto alpha_pair = [&](std::size_t i,
                         std::size_t j) -> const PackedPairProduct& {
@@ -476,8 +483,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t s = 0; s < n_spatial; ++s) {
       double h_a = h1_alpha[p * n_spatial + s];
-      double h_b = spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
-      if (spin_symmetric) {
+      double h_b = use_spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
+      if (use_spin_symmetric) {
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
           delta_corr += eri_provider.aaaa(p, q, q, s);
@@ -496,16 +503,18 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       if (std::abs(h_pq_a) > integral_threshold) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
-      double h_pq_b = h1_eff_beta[p * n_spatial + q];
-      if (std::abs(h_pq_b) > integral_threshold) {
-        accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
+      if (num_spin_species == 2) {
+        double h_pq_b = h1_eff_beta[p * n_spatial + q];
+        if (std::abs(h_pq_b) > integral_threshold) {
+          accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
+        }
       }
     }
   }
 
   // ─── Two-body terms ───────────────────────────────────────────────
 
-  if (spin_symmetric) {
+  if (use_spin_symmetric) {
     struct SpinSummedE {
       std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
@@ -699,6 +708,149 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                         mode_alpha(p), mode_alpha(q), eri);
           }
         }
+      }
+    }
+  }
+
+  if (!mapping.stabilizers().empty()) {
+    double h1_sum = 0.0;
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = 0; q < n_spatial; ++q) {
+        h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+        if (!spin_symmetric) {
+          h1_sum += std::abs(h1_beta[p * n_spatial + q]);
+        } else {
+          h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+        }
+      }
+    }
+
+    // If stabilizers are included in the mapping, our total Hamiltonian becomes
+    // H_total = H_physical + H_aux. We add H_aux = λ · Σ_i (I − S_i S_{i+1})
+    // (sum of products of adjacent stabilizers per spin channel) to penalize
+    // unphysical codespace sectors using local terms.
+    double aux_ham_coefficient = 1.0 + h1_sum;
+
+    std::size_t num_stabs = mapping.stabilizers().size();
+    std::size_t half_stabs = num_stabs / 2;
+
+    struct PackedStab {
+      std::complex<double> coeff;
+      PackedPauliWord<NW> word;
+    };
+    std::vector<PackedStab> packed_stabs;
+    packed_stabs.reserve(num_stabs);
+    for (const auto& [coeff, word] : mapping.stabilizers()) {
+      packed_stabs.push_back({coeff, sparse_to_packed<NW>(word)});
+    }
+
+    std::size_t num_penalty_terms = 0;
+    if (half_stabs >= 2) {
+      num_penalty_terms = 2 * (half_stabs - 1);
+    } else {
+      num_penalty_terms = num_stabs;
+    }
+
+    PackedPauliWord<NW> identity{};
+    acc.accumulate(identity,
+                   std::complex<double>(aux_ham_coefficient * num_stabs, 0.0));
+
+    // For each spin sector, we accumulate the single boundary link stabilizer
+    // individually to lift the Z_2 gauge degeneracy, followed by the products
+    // of adjacent link stabilizers (paired via Minimum Spanning Tree to
+    // minimize their Pauli weight) to form local loop-plaquette stabilizers.
+    if (half_stabs >= 1) {
+      auto get_packed_weight = [](const PackedPauliWord<NW>& pw) -> int {
+        int w = 0;
+        for (std::size_t k = 0; k < NW; ++k) {
+          w += std::popcount(pw.x[k] | pw.z[k]);
+        }
+        return w;
+      };
+
+      auto accumulate_product = [&](std::size_t i, std::size_t j) {
+        const auto& s1 = packed_stabs[i];
+        const auto& s2 = packed_stabs[j];
+        auto [phase_idx, word] = multiply_packed(s1.word, s2.word);
+        std::complex<double> prod_coeff =
+            apply_phase(phase_idx, s1.coeff * s2.coeff);
+        acc.accumulate(word, -aux_ham_coefficient * prod_coeff);
+      };
+
+      auto build_mst_and_accumulate = [&](std::size_t start_idx,
+                                          std::size_t count) {
+        if (count == 0) return;
+
+        // Find the lightest stabilizer as root
+        std::size_t root = 0;
+        int root_weight = get_packed_weight(packed_stabs[start_idx].word);
+        for (std::size_t i = 1; i < count; ++i) {
+          int w = get_packed_weight(packed_stabs[start_idx + i].word);
+          if (w < root_weight) {
+            root = i;
+            root_weight = w;
+          }
+        }
+
+        // Accumulate the root boundary link stabilizer
+        acc.accumulate(
+            packed_stabs[start_idx + root].word,
+            -aux_ham_coefficient * packed_stabs[start_idx + root].coeff);
+
+        if (count <= 1) return;
+
+        // Prim's algorithm to find the minimum spanning tree of stabilizer
+        // pairings starting from the chosen root
+        std::vector<bool> in_mst(count, false);
+        std::vector<int> min_weight(count, 1e9);
+        std::vector<std::size_t> parent(count, root);
+
+        min_weight[root] = 0;
+
+        for (std::size_t step = 0; step < count; ++step) {
+          std::size_t u = 0;
+          int min_val = 1e9;
+          for (std::size_t i = 0; i < count; ++i) {
+            if (!in_mst[i] && min_weight[i] < min_val) {
+              min_val = min_weight[i];
+              u = i;
+            }
+          }
+
+          in_mst[u] = true;
+
+          for (std::size_t v = 0; v < count; ++v) {
+            if (!in_mst[v]) {
+              auto [phase_idx, word] =
+                  multiply_packed(packed_stabs[start_idx + u].word,
+                                  packed_stabs[start_idx + v].word);
+              int w = get_packed_weight(word);
+              if (w < min_weight[v]) {
+                min_weight[v] = w;
+                parent[v] = u;
+              }
+            }
+          }
+        }
+
+        // Accumulate products for the selected MST edges
+        for (std::size_t v = 0; v < count; ++v) {
+          if (v != root) {
+            accumulate_product(start_idx + parent[v], start_idx + v);
+          }
+        }
+      };
+
+      // Construct MST for α spin Majoranas
+      build_mst_and_accumulate(0, half_stabs);
+
+      // Construct MST for β spin Majoranas
+      build_mst_and_accumulate(half_stabs, half_stabs);
+
+    } else {
+      // Fallback to individual stabilizers if too few to form products
+      for (const auto& stab : packed_stabs) {
+        acc.accumulate(stab.word, -aux_ham_coefficient * stab.coeff);
       }
     }
   }

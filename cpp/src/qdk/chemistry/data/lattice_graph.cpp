@@ -28,6 +28,67 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(i, j, t);
   triplets.emplace_back(j, i, t);
 }
+
+/**
+ * @brief Depth-first search (DFS) helper to find a Hamiltonian path in a sparse
+ * graph.
+ *
+ * Recursively visits unvisited neighbor vertices to build a path that visits
+ * every vertex in the graph exactly once.
+ *
+ * @param curr    The vertex index currently being visited.
+ * @param adj     The sparse adjacency matrix of the graph.
+ * @param visited Tracks which vertices have already been visited.
+ * @param path    Stores the sequence of vertices in the current path.
+ * @return True if a Hamiltonian path is found, false otherwise.
+ */
+bool find_hamiltonian_path_dfs(std::uint64_t curr,
+                               const Eigen::SparseMatrix<double>& adj,
+                               std::vector<bool>& visited,
+                               std::vector<std::uint64_t>& path) {
+  path.push_back(curr);
+  if (path.size() == static_cast<std::size_t>(adj.rows())) {
+    return true;
+  }
+  visited[curr] = true;
+
+  // Iterate directly over the sparse matrix columns/rows for neighbors
+  for (Eigen::SparseMatrix<double>::InnerIterator it(adj, curr); it; ++it) {
+    std::uint64_t neighbor = it.row();
+    if (neighbor != curr && !visited[neighbor]) {
+      if (find_hamiltonian_path_dfs(neighbor, adj, visited, path)) {
+        return true;
+      }
+    }
+  }
+  visited[curr] = false;
+  path.pop_back();
+  return false;
+}
+
+/**
+ * @brief Search for a Hamiltonian path in the given sparse graph.
+ *
+ * Tries to find a path that visits every vertex exactly once, starting the
+ * search from each possible vertex in the graph.
+ *
+ * @param adj The sparse adjacency matrix representing the graph.
+ * @return A vector of vertex indices in path order, or an empty vector if no
+ * path exists.
+ */
+std::vector<std::uint64_t> find_hamiltonian_path(
+    const Eigen::SparseMatrix<double>& adj) {
+  std::uint64_t V = adj.rows();
+  std::vector<bool> visited(V, false);
+  std::vector<std::uint64_t> path;
+  for (std::uint64_t start = 0; start < V; ++start) {
+    if (find_hamiltonian_path_dfs(start, adj, visited, path)) {
+      return path;
+    }
+  }
+  return {};
+}
+
 }  // namespace detail
 
 LatticeGraph::LatticeGraph(
@@ -164,7 +225,8 @@ std::uint64_t LatticeGraph::num_edges() const {
   return count;
 }
 
-LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
+LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
+                                 bool dfs_ordering) {
   if (n == 0) {
     throw std::invalid_argument("chain: n must be > 0.");
   }
@@ -186,12 +248,23 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj),
-                      chain_coloring(static_cast<std::int64_t>(N), periodic));
+  LatticeGraph g(std::move(adj),
+                 chain_coloring(static_cast<std::int64_t>(N), periodic));
+  if (dfs_ordering) {
+    auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
+    if (!path.empty()) {
+      return permute(g, path);
+    } else {
+      throw std::runtime_error(
+          "No Hamiltonian path found in the lattice graph.");
+    }
+  }
+  return g;
 }
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
-                                  bool periodic_x, bool periodic_y, double t) {
+                                  bool periodic_x, bool periodic_y, double t,
+                                  bool dfs_ordering) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("square: nx and ny must be > 0.");
   }
@@ -234,13 +307,24 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj),
-                      square_coloring(Nx, Ny, periodic_x, periodic_y));
+  LatticeGraph g(std::move(adj),
+                 square_coloring(Nx, Ny, periodic_x, periodic_y));
+  if (dfs_ordering) {
+    auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
+    if (!path.empty()) {
+      return permute(g, path);
+    } else {
+      throw std::runtime_error(
+          "No Hamiltonian path found in the lattice graph.");
+    }
+  }
+  return g;
 }
 
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
                                       bool periodic_x, bool periodic_y,
-                                      double t, int coloring_seed) {
+                                      double t, int coloring_seed,
+                                      bool dfs_ordering) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("triangular: nx and ny must be > 0.");
   }
@@ -295,13 +379,23 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   adj.makeCompressed();
   // No known deterministic coloring for triangular lattices with arbitrary
   // periodic boundaries; use greedy with multiple trials instead.
-  return LatticeGraph(std::move(adj),
-                      greedy_edge_coloring(adj, coloring_seed, 32));
+  LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32));
+  if (dfs_ordering) {
+    auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
+    if (!path.empty()) {
+      return permute(g, path);
+    } else {
+      throw std::runtime_error(
+          "No Hamiltonian path found in the lattice graph.");
+    }
+  }
+  return g;
 }
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
-                                     bool periodic_x, bool periodic_y,
-                                     double t) {
+                                     bool periodic_x, bool periodic_y, double t,
+                                     bool dfs_ordering) {
+  (void)dfs_ordering;
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("honeycomb: nx and ny must be > 0.");
   }
@@ -354,7 +448,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
                                   bool periodic_x, bool periodic_y, double t,
-                                  int coloring_seed) {
+                                  int coloring_seed, bool dfs_ordering) {
+  (void)dfs_ordering;
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("kagome: nx and ny must be > 0.");
   }
@@ -947,6 +1042,40 @@ void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, static_cast<uint64_t>(_num_sites));
   hash_value(ctx, adjacency_);
   hash_value(ctx, _is_symmetric);
+}
+
+LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
+                                   const std::vector<std::uint64_t>& path) {
+  std::uint64_t V = graph.num_sites();
+  const auto& adj = graph.sparse_adjacency_matrix();
+
+  // Reorder the adjacency matrix using Eigen's PermutationMatrix
+  Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic, int> P(
+      static_cast<Eigen::Index>(V));
+  for (std::uint64_t i = 0; i < V; ++i) {
+    P.indices()[static_cast<Eigen::Index>(i)] = static_cast<int>(path[i]);
+  }
+  Eigen::SparseMatrix<double> new_adj = P.transpose() * adj * P;
+  new_adj.makeCompressed();
+
+  std::vector<std::uint64_t> inv_p(V);
+  for (std::uint64_t i = 0; i < V; ++i) {
+    inv_p[path[i]] = i;
+  }
+
+  std::optional<EdgeColoring> new_coloring = std::nullopt;
+  if (graph.edge_coloring().has_value()) {
+    EdgeColoring coloring;
+    for (const auto& [edge, color] : *(graph.edge_coloring())) {
+      std::uint64_t new_u = inv_p[edge.first];
+      std::uint64_t new_v = inv_p[edge.second];
+      auto new_edge = std::minmax(new_u, new_v);
+      coloring[{new_edge.first, new_edge.second}] = color;
+    }
+    new_coloring = std::move(coloring);
+  }
+
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring));
 }
 
 }  // namespace qdk::chemistry::data
