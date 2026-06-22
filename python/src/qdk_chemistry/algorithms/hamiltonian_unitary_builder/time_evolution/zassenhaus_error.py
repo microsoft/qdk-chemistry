@@ -76,7 +76,7 @@ def zassenhaus_steps_naive(
         order: The order of the Zassenhaus formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
         commutator_exponents: Optional precomputed symbolic Zassenhaus exponents
-            returned as the first element of :func:`zassenhaus_commutator_plan`.
+            returned as the first element of :func:`~qdk_chemistry.utils.zassenhaus_generation.zassenhaus_commutator_plan`.
             If provided, the mapping must include ``order + 1`` so the bound can
             use the first omitted exponent without regenerating the plan.
 
