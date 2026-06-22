@@ -24,7 +24,6 @@ set -ex
 PHASE=${1:-deps}
 
 MARCH=x86-64-v3
-CMAKE_VERSION=3.28.3
 HDF5_VERSION=1.13.0
 BLIS_VERSION=2.0
 LIBFLAME_VERSION=5.2.0
@@ -57,6 +56,7 @@ if [ "$PHASE" = "deps" ]; then
     $APT update -q
     $APT install -y -q \
         build-essential \
+        cmake \
         curl \
         gcc g++ \
         git \
@@ -79,32 +79,15 @@ if [ "$PHASE" = "deps" ]; then
         ninja-build \
         nlohmann-json3-dev \
         patchelf \
-        pybind11-dev \
         python3 \
         python3-dev \
         python3-pip \
-        python3-pybind11 \
         python3-venv \
         tk-dev \
         unzip \
         wget \
         xz-utils \
         zlib1g-dev
-
-    # Upgrade cmake (Ubuntu 22/24 apt only ships up to 3.22/3.28).
-    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    rm cmake-${CMAKE_VERSION}.tar.gz
-    cd cmake-${CMAKE_VERSION}
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make --silent -j$(nproc)
-    $SUDO make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}
-    cmake --version
 
     # The install-{blis,libflame,hdf5}.sh helpers do `make install` into
     # /usr/local without sudo internally, so wrap their invocation.
@@ -116,6 +99,15 @@ if [ "$PHASE" = "deps" ]; then
 
     echo "Installing HDF5..."
     $SUDO bash .pipelines/install-scripts/install-hdf5.sh /usr/local Release ${PWD} "${CFLAGS}" OFF ${HDF5_VERSION}
+
+    # Create a venv with the pinned build-time requirements
+    echo "Setting up Python venv with build requirements..."
+    VENV_DIR="${PWD}/.codeql-venv"
+    python3 -m venv "${VENV_DIR}"
+    "${VENV_DIR}/bin/pip" install --quiet --upgrade pip
+    "${VENV_DIR}/bin/pip" install --quiet -r .pipelines/requirements.txt
+    PYBIND11_CMAKEDIR="$("${VENV_DIR}/bin/python" -m pybind11 --cmakedir)"
+    echo "Using pybind11 cmake dir: ${PYBIND11_CMAKEDIR}"
 
     # Configure CMake outside the CodeQL trace so configure-time toolchain
     # probes don't pollute the database. Flags mirror what scikit-build-core
@@ -130,7 +122,9 @@ if [ "$PHASE" = "deps" ]; then
         -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF \
         -DBUILD_TESTING=OFF \
         -DCMAKE_C_FLAGS="${CFLAGS_COMMON}" \
-        -DCMAKE_CXX_FLAGS="${CFLAGS_COMMON}"
+        -DCMAKE_CXX_FLAGS="${CFLAGS_COMMON}" \
+        -DPython_EXECUTABLE="${VENV_DIR}/bin/python" \
+        -Dpybind11_DIR="${PYBIND11_CMAKEDIR}"
 
 elif [ "$PHASE" = "build" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
