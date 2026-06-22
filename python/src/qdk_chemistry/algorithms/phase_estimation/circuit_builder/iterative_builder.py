@@ -164,14 +164,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         power = 2 ** (total_iterations - iteration - 1)
 
-        # Build the unitary and controlled circuit, extracting ancilla count.
-        unitary_builder = self._create_nested("unitary_builder")
-        unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(hamiltonian)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        ctrl_unitary_circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
+        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         # Update ancilla count from mapper output when available (alias sampling needs more qubits)
         factory = ctrl_unitary_circuit._qsharp_factory  # noqa: SLF001

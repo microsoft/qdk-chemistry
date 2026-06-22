@@ -305,32 +305,77 @@ Returns:
 
 )");
 
-  configuration.def("to_bits", &Configuration::to_bits,
-                    R"(
+  configuration.def(
+      "to_bits",
+      [](const Configuration &self, size_t n_bits) -> py::list {
+        const auto &packed = self.packed_data();
+        uint8_t bpm = self.bits_per_mode();
+        size_t modes_per_byte = 8 / bpm;
+        size_t n_modes = n_bits / bpm;
+
+        py::list result;
+        if (bpm == 1) {
+          for (size_t i = 0; i < n_bits; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = i % modes_per_byte;
+            uint8_t val = (byte_idx < packed.size())
+                              ? (packed[byte_idx] >> bit_offset) & 1
+                              : 0;
+            result.append(static_cast<int>(val));
+          }
+        } else {
+          // bpm == 2: alpha block then beta block (Jordan-Wigner)
+          // First half: alpha occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // ALPHA=1, DOUBLY=3 have bit 0 set
+            result.append(static_cast<int>(state & 1));
+          }
+          // Second half: beta occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // BETA=2, DOUBLY=3 have bit 1 set
+            result.append(static_cast<int>((state >> 1) & 1));
+          }
+        }
+        return result;
+      },
+      R"(
 Return a flat list of 0/1 bit values representing the configuration.
 
-For bits_per_mode == 1: returns a list of length num_modes where each
-element is the mode state (0 or 1).
+Args:
+    n_bits (int): Number of output bits. For bits_per_mode == 1 this equals
+        the number of modes to read; for bits_per_mode == 2 it equals
+        2 * (number of modes to read). Obtain the true mode count from the
+        owning container (e.g. ``configuration_set.num_modes``) and compute
+        ``n_bits = num_modes * bits_per_mode``.
 
-For bits_per_mode == 2 (spin-½): returns a list of length 2 * num_modes.
-The first num_modes entries are the alpha occupations and the last num_modes
-entries are the beta occupations (Jordan-Wigner ordering).
-
-The total length is always num_modes * bits_per_mode, i.e. the number of
-qubits in a Jordan-Wigner mapping.
+For bits_per_mode == 1: returns a list of length n_bits.
+For bits_per_mode == 2 (spin-½): returns a list of length n_bits with
+the first half being alpha occupations and the second half beta
+occupations (Jordan-Wigner ordering).
 
 Returns:
-    list[int]: List of 0s and 1s.
+    list[int]: List of 0s and 1s of length n_bits.
 
 Examples:
     >>> config = qdk_chemistry.Configuration.from_bitstring("10110")
-    >>> config.to_bits()
+    >>> config.to_bits(5)
     [1, 0, 1, 1, 0]
     >>> config = qdk_chemistry.Configuration.from_spin_half_string("2u0d")
-    >>> config.to_bits()
+    >>> config.to_bits(8)
     [1, 1, 0, 0, 1, 0, 0, 1]
 
-)");
+)",
+      py::arg("n_bits"));
   // Data type name class attribute
   configuration.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(Configuration);

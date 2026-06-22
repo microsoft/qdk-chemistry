@@ -111,11 +111,12 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
-        # Determine unitary ancilla qubit count by inspecting a trial controlled circuit.
-        trial_ctrl_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
-        trial_qc = trial_ctrl_circuit.get_qiskit_circuit()
+        # Determine unitary ancilla qubit count from the compiled controlled-circuit.
+        # The compiled Qiskit circuit may have additional decomposition ancillas
+        # beyond the logical count (e.g., for multi-controlled gate synthesis).
         num_system = qubit_hamiltonian.num_qubits
-        num_unitary_ancilla = trial_qc.num_qubits - 1 - num_system
+        probe_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
+        num_unitary_ancilla = probe_circuit.get_qiskit_circuit().num_qubits - 1 - num_system
 
         phase = QuantumRegister(num_bits, "phase")
         system = QuantumRegister(num_system, "system")
@@ -181,7 +182,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             power: The power to which the controlled unitary is raised.
 
         """
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
         cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
@@ -313,7 +314,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
             return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)

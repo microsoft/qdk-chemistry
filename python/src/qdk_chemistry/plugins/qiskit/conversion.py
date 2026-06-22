@@ -69,7 +69,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     # Fill statevector
     for i, det in enumerate(determinants):
         # Convert configuration to statevector index
-        index = _configuration_to_statevector_index(det)
+        index = _configuration_to_statevector_index(det, num_qubits)
         statevector[index] = coeffs_array[i]
 
     # Normalize if requested
@@ -81,7 +81,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     return statevector
 
 
-def _configuration_to_statevector_index(configuration: data.Configuration) -> int:
+def _configuration_to_statevector_index(configuration: data.Configuration, n_bits: int) -> int:
     """Convert a Configuration to its corresponding integer index in the statevector array.
 
     This function maps an electronic configuration (orbital occupation pattern) to
@@ -112,6 +112,8 @@ def _configuration_to_statevector_index(configuration: data.Configuration) -> in
         configuration (Configuration): The electronic configuration to convert. This object
             encodes the occupation of each orbital (unoccupied, alpha, beta,
             or doubly occupied).
+        n_bits (int): Number of bits to read from the configuration
+            (num_modes * bits_per_mode).
 
     Returns:
         int: The statevector index corresponding to this configuration in the
@@ -119,7 +121,7 @@ def _configuration_to_statevector_index(configuration: data.Configuration) -> in
 
     """
     # Get bit vector: [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]
-    bits = configuration.to_bits()
+    bits = configuration.to_bits(n_bits)
 
     index = 0
 

@@ -121,9 +121,14 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         select = unitary_container.select
 
         # 1. Create PREPARE circuit via the state-preparation algorithm.
-        prepare_algorithm = self._create_nested("state_prep")
-        prepare_circuit = prepare_algorithm.run(prepare_wavefunction)
-        prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
+        #    For the 0-ancilla case the wavefunction has 0 modes, producing a
+        #    no-op circuit.
+        if prepare_wavefunction is not None:
+            prepare_algorithm = self._create_nested("state_prep")
+            prepare_circuit = prepare_algorithm.run(prepare_wavefunction)
+            prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
+        else:
+            prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
         # 2. Create SELECT circuit directly (Pauli SELECT oracle).
         select_op = self._build_pauli_select_op(select)

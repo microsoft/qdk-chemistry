@@ -138,12 +138,14 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
     @staticmethod
     def _build_prepare(
         qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int, tolerance: float
-    ) -> Wavefunction:
+    ) -> "Wavefunction":
         """Compute the prepare wavefunction from Hamiltonian coefficients.
 
         Normalizes the absolute Hamiltonian coefficients by the L1 norm and
         takes the element-wise square root to produce the state-preparation amplitudes.
         Returns a :class:`Wavefunction` with 1-bit-per-mode configurations.
+        For single-term Hamiltonians (``num_prepare_ancillas == 0``), returns a
+        trivial 0-mode wavefunction.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian whose coefficients define the amplitudes.
@@ -152,24 +154,29 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
                 this threshold.
 
         Returns:
-            Wavefunction: A wavefunction over the ancilla register whose amplitudes encode
-            the normalized coefficients of the Hamiltonian.
+            Wavefunction: A wavefunction over the ancilla register whose amplitudes
+            encode the normalized coefficients (0-mode for single-term case).
 
         """
-        coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
-        l1_norm = float(np.sum(np.abs(coefficients)))
+        l1_norm = qubit_hamiltonian.schatten_norm
         if l1_norm < tolerance:
             raise ValueError("L1 norm is too small, cannot build LCU block encoding.")
 
+        if num_prepare_ancillas == 0:
+            orbitals = ModelOrbitals(0)
+            container = StateVectorContainer([1.0], [Configuration.from_bitstring("")], orbitals)
+            return Wavefunction(container)
+
+        coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
         abs_coeffs = np.abs(coefficients)
         amplitudes = np.sqrt(abs_coeffs / l1_norm)
 
-        # Build 1-bit-per-mode Configuration determinants for each nonzero amplitude
+        # Build 1-bit-per-mode Configuration determinants for each nonzero amplitude.
         coeffs_list: list[float] = []
         dets: list[Configuration] = []
         for idx, amp in enumerate(amplitudes):
             if amp != 0.0:
-                bitstring = format(idx, f"0{num_prepare_ancillas}b")
+                bitstring = format(idx, f"0{num_prepare_ancillas}b")[::-1]
                 dets.append(Configuration.from_bitstring(bitstring))
                 coeffs_list.append(float(amp))
 
