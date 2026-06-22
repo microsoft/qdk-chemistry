@@ -579,7 +579,7 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
   // non-negative integer with no trailing tokens.
   auto parse_count_line = [](const std::string& s, size_t& count) {
     std::istringstream ss(s);
-    size_t value;
+    unsigned value;
     if (!(ss >> value)) {
       return false;
     }
@@ -609,6 +609,7 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
 
   bool has_header = false;
   size_t expected_num_atoms = 0;
+  if (parse_count_line(first_line, expected_num_atoms)) {
     has_header = true;
     // The line immediately following the count is the comment line and is
     // skipped regardless of its content.
