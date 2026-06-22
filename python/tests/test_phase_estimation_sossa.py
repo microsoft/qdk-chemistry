@@ -19,12 +19,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import (
-    InnerPrepareMapper,
-    OuterPrepareMapper,
-    SelectMapper,
-    SOSSAMapper,
-)
+from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit
@@ -216,6 +211,14 @@ def _python_to_qsharp_permutation(num_orbitals):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+# Short name -> registry name for outer_prepare AlgorithmRef
+_OUTER_PREP_MAP = {
+    "alias_sampling": "alias_sampling",
+    "dense_pure": "dense_pure_state",
+    "qrom": "qrom_state_prep",
+}
+
+
 def _sossa_qpe_circuit_builder_ref(
     num_bits: int = 4,
     *,
@@ -226,13 +229,7 @@ def _sossa_qpe_circuit_builder_ref(
     rotation_bit_precision: int = 10,
 ) -> AlgorithmRef:
     """Return an AlgorithmRef for iterative QPE with SOSSA."""
-    mapper_kwargs = dict(
-        outer_prepare_algorithm=outer_prepare_algorithm,
-        inner_prepare_algorithm=inner_prepare_algorithm,
-        select_algorithm=select_algorithm,
-        coefficient_bit_precision=coefficient_bit_precision,
-        rotation_bit_precision=rotation_bit_precision,
-    )
+    ref_name = _OUTER_PREP_MAP.get(outer_prepare_algorithm, outer_prepare_algorithm)
     return AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_iterative",
@@ -240,7 +237,11 @@ def _sossa_qpe_circuit_builder_ref(
         controlled_circuit_mapper=AlgorithmRef(
             "controlled_circuit_mapper",
             "sossa",
-            **mapper_kwargs,
+            outer_prepare=AlgorithmRef("state_prep", ref_name),
+            inner_prepare_algorithm=inner_prepare_algorithm,
+            select_algorithm=select_algorithm,
+            coefficient_bit_precision=coefficient_bit_precision,
+            rotation_bit_precision=rotation_bit_precision,
         ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa", quantum_walk=True),
     )
@@ -299,8 +300,12 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
         data["basis_vectors"].flatten(),
         data["two_body_weights"].flatten(),
         data["identity_weight"],
-        R, B, C,
-        orbitals, 0.0, inactive_fock,
+        R,
+        B,
+        C,
+        orbitals,
+        0.0,
+        inactive_fock,
     )
 
     # Build SOSSA unitary and get normalization
@@ -338,7 +343,7 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
 
     result = iqpe.run(
         state_preparation=state_prep,
-        factorized_hamiltonian=fh,
+        qubit_hamiltonian=fh,
     )
 
     # Convert measured phase to k
@@ -410,11 +415,10 @@ class TestSOSSAQPEIntegration:
 
         # Map to controlled circuit
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct"),
-        )
+        mapper = SOSSAMapper()
+        mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_state"))
+        mapper.settings().set("inner_prepare_algorithm", "direct")
+        mapper.settings().set("select_algorithm", "direct")
         circuit = mapper.run(controlled_unitary)
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
@@ -497,7 +501,7 @@ class TestSOSSAQPEIntegration:
 
         result = iqpe.run(
             state_preparation=state_prep,
-            factorized_hamiltonian=fh,
+            qubit_hamiltonian=fh,
         )
 
         # Verify: for SOS walk, E_gap = Λ(1 - cos(2πφ))
@@ -553,11 +557,10 @@ class TestSOSSAQPEIntegration:
 
         # Step 2: SOSSAMapper → Circuit
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        mapper = SOSSAMapper(
-            outer_prepare_mapper=OuterPrepareMapper(algorithm="dense_pure"),
-            inner_prepare_mapper=InnerPrepareMapper(algorithm="direct"),
-            select_mapper=SelectMapper(multiplexed_rotation="direct"),
-        )
+        mapper = SOSSAMapper()
+        mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_state"))
+        mapper.settings().set("inner_prepare_algorithm", "direct")
+        mapper.settings().set("select_algorithm", "direct")
         circuit = mapper.run(controlled_unitary)
 
         # Verify circuit has all required components

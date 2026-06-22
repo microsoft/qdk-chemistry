@@ -6,12 +6,12 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -60,9 +60,8 @@ class PhaseEstimation(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | Any = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
         *,
-        factorized_hamiltonian: Any = None,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         r"""Run the phase estimation algorithm with the given state preparation circuit and Hamiltonian.
@@ -77,10 +76,8 @@ class PhaseEstimation(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-                Mutually exclusive with factorized_hamiltonian.
-            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
-                Mutually exclusive with qubit_hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

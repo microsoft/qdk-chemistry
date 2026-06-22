@@ -13,13 +13,12 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from typing import Any
-
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     Circuit,
+    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -74,18 +73,16 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | Any = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
         *,
-        factorized_hamiltonian: Any = None,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the iterative phase estimation algorithm with the given state preparation circuit and Hamiltonian.
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
-                Mutually exclusive with qubit_hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to estimate the phase.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -115,7 +112,6 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
-                factorized_hamiltonian=factorized_hamiltonian,
             )
             iteration_circuit = iteration_circuits[0]
             Logger.info(f"Iteration {iteration + 1} / {num_bits}: circuit generated.")
@@ -159,7 +155,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         if isinstance(unitary_builder, SOSSABuilder):
             # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
             # Build the unitary once more to access the container's normalization.
-            hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
+            hamiltonian = qubit_hamiltonian
             unitary_rep = unitary_builder.run(hamiltonian)
             container = unitary_rep.get_container()
             if not isinstance(container, SOSSAContainer):

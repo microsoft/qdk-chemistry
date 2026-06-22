@@ -13,14 +13,13 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
-
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
+    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -73,18 +72,16 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | Any = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
         *,
-        factorized_hamiltonian: Any = None,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the standard phase estimation algorithm given the state preparation and Hamiltonian.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
-                Mutually exclusive with qubit_hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -100,13 +97,10 @@ class StandardPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
         num_bits = circuit_builder.settings().get("num_bits")
-        builder_kwargs = {
-            "state_preparation": state_preparation,
-            "qubit_hamiltonian": qubit_hamiltonian,
-        }
-        if factorized_hamiltonian is not None:
-            builder_kwargs["factorized_hamiltonian"] = factorized_hamiltonian
-        circuits = circuit_builder.run(**builder_kwargs)
+        circuits = circuit_builder.run(
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
+        )
         circuit = circuits[0]
         shots = self._settings.get("shots")
         execution_data = circuit_executor.run(circuit, shots=shots, noise=noise)
@@ -135,7 +129,7 @@ class StandardPhaseEstimation(PhaseEstimation):
             )
         if isinstance(unitary_builder, SOSSABuilder):
             # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
-            hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
+            hamiltonian = qubit_hamiltonian
             unitary_rep = unitary_builder.run(hamiltonian)
             container = unitary_rep.get_container()
             if not isinstance(container, SOSSAContainer):
