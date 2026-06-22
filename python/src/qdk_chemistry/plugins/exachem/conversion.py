@@ -507,8 +507,11 @@ def spinorb_to_spatial(fcidump: FcidumpData) -> FcidumpData:
     decompose into spatial Coulomb and exchange integrals. This function
     extracts the spatial-orbital integrals from the spin-orbital ones.
 
-    The spin-orbital ordering is assumed to be interleaved:
-    ``[α₁, β₁, α₂, β₂, ...]`` (alpha/beta alternating for each spatial orbital).
+    The spin-orbital ordering is the block layout produced by
+    :func:`parse_ducc_results`:
+    ``[α_occ(noa), β_occ(nob), α_vir(nva), β_vir(nvb)]`` (occupied first, alpha
+    then beta, then virtual alpha then beta), with ``noa=nob`` and ``nva=nvb``
+    for a closed-shell restricted system.
 
     The returned 2e integrals are in **chemist notation** ``(pq|rs)``
     (Coulomb integrals), not physicist notation ``<pq||rs>``.
@@ -541,9 +544,7 @@ def spinorb_to_spatial(fcidump: FcidumpData) -> FcidumpData:
     # spatial occ orbital i (0..noa-1): alpha = i, beta = noa + i
     # spatial vir orbital j (0..nva-1): alpha = nocc + j, beta = nocc + nva + j
 
-    noa = norb_spin // 4  # assuming noa = nob, nva = nvb and norb_spin = 2*(noa+nva)
-    # Actually we need the actual split. nelec gives nocc_spin.
-    nocc = fcidump.nelec  # total occupied spin-orbitals
+    nocc = fcidump.nelec  # total occupied spin-orbitals (= active electrons)
     noa_val = nocc // 2
     nvir = norb_spin - nocc
     nva_val = nvir // 2
