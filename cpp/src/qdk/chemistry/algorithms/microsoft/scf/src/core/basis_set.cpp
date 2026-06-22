@@ -259,11 +259,14 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
       // On Windows, GNU tar (Git for Windows/MSYS) interprets paths with a
       // colon as remote host:path and fails with "Cannot connect to C:". The
       // --force-local flag disables that parsing. BSD tar (the System32 one)
-      // does not need or recognize it, so only pass it on Windows.
+      // does not need or recognize it. Detect at runtime which tar is available.
 #ifdef _WIN32
-      auto cmd =
-          fmt::format("tar --force-local -xzf \"{}\" --directory \"{}\"",
-                      compressed_path.generic_string(), odir.generic_string());
+      static const bool tar_has_force_local =
+          (std::system("tar --force-local --version > nul 2>&1") == 0);
+      auto cmd = fmt::format(
+          "{} -xzf \"{}\" --directory \"{}\"",
+          tar_has_force_local ? "tar --force-local" : "tar",
+          compressed_path.generic_string(), odir.generic_string());
 #else
       auto cmd =
           fmt::format("tar -xzf \"{}\" --directory \"{}\"",

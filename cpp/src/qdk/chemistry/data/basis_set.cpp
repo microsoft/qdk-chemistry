@@ -68,9 +68,12 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   // "C:/...", as remote host:path syntax and fails with
   // "Cannot connect to C: resolve failed". --force-local disables that parsing.
   // BSD tar (Windows 10+ System32\tar.exe) does not need this flag and does not
-  // recognize it, so we only add it on Windows where GNU tar dominates.
+  // recognize it. Detect at runtime which tar is available.
 #ifdef _WIN32
-  const std::string tar_cmd = "tar --force-local -xzf ";
+  static const bool tar_has_force_local =
+      (std::system("tar --force-local --version > nul 2>&1") == 0);
+  const std::string tar_cmd =
+      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
 #else
   const std::string tar_cmd = "tar -xzf ";
 #endif
