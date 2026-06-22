@@ -230,6 +230,202 @@ def _extract_integrals(op, core, act):
     return E0, h1_eff, v2_eff
 
 
+def _to_particle_hole_integrals(op, occ_so, active_so):
+    """Convert a vacuum-NO FermionOperator to physical-vacuum ≤2-body integrals.
+
+    Implements the procedure from Bauman et al. (2019), Eqs. 62–66 / Tables IV–V:
+
+    1. **Fermi-vacuum normal ordering** — Wick-contract every vacuum-NO term
+       w.r.t. the HF reference (occupied spin-orbitals ``occ_so``).  Each
+       contraction pairs a creator at index *k* ∈ ``occ_so`` with the matching
+       annihilator (same index), giving factor 1 and a sign.  This folds
+       *n*-body vacuum-NO terms into ≤2-body particle-hole coefficients.
+    2. **Active-space projection** — keep only terms whose remaining
+       (uncontracted) indices are all in ``active_so``.  FV-NO 3-body+
+       residuals are dropped.
+    3. **Table IV/V transformation** — convert the particle-hole coefficients
+       (``f̃``, ``ṽ``) to physical-vacuum integrals (``h``, ``v``).
+
+    Args:
+        op: Normal-ordered FermionOperator (vacuum NO).
+        occ_so: Sorted list of occupied spin-orbital indices (HF reference).
+        active_so: Sorted list of active spin-orbital indices.
+
+    Returns:
+        ``(E0, h1, v2)`` — physical-vacuum effective integrals in the active
+        spin-orbital basis (indices ``0 .. len(active_so)-1``).
+
+    """
+    occ_set = frozenset(occ_so)
+    act_set = frozenset(active_so)
+    nA = len(active_so)
+    act_idx = {p: i for i, p in enumerate(active_so)}
+    act_occ_local = [act_idx[k] for k in active_so if k in occ_set]
+
+    # Particle-hole (Fermi-vacuum NO) accumulators
+    E0_ph = 0.0
+    h1_ph = np.zeros((nA, nA))
+    v2_ph = np.zeros((nA, nA, nA, nA))
+
+    for term, coeff in op.terms.items():
+        if abs(coeff) < 1e-15:
+            continue
+        n_body = len(term) // 2
+
+        # Split into creators and annihilators (vacuum-NO order)
+        creators = [term[i] for i in range(n_body)]  # (idx, 1)
+        anns = [term[n_body + i] for i in range(n_body)]  # (idx, 0)
+
+        # Find all contractible pairs: creator k with annihilator k, k ∈ occ
+        pairs = []
+        for ci, (cp, _) in enumerate(creators):
+            if cp not in occ_set:
+                continue
+            for ai, (ap, _) in enumerate(anns):
+                if ap == cp:
+                    pairs.append((ci, ai))
+
+        # Enumerate contraction sets.  For n-body ≤ 2, the empty set (no
+        # contractions) gives the vacuum-NO piece that the CI solver handles
+        # natively — we keep it as-is and skip all contractions (the CI solver
+        # accounts for the occupied-density folding internally).
+        # For n-body ≥ 3, only non-empty contraction sets that reduce to
+        # ≤ 2-body are kept; these fold 3-body+ contributions into effective
+        # ≤ 2-body integrals that a CI solver can use.
+        if n_body <= 2:
+            # Pass through the vacuum-NO piece unchanged
+            indices = [idx for idx, _ in creators] + [idx for idx, _ in anns]
+            if all(idx in act_set for idx in indices):
+                if n_body == 0:
+                    E0_ph += coeff
+                elif n_body == 1:
+                    E0_ph  # h1 assignment below
+                    ip = act_idx[creators[0][0]]
+                    iq = act_idx[anns[0][0]]
+                    h1_ph[ip, iq] += coeff
+                elif n_body == 2:
+                    ip = act_idx[creators[0][0]]
+                    iq = act_idx[creators[1][0]]
+                    ir = act_idx[anns[0][0]]
+                    is_ = act_idx[anns[1][0]]
+                    v2_ph[ip, iq, ir, is_] += coeff
+            continue
+
+        # n_body >= 3: apply Wick contractions to fold into ≤ 2-body
+        for cset in _enum_contraction_sets(pairs, n_body, max_remaining=2):
+            n_contracted = len(cset)
+            remaining_body = n_body - n_contracted
+
+            # Skip the uncontracted piece (FV-NO 3-body+ residual)
+            if n_contracted == 0:
+                continue
+            c_cr = {ci for ci, _ in cset}
+            c_an = {ai for _, ai in cset}
+            rem_cr = [creators[i] for i in range(n_body) if i not in c_cr]
+            rem_an = [anns[i] for i in range(n_body) if i not in c_an]
+
+            # Active-space filter: all remaining indices must be active
+            rem_indices = [idx for idx, _ in rem_cr] + [idx for idx, _ in rem_an]
+            if not all(idx in act_set for idx in rem_indices):
+                continue
+
+            sign = _wick_sign(cset, n_body) if cset else 1
+            c_total = coeff * sign
+
+            if remaining_body == 0:
+                E0_ph += c_total
+            elif remaining_body == 1:
+                ip = act_idx[rem_cr[0][0]]
+                iq = act_idx[rem_an[0][0]]
+                h1_ph[ip, iq] += c_total
+            elif remaining_body == 2:
+                ip = act_idx[rem_cr[0][0]]
+                iq = act_idx[rem_cr[1][0]]
+                ir = act_idx[rem_an[0][0]]
+                is_ = act_idx[rem_an[1][0]]
+                v2_ph[ip, iq, ir, is_] += c_total
+
+    # The Wick contraction procedure above already produces physical-vacuum
+    # quantities: E0_ph = ⟨Φ|H|Φ⟩ (all fully-contracted pieces), and h1_ph/v2_ph
+    # include the occupied-density folding of higher-body terms.  No Table IV/V
+    # transformation is needed — that would double-count.
+
+    return E0_ph, h1_ph, v2_ph
+
+
+def _enum_contraction_sets(pairs, n_body, max_remaining=2):
+    """Yield all non-overlapping contraction sets from ``pairs``.
+
+    Each set has between 0 and ``n_body - max_remaining`` contractions
+    (but at least 0) such that the remaining body count is ≤ ``max_remaining``.
+    The empty set (no contractions) is always yielded for ``n_body ≤ max_remaining``.
+    """
+    min_contractions = max(0, n_body - max_remaining)
+
+    def _recurse(remaining_pairs, used_cr, used_an, depth):
+        n_contracted = len(used_cr)
+        if n_contracted >= min_contractions:
+            yield []
+        if n_body - n_contracted <= 0:
+            return
+        for pi, (ci, ai) in enumerate(remaining_pairs):
+            if ci in used_cr or ai in used_an:
+                continue
+            for rest in _recurse(remaining_pairs[pi + 1 :], used_cr | {ci}, used_an | {ai}, depth + 1):
+                yield [(ci, ai)] + rest
+
+    return _recurse(pairs, frozenset(), frozenset(), 0)
+
+
+def _wick_sign(cset, n_body):
+    """Compute the sign for a set of Wick contractions.
+
+    For vacuum-NO ``a†_{c0} … a†_{c(n-1)} a_{a0} … a_{a(n-1)}``, contracting
+    creator ``ci`` with annihilator ``ai`` costs ``(adj_n - 1 - adj_ci) + adj_ai``
+    anticommutation hops.  Contractions are processed right-to-left in the
+    creator block to keep adjusted indices simple.
+    """
+    sign = 1
+    adj_n = n_body
+    removed_cr: list[int] = []
+    removed_an: list[int] = []
+    for ci, ai in sorted(cset, key=lambda x: -x[0]):
+        adj_ci = ci - sum(1 for rc in removed_cr if rc < ci)
+        adj_ai = ai - sum(1 for ra in removed_an if ra < ai)
+        sign *= (-1) ** ((adj_n - 1 - adj_ci) + adj_ai)
+        removed_cr.append(ci)
+        removed_an.append(ai)
+        adj_n -= 1
+    return sign
+
+
+def _project_to_active_space(op, active_so):
+    """Project a FermionOperator to the active spin-orbital subspace.
+
+    Keeps every term whose indices all belong to ``active_so`` and re-indexes
+    them to a contiguous ``0 .. len(active_so)-1`` range.  Terms with any
+    index outside the active set are dropped.
+
+    Args:
+        op: Normal-ordered FermionOperator on the full spin-orbital space.
+        active_so: Sorted list of active spin-orbital indices.
+
+    Returns:
+        A new FermionOperator whose indices span ``[0, len(active_so))``.
+
+    """
+    idx_map = {p: i for i, p in enumerate(active_so)}
+    active_set = set(active_so)
+    projected = FermionOperator()
+    for term, coeff in op.terms.items():
+        if abs(coeff) < 1e-15:
+            continue
+        if all(idx in active_set for idx, _ in term):
+            new_term = tuple((idx_map[idx], dag) for idx, dag in term)
+            projected += FermionOperator(new_term, coeff)
+    return projected
+
+
 def _project_to_active_ci(op, active_so, n_elec, nso_full):
     """Build the active-space CI matrix directly from a FermionOperator.
 
