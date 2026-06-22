@@ -304,9 +304,6 @@ extends:
 
         - task: CodeQL3000Init@0
           displayName: 🛡 CodeQL Initialize
-          inputs:
-            Enabled: true
-            Language: cpp
 
         - script: |
             set -e

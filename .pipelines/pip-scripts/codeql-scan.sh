@@ -4,11 +4,12 @@
 #
 # The wheel build (build-pip-wheels.sh) does too much for CodeQL to wrap
 # cleanly: dep install + configure-time toolchain probes + compile + wheel
-# repair all in one go. This script builds only the pure C++ library
-# (cpp/CMakeLists.txt — no pybind11, no Python wheel) and splits the work
-# into two phases so the pipeline can run the heavy env setup + CMake
-# configure *before* CodeQL Init, and only the actual `cmake --build`
-# under tracing.
+# repair all in one go. This script runs only the cmake configure +
+# compile from python/CMakeLists.txt — which add_subdirectory()s cpp/ and
+# adds the pybind11 _core module, so a single cmake build covers both the
+# C++ library and the Python bindings. Split into two phases so the heavy
+# env setup + CMake configure run *before* CodeQL Init, and only the
+# actual `cmake --build` is traced.
 #
 # Usage:
 #   bash codeql-scan.sh deps    # outside CodeQL
@@ -28,7 +29,7 @@ HDF5_VERSION=1.13.0
 BLIS_VERSION=2.0
 LIBFLAME_VERSION=5.2.0
 
-BUILD_DIR=cpp/build
+BUILD_DIR=python/build
 CFLAGS_COMMON="-march=${MARCH} -fPIC -Os -fvisibility=hidden -g"
 
 export CFLAGS="-fPIC -Os"
@@ -120,7 +121,7 @@ if [ "$PHASE" = "deps" ]; then
     # probes don't pollute the database. Flags mirror what scikit-build-core
     # injects in the production wheel build (build-pip-wheels.sh) so the
     # scanned compilation matches what ships.
-    cmake -S cpp -B "${BUILD_DIR}" -G Ninja \
+    cmake -S python -B "${BUILD_DIR}" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DQDK_UARCH=${MARCH} \
         -DBUILD_SHARED_LIBS=OFF \
