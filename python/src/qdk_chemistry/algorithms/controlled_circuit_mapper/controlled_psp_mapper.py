@@ -10,7 +10,8 @@ from qdk import qsharp
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, Select
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
@@ -53,8 +54,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
-    When the container has ``quantum_walk=True``, the block encoding is wrapped with
-    a quantum walk operator:
+    When the input is an :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
+    the block encoding is additionally wrapped with the reflection operator to form a quantum walk:
 
     .. math::
 
@@ -88,56 +89,52 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled block-encoding circuit.
 
-        The method proceeds in three stages:
-
-        1. **PREPARE** — delegates to the nested ``state_prep`` algorithm
-           to build a Q# callable that loads amplitudes into the ancilla register.
-        2. **SELECT** — builds the Pauli SELECT oracle directly from the
-           block-encoding container's SELECT data.
-        3. **Compose** — stitches controlled PREPARE-SELECT-PREPARE into either a plain block
-           encoding or a quantum walk step (when ``quantum_walk=True``), via the
-           Q# ``PrepSelPrep`` / ``QuantumWalkStep`` operations.
-
         Args:
-            unitary: The unitary representation containing the block-encoding
-                decomposition (PREPARE and SELECT data). Control and target
-                indices are read from settings.
+            unitary: The unitary representation containing either an
+                :class:`LCUContainer` (plain block encoding) or an
+                :class:`LCUWalkContainer` (quantum walk).
 
         Returns:
             Circuit: A quantum circuit implementing the controlled block encoding.
 
         """
-        unitary_container = unitary.get_container()
-        if not isinstance(unitary_container, BlockEncodingContainer):
+        container = unitary.get_container()
+
+        # Resolve container type → LCU data + dispatch flag
+        if isinstance(container, LCUWalkContainer):
+            lcu = container.block_encoding
+            power = container.power
+            use_quantum_walk = True
+        elif isinstance(container, LCUContainer):
+            lcu = container
+            power = container.power
+            use_quantum_walk = False
+        else:
             raise ValueError(
-                f"The {unitary.get_container_type()} container type is not supported. "
-                "ControlledPSPMapper only supports BlockEncodingContainer."
+                f"Container type '{unitary.get_container_type()}' is not supported. "
+                "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."
             )
 
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
             raise ValueError("ControlledPSPMapper currently only supports a single control qubit.")
 
-        power = unitary_container.power
-        prepare_wavefunction = unitary_container.prepare
-        select = unitary_container.select
+        # 1. PREPARE — build state-preparation oracle
+        prepare_op = self._build_prepare_op(lcu)
 
-        # 1. Create PREPARE circuit via the state-preparation algorithm.
-        #    For the 0-ancilla case the wavefunction has 0 modes, producing a
-        #    no-op circuit.
-        if prepare_wavefunction is not None:
-            prepare_algorithm = self._create_nested("prepare")
-            prepare_circuit = prepare_algorithm.run(prepare_wavefunction)
-            prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
+        # 2. SELECT — build Pauli SELECT oracle
+        select_op = self._build_pauli_select_op(lcu.select)
+
+        # 3. Compose controlled circuit
+        num_system = lcu.select.num_target_qubits
+        num_ancilla = lcu.num_prepare_ancillas
+
+        if use_quantum_walk:
+            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkCircuit
+            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkOp
         else:
-            prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-
-        # 2. Create SELECT circuit directly (Pauli SELECT oracle).
-        select_op = self._build_pauli_select_op(select)
-
-        # 3. Compose into a controlled PREPARE-SELECT-PREPARE (optionally with quantum walk).
-        num_system = select.num_target_qubits
-        num_ancilla = unitary_container.num_prepare_ancillas
+            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit
+            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp
 
         psp_parameters = {
             "prepareOp": prepare_op,
@@ -147,24 +144,28 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             "power": power,
         }
 
-        if unitary_container.quantum_walk:
-            qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepSelPrep.MakeControlledQuantumWalkCircuit,
-                parameter=psp_parameters,
-            )
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledQuantumWalkOp(
-                prepare_op, select_op, num_system, num_ancilla, power
-            )
-        else:
-            qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
-                parameter=psp_parameters,
-            )
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp(
-                prepare_op, select_op, num_system, num_ancilla, power
-            )
+        qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
+        qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    def _build_prepare_op(self, lcu: LCUContainer):
+        """Build the PREPARE Q# operation from an LCU container.
+
+        For the 0-ancilla case the wavefunction has 0 modes, producing a no-op.
+
+        Args:
+            lcu: The LCU container holding the prepare wavefunction.
+
+        Returns:
+            A Q# callable implementing the PREPARE oracle.
+
+        """
+        if lcu.prepare is not None:
+            prepare_algorithm = self._create_nested("prepare")
+            prepare_circuit = prepare_algorithm.run(lcu.prepare)
+            return prepare_circuit._qsharp_op  # noqa: SLF001
+        return QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
     @staticmethod
     def _build_pauli_select_op(select: Select):
