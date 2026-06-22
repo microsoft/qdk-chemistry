@@ -763,7 +763,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
-        PrepSelPrepMapper,
+        ControlledPSPMapper,
     )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
@@ -811,7 +811,7 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
-    register(lambda: PrepSelPrepMapper())
+    register(lambda: ControlledPSPMapper())
     register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())

@@ -11,7 +11,6 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledUnitary,
     QubitHamiltonian,
     Settings,
 )
@@ -119,9 +118,8 @@ class QpeCircuitBuilder(Algorithm):
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
+        circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
 
 
