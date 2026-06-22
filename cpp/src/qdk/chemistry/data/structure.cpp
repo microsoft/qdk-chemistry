@@ -579,15 +579,15 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
   // non-negative integer with no trailing tokens.
   auto parse_count_line = [](const std::string& s, unsigned& count) {
     std::istringstream ss(s);
-    long long value;
-    if (!(ss >> value) || value < 0) {
+    unsigned value;
+    if (!(ss >> value)) {
       return false;
     }
     std::string extra;
     if (ss >> extra) {
       return false;  // additional tokens => not a pure count line
     }
-    count = static_cast<unsigned>(value);
+    count = value;
     return true;
   };
 
