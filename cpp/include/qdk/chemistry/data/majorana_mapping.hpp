@@ -20,6 +20,8 @@ namespace qdk::chemistry::data {
 
 class Hamiltonian;
 
+class LatticeGraph;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -101,6 +103,15 @@ class MajoranaMapping : public DataClass {
   /// Optional post-mapping tapering specification.
   const std::optional<TaperingSpecification>& tapering() const {
     return tapering_;
+  }
+
+  /**
+   * @brief Stabilizer terms carried by this mapping.
+   * @return Reference to the vector of stabilizers.
+   */
+  const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+  stabilizers() const {
+    return stabilizers_;
   }
 
   /**
@@ -246,13 +257,25 @@ class MajoranaMapping : public DataClass {
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
+  /**
+   * @brief Verstraete-Cirac encoding.
+   *
+   * Maps fermionic modes on a `LatticeGraph` to qubits.
+   *
+   * @param lattice The `LatticeGraph` connectivity.
+   * @return MajoranaMapping with name ``"verstraete-cirac"``.
+   */
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
-      std::optional<TaperingSpecification> tapering = std::nullopt);
+      std::optional<TaperingSpecification> tapering = std::nullopt,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+          stabilizers = {});
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
@@ -280,6 +303,9 @@ class MajoranaMapping : public DataClass {
 
   /// Feed the mapping's identifying data into a content hash.
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+  /// Optional stabilizer terms.
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers_;
 
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
