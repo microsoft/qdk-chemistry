@@ -48,13 +48,14 @@ export MPSSparse, MakeMPSSparseCircuit, SparseSiteUnitary, PermutationViaQROAM;
 /// ## permTargets
 /// Bool[N][m]: The permutation targets encoded as bit strings.
 ///   permTargets[i] = binary encoding of P(i).
-/// ## signFixes
-/// Bool[N][1]: sign fix-up data for each basis state.
+/// ## invPermTargets
+/// Bool[N][m]: The inverse permutation targets encoded as bit strings.
+///   invPermTargets[j] = binary encoding of P^{-1}(j).
 /// ## target
 /// The target register to be permuted.
 operation PermutationViaQROAM(
     permTargets : Bool[][],
-    signFixes : Bool[][],
+    invPermTargets : Bool[][],
     target : Qubit[]
 ) : Unit {
     let n = Length(target);
@@ -70,19 +71,11 @@ operation PermutationViaQROAM(
         SWAP(target[i], loaded[i]);
     }
 
-    // Step 3: X-basis measurement of old register (uncomputation)
-    ApplyToEachA(H, loaded);
-    let _ = MResetEachZ(loaded);
-
-    // Step 4: Sign fix-up
-    // Apply Z corrections based on precomputed sign pattern.
-    // Model as Select lookup for resource estimation cost.
-    if Length(signFixes) > 0 and Length(signFixes[0]) > 0 {
-        use signReg = Qubit[1];
-        Select(signFixes, target[...nRequired - 1], signReg);
-        CZ(signReg[0], target[0]);
-        Adjoint Select(signFixes, target[...nRequired - 1], signReg);
-    }
+    // Step 3: Uncompute loaded via XOR with inverse permutation.
+    // After SWAP: target = P(i), loaded = i = invPermTargets[P(i)].
+    // XOR invPermTargets[target] into loaded: loaded = i ⊕ i = 0.
+    // SelectSwap internally uses within/apply with measurement-based cleanup.
+    SelectSwap(-1, invPermTargets, target[...nRequired - 1], loaded);
 }
 
 // =============================================================================
@@ -95,16 +88,18 @@ operation PermutationViaQROAM(
 /// # Input
 /// ## colPermTargets
 /// Bool[N][m]: column permutation targets as bit strings.
+/// ## colInvPermTargets
+/// Bool[N][m]: inverse column permutation targets as bit strings.
 /// ## rowPermTargets
 /// Bool[N][m]: row permutation targets as bit strings.
+/// ## rowInvPermTargets
+/// Bool[N][m]: inverse row permutation targets as bit strings.
 /// ## blockLayerAngles
 /// Double[numLayers][numAngles]: Givens angles for block-diagonal V.
 /// ## blockLayerShifted
 /// Bool[numLayers]: whether each Givens layer is shifted.
 /// ## blockPhases
 /// Bool[dim]: phase corrections for block-diagonal V.
-/// ## signFixes
-/// Bool[N][1]: sign fix-ups for permutations.
 /// ## newSite
 /// The 2-qubit new site register.
 /// ## ancilla
@@ -115,11 +110,12 @@ operation PermutationViaQROAM(
 /// Reusable angle register for QROAM rotations.
 operation SparseSiteUnitary(
     colPermTargets : Bool[][],
+    colInvPermTargets : Bool[][],
     rowPermTargets : Bool[][],
+    rowInvPermTargets : Bool[][],
     blockLayerAngles : Double[][],
     blockLayerShifted : Bool[],
     blockPhases : Bool[],
-    signFixes : Bool[][],
     newSite : Qubit[],
     ancilla : Qubit[],
     phaseGradient : Qubit[],
@@ -139,20 +135,23 @@ operation SparseSiteUnitary(
     let blockPhaseData = PhaseFlipsAsSelectData(blockPhases);
 
     // Step 1: Apply column permutation
-    PermutationViaQROAM(colPermTargets, signFixes, target);
+    PermutationViaQROAM(colPermTargets, colInvPermTargets, target);
 
     // Step 2: Apply block-diagonal unitary via Givens layers
+    // Use Reversed(newSite) + Reversed(ancilla) to get MSB-first ordering
+    // that matches the target matrix row convention: row = physical * ancilla_dim + ancilla.
+    // Note: Reversed(target) would give [anc_msb, ..., site_lsb] = ancilla*d + physical (wrong).
     ApplyRealUnitaryViaGivens(
         blockData,
         blockLayerShifted,
         blockPhaseData,
-        Reversed(target),
+        Reversed(newSite) + Reversed(ancilla),
         phaseGradient,
         angleReg
     );
 
     // Step 3: Apply row permutation
-    PermutationViaQROAM(rowPermTargets, signFixes, target);
+    PermutationViaQROAM(rowPermTargets, rowInvPermTargets, target);
 }
 
 // =============================================================================
@@ -174,11 +173,12 @@ operation MPSSparse(
     numSites : Int,
     rotationBits : Int,
     siteColPermTargets : Bool[][][],
+    siteColInvPermTargets : Bool[][][],
     siteRowPermTargets : Bool[][][],
+    siteRowInvPermTargets : Bool[][][],
     siteBlockLayerAngles : Double[][][],
     siteBlockLayerShifted : Bool[][],
     siteBlockPhases : Bool[][],
-    siteSignFixes : Bool[][][],
     state : Qubit[],
     ancilla : Qubit[]
 ) : Unit {
@@ -199,11 +199,12 @@ operation MPSSparse(
         if BeginEstimateCaching("SparseSiteUnitary", SingleVariant()) {
             SparseSiteUnitary(
                 siteColPermTargets[siteIdx],
+                siteColInvPermTargets[siteIdx],
                 siteRowPermTargets[siteIdx],
+                siteRowInvPermTargets[siteIdx],
                 siteBlockLayerAngles[siteIdx],
                 siteBlockLayerShifted[siteIdx],
                 siteBlockPhases[siteIdx],
-                siteSignFixes[siteIdx],
                 newSite,
                 ancilla,
                 phaseGradient,
@@ -224,11 +225,12 @@ operation MakeMPSSparseCircuit(
     rotationBits : Int,
     numAncillaQubits : Int,
     siteColPermTargets : Bool[][][],
+    siteColInvPermTargets : Bool[][][],
     siteRowPermTargets : Bool[][][],
+    siteRowInvPermTargets : Bool[][][],
     siteBlockLayerAngles : Double[][][],
     siteBlockLayerShifted : Bool[][],
-    siteBlockPhases : Bool[][],
-    siteSignFixes : Bool[][][]
+    siteBlockPhases : Bool[][]
 ) : Unit {
     use state = Qubit[2 * numSites];
     use ancilla = Qubit[numAncillaQubits];
@@ -237,11 +239,12 @@ operation MakeMPSSparseCircuit(
         numSites,
         rotationBits,
         siteColPermTargets,
+        siteColInvPermTargets,
         siteRowPermTargets,
+        siteRowInvPermTargets,
         siteBlockLayerAngles,
         siteBlockLayerShifted,
         siteBlockPhases,
-        siteSignFixes,
         state,
         ancilla
     );

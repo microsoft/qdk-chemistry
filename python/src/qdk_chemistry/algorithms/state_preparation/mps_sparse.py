@@ -140,14 +140,17 @@ class SparseSiteUnitaryData:
     col_perm_targets: list[int]
     """Column permutation targets: col_perm_targets[i] = P_col(i)."""
 
+    col_inv_perm_targets: list[int]
+    """Inverse column permutation targets: col_inv_perm_targets[j] = P_col^{-1}(j)."""
+
     row_perm_targets: list[int]
     """Row permutation targets: row_perm_targets[i] = P_row(i)."""
 
+    row_inv_perm_targets: list[int]
+    """Inverse row permutation targets: row_inv_perm_targets[j] = P_row^{-1}(j)."""
+
     block_givens: GivensLayerData
     """Givens layers for the block-diagonal unitary V."""
-
-    sign_fixes: list[bool]
-    """Sign fix-ups for the permutations (per basis state)."""
 
     target_bits: int
     """Number of bits in the target register (site + ancilla)."""
@@ -171,17 +174,44 @@ class MPSSparsePreparationData:
 
     def to_qsharp_params(self, rotation_bits: int) -> dict:
         """Flatten into the dict expected by the MakeMPSSparseCircuit Q# operation."""
+        d = 4  # physical dimension (2-qubit site register)
+        ancilla_dim = 1 << self.ancilla_bits
         return {
             "initialStateVec": self.initial_state_vec,
             "numSites": self.num_sites,
             "rotationBits": rotation_bits,
             "numAncillaQubits": self.ancilla_bits,
-            "siteColPermTargets": [_perm_to_bitstrings(s.col_perm_targets, s.target_bits) for s in self.sites],
-            "siteRowPermTargets": [_perm_to_bitstrings(s.row_perm_targets, s.target_bits) for s in self.sites],
+            "siteColPermTargets": [
+                _perm_to_bitstrings(
+                    _remap_perm_to_qsharp_order(s.col_perm_targets, d, ancilla_dim),
+                    s.target_bits,
+                )
+                for s in self.sites
+            ],
+            "siteColInvPermTargets": [
+                _perm_to_bitstrings(
+                    _remap_perm_to_qsharp_order(s.col_inv_perm_targets, d, ancilla_dim),
+                    s.target_bits,
+                )
+                for s in self.sites
+            ],
+            "siteRowPermTargets": [
+                _perm_to_bitstrings(
+                    _remap_perm_to_qsharp_order(s.row_perm_targets, d, ancilla_dim),
+                    s.target_bits,
+                )
+                for s in self.sites
+            ],
+            "siteRowInvPermTargets": [
+                _perm_to_bitstrings(
+                    _remap_perm_to_qsharp_order(s.row_inv_perm_targets, d, ancilla_dim),
+                    s.target_bits,
+                )
+                for s in self.sites
+            ],
             "siteBlockLayerAngles": [s.block_givens.layer_angles for s in self.sites],
             "siteBlockLayerShifted": [s.block_givens.layer_shifted for s in self.sites],
             "siteBlockPhases": [s.block_givens.phases for s in self.sites],
-            "siteSignFixes": [_sign_fixes_to_bitstrings(s.sign_fixes) for s in self.sites],
         }
 
 
@@ -305,19 +335,19 @@ def _decompose_sparse_site(tensor: np.ndarray, ancilla_dim: int) -> SparseSiteUn
         phases=block_phases,
     )
 
-    # Sign fixes: precompute based on block phases and permutation structure
-    # The row permutation introduces sign flips from the X-measurement uncomputation.
-    # For resource estimation, we store the deterministic sign pattern.
-    sign_fixes = [False] * active_dim
+    # Compute inverse permutations for measurement-based unlookup
+    col_inv_perm_final = _invert_perm(col_perm_final)
+    row_inv_perm_final = _invert_perm(row_perm_final)
 
     # Number of bits in the target register (site + ancilla)
     target_bits = int(np.log2(active_dim))
 
     return SparseSiteUnitaryData(
         col_perm_targets=col_perm_final,
+        col_inv_perm_targets=col_inv_perm_final,
         row_perm_targets=row_perm_final,
+        row_inv_perm_targets=row_inv_perm_final,
         block_givens=block_givens,
-        sign_fixes=sign_fixes,
         target_bits=target_bits,
     )
 
@@ -569,6 +599,50 @@ def _pad_permutation(perm: list[int], target_len: int) -> list[int]:
 # ---------------------------------------------------------------------------
 # Q# encoding utilities
 # ---------------------------------------------------------------------------
+
+
+def _remap_perm_to_qsharp_order(perm_targets: list[int], d: int, ancilla_dim: int) -> list[int]:
+    """Remap permutation indices from target-matrix order to Q# register order.
+
+    The target matrix uses row = physical_state * ancilla_dim + ancilla_state,
+    but the Q# register (target = newSite + ancilla) with little-endian
+    convention gives value = physical_state + ancilla_state * d.
+
+    This function conjugates the permutation by the reindexing so that
+    SelectSwap (which uses Q# little-endian addressing) applies the correct
+    permutation.
+
+    Parameters
+    ----------
+    perm_targets : list[int]
+        Permutation targets in target-matrix row ordering.
+    d : int
+        Physical dimension (always 4 for 2-qubit site register).
+    ancilla_dim : int
+        Ancilla dimension (2^ancilla_bits).
+
+    Returns
+    -------
+    list[int]
+        Permutation targets reindexed for Q# register ordering.
+
+    """
+    active_dim = d * ancilla_dim
+    qs_perm = [0] * active_dim
+    for v in range(active_dim):
+        # Register value v encodes physical=v%d, ancilla=v//d
+        p = v % d
+        a = v // d
+        # Convert to target matrix row
+        r = p * ancilla_dim + a
+        # Apply permutation in target matrix space
+        r_out = perm_targets[r]
+        # Convert result back to Q# register value
+        p_out = r_out // ancilla_dim
+        a_out = r_out % ancilla_dim
+        v_out = p_out + a_out * d
+        qs_perm[v] = v_out
+    return qs_perm
 
 
 def _perm_to_bitstrings(perm_targets: list[int], num_bits: int) -> list[list[bool]]:
