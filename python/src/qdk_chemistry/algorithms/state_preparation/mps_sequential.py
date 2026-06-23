@@ -123,11 +123,10 @@ class MPSSequentialStatePreparation(StatePreparation):
         rotation_bits = self._settings.get("rotation_bits")
 
         if fast_re:
-            # Use the uniform Q# operation that accepts only 1 site's data.
-            # This avoids marshaling N-1 identical copies of large angle arrays
-            # into the Q# runtime, giving ~(N-1)x speedup on estimate().
-            params = data.to_qsharp_params_uniform(rotation_bits)
-            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitUniform
+            # Use the grouped Q# operation that passes one representative per shape.
+            # This avoids marshaling redundant data and enables accurate per-shape caching.
+            params = data.to_qsharp_params_grouped(rotation_bits)
+            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
         else:
             params = data.to_qsharp_params(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
@@ -216,7 +215,17 @@ class MPSPreparationData:
     """Number of ancilla qubits (log2 of ancilla dimension)."""
 
     sites: list[SiteUnitaryData] = field(default_factory=list)
-    """Per-site decomposition data (one entry per site 1..num_sites-1)."""
+    """Per-site decomposition data (one entry per site 1..num_sites-1).
+
+    In grouped mode (when site_shape_indices is not None), this contains
+    one entry per unique shape rather than per site.
+    """
+
+    site_shape_indices: list[int] | None = None
+    """Per-site mapping to shape group index (0-based). None means ungrouped."""
+
+    shape_effective_bits: list[int] | None = None
+    """Effective ancilla bits per shape group. None means ungrouped."""
 
     def to_qsharp_params(self, rotation_bits: int) -> dict:
         """Flatten into the dict expected by the MakeMPSSequentialCircuit Q# operation."""
@@ -274,6 +283,41 @@ class MPSPreparationData:
         }
         return params
 
+    def to_qsharp_params_grouped(self, rotation_bits: int) -> dict:
+        """Flatten into the dict expected by MakeMPSSequentialCircuitGrouped.
+
+        Passes one representative per unique shape + a site-to-shape mapping.
+        This minimizes data transfer while enabling accurate per-shape caching
+        in the Q# resource estimator.
+        """
+        assert self.site_shape_indices is not None, "Grouped mode requires site_shape_indices"
+        assert self.shape_effective_bits is not None, "Grouped mode requires shape_effective_bits"
+
+        params: dict = {
+            "initialStateVec": self.initial_state_vec,
+            "numSites": self.num_sites,
+            "rotationBits": rotation_bits,
+            "numAncillaQubits": self.ancilla_bits,
+            "siteShapeIndices": self.site_shape_indices,
+            "shapeEffectiveBits": self.shape_effective_bits,
+            "shapeVLayerAngles": [s.v.layer_angles for s in self.sites],
+            "shapeVLayerShifted": [s.v.layer_shifted for s in self.sites],
+            "shapeVPhases": [s.v.phases for s in self.sites],
+            "shapeRot0Angles": [s.rot_angles[0] for s in self.sites],
+            "shapeRot1Angles": [s.rot_angles[1] for s in self.sites],
+            "shapeRot2Angles": [s.rot_angles[2] for s in self.sites],
+            "shapeW0LayerAngles": [s.w0.layer_angles for s in self.sites],
+            "shapeW0LayerShifted": [s.w0.layer_shifted for s in self.sites],
+            "shapeW0Phases": [s.w0.phases for s in self.sites],
+            "shapeW1LayerAngles": [s.w1.layer_angles for s in self.sites],
+            "shapeW1LayerShifted": [s.w1.layer_shifted for s in self.sites],
+            "shapeW1Phases": [s.w1.phases for s in self.sites],
+            "shapeULayerAngles": [s.u.layer_angles for s in self.sites],
+            "shapeULayerShifted": [s.u.layer_shifted for s in self.sites],
+            "shapeUPhases": [s.u.phases for s in self.sites],
+        }
+        return params
+
 
 # ---------------------------------------------------------------------------
 # Unitary synthesis helpers
@@ -327,12 +371,32 @@ def generate_mps_preparation_data(
     # eliminating the explicit V unitary application. This mirrors Qualtran's approach.
     sites: list[SiteUnitaryData] = []
     v_from_next: np.ndarray | None = None
+    site_shape_indices: list[int] | None = None
+    unique_bits: list[int] | None = None
     if fast_resource_estimation and num_sites > 2:
-        # Only decompose one site; replicate for all others.
-        # Pick the site with the largest tensor (most representative cost).
-        representative_idx = max(range(1, num_sites), key=lambda i: tensors[i].size)
-        site_data = _decompose_site(tensors[representative_idx], ancilla_dim, v_from_next=None)
-        sites = [site_data] * (num_sites - 1)
+        # Group sites by effective ancilla dimension (shape).
+        # Sites with the same max(chi_left, chi_right) have the same circuit cost.
+        # For RE, only array SHAPES matter (not values) — skip expensive decomposition.
+        site_effective_bits: list[int] = []
+        for i in range(1, num_sites):
+            chi_left, _, chi_right = tensors[i].shape
+            eff = max(chi_left, chi_right)
+            bits = int(np.ceil(np.log2(eff))) if eff > 1 else 1
+            site_effective_bits.append(bits)
+
+        unique_bits = sorted(set(site_effective_bits))
+        shape_to_idx = {b: idx for idx, b in enumerate(unique_bits)}
+        site_shape_indices = [shape_to_idx[b] for b in site_effective_bits]
+
+        # Generate dummy data of the correct shape for each unique dimension.
+        # No SVD/QR/Givens needed — resource estimator only uses array lengths.
+        shape_representatives: list[SiteUnitaryData] = []
+        for shape_bits in unique_bits:
+            effective_dim = 1 << shape_bits
+            site_data = _make_dummy_site_data(effective_dim)
+            shape_representatives.append(site_data)
+
+        sites = shape_representatives
     else:
         # Reverse-order decomposition: last site first, propagating V backwards.
         sites_reversed: list[SiteUnitaryData] = []
@@ -343,29 +407,83 @@ def generate_mps_preparation_data(
         sites = list(reversed(sites_reversed))
 
     # Initial state from first tensor, absorbing V from site 1's decomposition.
-    first_tensor = tensors[0]
-    chi_1 = first_tensor.shape[2]
-    # Transpose to (d, chi_right, chi_left) then sum over chi_left → (d, chi_right)
-    init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
-    init_padded = np.zeros((d, ancilla_dim))
-    init_padded[:, :chi_1] = init_state
-    # Absorb the V matrix from site 1 into the initial state
-    if v_from_next is not None and not fast_resource_estimation:
-        v_pad = np.eye(ancilla_dim, dtype=np.float64)
-        v_pad[: v_from_next.shape[0], : v_from_next.shape[1]] = np.asarray(v_from_next).real
-        # V acts on the ancilla (right) dimension of init_padded
-        init_padded = init_padded @ v_pad.T
-    initial_state_vec = init_padded.flatten()
-    norm = np.linalg.norm(initial_state_vec)
-    if norm > 1e-15:
-        initial_state_vec = initial_state_vec / norm
+    if fast_resource_estimation:
+        # For RE, only the vector length matters (determines QroamStatePrep cost).
+        # Length = d * ancilla_dim entries, addressed by ancilla + site[0..1].
+        initial_state_vec = [0.0] * (d * ancilla_dim)
+        initial_state_vec[0] = 1.0  # valid normalized state
+    else:
+        first_tensor = tensors[0]
+        chi_1 = first_tensor.shape[2]
+        # Transpose to (d, chi_right, chi_left) then sum over chi_left → (d, chi_right)
+        init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
+        init_padded = np.zeros((d, ancilla_dim))
+        init_padded[:, :chi_1] = init_state
+        # Absorb the V matrix from site 1 into the initial state
+        if v_from_next is not None:
+            v_pad = np.eye(ancilla_dim, dtype=np.float64)
+            v_pad[: v_from_next.shape[0], : v_from_next.shape[1]] = np.asarray(v_from_next).real
+            # V acts on the ancilla (right) dimension of init_padded
+            init_padded = init_padded @ v_pad.T
+        initial_state_vec_arr = init_padded.flatten()
+        norm = np.linalg.norm(initial_state_vec_arr)
+        if norm > 1e-15:
+            initial_state_vec_arr = initial_state_vec_arr / norm
+        initial_state_vec = initial_state_vec_arr.tolist()
 
     return MPSPreparationData(
-        initial_state_vec=initial_state_vec.tolist(),
+        initial_state_vec=initial_state_vec,
         num_sites=num_sites,
         ancilla_bits=ancilla_bits,
         sites=sites,
+        site_shape_indices=site_shape_indices,
+        shape_effective_bits=unique_bits,
     )
+
+
+def _make_dummy_site_data(effective_dim: int) -> SiteUnitaryData:
+    """Generate dummy site unitary data of the correct shape for resource estimation.
+
+    Only array sizes matter for the Q# resource estimator — actual angle values
+    are irrelevant. This skips all expensive SVD/QR/Givens decomposition.
+    """
+    dim = effective_dim
+
+    # V is never applied in the circuit (always propagated to previous site)
+    v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
+
+    # W0, W1: dim x dim Givens -> dim layers alternating even/odd
+    def _dummy_givens(d: int) -> GivensLayerData:
+        n_even = d // 2
+        n_odd = (d - 1) // 2
+        angles = []
+        shifted = []
+        for i in range(d):
+            s = i % 2 == 1
+            angles.append([1.0] * (n_odd if s else n_even))
+            shifted.append(s)
+        return GivensLayerData(layer_angles=angles, layer_shifted=shifted, phases=[False] * d)
+
+    w0_givens = _dummy_givens(dim)
+    w1_givens = _dummy_givens(dim)
+
+    # UCR angles: dim entries each (3 rotation steps)
+    rot_angles = [[1.0] * dim, [1.0] * dim, [1.0] * dim]
+
+    # U: block-diagonal (4 blocks of dim x dim), total_dim = 4*dim
+    # Blocks parallelize → dim layers, each with total_dim//2 or (total_dim-1)//2 angles
+    total_dim = 4 * dim
+    n_even_u = total_dim // 2
+    n_odd_u = (total_dim - 1) // 2
+    u_angles = []
+    u_shifted = []
+    for i in range(dim):
+        s = i % 2 == 1
+        u_angles.append([1.0] * (n_odd_u if s else n_even_u))
+        u_shifted.append(s)
+    u_givens = GivensLayerData(layer_angles=u_angles, layer_shifted=u_shifted, phases=[False] * total_dim)
+
+    return SiteUnitaryData(v=v_givens, rot_angles=rot_angles, w0=w0_givens, w1=w1_givens, u=u_givens)
 
 
 def _pad_and_givens(mat: np.ndarray, dim: int) -> GivensLayerData:
