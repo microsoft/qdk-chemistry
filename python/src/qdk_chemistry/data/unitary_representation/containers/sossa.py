@@ -13,7 +13,7 @@ References:
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-
+from math import ceil, log2
 import h5py
 import numpy as np
 
@@ -190,15 +190,14 @@ class SOSSAContainer(BlockEncodingContainer):
         Ancilla: x_o register + inner register (b + free-rider) + 2 spin qubits.
 
         """
-        from math import ceil, log2
 
         num_system = 2 * self.select.num_orbitals
         # Outer register: ceil(log2(x_o_dim))
         x_o_dim = self.select.num_orbitals + self.select.num_ranks * self.select.num_copies
         num_outer = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
         # Inner register: b bits + free-rider bits
-        R = self.select.num_ranks
-        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_ranks = self.select.num_ranks
+        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits  # isSF + dvsq + rank
         num_inner = self.inner_prepare.num_inner_qubits + num_free_rider_bits
         # Spin register: 2 (spinDQ, spinSF)

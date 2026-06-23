@@ -104,18 +104,18 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         """
         # Extract dimensions
-        N = factorized_hamiltonian.get_num_orbitals()
-        R = factorized_hamiltonian.get_num_ranks()
-        B = factorized_hamiltonian.get_num_bases()
-        C = factorized_hamiltonian.get_num_copies()
+        n_orbitals = factorized_hamiltonian.get_num_orbitals()
+        n_ranks = factorized_hamiltonian.get_num_ranks()
+        n_bases = factorized_hamiltonian.get_num_bases()
+        n_copies = factorized_hamiltonian.get_num_copies()
 
         # Extract tensors and reshape from flat storage
         u_flat = np.array(factorized_hamiltonian.get_u_matrices())  # [R*B*N]
         w_flat = np.array(factorized_hamiltonian.get_w_matrices())  # [R*B*C]
         wb = np.array(factorized_hamiltonian.get_wb_matrix())  # [R, C]
 
-        basis_vectors = u_flat.reshape(R, B, N)  # U[r, b, p]
-        two_body_weights = w_flat.reshape(R, B, C)  # W[r, b, c]
+        basis_vectors = u_flat.reshape(n_ranks, n_bases, n_orbitals)  # U[r, b, p]
+        two_body_weights = w_flat.reshape(n_ranks, n_bases, n_copies)  # W[r, b, c]
 
         # Compute adjusted one-body matrix (Majorana representation)
         h1_majorana = np.array(factorized_hamiltonian.get_h1_majorana())  # [N, N]
@@ -126,25 +126,29 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         # Reshape for coefficient computation: [R][C][B] and [R][C]
         tbw: list[list[list[float]]] = []
-        for r in range(R):
+        for r in range(n_ranks):
             r_list: list[list[float]] = []
-            for c in range(C):
-                r_list.append([float(two_body_weights[r, b, c]) for b in range(B)])
+            for c in range(n_copies):
+                r_list.append([float(two_body_weights[r, b, c]) for b in range(n_bases)])
             tbw.append(r_list)
 
         iw: list[list[float]] = []
-        for r in range(R):
-            iw.append([float(wb[r, c]) for c in range(C)])
+        for r in range(n_ranks):
+            iw.append([float(wb[r, c]) for c in range(n_copies)])
 
         # Compute PREPARE coefficients
-        outer_coeffs = self._compute_outer_coefficients(w_plus.tolist(), w_minus.tolist(), tbw, iw, N, R, C)
-        inner_coeffs = self._compute_inner_coefficients(tbw, iw, N, R, C, B)
+        outer_coeffs = self._compute_outer_coefficients(
+            w_plus.tolist(), w_minus.tolist(), tbw, iw, n_orbitals, n_ranks, n_copies
+        )
+        inner_coeffs = self._compute_inner_coefficients(tbw, iw, n_orbitals, n_ranks, n_copies, n_bases)
 
         # Compute rotation angles
-        dq_angles, sf_angles = self._compute_rotation_angles(u_plus.T, u_minus.T, basis_vectors, num_d1, N, R, B)
+        dq_angles, sf_angles = self._compute_rotation_angles(
+            u_plus.T, u_minus.T, basis_vectors, num_d1, n_orbitals, n_ranks, n_bases
+        )
 
         # Compute free-rider data (G, r encoding for QROM)
-        free_rider = self._compute_free_rider_data(num_d1, N, R, C)
+        free_rider = self._compute_free_rider_data(num_d1, n_orbitals, n_ranks, n_copies)
 
         # Compute normalization
         outer_arr = np.array(outer_coeffs)
@@ -152,26 +156,26 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         normalization = self._compute_normalization(outer_arr, inner_arr)
 
         # Build sub-oracles
-        Xo = N + R * C
-        num_outer_qubits = int(ceil(log2(Xo))) if Xo > 1 else 1
-        num_inner_qubits = int(ceil(log2(B + 1))) if B + 1 > 1 else 1
+        xo_dim = n_orbitals + n_ranks * n_copies
+        num_outer_qubits = ceil(log2(xo_dim)) if xo_dim > 1 else 1
+        num_inner_qubits = ceil(log2(n_bases + 1)) if n_bases + 1 > 1 else 1
 
         outer_prepare = self._build_outer_prepare(outer_arr, num_outer_qubits)
 
         inner_prepare = SOSSAInnerPrepare(
             conditional_coefficients=inner_arr,
             num_inner_qubits=num_inner_qubits,
-            num_bases=B,
+            num_bases=n_bases,
             free_rider_data=np.array(free_rider, dtype=bool) if free_rider else None,
         )
 
         select = SOSSASelect(
             rotation_angles=np.array(dq_angles),
             sf_rotation_angles=np.array(sf_angles),
-            num_orbitals=N,
-            num_ranks=R,
-            num_copies=C,
-            num_bases=B,
+            num_orbitals=n_orbitals,
+            num_ranks=n_ranks,
+            num_copies=n_copies,
+            num_bases=n_bases,
             num_d1=num_d1,
         )
 
@@ -250,16 +254,16 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         one_body_weights_minus: list[float],
         two_body_weights: list[list[list[float]]],
         identity_weight: list[list[float]],
-        N: int,
-        R: int,
-        C: int,
+        n_orbitals: int,
+        n_ranks: int,
+        n_copies: int,
     ) -> list[float]:
         r"""Compute the outer PREP amplitudes for the :math:`x_o` register.
 
         Reference: Eq. 84-87, B9 in arXiv:2502.15882v1.
         """
-        Xo = N + R * C
-        coefficients = [0.0] * Xo
+        xo_dim = n_orbitals + n_ranks * n_copies
+        coefficients = [0.0] * xo_dim
 
         idx = 0
         for coeff in one_body_weights_plus:
@@ -268,8 +272,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         for coeff in one_body_weights_minus:
             coefficients[idx] = sqrt(2.0 * abs(coeff))
             idx += 1
-        for r in range(R):
-            for c in range(C):
+        for r in range(n_ranks):
+            for c in range(n_copies):
                 wb = abs(identity_weight[r][c])
                 ws = sum(abs(w) for w in two_body_weights[r][c])
                 coefficients[idx] = (wb + ws) / sqrt(2)
@@ -281,32 +285,32 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     def _compute_inner_coefficients(
         two_body_weights: list[list[list[float]]],
         identity_weight: list[list[float]],
-        N: int,
-        R: int,
-        C: int,
-        B: int,
+        n_orbitals: int,
+        n_ranks: int,
+        n_copies: int,
+        n_bases: int,
     ) -> list[list[float]]:
         r"""Compute the inner PREP amplitudes for the b register.
 
         Shape: [Xo][B+1]. Reference: Appendix B.4 in arXiv:2502.15882v1.
         """
-        Xo = N + R * C
+        xo_dim = n_orbitals + n_ranks * n_copies
         coefficients: list[list[float]] = []
 
-        for _ in range(N):
-            row = [0.0] * (B + 1)
+        for _ in range(n_orbitals):
+            row = [0.0] * (n_bases + 1)
             row[0] = 1.0
             coefficients.append(row)
 
-        for r in range(R):
-            for c in range(C):
-                row = [0.0] * (B + 1)
-                for b in range(B):
+        for r in range(n_ranks):
+            for c in range(n_copies):
+                row = [0.0] * (n_bases + 1)
+                for b in range(n_bases):
                     row[b] = float(two_body_weights[r][c][b])
-                row[B] = float(abs(identity_weight[r][c]))
+                row[n_bases] = float(abs(identity_weight[r][c]))
                 coefficients.append(row)
 
-        assert len(coefficients) == Xo
+        assert len(coefficients) == xo_dim
         return coefficients
 
     @staticmethod
@@ -315,9 +319,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         one_body_basis_minus: np.ndarray,
         basis_vectors: np.ndarray,
         num_one_body_plus: int,
-        N: int,
-        R: int,
-        B: int,
+        n_orbitals: int,
+        n_ranks: int,
+        n_bases: int,
     ) -> tuple[list[list[float]], list[list[float]]]:
         r"""Compute Givens rotation angles for D1/Q1 and SF generators.
 
@@ -330,7 +334,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         """
         dq_angles: list[list[float]] = []
-        for x_o in range(N):
+        for x_o in range(n_orbitals):
             if x_o < num_one_body_plus:
                 angles = SOSSABuilder._vector_to_givens_angles(one_body_basis_plus[x_o])
             else:
@@ -338,14 +342,15 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             dq_angles.append(angles)
 
         sf_angles_3d: list[list[list[float]]] = []
-        for r in range(R):
+        for r in range(n_ranks):
             b_entries: list[list[float]] = []
-            for b in range(B + 1):
-                if b < B:
-                    angles = SOSSABuilder._vector_to_givens_angles(basis_vectors[r, b])
-                else:
-                    angles = [0.0] * (N - 1)
-                angles.append(1.0 if b == B else 0.0)
+            for b in range(n_bases + 1):
+                angles = (
+                    SOSSABuilder._vector_to_givens_angles(basis_vectors[r, b])
+                    if b < n_bases
+                    else [0.0] * (n_orbitals - 1)
+                )
+                angles.append(1.0 if b == n_bases else 0.0)
                 b_entries.append(angles)
             sf_angles_3d.append(b_entries)
 
@@ -359,10 +364,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     @staticmethod
     def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
         """Convert a unit vector to Givens rotation angles via bottom-up elimination."""
-        N = len(vec)
+        n_orbitals = len(vec)
         v = vec.copy().astype(float)
-        angles: list[float] = [0.0] * (N - 1)
-        for j in range(N - 2, -1, -1):
+        angles: list[float] = [0.0] * (n_orbitals - 1)
+        for j in range(n_orbitals - 2, -1, -1):
             angles[j] = float(atan2(v[j + 1], v[j]))
             v[j] = float(np.sqrt(v[j] ** 2 + v[j + 1] ** 2))
         return angles
@@ -388,9 +393,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     @staticmethod
     def _compute_free_rider_data(
         num_one_body_plus: int,
-        N: int,
-        R: int,
-        C: int,
+        n_orbitals: int,
+        n_ranks: int,
+        n_copies: int,
     ) -> list[list[bool]]:
         r"""Compute QROM free-rider data encoding (G, r) for each outer index.
 
@@ -407,25 +412,25 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         Reference: Eq. 82 in arXiv:2502.15882v1.
 
         """
-        Xo = N + R * C
-        N_D1 = num_one_body_plus
-        R_bits = int(ceil(log2(R))) if R > 1 else 0
+        xo_dim = n_orbitals + n_ranks * n_copies
+        n_d1 = num_one_body_plus
+        r_bits = ceil(log2(n_ranks)) if n_ranks > 1 else 0
 
         data: list[list[bool]] = []
-        for x_o in range(Xo):
-            if x_o < N_D1:
+        for x_o in range(xo_dim):
+            if x_o < n_d1:
                 g_bits = [False, False]
                 r_val = 0
-            elif x_o < N:
+            elif x_o < n_orbitals:
                 g_bits = [False, True]
                 r_val = 0
             else:
                 g_bits = [True, True]
-                sf_idx = x_o - N
-                r_val = sf_idx // C
+                sf_idx = x_o - n_orbitals
+                r_val = sf_idx // n_copies
 
-            r_bits = [(r_val >> k) & 1 == 1 for k in range(R_bits)]
-            data.append(g_bits + r_bits)
+            r_enc = [(r_val >> k) & 1 == 1 for k in range(r_bits)]
+            data.append(g_bits + r_enc)
 
         return data
 

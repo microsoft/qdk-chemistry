@@ -83,7 +83,7 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 

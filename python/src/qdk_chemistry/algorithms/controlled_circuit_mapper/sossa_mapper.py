@@ -125,6 +125,10 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         """
         prepare_algorithm = self._create_nested("outer_prepare")
+        # Ensure the alias sampling precision matches the mapper's
+        # coefficient_bit_precision so register sizes are consistent.
+        if self.outer_prepare_needs_alias_reflection and hasattr(prepare_algorithm, "_bits_precision"):
+            prepare_algorithm._bits_precision = self.outer_prepare_coefficient_bits  # noqa: SLF001
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op  # noqa: SLF001
 
@@ -188,8 +192,8 @@ class SOSSAMapper(ControlledCircuitMapper):
         algorithm = self._settings.get("select_algorithm")
         rot_bits = self._settings.get("rotation_bit_precision")
 
-        R = container.select.num_ranks
-        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_ranks = container.select.num_ranks
+        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits
 
         select_data = {
@@ -224,8 +228,8 @@ class SOSSAMapper(ControlledCircuitMapper):
         xo_bits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
         num_bases = container.select.num_bases
         b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
-        R = container.select.num_ranks
-        rank_bits = ceil(log2(R)) if R > 1 else 0
+        num_ranks = container.select.num_ranks
+        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits
 
         if self.outer_prepare_needs_alias_reflection:

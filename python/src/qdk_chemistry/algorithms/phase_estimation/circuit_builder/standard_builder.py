@@ -70,7 +70,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -151,6 +151,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             num_bits: Number of phase ancilla qubits (phase bits).
             num_system_qubits: Number of bare system qubits (state prep target).
             num_be_ancillas: Number of block-encoding ancilla qubits (0 for LCU/Trotter).
+            ancilla_prep_op: Q# callable to initialize block-encoding ancillas (None for no-op).
 
         Returns:
             A Circuit object representing the standard QPE circuit.

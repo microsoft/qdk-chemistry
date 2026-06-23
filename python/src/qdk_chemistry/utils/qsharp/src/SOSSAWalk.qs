@@ -35,10 +35,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.ResourceEstimation.RepeatEstimates;
     import Std.ResourceEstimation.SingleVariant;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
+    import Std.Arithmetic.RippleCarryCGIncByLE;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
-    import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
-    import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Type aliases for composable sub-operations
@@ -159,7 +158,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build a SELECT using QROM + phase gradient rotation.
     ///
-    /// Givens rotations are applied via SelectSwap QROM angle load + RyViaPhaseGradient.
+    /// Givens rotations are applied via split DQ/SF Select QROM + RyViaPhaseGradient.
     /// This is the production implementation for fault-tolerant resource estimation.
     /// The phase gradient register is allocated and prepared externally by QPE.
     function MakeSelectPhaseGradient(
@@ -244,6 +243,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             within {
                 // Givens rotations: basis change to localize amplitude on qubit 0
                 if usePhaseGradient {
+                    let rBits = if nFR > 2 { innerReg[nInner - nFR + 2..nInner - 1] } else { [] };
                     ApplyGivensRotationsQROM(
                         params,
                         N,
@@ -251,8 +251,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         numBp1,
                         numRotAngles,
                         xoBits,
+                        isSF,
                         xoReg,
                         bReg,
+                        rBits,
                         sysRegDown,
                         phaseGradientReg
                     );
@@ -586,19 +588,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
-    /// Givens rotation chain using QROM angle load + phase gradient rotation.
+    /// Givens rotation chain using split DQ/SF QROM bulk-load + phase gradient rotation.
     ///
-    /// For each step j, loads the quantized angle θ_{xo,b,j} from a QROM table
-    /// addressed by (xoReg ++ bReg), then applies Ry(-2θ) via phase gradient addition.
-    /// The CNOT sandwich structure is the same as the direct version.
+    /// Loads ALL (N-1) rotation angles at once using two Controlled Select calls:
+    ///   - DQ: Select(N entries) addressed by xoReg[0..⌈log₂N⌉-1], fires when isSF=0
+    ///   - SF: Select(R*2^bBits entries) addressed by bReg++rBits, fires when isSF=1
+    /// Then applies all Givens rotations from the loaded rotTarget register.
     ///
-    /// The phase gradient register is allocated and prepared externally by QPE.
-    /// The angleReg is allocated internally as temporary scratch.
+    /// Cost: N + R*2^bBits (Select) + (N-1) × Adder(bRot) (rotations).
+    /// Matches paper cost formula (arXiv:2502.15882v1, Step 5).
     ///
-    /// Cost per step: 1 SelectSwap QROM (load) + 1 RippleCarryAdder (rotation) + 1 SelectSwap† (unload).
-    /// Total cost: (N-1) × [QROM(2^(xoBits+bBits), bRot) + Adder(bRot)].
-    ///
-    /// Reference: arXiv:2502.15882v1, Appendix B.5; Sanders et al. (arXiv:2007.07391).
+    /// Reference: arXiv:2502.15882v1, Appendix B.5; Babbush et al. (arXiv:1805.03662).
     operation ApplyGivensRotationsQROM(
         params : SelectParams,
         N : Int,
@@ -606,87 +606,112 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numBp1 : Int,
         numRotAngles : Int,
         xoBits : Int,
+        isSF : Qubit,
         xoReg : Qubit[],
         bReg : Qubit[],
+        rBits : Qubit[],
         sysRegDown : Qubit[],
         phaseGradientReg : Qubit[],
     ) : Unit is Adj + Ctl {
         let bRot = params.rotationBitPrecision;
         let bBits = Length(bReg);
-        let angleTables = ComputeGivensAngleTables(
-            params,
-            N,
-            numSF,
-            numBp1,
-            numRotAngles,
-            xoBits,
-            bBits
-        );
+        let R = params.numRanks;
+        let nRotBits = numRotAngles * bRot;
+        let nDQBits = Ceiling(Lg(IntAsDouble(if N > 1 { N } else { 2 })));
 
-        use angleReg = Qubit[bRot];
+        // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
+        let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
 
+        // SF table: R*2^bBits entries × (N-1)*bRot bits, addressed by bReg++rBits
+        let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits);
+
+        // Allocate rotation target register (all angles loaded at once).
+        use rotTarget = Qubit[nRotBits];
+
+        // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg
+        within { X(isSF); } apply {
+            Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget));
+        }
+        // SF load: fires when isSF=1, addressed by (bReg ++ rBits)
+        Controlled Select([isSF], (sfData, bReg + rBits, rotTarget));
+
+        // Apply all Givens rotations from the loaded register.
+        // Uses DFTHC-style conjugation: CNOT(j+1→j) + S†H converts Rz→Ry
+        // and conditions on particle-number subspace, all with an uncontrolled
+        // adder (n Toffoli) instead of a controlled adder (2n Toffoli).
+        // Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
         for j in 0..numRotAngles - 1 {
-            CNOT(sysRegDown[j], sysRegDown[j + 1]);
             within {
-                SelectSwap(-1, angleTables[j], xoReg + bReg, angleReg);
+                CNOT(sysRegDown[j + 1], sysRegDown[j]);
+                Adjoint S(sysRegDown[j]);
+                H(sysRegDown[j]);
             } apply {
-                // Controlled on sysRegDown[j+1] for particle-number preservation
-                Controlled RyViaPhaseGradient([sysRegDown[j + 1]], (sysRegDown[j], angleReg, phaseGradientReg));
+                for k in 0..Length(phaseGradientReg) - 1 {
+                    CNOT(sysRegDown[j], phaseGradientReg[k]);
+                }
+                RippleCarryCGIncByLE(rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
+                for k in 0..Length(phaseGradientReg) - 1 {
+                    CNOT(sysRegDown[j], phaseGradientReg[k]);
+                }
             }
-            CNOT(sysRegDown[j], sysRegDown[j + 1]);
         }
     }
 
-    /// Compute QROM data tables for all Givens rotation steps.
-    ///
-    /// Returns Bool[numRotAngles][2^(xoBits+bBits)][bRot]:
-    ///   tables[j][addr] = quantized angle for step j at address (xo, b).
-    ///
-    /// Address encoding: addr = xo + b * 2^xoBits (xoReg is LSB part).
-    /// Angles are quantized so that RyViaPhaseGradient(x) = Ry(4π·x/2^b) = Ry(-2θ).
-    internal function ComputeGivensAngleTables(
+    /// Build DQ bulk rotation data: N entries, each containing all (N-1) quantized angles.
+    /// Addressed by xoReg[0..⌈log₂N⌉-1] (the orbital index for one-body terms).
+    internal function BuildDQBulkRotationData(
         params : SelectParams,
         N : Int,
-        numSF : Int,
-        numBp1 : Int,
         numRotAngles : Int,
-        xoBits : Int,
-        bBits : Int,
-    ) : Bool[][][] {
-        let bRot = params.rotationBitPrecision;
-        let addrBits = xoBits + bBits;
-        let numAddresses = 1 <<< addrBits;
-
-        mutable tables : Bool[][][] = [];
-        for j in 0..numRotAngles - 1 {
-            mutable table : Bool[][] = [];
-            for addr in 0..numAddresses - 1 {
-                let xo = addr % (1 <<< xoBits);
-                let b = addr / (1 <<< xoBits);
-
-                mutable angle = 0.0;
-                if xo < N {
-                    // DQ entry: angle depends on xo only (same for all b)
-                    if j < Length(params.dqRotationAngles[xo]) {
-                        set angle = params.dqRotationAngles[xo][j];
-                    }
-                } elif xo < N + numSF {
-                    // SF entry: angle depends on (xo, b) via rank index
-                    let xoIdx = xo - N;
-                    let r = xoIdx / params.numCopies;
-                    let angleIdx = b * params.numRanks + r;
-                    if angleIdx < Length(params.sfRotationAngles) and j < Length(params.sfRotationAngles[angleIdx]) {
-                        set angle = params.sfRotationAngles[angleIdx][j];
-                    }
-                }
-                // else: invalid address → angle = 0
-
-                let quantized = QuantizeGivensAngle(angle, bRot);
-                set table += [IntAsBoolArray(quantized, bRot)];
+        bRot : Int,
+    ) : Bool[][] {
+        mutable table : Bool[][] = [];
+        for xo in 0..N - 1 {
+            mutable bits : Bool[] = [];
+            for j in 0..numRotAngles - 1 {
+                let angle = if j < Length(params.dqRotationAngles[xo]) {
+                    params.dqRotationAngles[xo][j]
+                } else {
+                    0.0
+                };
+                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
             }
-            set tables += [table];
+            set table += [bits];
         }
-        return tables;
+        return table;
+    }
+
+    /// Build SF bulk rotation data: R*2^bBits entries, each containing all (N-1) quantized angles.
+    /// Address layout: bReg (low bBits) ++ rBits (high), so addr = b + r * 2^bBits.
+    /// Matches DFTHC paper cost formula: R*(B+1) entries.
+    internal function BuildSFBulkRotationData(
+        params : SelectParams,
+        R : Int,
+        numRotAngles : Int,
+        bRot : Int,
+        bBits : Int,
+    ) : Bool[][] {
+        let nInnerSlots = 1 <<< bBits; // 2^bBits
+        let tableSize = R * nInnerSlots;
+
+        mutable table : Bool[][] = [];
+        for idx in 0..tableSize - 1 {
+            let b = idx % nInnerSlots;   // basis = low bits (bReg is LSB)
+            let r = idx / nInnerSlots;   // rank = high bits (rBits is MSB)
+
+            mutable bits : Bool[] = [];
+            for j in 0..numRotAngles - 1 {
+                let angleIdx = b * params.numRanks + r;
+                let angle = if r < R and angleIdx < Length(params.sfRotationAngles) and j < Length(params.sfRotationAngles[angleIdx]) {
+                    params.sfRotationAngles[angleIdx][j]
+                } else {
+                    0.0
+                };
+                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
+            }
+            set table += [bits];
+        }
+        return table;
     }
 
     /// Quantize a Givens rotation angle for phase gradient application.
