@@ -11,7 +11,7 @@ The Hadamard test is a standard primitive for extracting overlap information fro
 Given a prepared system state :math:`\vert \psi\rangle` and a unitary :math:`U`, the algorithm builds a circuit with one control qubit and the system register:
 
 1. Prepare the system in :math:`\vert \psi\rangle`
-2. Apply :math:`U` to the control qubit
+2. Apply :math:`H` to the control qubit
 3. Apply controlled-:math:`U` to the system register (controlled on the control qubit)
 4. Measure the control qubit in a selected basis
 
@@ -127,7 +127,7 @@ Direct settings on :class:`~qdk_chemistry.algorithms.hadamard_test.hadamard_test
      - Description
    * - ``test_basis``
      - string
-   - Measurement basis for the control qubit. Allowed values are ``"X"`` and ``"Y"``. Default is ``"X"``.
+     - Measurement basis for the control qubit. Allowed values are ``"X"`` and ``"Y"``. Default is ``"X"``.
    * - ``controlled_circuit_mapper``
      - AlgorithmRef
      - Nested :doc:`ControlledCircuitMapper <circuit_mapper>` used to synthesize controlled-:math:`U`.

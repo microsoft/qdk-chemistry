@@ -31,7 +31,6 @@ hadamard_test.settings().set(
 
 # Change measurement basis on the same algorithm implementation if needed
 # hadamard_test.settings().set("test_basis", "Y")
-# hadamard_test.settings().set("test_basis", "Z")
 # end-cell-configure
 ################################################################################
 

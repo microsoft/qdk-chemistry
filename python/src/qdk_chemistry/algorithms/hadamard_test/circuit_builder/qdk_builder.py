@@ -27,8 +27,7 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
         Args:
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-                            ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
 
         """
         Logger.trace_entering()
@@ -65,7 +64,7 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
         state_prep_op = state_preparation_circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
-            raise ValueError("Input state_preparation_circuit cannot is not a Q# callable circuit.")
+            raise ValueError("Input state_preparation_circuit is not a Q# callable circuit.")
 
         ctrl_evol_op = ctrl_time_evol_unitary_circuit._qsharp_op  # noqa: SLF001
         if ctrl_evol_op is None:
