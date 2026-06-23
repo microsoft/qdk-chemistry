@@ -173,3 +173,26 @@ if(MSVC)
   _qdk_msvc_suppress_warnings_if_built(libint2_cxx INTERFACE)
   _qdk_msvc_suppress_warnings_if_built(libint2_obj PRIVATE)
 endif()
+
+if(MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  # Under clang-cl the remaining _deps (ecpint, gauxc, libint2) produce
+  # spurious Clang-specific warnings (-Wvla-cxx-extension, -Wunused-variable,
+  # -Wreorder-ctor, -Wunused-function) that are not actionable in third-party
+  # code.  Apply -Wno-everything PRIVATE to silence them.
+  function(_qdk_clangcl_silence_if_built target visibility)
+    if(NOT TARGET ${target})
+      return()
+    endif()
+    get_target_property(_is_imported ${target} IMPORTED)
+    if(_is_imported)
+      return()
+    endif()
+    target_compile_options(${target} ${visibility} -Wno-everything)
+  endfunction()
+
+  _qdk_clangcl_silence_if_built(ecpint      PRIVATE)
+  _qdk_clangcl_silence_if_built(generate    PRIVATE)
+  _qdk_clangcl_silence_if_built(gauxc       PRIVATE)
+  _qdk_clangcl_silence_if_built(libint2_cxx INTERFACE)
+  _qdk_clangcl_silence_if_built(libint2_obj PRIVATE)
+endif()
