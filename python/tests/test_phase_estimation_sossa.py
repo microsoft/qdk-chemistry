@@ -22,12 +22,14 @@ import pytest
 from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
-from qdk_chemistry.data import AlgorithmRef, Circuit
+from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from .test_helpers import create_test_orbitals
 
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 _PROJECT_ROOT = str(_QS_DIR)
@@ -46,10 +48,10 @@ def _build_h2_dfthc_data():
 
     Returns a dict with all tensor data needed for SOSSA.
     """
-    N = 2  # spatial orbitals
-    R = 1  # ranks
-    B = 1  # bases
-    C = 1  # copies
+    n_orb = 2  # spatial orbitals
+    n_ranks = 1  # ranks
+    n_bases = 1  # bases
+    n_copies = 1  # copies
 
     # Symmetric one-body matrix (adjusted for Majorana representation)
     h1 = np.array(
@@ -60,7 +62,7 @@ def _build_h2_dfthc_data():
     )
 
     # Basis vectors: unit vectors in R^N for each (r, b)
-    # Shape: [R, B, N]
+    # Tensor shape is (R, B, N)
     basis_vectors = np.array([[[1.0 / sqrt(2), 1.0 / sqrt(2)]]])
 
     # Two-body weights: [R, B, C]
@@ -74,10 +76,10 @@ def _build_h2_dfthc_data():
         "basis_vectors": basis_vectors,
         "two_body_weights": two_body_weights,
         "identity_weight": identity_weight,
-        "N": N,
-        "R": R,
-        "B": B,
-        "C": C,
+        "N": n_orb,
+        "R": n_ranks,
+        "B": n_bases,
+        "C": n_copies,
     }
 
 
@@ -91,84 +93,83 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
     Reference: Eq. 29 in arXiv:2502.15882v1.
     """
     num_orbitals = h1.shape[0]
-    R, B_dim, _ = basis_vectors.shape
-    _, C = identity_weight.shape
+    n_ranks, b_dim, _ = basis_vectors.shape
+    _, n_copies = identity_weight.shape
     num_spin_orbitals = 2 * num_orbitals
     dim = 2**num_spin_orbitals
 
     # Jordan-Wigner operators
-    I2 = np.eye(2, dtype=complex)
-    Z = np.diag([1.0, -1.0]).astype(complex)
+    eye2 = np.eye(2, dtype=complex)
+    pauli_z = np.diag([1.0, -1.0]).astype(complex)
     sp = np.array([[0, 0], [1, 0]], dtype=complex)  # a† = |1><0|
 
     def adag(i):
-        ops = [Z if j < i else (sp if j == i else I2) for j in range(num_spin_orbitals)]
+        ops = [pauli_z if j < i else (sp if j == i else eye2) for j in range(num_spin_orbitals)]
         result = ops[0]
         for op in ops[1:]:
             result = np.kron(result, op)
         return result
 
-    # Excitation operator E_{pq} = Σ_σ a†_{pσ} a_{qσ}
-    Epq_cache = {}
+    # Excitation operator E_{pq} = Sum_sigma a†_{p,sigma} a_{q,sigma}
+    epq_cache = {}
 
-    def Epq(p, q):
-        if (p, q) not in Epq_cache:
-            E = np.zeros((dim, dim), dtype=complex)
+    def excitation_pq(p, q):
+        if (p, q) not in epq_cache:
+            mat = np.zeros((dim, dim), dtype=complex)
             for sigma in range(2):
                 c_dag = adag(2 * p + sigma)
                 c = adag(2 * q + sigma).conj().T
-                E += c_dag @ c
-            Epq_cache[(p, q)] = E
-        return Epq_cache[(p, q)]
+                mat += c_dag @ c
+            epq_cache[(p, q)] = mat
+        return epq_cache[(p, q)]
 
     # Eigendecompose h1 for w_minus
     eigvals, _ = np.linalg.eigh(h1)
     w_minus = -eigvals[eigvals < 0]
 
     # 1) One-body: h'(1)_{pq} E_{pq} + 2 Σ w⁻ · I
-    H_1b = np.zeros((dim, dim), dtype=complex)
+    h_1b = np.zeros((dim, dim), dtype=complex)
     for p in range(num_orbitals):
         for q in range(num_orbitals):
             if abs(h1[p, q]) > 1e-15:
-                H_1b += h1[p, q] * Epq(p, q)
-    H_1b += 2.0 * np.sum(w_minus) * np.eye(dim)
+                h_1b += h1[p, q] * excitation_pq(p, q)
+    h_1b += 2.0 * np.sum(w_minus) * np.eye(dim)
 
     # 2) SF squares: ½ Σ_{r,c} (W·I + Σ_b w_b L_b)²
-    H_2b = np.zeros((dim, dim), dtype=complex)
-    for r in range(R):
-        for c_idx in range(C):
-            W_rc = identity_weight[r, c_idx] - np.sum(two_body_weights[r, :, c_idx])
-            M = W_rc * np.eye(dim, dtype=complex)
-            for b in range(B_dim):
-                L_b = np.zeros((dim, dim), dtype=complex)
+    h_2b = np.zeros((dim, dim), dtype=complex)
+    for r in range(n_ranks):
+        for c_idx in range(n_copies):
+            w_rc = identity_weight[r, c_idx] - np.sum(two_body_weights[r, :, c_idx])
+            m_op = w_rc * np.eye(dim, dtype=complex)
+            for b in range(b_dim):
+                l_b = np.zeros((dim, dim), dtype=complex)
                 for p in range(num_orbitals):
                     for q in range(num_orbitals):
-                        L_b += basis_vectors[r, b, p] * basis_vectors[r, b, q] * Epq(p, q)
-                M += two_body_weights[r, b, c_idx] * L_b
-            H_2b += 0.5 * (M @ M)
+                        l_b += basis_vectors[r, b, p] * basis_vectors[r, b, q] * excitation_pq(p, q)
+                m_op += two_body_weights[r, b, c_idx] * l_b
+            h_2b += 0.5 * (m_op @ m_op)
 
-    return (H_1b + H_2b).real
+    return (h_1b + h_2b).real
 
 
-def _get_ground_state_and_energy(H_matrix, num_orbitals, nalpha=1, nbeta=1):
+def _get_ground_state_and_energy(h_matrix, num_orbitals, nalpha=1, nbeta=1):
     """Diagonalize H_gap and return ground state within the correct particle sector.
 
     Returns:
         (ground_energy, ground_state_vector) in the Q# spin-blocked basis ordering.
 
     """
-    dim = H_matrix.shape[0]
-    num_spin_orbitals = 2 * num_orbitals
+    dim = h_matrix.shape[0]
 
     # Build number operator
-    N_hat = np.diag([bin(x).count("1") for x in range(dim)]).astype(float)
+    n_hat = np.diag([bin(x).count("1") for x in range(dim)]).astype(float)
 
-    eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+    eigenvalues, eigenvectors = np.linalg.eigh(h_matrix)
 
     # Filter to correct particle number sector
     target_n = nalpha + nbeta
     sector_indices = [
-        i for i in range(len(eigenvalues)) if round(eigenvectors[:, i] @ N_hat @ eigenvectors[:, i]) == target_n
+        i for i in range(len(eigenvalues)) if round(eigenvectors[:, i] @ n_hat @ eigenvectors[:, i]) == target_n
     ]
 
     if not sector_indices:
@@ -257,13 +258,13 @@ def _energy_to_qpe_phase(energy_gap, lambda_sos):
     return math.acos(cos_val) / (2 * math.pi)
 
 
-def _energy_to_k_sos(E_gap, num_bits, lambda_sos):
-    """Predict the most likely QPE integer for a given E_gap (SOS walk).
+def _energy_to_k_sos(e_gap, num_bits, lambda_sos):
+    """Predict the most likely QPE integer for a given e_gap (SOS walk).
 
     Inverts: E_gap = Λ(1 - cos(2πφ))  →  φ = arccos(1 - E_gap/Λ) / (2π)
     Returns (k, conjugate_k) where k = round(φ · 2^n).
     """
-    phi = _energy_to_qpe_phase(E_gap, lambda_sos)
+    phi = _energy_to_qpe_phase(e_gap, lambda_sos)
     total_states = 2**num_bits
     k = round(phi * total_states)
     conjugate_k = total_states - k if k != 0 else 0
@@ -276,33 +277,26 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
     Uses IQPE with the given mapper configuration, computes k_measured from the
     result phase, and asserts it matches k_expect from exact diagonalization.
     """
-    try:
-        from qdk_chemistry.data import FactorizedHamiltonianContainer
-    except ImportError:
-        pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
-
-    from .test_helpers import create_test_orbitals
-
     data = _build_h2_dfthc_data()
-    N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+    n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
 
     # Build reference Hamiltonian matrix and diagonalize
-    H_matrix = _build_dfthc_hamiltonian_matrix(
+    h_matrix = _build_dfthc_hamiltonian_matrix(
         data["h1"], data["basis_vectors"], data["two_body_weights"], data["identity_weight"]
     )
-    gs_energy, gs_vec = _get_ground_state_and_energy(H_matrix, N, nalpha=1, nbeta=1)
+    gs_energy, gs_vec = _get_ground_state_and_energy(h_matrix, n_orb, nalpha=1, nbeta=1)
 
     # Create FactorizedHamiltonianContainer
-    orbitals = create_test_orbitals(N)
-    inactive_fock = np.zeros((N, N))
+    orbitals = create_test_orbitals(n_orb)
+    inactive_fock = np.zeros((n_orb, n_orb))
     fh = FactorizedHamiltonianContainer(
         data["h1"],
         data["basis_vectors"].flatten(),
         data["two_body_weights"].flatten(),
         data["identity_weight"],
-        R,
-        B,
-        C,
+        n_ranks,
+        n_bases,
+        n_copies,
         orbitals,
         0.0,
         inactive_fock,
@@ -318,7 +312,7 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
     k_expect, _ = _energy_to_k_sos(gs_energy, num_bits, lambda_sos)
 
     # Prepare ground state
-    num_system_qubits = 2 * N
+    num_system_qubits = 2 * n_orb
     state_prep_params = {
         "rowMap": list(range(num_system_qubits - 1, -1, -1)),
         "stateVector": gs_vec.real.tolist(),
@@ -373,32 +367,25 @@ class TestSOSSAQPEIntegration:
 
         Tests: FactorizedHamiltonian → SOSSABuilder → UnitaryRep → SOSSAMapper → Circuit.
         """
-        try:
-            from qdk_chemistry.data import FactorizedHamiltonianContainer
-        except ImportError:
-            pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
-
-        from .test_helpers import create_test_orbitals
-
         data = _build_h2_dfthc_data()
-        N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
 
         # Create FactorizedHamiltonianContainer
         h1 = data["h1"]
         u_matrices = data["basis_vectors"].flatten()
         w_matrices = data["two_body_weights"].flatten()
         wb_matrix = data["identity_weight"]
-        orbitals = create_test_orbitals(N)
-        inactive_fock = np.zeros((N, N))
+        orbitals = create_test_orbitals(n_orb)
+        inactive_fock = np.zeros((n_orb, n_orb))
 
         fh = FactorizedHamiltonianContainer(
             h1,
             u_matrices,
             w_matrices,
             wb_matrix,
-            R,
-            B,
-            C,
+            n_ranks,
+            n_bases,
+            n_copies,
             orbitals,
             0.0,
             inactive_fock,
@@ -429,41 +416,34 @@ class TestSOSSAQPEIntegration:
         Uses a small H2-like DFTHC decomposition, runs IQPE with SOSSA block
         encoding, and verifies the measured energy matches exact diagonalization.
         """
-        try:
-            from qdk_chemistry.data import FactorizedHamiltonianContainer
-        except ImportError:
-            pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
-
-        from .test_helpers import create_test_orbitals
-
         data = _build_h2_dfthc_data()
-        N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
 
         # Build the Hamiltonian matrix for reference diagonalization
-        H_matrix = _build_dfthc_hamiltonian_matrix(
+        h_matrix = _build_dfthc_hamiltonian_matrix(
             data["h1"],
             data["basis_vectors"],
             data["two_body_weights"],
             data["identity_weight"],
         )
-        gs_energy, gs_vec = _get_ground_state_and_energy(H_matrix, N, nalpha=1, nbeta=1)
+        gs_energy, gs_vec = _get_ground_state_and_energy(h_matrix, n_orb, nalpha=1, nbeta=1)
 
         # Create FactorizedHamiltonianContainer
         h1 = data["h1"]
         u_matrices = data["basis_vectors"].flatten()
         w_matrices = data["two_body_weights"].flatten()
         wb_matrix = data["identity_weight"]
-        orbitals = create_test_orbitals(N)
-        inactive_fock = np.zeros((N, N))
+        orbitals = create_test_orbitals(n_orb)
+        inactive_fock = np.zeros((n_orb, n_orb))
 
         fh = FactorizedHamiltonianContainer(
             h1,
             u_matrices,
             w_matrices,
             wb_matrix,
-            R,
-            B,
-            C,
+            n_ranks,
+            n_bases,
+            n_copies,
             orbitals,
             0.0,
             inactive_fock,
@@ -476,7 +456,7 @@ class TestSOSSAQPEIntegration:
         lambda_sos = container.normalization
 
         # Prepare ground state
-        num_system_qubits = 2 * N
+        num_system_qubits = 2 * n_orb
         state_prep_params = {
             "rowMap": list(range(num_system_qubits - 1, -1, -1)),
             "stateVector": gs_vec.real.tolist(),
@@ -523,27 +503,20 @@ class TestSOSSAQPEIntegration:
             SOSSABuilder → SOSSAMapper → IQPE circuit construction
         to verify the workflow end-to-end.
         """
-        try:
-            from qdk_chemistry.data import FactorizedHamiltonianContainer
-        except ImportError:
-            pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
-
-        from .test_helpers import create_test_orbitals
-
         data = _build_h2_dfthc_data()
-        N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
 
         # Create FactorizedHamiltonianContainer
-        orbitals = create_test_orbitals(N)
-        inactive_fock = np.zeros((N, N))
+        orbitals = create_test_orbitals(n_orb)
+        inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
             data["h1"],
             data["basis_vectors"].flatten(),
             data["two_body_weights"].flatten(),
             data["identity_weight"],
-            R,
-            B,
-            C,
+            n_ranks,
+            n_bases,
+            n_copies,
             orbitals,
             0.0,
             inactive_fock,
@@ -572,13 +545,13 @@ class TestSOSSAQPEIntegration:
         assert lambda_sos > 0
 
         # Step 4: Compute expected spectrum
-        H_matrix = _build_dfthc_hamiltonian_matrix(
+        h_matrix = _build_dfthc_hamiltonian_matrix(
             data["h1"],
             data["basis_vectors"],
             data["two_body_weights"],
             data["identity_weight"],
         )
-        eigenvalues = np.linalg.eigvalsh(H_matrix)
+        eigenvalues = np.linalg.eigvalsh(h_matrix)
         # H_gap should be positive semi-definite
         assert eigenvalues[0] >= -1e-10, f"H_gap has negative eigenvalue: {eigenvalues[0]}"
 
@@ -588,26 +561,19 @@ class TestSOSSAQPEIntegration:
         For a valid SOS walk, E_gap ∈ [0, 2Λ], so all eigenvalues of H_gap
         must satisfy 0 ≤ E ≤ 2Λ.
         """
-        try:
-            from qdk_chemistry.data import FactorizedHamiltonianContainer
-        except ImportError:
-            pytest.skip("FactorizedHamiltonianContainer not available (requires dev build)")
-
-        from .test_helpers import create_test_orbitals
-
         data = _build_h2_dfthc_data()
-        N, R, B, C = data["N"], data["R"], data["B"], data["C"]
+        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
 
-        orbitals = create_test_orbitals(N)
-        inactive_fock = np.zeros((N, N))
+        orbitals = create_test_orbitals(n_orb)
+        inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
             data["h1"],
             data["basis_vectors"].flatten(),
             data["two_body_weights"].flatten(),
             data["identity_weight"],
-            R,
-            B,
-            C,
+            n_ranks,
+            n_bases,
+            n_copies,
             orbitals,
             0.0,
             inactive_fock,
@@ -618,13 +584,13 @@ class TestSOSSAQPEIntegration:
         container = unitary_rep.get_container()
         lambda_sos = container.normalization
 
-        H_matrix = _build_dfthc_hamiltonian_matrix(
+        h_matrix = _build_dfthc_hamiltonian_matrix(
             data["h1"],
             data["basis_vectors"],
             data["two_body_weights"],
             data["identity_weight"],
         )
-        eigenvalues = np.linalg.eigvalsh(H_matrix)
+        eigenvalues = np.linalg.eigvalsh(h_matrix)
 
         # All eigenvalues should be ≤ 2Λ (with small numerical tolerance)
         assert np.all(eigenvalues <= 2 * lambda_sos + 1e-10), (

@@ -12,12 +12,13 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
 from math import ceil, log2
+from typing import TYPE_CHECKING, Any
+
 import h5py
 import numpy as np
 
-from .block_encoding import BlockEncodingContainer, wavefunction_from_hdf5, wavefunction_to_hdf5
+from .block_encoding import BlockEncodingContainer, _wavefunction_from_hdf5, _wavefunction_to_hdf5
 
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
@@ -190,7 +191,6 @@ class SOSSAContainer(BlockEncodingContainer):
         Ancilla: x_o register + inner register (b + free-rider) + 2 spin qubits.
 
         """
-
         num_system = 2 * self.select.num_orbitals
         # Outer register: ceil(log2(x_o_dim))
         x_o_dim = self.select.num_orbitals + self.select.num_ranks * self.select.num_copies
@@ -246,7 +246,7 @@ class SOSSAContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
         group.attrs["normalization"] = self.normalization
-        wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
+        _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
         self.inner_prepare.to_hdf5(group.create_group("inner_prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
@@ -291,7 +291,7 @@ class SOSSAContainer(BlockEncodingContainer):
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAContainer":
         """Load a SOSSAContainer from an HDF5 group."""
-        outer_prepare = wavefunction_from_hdf5(group["outer_prepare"])
+        outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
         return cls(

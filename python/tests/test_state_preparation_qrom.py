@@ -12,12 +12,12 @@ import numpy as np
 import pytest
 import qdk
 
-# Q# source directory (relative to this test file, not the installed package).
-_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
-
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
+
+# Path to the QSharp source directory used for test context initialization.
+_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 
 
 def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int) -> np.ndarray:

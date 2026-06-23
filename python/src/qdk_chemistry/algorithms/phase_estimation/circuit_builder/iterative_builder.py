@@ -133,7 +133,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: Any,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
         *,
         iteration: int,
         total_iterations: int,

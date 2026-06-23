@@ -116,8 +116,8 @@ class TestAliasSamplingStatePreparation:
         """Verify alias sampling marginal probabilities with random coefficients.
 
         The alias sampling circuit prepares:
-          |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩
-        where p̃_ℓ ≈ |c_ℓ| / Σ|c_j| is the discretized probability.
+          |0> -> Sum_l sqrt(p_l) |l>|garbage_l>
+        where p_l ~ |c_l| / Sum|c_j| is the discretized probability.
 
         We verify the marginal probability on the index register matches the
         expected distribution within the discretization tolerance.

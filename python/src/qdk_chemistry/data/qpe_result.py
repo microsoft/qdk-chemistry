@@ -19,6 +19,7 @@ from qdk_chemistry.utils.phase import (
     energy_alias_candidates,
     energy_from_phase,
     energy_from_phase_qubitization,
+    energy_from_phase_sossa,
     resolve_energy_aliases,
 )
 
@@ -219,6 +220,77 @@ class QpeResult(DataClass):
         normalized_phase = float(phase_fraction % 1.0)
         phase_angle = float(normalized_phase * (2 * np.pi))
         raw_energy = energy_from_phase_qubitization(normalized_phase, lambda_val=lambda_val)
+
+        normalized_bits: tuple[int, ...] | None = None
+        bitstring = bitstring_msb_first
+        if bits_msb_first is not None:
+            normalized_bits = tuple(int(bit) for bit in bits_msb_first)
+            if bitstring is None:
+                bitstring = "".join(str(bit) for bit in normalized_bits)
+
+        metadata_copy = dict(metadata) if metadata is not None else None
+
+        return cls(
+            method=method_label,
+            phase_fraction=normalized_phase,
+            phase_angle=phase_angle,
+            canonical_phase_fraction=normalized_phase,
+            canonical_phase_angle=phase_angle,
+            raw_energy=raw_energy,
+            branching=(raw_energy,),
+            resolved_energy=None,
+            bits_msb_first=normalized_bits,
+            bitstring_msb_first=bitstring,
+            metadata=metadata_copy,
+        )
+
+    @classmethod
+    def from_sossa_result(
+        cls,
+        *,
+        method: str,
+        phase_fraction: float,
+        lambda_val: float,
+        energy_shift: float = 0.0,
+        bits_msb_first: Sequence[int] | None = None,
+        bitstring_msb_first: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> "QpeResult":
+        r"""Construct a :class:`QpeResult` from a SOSSA product-walk phase measurement.
+
+        For the SOS product walk the eigenphases encode:
+
+        .. math::
+
+            \cos(2\pi\varphi) = 1 - E_{\text{gap}} / \Lambda
+
+        so the energy gap is recovered as
+        :math:`E_{\text{gap}} = \Lambda (1 - \cos(2\pi\varphi))`
+        and the total energy is :math:`E = E_{\text{gap}} + E_{\text{shift}}`.
+
+        Args:
+            method: Phase estimation algorithm or workflow label.
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            lambda_val: The SOSSA normalization
+                :math:`\Lambda = \lambda_{\text{sqrt}}^2 / 2`.
+            energy_shift: Classical SOS energy shift :math:`E_{\text{SOS}}`.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            metadata: Optional dictionary copied into the result for caller-defined context.
+
+        Returns:
+            QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        Reference:
+            Eq. 11, 77 in arXiv:2502.15882.
+
+        """
+        Logger.trace_entering()
+        method_label = str(method.value) if hasattr(method, "value") else str(method)
+
+        normalized_phase = float(phase_fraction % 1.0)
+        phase_angle = float(normalized_phase * (2 * np.pi))
+        raw_energy = energy_from_phase_sossa(normalized_phase, lambda_val=lambda_val, energy_shift=energy_shift)
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first

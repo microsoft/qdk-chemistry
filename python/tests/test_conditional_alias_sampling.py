@@ -94,7 +94,7 @@ class TestConditionalAliasSamplingPrepare:
     """Tests for conditional alias sampling state preparation (2D)."""
 
     @pytest.mark.parametrize(
-        "n_cond,n_coeffs,condition_value",
+        ("n_cond", "n_coeffs", "condition_value"),
         [
             (2, 4, 0),
             (2, 4, 1),
@@ -129,7 +129,7 @@ class TestConditionalAliasSamplingWithFreeRider:
     """Tests for conditional alias sampling with free-rider data."""
 
     @pytest.mark.parametrize(
-        "n_cond,n_coeffs,condition_value",
+        ("n_cond", "n_coeffs", "condition_value"),
         [
             (2, 4, 0),
             (2, 4, 1),
