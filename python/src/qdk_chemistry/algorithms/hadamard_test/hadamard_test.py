@@ -29,10 +29,9 @@ class HadamardTestBasis(Enum):
 
     X = "X"
     Y = "Y"
-    Z = "Z"
 
     def __str__(self) -> str:
-        """Return the string label ("X", "Y", or "Z") for this basis."""
+        """Return the string label ("X" or "Y") for this basis."""
         return str(self.value)
 
 
@@ -69,7 +68,7 @@ class HadamardTestSettings(Settings):
             "test_basis",
             "string",
             HadamardTestBasis.X.value,
-            "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
+            "Measurement basis for the control qubit ('X' or 'Y').",
             [basis.value for basis in HadamardTestBasis],
         )
 
@@ -106,7 +105,7 @@ class HadamardTest(Algorithm):
             try:
                 test_basis_value = HadamardTestBasis(test_basis).value
             except ValueError as err:
-                raise ValueError("test_basis must be one of {'X', 'Y', 'Z'}.") from err
+                raise ValueError("test_basis must be one of {'X', 'Y'}.") from err
         else:
             raise TypeError("test_basis must be an instance of HadamardTestBasis or a string.")
 

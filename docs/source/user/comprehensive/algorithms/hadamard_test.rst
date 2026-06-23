@@ -15,7 +15,7 @@ Given a prepared system state :math:`\vert \psi\rangle` and a unitary :math:`U`,
 3. Apply controlled-:math:`U` to the system register (controlled on the control qubit)
 4. Measure the control qubit in a selected basis
 
-QDK/Chemistry supports control-qubit measurement in ``X``, ``Y``, and ``Z`` bases through the ``test_basis`` setting.
+QDK/Chemistry supports control-qubit measurement in ``X`` and ``Y`` bases through the ``test_basis`` setting.
 For shot-based execution, the control-qubit expectation estimate from measured counts is:
 
 .. math::
@@ -64,7 +64,7 @@ Shots
 Settings
    The :class:`~qdk_chemistry.algorithms.HadamardTest` is configured via its settings object, which includes:
 
-   - ``test_basis`` - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``.
+   - ``test_basis`` - Measurement basis for the control qubit. Allowed values are ``"X"`` and ``"Y"``.
    - ``controlled_circuit_mapper`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`ControlledCircuitMapper <circuit_mapper>` implementation used to synthesize controlled-:math:`U`.
    - ``circuit_executor`` - A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`CircuitExecutor <circuit_executor>` implementation used to run the final circuit.
 
@@ -127,7 +127,7 @@ Direct settings on :class:`~qdk_chemistry.algorithms.hadamard_test.hadamard_test
      - Description
    * - ``test_basis``
      - string
-     - Measurement basis for the control qubit. Allowed values are ``"X"``, ``"Y"``, and ``"Z"``. Default is ``"X"``.
+   - Measurement basis for the control qubit. Allowed values are ``"X"`` and ``"Y"``. Default is ``"X"``.
    * - ``controlled_circuit_mapper``
      - AlgorithmRef
      - Nested :doc:`ControlledCircuitMapper <circuit_mapper>` used to synthesize controlled-:math:`U`.

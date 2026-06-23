@@ -126,6 +126,8 @@ def test_hadamard_test_rejects_invalid_test_basis() -> None:
     hadamard_test = create("hadamard_test")
     with pytest.raises(ValueError, match="allowed options"):
         hadamard_test.settings().set("test_basis", "InvalidBasis")
+    with pytest.raises(ValueError, match="allowed options"):
+        hadamard_test.settings().set("test_basis", "Z")
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")

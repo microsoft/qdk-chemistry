@@ -28,7 +28,7 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         Args:
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
+                            ``HadamardTestBasis.Y``).
 
         """
         Logger.trace_entering()

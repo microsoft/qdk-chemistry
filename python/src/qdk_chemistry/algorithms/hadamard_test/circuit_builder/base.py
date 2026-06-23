@@ -38,7 +38,7 @@ class HadamardTestCircuitBuilderSettings(Settings):
             "test_basis",
             "string",
             HadamardTestBasis.X.value,
-            "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
+            "Measurement basis for the control qubit ('X' or 'Y').",
             [basis.value for basis in HadamardTestBasis],
         )
 
@@ -61,7 +61,7 @@ class HadamardTestCircuitBuilder(Algorithm):
         Args:
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
+                            ``HadamardTestBasis.Y``).
 
         """
         super().__init__()
@@ -77,7 +77,7 @@ class HadamardTestCircuitBuilder(Algorithm):
             try:
                 test_basis_value = HadamardTestBasis(test_basis).value
             except ValueError as err:
-                raise ValueError("test_basis must be one of {'X', 'Y', 'Z'}.") from err
+                raise ValueError("test_basis must be one of {'X', 'Y'}.") from err
         else:
             raise TypeError("test_basis must be an instance of HadamardTestBasis or a string.")
 
