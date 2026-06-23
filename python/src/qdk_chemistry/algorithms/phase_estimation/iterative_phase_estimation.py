@@ -153,7 +153,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 bits_msb_first=bits,
             )
         if isinstance(unitary_builder, SOSSABuilder):
-            # For SOSSA block encoding, use E = Λ(1 - cos(2πφ)) + E_SOS.
+            # For SOSSA block encoding, use E = Λ(1 + cos(2πφ)) + E_SOS.
             # Build the unitary once more to access the container's normalization.
             hamiltonian = qubit_hamiltonian
             unitary_rep = unitary_builder.run(hamiltonian)

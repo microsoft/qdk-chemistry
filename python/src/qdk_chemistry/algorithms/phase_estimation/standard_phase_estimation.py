@@ -128,7 +128,7 @@ class StandardPhaseEstimation(PhaseEstimation):
                 bits_msb_first=dominant_bitstring,
             )
         if isinstance(unitary_builder, SOSSABuilder):
-            # For SOSSA block encoding, use E = Λ(1 - cos(2πφ)) + E_SOS.
+            # For SOSSA block encoding, use E = Λ(1 + cos(2πφ)) + E_SOS.
             hamiltonian = qubit_hamiltonian
             unitary_rep = unitary_builder.run(hamiltonian)
             container = unitary_rep.get_container()

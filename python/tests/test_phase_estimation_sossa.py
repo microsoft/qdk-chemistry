@@ -251,9 +251,9 @@ def _sossa_qpe_circuit_builder_ref(
 def _energy_to_qpe_phase(energy_gap, lambda_sos):
     """Convert energy gap to QPE phase for the SOS walk operator.
 
-    For SOS walk: cos(2πφ) = 1 - E_gap / Λ
+    For SOS walk: cos(2πφ) = E_gap / Λ - 1
     """
-    cos_val = 1.0 - energy_gap / lambda_sos
+    cos_val = energy_gap / lambda_sos - 1.0
     cos_val = max(-1.0, min(1.0, cos_val))
     return math.acos(cos_val) / (2 * math.pi)
 
@@ -261,7 +261,7 @@ def _energy_to_qpe_phase(energy_gap, lambda_sos):
 def _energy_to_k_sos(e_gap, num_bits, lambda_sos):
     """Predict the most likely QPE integer for a given e_gap (SOS walk).
 
-    Inverts: E_gap = Λ(1 - cos(2πφ))  →  φ = arccos(1 - E_gap/Λ) / (2π)
+    Inverts: E_gap = Λ(1 + cos(2πφ))  →  φ = arccos(E_gap/Λ - 1) / (2π)
     Returns (k, conjugate_k) where k = round(φ · 2^n).
     """
     phi = _energy_to_qpe_phase(e_gap, lambda_sos)
@@ -484,7 +484,7 @@ class TestSOSSAQPEIntegration:
             qubit_hamiltonian=fh,
         )
 
-        # Verify: for SOS walk, raw_energy = Λ(1 - cos(2πφ)) + energy_shift
+        # Verify: for SOS walk, raw_energy = Λ(1 + cos(2πφ)) + energy_shift
         measured_e_gap = result.raw_energy - container.energy_shift
 
         # With 5 bits, discretization error ~ Λ * 2π / 2^5 ≈ Λ * 0.2

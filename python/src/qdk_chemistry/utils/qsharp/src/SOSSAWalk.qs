@@ -2,11 +2,11 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// SOSSA (Sum of Squares Spectral Amplification) walk operator for DFTHC block encoding.
+/// SOSSA (Sum of Squares Spectral Amplification) walk operator.
 ///
 /// Composable design: each sub-operation (OuterPrepare, InnerPrepare, Select)
 /// is built independently as a Q# callable. The walk step composes them with
-/// reflections, following the same pattern as PrepSelPrep.
+/// reflections.
 ///
 /// Walk operator (arXiv:2502.15882v1, Eq. 77):
 ///   W = Ref_{a,B} · U† · Ref_B · U

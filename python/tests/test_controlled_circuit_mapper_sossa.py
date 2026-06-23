@@ -455,6 +455,7 @@ class TestSOSSAMapper:
             "selectOp",
             "numSystemQubits",
             "numOuterQubits",
+            "numOuterIndexQubits",
             "numInnerQubits",
             "numReflectInner",
             "numPhaseGradientQubits",
