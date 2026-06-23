@@ -91,6 +91,7 @@ class DynamicBitMaskHamiltonianGenerator
   enumerate_connected_pairs_(full_det_iterator dets_begin,
                              full_det_iterator dets_end) {
     const size_t ndets = std::distance(dets_begin, dets_end);
+    if (ndets == 0) return {{}, detail::SpinCache<WfnType>{}};
     const WfnType* dets = &*dets_begin;
 
     detail::SpinCache<WfnType> cache;
