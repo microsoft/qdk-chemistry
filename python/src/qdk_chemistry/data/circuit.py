@@ -19,9 +19,11 @@ from typing import Any
 
 import h5py
 from qdk import qsharp
-from qsharp.estimator import EstimatorParams, EstimatorResult
-from qsharp.openqasm import OutputSemantics
-from qsharp.openqasm import estimate as openqasm_estimate
+from qdk.estimator import EstimatorParams, EstimatorResult
+from qdk.openqasm import OutputSemantics
+from qdk.openqasm import circuit as openqasm_circuit
+from qdk.openqasm import compile as openqasm_compile
+from qdk.openqasm import estimate as openqasm_estimate
 
 from qdk_chemistry.data._hashing import _hash_optional, _hash_str
 from qdk_chemistry.data.base import DataClass
@@ -163,7 +165,7 @@ class Circuit(DataClass):
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return qsharp.openqasm.compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
@@ -197,7 +199,7 @@ class Circuit(DataClass):
                 prune_classical_qubits=prune_classical_qubits,
             )
         if self.qasm:
-            return qsharp.openqasm.circuit(self.qasm)
+            return openqasm_circuit(self.qasm)
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 

@@ -6,30 +6,43 @@
 # --------------------------------------------------------------------------------------------
 
 ################################################################################
-# start-cell-create-from-phase
-from qdk_chemistry.data import QpeResult
+# start-cell-create-from-time-evolution
 
-# Construct a QpeResult from a measured phase fraction
-result = QpeResult.from_time_evolution_result(
+from qdk_chemistry.data import QpeResult
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    PauliProductFormulaContainer,
+)
+
+# Time-evolution QPE: U = e^{-iHt}, eigenvalue_from_phase wraps the angle.
+evolution_time = 0.1
+result = QpeResult.from_phase_fraction(
     method="iterative",
     phase_fraction=0.423828125,
-    evolution_time=0.1,
+    eigenvalue_from_phase=lambda phi: (
+        PauliProductFormulaContainer.eigenvalue_from_phase(phi, evolution_time)
+    ),
     bits_msb_first=(0, 1, 1, 0, 1, 1, 0, 0, 1, 0),
     bitstring_msb_first="0110110010",
-    reference_energy=-1.137,
 )
-# end-cell-create-from-phase
+# end-cell-create-from-time-evolution
 ################################################################################
 
 ################################################################################
 # start-cell-create-from-qubitization
-from qdk_chemistry.data import QpeResult
 
-# Construct a QpeResult from a qubitization (walk operator) measurement
-result_qubitization = QpeResult.from_qubitization_result(
+from qdk_chemistry.data import QpeResult
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import (
+    QuantumWalkContainer,
+)
+
+# Qubitization QPE: W = walk operator, E = lambda * cos(2*pi*phi).
+lambda_val = 5.0
+result_qubitization = QpeResult.from_phase_fraction(
     method="qubitization_qpe",
     phase_fraction=0.25,
-    lambda_val=5.0,
+    eigenvalue_from_phase=lambda phi: QuantumWalkContainer.eigenvalue_from_phase(
+        phi, lambda_val
+    ),
     bits_msb_first=(0, 1, 0, 0),
     bitstring_msb_first="0100",
 )
@@ -43,38 +56,11 @@ print(f"Method: {result.method}")
 print(f"Phase fraction: {result.phase_fraction:.6f}")
 print(f"Phase angle: {result.phase_angle:.6f} rad")
 print(f"Raw energy: {result.raw_energy:.8f} Ha")
-print(f"Alias candidates: {result.branching}")
-print(f"Resolved energy: {result.resolved_energy:.8f} Ha")
 print(f"Measured bits: {result.bits_msb_first}")
 
 # Full summary
 print(result.get_summary())
 # end-cell-inspect
-################################################################################
-
-################################################################################
-# start-cell-alias
-# Construct without a reference energy — no alias resolution
-result_no_ref = QpeResult.from_time_evolution_result(
-    method="iterative",
-    phase_fraction=0.423828125,
-    evolution_time=0.1,
-)
-
-# All alias candidates are available in the branching tuple
-for i, energy in enumerate(result_no_ref.branching):
-    print(f"  Candidate {i}: {energy:.6f} Ha")
-
-# Resolve later using a reference energy
-from qdk_chemistry.utils.phase import resolve_energy_aliases
-
-resolved = resolve_energy_aliases(
-    result_no_ref.raw_energy,
-    evolution_time=0.1,
-    reference_energy=-1.137,
-)
-print(f"Resolved energy: {resolved:.8f} Ha")
-# end-cell-alias
 ################################################################################
 
 ################################################################################

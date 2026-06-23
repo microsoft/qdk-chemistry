@@ -14,6 +14,11 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.phase import (
+    energy_alias_candidates,
+    energy_from_phase,
+    resolve_energy_aliases,
+)
 
 try:
     import pennylane as qml
@@ -166,18 +171,18 @@ phase_fraction = dominant_index / (2**M_PRECISION)
 # 5. Process and display results
 ########################################################################################
 
-result = QpeResult.from_time_evolution_result(
+result = QpeResult.from_phase_fraction(
     method="pennylane_qpe",
     phase_fraction=phase_fraction,
-    evolution_time=T_TIME,
+    eigenvalue_from_phase=lambda phi: energy_from_phase(phi, evolution_time=T_TIME),
     bitstring_msb_first=dominant_bits,
-    reference_energy=casci_energy,
 )
 raw_energy = result.raw_energy
-candidate_energies = result.branching
-estimated_total_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
+candidate_energies = energy_alias_candidates(raw_energy, evolution_time=T_TIME)
+resolved_energy = resolve_energy_aliases(
+    raw_energy, evolution_time=T_TIME, reference_energy=casci_energy
 )
+estimated_total_energy = resolved_energy + core_energy
 
 Logger.info(f"\nMost likely phase bitstring: {dominant_bits}")
 Logger.info(f"Phase fraction φ (measured): {result.phase_fraction:.4f} rad")
