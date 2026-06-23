@@ -3,7 +3,9 @@
 // license information.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
@@ -331,6 +333,192 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
                          "symmetry-conserving-bravyi-kitaev", base.num_modes_,
                          base.num_qubits_, "bravyi-kitaev-tree",
                          std::move(tapering));
+}
+
+// ── Factory: Verstraete-Cirac ──────────────────────────────────────────
+
+MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
+  using namespace detail;
+  const std::string name = "verstraete-cirac";
+
+  std::uint64_t V = lattice.num_sites();
+  if (V < 3) {
+    throw std::invalid_argument(
+        name + " requires a lattice graph with at least 3 sites");
+  }
+
+  // Since the lattice graph is pre-ordered optimally (if requested) or
+  // processed in default ordering, the node sequence/path is simply 0, 1, ...,
+  // V-1. Identify all non-adjacent edges incident to each vertex.
+  const auto& adj = lattice.sparse_adjacency_matrix();
+  std::vector<std::vector<std::uint64_t>> non_adjacent_incident(V);
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      std::uint64_t u = it.row();
+      std::uint64_t v = it.col();
+      // Since the matrix is symmetric, only process the upper-triangle (u < v)
+      if (u < v) {
+        std::size_t diff = v - u;
+        if (diff > 1) {
+          non_adjacent_incident[u].push_back(v);
+          non_adjacent_incident[v].push_back(u);
+        }
+      }
+    }
+  }
+
+  // Count aux fermionic modes per site
+  std::vector<std::size_t> n_aux(V);
+  std::size_t total_n_aux = 0;
+  for (std::uint64_t u = 0; u < V; ++u) {
+    n_aux[u] = (non_adjacent_incident[u].size() + 1) / 2;
+    total_n_aux += n_aux[u];
+  }
+
+  std::size_t modes_per_spin = V + total_n_aux;
+  std::size_t num_modes = 2 * V;                 // 2 spin species
+  std::size_t base_qubits = 2 * modes_per_spin;  // total qubits in jw_base
+  std::size_t base_modes = 2 * base_qubits;      // total Majoranas in jw_base
+
+  auto jw_base = MajoranaMapping::jordan_wigner(base_qubits);
+
+  // Precompute mode offsets along the sequence of sites
+  std::vector<std::size_t> site_to_mode_offset(V);
+  site_to_mode_offset[0] = 0;
+  for (std::size_t k = 1; k < V; ++k) {
+    std::uint64_t prev_site = k - 1;
+    site_to_mode_offset[k] = site_to_mode_offset[k - 1] + 1 + n_aux[prev_site];
+  }
+
+  auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t offset) -> std::size_t {
+    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
+    return 2 * mode_idx + offset;
+  };
+
+  auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t offset) -> std::size_t {
+    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
+    return 2 * (mode_idx + 1) + offset;
+  };
+
+  // Get a Pauli representation of the antisymmetric Majorana bilinear iγ_pγ_q
+  auto get_bilinear =
+      [&](std::size_t p,
+          std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
+    if (p < q) {
+      auto b = jw_base.bilinear(p, q);
+      return {b.first, b.second};
+    } else {
+      auto b = jw_base.bilinear(q, p);
+      return {-b.first, b.second};
+    }
+  };
+
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  std::vector<std::map<std::pair<std::uint64_t, std::uint64_t>, std::size_t>>
+      edge_to_stab_idx(2);
+
+  for (std::size_t spin = 0; spin < 2; ++spin) {
+    // Add 2-body link stabilizers for non-adjacent edges on the lattice
+    for (std::uint64_t u = 0; u < V; ++u) {
+      for (std::uint64_t v : non_adjacent_incident[u]) {
+        if (u < v) {
+          auto it_u = std::find(non_adjacent_incident[u].begin(),
+                                non_adjacent_incident[u].end(), v);
+          auto it_v = std::find(non_adjacent_incident[v].begin(),
+                                non_adjacent_incident[v].end(), u);
+          std::size_t a = std::distance(non_adjacent_incident[u].begin(), it_u);
+          std::size_t b = std::distance(non_adjacent_incident[v].begin(), it_v);
+
+          std::size_t p = get_aux_majorana(u, spin, a);
+          std::size_t q = get_aux_majorana(v, spin, b);
+
+          auto [coeff, word] = get_bilinear(p, q);
+          edge_to_stab_idx[spin][{u, v}] = stabilizers.size();
+          edge_to_stab_idx[spin][{v, u}] = stabilizers.size();
+          stabilizers.emplace_back(coeff, std::move(word));
+        }
+      }
+    }
+
+    // Identify and pair up any remaining unused aux Majorana modes to
+    // lift boundary/corner codespace degeneracy
+    std::vector<std::size_t> unpaired_modes;
+    for (std::uint64_t u = 0; u < V; ++u) {
+      std::size_t A_u = non_adjacent_incident[u].size();
+      if (A_u % 2 != 0) {
+        unpaired_modes.push_back(get_aux_majorana(u, spin, A_u));
+      }
+    }
+
+    // Unused aux Majorana modes become trivial stabilizers
+    // (we are guaranteed an even number due to the handshaking lemma)
+    for (std::size_t i = 0; i < unpaired_modes.size(); i += 2) {
+      if (i + 1 < unpaired_modes.size()) {
+        auto [coeff, word] =
+            get_bilinear(unpaired_modes[i], unpaired_modes[i + 1]);
+        stabilizers.emplace_back(coeff, std::move(word));
+      }
+    }
+  }
+
+  // Build a lookup table of VC bilinears by dressing non-local JW bilinears
+  // with their stabilizer to make everything local
+  std::size_t num_physical_modes = 2 * V;
+  std::size_t num_physical_majoranas = 2 * num_physical_modes;
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
+  upper_triangle.reserve(num_physical_majoranas * (num_physical_majoranas - 1) /
+                         2);
+
+  for (std::size_t u = 0; u < num_physical_majoranas; ++u) {
+    for (std::size_t v = u + 1; v < num_physical_majoranas; ++v) {
+      std::size_t u_mode = u / 2;
+      std::size_t v_mode = v / 2;
+      std::size_t s_u = u_mode / V;
+      std::size_t s_v = v_mode / V;
+      std::size_t i = u_mode % V;
+      std::size_t j = v_mode % V;
+      std::size_t a = u % 2;
+      std::size_t b = v % 2;
+
+      bool connected = (s_u == s_v) && lattice.are_connected(i, j);
+
+      if (connected) {
+        std::size_t path_min = std::min(i, j);
+        std::size_t path_max = std::max(i, j);
+
+        std::size_t p = get_sys_majorana(i, s_u, a);
+        std::size_t q = get_sys_majorana(j, s_v, b);
+        auto [coeff, word] = get_bilinear(p, q);
+
+        // For non-local paths, the raw JW bilinear iγ_pγ_q loses its long
+        // Z-string by multiplying by edge stabilizer iγ̃_aγ̃_b
+        if (path_max - path_min > 1) {
+          auto key = std::make_pair(std::min(i, j), std::max(i, j));
+          std::size_t stab_idx = edge_to_stab_idx[s_u].at(key);
+          const auto& [b_coeff, b_word] = stabilizers[stab_idx];
+
+          auto [phase, new_word] =
+              PauliTermAccumulator::multiply_uncached(word, b_word);
+          coeff *= b_coeff * phase;
+          word = std::move(new_word);
+        }
+
+        upper_triangle.emplace_back(coeff, std::move(word));
+      } else {
+        std::size_t p = get_sys_majorana(i, s_u, a);
+        std::size_t q = get_sys_majorana(j, s_v, b);
+        auto [coeff, word] = get_bilinear(p, q);
+        upper_triangle.emplace_back(coeff, std::move(word));
+      }
+    }
+  }
+
+  return MajoranaMapping(std::vector<SparsePauliWord>{},
+                         std::move(upper_triangle), name, num_physical_modes,
+                         base_qubits, name, std::nullopt,
+                         std::move(stabilizers));
 }
 
 }  // namespace qdk::chemistry::data
