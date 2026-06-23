@@ -1,11 +1,4 @@
-"""QDK/Chemistry SOSSA (Sum of Squares with Ancilla) controlled circuit mapper.
-
-The SOSSAMapper composes the full controlled walk operator from three
-sub-operations (outer PREPARE, inner PREPARE, SELECT), each built as a
-method on the mapper itself. Configuration is via Settings, matching the
-pattern used by PrepSelPrepMapper.
-
-"""
+"""QDK/Chemistry SOSSA (Sum of Squares Spectral Amplification) controlled circuit mapper :cite:`Low2025`."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -41,18 +34,6 @@ class SOSSAMapperSettings(Settings):
             AlgorithmRef("state_prep", "alias_sampling"),
         )
         self._set_default(
-            "rotation_bit_precision",
-            "int",
-            10,
-            "Number of bits for Givens rotation angle precision.",
-        )
-        self._set_default(
-            "coefficient_bit_precision",
-            "int",
-            10,
-            "Number of bits for alias sampling coefficient precision.",
-        )
-        self._set_default(
             "inner_prepare_algorithm",
             "string",
             "controlled_alias_sampling",
@@ -63,6 +44,18 @@ class SOSSAMapperSettings(Settings):
             "string",
             "qrom_phase_gradient",
             "SELECT algorithm: qrom_phase_gradient or direct.",
+        )
+        self._set_default(
+            "rotation_bit_precision",
+            "int",
+            10,
+            "Number of bits for Givens rotation angle precision.",
+        )
+        self._set_default(
+            "coefficient_bit_precision",
+            "int",
+            10,
+            "Number of bits for alias sampling coefficient precision.",
         )
 
 
@@ -75,9 +68,10 @@ class SOSSAMapper(ControlledCircuitMapper):
     1. :meth:`build_outer_prep` — outer PREPARE (amplitude-loading into
        :math:`x_o` register), resolved via an ``AlgorithmRef`` state_prep setting.
     2. :meth:`build_inner_prep` — inner (controlled) PREPARE over bases.
-    3. :meth:`build_select` — SELECT (multiplexed Givens rotations + Majorana).
+    3. :meth:`build_select` — SELECT (multiplexed Givens rotations + Spin Swap +
+        Majorana).
 
-    The walk operator:
+    The walk operator (:cite:`Low2025`, Eq. 77):
 
     .. math::
 
@@ -254,6 +248,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         return {
             "num_system_qubits": num_system_qubits,
             "num_outer_qubits": num_outer_qubits,
+            "num_outer_index_qubits": xo_bits,
             "num_inner_qubits": num_inner_qubits,
             "num_reflect_inner": num_reflect_inner,
             "num_phase_gradient_qubits": num_phase_gradient_qubits,
@@ -298,6 +293,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             "selectOp": select_op,
             "numSystemQubits": regs["num_system_qubits"],
             "numOuterQubits": regs["num_outer_qubits"],
+            "numOuterIndexQubits": regs["num_outer_index_qubits"],
             "numInnerQubits": regs["num_inner_qubits"],
             "numReflectInner": regs["num_reflect_inner"],
             "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],
@@ -314,6 +310,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             select_op,
             regs["num_system_qubits"],
             regs["num_outer_qubits"],
+            regs["num_outer_index_qubits"],
             regs["num_inner_qubits"],
             regs["num_reflect_inner"],
             regs["num_phase_gradient_qubits"],
@@ -382,6 +379,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             "selectOp": select_op,
             "numSystemQubits": regs["num_system_qubits"],
             "numOuterQubits": regs["num_outer_qubits"],
+            "numOuterIndexQubits": regs["num_outer_index_qubits"],
             "numInnerQubits": regs["num_inner_qubits"],
             "numReflectInner": regs["num_reflect_inner"],
             "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],

@@ -1,8 +1,8 @@
-r"""QDK/Chemistry SOSSA (Sum of Squares with Ancilla) block encoding container.
+r"""QDK/Chemistry SOSSA (Sum of Squares Spectral Amplification) block encoding container.
 
 References:
     Low, G. H. et al. "Quantum simulation of chemistry with sublinear scaling
-    in basis size." arXiv:2502.15882v1 (2025).
+    in basis size." :cite:`Low2025`.
 
 """
 
@@ -127,11 +127,11 @@ class SOSSASelect:
 
 
 class SOSSAContainer(BlockEncodingContainer):
-    r"""Container for the SOSSA (Sum of Squares with Ancilla) block encoding.
+    r"""Container for the SOSSA (Sum of Squares Spectral Amplification) block encoding.
 
     Stores the two-level PREPARE and rotation-based SELECT for the DFTHC walk operator.
 
-    The walk operator is (arXiv:2502.15882, Eq. 77):
+    The walk operator is (:cite:`Low2025`, Eq. 77):
 
     .. math::
 

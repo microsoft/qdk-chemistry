@@ -1,18 +1,13 @@
-r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares with Ancilla) block encoding.
+r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplification) block encoding.
 
 The SOSSA block encoding implements the walk operator from the DFTHC
 (Density-Fitted Tensor Hypercontraction) decomposition for quantum chemistry
-Hamiltonians, as described in arXiv:2502.15882v1 (Low et al. 2025).
+Hamiltonians, as described in :cite:`Low2025`.
 
 The walk operator is:
     W = Ref_{a,B} · U† · Ref_B · U
 where
     U = OuterPREP · within{InnerPREP} apply{SELECT}
-
-References:
-    Low, G. H. et al. "Quantum simulation of chemistry with sublinear scaling
-    in basis size." arXiv:2502.15882v1 (2025).
-
 """
 
 # --------------------------------------------------------------------------------------------
@@ -66,7 +61,7 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
-    r"""SOSSA (Sum of Squares with Ancilla) block encoding builder.
+    r"""SOSSA (Sum of Squares Spectral Amplification) block encoding builder.
 
     Constructs a SOSSA block encoding from a FactorizedHamiltonianContainer.
     Unlike LCU which operates on a QubitHamiltonian (Pauli decomposition),
@@ -179,14 +174,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             num_d1=num_d1,
         )
 
-        # Energy shift: E_SOS + E_nuc for full energy recovery (Eq. 29, arXiv:2502.15882)
+        # Energy shift: E_SOS + E_nuc for full energy recovery (Eq. 29, :cite:`Low2025`)
         # E_SOS = -2·Σw⁻ - ½·Σ|W₀|² + E_BLISS
         w0 = wb - np.sum(two_body_weights, axis=1)  # [R, C]
-        e_sos = (
-            -2.0 * np.sum(w_minus)
-            - 0.5 * float(np.sum(w0**2))
-            + factorized_hamiltonian.get_bliss_core_shift()
-        )
+        e_sos = -2.0 * np.sum(w_minus) - 0.5 * float(np.sum(w0**2)) + factorized_hamiltonian.get_bliss_core_shift()
         energy_shift = e_sos + factorized_hamiltonian.get_core_energy()
 
         container = SOSSAContainer(
@@ -229,7 +220,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return Wavefunction(container)
 
     # =========================================================================
-    # Circuit synthesis helpers (from arXiv:2502.15882, Appendix B)
+    # Circuit synthesis helpers
     # =========================================================================
 
     @staticmethod
@@ -271,7 +262,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     ) -> list[float]:
         r"""Compute the outer PREP amplitudes for the :math:`x_o` register.
 
-        Reference: Eq. 84-87, B9 in arXiv:2502.15882v1.
+        Reference: Eq. 84-87, B9 in :cite:`Low2025`.
         """
         xo_dim = n_orbitals + n_ranks * n_copies
         coefficients = [0.0] * xo_dim
@@ -303,7 +294,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     ) -> list[list[float]]:
         r"""Compute the inner PREP amplitudes for the b register.
 
-        Shape: [Xo][B+1]. Reference: Appendix B.4 in arXiv:2502.15882v1.
+        Shape: [Xo][B+1]. Reference: Appendix B.4 in :cite:`Low2025`.
         """
         xo_dim = n_orbitals + n_ranks * n_copies
         coefficients: list[list[float]] = []
@@ -341,7 +332,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 dq_angles: shape [N][N-1], D1 then Q1 angles.
                 sf_angles: shape [R*(B+1)][N], SF Givens angles + bEqB flag.
 
-        Reference: Appendix B.5, Eq. 115 in arXiv:2502.15882v1.
+        Reference: Appendix B.5, Eq. 115 in :cite:`Low2025`.
 
         """
         dq_angles: list[list[float]] = []
@@ -420,7 +411,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             - Q1 (hole):     ``[False, True]``
             - SF (two-body): ``[True,  True]``
 
-        Reference: Eq. 82 in arXiv:2502.15882v1.
+        Reference: Eq. 82 in :cite:`Low2025`.
 
         """
         xo_dim = n_orbitals + n_ranks * n_copies

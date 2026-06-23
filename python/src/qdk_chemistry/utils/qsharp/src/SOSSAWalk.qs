@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// SOSSA (Sum of Squares with Ancilla) walk operator for DFTHC block encoding.
+/// SOSSA (Sum of Squares Spectral Amplification) walk operator for DFTHC block encoding.
 ///
 /// Composable design: each sub-operation (OuterPrepare, InnerPrepare, Select)
 /// is built independently as a Q# callable. The walk step composes them with
@@ -304,6 +304,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numReflectInner : Int,
+        numOuterIndexQubits : Int,
         outerReg : Qubit[],
         innerReg : Qubit[],
         spinReg : Qubit[],
@@ -311,14 +312,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         phaseGradientReg : Qubit[],
     ) : Unit is Adj + Ctl {
         body ... {
+            // outerIndexReg: logical index qubits used by innerPrep and SELECT addressing.
+            // For alias sampling, outerReg has extra garbage qubits beyond the index.
+            let outerIndexReg = outerReg[0..numOuterIndexQubits - 1];
+
             // U: OuterPREP · H(spinDQ) · within{InnerPREP + H(spinSF)} apply{SELECT}
             outerPrepareOp(outerReg);
             H(spinReg[0]);
             within {
-                innerPrepareOp(outerReg, innerReg);
+                innerPrepareOp(outerIndexReg, innerReg);
                 H(spinReg[1]); // H(spinSF): part of inner prep for reflection
             } apply {
-                selectOp(outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
             }
 
             // Ref_B: inner reflection on bReg + spinSF (excludes freeRider)
@@ -326,10 +331,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
             // U†: must undo inner BE first (needs outerReg superposition), then outer
             within {
-                innerPrepareOp(outerReg, innerReg);
+                innerPrepareOp(outerIndexReg, innerReg);
                 H(spinReg[1]); // H(spinSF)
             } apply {
-                Adjoint selectOp(outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
             }
             H(spinReg[0]);
             Adjoint outerPrepareOp(outerReg);
@@ -340,15 +345,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         adjoint auto;
         controlled (ctls, ...) {
             if BeginEstimateCaching("Controlled_SOSSAWalkStep", SingleVariant()) {
+                let outerIndexReg = outerReg[0..numOuterIndexQubits - 1];
+
                 // Only reflections are controlled for QPE.
                 // U (uncontrolled)
                 outerPrepareOp(outerReg);
                 H(spinReg[0]);
                 within {
-                    innerPrepareOp(outerReg, innerReg);
+                    innerPrepareOp(outerIndexReg, innerReg);
                     H(spinReg[1]); // H(spinSF)
                 } apply {
-                    selectOp(outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                    selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
                 }
 
                 // c-Ref_B
@@ -356,10 +363,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
                 // U† (uncontrolled): inner BE adjoint first, then outer
                 within {
-                    innerPrepareOp(outerReg, innerReg);
+                    innerPrepareOp(outerIndexReg, innerReg);
                     H(spinReg[1]); // H(spinSF)
                 } apply {
-                    Adjoint selectOp(outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                    Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
                 }
                 H(spinReg[0]);
                 Adjoint outerPrepareOp(outerReg);
@@ -382,6 +389,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numOuterQubits : Int,
+        numOuterIndexQubits : Int,
         numInnerQubits : Int,
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
@@ -403,7 +411,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 if BeginEstimateCaching("Controlled_SOSSAWalkOp", SingleVariant()) {
                     Controlled SOSSAWalkStep(
                         [control],
-                        (outerPrepareOp, innerPrepareOp, selectOp, numReflectInner, outerReg, innerReg, spinReg, systemReg, phaseGradientReg),
+                        (outerPrepareOp, innerPrepareOp, selectOp, numReflectInner, numOuterIndexQubits, outerReg, innerReg, spinReg, systemReg, phaseGradientReg),
                     );
                     EndEstimateCaching();
                 }
@@ -419,6 +427,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numOuterQubits : Int,
+        numOuterIndexQubits : Int,
         numInnerQubits : Int,
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
@@ -435,6 +444,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             selectOp,
             numSystemQubits,
             numOuterQubits,
+            numOuterIndexQubits,
             numInnerQubits,
             numReflectInner,
             numPhaseGradientQubits,
@@ -457,6 +467,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numOuterQubits : Int,
+        numOuterIndexQubits : Int,
         numInnerQubits : Int,
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
@@ -480,7 +491,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         within { RepeatEstimates(numQueries); } apply {
             Controlled SOSSAWalkStep(
                 control,
-                (outerPrepareOp, innerPrepareOp, selectOp, numReflectInner, outerReg, innerReg, spinReg, systemReg, phaseGradientReg),
+                (outerPrepareOp, innerPrepareOp, selectOp, numReflectInner, numOuterIndexQubits, outerReg, innerReg, spinReg, systemReg, phaseGradientReg),
             );
         }
     }
@@ -560,14 +571,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
 
             // DQ rotations: x_o in [0, N)
-            // The Ry is controlled on sysRegDown[j+1] to make the Givens rotation
-            // particle-number-preserving. After the CNOT, sysRegDown[j+1]=1 iff the
-            // original pair (j, j+1) was in the 1-excitation subspace. This ensures
-            // the rotation acts as identity on |00⟩ and |11⟩ sectors, preventing
-            // particle-number violation when MajoranaOp changes the occupation.
+            // No extra control on sysRegDown[j+1]: the CNOT sandwich already
+            // restricts the 1-excitation subspace, and the Givens rotation must
+            // act on ALL sectors (0, 1, 2 excitations) so that its adjoint
+            // properly uncomputes after MajoranaOp changes the particle number.
             for a in 0..N - 1 {
                 let angle = params.dqRotationAngles[a][j];
-                ApplyControlledOnInt(a, q => Controlled Ry([sysRegDown[j + 1]], (-2.0 * angle, q)), xoReg, sysRegDown[j]);
+                ApplyControlledOnInt(a, Ry(-2.0 * angle, _), xoReg, sysRegDown[j]);
             }
 
             // SF rotations: x_o in [N, N+numSF), conditioned on b
@@ -579,7 +589,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     if angleIdx < Length(params.sfRotationAngles) and j < Length(params.sfRotationAngles[angleIdx]) {
                         let angle = params.sfRotationAngles[angleIdx][j];
                         let condValue = xo + b * (1 <<< xoBits);
-                        ApplyControlledOnInt(condValue, q => Controlled Ry([sysRegDown[j + 1]], (-2.0 * angle, q)), xoReg + bReg, sysRegDown[j]);
+                        ApplyControlledOnInt(condValue, Ry(-2.0 * angle, _), xoReg + bReg, sysRegDown[j]);
                     }
                 }
             }
@@ -776,7 +786,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Build an outer PREPARE that applies PreparePureStateD (pure-state amplitude encoding).
     /// Returns a callable (Qubit[]) => Unit is Adj + Ctl.
     function MakeOuterPreparePureState(coefficients : Double[]) : (Qubit[]) => Unit is Adj + Ctl {
-        PreparePureStateD(coefficients, _)
+        // Reversed: PreparePureStateD is big-endian (qubit[0]=MSB), but
+        // Select/ApplyControlledOnInt are little-endian (qubit[0]=LSB).
+        (register) => PreparePureStateD(coefficients, Reversed(register))
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -971,5 +983,32 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             selectOp(outerReg, innerReg, spinReg, systemReg, []);
         }
         // State is now U|0_anc⟩|ψ_sys⟩ — can be inspected with dump_machine
+    }
+
+    /// Test: controlled walk with control in |+⟩ to reproduce IQPE scenario.
+    operation TestControlledWalkWithSuperposition(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numOuterQubits : Int,
+        numOuterIndexQubits : Int,
+        numInnerQubits : Int,
+        numReflectInner : Int,
+        numPhaseGradientQubits : Int,
+    ) : Unit {
+        let numSpinQubits = 2;
+        let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits + numPhaseGradientQubits;
+        use control = Qubit();
+        use allQubits = Qubit[numSystemQubits + totalAncilla];
+        let walkOp = MakeControlledSOSSAWalkOp(
+            outerPrepareOp, innerPrepareOp, selectOp,
+            numSystemQubits, numOuterQubits, numOuterIndexQubits,
+            numInnerQubits, numReflectInner, numPhaseGradientQubits, 1);
+        H(control);
+        walkOp(control, allQubits);
+        H(control);
+        ResetAll(allQubits);
+        Reset(control);
     }
 }

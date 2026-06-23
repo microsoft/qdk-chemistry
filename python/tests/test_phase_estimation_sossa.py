@@ -484,10 +484,8 @@ class TestSOSSAQPEIntegration:
             qubit_hamiltonian=fh,
         )
 
-        # Verify: for SOS walk, E_gap = Λ(1 - cos(2πφ))
-        # The raw_energy from from_qubitization_result is Λ·cos(2πφ)
-        # E_gap = Λ - raw_energy (since cos(2πφ) = 1 - E_gap/Λ)
-        measured_e_gap = lambda_sos - result.raw_energy
+        # Verify: for SOS walk, raw_energy = Λ(1 - cos(2πφ)) + energy_shift
+        measured_e_gap = result.raw_energy - container.energy_shift
 
         # With 5 bits, discretization error ~ Λ * 2π / 2^5 ≈ Λ * 0.2
         discretization_tol = lambda_sos * 2 * math.pi / (2**num_bits) + 0.05
