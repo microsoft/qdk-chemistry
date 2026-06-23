@@ -282,7 +282,7 @@ class QpeResult(DataClass):
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
 
         Reference:
-            Eq. 11, 77 in arXiv:2502.15882.
+            Eq. 11, 77 in :cite:`Low2025`.
 
         """
         Logger.trace_entering()

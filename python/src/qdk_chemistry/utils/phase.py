@@ -92,7 +92,7 @@ def energy_from_phase_sossa(phase_fraction: float, *, lambda_val: float, energy_
         Total energy estimate.
 
     Reference:
-        Eq. 11, 77 in arXiv:2502.15882.
+        Eq. 11, 77 in :cite:`Low2025`.
 
     """
     Logger.trace_entering()

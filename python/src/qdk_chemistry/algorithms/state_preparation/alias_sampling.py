@@ -78,6 +78,12 @@ class AliasSamplingStatePreparation(StatePreparation):
 
         coefficients = coeffs.tolist()
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
+        # Pad to 2^numIndexQubits so PrepareUniformSuperposition uses H⊗n
+        # (no internal ancilla qubits). Zero-weight entries are handled by the
+        # alias table — they get keepCoeff=0 and alias away to valid entries.
+        padded_len = 1 << num_index_qubits
+        if len(coefficients) < padded_len:
+            coefficients = coefficients + [0.0] * (padded_len - len(coefficients))
         # Total qubits: index + uniform + flag + qrom_output
         total_qubits = 2 * num_index_qubits + 2 * self._bits_precision + 1
 

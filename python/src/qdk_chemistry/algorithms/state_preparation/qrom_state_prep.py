@@ -33,9 +33,6 @@ class QROMStatePreparation(StatePreparation):
       - QROM uncompute: measurement-based (free in Toffoli cost)
 
     Total Toffoli cost: :math:`\sum_{l=0}^{n-1} (2^l + b_{rot})` per walk step.
-
-    Reference: arXiv:2502.15882v1, Section C (SBM decomposition).
-
     """
 
     def __init__(self, rotation_bit_precision: int = 10):
