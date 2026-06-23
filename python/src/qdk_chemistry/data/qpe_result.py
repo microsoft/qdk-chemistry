@@ -258,13 +258,12 @@ class QpeResult(DataClass):
 
         This factory accepts a callable that maps a phase fraction to the
         corresponding Hamiltonian eigenvalue, as defined by the container's
-        :meth:`~qdk_chemistry.data.unitary_representation.containers.UnitaryContainer.eigenvalue_from_phase`.
+        :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`.
 
         Args:
             method: Phase estimation algorithm or workflow label.
             phase_fraction: Measured phase fraction in ``[0, 1)``.
-            eigenvalue_from_phase: A callable mapping phase fraction to the
-                Hamiltonian eigenvalue.
+            eigenvalue_from_phase: A callable mapping phase fraction to the Hamiltonian eigenvalue.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
             metadata: Optional dictionary copied into the result for caller-defined context.
