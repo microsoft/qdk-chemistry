@@ -15,9 +15,6 @@ ENV LANG=en_US.UTF-8 \
     LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
     PATH=/usr/local/bin:${PATH}
 
-# Cap cmake build parallelism to prevent OOM (e.g., in dev-loop rebuilds)
-ENV CMAKE_BUILD_PARALLEL_LEVEL=4
-
 # Create a non-root user with sudo privileges
 ARG USERNAME=vscode
 ARG USER_UID=1000
@@ -57,6 +54,11 @@ RUN apt-get update && \
     graphviz \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the memory-/core-aware build parallelism helper. It is used during
+# dependency installation and may also be sourced by development scripts and
+# interactive shells.
+COPY .devcontainer/scripts/parallelism.sh /usr/local/share/qdk/parallelism.sh
 
 # Install C++ dependencies
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
@@ -107,6 +109,9 @@ RUN python -m venv "$VIRTUAL_ENV" \
     "pre-commit>=4.6,<5" \
     "rdkit" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
+
+# Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells
+RUN echo "source /usr/local/share/qdk/parallelism.sh" >> ~/.bashrc
 
 # Make user-local C++ installations discoverable
 ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local
