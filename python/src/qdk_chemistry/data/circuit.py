@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-import qsharp.openqasm
+from qdk import qsharp
 from qsharp.estimator import EstimatorParams, EstimatorResult
 from qsharp.openqasm import OutputSemantics
 from qsharp.openqasm import estimate as openqasm_estimate
