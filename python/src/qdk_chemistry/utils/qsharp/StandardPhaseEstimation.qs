@@ -9,7 +9,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
-    /// - `controlledEvolutions`: An array of functions to perform controlled-U^(2^k) on (control, systems),
+    /// - `controlledUnitary`: An array of functions to perform controlled-U^(2^k) on (control, systems),
     ///   one per ancilla qubit. Each operation already encapsulates the correct power.
     /// - `phaseQubitPrep`: A function to prepare the phase (ancilla) qubits (e.g., Hadamard on each qubit).
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
@@ -18,7 +18,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit,
-        controlledEvolutions : ((Qubit, Qubit[]) => Unit)[],
+        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
         phaseQubitPrep : Qubit[] => Unit,
         numBits : Int,
         ancillas : Int[],
@@ -51,10 +51,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         params.phaseQubitPrep(ancillas);
 
         // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
-        // Each controlledEvolutions[k] already implements the correct power.
+        // Each controlledUnitary[k] already implements the correct power.
         // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
         for ancillaIdx in 0..params.numBits - 1 {
-            params.controlledEvolutions[ancillaIdx](ancillas[ancillaIdx], allTargets);
+            params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
         }
 
         // Step 4: Apply inverse QFT on ancilla qubits
@@ -72,7 +72,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// Prepare a standard QPE circuit (factory entry point).
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state.
-    /// - `controlledEvolutions`: An array of functions to perform controlled-U^(2^k) on (control, systems),
+    /// - `controlledUnitary`: An array of functions to perform controlled-U^(2^k) on (control, systems),
     ///   one per ancilla qubit. Each operation already encapsulates the correct power.
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices for the ancilla qubits.
@@ -83,7 +83,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// The measurement results of the ancilla qubits.
     operation MakeStandardQPECircuit(
         statePrep : Qubit[] => Unit,
-        controlledEvolutions : ((Qubit, Qubit[]) => Unit)[],
+        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
@@ -92,7 +92,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     ) : Result[] {
         return RunStandardQPE(new StandardPhaseEstimationParams {
             statePrep = statePrep,
-            controlledEvolutions = controlledEvolutions,
+            controlledUnitary = controlledUnitary,
             phaseQubitPrep = phaseQubitPrep,
             numBits = numBits,
             ancillas = ancillas,

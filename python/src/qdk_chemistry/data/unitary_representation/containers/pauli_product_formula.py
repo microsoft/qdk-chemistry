@@ -79,13 +79,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
     def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
 
-        For :math:`U = e^{-iHt}` the eigenvalues are :math:`e^{-iE_k t}`
-        and QPE measures :math:`\varphi = -E_k t / (2\pi) \mod 1`.
-        Inverting gives:
-
-        .. math::
-
-            E_k = -\arg(e^{2\pi i \varphi}) / t
+        Convert a measured phase fraction to energy using ``E = angle / t``.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.

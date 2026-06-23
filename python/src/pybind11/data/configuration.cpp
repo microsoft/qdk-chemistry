@@ -310,6 +310,10 @@ Returns:
       [](const Configuration &self, size_t n_bits) -> py::list {
         const auto &packed = self.packed_data();
         uint8_t bpm = self.bits_per_mode();
+        if ((n_bits % bpm) != 0) {
+          throw py::value_error(
+              "n_bits must be a multiple of bits_per_mode().");
+        }
         size_t modes_per_byte = 8 / bpm;
         size_t n_modes = n_bits / bpm;
 

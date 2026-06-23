@@ -69,7 +69,10 @@ class ControlledCircuitMapper(Algorithm):
             The control qubit indices.
 
         """
-        return self._settings.get("control_indices")
+        control_indices = self._settings.get("control_indices")
+        if len(control_indices) != len(set(control_indices)):
+            raise ValueError("control_indices must not contain duplicates.")
+        return control_indices
 
     def _get_target_indices(self, unitary: UnitaryRepresentation) -> list[int]:
         """Get target indices from settings, auto-filling if empty.
@@ -83,6 +86,10 @@ class ControlledCircuitMapper(Algorithm):
         """
         target_indices = self._settings.get("target_indices")
         if target_indices:
+            if len(target_indices) != len(set(target_indices)):
+                raise ValueError("target_indices must not contain duplicates.")
+            if any(idx in self._get_control_indices() for idx in target_indices):
+                raise ValueError("target_indices must not overlap with control_indices.")
             return target_indices
         control_indices = self._get_control_indices()
         control_set = set(control_indices)
