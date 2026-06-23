@@ -152,6 +152,7 @@ class SOSSAContainer(BlockEncodingContainer):
         normalization: float,
         power: int = 1,
         quantum_walk: bool = True,
+        energy_shift: float = 0.0,
     ) -> None:
         r"""Initialize a SOSSAContainer.
 
@@ -162,6 +163,8 @@ class SOSSAContainer(BlockEncodingContainer):
             normalization: The block encoding normalization :math:`\Lambda`.
             power: Number of times to apply the walk operator.
             quantum_walk: Whether to use quantum walk (always True for SOSSA/QPE).
+            energy_shift: Classical energy shift :math:`E_{\text{SOS}} + E_{\text{nuc}}`
+                to add when recovering total energy from the measured phase.
 
         """
         self._power = power
@@ -170,6 +173,7 @@ class SOSSAContainer(BlockEncodingContainer):
         self.inner_prepare = inner_prepare
         self.select = select
         self.normalization = normalization
+        self.energy_shift = energy_shift
 
         super().__init__()
 
@@ -216,6 +220,7 @@ class SOSSAContainer(BlockEncodingContainer):
             "power": self.power,
             "quantum_walk": self.quantum_walk,
             "normalization": self.normalization,
+            "energy_shift": self.energy_shift,
             "outer_prepare": self.outer_prepare.to_json(),
             "inner_prepare": {
                 "conditional_coefficients": self.inner_prepare.conditional_coefficients.tolist(),
@@ -246,6 +251,7 @@ class SOSSAContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
         group.attrs["normalization"] = self.normalization
+        group.attrs["energy_shift"] = self.energy_shift
         _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
         self.inner_prepare.to_hdf5(group.create_group("inner_prepare"))
         self.select.to_hdf5(group.create_group("select"))
@@ -286,6 +292,7 @@ class SOSSAContainer(BlockEncodingContainer):
             normalization=json_data["normalization"],
             power=json_data.get("power", 1),
             quantum_walk=json_data.get("quantum_walk", True),
+            energy_shift=json_data.get("energy_shift", 0.0),
         )
 
     @classmethod
@@ -301,6 +308,7 @@ class SOSSAContainer(BlockEncodingContainer):
             normalization=float(group.attrs["normalization"]),
             power=int(group.attrs["power"]),
             quantum_walk=bool(group.attrs.get("quantum_walk", True)),
+            energy_shift=float(group.attrs.get("energy_shift", 0.0)),
         )
 
     def get_summary(self) -> str:

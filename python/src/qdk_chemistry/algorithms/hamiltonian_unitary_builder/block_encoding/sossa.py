@@ -179,6 +179,16 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             num_d1=num_d1,
         )
 
+        # Energy shift: E_SOS + E_nuc for full energy recovery (Eq. 29, arXiv:2502.15882)
+        # E_SOS = -2·Σw⁻ - ½·Σ|W₀|² + E_BLISS
+        w0 = wb - np.sum(two_body_weights, axis=1)  # [R, C]
+        e_sos = (
+            -2.0 * np.sum(w_minus)
+            - 0.5 * float(np.sum(w0**2))
+            + factorized_hamiltonian.get_bliss_core_shift()
+        )
+        energy_shift = e_sos + factorized_hamiltonian.get_core_energy()
+
         container = SOSSAContainer(
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
@@ -186,6 +196,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             normalization=normalization,
             power=self._settings.get("power"),
             quantum_walk=self._settings.get("quantum_walk"),
+            energy_shift=energy_shift,
         )
 
         return UnitaryRepresentation(container=container)
