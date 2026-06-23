@@ -72,7 +72,7 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -128,17 +128,19 @@ class StandardPhaseEstimation(PhaseEstimation):
                 bits_msb_first=dominant_bitstring,
             )
         if isinstance(unitary_builder, SOSSABuilder):
-            # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
+            # For SOSSA block encoding, use E = Λ(1 - cos(2πφ)) + E_SOS.
             hamiltonian = qubit_hamiltonian
             unitary_rep = unitary_builder.run(hamiltonian)
             container = unitary_rep.get_container()
             if not isinstance(container, SOSSAContainer):
                 raise TypeError(f"Expected SOSSAContainer, got {type(container)}")
             lambda_val = container.normalization
-            return QpeResult.from_qubitization_result(
+            energy_shift = container.energy_shift if hasattr(container, "energy_shift") else 0.0
+            return QpeResult.from_sossa_result(
                 method=self.name(),
                 phase_fraction=raw_phase,
                 lambda_val=lambda_val,
+                energy_shift=energy_shift,
                 bits_msb_first=dominant_bitstring,
             )
         raise NotImplementedError(

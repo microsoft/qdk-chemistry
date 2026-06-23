@@ -7,6 +7,11 @@ Tests two aspects:
 Reference: Low et al. arXiv:1805.03662, Berry et al. arXiv:1902.02134.
 """
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+import math
 from pathlib import Path
 from typing import Any, cast
 
@@ -57,8 +62,6 @@ def _make_random_data_2d(n_outer: int, n_inner: int, n_bits: int, seed: int = 42
 
 def _ceil_log2(n: int) -> int:
     """Ceiling of log2(n), i.e. number of address bits for n entries."""
-    import math
-
     return math.ceil(math.log2(n))
 
 
@@ -86,10 +89,10 @@ def _expected_tof_1d(n_data: int, n_bits: int, lam: int) -> int:
     """
     if lam == 0:
         return n_data - 2
-    K = 2**lam
-    n_select = _ceil_log2(n_data // K)
-    select_cost = n_data // K - 2
-    swap_cost = (K - 1) * n_bits
+    k_swap = 2**lam
+    n_select = _ceil_log2(n_data // k_swap)
+    select_cost = n_data // k_swap - 2
+    swap_cost = (k_swap - 1) * n_bits
     unlookup_cost = _phase_lookup_cost(n_select)
     return select_cost + swap_cost + unlookup_cost
 
@@ -108,8 +111,8 @@ def _expected_qubits_1d(n_data: int, n_bits: int, lam: int) -> int:
     n_addr = _ceil_log2(n_data)
     if lam == 0:
         return 2 * n_addr + n_bits - 1
-    K = 2**lam
-    return 2 * n_addr - lam + n_bits * (K + 1) - 1
+    k_swap = 2**lam
+    return 2 * n_addr - lam + n_bits * (k_swap + 1) - 1
 
 
 def _expected_tof_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> int:
@@ -121,8 +124,8 @@ def _expected_tof_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> int:
       - Swap network: (K-1)*b Fredkin gates
     Total = N_out * N_in / K - 2 + (K-1)*b
     """
-    K = 2**lam
-    return n_outer * n_inner // K - 2 + (K - 1) * n_bits
+    k_swap = 2**lam
+    return n_outer * n_inner // k_swap - 2 + (k_swap - 1) * n_bits
 
 
 def _expected_qubits_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> int:
@@ -136,10 +139,10 @@ def _expected_qubits_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> in
       - Controlled Select ancillas: ceil_log2(N_in/K)
     Peak = 2*ceil_log2(N_out) + 2*ceil_log2(N_in) - λ + K*b - 1
     """
-    K = 2**lam
+    k_swap = 2**lam
     n_outer_addr = _ceil_log2(n_outer)
     n_inner_addr = _ceil_log2(n_inner)
-    return 2 * n_outer_addr + 2 * n_inner_addr - lam + K * n_bits - 1
+    return 2 * n_outer_addr + 2 * n_inner_addr - lam + k_swap * n_bits - 1
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -151,7 +154,7 @@ class TestSelectSwapCorrectness:
     """Verify SelectSwap loads the correct data for each address."""
 
     @pytest.mark.parametrize(
-        "n_data,n_bits,num_swap_bits",
+        ("n_data", "n_bits", "num_swap_bits"),
         [
             (4, 3, 0),  # no swap (plain Select)
             (4, 3, 1),  # 1 swap bit
@@ -175,7 +178,7 @@ class TestSelectSwapCorrectness:
         assert result, "SelectSwap 1D with auto lambda failed"
 
     @pytest.mark.parametrize(
-        "n_outer,n_inner,n_bits,num_swap_bits",
+        ("n_outer", "n_inner", "n_bits", "num_swap_bits"),
         [
             (2, 4, 3, 0),  # no swap
             (2, 4, 3, 1),  # 1 swap bit
@@ -221,7 +224,7 @@ class TestSelectSwapResourceEstimates:
     """
 
     @pytest.mark.parametrize(
-        "n_data,n_bits",
+        ("n_data", "n_bits"),
         [
             (4, 4),
             (8, 4),
@@ -242,7 +245,7 @@ class TestSelectSwapResourceEstimates:
         )
 
     @pytest.mark.parametrize(
-        "n_data,n_bits,lam",
+        ("n_data", "n_bits", "lam"),
         [
             (8, 4, 1),
             (8, 4, 2),
@@ -273,7 +276,7 @@ class TestSelect2DResourceEstimates:
     """
 
     @pytest.mark.parametrize(
-        "n_outer,n_inner,n_bits,lam",
+        ("n_outer", "n_inner", "n_bits", "lam"),
         [
             (2, 4, 4, 0),
             (4, 4, 4, 0),

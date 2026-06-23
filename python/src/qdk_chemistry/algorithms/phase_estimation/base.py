@@ -60,7 +60,7 @@ class PhaseEstimation(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:

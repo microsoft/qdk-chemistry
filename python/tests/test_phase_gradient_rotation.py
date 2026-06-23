@@ -54,7 +54,7 @@ class TestRzViaPhaseGradient:
     """Tests for the RzViaPhaseGradient operation."""
 
     @pytest.mark.parametrize(
-        "x, n",
+        ("x", "n"),
         [
             (0, 4),  # θ = 0 → Rz = I
             (1, 4),  # θ = π/4
@@ -84,7 +84,7 @@ class TestRzViaPhaseGradient:
         theta = 4.0 * math.pi * x / (1 << n)
         np.testing.assert_allclose(a0 / a1, np.exp(1j * theta), atol=1e-6)
 
-    @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (7, 4)])
+    @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (7, 4)])
     def test_adjoint_roundtrip(self, x, n):
         """Rz followed by Adjoint Rz returns target to |+⟩."""
         ctx = _make_ctx()
@@ -101,7 +101,7 @@ class TestRyViaPhaseGradient:
     """Tests for the RyViaPhaseGradient operation."""
 
     @pytest.mark.parametrize(
-        "x, n",
+        ("x", "n"),
         [
             (0, 4),  # θ = 0 → Ry = I
             (1, 4),  # θ = π/4
@@ -122,7 +122,7 @@ class TestRyViaPhaseGradient:
         np.testing.assert_allclose(abs(a0) ** 2, math.cos(theta / 2) ** 2, atol=1e-6)
         np.testing.assert_allclose(abs(a1) ** 2, math.sin(theta / 2) ** 2, atol=1e-6)
 
-    @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (3, 4)])
+    @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (3, 4)])
     def test_adjoint_roundtrip(self, x, n):
         """Ry followed by Adjoint Ry returns target to |+⟩."""
         ctx = _make_ctx()

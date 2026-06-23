@@ -279,29 +279,29 @@ def create_random_dfthc_data(
 
     """
     rng = np.random.default_rng(seed)
-    N, R, B, C = num_orbitals, num_ranks, num_bases, num_copies
+    n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
 
     # Symmetric one-body matrix (Majorana-adjusted)
-    raw = rng.standard_normal((N, N)) * 0.3
+    raw = rng.standard_normal((n, n)) * 0.3
     h1_majorana = (raw + raw.T) / 2
 
     # Row-normalized U matrices: shape [R, B, N]
-    basis_vectors = rng.standard_normal((R, B, N))
+    basis_vectors = rng.standard_normal((r, b, n))
     norms = np.linalg.norm(basis_vectors, axis=2, keepdims=True)
     norms = np.where(norms > 1e-12, norms, 1.0)
     basis_vectors = basis_vectors / norms
 
     # Two-body weights: shape [R, B, C]
-    two_body_weights = rng.standard_normal((R, B, C)) * 0.1
+    two_body_weights = rng.standard_normal((r, b, c)) * 0.1
 
     # Identity weights: shape [R, C]
-    identity_weight = rng.standard_normal((R, C)) * 0.1
+    identity_weight = rng.standard_normal((r, c)) * 0.1
 
     return {
-        "num_orbitals": N,
-        "num_ranks": R,
-        "num_bases": B,
-        "num_copies": C,
+        "num_orbitals": n,
+        "num_ranks": r,
+        "num_bases": b,
+        "num_copies": c,
         "h1_majorana": h1_majorana,
         "basis_vectors": basis_vectors,
         "two_body_weights": two_body_weights,

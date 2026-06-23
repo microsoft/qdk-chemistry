@@ -16,6 +16,7 @@ __all__ = [
     "energy_alias_candidates",
     "energy_from_phase",
     "energy_from_phase_qubitization",
+    "energy_from_phase_sossa",
     "iterative_phase_feedback_update",
     "phase_fraction_from_feedback",
     "resolve_energy_aliases",
@@ -63,6 +64,40 @@ def energy_from_phase_qubitization(phase_fraction: float, *, lambda_val: float) 
     Logger.trace_entering()
     phi = phase_fraction % 1.0
     return float(lambda_val * np.cos(2 * np.pi * phi))
+
+
+def energy_from_phase_sossa(phase_fraction: float, *, lambda_val: float, energy_shift: float = 0.0) -> float:
+    r"""Convert a measured phase fraction to energy for the SOSSA product walk.
+
+    For the SOS product walk operator the eigenphases encode:
+
+    .. math::
+
+        \cos(2\pi\varphi) = 1 - E_{\text{gap}} / \Lambda
+
+    so the energy gap is recovered as:
+
+    .. math::
+
+        E_{\text{gap}} = \Lambda (1 - \cos(2\pi\varphi))
+
+    and the total energy is :math:`E = E_{\text{gap}} + E_{\text{shift}}`.
+
+    Args:
+        phase_fraction: Fractional phase :math:`\varphi \in [0, 1)` from the phase register.
+        lambda_val: The SOSSA normalization :math:`\Lambda = \lambda_{\text{sqrt}}^2 / 2`.
+        energy_shift: Classical energy shift :math:`E_{\text{SOS}}` to add.
+
+    Returns:
+        Total energy estimate.
+
+    Reference:
+        Eq. 11, 77 in arXiv:2502.15882.
+
+    """
+    Logger.trace_entering()
+    phi = phase_fraction % 1.0
+    return float(lambda_val * (1.0 - np.cos(2 * np.pi * phi)) + energy_shift)
 
 
 def energy_alias_candidates(
