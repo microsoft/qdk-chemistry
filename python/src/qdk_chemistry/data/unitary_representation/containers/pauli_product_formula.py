@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
+import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash_uint
 
@@ -73,6 +74,31 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self.step_reps = step_reps
         self._num_qubits = num_qubits
         super().__init__()
+
+    @staticmethod
+    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
+
+        For :math:`U = e^{-iHt}` the eigenvalues are :math:`e^{-iE_k t}`
+        and QPE measures :math:`\varphi = -E_k t / (2\pi) \mod 1`.
+        Inverting gives:
+
+        .. math::
+
+            E_k = -\arg(e^{2\pi i \varphi}) / t
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+            scale: The evolution time :math:`t`.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+        angle = (phase_fraction % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        return float(angle / scale)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -183,7 +209,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
                             merged.pop()
                     else:
                         merged.append(term)
-        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=self.num_qubits)
+        return PauliProductFormulaContainer(
+            step_terms=merged,
+            step_reps=1,
+            num_qubits=self.num_qubits,
+        )
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.

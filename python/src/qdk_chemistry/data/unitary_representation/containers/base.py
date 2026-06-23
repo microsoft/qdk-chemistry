@@ -97,6 +97,30 @@ class UnitaryContainer(DataClass):
 
         """
 
+    @staticmethod
+    @abstractmethod
+    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from the measured phase fraction.
+
+        Each unitary encoding maps Hamiltonian eigenvalues to phases on the
+        unit circle.  This method inverts that mapping so that a measured
+        phase fraction :math:`\varphi \in [0, 1)` is converted back to the
+        corresponding eigenvalue :math:`E`.
+
+        The meaning of ``scale`` depends on the encoding:
+
+        - Time evolution: ``scale`` = evolution time :math:`t`
+        - Quantum walk: ``scale`` = 1-norm :math:`\lambda`
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+            scale: The encoding-specific scaling factor.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+
     @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
         """Combine this container with another to represent sequential application.
