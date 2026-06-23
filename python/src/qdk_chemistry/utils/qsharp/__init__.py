@@ -55,6 +55,9 @@ class _QSharpUtilsProxy:
         if name == "MPSSequential":
             get_qsharp_utils()  # ensure initialized
             return qdk.code.MPSSequential
+        if name == "MPSSparse":
+            get_qsharp_utils()  # ensure initialized
+            return qdk.code.MPSSparse
         utils = get_qsharp_utils()
         return getattr(utils, name)
 
