@@ -7,7 +7,6 @@
 
 ################################################################################
 # start-cell-create
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -29,10 +28,14 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 
 ################################################################################
 # start-cell-localize
-# Load H2O molecule from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
-)
+# Define the water molecule in XYZ format
+structure = Structure.from_xyz("""\
+3
+Water molecule
+O    0.000000    0.000000    0.000000
+H    0.758602    0.000000    0.504284
+H   -0.758602    0.000000    0.504284
+""")
 
 # Obtain orbitals from SCF
 scf_solver = create("scf_solver")
