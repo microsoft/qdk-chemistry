@@ -233,3 +233,12 @@ class TestPauliSequenceMapper:
 
         with pytest.raises(ValueError, match="overlap"):
             mapper.run(unitary_rep)
+
+    def test_wrong_target_indices_length_raises(self, unitary_rep):
+        """Test that target_indices length mismatching unitary qubit count raises ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [3])
+        mapper.settings().set("target_indices", [0, 1, 2])  # unitary has 2 qubits, not 3
+
+        with pytest.raises(ValueError, match="length"):
+            mapper.run(unitary_rep)
