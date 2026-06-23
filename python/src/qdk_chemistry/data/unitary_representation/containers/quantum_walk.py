@@ -9,6 +9,7 @@ from abc import abstractmethod
 from typing import Any
 
 import h5py
+import numpy as np
 
 from .base import UnitaryContainer
 from .block_encoding import BlockEncodingContainer
@@ -36,6 +37,29 @@ class QuantumWalkContainer(UnitaryContainer):
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
+
+    @staticmethod
+    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
+
+        For a walk operator whose eigenvalues are
+        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE measures
+        :math:`\varphi = \arccos(E_k / \lambda) / (2\pi)`.  Inverting gives:
+
+        .. math::
+
+            E_k = \lambda \cos(2\pi\varphi)
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+            scale: The 1-norm :math:`\lambda = \sum_j |\alpha_j|`.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+        phi = phase_fraction % 1.0
+        return float(scale * np.cos(2 * np.pi * phi))
 
     @property
     @abstractmethod

@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 import h5py
@@ -219,6 +219,66 @@ class QpeResult(DataClass):
         normalized_phase = float(phase_fraction % 1.0)
         phase_angle = float(normalized_phase * (2 * np.pi))
         raw_energy = energy_from_phase_qubitization(normalized_phase, lambda_val=lambda_val)
+
+        normalized_bits: tuple[int, ...] | None = None
+        bitstring = bitstring_msb_first
+        if bits_msb_first is not None:
+            normalized_bits = tuple(int(bit) for bit in bits_msb_first)
+            if bitstring is None:
+                bitstring = "".join(str(bit) for bit in normalized_bits)
+
+        metadata_copy = dict(metadata) if metadata is not None else None
+
+        return cls(
+            method=method_label,
+            phase_fraction=normalized_phase,
+            phase_angle=phase_angle,
+            canonical_phase_fraction=normalized_phase,
+            canonical_phase_angle=phase_angle,
+            raw_energy=raw_energy,
+            branching=(raw_energy,),
+            resolved_energy=None,
+            bits_msb_first=normalized_bits,
+            bitstring_msb_first=bitstring,
+            metadata=metadata_copy,
+        )
+
+    @classmethod
+    def from_phase_fraction(
+        cls,
+        *,
+        method: str,
+        phase_fraction: float,
+        eigenvalue_from_phase: Callable[[float], float],
+        bits_msb_first: Sequence[int] | None = None,
+        bitstring_msb_first: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> "QpeResult":
+        r"""Construct a :class:`QpeResult` from a measured phase fraction.
+
+        This factory accepts a callable that maps a phase fraction to the
+        corresponding Hamiltonian eigenvalue, as defined by the container's
+        :meth:`~qdk_chemistry.data.unitary_representation.containers.UnitaryContainer.eigenvalue_from_phase`.
+
+        Args:
+            method: Phase estimation algorithm or workflow label.
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            eigenvalue_from_phase: A callable mapping phase fraction to the
+                Hamiltonian eigenvalue.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            metadata: Optional dictionary copied into the result for caller-defined context.
+
+        Returns:
+            QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        """
+        Logger.trace_entering()
+        method_label = str(method.value) if hasattr(method, "value") else str(method)
+
+        normalized_phase = float(phase_fraction % 1.0)
+        phase_angle = float(normalized_phase * (2 * np.pi))
+        raw_energy = eigenvalue_from_phase(normalized_phase)
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
