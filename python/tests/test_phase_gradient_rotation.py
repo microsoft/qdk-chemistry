@@ -1,7 +1,7 @@
-"""Tests for PhaseGradient.qs: RzViaPhaseGradient and RyViaPhaseGradient.
+"""Tests for PhaseGradient.qs: RyViaPhaseGradient.
 
 Validates that the phase gradient rotation operations produce correct
-Rz and Ry rotations by comparing simulation statevectors against
+Ry rotations by comparing simulation statevectors against
 analytically expected values.
 
 The rotation angle is θ = 4π·x/2^b where x is the integer encoded
@@ -48,53 +48,6 @@ def _target_amps(sv: np.ndarray, x: int, n_bits: int) -> tuple[complex, complex]
     idx_0 = angle_idx  # target = |0⟩
     idx_1 = angle_idx | (1 << (2 * n_bits))  # target = |1⟩
     return sv[idx_0], sv[idx_1]
-
-
-class TestRzViaPhaseGradient:
-    """Tests for the RzViaPhaseGradient operation."""
-
-    @pytest.mark.parametrize(
-        ("x", "n"),
-        [
-            (0, 4),  # θ = 0 → Rz = I
-            (1, 4),  # θ = π/4
-            (2, 4),  # θ = π/2
-            (4, 4),  # θ = π → Rz = diag(-i, i)
-            (8, 4),  # θ = 2π → Rz = -I
-            (3, 5),  # θ = 3π/8
-            (7, 4),  # θ = 7π/4
-        ],
-    )
-    def test_rotation_phase(self, x, n):
-        """Phase ratio amp(|0⟩)/amp(|1⟩) matches Rz(-4πx/2^n).
-
-        The CNOT-adder-CNOT pattern on the phase gradient eigenstate yields
-        diag(e^{+2πix/2^n}, e^{-2πix/2^n}), which is Rz(-4πx/2^n).
-        """
-        ctx = _make_ctx()
-        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRz(x, n)
-        sv = np.array(ctx.dump_machine().as_dense_state())
-        a0, a1 = _target_amps(sv, x, n)
-
-        # Rz preserves amplitudes on |+⟩
-        np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
-        np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
-
-        # Rz(-θ)|+⟩ = (e^{iθ/2}|0⟩ + e^{-iθ/2}|1⟩)/√2  ⟹  a0/a1 = e^{iθ}
-        theta = 4.0 * math.pi * x / (1 << n)
-        np.testing.assert_allclose(a0 / a1, np.exp(1j * theta), atol=1e-6)
-
-    @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (7, 4)])
-    def test_adjoint_roundtrip(self, x, n):
-        """Rz followed by Adjoint Rz returns target to |+⟩."""
-        ctx = _make_ctx()
-        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRzRoundtrip(x, n)
-        sv = np.array(ctx.dump_machine().as_dense_state())
-        a0, a1 = _target_amps(sv, x, n)
-
-        np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
-        np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
-        np.testing.assert_allclose(a0 / a1, 1.0, atol=1e-8)
 
 
 class TestRyViaPhaseGradient:

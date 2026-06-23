@@ -333,12 +333,8 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         """
         regs = self._compute_register_sizes(container)
-        return (
-            regs["num_outer_qubits"]
-            + regs["num_inner_qubits"]
-            + regs["num_reflect_inner"]
-            + regs["num_phase_gradient_qubits"]
-        )
+        num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
+        return regs["num_outer_qubits"] + regs["num_inner_qubits"] + num_spin_qubits + regs["num_phase_gradient_qubits"]
 
     def get_ancilla_prep_op(self) -> Any:
         """Return the Q# ancilla preparation op for SOSSA (phase gradient init).

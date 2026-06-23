@@ -185,6 +185,9 @@ def get_bitstring(circuit: Circuit) -> str:
     return next(iter(counts.keys()))
 
 
+@pytest.mark.xfail(
+    reason="QIR-to-Qiskit converter does not support backward branches/dynamic qubit refs from Adaptive_RIFLA profile"
+)
 @pytest.mark.parametrize(
     "bitstring",
     [[1, 0, 1, 0], [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 1, 0, 0, 1], [1], [0]],

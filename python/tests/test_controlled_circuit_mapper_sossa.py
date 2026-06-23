@@ -457,6 +457,7 @@ class TestSOSSAMapper:
             "numOuterQubits",
             "numInnerQubits",
             "numReflectInner",
+            "numPhaseGradientQubits",
             "power",
         }
         assert expected_keys == set(factory.parameter.keys())
