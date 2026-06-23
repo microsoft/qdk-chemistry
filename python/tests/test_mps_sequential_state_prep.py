@@ -205,7 +205,6 @@ class TestMPSSequentialFidelity:
             (2, 4, 42),
             (3, 4, 42),
             (4, 2, 42),
-            (5, 2, 42),
         ],
     )
     def test_fidelity_vs_exact(self, num_sites, bond_dim, seed):

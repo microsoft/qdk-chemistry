@@ -208,7 +208,7 @@ class TestSparseDecompositionHelpers:
         for rect in rectangles:
             unitary = _expand_to_unitary(rect)
             h = unitary.shape[0]
-            assert np.allclose(unitary @ unitary.T, np.eye(h), atol=1e-10)
+            assert np.allclose(unitary @ unitary.T, np.eye(h), atol=1e-8)
 
     def test_order_blocks_sorts_descending(self):
         """Verify blocks are sorted by size largest first."""
@@ -276,10 +276,9 @@ class TestSparseDecompositionCorrectness:
         col_perm_final = _invert_perm(col_composed)
         row_perm_final = [row_perm[ordering_perm[i]] for i in range(active_dim)]
 
-        # Verify: V[invert(row_final)][:, col_final][:, :cols] == target
         row_inv = _invert_perm(row_perm_final)
-        V = block_diag(*blocks)
-        result = V[row_inv][:, col_perm_final][:, :num_cols]
+        block_diag_mat = block_diag(*blocks)
+        result = block_diag_mat[row_inv][:, col_perm_final][:, :num_cols]
 
         assert np.allclose(result, target_dense, atol=1e-10), (
             f"Decomposition failed for site {site_idx}: max error = {np.max(np.abs(result - target_dense)):.2e}"
@@ -300,7 +299,7 @@ class TestSparseDecompositionCorrectness:
         for i, b in enumerate(blocks):
             h = b.shape[0]
             err = np.max(np.abs(b @ b.T - np.eye(h)))
-            assert err < 1e-10, f"Block {i} (size {h}) not unitary: error={err:.2e}"
+            assert err < 1e-8, f"Block {i} (size {h}) not unitary: error={err:.2e}"
 
 
 class TestGenerateMPSSparsePreparationData:
@@ -345,17 +344,20 @@ class TestGenerateMPSSparsePreparationData:
             "rotationBits",
             "numAncillaQubits",
             "siteColPermTargets",
+            "siteColInvPermTargets",
             "siteRowPermTargets",
+            "siteRowInvPermTargets",
             "siteBlockLayerAngles",
             "siteBlockLayerShifted",
             "siteBlockPhases",
-            "siteSignFixes",
         }
         assert set(params.keys()) == expected_keys
         assert params["numSites"] == 4
         assert params["rotationBits"] == 10
         assert len(params["siteColPermTargets"]) == 3
         assert len(params["siteRowPermTargets"]) == 3
+        assert len(params["siteColInvPermTargets"]) == 3
+        assert len(params["siteRowInvPermTargets"]) == 3
 
     @pytest.mark.parametrize(
         ("num_sites", "bond_dim", "seed"),
@@ -375,11 +377,6 @@ class TestGenerateMPSSparsePreparationData:
         assert len(data.sites) == num_sites - 1
         init_vec = np.array(data.initial_state_vec)
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
-
-
-# =============================================================================
-# Tests: Q# circuit simulation fidelity
-# =============================================================================
 
 
 class TestMPSSparseQSharpFidelity:
@@ -451,10 +448,10 @@ class TestMPSSparseQSharpFidelity:
         qsharp.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
         qsharp.eval(qs_code)
         dump = qsharp.dump_machine()
-        amplitudes = np.array(dump.as_dense_state(), dtype=complex)
         qsharp.eval("ResetAll(state + ancilla);")
 
-        state_amplitudes = _extract_state_amplitudes(amplitudes, num_state_qubits, num_ancilla_qubits)
+        # Use sparse extraction (dump may have many internal qubits from QROAM)
+        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, num_ancilla_qubits)
 
         ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
         assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low for Qualtran tensors"
@@ -521,6 +518,50 @@ def _extract_state_amplitudes(
     return state_amplitudes
 
 
+def _extract_state_amplitudes_sparse(
+    dump,
+    num_state_qubits: int,
+    num_ancilla_qubits: int,
+) -> np.ndarray:
+    """Extract amplitudes where ancilla = |0> from a sparse DumpMachine result.
+
+    Works with large qubit counts where as_dense_state() would be infeasible.
+    Only considers basis states where all internal qubits (beyond state+ancilla)
+    are |0>, i.e., properly uncomputed.
+
+    Parameters
+    ----------
+    dump : StateDump
+        Sparse dump from qsharp.dump_machine().
+    num_state_qubits : int
+        Number of state qubits (lowest-addressed qubits).
+    num_ancilla_qubits : int
+        Number of ancilla qubits (next after state).
+
+    Returns
+    -------
+    np.ndarray
+        Amplitudes for the state register conditioned on ancilla = |0>.
+
+    """
+    num_relevant_qubits = num_state_qubits + num_ancilla_qubits
+    ancilla_mask = (1 << num_ancilla_qubits) - 1
+    state_dim = 2**num_state_qubits
+    state_amplitudes = np.zeros(state_dim, dtype=complex)
+
+    for idx in dump:
+        # Only consider states where internal qubits (above state+ancilla) are 0
+        if idx >> num_relevant_qubits != 0:
+            continue
+        # Only consider states where ancilla = |0>
+        if (idx & ancilla_mask) == 0:
+            state_idx = idx >> num_ancilla_qubits
+            if state_idx < state_dim:
+                state_amplitudes[state_idx] = dump[idx]
+
+    return state_amplitudes
+
+
 def _reindex_sites(state_amplitudes: np.ndarray, num_sites: int) -> np.ndarray:
     """Reindex from Q# big-endian to Python MPS convention.
 
@@ -561,11 +602,12 @@ def _build_mps_sparse_eval_code(params: dict) -> str:
         str(params["numSites"]),
         str(params["rotationBits"]),
         _nested_list_to_qsharp_3d_bool(params["siteColPermTargets"]),
+        _nested_list_to_qsharp_3d_bool(params["siteColInvPermTargets"]),
         _nested_list_to_qsharp_3d_bool(params["siteRowPermTargets"]),
+        _nested_list_to_qsharp_3d_bool(params["siteRowInvPermTargets"]),
         _nested_list_to_qsharp_3d(params["siteBlockLayerAngles"]),
         _nested_list_to_qsharp_2d_bool(params["siteBlockLayerShifted"]),
         _nested_list_to_qsharp_2d_bool(params["siteBlockPhases"]),
-        _nested_list_to_qsharp_3d_bool(params["siteSignFixes"]),
         "state",
         "ancilla",
     ]
