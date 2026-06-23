@@ -5,10 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import sys
 from collections.abc import Hashable
 from fractions import Fraction
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -39,10 +37,6 @@ from qdk_chemistry.utils.zassenhaus_generation import (
     PlanTerm,
     zassenhaus_commutator_plan,
 )
-
-# Add repo root / examples to sys.path so we can import from examples.utils
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "examples"))
-from utils.qpe_utils import compute_evolution_time
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -519,7 +513,7 @@ class TestZassenhausPhaseEstimation:
 
         # Configure the Zassenhaus evolution builder reference
         num_bits = 12
-        evolution_time = compute_evolution_time(qubit_hamiltonian, num_bits=num_bits)
+        evolution_time = 1.175
         zassenhaus_order = 2
         zassenhaus_num_divisions = 10
         unitary_builder_ref = AlgorithmRef(
