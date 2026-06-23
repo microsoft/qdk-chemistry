@@ -161,7 +161,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             if not isinstance(container, SOSSAContainer):
                 raise TypeError(f"Expected SOSSAContainer, got {type(container)}")
             lambda_val = container.normalization
-            energy_shift = container.energy_shift if hasattr(container, "energy_shift") else 0.0
+            energy_shift = container.energy_shift
             return QpeResult.from_sossa_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,
