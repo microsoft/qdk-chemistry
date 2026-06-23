@@ -447,7 +447,7 @@ operation ApplyRealUnitaryViaGivens(
     // All layers have the same circuit structure (same register sizes), only data differs.
     // Cache by shifted/non-shifted variant to avoid re-tracing ~1000 identical layers.
     for i in 0..numLayers - 1 {
-        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        let variant = Length(target) * 2 + (if layerIsShifted[i] { 1 } else { 0 });
         if BeginEstimateCaching("GivensLayer", variant) {
             ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], target, phaseGradient, angleReg);
             EndEstimateCaching();
@@ -504,7 +504,7 @@ operation ApplyControlledRealUnitaryViaGivens(
     let numLayers = Length(layerAngleData);
 
     for i in 0..numLayers - 1 {
-        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        let variant = Length(target) * 2 + (if layerIsShifted[i] { 1 } else { 0 });
         if BeginEstimateCaching("ControlledGivensLayer", variant) {
             ApplyControlledGivensLayer(
                 layerAngleData[i],
@@ -579,7 +579,7 @@ operation ApplyBlockDiagUnitaryViaGivens(
     let numLayers = Length(layerAngleData);
 
     for i in 0..numLayers - 1 {
-        let variant = if layerIsShifted[i] { 1 } else { 0 };
+        let variant = Length(jointReg) * 2 + (if layerIsShifted[i] { 1 } else { 0 });
         if BeginEstimateCaching("BlockDiagGivensLayer", variant) {
             ApplyGivensLayer(layerAngleData[i], layerIsShifted[i], jointReg, phaseGradient, angleReg);
             EndEstimateCaching();

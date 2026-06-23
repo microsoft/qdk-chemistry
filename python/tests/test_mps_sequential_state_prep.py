@@ -9,7 +9,6 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 import numpy as np
 import pytest
 from qdk import qsharp

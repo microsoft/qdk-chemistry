@@ -14,7 +14,7 @@ import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, MakeMPSSequentialCircuit, SiteUnitary, ApplyUCR, ApplyControlledUCR;
+export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, SiteUnitary, ApplyUCR, ApplyControlledUCR;
 
 // =============================================================================
 // Helper operations for the decomposition
@@ -445,6 +445,97 @@ operation MakeMPSSequentialCircuitUniform(
                 uPhases,
                 newSite,
                 ancilla,
+                phaseGradient,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
+    }
+
+    // Undo phase gradient state
+    Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+/// Circuit wrapper for accurate fast resource estimation with non-uniform bond dimensions.
+///
+/// Groups sites by their effective ancilla dimension (shape). For each unique shape,
+/// one representative set of angle data is provided. The resource estimator evaluates
+/// each shape once and caches the cost, then replicates it for all sites of that shape.
+///
+/// This is more accurate than MakeMPSSequentialCircuitUniform (which uses the largest
+/// site's cost for all sites) while still being fast (only evaluates unique shapes,
+/// not all sites individually).
+///
+/// # Input
+/// ## siteShapeIndices
+/// Int[numSites-1]: for each site, the index into the shape arrays.
+/// ## shapeEffectiveBits
+/// Int[numShapes]: effective ancilla bits for each shape group.
+/// ## shape*
+/// Per-shape representative decomposition data (indexed by shape, not site).
+operation MakeMPSSequentialCircuitGrouped(
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteShapeIndices : Int[],
+    shapeEffectiveBits : Int[],
+    shapeVLayerAngles : Double[][][],
+    shapeVLayerShifted : Bool[][],
+    shapeVPhases : Bool[][],
+    shapeRot0Angles : Double[][],
+    shapeRot1Angles : Double[][],
+    shapeRot2Angles : Double[][],
+    shapeW0LayerAngles : Double[][][],
+    shapeW0LayerShifted : Bool[][],
+    shapeW0Phases : Bool[][],
+    shapeW1LayerAngles : Double[][][],
+    shapeW1LayerShifted : Bool[][],
+    shapeW1Phases : Bool[][],
+    shapeULayerAngles : Double[][][],
+    shapeULayerShifted : Bool[][],
+    shapeUPhases : Bool[][]
+) : Unit {
+    use state = Qubit[2 * numSites];
+    use ancilla = Qubit[numAncillaQubits];
+
+    // Initialize phase gradient register
+    use phaseGradient = Qubit[rotationBits];
+    PreparePhaseGradientState(phaseGradient);
+
+    // Single shared angle register for QROM-loaded angles (reused by all operations)
+    use angleReg = Qubit[rotationBits];
+
+    // Prepare initial state (uses full ancilla)
+    let initReg = ancilla + state[0..1];
+    QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
+
+    // Apply site unitaries — each site uses data for its shape group.
+    // BeginEstimateCaching with the shape index ensures accurate per-shape costing:
+    // sites with the same effective dimension share a cached cost.
+    for siteIdx in 0..numSites - 2 {
+        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let shapeIdx = siteShapeIndices[siteIdx];
+        let effectiveBits = shapeEffectiveBits[shapeIdx];
+        if BeginEstimateCaching("SiteUnitary", shapeIdx) {
+            SiteUnitary(
+                shapeVLayerAngles[shapeIdx],
+                shapeVLayerShifted[shapeIdx],
+                shapeVPhases[shapeIdx],
+                shapeRot0Angles[shapeIdx],
+                shapeRot1Angles[shapeIdx],
+                shapeRot2Angles[shapeIdx],
+                shapeW0LayerAngles[shapeIdx],
+                shapeW0LayerShifted[shapeIdx],
+                shapeW0Phases[shapeIdx],
+                shapeW1LayerAngles[shapeIdx],
+                shapeW1LayerShifted[shapeIdx],
+                shapeW1Phases[shapeIdx],
+                shapeULayerAngles[shapeIdx],
+                shapeULayerShifted[shapeIdx],
+                shapeUPhases[shapeIdx],
+                newSite,
+                ancilla[0..effectiveBits - 1],
                 phaseGradient,
                 angleReg
             );
