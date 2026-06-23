@@ -19,12 +19,12 @@ parallel_jobs_for_memory() {
     local memory_per_job_gb="$1"
     local cores mem_bytes jobs
 
-    if command -v nproc >/dev/null 2>&1; then
+    if [ -r /proc/meminfo ] && command -v nproc >/dev/null 2>&1; then
         # Linux
         cores=$(nproc)
         mem_bytes=$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)
     else
-        # macOS
+        # macOS (or other non-/proc environments)
         cores=$(sysctl -n hw.logicalcpu)
         mem_bytes=$(sysctl -n hw.memsize)
     fi
