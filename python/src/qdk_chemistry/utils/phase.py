@@ -73,13 +73,13 @@ def energy_from_phase_sossa(phase_fraction: float, *, lambda_val: float, energy_
 
     .. math::
 
-        \cos(2\pi\varphi) = 1 - E_{\text{gap}} / \Lambda
+        \cos(2\pi\varphi) = E_{\text{gap}} / \Lambda - 1
 
     so the energy gap is recovered as:
 
     .. math::
 
-        E_{\text{gap}} = \Lambda (1 - \cos(2\pi\varphi))
+        E_{\text{gap}} = \Lambda (1 + \cos(2\pi\varphi))
 
     and the total energy is :math:`E = E_{\text{gap}} + E_{\text{shift}}`.
 
@@ -97,7 +97,7 @@ def energy_from_phase_sossa(phase_fraction: float, *, lambda_val: float, energy_
     """
     Logger.trace_entering()
     phi = phase_fraction % 1.0
-    return float(lambda_val * (1.0 - np.cos(2 * np.pi * phi)) + energy_shift)
+    return float(lambda_val * (1.0 + np.cos(2 * np.pi * phi)) + energy_shift)
 
 
 def energy_alias_candidates(

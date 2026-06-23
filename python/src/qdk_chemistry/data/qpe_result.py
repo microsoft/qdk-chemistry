@@ -262,10 +262,10 @@ class QpeResult(DataClass):
 
         .. math::
 
-            \cos(2\pi\varphi) = 1 - E_{\text{gap}} / \Lambda
+            \cos(2\pi\varphi) = E_{\text{gap}} / \Lambda - 1
 
         so the energy gap is recovered as
-        :math:`E_{\text{gap}} = \Lambda (1 - \cos(2\pi\varphi))`
+        :math:`E_{\text{gap}} = \Lambda (1 + \cos(2\pi\varphi))`
         and the total energy is :math:`E = E_{\text{gap}} + E_{\text{shift}}`.
 
         Args:

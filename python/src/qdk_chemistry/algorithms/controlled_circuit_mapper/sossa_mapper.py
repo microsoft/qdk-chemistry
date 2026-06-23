@@ -118,6 +118,18 @@ class SOSSAMapper(ControlledCircuitMapper):
             A Q# callable ``(Qubit[]) => Unit is Adj + Ctl``.
 
         """
+        ref: AlgorithmRef = self._settings.get("outer_prepare")
+        if ref.algorithm_name == "dense_pure_state":
+            # Use MakeOuterPreparePureState directly to avoid the endianness
+            # mismatch in DensePureStatePreparation. The Wavefunction's
+            # determinant bit encoding does not align with the little-endian
+            # address convention used by Select/ApplyControlledOnInt, causing
+            # outer indices to be loaded with incorrect free-rider data.
+            coeffs = [float(c) for c in container.outer_prepare.get_coefficients()]
+            n_qubits = self._compute_register_sizes(container)["num_outer_qubits"]
+            n_padded = 1 << n_qubits
+            padded = coeffs + [0.0] * (n_padded - len(coeffs))
+            return QSHARP_UTILS.SOSSAWalk.MakeOuterPreparePureState(padded)
         prepare_algorithm = self._create_nested("outer_prepare")
         # Ensure the alias sampling precision matches the mapper's
         # coefficient_bit_precision so register sizes are consistent.
