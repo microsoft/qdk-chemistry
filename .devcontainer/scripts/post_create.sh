@@ -3,6 +3,10 @@
 set -euo pipefail
 source "$HOME/qdk_chemistry_venv/bin/activate"
 
+# Set a memory-/core-aware CMAKE_BUILD_PARALLEL_LEVEL (unless already set) so the
+# initial build below does not oversubscribe CPU or OOM on constrained machines.
+source /usr/local/share/qdk/parallelism.sh
+
 # Build C++ and install to a user-local prefix.
 # Use the in-tree macis (external/macis) per INSTALL.md; prevents a
 # full rebuild on reconfigure.
