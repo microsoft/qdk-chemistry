@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 from qdk import qsharp
@@ -205,6 +207,12 @@ class TestPrepareSelectMapper:
         Uses ``qsharp.eval`` + ``qsharp.dump_machine()`` to inspect the quantum
         state after applying Reflect.
         """
+        # Re-initialize Q# interpreter to ensure a clean state (no leftover qubits
+        # from prior tests in the session).
+        qsharp.init(
+            project_root=str(Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"),
+            target_profile=qsharp.TargetProfile.Adaptive_RIFLA,
+        )
         # Ensure Q# sources are loaded
         _ = QSHARP_UTILS.PrepSelPrep.Reflect
 

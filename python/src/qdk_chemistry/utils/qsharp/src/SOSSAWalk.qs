@@ -779,24 +779,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         PreparePureStateD(coefficients, _)
     }
 
-    /// Reflect about the |0⟩ state: R = 2|0⟩⟨0| - I.
-    /// |0⟩ → +|0⟩, |x≠0⟩ → -|x≠0⟩.
-    operation ReflectAboutZero(qs : Qubit[]) : Unit is Adj + Ctl {
-        Reflect(qs);
-    }
-
-    /// Majorana D1 (double-qubit annihilation): X then CZ.
-    /// On |spin⟩|sys⟩: applies X(sys[0]) then CZ(spin[0], sys[0]).
-    operation MajoranaD1(spin : Qubit[], sys : Qubit[]) : Unit is Adj + Ctl {
-        X(sys[0]);
-        CZ(spin[0], sys[0]);
-    }
-
-    /// Majorana SF (spin-free two-body): Z on sys[0].
-    operation MajoranaSF(sys : Qubit[]) : Unit is Adj + Ctl {
-        Z(sys[0]);
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
     // Test wrappers — allocate qubits via QIR.Runtime so they persist for
     // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).

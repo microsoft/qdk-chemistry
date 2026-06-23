@@ -40,6 +40,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.xfail(
+    reason="QIR-to-Qiskit converter does not support backward branches/dynamic qubit refs from Adaptive_RIFLA profile"
+)
 def test_qiskit_iqpe_model_hamiltonian():
     """Execute the non-commuting IQPE sample and validate reported results."""
     repo_root = Path(__file__).resolve().parents[2]

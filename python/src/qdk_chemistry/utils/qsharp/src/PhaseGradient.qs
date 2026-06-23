@@ -32,38 +32,13 @@ namespace QDKChemistry.Utils.PhaseGradient {
         Adjoint ApplyQFT(phaseGradient);
     }
 
-    /// Applies Rz(4π·x/2^b) using phase gradient addition.
-    ///
-    /// Uses CNOT-adder-CNOT pattern: n Toffoli (adder) + 2b CNOTs,
-    /// cheaper than a Controlled adder (2n Toffoli).
-    ///
-    /// Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
-    ///
-    /// # Input
-    /// ## targetQubit
-    /// The qubit to apply the rotation to.
-    /// ## angleQubits
-    /// Register containing the binary representation of the rotation angle.
-    /// ## phaseGradient
-    /// The phase gradient ancilla register.
-    operation RzViaPhaseGradient(
-        targetQubit : Qubit,
-        angleQubits : Qubit[],
-        phaseGradient : Qubit[],
-    ) : Unit is Adj + Ctl {
-        for k in 0..Length(phaseGradient) - 1 {
-            CNOT(targetQubit, phaseGradient[k]);
-        }
-        RippleCarryCGIncByLE(angleQubits, phaseGradient);
-        for k in 0..Length(phaseGradient) - 1 {
-            CNOT(targetQubit, phaseGradient[k]);
-        }
-    }
-
-    /// Applies Ry(θ) via the decomposition Ry = S†·H·Rz·H·S.
+    /// Applies Ry(θ) via the decomposition Ry = S†·H·Rz·H·S,
+    /// where Rz uses the CNOT-adder-CNOT pattern.
     ///
     /// The rotation angle is encoded in angleQubits as an integer x,
     /// giving Ry(4π·x/2^b) where b = Length(phaseGradient).
+    ///
+    /// Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
     ///
     /// # Input
     /// ## targetQubit
@@ -79,7 +54,13 @@ namespace QDKChemistry.Utils.PhaseGradient {
     ) : Unit is Adj + Ctl {
         S(targetQubit);
         H(targetQubit);
-        RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
+        for k in 0..Length(phaseGradient) - 1 {
+            CNOT(targetQubit, phaseGradient[k]);
+        }
+        RippleCarryCGIncByLE(angleQubits, phaseGradient);
+        for k in 0..Length(phaseGradient) - 1 {
+            CNOT(targetQubit, phaseGradient[k]);
+        }
         H(targetQubit);
         Adjoint S(targetQubit);
     }
@@ -88,41 +69,6 @@ namespace QDKChemistry.Utils.PhaseGradient {
     // Test wrappers — allocate qubits via QIR.Runtime so they persist for
     // dump_machine.  Qubit layout: target[0], angle[0..n-1], pg[0..n-1].
     // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Test wrapper: apply Rz via phase gradient on |+⟩ and leave state.
-    operation TestRz(angleValue : Int, nBits : Int) : Unit {
-        let target = QIR.Runtime.AllocateQubitArray(1);
-        let angle = QIR.Runtime.AllocateQubitArray(nBits);
-        let pg = QIR.Runtime.AllocateQubitArray(nBits);
-
-        H(target[0]);
-
-        for k in 0..nBits - 1 {
-            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-        }
-
-        PreparePhaseGradientState(pg);
-        RzViaPhaseGradient(target[0], angle, pg);
-        Adjoint PreparePhaseGradientState(pg);
-    }
-
-    /// Test wrapper: apply Rz then Adjoint Rz (round-trip identity check).
-    operation TestRzRoundtrip(angleValue : Int, nBits : Int) : Unit {
-        let target = QIR.Runtime.AllocateQubitArray(1);
-        let angle = QIR.Runtime.AllocateQubitArray(nBits);
-        let pg = QIR.Runtime.AllocateQubitArray(nBits);
-
-        H(target[0]);
-
-        for k in 0..nBits - 1 {
-            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-        }
-
-        PreparePhaseGradientState(pg);
-        RzViaPhaseGradient(target[0], angle, pg);
-        Adjoint RzViaPhaseGradient(target[0], angle, pg);
-        Adjoint PreparePhaseGradientState(pg);
-    }
 
     /// Test wrapper: apply Ry via phase gradient on |0⟩ and leave state.
     operation TestRy(angleValue : Int, nBits : Int) : Unit {
