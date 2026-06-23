@@ -157,6 +157,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
+intersphinx_timeout = 10  # Seconds; fail fast on unreachable inventories
 
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
@@ -169,6 +170,7 @@ suppress_warnings = [
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
     "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
+    "intersphinx.external",  # Suppress warnings when external inventories are unreachable (transient network issues)
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [
