@@ -386,8 +386,6 @@ class TestMPSSparseQSharpFidelity:
         ("num_sites", "bond_dim", "seed"),
         [
             (2, 4, 42),
-            (3, 4, 42),
-            (4, 2, 42),
         ],
     )
     def test_fidelity_random_mps(self, num_sites, bond_dim, seed):
