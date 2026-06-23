@@ -31,6 +31,7 @@ RUN apt-get update && \
     gnupg \
     build-essential \
     cmake \
+    ccache \
     clang \
     pkg-config \
     python3 \
@@ -54,6 +55,11 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install the memory-/core-aware build parallelism helper. It is used during
+# dependency installation and may also be sourced by development scripts and
+# interactive shells.
+COPY .devcontainer/scripts/parallelism.sh /usr/local/share/qdk/parallelism.sh
+
 # Install C++ dependencies
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
 COPY cpp/manifest/qdk-chemistry/cgmanifest.json /tmp/cpp_cgmanifest.json
@@ -62,7 +68,7 @@ COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
 # Delete build directory after installation
 ENV KEEP_BUILD_DIR=0
 RUN bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
-     rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
+    rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
@@ -89,3 +95,23 @@ USER $USERNAME
 
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
+
+# Create the Python virtual environment and pre-install workspace-independent
+# Python dev dependencies.
+ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
+    PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
+
+RUN python -m venv "$VIRTUAL_ENV" \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir \
+    "ipykernel>=6.0" \
+    "pandas>=2.0.0" \
+    "pre-commit>=4.6,<5" \
+    "rdkit" \
+    && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
+
+# Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells
+RUN echo "source /usr/local/share/qdk/parallelism.sh" >> ~/.bashrc
+
+# Make user-local C++ installations discoverable
+ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local

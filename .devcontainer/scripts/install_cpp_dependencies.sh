@@ -37,13 +37,30 @@ BUILD_DIR="${BUILD_DIR:-/tmp/qdk_deps_build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
-LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
+
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
-if command -v nproc >/dev/null 2>&1; then
-    JOBS=$(nproc) # Linux
-else
-    JOBS=$(sysctl -n hw.logicalcpu) # macOS
+
+PARALLELISM_HELPER="/usr/local/share/qdk/parallelism.sh"
+if [ -f "$PARALLELISM_HELPER" ]; then
+    # shellcheck source=/dev/null
+    source "$PARALLELISM_HELPER"
 fi
+
+if command -v parallel_jobs_for_memory >/dev/null 2>&1; then
+    # Use the parallelism helper to determine job counts based on memory
+    JOBS="${JOBS:-$(parallel_jobs_for_memory 1)}"
+    LIBINT_JOBS="${LIBINT_JOBS:-$(parallel_jobs_for_memory 4)}"
+else
+    # Fallback when helper is unavailable
+    if command -v nproc >/dev/null 2>&1; then
+        DEFAULT_JOBS=$(nproc) # Linux
+    else
+        DEFAULT_JOBS=$(sysctl -n hw.logicalcpu) # macOS
+    fi
+    JOBS="${JOBS:-$DEFAULT_JOBS}"
+    LIBINT_JOBS="${LIBINT_JOBS:-4}"
+fi
+
 MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
@@ -224,7 +241,6 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-# libint's compilation is memory intensive so parallel jobs are limited to 4 to prevent OOM errors
 make -j"$LIBINT_JOBS"
 make install
 cd "$BUILD_DIR"
