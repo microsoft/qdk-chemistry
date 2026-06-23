@@ -7,19 +7,19 @@
 
 from qdk import qsharp
 
-from qdk_chemistry.data import AlgorithmRef, Settings
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledCircuitMapper
+from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
 
 __all__: list[str] = ["ControlledPSPMapper", "ControlledPSPMapperSettings"]
 
 
-class ControlledPSPMapperSettings(Settings):
+class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     """Settings for the ControlledPSPMapper.
 
     Attributes:
