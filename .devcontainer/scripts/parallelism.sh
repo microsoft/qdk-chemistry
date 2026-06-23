@@ -29,6 +29,17 @@ parallel_jobs_for_memory() {
         mem_bytes=$(sysctl -n hw.memsize)
     fi
 
+    # If running inside a cgroup with a memory limit, respect it.
+    local cgroup_limit_bytes=""
+    if [ -r /sys/fs/cgroup/memory.max ]; then
+        cgroup_limit_bytes="$(cat /sys/fs/cgroup/memory.max)"                    # cgroup v2
+    elif [ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]; then
+        cgroup_limit_bytes="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)"  # cgroup v1
+    fi
+    if [[ "$cgroup_limit_bytes" =~ ^[0-9]+$ ]] && (( cgroup_limit_bytes > 0 )) && (( cgroup_limit_bytes < mem_bytes )); then
+        mem_bytes="$cgroup_limit_bytes"
+    fi
+
     # tiny overhead to get common cases correct (e.g., 15.9GB RAM, 8GB per job -> 2 jobs)
     mem_bytes=$(( mem_bytes * 103 / 100 ))
 
