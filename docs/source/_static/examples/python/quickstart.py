@@ -7,16 +7,25 @@
 
 ################################################################################
 # start-cell-structure
-from pathlib import Path
-
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Structure
 
-# Load para-benzyne structure from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/para_benzyne.structure.xyz"
-)
+# Define the para-benzyne molecule in XYZ format
+structure = Structure.from_xyz("""\
+10
+para-Benzyne
+C    0.000000    1.396000    0.000000
+C    1.209077    0.698000    0.000000
+C    1.209077   -0.698000    0.000000
+C    0.000000   -1.396000    0.000000
+C   -1.209077   -0.698000    0.000000
+C   -1.209077    0.698000    0.000000
+H    2.151000    1.242000    0.000000
+H    2.151000   -1.242000    0.000000
+H   -2.151000   -1.242000    0.000000
+H   -2.151000    1.242000    0.000000
+""")
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
 print(f"Elements: {structure.get_elements()}")

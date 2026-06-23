@@ -11,7 +11,6 @@ is executed end-to-end by the ``test_docs_examples.py`` test harness.
 # --------------------------------------------------------------------------------------------
 
 import importlib.util
-from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.algorithms import create
@@ -21,9 +20,12 @@ from qdk_chemistry.data import Structure
 # Shared pipeline: H2 molecule → SCF → active-space → Hamiltonian → QubitHam
 # (used by cells below that need a fermionic or qubit Hamiltonian)
 # ---------------------------------------------------------------------------
-_h2_structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
-)
+_h2_structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 _scf = create("scf_solver")
 _E_scf, _wfn_scf = _scf.run(
     _h2_structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"

@@ -5,15 +5,19 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, ModelOrbitals
 from qdk_chemistry.data.symmetry import spin_index_set
 
 ################################################################################
 # start-cell-create
-# Load H2 molecule from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+# Define the H2 molecule in XYZ format
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")

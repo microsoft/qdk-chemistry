@@ -8,7 +8,6 @@
 ################################################################################
 # start-cell-create
 import numpy as np
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, BasisSet
 
@@ -28,8 +27,13 @@ scf_solver.settings().set("method", "hf")
 
 ################################################################################
 # start-cell-run
-# Load structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+# Define the H2 molecule in XYZ format
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Run scf
 E_scf, wfn = scf_solver.run(

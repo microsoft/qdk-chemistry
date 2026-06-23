@@ -53,14 +53,16 @@ mcscf.settings().set("max_cycle_macro", 50)
 
 ################################################################################
 # start-cell-run
-from pathlib import Path
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import compute_valence_space_parameters
 
-# Load nitrogen molecule structure
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/n2_stretched.structure.xyz"
-)
+# Define the stretched nitrogen molecule in XYZ format
+structure = Structure.from_xyz("""\
+2
+N2 (stretched)
+N 0 0 0
+N 0 0 2
+""")
 charge = 0
 
 # First, run SCF to get molecular orbitals
