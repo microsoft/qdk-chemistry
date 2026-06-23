@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import tempfile
 
 import h5py
@@ -102,11 +103,16 @@ class TestVerstraeteCiracMapping:
         terms_orig = sorted(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=False))
 
         # HDF5 Round-trip
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        # Use delete=False so h5py can open the file on Windows (no exclusive lock)
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 mapping.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded_hdf5 = MajoranaMapping.from_hdf5(hf)
+        finally:
+            os.unlink(fname)
         assert loaded_hdf5.name == mapping.name
         assert loaded_hdf5.num_modes == mapping.num_modes
         assert loaded_hdf5.num_qubits == mapping.num_qubits
