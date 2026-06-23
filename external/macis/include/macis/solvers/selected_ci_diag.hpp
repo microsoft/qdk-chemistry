@@ -8,6 +8,8 @@
  */
 
 #pragma once
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator.hpp>

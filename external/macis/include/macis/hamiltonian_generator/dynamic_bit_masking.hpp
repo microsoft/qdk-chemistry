@@ -8,13 +8,13 @@
  */
 
 #pragma once
+#include <algorithm>
 #include <array>
 #include <cassert>
-#include <stdexcept>
-#include <string>
-
 #include <macis/hamiltonian_generator/connection_build_utils.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
+#include <stdexcept>
+#include <string>
 
 namespace macis {
 
