@@ -17,8 +17,15 @@ The data type is taken from the ``name.type.ext`` filename convention
 from the file extension (``.json`` or ``.h5`` / ``.hdf5``). Input and output
 formats may differ.
 
-This module is transitional and will be removed once v1 files are no longer
-supported; it lives outside the data classes so that no legacy-schema knowledge
+Migration is keyed point-by-point on each object's serialization version, not on
+a release: every migratable type exposes a ``STEPS`` table mapping a source
+version to a ``(next_version, transform)`` pair, and the chain is followed until
+it reaches the schema the installed library accepts. To support a future
+serialization-version bump, register the next step in that type's ``STEPS`` table
+(``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated document is
+validated against the live deserializer, so a missing step fails loudly.
+
+This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.
 """
 
@@ -89,13 +96,29 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
     module = _MODULES[data_type]
     try:
         old_doc = _read_old(module, data_type, src_path, src_format)
-        new_json = module.to_new_json(old_doc)
-        obj = _CLASSES[data_type].from_json(json.dumps(new_json))
-        _io.write_object(obj, dst_path, dst_format)
+        if data_type == "ansatz":
+            # An Ansatz has no version step of its own; it delegates to each
+            # embedded payload's serialization-version chain.
+            new_json = module.to_new_json(old_doc)
+        else:
+            new_json = _io.migrate_doc(module.STEPS, old_doc, data_type)
     except NotImplementedError as error:
         raise MigrationError(str(error)) from error
     except (KeyError, ValueError, RuntimeError, OSError) as error:
         raise MigrationError(f"Failed to migrate '{src_path}': {error}") from error
+
+    try:
+        obj = _CLASSES[data_type].from_json(json.dumps(new_json))
+    except RuntimeError as error:
+        raise MigrationError(
+            f"The installed qdk-chemistry rejected the migrated {data_type} ({error}). If the "
+            f"{data_type} serialization schema changed, register the next step in {module.__name__}.STEPS."
+        ) from error
+
+    try:
+        _io.write_object(obj, dst_path, dst_format)
+    except (OSError, RuntimeError) as error:
+        raise MigrationError(f"Failed to write '{dst_path}': {error}") from error
     return dst_path
 
 
@@ -103,7 +126,6 @@ def _read_old(module, data_type: str, src: Path, src_format: str):
     """Read a v1 file into a normalized old-doc for ``data_type``."""
     if src_format == "json":
         doc = json.loads(src.read_text(encoding="utf-8"))
-        module.assert_legacy(doc)
         return module.from_json_doc(doc)
 
     if data_type == "orbitals":

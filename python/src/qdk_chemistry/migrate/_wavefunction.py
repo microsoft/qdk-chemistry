@@ -30,35 +30,18 @@ from . import _io, _orbitals, _sbt
 WAVEFUNCTION_VERSION = "0.2.0"
 CONTAINER_VERSION = "0.2.0"
 AMPLITUDE_CONTAINER_VERSION = "0.1.0"
+OLD_VERSION = "0.1.0"
 
 _STATE_VECTOR_TYPES = {"sd", "cas", "sci"}
 _AMPLITUDE_TYPES = {"mp2", "coupled_cluster", "cc"}
-_LEGACY_CONTAINER_TYPES = _STATE_VECTOR_TYPES | _AMPLITUDE_TYPES
 _SPIN_HALF_CHARS = "0ud2"
-
-
-def assert_legacy(doc: dict) -> None:
-    """Raise if ``doc`` is not a migratable v1 Wavefunction JSON object.
-
-    The v1 containers (``sd``/``cas``/``sci``/``mp2``/``coupled_cluster``) were
-    flattened into ``state_vector``/``amplitude`` in v2; a v2 document is rejected
-    so it is not silently re-processed (which would drop v2-only fields).
-    """
-    container = doc.get("container", doc)
-    tag = container.get("container_type", container.get("type"))
-    if tag not in _LEGACY_CONTAINER_TYPES:
-        raise ValueError(
-            f"Wavefunction container type {tag!r} is not a migratable v1 container "
-            "(expected one of sd/cas/sci/mp2/coupled_cluster); the file may already be "
-            "in the current schema (state_vector/amplitude)."
-        )
 
 
 def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed v1 Wavefunction JSON object into an old-doc."""
     container = doc.get("container", doc)
     tag = container.get("container_type", container.get("type"))
-    return {"tag": tag, "container": container}
+    return {"_source_version": str(doc.get("version")), "tag": tag, "container": container}
 
 
 def from_hdf5_file(path) -> dict:
@@ -206,7 +189,7 @@ def _read_wavefunction_group(group: h5py.Group) -> dict:
         container = _read_amplitude_hdf5(container_group, tag)
     else:
         container = _read_state_vector_hdf5(container_group, tag)
-    return {"tag": tag, "container": container}
+    return {"_source_version": _io.read_attr(group, "version"), "tag": tag, "container": container}
 
 
 def _orbitals_to_new(group: h5py.Group) -> dict:
@@ -309,3 +292,6 @@ def _read_amplitude_hdf5(container_group: h5py.Group, tag: str) -> dict:
         if name in container_group:
             new[name] = _read_real_vector(container_group, name)
     return new
+
+
+STEPS = {OLD_VERSION: (WAVEFUNCTION_VERSION, to_new_json)}

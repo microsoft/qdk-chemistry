@@ -2,8 +2,9 @@
 
 An ``Ansatz`` is an envelope around a :class:`~qdk_chemistry.data.Hamiltonian`
 and a :class:`~qdk_chemistry.data.Wavefunction`. The envelope itself
-(``{type, version, hamiltonian, wavefunction}``) is schema-stable; only the two
-embedded payloads changed, so this converter simply migrates each in place.
+(``{type, version, hamiltonian, wavefunction}``) is schema-stable, so this
+converter has no version step of its own; it migrates each embedded payload
+through that payload's own serialization-version chain.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -15,23 +16,9 @@ from __future__ import annotations
 
 import h5py
 
-from . import _hamiltonian, _wavefunction
+from . import _hamiltonian, _io, _wavefunction
 
 ANSATZ_VERSION = "0.1.0"
-
-
-def assert_legacy(doc: dict) -> None:
-    """Raise if ``doc`` embeds a Hamiltonian or Wavefunction that is not v1.
-
-    The Ansatz envelope version is unchanged between v1 and v2; only the embedded
-    payloads carry the schema bump, so they are what is checked.
-    """
-    hamiltonian = doc.get("hamiltonian")
-    wavefunction = doc.get("wavefunction")
-    if hamiltonian:
-        _hamiltonian.assert_legacy(hamiltonian)
-    if wavefunction:
-        _wavefunction.assert_legacy(wavefunction)
 
 
 def from_json_doc(doc: dict) -> dict:
@@ -54,8 +41,14 @@ def from_hdf5_file(path) -> dict:
 
 
 def to_new_json(old: dict) -> dict:
-    """Build the v2 Ansatz JSON object from a normalized old-doc."""
+    """Build the v2 Ansatz JSON object by migrating each embedded payload's chain."""
     new: dict = {"version": ANSATZ_VERSION, "type": "Ansatz"}
-    new["hamiltonian"] = None if old["hamiltonian"] is None else _hamiltonian.to_new_json(old["hamiltonian"])
-    new["wavefunction"] = None if old["wavefunction"] is None else _wavefunction.to_new_json(old["wavefunction"])
+    hamiltonian = old["hamiltonian"]
+    wavefunction = old["wavefunction"]
+    new["hamiltonian"] = (
+        None if hamiltonian is None else _io.migrate_doc(_hamiltonian.STEPS, hamiltonian, "embedded Hamiltonian")
+    )
+    new["wavefunction"] = (
+        None if wavefunction is None else _io.migrate_doc(_wavefunction.STEPS, wavefunction, "embedded Wavefunction")
+    )
     return new

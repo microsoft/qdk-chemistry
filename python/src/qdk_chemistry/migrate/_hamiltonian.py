@@ -23,24 +23,9 @@ from . import _io, _orbitals, _sbt, _sparse
 
 HAMILTONIAN_VERSION = "0.1.0"
 CONTAINER_VERSION = "0.2.0"
+OLD_CONTAINER_VERSION = "0.1.0"
 
 _FOUR_CENTER = "canonical_four_center"
-
-
-def assert_legacy(doc: dict) -> None:
-    """Raise if ``doc`` is not a migratable v1 Hamiltonian JSON object.
-
-    The Hamiltonian envelope version is unchanged between v1 and v2, so the
-    container's schema version is what distinguishes them.
-    """
-    container = doc.get("container")
-    if not isinstance(container, dict):
-        raise ValueError("Hamiltonian JSON has no 'container' object; cannot migrate.")
-    if _io.major_minor(container.get("version")) != (0, 1):
-        raise ValueError(
-            f"Hamiltonian container schema version {container.get('version')!r} is not the migratable "
-            "v1 schema (expected 0.1.x); the file may already be in the current schema."
-        )
 
 
 def from_json_doc(doc: dict) -> dict:
@@ -78,6 +63,7 @@ def _four_center_from_json(container: dict) -> dict:
     """Read four-center / Cholesky container fields from old JSON."""
     two_body = container.get("two_body_integrals") or {}
     return {
+        "_source_version": str(container.get("version")),
         "container_type": _FOUR_CENTER,
         "core_energy": container.get("core_energy", 0.0),
         "type": container.get("type", "Hermitian"),
@@ -97,6 +83,7 @@ def _four_center_from_hdf5(container: h5py.Group) -> dict:
     """Read four-center / Cholesky container fields from old HDF5."""
     metadata = container["metadata"]
     return {
+        "_source_version": _io.read_attr(container, "version"),
         "container_type": _FOUR_CENTER,
         "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
         "type": _io.read_attr(metadata, "type", "Hermitian"),
@@ -146,3 +133,9 @@ def _four_center_to_new_json(old: dict) -> dict:
 def _opt_array(value):
     """Return ``value`` as a float64 array, or None when absent."""
     return None if value is None else np.asarray(value, dtype=np.float64)
+
+
+# The Hamiltonian envelope version is unchanged; the chain is keyed on the
+# container's serialization version (the v1 cholesky/sparse/four-center
+# containers all serialized version 0.1.0).
+STEPS = {OLD_CONTAINER_VERSION: (CONTAINER_VERSION, to_new_json)}

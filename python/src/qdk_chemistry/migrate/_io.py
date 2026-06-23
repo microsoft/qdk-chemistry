@@ -1,9 +1,10 @@
-"""Low-level I/O helpers for the v1 -> v2 schema migration.
+"""Low-level helpers shared across the schema-migration converters.
 
-Handles serialization-format and data-type detection, reading dense
-arrays out of the v1 HDF5 layout (which stores Eigen column-major matrices
-in ``[rows, cols]`` datasets), and writing a reconstructed v2 object back
-out in the requested format.
+Handles serialization-format and data-type detection, the per-object
+serialization-version step chain (:func:`migrate_doc`), reading dense arrays out
+of the legacy HDF5 layout (which stores Eigen column-major matrices in
+``[rows, cols]`` datasets), and writing a reconstructed object back out in the
+requested format.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -26,13 +27,26 @@ _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 _TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz")
 
 
-def major_minor(version) -> tuple[int, int]:
-    """Parse a ``"major.minor.patch"`` schema version string into ``(major, minor)``."""
-    parts = str(version).split(".")
-    try:
-        return int(parts[0]), int(parts[1])
-    except (IndexError, ValueError) as error:
-        raise ValueError(f"Missing or malformed schema version: {version!r}") from error
+def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
+    """Upgrade ``read_doc`` to the current schema by following ``steps``.
+
+    ``steps`` maps a serialization version to a ``(next_version, transform)`` pair.
+    The chain is walked from the document's own ``_source_version`` until no further
+    step applies. A version with no registered step is rejected rather than silently
+    reinterpreted, so an already-current (or otherwise unsupported) file fails fast.
+    """
+    version = read_doc["_source_version"]
+    if version not in steps:
+        raise ValueError(
+            f"No migration step is registered for the {label} serialization version {version!r}. "
+            "The file may already be in the current schema, or a new step must be added to its "
+            "qdk_chemistry.migrate STEPS table."
+        )
+    doc: dict = read_doc
+    while version in steps:
+        version, transform = steps[version]
+        doc = transform(doc)
+    return doc
 
 
 def detect_format(path: Path) -> str:

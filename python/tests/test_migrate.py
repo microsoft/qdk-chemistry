@@ -21,7 +21,7 @@ import pytest
 
 from qdk_chemistry import migrate
 from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, Wavefunction
-from qdk_chemistry.migrate import _wavefunction
+from qdk_chemistry.migrate import _orbitals, _wavefunction
 
 RNG = np.random.default_rng(20240101)
 
@@ -642,3 +642,33 @@ def test_sd_determinant_spinless_bits_per_mode(tmp_path):
         decoded = _wavefunction._decode_configuration_dataset(handle["configuration"])
     assert decoded["bits_per_mode"] == 1
     assert decoded["configuration"] == "101"
+
+
+# --------------------------------------------------------------------------- #
+# The migration is keyed point-by-point on each object's serialization version
+# (not the release): an unknown source version is rejected, and a chain that
+# terminates at a version the installed library does not accept fails fast.
+# --------------------------------------------------------------------------- #
+def test_unknown_source_version_rejected(tmp_path):
+    doc = _old_orbitals_json(2, 2, True, (np.eye(2), np.eye(2)))
+    doc["version"] = "0.9.0"
+    src = tmp_path / "x.orbitals.json"
+    src.write_text(json.dumps(doc))
+    with pytest.raises(migrate.MigrationError, match="No migration step is registered"):
+        migrate.convert_file(src, tmp_path / "y.orbitals.json")
+
+
+def test_library_anchor_requires_step_to_current_schema(tmp_path, monkeypatch):
+    # Simulate the serialization version being bumped without a matching step:
+    # the chain ends at a version the installed library rejects, so the anchor
+    # must fail fast and point at the STEPS table.
+    def to_unsupported(old):
+        new = _orbitals.to_new_json(old)
+        new["version"] = "9.9.0"
+        return new
+
+    monkeypatch.setattr(_orbitals, "STEPS", {"0.1.0": ("9.9.0", to_unsupported)})
+    src = tmp_path / "x.orbitals.json"
+    src.write_text(json.dumps(_old_orbitals_json(2, 2, True, (np.eye(2), np.eye(2)))))
+    with pytest.raises(migrate.MigrationError, match="register the next step"):
+        migrate.convert_file(src, tmp_path / "y.orbitals.json")

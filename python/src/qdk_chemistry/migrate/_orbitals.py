@@ -28,20 +28,12 @@ NEW_VERSION = "0.2.0"
 OLD_VERSION = "0.1.0"
 
 
-def assert_legacy(doc: dict) -> None:
-    """Raise if ``doc`` is not a migratable v1 Orbitals JSON object."""
-    if _io.major_minor(doc.get("version")) != (0, 1):
-        raise ValueError(
-            f"Orbitals schema version {doc.get('version')!r} is not the migratable v1 schema "
-            "(expected 0.1.x); the file may already be in the current schema."
-        )
-
-
 def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed v1 orbitals JSON object into the internal old-doc."""
     coeff = doc["coefficients"]
     energies = doc.get("energies")
     return {
+        "_source_version": str(doc.get("version")),
         "is_restricted": bool(doc.get("is_restricted", True)),
         "num_atomic_orbitals": doc.get("num_atomic_orbitals"),
         "num_molecular_orbitals": doc.get("num_molecular_orbitals"),
@@ -70,6 +62,7 @@ def from_hdf5_group(group: h5py.Group) -> dict:
         basis_set = _io.subgroup_to_json(group["basis_set"], BasisSet, "basis_set")
 
     return {
+        "_source_version": _io.read_attr(group, "version"),
         "is_restricted": is_restricted,
         "num_atomic_orbitals": int(np.asarray(metadata["num_atomic_orbitals"]).ravel()[0]),
         "num_molecular_orbitals": int(np.asarray(metadata["num_molecular_orbitals"]).ravel()[0]),
@@ -127,3 +120,6 @@ def _index_pair(indices: dict) -> dict:
         "alpha": [int(i) for i in indices["alpha"]],
         "beta": [int(i) for i in indices["beta"]],
     }
+
+
+STEPS = {OLD_VERSION: (NEW_VERSION, to_new_json)}

@@ -28,6 +28,7 @@ CONTAINER_VERSION = "0.2.0"
 def from_json_doc(container: dict) -> dict:
     """Normalize a parsed v1 sparse container JSON object into an old-doc."""
     return {
+        "_source_version": str(container.get("version")),
         "container_type": "sparse",
         "core_energy": container.get("core_energy", 0.0),
         "type": container.get("type", "Hermitian"),
@@ -81,6 +82,7 @@ def from_hdf5_group(container: h5py.Group) -> dict:
         ]
 
     return {
+        "_source_version": _io.read_attr(container, "version"),
         "container_type": "sparse",
         "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
         "type": _io.read_attr(metadata, "type", "Hermitian"),
