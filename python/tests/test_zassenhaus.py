@@ -5,8 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import sys
 from collections.abc import Hashable
 from fractions import Fraction
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -37,6 +39,10 @@ from qdk_chemistry.utils.zassenhaus_generation import (
     PlanTerm,
     zassenhaus_commutator_plan,
 )
+
+# Add repo root / examples to sys.path so we can import from examples.utils
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "examples"))
+from utils.qpe_utils import compute_evolution_time
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -512,7 +518,8 @@ class TestZassenhausPhaseEstimation:
         state_preparation = create("state_prep", "sparse_isometry_gf2x").run(casci_wavefunction)
 
         # Configure the Zassenhaus evolution builder reference
-        evolution_time = 1.0
+        num_bits = 12
+        evolution_time = compute_evolution_time(qubit_hamiltonian, num_bits=num_bits)
         zassenhaus_order = 2
         zassenhaus_num_divisions = 10
         unitary_builder_ref = AlgorithmRef(
@@ -527,11 +534,11 @@ class TestZassenhausPhaseEstimation:
         qpe_builder_ref = AlgorithmRef(
             "qpe_circuit_builder",
             "qdk_iterative",
-            num_bits=12,
+            num_bits=num_bits,
             unitary_builder=unitary_builder_ref,
             controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
-        iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=3)
+        iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=15)
         iqpe.settings().set("qpe_circuit_builder", qpe_builder_ref)
         iqpe.settings().set(
             "circuit_executor",
