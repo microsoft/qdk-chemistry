@@ -207,3 +207,29 @@ class TestPauliSequenceMapper:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_duplicate_control_indices_raises(self, unitary_rep):
+        """Test that duplicate control indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2, 2])
+
+        with pytest.raises(ValueError, match="duplicates"):
+            mapper.run(unitary_rep)
+
+    def test_duplicate_target_indices_raises(self, unitary_rep):
+        """Test that duplicate target indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+        mapper.settings().set("target_indices", [0, 0])
+
+        with pytest.raises(ValueError, match="duplicates"):
+            mapper.run(unitary_rep)
+
+    def test_overlapping_control_and_target_indices_raises(self, unitary_rep):
+        """Test that overlapping control and target indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [1])
+        mapper.settings().set("target_indices", [0, 1])
+
+        with pytest.raises(ValueError, match="overlap"):
+            mapper.run(unitary_rep)
