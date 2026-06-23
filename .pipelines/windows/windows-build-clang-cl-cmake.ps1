@@ -17,6 +17,8 @@
 #   -SkipConfigure  # Skip CMake configure, incremental build only
 #   -SkipPython     # Skip Python build, only do C++
 #   -SkipTests      # Skip test runs
+#   -DebugBuild     # Build C++ in Debug mode (build-msvc-debug/, enables MSVC iterator checks).
+#                   # Python build is skipped automatically.
 
 param(
     [switch]$DynamicDeps,
@@ -24,7 +26,8 @@ param(
     [switch]$SkipCpp,
     [switch]$SkipConfigure,
     [switch]$SkipPython,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$DebugBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,8 +36,16 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-$BuildDir = "$RepoRoot\cpp\build-clang-cl"
-$InstallDir = "$RepoRoot\install-clang-cl"
+if ($DebugBuild) {
+    $BuildDir   = "$RepoRoot\cpp\build-clang-cl-debug"
+    $InstallDir = "$RepoRoot\install-clang-cl-debug"
+    $BuildType  = "Debug"
+    $SkipPython = $true   # Debug build is not usable for the Python extension
+} else {
+    $BuildDir   = "$RepoRoot\cpp\build-clang-cl"
+    $InstallDir = "$RepoRoot\install-clang-cl"
+    $BuildType  = "Release"
+}
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
 # Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
@@ -51,8 +62,9 @@ $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  QDK Chemistry - Windows Build (clang-cl)  " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "Repo root: $RepoRoot"
-Write-Host "Triplet:   $VcpkgTriplet ($linkMode)"
+Write-Host "Repo root:  $RepoRoot"
+Write-Host "Build type: $BuildType"
+Write-Host "Triplet:    $VcpkgTriplet ($linkMode)"
 Write-Host ""
 
 # --------------------------------------------------------------------------
@@ -341,10 +353,10 @@ if (-not $SkipCpp) {
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
             -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
             -DQDK_ENABLE_OPENMP=ON `
-            -DMACIS_ENABLE_TESTS=OFF `
+            -DMACIS_ENABLE_TESTS=ON `
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
-            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_BUILD_TYPE="$BuildType" `
             -DCMAKE_C_COMPILER=clang-cl `
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
@@ -363,7 +375,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 6 2>&1 *> "$BuildDir\build.log"
+    cmake --build "$BuildDir" --parallel $NCPUS 2>&1 *> "$BuildDir\build.log"
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
     Write-Host "C++ build succeeded." -ForegroundColor Green
 
@@ -372,7 +384,7 @@ if (-not $SkipCpp) {
         Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
         Push-Location "$BuildDir"
         $env:OMP_NUM_THREADS = 2
-        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST" 2>&1 *> ctest.log
+        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST" 2>&1 *> ctest_clang_cl.log
         $ctestExit = $LASTEXITCODE
         Pop-Location
         if ($ctestExit -ne 0) {
@@ -400,7 +412,7 @@ if (-not $SkipPython) {
     Write-Host "=== Step 5: Install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "$NCPUS"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
@@ -408,11 +420,14 @@ if (-not $SkipPython) {
     # Do not install:
     # - plugins: pyscf does not build on Windows
     # - jupyter: requires plugins
+    # Resolve the full path to clang-cl so that the scikit-build-core subprocess
+    # (which does not inherit our modified PATH) can locate the compiler.
+    $clangClExe = (Get-Command clang-cl -ErrorAction Stop).Source
     uv pip install -v .[test] `
         -C cmake.args=-GNinja `
         -C cmake.define.CMAKE_PREFIX_PATH="$env:CMAKE_PREFIX_PATH;$InstallDir" `
-        -C cmake.define.CMAKE_C_COMPILER=clang-cl `
-        -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
+        -C cmake.define.CMAKE_C_COMPILER="$clangClExe" `
+        -C cmake.define.CMAKE_CXX_COMPILER="$clangClExe" `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
         -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
         -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
