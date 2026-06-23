@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import qdk
 from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
@@ -142,8 +143,6 @@ class TestOuterPrep:
         against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
         """
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary()
@@ -171,12 +170,10 @@ class TestOuterPrep:
     def test_build_outer_prep_alias_sampling_marginal_probs(self):
         """Verify alias sampling prepares the correct marginal probabilities.
 
-        The alias sampling op produces |ψ⟩ = Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩.
+        The alias sampling op produces |ψ⟩ = Σ_l √(p̃_l) |l⟩|garbage_l⟩.
         We check that the marginal probabilities on the index register match
-        p(ℓ) = |c_ℓ| / Σ|c_j|.
+        p(l) = |c_l| / Σ|c_j|.
         """
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary()
@@ -217,13 +214,11 @@ class TestInnerPrep:
         """Verify inner prep conditional marginals when combined with outer prep.
 
         Applies outer prep (dense_pure, exact) then inner prep on the combined
-        register.  For each outer index ℓ with non-negligible amplitude, checks
+        register.  For each outer index l with non-negligible amplitude, checks
         that the conditional marginal probabilities on the inner index register
         match:
-            P(b|ℓ) ≈ |c_{ℓ,b}|² / Σ_j |c_{ℓ,j}|²
+            P(b|l) ≈ |c_{l,b}|² / Σ_j |c_{l,j}|²
         """
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
@@ -263,7 +258,7 @@ class TestInnerPrep:
         state = qsharp.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
-        # Check conditional marginals for each outer value ℓ
+        # Check conditional marginals for each outer value l
         total_qubits = num_outer_qubits + num_inner_qubits
         n_inner_index = 2**n_index_bits
 
@@ -292,7 +287,7 @@ class TestInnerPrep:
                 continue
             probs /= total_prob
 
-            # Expected: |c_{ℓ,b}|² / Σ|c_{ℓ,j}|²
+            # Expected: |c_{l,b}|² / Σ|c_{l,j}|²
             abs_coeffs = np.abs(inner_coeffs[ell])
             expected_probs = abs_coeffs**2 / np.sum(abs_coeffs**2)
 
@@ -530,7 +525,7 @@ class TestSOSSAMapper:
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
     """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
-    N = len(vec)
+    N = len(vec)  # noqa: N806
     v = vec.copy().astype(float)
     angles = [0.0] * (N - 1)
     for j in range(N - 2, -1, -1):
@@ -555,9 +550,7 @@ class TestSelectGivensFidelity:
 
     def test_givens_rotation_n2_exact(self):
         """Verify ApplyGivensSequence maps |10⟩ → target vector exactly for N=2."""
-        import qdk
-
-        N = 2
+        N = 2  # noqa: N806
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         rng = np.random.default_rng(42)
@@ -582,10 +575,8 @@ class TestSelectGivensFidelity:
                 assert abs(sv[i]) < 1e-10, f"Non-zero amplitude at index {i}: {sv[i]}"
 
     @pytest.mark.parametrize("N", [2, 3, 4])
-    def test_givens_round_trip(self, N):
+    def test_givens_round_trip(self, N):  # noqa: N803
         """Verify Givens rotation and its adjoint cancel: G†G|ψ⟩ = |ψ⟩."""
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         rng = np.random.default_rng(123 + N)
@@ -617,9 +608,7 @@ class TestSelectGivensFidelity:
     )
     def test_givens_specific_vectors_n2(self, vec_desc, vec):
         """Verify Givens rotation for specific N=2 vectors (exact, no leakage)."""
-        import qdk
-
-        N = len(vec)
+        N = len(vec)  # noqa: N806
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         angles = _vector_to_givens_angles(vec)
@@ -651,9 +640,7 @@ class TestSelectGivensFidelity:
         When the target is a basis vector, only one Givens rotation is non-trivial
         and the others have angle 0 or π/2, avoiding the leakage issue.
         """
-        import qdk
-
-        N = len(vec)
+        N = len(vec)  # noqa: N806
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         angles = _vector_to_givens_angles(vec)
@@ -684,9 +671,7 @@ class TestSelectSpinsFidelity:
 
     def test_dq_mode_spin_up(self):
         """In DQ mode (isSF=0) with spinDQ=0, no SWAP should occur."""
-        import qdk
-
-        N = 2
+        N = 2  # noqa: N806
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
@@ -703,9 +688,7 @@ class TestSelectSpinsFidelity:
 
     def test_dq_mode_spin_down(self):
         """In DQ mode (isSF=0) with spinDQ=1, SWAP should move sysDown to sysUp."""
-        import qdk
-
-        N = 2
+        N = 2  # noqa: N806
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
@@ -713,9 +696,9 @@ class TestSelectSpinsFidelity:
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
-        spinDQ_bit = self._bit_of(1, total)  # bit 6
+        spinDQ_bit = self._bit_of(1, total)  # noqa: N806  # bit 6
         spin_bit = self._bit_of(3, total)  # bit 4
-        sysUp0_bit = self._bit_of(4 + N, total)  # bit 1
+        sysUp0_bit = self._bit_of(4 + N, total)  # noqa: N806  # bit 1
         expected_idx = (1 << spinDQ_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
         assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
             f"Expected all amplitude at index {expected_idx}, got {abs(sv[expected_idx])}"
@@ -723,9 +706,7 @@ class TestSelectSpinsFidelity:
 
     def test_sf_mode_spin_down(self):
         """In SF mode (isSF=1) with spinSF=1, SWAP should occur."""
-        import qdk
-
-        N = 2
+        N = 2  # noqa: N806
         total = 2 * N + 4  # 8 qubits
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
@@ -733,10 +714,10 @@ class TestSelectSpinsFidelity:
         state = qsharp.dump_machine()
         sv = np.array(state.as_dense_state())
 
-        isSF_bit = self._bit_of(0, total)  # bit 7
-        spinSF_bit = self._bit_of(2, total)  # bit 5
+        isSF_bit = self._bit_of(0, total)  # noqa: N806  # bit 7
+        spinSF_bit = self._bit_of(2, total)  # noqa: N806  # bit 5
         spin_bit = self._bit_of(3, total)  # bit 4
-        sysUp0_bit = self._bit_of(4 + N, total)  # bit 1
+        sysUp0_bit = self._bit_of(4 + N, total)  # noqa: N806  # bit 1
         expected_idx = (1 << isSF_bit) | (1 << spinSF_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
         assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
             f"Expected all amplitude at index {expected_idx}, got {abs(sv[expected_idx])}"
@@ -747,20 +728,18 @@ class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_round_trip(self, N):
+    def test_select_round_trip(self, N):  # noqa: N803
         """Verify SELECT†·SELECT = Identity (unitarity check)."""
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         rng = np.random.default_rng(42 + N)
         dq_angles = []
-        for i in range(N):
+        for _ in range(N):
             v = rng.standard_normal(N)
             v /= np.linalg.norm(v)
             dq_angles.append(_vector_to_givens_angles(v))
 
-        R, B, C = 1, 1, 1
+        R, B, C = 1, 1, 1  # noqa: N806
         sf_angles = [
             [0.0] * (N - 1) + [0.0],
             [0.0] * (N - 1) + [1.0],
@@ -788,20 +767,18 @@ class TestSelectFullFidelity:
         assert num_nonzero == 1, f"Round trip has {num_nonzero} non-zero amps (expected 1)"
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N):
+    def test_select_dq_givens_fidelity(self, N):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
-        import qdk
-
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         rng = np.random.default_rng(42 + N)
         dq_angles = []
-        for i in range(N):
+        for _ in range(N):
             v = rng.standard_normal(N)
             v /= np.linalg.norm(v)
             dq_angles.append(_vector_to_givens_angles(v))
 
-        R, B, C = 1, 1, 1
+        R, B, C = 1, 1, 1  # noqa: N806
         sf_angles = [
             [0.0] * (N - 1) + [0.0],
             [0.0] * (N - 1) + [1.0],
@@ -883,9 +860,9 @@ class TestSOSSAWalkLogicalCounts:
 
         actual_qubits = lc["numQubits"]
 
-        N = num_orbitals
-        R, B, C = num_ranks, num_bases, num_copies
-        Xo = N + R * C
+        N = num_orbitals  # noqa: N806
+        R, B, C = num_ranks, num_bases, num_copies  # noqa: N806
+        Xo = N + R * C  # noqa: N806
         n_xo = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         n_b = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
         min_qubits = 2 * N + n_xo + n_b + 2 + 1
@@ -931,15 +908,15 @@ class TestSOSSAWalkLogicalCounts:
 
         tof = lc["cczCount"]
 
-        N = num_orbitals
-        R, B, C = num_ranks, num_bases, num_copies
+        N = num_orbitals  # noqa: N806
+        R, B, C = num_ranks, num_bases, num_copies  # noqa: N806
         num_sf = R * C
         num_rotations = N - 1
         gates_per_rotation = N + num_sf * (B + 1)
         dominant_term = 2 * num_rotations * gates_per_rotation
 
         assert tof >= dominant_term, f"N={N},R={R},B={B},C={C}: tof={tof} < dominant={dominant_term}"
-        Xo = N + num_sf
+        Xo = N + num_sf  # noqa: N806
         xo_bits = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         b_bits = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
         max_ctrl_cost = xo_bits + b_bits + 5
@@ -950,7 +927,7 @@ class TestSOSSAWalkLogicalCounts:
         """Verify that power=p multiplies the walk step Toffoli cost by p."""
         qsharp.init(project_root=_PROJECT_ROOT)
 
-        N, R, B, C = 2, 1, 1, 1
+        N, R, B, C = 2, 1, 1, 1  # noqa: N806
         fh = _make_random_factorized_hamiltonian(num_orbitals=N, num_ranks=R, num_bases=B, num_copies=C, seed=42)
 
         mapper = _make_sossa_mapper(
@@ -1045,7 +1022,7 @@ class TestSOSSAWalkLogicalCounts:
         factory = circuit._qsharp_factory
         lc = qsharp.logical_counts(factory.program, *factory.parameter.values())
 
-        N = num_orbitals
+        N = num_orbitals  # noqa: N806
         spin_copy_tof = 2 * N
         assert lc["cczCount"] >= spin_copy_tof, f"N={N}: total tof={lc['cczCount']} < spin_copy_min={spin_copy_tof}"
 
@@ -1079,9 +1056,9 @@ class TestSOSSAWalkLogicalCounts:
         factory = circuit._qsharp_factory
         lc = qsharp.logical_counts(factory.program, *factory.parameter.values())
 
-        N = num_orbitals
-        R, B, C = num_ranks, num_bases, num_copies
-        Xo = N + R * C
+        N = num_orbitals  # noqa: N806
+        R, B, C = num_ranks, num_bases, num_copies  # noqa: N806
+        Xo = N + R * C  # noqa: N806
         n_xo = math.ceil(math.log2(Xo)) if Xo > 1 else 1
         n_b = math.ceil(math.log2(B + 1)) if B + 1 > 1 else 1
 

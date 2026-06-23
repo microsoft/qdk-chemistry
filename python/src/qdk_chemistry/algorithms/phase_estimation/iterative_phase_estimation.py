@@ -145,7 +145,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
         if isinstance(unitary_builder, LCUBuilder):
             # For block-encoding builders (qubitization), use E = λ cos(2πφ).
-            lambda_val = qubit_hamiltonian.schatten_norm
+            lambda_val = qubit_hamiltonian.schatten_norm  # type: ignore[union-attr]
             return QpeResult.from_qubitization_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,

@@ -84,7 +84,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer | None = None,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -143,7 +143,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            hamiltonian: The Hamiltonian (QubitHamiltonian or FactorizedHamiltonianContainer).
+            qubit_hamiltonian: The Hamiltonian (QubitHamiltonian or FactorizedHamiltonianContainer).
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
