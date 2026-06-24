@@ -8,6 +8,7 @@
  */
 
 #pragma once
+#include <atomic>
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
@@ -163,6 +164,23 @@ class SortedDoubleLoopHamiltonianGenerator
           // Early exit if excitation level too high
           if (ex_alpha_count > 4) continue;
 
+          // Early exit if the only possible matrix element is 4x alpha
+          if (ex_alpha_count == 4) {
+#ifdef _MSC_VER
+            // MSVC /O2 can produce different FP results for the same inline
+            // matrix_element_4 call between the count and fill passes due to
+            // FMA contraction differences.  Force precise FP here to ensure
+            // count == fill.
+#pragma float_control(precise, on, push)
+#endif
+            const double h_el_all_alpha_4 =
+                this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha);
+#ifdef _MSC_VER
+#pragma float_control(pop)
+#endif
+            if (std::abs(h_el_all_alpha_4) < H_thresh) continue;
+          }
+
           const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
           const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
 
@@ -180,6 +198,19 @@ class SortedDoubleLoopHamiltonianGenerator
 
               // Skip if total excitation level too high
               if ((ex_alpha_count + ex_beta_count) > 4) continue;
+
+              // Early exit for all-beta excitations (see alpha comment above)
+              if (ex_beta_count == 4) {
+#ifdef _MSC_VER
+#pragma float_control(precise, on, push)
+#endif
+                const double h_el_all_beta_4 =
+                    this->matrix_element_4(bra_beta, ket_beta, ex_beta);
+#ifdef _MSC_VER
+#pragma float_control(pop)
+#endif
+                if (std::abs(h_el_all_beta_4) < H_thresh) continue;
+              }
 
               row_nnz_local[ibra]++;
 
@@ -303,29 +334,19 @@ class SortedDoubleLoopHamiltonianGenerator
                 h_el = this->matrix_element_diag(bra_occ_alpha, bra_occ_beta);
               }
 
-              index_t offset_row;
-#ifdef _OPENMP
-#pragma omp critical
-              {
-                offset_row = row_offsets[ibra]++;
-              }
-#else
-              offset_row = row_offsets[ibra]++;
-#endif /* _OPENMP */
+              // std::atomic_ref: lock-free on all platforms, avoids the
+              // omp atomic capture crash on MSVC + /openmp:llvm (64-bit types).
+              const index_t offset_row =
+                  std::atomic_ref<index_t>(row_offsets[ibra])
+                      .fetch_add(1, std::memory_order_relaxed);
 
               colind[offset_row] = iket;
               nzval[offset_row] = h_el;
 
               if (is_symm && ibra != iket) {
-                index_t offset_col;
-#ifdef _OPENMP
-#pragma omp critical
-                {
-                  offset_col = row_offsets[iket]++;
-                }
-#else
-                offset_col = row_offsets[iket]++;
-#endif /* _OPENMP */
+                const index_t offset_col =
+                    std::atomic_ref<index_t>(row_offsets[iket])
+                        .fetch_add(1, std::memory_order_relaxed);
 
                 colind[offset_col] = ibra;
                 nzval[offset_col] = h_el;
