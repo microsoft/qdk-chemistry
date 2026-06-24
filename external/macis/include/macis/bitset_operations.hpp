@@ -27,7 +27,7 @@ inline auto clz(unsigned int i) {
   if (i == 0) return static_cast<int>(sizeof(unsigned int) * CHAR_BIT);
 
   unsigned long idx;
-  const auto scanned = _BitScanReverse(&idx, i);
+  [[maybe_unused]] const auto scanned = _BitScanReverse(&idx, i);
   assert(scanned);
   return 31 - static_cast<int>(idx);
 }
@@ -39,7 +39,7 @@ inline auto clz(unsigned long long int i) {
     return static_cast<int>(sizeof(unsigned long long int) * CHAR_BIT);
 
   unsigned long idx;
-  const auto scanned = _BitScanReverse64(&idx, i);
+  [[maybe_unused]] const auto scanned = _BitScanReverse64(&idx, i);
   assert(scanned);
   return 63 - static_cast<int>(idx);
 }

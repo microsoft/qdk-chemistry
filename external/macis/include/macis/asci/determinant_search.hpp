@@ -823,7 +823,7 @@ std::vector<wfn_t<N>> asci_search(
       // Determine local counts
       size_t n_greater = std::distance(g_begin, e_begin);
       size_t n_equal = std::distance(e_begin, l_begin);
-      size_t n_less = std::distance(l_begin, _end);
+      [[maybe_unused]] size_t n_less = std::distance(l_begin, _end);
       const int n_geq_local = n_greater + n_equal;
 
       // Strip bitsrings
@@ -872,7 +872,7 @@ std::vector<wfn_t<N>> asci_search(
           [=](const auto& p, const auto& s) { return std::abs(p.rv()) == s; });
       size_t n_greater = std::distance(g_begin, e_begin);
       size_t n_equal = std::distance(e_begin, l_begin);
-      size_t n_less = std::distance(l_begin, _end);
+      [[maybe_unused]] size_t n_less = std::distance(l_begin, _end);
       const int n_geq = n_greater + n_equal;
       top_k_elements = n_geq;
       topk.resize(n_geq);

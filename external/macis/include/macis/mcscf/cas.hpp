@@ -40,7 +40,7 @@ double compute_casci_rdms(
   int rank;
   MPI_Comm_rank(comm, &rank);
 #else
-  int rank = 0;
+  [[maybe_unused]] int rank = 0;
 #endif /* MACIS_ENABLE_MPI */
 
   // Hamiltonian Matrix Element Generator

@@ -93,13 +93,13 @@ class SortedDoubleLoopHamiltonianGenerator
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
-    auto world_rank = comm_rank(MPI_COMM_WORLD);
+    [[maybe_unused]] auto world_rank = comm_rank(MPI_COMM_WORLD);
 #else
-    auto world_rank = 0;
+    [[maybe_unused]] auto world_rank = 0;
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -130,7 +130,7 @@ class SortedDoubleLoopHamiltonianGenerator
     // 1. First pass - Count non-zero matrix elements per row
     // 2. Second pass - Compute and fill the CSR matrix directly
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
 
     // First pass: Count non-zeros per row to allocate CSR structure
     std::vector<index_t> row_nnz(nbra_dets, 0);
@@ -398,17 +398,17 @@ class SortedDoubleLoopHamiltonianGenerator
     auto thresh_en = std::chrono::high_resolution_clock::now();
 
     // Print timing information if needed
-    auto duration_setup =
+    [[maybe_unused]] auto duration_setup =
         std::chrono::duration<double>(count_st - setup_st).count();
-    auto duration_compute =
+    [[maybe_unused]] auto duration_compute =
         std::chrono::duration<double>(count_en - count_st).count();
-    auto duration_alloc =
+    [[maybe_unused]] auto duration_alloc =
         std::chrono::duration<double>(alloc_en - alloc_st).count();
-    auto duration_fill =
+    [[maybe_unused]] auto duration_fill =
         std::chrono::duration<double>(fill_en - fill_st).count();
-    auto duration_sort =
+    [[maybe_unused]] auto duration_sort =
         std::chrono::duration<double>(sort_en - sort_st).count();
-    auto duration_thresh =
+    [[maybe_unused]] auto duration_thresh =
         std::chrono::duration<double>(thresh_en - thresh_st).count();
 
     return csr_mat;
@@ -492,7 +492,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -519,7 +519,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -610,7 +610,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -637,7 +637,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -733,7 +733,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -760,7 +760,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {

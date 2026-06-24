@@ -52,7 +52,7 @@ void mp2_1rdm(NumOrbital _norb, NumCanonicalOccupied _num_occupied_orbitals,
       num_occupied_orbitals * num_occupied_orbitals;
   const size_t nocc2v = num_occupied_orbitals2 * num_virtual_orbitals;
   const size_t LDV2 = LDV * LDV;
-  const size_t LDV3 = LDV2 * LDV;
+  [[maybe_unused]] const size_t LDV3 = LDV2 * LDV;
 
   // Compute canonical eigenenergies
   // XXX: This will not generally replicate full precision
