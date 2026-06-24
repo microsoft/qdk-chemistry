@@ -150,14 +150,17 @@ toc_object_entries_show_parents = "domain"  # Show parent modules in table of co
 # Language and cross-reference settings
 primary_domain = "py"  # Set Python as the primary documentation domain
 
-# Configure intersphinx mappings to link to external documentation
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
-    "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
-}
-intersphinx_timeout = 10  # Seconds; fail fast on unreachable inventories
+# Configure intersphinx mappings to link to external documentation.
+# Disabled in CI to avoid transient network timeouts failing the build.
+if os.environ.get("CI", "").lower() in {"1", "true", "yes"}:
+    intersphinx_mapping = {}
+else:
+    intersphinx_mapping = {
+        "python": ("https://docs.python.org/3", None),
+        "numpy": ("https://numpy.org/doc/stable/", None),
+        "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+        "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
+    }
 
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
@@ -170,7 +173,6 @@ suppress_warnings = [
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
     "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
-    "intersphinx.external",  # Suppress warnings when external inventories are unreachable (transient network issues)
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [

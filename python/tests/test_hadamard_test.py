@@ -15,7 +15,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
-from qdk_chemistry.data import Circuit, MajoranaMapping, Structure, UnitaryRepresentation
+from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -26,7 +26,11 @@ _OBSERVABLE_POWER = 10
 
 def _make_hadamard_test(test_basis: HadamardTestBasis = HadamardTestBasis.X):
     """Create a Hadamard test configured with the given measurement basis."""
-    return create("hadamard_test", test_basis=test_basis.value)
+    return create(
+        "hadamard_test",
+        test_basis=test_basis.value,
+        circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
+    )
 
 
 @dataclass(frozen=True)

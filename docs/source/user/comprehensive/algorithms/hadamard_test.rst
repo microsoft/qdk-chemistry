@@ -19,6 +19,11 @@ QDK/Chemistry supports control-qubit measurement in ``X`` and ``Y`` bases throug
 
 For the standard Hadamard-test circuit, ``test_basis="X"`` estimates :math:`\mathrm{Re}\langle \psi \vert U \vert \psi \rangle` and ``test_basis="Y"`` estimates :math:`\mathrm{Im}\langle \psi \vert U \vert \psi \rangle`.
 
+The algorithm returns the measurement counts for the control qubit, which can be converted to an expectation estimate:
+
+.. math::
+
+   \hat{m} = \frac{N_0 - N_1}{N_0 + N_1}
 
 Typical workflow
 ~~~~~~~~~~~~~~~~
