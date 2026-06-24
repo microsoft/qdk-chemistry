@@ -16,11 +16,11 @@
 namespace qdk::chemistry::data {
 
 FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
-    const Eigen::MatrixXd& one_body_integrals,
+    size_t num_ranks, size_t num_bases, size_t num_copies, double core_energy,
     const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
-    const Eigen::MatrixXd& wb_matrix, size_t num_ranks, size_t num_bases,
-    size_t num_copies, std::shared_ptr<Orbitals> orbitals, double core_energy,
-    const Eigen::MatrixXd& inactive_fock_matrix, double bliss_core_shift,
+    const Eigen::MatrixXd& one_body_integrals, const Eigen::MatrixXd& wb_matrix,
+    const Eigen::MatrixXd& inactive_fock_matrix,
+    std::shared_ptr<Orbitals> orbitals, double bliss_core_shift,
     double energy_gap, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
@@ -49,8 +49,6 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
 std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     const {
   QDK_LOG_TRACE_ENTERING();
-  // Reconstruct from stored data. The base-class SBT one-body
-  // is immutable/shared, but for clone we go through the dense ctor.
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
   Eigen::MatrixXd fock_alpha = Eigen::MatrixXd::Zero(0, 0);
   if (has_inactive_fock_matrix()) {
@@ -58,8 +56,8 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     fock_alpha = fa;
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
-      h1_alpha, _u, _w, _wb, _num_ranks, _num_bases, _num_copies, _orbitals,
-      _core_energy, fock_alpha, _bliss_core_shift, _energy_gap, _type);
+      _num_ranks, _num_bases, _num_copies, _core_energy, _u, _w, h1_alpha, _wb,
+      fock_alpha, _orbitals, _bliss_core_shift, _energy_gap, _type);
 }
 
 std::string FactorizedHamiltonianContainer::get_container_type() const {
@@ -394,7 +392,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      h1, u, w, wb, R, B, C, orbitals, core_energy, fock, bliss_core_shift,
+      R, B, C, core_energy, u, w, h1, wb, fock, orbitals, bliss_core_shift,
       energy_gap);
 }
 
@@ -536,7 +534,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      h1, u, w, wb, r_val, b_val, c_val, orbitals, core_energy, fock,
+      r_val, b_val, c_val, core_energy, u, w, h1, wb, fock, orbitals,
       bliss_core_shift, energy_gap);
 }
 

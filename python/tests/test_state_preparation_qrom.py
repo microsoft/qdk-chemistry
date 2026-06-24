@@ -71,7 +71,7 @@ class TestQROMStatePreparation:
     def test_name(self):
         """Test algorithm name."""
         prep = QROMStatePreparation()
-        assert prep.name() == "qrom_state_prep"
+        assert prep.name() == "qrom"
 
     def test_type_name(self):
         """Test algorithm type name."""
@@ -93,8 +93,8 @@ class TestQROMStatePreparation:
         assert circuit._qsharp_factory is not None
 
     def test_registered_in_registry(self):
-        """Test that qrom_state_prep is registered in the algorithm registry."""
-        prep = registry.create("state_prep", "qrom_state_prep")
+        """Test that qrom is registered in the algorithm registry."""
+        prep = registry.create("state_prep", "qrom")
         assert isinstance(prep, QROMStatePreparation)
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))

@@ -69,11 +69,13 @@ def energy_from_phase_qubitization(phase_fraction: float, *, lambda_val: float) 
 def energy_from_phase_sossa(phase_fraction: float, *, lambda_val: float, energy_shift: float = 0.0) -> float:
     r"""Convert a measured phase fraction to energy for the SOSSA product walk.
 
-    For the SOS product walk operator the eigenphases encode:
+    For the SOS product walk operator the eigenphases are
+    (Eq. 11 in :cite:`Low2025`):
 
     .. math::
 
-        \cos(2\pi\varphi) = E_{\text{gap}} / \Lambda - 1
+        e^{\pm i\arccos(E_\text{gap}/\Lambda - 1)},
+        \quad \Lambda \coloneqq \tfrac{1}{2}\lambda_{\text{sqrt}}^2
 
     so the energy gap is recovered as:
 

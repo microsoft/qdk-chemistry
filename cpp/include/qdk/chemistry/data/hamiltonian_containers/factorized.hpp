@@ -24,13 +24,10 @@ namespace qdk::chemistry::data {
  *   h2_{pqrs} ≈ Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
  *                        (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
  *
- * along with an identity weight matrix WB[R,C] and optional BLISS
- * core energy shift.
+ * along with an identity weight matrix WB[R,C], optional BLISS
+ * core energy shift, and other metadata for the SOS form.
  *
  * This container is always restricted (uses spin-free integrals).
- *
- * Additional metadata for the SOS spectrum-amplified block encoding:
- * - energy_gap: E_gap = E_gs - E_SOS - E_nuc (requires external E_gs)
  *
  * Reference: Low et al., arXiv:2502.15882
  */
@@ -38,26 +35,27 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for restricted factorized Hamiltonian.
-   * @param one_body_integrals One-body integrals in MO basis [N x N].
-   * @param u_matrices Orbital rotation matrices, flat [R*B*N].
-   * @param w_matrices Two-body weights, flat [R*B*C].
-   * @param wb_matrix Identity weights [R x C].
    * @param num_ranks R rank.
    * @param num_bases B rank.
    * @param num_copies C rank.
-   * @param orbitals Orbital data with active space set.
    * @param core_energy Nuclear repulsion + inactive core energy.
+   * @param u_matrices Orbital rotation matrices, flat [R*B*N].
+   * @param w_matrices Two-body weights, flat [R*B*C].
+   * @param one_body_integrals One-body integrals in MO basis [N x N].
+   * @param wb_matrix Identity weights [R x C].
    * @param inactive_fock_matrix Inactive Fock matrix.
+   * @param orbitals Orbital data with active space set.
    * @param bliss_core_shift BLISS core energy shift (default 0).
    * @param energy_gap E_gap for SOS block encoding (default 0).
    */
   FactorizedHamiltonianContainer(
-      const Eigen::MatrixXd& one_body_integrals,
+      size_t num_ranks, size_t num_bases, size_t num_copies, double core_energy,
       const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
-      const Eigen::MatrixXd& wb_matrix, size_t num_ranks, size_t num_bases,
-      size_t num_copies, std::shared_ptr<Orbitals> orbitals, double core_energy,
+      const Eigen::MatrixXd& one_body_integrals,
+      const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& inactive_fock_matrix,
-      double bliss_core_shift = 0.0, double energy_gap = 0.0,
+      std::shared_ptr<Orbitals> orbitals, double bliss_core_shift = 0.0,
+      double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   ~FactorizedHamiltonianContainer() override = default;
@@ -117,16 +115,14 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_energy_gap() const;
 
   /**
-   * @brief Block-encoding normalization Λ.
+   * @brief Block-encoding normalization Λ. Eq. 35
    *
-   * Λ = Σ|eig(h1_majorana)| + ¼ Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
-   *
-   * Computed on demand from stored data.
+   * Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    */
   double get_lambda() const;
 
   /**
-   * @brief Effective lambda for SOS walk.
+   * @brief Effective lambda for SOS walk. Eq. 13
    *
    * λ_eff = √(E_gap · (2Λ - E_gap))
    *
@@ -136,13 +132,11 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_lambda_eff() const;
 
   /**
-   * @brief Adjusted one-body matrix in Majorana basis h'(1).
+   * @brief Adjusted one-body matrix in Majorana basis h'(1). Eq 38
    *
    * h'(1)_{pq} = h1_{pq} - ½ Σ_{rs} h2_{prrs→pq}
    *              + Σ_{rs} h2_{pqrr}
    *              - Σ_{rc,b} WB^{rc} W^{rc}_b U^r_{bp} U^r_{bq}
-   *
-   * Computed on demand.
    */
   Eigen::MatrixXd get_h1_majorana() const;
 
