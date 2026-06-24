@@ -25,6 +25,7 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
+        select: Strategy for the SELECT oracle. Defaults to "multi_controlled_pauli".
 
     """
 
@@ -35,6 +36,13 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
+            "Algorithm for the PREPARE oracle state preparation. ",
+        )
+        self._set_default(
+            "select",
+            "string",
+            "multi_controlled_pauli",
+            "Algorithm for the SELECT oracle.",
         )
 
 
@@ -123,7 +131,11 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         prepare_op = self._build_prepare_op(lcu)
 
         # 2. SELECT — build Pauli SELECT oracle
-        select_op = self._build_pauli_select_op(lcu.select)
+        select_strategy = self._settings.get("select")
+        if select_strategy == "multi_controlled_pauli":
+            select_op = self._build_pauli_select_op(lcu.select)
+        else:
+            raise NotImplementedError(f"Select strategy '{select_strategy}' is not implemented. ")
 
         # 3. Compose controlled circuit
         num_system = lcu.select.num_target_qubits

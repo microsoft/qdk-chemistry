@@ -97,6 +97,15 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(unitary_rep)
 
+    def test_rejects_unsupported_select_strategy(self):
+        """Verify ControlledPSPMapper raises NotImplementedError for unknown select strategy."""
+        unitary_rep = _build_unitary_rep(["XX", "ZZ"], np.array([0.25, 0.5]))
+
+        mapper = ControlledPSPMapper()
+        mapper.settings().set("select", "unknown_strategy")
+        with pytest.raises(NotImplementedError, match="unknown_strategy"):
+            mapper.run(unitary_rep)
+
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
