@@ -902,11 +902,11 @@ Uses the spin-dependent one- and two-particle reduced density matrices (RDMs):
 For a pure spin eigenstate, <S^2> = S(S+1).
 
 Returns:
-    float: The expectation value <S^2> (always real)
+    float: The expectation value <S^2> (real-valued wavefunctions only)
 
 Raises:
-    RuntimeError: If spin-dependent 1-RDMs or 2-RDMs are not available
-
+    RuntimeError: If spin-dependent 1-RDMs or 2-RDMs are not available, or if
+                  the underlying RDMs are complex-valued (not yet supported)
 Examples:
     >>> s_squared = wf.compute_s_squared()
 )");

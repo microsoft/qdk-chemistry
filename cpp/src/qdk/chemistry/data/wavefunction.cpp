@@ -722,29 +722,26 @@ double WavefunctionContainer::compute_s_squared() const {
   const auto& one_rdm = active_one_rdm();
   const auto& two_rdm = active_two_rdm();
 
-  Eigen::MatrixXd one_rdm_aa;
-  Eigen::MatrixXd one_rdm_bb;
-  Eigen::VectorXd two_rdm_aaaa;
-  Eigen::VectorXd two_rdm_aabb;
-  Eigen::VectorXd two_rdm_bbbb;
-
   if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
           one_rdm) ||
       std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
           two_rdm)) {
     throw std::runtime_error("Complex <S^2> calculation not yet implemented");
-  } else {
-    const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
-    const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
-    one_rdm_aa = one_sbt.block({axes::alpha(), axes::alpha()});
-    one_rdm_bb = one_sbt.block({axes::beta(), axes::beta()});
-    two_rdm_aaaa = two_sbt.block(
-        {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
-    two_rdm_aabb = two_sbt.block(
-        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
-    two_rdm_bbbb =
-        two_sbt.block({axes::beta(), axes::beta(), axes::beta(), axes::beta()});
   }
+
+  const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+  const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+
+  const Eigen::MatrixXd& one_rdm_aa =
+      one_sbt.block({axes::alpha(), axes::alpha()});
+  const Eigen::MatrixXd& one_rdm_bb =
+      one_sbt.block({axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_aaaa = two_sbt.block(
+      {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+  const Eigen::VectorXd& two_rdm_aabb = two_sbt.block(
+      {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_bbbb = two_sbt.block(
+      {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
 
   int norbs = static_cast<int>(one_rdm_aa.rows());
   double one_rdm_trace = one_rdm_aa.trace() + one_rdm_bb.trace();

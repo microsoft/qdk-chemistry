@@ -118,7 +118,8 @@ TEST(SSquared, TripletMSZero) {
       Configuration::from_spin_half_string("du")};
 
   // Note: We override the RDMs manually here to match the triplet state.
-  // The CAS container doesn't recompute them from coefficients.
+  // StateVectorContainer only auto-generates RDMs for single-determinant
+  // expansions, so it won't recompute them from CI coefficients.
   auto wf = Wavefunction(std::make_unique<StateVectorContainer>(
       coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
       std::make_optional(one_rdm_bb), std::nullopt,

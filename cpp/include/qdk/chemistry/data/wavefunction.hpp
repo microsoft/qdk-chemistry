@@ -542,7 +542,8 @@ class WavefunctionContainer {
    * \f]
    * @return The expectation value \f$\langle S^2 \rangle\f$
    * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
-   *         available
+   *         available, or if the underlying RDMs are complex-valued (not yet
+   *         supported).
    */
   double compute_s_squared() const;
 
