@@ -63,8 +63,14 @@ class TestNaturalOrbitalLocalizerBindings:
         n_occ = rks_wfn.get_total_num_electrons()[0]
         ho, lu = n_occ - 1, n_occ  # HOMO, LUMO
         s2 = np.sqrt(0.5)  # 45-degree rotation
-        c_a[:, ho], c_a[:, lu] = s2 * (c_a[:, ho] + c_a[:, lu]), s2 * (c_a[:, lu] - c_a[:, ho])
-        c_b[:, ho], c_b[:, lu] = s2 * (c_b[:, ho] - c_b[:, lu]), s2 * (c_b[:, ho] + c_b[:, lu])
+        c_a[:, ho], c_a[:, lu] = (
+            s2 * (c_a[:, ho] + c_a[:, lu]),
+            s2 * (c_a[:, lu] - c_a[:, ho]),
+        )
+        c_b[:, ho], c_b[:, lu] = (
+            s2 * (c_b[:, ho] - c_b[:, lu]),
+            s2 * (c_b[:, ho] + c_b[:, lu]),
+        )
         guess = Orbitals(
             coefficients_alpha=c_a,
             coefficients_beta=c_b,
@@ -78,19 +84,9 @@ class TestNaturalOrbitalLocalizerBindings:
         uks.settings().set("scf_type", "unrestricted")
         _, wfn = uks.run(structure, 0, 1, guess)
 
-        # The UKS wavefunction's spin-traced 1-RDM (in the alpha MO basis)
-        # should be non-diagonal — its eigenvalues are the NOONs.
-        rdm = wfn.get_active_one_rdm_spin_traced()
-        noons = np.sort(np.linalg.eigvalsh(rdm))[::-1]
-        n_a, n_b = wfn.get_total_num_electrons()
-
         assert not wfn.get_orbitals().is_restricted()
-        assert np.all(noons >= -1e-12)
-        assert np.all(noons < 2.0 + 1e-8)
-        np.testing.assert_allclose(noons.sum(), n_a + n_b, atol=1e-6)
-        assert any(0.1 < n < 1.9 for n in noons), f"No fractional NOONs: {noons}"
 
-        # Run the natural orbital localizer — should accept UHF and produce
+        # Run the natural orbital localizer — should accept UKS and produce
         # restricted NOs.
         localizer = create("orbital_localizer", "qdk_natural_orbitals")
         n_mo = c_a.shape[1]
@@ -98,3 +94,14 @@ class TestNaturalOrbitalLocalizerBindings:
         no_wfn = localizer.run(wfn, indices, indices)
 
         assert no_wfn.get_orbitals().is_restricted()
+        output_rdm = no_wfn.get_active_one_rdm_spin_traced()
+        off_diagonal = output_rdm - np.diag(np.diag(output_rdm))
+        np.testing.assert_allclose(off_diagonal, 0.0, atol=1e-8)
+
+        noons = np.diag(output_rdm)
+        n_a, n_b = wfn.get_total_num_electrons()
+        assert np.all(noons[:-1] >= noons[1:] - 1e-10)
+        assert np.all(noons >= -1e-12)
+        assert np.all(noons <= 2.0)
+        np.testing.assert_allclose(noons.sum(), n_a + n_b, atol=1e-6)
+        assert any(0.1 < n < 1.9 for n in noons), f"No fractional NOONs: {noons}"

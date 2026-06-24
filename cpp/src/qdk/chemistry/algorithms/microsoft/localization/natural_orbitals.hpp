@@ -9,77 +9,37 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @class NaturalOrbitalLocalizer
- * @brief Localizer implementation that transforms orbitals to natural orbitals
- * by diagonalizing the spin-traced one-particle reduced density matrix (1-RDM)
+ * @brief Transform the active orbitals to natural orbitals.
  *
- * This class provides a concrete implementation of the Localizer interface
- * that transforms molecular orbitals into natural orbitals. Natural orbitals
- * are eigenfunctions of the one-particle reduced density matrix (1-RDM), and
- * their eigenvalues are the occupation numbers.
- *
- * Restrictions:
- * - Requires loc_indices_a == loc_indices_b (natural orbitals are a single set)
- * - Requires a spin-traced 1-RDM to be available in the wavefunction
- * - The wavefunction must have an active space defined
- *
- * For an unrestricted Slater-determinant input, the spin-traced 1-RDM is
- * expressed in the alpha MO basis, so the rotation is applied to the alpha
- * coefficients. The output is always a restricted set of natural orbitals.
- *
- * Algorithm steps:
- * 1. Extract the spin-traced 1-RDM from the wavefunction
- * 2. Diagonalize the 1-RDM to obtain natural orbital coefficients and
- *    occupation numbers
- * 3. Transform the active orbital coefficients to the natural orbital basis
- * 4. Construct a new wavefunction with the transformed orbitals
+ * For restricted inputs, the localizer diagonalizes the spin-traced active
+ * 1-RDM. For unrestricted inputs, it builds the spin-summed active AO density
+ * from the alpha and beta 1-RDM blocks and projects it into the active alpha
+ * orbital subspace before diagonalization. Natural orbitals form a single
+ * orbital set, so alpha and beta selection indices must match the active-space
+ * indices exactly; the result is always restricted.
  */
 class NaturalOrbitalLocalizer : public Localizer {
  public:
-  /**
-   * @brief Default constructor
-   */
   NaturalOrbitalLocalizer() = default;
-
-  /**
-   * @brief Virtual destructor
-   */
   ~NaturalOrbitalLocalizer() override = default;
-
-  /**
-   * @brief Access the algorithm's name
-   *
-   * @return The algorithm's name
-   */
-  virtual std::string name() const final { return "qdk_natural_orbitals"; };
+  virtual std::string name() const final { return "qdk_natural_orbitals"; }
 
  protected:
   /**
-   * @brief Transform orbitals into natural orbitals via 1-RDM diagonalization
+   * @brief Build natural orbitals for the active orbital space.
    *
-   * This method diagonalizes the spin-traced one-particle reduced density
-   * matrix to obtain natural orbitals. The eigenvectors define the
-   * transformation from the current orbital basis to the natural orbital basis,
-   * and the eigenvalues are the occupation numbers.
+   * @param wavefunction Input wavefunction carrying orbitals and an active
+   * 1-RDM.
+   * @param loc_indices_a Sorted alpha orbital indices to transform; must match
+   * the active-space alpha indices exactly.
+   * @param loc_indices_b Sorted beta orbital indices to transform; must match
+   * the active-space beta indices exactly.
+   * @return Wavefunction with active orbitals replaced by natural orbitals.
    *
-   * @param wavefunction The input wavefunction with a 1-RDM
-   * @param loc_indices_a Indices of alpha orbitals to transform (must be
-   * sorted)
-   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted)
-   * @return A new wavefunction with orbitals transformed to the natural orbital
-   * basis
-   *
-   * @throws std::invalid_argument if loc_indices_a != loc_indices_b
-   * @throws std::invalid_argument if loc_indices_a or loc_indices_b are not
-   * sorted
-   * @throws std::invalid_argument if any orbital index is >=
-   * num_molecular_orbitals
-   * @throws std::invalid_argument if the wavefunction has no spin-traced 1-RDM
-   * @throws std::invalid_argument if the wavefunction has no active space
-   * @throws std::invalid_argument if the orbitals are unrestricted and the
-   * wavefunction container is not a SlaterDeterminantContainer
-   * @throws std::invalid_argument if 1-RDM dimensions do not match the number
-   * of selected orbitals
+   * @throws std::invalid_argument if the selected indices are invalid, the
+   * active space or overlap matrix is unavailable, or the required active 1-RDM
+   * is unavailable or not real-valued.
+   * @throws std::runtime_error if diagonalizing the selected 1-RDM fails.
    */
   std::shared_ptr<data::Wavefunction> _run_impl(
       std::shared_ptr<data::Wavefunction> wavefunction,

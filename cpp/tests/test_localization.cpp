@@ -20,17 +20,9 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
-class LocalizationTest : public ::testing::Test {
- protected:
-  void SetUp() override {}
-
-  void TearDown() override {}
-};
+class LocalizationTest : public ::testing::Test {};
 
 class TestLocalization : public Localizer {
- private:
-  Settings settings_;
-
  public:
   TestLocalization() = default;
   ~TestLocalization() override = default;
@@ -1199,53 +1191,113 @@ TEST_F(LocalizationTest, NaturalOrbitals) {
       hamiltonian_cas, active_space_wfn->get_active_num_electrons().first,
       active_space_wfn->get_active_num_electrons().second);
 
-  // Run NO localizer on the active space indices
   const auto& [active_indices_a, active_indices_b] =
       active_orbitals->get_active_space_indices();
-  std::vector<size_t> active_sorted(active_indices_a.begin(),
-                                    active_indices_a.end());
-  std::sort(active_sorted.begin(), active_sorted.end());
+  EXPECT_EQ(active_indices_b, active_indices_a);
+  std::vector<size_t> active_indices(active_indices_a.begin(),
+                                     active_indices_a.end());
+  ASSERT_TRUE(std::is_sorted(active_indices.begin(), active_indices.end()));
+
+  Eigen::MatrixXd rdm =
+      std::get<Eigen::MatrixXd>(wfn_cas->get_active_one_rdm_spin_traced());
 
   std::shared_ptr<Wavefunction> no_wfn_ptr;
-  EXPECT_NO_THROW(
-      { no_wfn_ptr = localizer->run(wfn_cas, active_sorted, active_sorted); });
+  // Check that natural orbital localization succeeds on the active space.
+  EXPECT_NO_THROW({
+    no_wfn_ptr = localizer->run(wfn_cas, active_indices, active_indices);
+  });
+  ASSERT_NE(no_wfn_ptr, nullptr);
+  // Check that the returned wavefunction is a mean-field determinant carrier.
+  ASSERT_TRUE(qdk::chemistry::algorithms::detail::is_mean_field_wavefunction(
+      no_wfn_ptr));
   auto& no_orbitals = *no_wfn_ptr->get_orbitals();
 
-  // Dimension checks
-  const auto& [Ca_can, Cb_can] = active_orbitals->get_coefficients();
-  const auto& [Ca_no, Cb_no] = no_orbitals.get_coefficients();
+  const auto& Ca_can = active_orbitals->get_coefficients().first;
+  const auto& Ca_no = no_orbitals.get_coefficients().first;
+  // Check that natural orbitals preserve the AO dimension.
   EXPECT_EQ(Ca_no.rows(), Ca_can.rows());
+  // Check that natural orbitals preserve the MO dimension.
   EXPECT_EQ(Ca_no.cols(), Ca_can.cols());
 
-  // Check unitarity / orthonormality on the active subspace
   const auto& S = active_orbitals->get_overlap_matrix();
-  const size_t num_active = active_sorted.size();
+  const size_t num_active = active_indices.size();
   Eigen::MatrixXd Ca_selected(Ca_can.rows(), num_active);
   Eigen::MatrixXd Ca_no_selected(Ca_no.rows(), num_active);
   for (size_t i = 0; i < num_active; ++i) {
-    Ca_selected.col(i) = Ca_can.col(active_sorted[i]);
-    Ca_no_selected.col(i) = Ca_no.col(active_sorted[i]);
+    Ca_selected.col(i) = Ca_can.col(active_indices[i]);
+    Ca_no_selected.col(i) = Ca_no.col(active_indices[i]);
   }
 
-  // Check that the transformation for selected indices is unitary
   Eigen::MatrixXd U_selected = Ca_selected.transpose() * S * Ca_no_selected;
+  // Check that the active-space natural orbital rotation is unitary.
   EXPECT_NEAR(0.0, testing::norm_diff_from_unitary(U_selected),
               testing::numerical_zero_tolerance * 10);
 
-  // Check that natural orbitals are orthonormal
   Eigen::MatrixXd overlap_check =
       Ca_no_selected.transpose() * S * Ca_no_selected;
+  // Check that the returned active natural orbitals are orthonormal.
   EXPECT_NEAR(
       0.0,
       (overlap_check - Eigen::MatrixXd::Identity(num_active, num_active))
           .norm(),
       testing::numerical_zero_tolerance * 10);
+
+  Eigen::MatrixXd transformed_rdm = U_selected.transpose() * rdm * U_selected;
+  Eigen::MatrixXd off_diagonal = transformed_rdm;
+  off_diagonal.diagonal().setZero();
+  // Check that the returned orbitals diagonalize the input active 1-RDM.
+  EXPECT_NEAR(0.0, off_diagonal.norm(), 1e-8);
+
+  const auto& output_rdm_variant = no_wfn_ptr->get_active_one_rdm_spin_traced();
+  const auto* output_rdm = std::get_if<Eigen::MatrixXd>(&output_rdm_variant);
+  // Check that the output wavefunction carries a real active 1-RDM payload.
+  ASSERT_NE(output_rdm, nullptr);
+  Eigen::MatrixXd output_off_diagonal = *output_rdm;
+  output_off_diagonal.diagonal().setZero();
+  // Check that the output active 1-RDM payload is diagonal.
+  EXPECT_NEAR(0.0, output_off_diagonal.norm(), 1e-12);
+
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(rdm);
+  // Check that the reference active 1-RDM diagonalization succeeds.
+  ASSERT_EQ(es.info(), Eigen::Success);
+  Eigen::VectorXd expected_noons = es.eigenvalues().reverse();
+  for (Eigen::Index i = 0; i < expected_noons.size(); ++i) {
+    // Check that the output 1-RDM diagonal stores the expected NOONs.
+    EXPECT_NEAR(expected_noons(i), (*output_rdm)(i, i), 1e-8);
+  }
+}
+
+TEST_F(LocalizationTest, NaturalOrbitalsRejectsPartialActiveSpaceIndices) {
+  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  std::vector<size_t> active_indices({1, 2, 3});
+  std::vector<size_t> inactive_indices({0});
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+
+  Eigen::MatrixXd one_rdm(3, 3);
+  one_rdm << 1.5, 0.0, 0.4, 0.0, 0.7, 0.0, 0.4, 0.0, 0.5;
+  Eigen::VectorXd ci_coeffs(1);
+  ci_coeffs << 1.0;
+  std::vector<Configuration> dets(
+      {Configuration::from_spin_half_string("200")});
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
+          std::make_optional<ContainerTypes::MatrixVariant>(one_rdm),
+          std::nullopt));
+
+  std::vector<size_t> partial_indices({1, 3});
+  EXPECT_THROW(localizer->run(wfn, partial_indices, partial_indices),
+               std::invalid_argument);
 }
 
 TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
   // Stretched N2 with broken-symmetry UKS yields fractional NOONs.
-  // This test exercises the unrestricted spin-traced 1-RDM construction
-  // through the natural orbital localizer.
   auto n2 = testing::create_stretched_n2_structure();
 
   // Restricted KS to get starting MOs, then break alpha/beta symmetry
@@ -1287,19 +1339,35 @@ TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
 
   ASSERT_FALSE(wfn->get_orbitals()->is_restricted());
 
-  // The UKS wavefunction's spin-traced 1-RDM should be non-diagonal — its
-  // eigenvalues are the NOONs.
-  const auto& rdm_variant = wfn->get_active_one_rdm_spin_traced();
-  const Eigen::MatrixXd& rdm = std::get<Eigen::MatrixXd>(rdm_variant);
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(rdm);
-  Eigen::VectorXd noons = es.eigenvalues().reverse();
+  // Run the natural orbital localizer — should accept UKS and produce
+  // restricted NOs.
+  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  const size_t n_mo = c_a.cols();
+  std::vector<size_t> indices(n_mo);
+  std::iota(indices.begin(), indices.end(), 0);
+  std::shared_ptr<Wavefunction> no_wfn;
+  EXPECT_NO_THROW({ no_wfn = localizer->run(wfn, indices, indices); });
+  ASSERT_NE(no_wfn, nullptr);
 
+  EXPECT_TRUE(no_wfn->get_orbitals()->is_restricted());
+
+  const auto& output_rdm_variant = no_wfn->get_active_one_rdm_spin_traced();
+  const auto* output_rdm = std::get_if<Eigen::MatrixXd>(&output_rdm_variant);
+  ASSERT_NE(output_rdm, nullptr);
+  Eigen::MatrixXd output_off_diagonal = *output_rdm;
+  output_off_diagonal.diagonal().setZero();
+  EXPECT_NEAR(0.0, output_off_diagonal.norm(), 1e-12);
+
+  Eigen::VectorXd noons = output_rdm->diagonal();
   const auto [n_a, n_b] = wfn->get_total_num_electrons();
-  EXPECT_NEAR(noons.sum(), n_a + n_b, 1e-6);
+  for (Eigen::Index i = 1; i < noons.size(); ++i) {
+    EXPECT_GE(noons(i - 1), noons(i) - 1e-10);
+  }
   for (Eigen::Index i = 0; i < noons.size(); ++i) {
     EXPECT_GE(noons(i), -testing::numerical_zero_tolerance);
     EXPECT_LE(noons(i), 2.0 + testing::numerical_zero_tolerance);
   }
+  EXPECT_NEAR(noons.sum(), n_a + n_b, 1e-6);
   bool has_fractional = false;
   for (Eigen::Index i = 0; i < noons.size(); ++i) {
     if (noons(i) > 0.1 && noons(i) < 1.9) {
@@ -1308,17 +1376,6 @@ TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
     }
   }
   EXPECT_TRUE(has_fractional) << "No fractional NOONs found";
-
-  // Run the natural orbital localizer — should accept UHF and produce
-  // restricted NOs.
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
-  const size_t n_mo = c_a.cols();
-  std::vector<size_t> indices(n_mo);
-  std::iota(indices.begin(), indices.end(), 0);
-  std::shared_ptr<Wavefunction> no_wfn;
-  EXPECT_NO_THROW({ no_wfn = localizer->run(wfn, indices, indices); });
-
-  EXPECT_TRUE(no_wfn->get_orbitals()->is_restricted());
 }
 
 TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
@@ -1341,8 +1398,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -1356,9 +1413,24 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
+      },
+      std::invalid_argument);
+
+  // Throw on duplicate indices
+  std::vector<size_t> duplicate_indices({0, 1, 1});
+  EXPECT_THROW(
+      {
+        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
+            fake_basis_set, std::nullopt);
+        auto wfn = std::make_shared<Wavefunction>(
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
+        localizer->run(wfn, duplicate_indices, duplicate_indices);
       },
       std::invalid_argument);
 
@@ -1371,8 +1443,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, oob_indices, oob_indices);
       },
       std::invalid_argument);
@@ -1380,9 +1452,11 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   // Throw when no 1-RDM is available.
   std::vector<size_t> active_indices({1, 2});
   std::vector<size_t> inactive_indices({0, 3});
-  std::vector<Configuration> dets_sci({Configuration("2200")});
-  Eigen::VectorXd ci_coeffs_sci(1);
-  ci_coeffs_sci << 1.0;
+  std::vector<Configuration> dets_sci(
+      {Configuration::from_spin_half_string("20"),
+       Configuration::from_spin_half_string("02")});
+  Eigen::VectorXd ci_coeffs_sci(2);
+  ci_coeffs_sci << 1.0, 0.0;
   EXPECT_THROW(
       {
         auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
@@ -1390,7 +1464,7 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(active_indices, inactive_indices));
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SciWavefunctionContainer>(
+            std::make_unique<StateVectorContainer>(
                 ContainerTypes::VectorVariant(ci_coeffs_sci), dets_sci,
                 orbitals));
         localizer->run(wfn, active_indices, active_indices);
@@ -1400,7 +1474,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   // Throw when no active space is defined.
   // Construct orbitals with an explicitly empty active space.
   Eigen::MatrixXd one_rdm_full = Eigen::MatrixXd::Identity(4, 4);
-  std::vector<Configuration> dets_full({Configuration("2200")});
+  std::vector<Configuration> dets_full(
+      {Configuration::from_spin_half_string("2200")});
   Eigen::VectorXd ci_coeffs_full(1);
   ci_coeffs_full << 1.0;
   std::vector<size_t> empty_active;
@@ -1411,22 +1486,23 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(empty_active, all_indices));
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<CasWavefunctionContainer>(
+            std::make_unique<StateVectorContainer>(
                 ContainerTypes::VectorVariant(ci_coeffs_full), dets_full,
-                orbitals,
-                std::optional<ContainerTypes::MatrixVariant>(one_rdm_full),
-                std::nullopt));
+                orbitals, std::nullopt,
+                std::make_optional<ContainerTypes::MatrixVariant>(one_rdm_full),
+                std::make_optional<ContainerTypes::MatrixVariant>(one_rdm_full),
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt));
         localizer->run(wfn, all_indices, all_indices);
       },
       std::invalid_argument);
 
-  // Throw when selected indices don't match the active space
+  // Throw when selected indices do not match the full active space.
   Eigen::MatrixXd one_rdm_small = Eigen::MatrixXd::Identity(2, 2);
-  std::vector<Configuration> dets_small({Configuration("20")});
+  std::vector<Configuration> dets_small(
+      {Configuration::from_spin_half_string("20")});
   Eigen::VectorXd ci_coeffs_small(1);
   ci_coeffs_small << 1.0;
-  // Active space is {1, 2} (size 2) but we pass 3 indices: dim mismatch.
-  std::vector<size_t> wrong_indices({0, 1, 3});
+  std::vector<size_t> wrong_indices({1});
   EXPECT_THROW(
       {
         auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
@@ -1434,12 +1510,42 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(active_indices, inactive_indices));
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<CasWavefunctionContainer>(
+            std::make_unique<StateVectorContainer>(
                 ContainerTypes::VectorVariant(ci_coeffs_small), dets_small,
-                orbitals,
-                std::optional<ContainerTypes::MatrixVariant>(one_rdm_small),
-                std::nullopt));
+                orbitals, std::nullopt,
+                std::make_optional<ContainerTypes::MatrixVariant>(
+                    one_rdm_small),
+                std::make_optional<ContainerTypes::MatrixVariant>(
+                    one_rdm_small),
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt));
         localizer->run(wfn, wrong_indices, wrong_indices);
+      },
+      std::invalid_argument);
+
+  // Throw for unrestricted inputs with mismatched alpha/beta active spaces.
+  std::vector<size_t> active_alpha({0, 1});
+  std::vector<size_t> active_beta({1, 2});
+  std::vector<size_t> inactive_empty;
+  Eigen::MatrixXd one_rdm_unrestricted = Eigen::MatrixXd::Identity(2, 2);
+  EXPECT_THROW(
+      {
+        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, coeffs, std::nullopt, std::nullopt,
+            std::make_optional(fake_ao_overlap), fake_basis_set,
+            std::make_tuple(active_alpha, active_beta, inactive_empty,
+                            inactive_empty));
+        Eigen::VectorXd ci_coeffs(1);
+        ci_coeffs << 1.0;
+        std::vector<Configuration> dets(
+            {Configuration::from_spin_half_string("20")});
+        auto wfn = std::make_shared<Wavefunction>(
+            std::make_unique<StateVectorContainer>(
+                ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
+                std::make_optional<ContainerTypes::MatrixVariant>(
+                    one_rdm_unrestricted),
+                std::nullopt));
+        localizer->run(wfn, active_alpha, active_alpha);
       },
       std::invalid_argument);
 }
