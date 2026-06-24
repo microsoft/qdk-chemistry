@@ -133,7 +133,11 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             select=select,
         )
 
-        container = LCUWalkContainer(block_encoding=lcu_container, power=power) if quantum_walk else lcu_container
+        container = (
+            LCUWalkContainer(block_encoding=lcu_container, power=power, scale=qubit_hamiltonian.schatten_norm)
+            if quantum_walk
+            else lcu_container
+        )
 
         return UnitaryRepresentation(container=container)
 

@@ -19,12 +19,64 @@ from qdk_chemistry.data.unitary_representation.containers.quantum_walk import Qu
 from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
+def _ppf_converter(scale: float):
+    """Create an eigenvalue_from_phase bound method for PauliProductFormula with given scale."""
+    c = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=scale)
+    return c.eigenvalue_from_phase
+
+
+class _ConcreteWalkContainer(QuantumWalkContainer):
+    """Minimal concrete QuantumWalkContainer for testing eigenvalue_from_phase."""
+
+    def __init__(self, scale: float = 1.0) -> None:
+        self._scale = scale
+        super().__init__()
+
+    @property
+    def power(self) -> int:
+        return 1
+
+    @property
+    def num_qubits(self) -> int:
+        return 1
+
+    @property
+    def type(self) -> str:
+        return "test_walk"
+
+    def to_json(self, *a, **kw):
+        raise NotImplementedError
+
+    def to_hdf5(self, *a, **kw):
+        raise NotImplementedError
+
+    @classmethod
+    def from_json(cls, *a, **kw):
+        raise NotImplementedError
+
+    @classmethod
+    def from_hdf5(cls, *a, **kw):
+        raise NotImplementedError
+
+    def get_summary(self) -> str:
+        return ""
+
+    def combine(self, other):
+        raise NotImplementedError
+
+
+def _qw_converter(scale: float):
+    """Create an eigenvalue_from_phase bound method for QuantumWalk with given scale."""
+    c = _ConcreteWalkContainer(scale=scale)
+    return c.eigenvalue_from_phase
+
+
 def test_qpe_result_creation():
     """Test basic QpeResult creation."""
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
         bits_msb_first=[0, 1],
     )
 
@@ -39,7 +91,7 @@ def test_qpe_result_json_serialization():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.125,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=2.0),
+        eigenvalue_from_phase=_ppf_converter(2.0),
         bits_msb_first=[0, 0, 1],
     )
 
@@ -57,7 +109,7 @@ def test_qpe_result_json_file_io():
     result = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.5,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.json", delete=False) as tmp:
@@ -84,7 +136,7 @@ def test_qpe_result_hdf5_file_io():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.375,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=3.0),
+        eigenvalue_from_phase=_ppf_converter(3.0),
         metadata={"test": "data"},
     )
 
@@ -112,7 +164,7 @@ def test_qpe_result_summary():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     summary = result.get_summary()
@@ -127,7 +179,7 @@ def test_qpe_result_immutability():
     qpe = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     try:
@@ -194,7 +246,7 @@ def test_qpe_result_json_roundtrip():
     original = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.375,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=2.5),
+        eigenvalue_from_phase=_ppf_converter(2.5),
         bits_msb_first=[1, 1, 0],
         metadata={"source": "test", "iteration": 5},
     )
@@ -224,7 +276,7 @@ def test_qpe_result_hdf5_roundtrip():
     original = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.125,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
         bits_msb_first=[0, 0, 1],
         metadata={"tag": "experiment_1"},
     )
@@ -262,7 +314,7 @@ def test_qpe_result_from_file_json():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=1.0),
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.json", delete=False) as tmp:
@@ -283,7 +335,7 @@ def test_qpe_result_from_file_hdf5():
     result = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.5,
-        eigenvalue_from_phase=lambda phi: PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=2.0),
+        eigenvalue_from_phase=_ppf_converter(2.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.hdf5", delete=False) as tmp:
@@ -308,7 +360,7 @@ def test_qpe_result_from_phase_fraction_qubitization():
     result = QpeResult.from_phase_fraction(
         method="qubitization_qpe",
         phase_fraction=phase_fraction,
-        eigenvalue_from_phase=lambda phi: QuantumWalkContainer.eigenvalue_from_phase(phi, scale=lambda_val),
+        eigenvalue_from_phase=_qw_converter(lambda_val),
         bits_msb_first=[0, 1, 0, 0],
     )
 
@@ -339,7 +391,7 @@ def test_qpe_result_from_phase_fraction_qubitization():
 def test_ppf_eigenvalue_from_phase(phi, scale, expected):
     """Time evolution eigenvalue_from_phase maps phase fraction to correct energy."""
     assert np.isclose(
-        PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=scale),
+        _ppf_converter(scale)(phi),
         expected,
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
@@ -353,7 +405,7 @@ def test_ppf_eigenvalue_from_phase_roundtrip():
     # Convention: U = e^{iHt}, so eigenvalue = e^{iEt}, phase_fraction = Et/(2π)
     phi = (energy * t / (2 * np.pi)) % 1.0
     assert np.isclose(
-        PauliProductFormulaContainer.eigenvalue_from_phase(phi, scale=t),
+        _ppf_converter(t)(phi),
         energy,
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
@@ -372,7 +424,7 @@ def test_ppf_eigenvalue_from_phase_roundtrip():
 def test_qw_eigenvalue_from_phase(phi, scale, expected):
     """Quantum walk eigenvalue_from_phase maps phase fraction to correct energy."""
     assert np.isclose(
-        QuantumWalkContainer.eigenvalue_from_phase(phi, scale=scale),
+        _qw_converter(scale)(phi),
         expected,
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
@@ -385,7 +437,7 @@ def test_qw_eigenvalue_from_phase_roundtrip():
     energy = -2.5
     phi = np.arccos(energy / lam) / (2 * np.pi)
     assert np.isclose(
-        QuantumWalkContainer.eigenvalue_from_phase(phi, scale=lam),
+        _qw_converter(lam)(phi),
         energy,
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
@@ -394,5 +446,6 @@ def test_qw_eigenvalue_from_phase_roundtrip():
 
 def test_lcu_eigenvalue_from_phase_raises():
     """LCUContainer.eigenvalue_from_phase raises NotImplementedError."""
+    c = LCUContainer.__new__(LCUContainer)
     with pytest.raises(NotImplementedError):
-        LCUContainer.eigenvalue_from_phase(0.25, scale=1.0)
+        c.eigenvalue_from_phase(0.25)

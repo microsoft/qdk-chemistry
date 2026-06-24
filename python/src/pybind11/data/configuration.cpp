@@ -112,7 +112,7 @@ Examples:
 
 )");
 
-  bind_getter_as_property(configuration, "num_modes", &Configuration::num_modes,
+  bind_getter_as_property(configuration, "capacity", &Configuration::capacity,
                           R"(
 Number of single-particle modes in the configuration.
 
@@ -120,7 +120,7 @@ Returns:
     int: Number of modes.
 
 Examples:
-    >>> qdk_chemistry.Configuration.from_bitstring("1010").num_modes
+    >>> qdk_chemistry.Configuration.from_bitstring("1010").capacity
     8
 
 )");
@@ -154,7 +154,7 @@ Returns:
     int: Packed state value (range 0 to 2^bits_per_mode - 1).
 
 Raises:
-    IndexError: If idx >= num_modes.
+    IndexError: If idx >= capacity.
 
 Examples:
     >>> config = qdk_chemistry.Configuration.from_bitstring("101")
@@ -359,8 +359,8 @@ Args:
     n_bits (int): Number of output bits. For bits_per_mode == 1 this equals
         the number of modes to read; for bits_per_mode == 2 it equals
         2 * (number of modes to read). Obtain the true mode count from the
-        owning container (e.g. ``configuration_set.num_modes``) and compute
-        ``n_bits = num_modes * bits_per_mode``.
+        owning container (e.g. ``configuration_set.capacity``) and compute
+        ``n_bits = capacity * bits_per_mode``.
 
 For bits_per_mode == 1: returns a list of length n_bits.
 For bits_per_mode == 2 (spin-½): returns a list of length n_bits with

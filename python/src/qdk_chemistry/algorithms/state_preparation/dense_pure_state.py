@@ -59,7 +59,7 @@ class DensePureStatePreparation(StatePreparation):
             if not np.allclose(coeffs.imag, 0.0):
                 raise ValueError("Dense state preparation requires real coefficients (imaginary part must be zero).")
             coeffs = coeffs.real
-        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
+        n_bits = config_set.capacity() * dets[0].bits_per_mode()
         n_qubits = n_bits
         if n_qubits > 32:
             raise ValueError("Dense state preparation is only supported for up to 32 qubits.")

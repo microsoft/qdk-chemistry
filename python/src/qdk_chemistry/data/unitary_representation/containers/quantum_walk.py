@@ -38,8 +38,17 @@ class QuantumWalkContainer(UnitaryContainer):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    @staticmethod
-    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+    @property
+    def scale(self) -> float:
+        """The 1-norm used for eigenvalue-phase conversion.
+
+        Returns:
+            float: The scale factor.
+
+        """
+        return self._scale
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
 
         For a walk operator whose eigenvalues are
@@ -52,14 +61,13 @@ class QuantumWalkContainer(UnitaryContainer):
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
-            scale: The 1-norm :math:`\lambda = \sum_j |\alpha_j|`.
 
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
         """
         phi = phase_fraction % 1.0
-        return float(scale * np.cos(2 * np.pi * phi))
+        return float(self.scale * np.cos(2 * np.pi * phi))
 
     @property
     @abstractmethod
@@ -89,16 +97,18 @@ class LCUWalkContainer(QuantumWalkContainer):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, block_encoding: BlockEncodingContainer, power: int = 1) -> None:
+    def __init__(self, block_encoding: BlockEncodingContainer, power: int = 1, scale: float = 1.0) -> None:
         """Initialize an LCUWalkContainer.
 
         Args:
             block_encoding: The block encoding container to wrap with a reflection.
             power: Number of times to apply the walk operator (for :math:`W^k` in QPE).
+            scale: The 1-norm used for eigenvalue-phase conversion.
 
         """
         self._block_encoding = block_encoding
         self._power = power
+        self._scale = scale
         super().__init__()
 
     @property
