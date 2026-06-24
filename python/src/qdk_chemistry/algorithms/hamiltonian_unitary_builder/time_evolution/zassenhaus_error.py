@@ -74,12 +74,7 @@ def zassenhaus_steps_naive(
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Zassenhaus formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
-        commutator_exponents:
-            Optional precomputed symbolic Zassenhaus exponents
-            returned by :func:`~qdk_chemistry.utils.zassenhaus_generation.zassenhaus_commutator_plan`
-            as its first element. If provided, the mapping must include
-            ``order + 1`` so the bound can use the first omitted exponent
-            without regenerating the plan.
+        commutator_exponents: Precomputed mapping from zassenhaus_commutator_plan; must include order + 1.
 
     Returns:
         The minimum number of Zassenhaus steps (at least 1).
@@ -93,6 +88,10 @@ def zassenhaus_steps_naive(
     if order < 1:
         raise ValueError(f"Zassenhaus order must be positive, got {order}.")
 
+    # commutator_exponents are precomputed symbolic Zassenhaus exponents returned by
+    # zassenhaus_commutator_plan as its first element. If provided, the mapping must
+    # include 'order + 1' so the bound can use the first omitted exponent without
+    # regenerating the plan.
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
     num_real_terms = len(real_terms)
