@@ -13,6 +13,8 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import numpy as np
+
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -20,7 +22,6 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 from .circuit_builder.base import IterativeQpeCircuitBuilder
@@ -127,10 +128,10 @@ class IterativePhaseEstimation(PhaseEstimation):
             bits.append(measured_bit)
 
             # Update the phase feedback for next iteration
-            phase_feedback = iterative_phase_feedback_update(phase_feedback, measured_bit)
+            phase_feedback = phase_feedback / 2.0 + np.pi * measured_bit / 2.0
 
         # Compute the final phase fraction
-        phase_fraction = phase_fraction_from_feedback(phase_feedback)
+        phase_fraction = phase_feedback / np.pi
 
         return QpeResult.from_phase_fraction(
             method=self.name(),
