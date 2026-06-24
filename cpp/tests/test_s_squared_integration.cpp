@@ -195,14 +195,14 @@ TEST(SSquaredSCI, H2_Singlet) {
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {0., 0., 1.4}};
   std::vector<std::string> symbols = {"H", "H"};
   auto h2 = std::make_shared<Structure>(coords, symbols);
-  auto wfn = run_sci_with_rdms(h2, 0, 1, "sto-3g", 1, 1, 4);
+  auto wfn = run_sci_with_rdms(h2, 0, 1, "sto-3g", 1, 1, 5);
   EXPECT_NEAR(wfn->compute_s_squared(), 0.0, testing::rdm_tolerance);
 }
 
 // Li atom via SCI: doublet, <S^2> = 0.75
 TEST(SSquaredSCI, Li_Doublet) {
   auto li = testing::create_li_structure();
-  auto wfn = run_sci_with_rdms(li, 0, 2, "sto-3g", 2, 1, 50);
+  auto wfn = run_sci_with_rdms(li, 0, 2, "sto-3g", 2, 1, 51);
   EXPECT_NEAR(wfn->compute_s_squared(), 0.75, testing::rdm_tolerance);
 }
 
@@ -210,7 +210,7 @@ TEST(SSquaredSCI, Li_Doublet) {
 // Full orbital space in sto-3g
 TEST(SSquaredSCI, Water_Singlet) {
   auto water = testing::create_water_structure();
-  auto wfn = run_sci_with_rdms(water, 0, 1, "sto-3g", 5, 5, 128);
+  auto wfn = run_sci_with_rdms(water, 0, 1, "sto-3g", 5, 5, 500);
   EXPECT_NEAR(wfn->compute_s_squared(), 0.0, testing::rdm_tolerance);
 }
 
