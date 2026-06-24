@@ -15,6 +15,7 @@
 #include "microsoft/localization/mp2_natural_orbitals.hpp"
 #include "microsoft/localization/natural_orbitals.hpp"
 #include "microsoft/localization/pipek_mezey.hpp"
+#include "microsoft/localization/qio.hpp"
 #include "microsoft/localization/vvhv.hpp"
 
 namespace qdk::chemistry::algorithms {
@@ -170,6 +171,12 @@ std::unique_ptr<Localizer> make_natural_orbital_localizer() {
   return std::make_unique<microsoft::NaturalOrbitalLocalizer>();
 }
 
+std::unique_ptr<Localizer> make_qio_localizer() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<microsoft::QIOLocalizer>();
+}
+
 std::unique_ptr<Localizer> make_vvhv_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
@@ -182,6 +189,7 @@ void LocalizerFactory::register_default_instances() {
   LocalizerFactory::register_instance(&make_pipek_mezey_localizer);
   LocalizerFactory::register_instance(&make_mp2_natural_orbital_localizer);
   LocalizerFactory::register_instance(&make_natural_orbital_localizer);
+  LocalizerFactory::register_instance(&make_qio_localizer);
   LocalizerFactory::register_instance(&make_vvhv_localizer);
 }
 
