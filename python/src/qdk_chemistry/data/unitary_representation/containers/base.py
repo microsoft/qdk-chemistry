@@ -106,8 +106,6 @@ class UnitaryContainer(DataClass):
         phase fraction :math:`\varphi \in [0, 1)` is converted back to the
         corresponding eigenvalue :math:`E`.
 
-        Uses :attr:`scale` internally as the normalization constant.
-
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
