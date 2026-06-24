@@ -13,16 +13,18 @@ lookup blocks.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.binary_encoding import (
-    BinaryEncodingSynthesizer,
     MatrixCompressionOp,
     MatrixCompressionType,
-    _dense_qubits_size,
+    RefTableau,
+    _BinaryEncodingSynthesizer,
 )
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -119,7 +121,8 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryStatePreparatio
         # Check applicability: binary encoding needs at least one spare row beyond
         # the dense register for the one-hot batch indicators.
         num_rows, num_cols = gf2x_result.reduced_matrix.shape
-        if _dense_qubits_size(num_cols) >= num_rows:
+        dense_register_width = 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
+        if not dense_register_width < num_rows:
             Logger.info(
                 "Binary encoding is not applicable for this wavefunction; falling back to dense+GF2X state preparation."
             )
@@ -158,10 +161,19 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryStatePreparatio
             A dict of parameters for Q# binary-encoding circuit construction.
 
         """
-        # Step 1: Binary encoding on the REF matrix
-        encoded_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
+        # Step 1: Binary encoding synthesis on the REF matrix
+        include_negative_controls = self._settings.get("include_negative_controls")
+        encoded_ops, bijection, dense_size = _BinaryEncodingSynthesizer(
+            RefTableau(gf2x_result.reduced_matrix),
+            include_negative_controls=include_negative_controls,
+            measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
+        ).synthesize(
+            num_local_qubits=n_qubits,
+            active_qubit_indices=gf2x_result.row_map,
+            ancilla_start=n_qubits,
+        )
 
-        # Step 2b: Build compressed statevector reindexed by the bijection.
+        # Step 2: Build compressed statevector reindexed by the bijection.
         # The bijection maps (dense_val, orig_col) where orig_col is the
         # determinant index and dense_val is the binary-register label.
         compressed_sv = np.zeros(2**dense_size, dtype=float)
@@ -186,13 +198,10 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryStatePreparatio
             elif operation[0] == "x" and isinstance(operation[1], int):
                 gaussian_elimination_ops.append(MatrixCompressionOp(MatrixCompressionType.X, [operation[1]]))
 
-        # Build circuit using QDK Q# factory with binary-encoding entry point
-        # dense_val from the bijection uses row 0 = MSB (_bits_to_int is MSB-first).
-        # PreparePureStateD treats qubits[0] as MSB, so pass dense_row_map
-        # as-is (row 0 first) — do NOT reverse like the parent sparse isometry
-        # (which uses the opposite convention: row rank-1 = MSB).
-        # Create the ancilla pool from the original qubits that are not touched by binary encoding (i.e. not in row_map)
-        # since they are idle until the expansion stage and can be borrowed as ancillas during SparseOneHotSCS.
+        # Step 4: Assemble Q# parameters
+        # dense_val uses row 0 = MSB. PreparePureStateD treats qubits[0] as MSB,
+        # so pass dense_row_map as-is (row 0 first).
+        # Ancilla pool: original qubits not in row_map, idle until expansion stage.
         active_qubits_set = {int(q) for q in gf2x_result.row_map}
         ancilla_pool = sorted(set(range(n_qubits)) - active_qubits_set)
 
@@ -302,56 +311,6 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryStatePreparatio
             },
         )
         return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
-
-    def _perform_binary_encoding(
-        self, gf2x_result: GF2XEliminationResult, n_qubits: int
-    ) -> tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]:
-        """Run binary-encoding synthesis and return Q#-ready ops.
-
-        Runs the synthesiser, translates qubit indices from local to global,
-        and converts operations directly into MatrixCompressionOp
-        instances in reversed order (so Q# can iterate forward).
-
-        Args:
-            gf2x_result: Result from GF2+X elimination containing the reduced matrix.
-            n_qubits: Total number of qubits in the original space.
-
-        Returns:
-            Tuple of ``(ops, bijection, dense_size)``:
-
-            - ``ops``: MatrixCompressionOp list ready for Q#.
-            - ``bijection``: list of ``(dense_val, orig_col)`` mapping each
-              original matrix column to its compressed binary-register label.
-            - ``dense_size``: number of qubits in the compressed dense register.
-
-        """
-        include_negative_controls = self._settings.get("include_negative_controls")
-
-        Logger.debug(
-            f"Binary encoding input: {gf2x_result.reduced_matrix.shape} matrix, "
-            f"include_negative_controls={include_negative_controls}"
-        )
-
-        synthesizer = BinaryEncodingSynthesizer.from_matrix(
-            gf2x_result.reduced_matrix,
-            include_negative_controls=include_negative_controls,
-            measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
-        )
-
-        ops = synthesizer.to_operations(
-            num_local_qubits=n_qubits,
-            active_qubit_indices=gf2x_result.row_map,
-            ancilla_start=n_qubits,
-            reverse=True,
-        )
-
-        Logger.debug(
-            f"Binary encoding output: {len(ops)} ops, "
-            f"bijection size {len(synthesizer.bijection)}, "
-            f"dense_size {synthesizer.dense_size}"
-        )
-
-        return ops, synthesizer.bijection, synthesizer.dense_size
 
     def name(self) -> str:
         """Return the algorithm identifier string."""

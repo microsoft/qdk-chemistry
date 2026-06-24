@@ -347,7 +347,7 @@ def create_random_bitstring_matrix(
 
     Builds physically meaningful determinants from the Hartree-Fock reference
     plus random excitations, then transposes to the binary matrix form
-    expected by ``gf2x_with_tracking`` and ``BinaryEncodingSynthesizer``.
+    expected by ``gf2x_with_tracking`` and ``synthesize``.
 
     Args:
         n_electrons: Total number of electrons.

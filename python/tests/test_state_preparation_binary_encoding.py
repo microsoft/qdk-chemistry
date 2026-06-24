@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 import pytest
 from qdk.estimator import EstimatorResult
@@ -21,7 +23,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionType, _dense_qubits_size
+from qdk_chemistry.utils.binary_encoding import MatrixCompressionType, RefTableau, _BinaryEncodingSynthesizer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.phase import energy_from_phase
 
@@ -51,8 +53,9 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
     matrix = np.array([[int(b) for b in bs] for bs in bitstrings], dtype=np.int8).T
     gf2x_result = gf2x_with_tracking(matrix, skip_diagonal_reduction=True, forward_only=True)
 
-    synthesizer = BinaryEncodingSynthesizer.from_matrix(gf2x_result.reduced_matrix)
-    ops = synthesizer.to_operations(
+    ops, bijection, dense_size = _BinaryEncodingSynthesizer(
+        RefTableau(gf2x_result.reduced_matrix),
+    ).synthesize(
         num_local_qubits=n_system,
         active_qubit_indices=gf2x_result.row_map,
         ancilla_start=n_system,
@@ -223,7 +226,7 @@ class TestSparseIsometryBinaryEncoding:
             # 4 electrons, 3 orbitals, 9 determinants: the full space has only
             # ceil(6 choose 4) = 15 states.  After GF2+X (forward-only, no
             # diagonal reduction) the REF matrix has rank 4 (4 rows) but still
-            # 9 columns, so dense_size = _dense_qubits_size(9) = 4 = num_rows.
+            # 9 columns, so dense_size = RefTableau.dense_register_width(9) = 4 = num_rows.
             # The condition dense_size >= num_rows triggers the fallback.
             (4, 3, 9, 0, 6),
             (4, 3, 9, 1, 6),
@@ -248,9 +251,8 @@ class TestSparseIsometryBinaryEncoding:
         mat = np.array([[int(c) for c in bs] for bs in bitstrings], dtype=np.int8).T
         gf2x_result = gf2x_with_tracking(mat, skip_diagonal_reduction=True, forward_only=True)
         num_rows, num_cols = gf2x_result.reduced_matrix.shape
-        assert _dense_qubits_size(num_cols) >= num_rows, (
-            f"Expected fallback: dense_size={_dense_qubits_size(num_cols)} must be >= num_rows={num_rows}"
-        )
+        dense_size = 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
+        assert dense_size >= num_rows, f"Expected fallback: dense_size={dense_size} must be >= num_rows={num_rows}"
 
         circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
         assert isinstance(circuit, Circuit)

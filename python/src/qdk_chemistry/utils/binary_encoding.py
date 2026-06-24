@@ -9,68 +9,17 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 
 from qdk_chemistry.utils import CaseInsensitiveStrEnum, Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-
 __all__ = [
-    "BinaryEncodingSynthesizer",
     "MatrixCompressionOp",
     "MatrixCompressionType",
-    "NotRefError",
-    "RefTableau",
 ]
-
-
-def _dense_qubits_size(num_cols: int) -> int:
-    """Return the dense-register width required to index ``num_cols`` columns.
-
-    Args:
-        num_cols: Number of columns to index.
-
-    Returns:
-        Number of qubits needed in the dense register to uniquely index all columns.
-
-    """
-    return 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
-
-
-def _int_to_bits(val: int, nbits: int) -> list[bool]:
-    """Convert an integer to a fixed-width MSB-first bit sequence.
-
-    Args:
-        val: Integer value to convert.
-        nbits: Number of bits in the output sequence.
-
-    Returns:
-        List of booleans representing the bits of *val*, with the most significant bit first.
-
-    """
-    return [bool((val >> i) & 1) for i in range(nbits - 1, -1, -1)]
-
-
-def _bits_to_int(bits: Iterable[int | bool]) -> int:
-    """Convert an MSB-first bit sequence to integer.
-
-    Args:
-        bits: Iterable of bits (as integers or booleans), with the most significant bit first.
-
-    Returns:
-        Integer value represented by the bit sequence.
-
-    """
-    return sum(int(b) << i for i, b in enumerate(reversed(list(bits))))
-
-
-class NotRefError(ValueError):
-    """Raised when a matrix is not in row echelon form (REF)."""
 
 
 class MatrixCompressionType(CaseInsensitiveStrEnum):
@@ -90,23 +39,27 @@ class MatrixCompressionOp:
     """Gate representation for matrix compression operations."""
 
     name: MatrixCompressionType
-    """Gate type, one of the MatrixCompressionType values."""
     qubits: list[int]
-    """Qubit indices involved in the operation."""
     control_state: int = 0
-    """Integer encoding of the control state for multi-controlled gates.
-    For ``SELECT``/``SELECT_AND``, this stores the number of address qubits."""
     lookup_data: list[list[bool]] = field(default_factory=list)
-    """Boolean lookup table for ``SELECT`` operations; empty list for all
-    other gate types."""
 
     def __post_init__(self):
-        """Validate the MatrixCompressionOp parameters."""
+        """Validate that SELECT/SELECT_AND operations have lookup_data.
+
+        Raises:
+            ValueError: If name is SELECT or SELECT_AND but lookup_data is empty.
+
+        """
         if self.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} and not self.lookup_data:
             raise ValueError(f"lookup_data must be provided for {self.name} operations")
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct."""
+        """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct.
+
+        Returns:
+            dict[str, Any]: Dictionary with keys 'name', 'qubits', 'controlState', 'lookupData'.
+
+        """
         return {
             "name": self.name,
             "qubits": self.qubits,
@@ -115,7 +68,12 @@ class MatrixCompressionOp:
         }
 
     def to_qsharp_parameter(self):
-        """Convert to a Q# ``MatrixCompressionOp`` struct."""
+        """Convert to a Q# ``MatrixCompressionOp`` struct.
+
+        Returns:
+            A Q# MatrixCompressionOp struct instance for use in Q# interop.
+
+        """
         return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
             name=self.name,
             qubits=self.qubits,
@@ -124,132 +82,75 @@ class MatrixCompressionOp:
         )
 
 
-def _check_ref(data: np.ndarray) -> None:
-    """Validate that a binary matrix is in row echelon form (REF).
-
-    REF requires non-zero rows to appear before any all-zero rows and each
-    row's leading 1 (pivot) to be strictly to the right of the pivot above.
-
-    Args:
-        data: Binary matrix to validate.
-
-    Raises:
-        NotRefError: If *data* is not in REF.
-
-    """
-    num_rows, _ = data.shape
-    prev_pivot = -1
-    found_zero_row = False
-    for row in range(num_rows):
-        nz = np.flatnonzero(data[row])
-        if nz.size == 0:
-            found_zero_row = True
-            continue
-        if found_zero_row:
-            raise NotRefError(f"Non-zero row {row} appears after an all-zero row")
-
-        pivot_col = int(nz[0])
-        if pivot_col <= prev_pivot:
-            raise NotRefError(
-                f"Pivot at row {row}, col {pivot_col} is not strictly to the right of previous pivot col {prev_pivot}"
-            )
-        prev_pivot = pivot_col
-
-
 class RefTableau:
-    """Binary tableau for the batched sparse-isometry algorithm.
-
-    The input matrix must be in row echelon form (REF).
-    The tableau supports in-place updates via the compression operations.
-
-    """
+    """Binary REF tableau with in-place gate operations for synthesis simulation."""
 
     def __init__(self, data: np.ndarray):
-        """Create a tableau from a binary matrix and validate its shape.
+        """Initialize a RefTableau from a binary matrix in row echelon form.
 
         Args:
-            data: Binary matrix with rows as qubits and columns as determinant
-                basis states. Values are coerced to ``np.int8``.
+            data: A 2-D binary numpy array in row echelon form (REF).
 
         Raises:
-            NotRefError: If ``data`` is not in REF.
-            ValueError: If ``data`` is not a 2-dimensional array.
+            ValueError: If data is not 2-dimensional.
+            NotRefError: If data is not in valid row echelon form.
 
         """
         self.data = np.asarray(data, dtype=np.int8)
         if self.data.ndim != 2:
             raise ValueError("Input data must be a 2-dimensional array")
-
-        _check_ref(self.data)
-
+        self._validate_ref(self.data)
         self.num_rows, self.num_cols = self.data.shape
-        self.dense_size = _dense_qubits_size(self.num_cols)
-
-        self._tmp_row = np.zeros(self.num_cols, dtype=np.int8)
+        self.dense_size = 1 if self.num_cols < 2 else math.ceil(math.log2(self.num_cols))
         self.pivots = self.identify_pivots()
-
         Logger.debug(f"Tableau shape: {self.data.shape}, dense size: {self.dense_size}, pivots: {self.pivots}")
 
-    def get(self, row: int, col: int) -> bool:
-        """Return the value at ``(row, col)``.
+    @staticmethod
+    def _validate_ref(data: np.ndarray) -> None:
+        """Validate that a binary matrix is in row echelon form (REF).
 
         Args:
-            row: Row index.
-            col: Column index.
+            data: A 2-D numpy array to validate.
 
-        Returns:
-            Boolean value at the specified position in the tableau.
-
-        """
-        return bool(self.data[row, col])
-
-    def get_col(self, col: int) -> np.ndarray:
-        """Return column *col* as a 1-D array.
-
-        Args:
-            col: Column index.
-
-        Returns:
-            1-D array representing the specified column.
+        Raises:
+            ValueError: If the matrix violates REF constraints.
 
         """
-        return self.data[:, col]
-
-    def row_is_zero(self, row: int) -> bool:
-        """Return True if *row* is all zeros.
-
-        Args:
-            row: Row index.
-
-        Returns:
-            True if the specified row is all zeros, False otherwise.
-
-        """
-        return not np.any(self.data[row])
+        num_rows, _ = data.shape
+        prev_pivot = -1
+        found_zero_row = False
+        for row in range(num_rows):
+            nz = np.flatnonzero(data[row])
+            if nz.size == 0:
+                found_zero_row = True
+                continue
+            if found_zero_row:
+                raise ValueError(f"Non-zero row {row} appears after an all-zero row")
+            pivot_col = int(nz[0])
+            if pivot_col <= prev_pivot:
+                raise ValueError(
+                    f"Pivot at row {row}, col {pivot_col} is not strictly "
+                    f"to the right of previous pivot col {prev_pivot}"
+                )
+            prev_pivot = pivot_col
 
     def identify_pivots(self) -> list[tuple[int, int]]:
         """Find pivot positions using vectorized operations.
 
         Returns:
-            List of pivot positions as (row, col) tuples.
+            list[tuple[int, int]]: List of (row, col) pairs for each pivot.
 
         """
         row_indices, col_indices = np.nonzero(self.data)
         _, first_occurrences = np.unique(row_indices, return_index=True)
-        return list(
-            zip(
-                row_indices[first_occurrences].tolist(),
-                col_indices[first_occurrences].tolist(),
-                strict=True,
-            )
-        )
+        return list(zip(row_indices[first_occurrences].tolist(), col_indices[first_occurrences].tolist(), strict=True))
 
     def cx(self, control: int, target: int):
         """Apply CX: ``target ^= control``.
 
         Args:
-            control: Control-row index.
-            target: Target-row index.
+            control: Row index of the control qubit.
+            target: Row index of the target qubit.
 
         """
         self.data[target] ^= self.data[control]
@@ -268,7 +169,7 @@ class RefTableau:
         """Apply bit-flip (X) to every entry in *row*.
 
         Args:
-            row: Row index.
+            row: Row index to flip.
 
         """
         self.data[row] ^= 1
@@ -277,27 +178,20 @@ class RefTableau:
         """Reorder tableau columns and refresh derived metadata.
 
         Args:
-            col_order: New-to-old index mapping used to permute columns.
-
-        Notes:
-            This recomputes ``num_cols``, resets the temporary PUI mask buffer,
-            and refreshes cached pivot positions.
+            col_order: New column ordering as a list of original column indices.
 
         """
         self.data = self.data[:, col_order].copy()
         self.num_cols = self.data.shape[1]
-        self._tmp_row = np.zeros(self.num_cols, dtype=np.int8)
         self.pivots = self.identify_pivots()
 
     def toffoli(self, target: int, ctrl0: tuple[int, bool], ctrl1: tuple[int, bool]):
         """Apply a two-control conditional XOR into ``target``.
 
         Args:
-            target: Target-row index.
-            ctrl0: Pair ``(row, value)`` for first control; when ``value`` is
-                ``False``, the negated control is used.
-            ctrl1: Pair ``(row, value)`` for second control; when ``value`` is
-                ``False``, the negated control is used.
+            target: Row index of the target qubit.
+            ctrl0: Tuple of (row_index, polarity) for the first control.
+            ctrl1: Tuple of (row_index, polarity) for the second control.
 
         """
         c0, v0 = ctrl0
@@ -309,14 +203,10 @@ class RefTableau:
     def select(self, data_table: list[list[bool]], addr_qubits: list[int], dat_qubits: list[int]):
         """Apply a SELECT lookup operation to the tableau.
 
-        For each column, compute an address from ``addr_qubits`` rows
-        (little-endian), look up the corresponding ``data_table`` entry,
-        and XOR the data bits into the ``dat_qubits`` rows.
-
         Args:
-            data_table: Dense Boolean lookup table indexed by address integer.
-            addr_qubits: Row indices used as address bits (index 0 = LSB).
-            dat_qubits: Row indices to XOR data into.
+            data_table: 2-D boolean table indexed by address value.
+            addr_qubits: Row indices forming the address register.
+            dat_qubits: Row indices forming the data register.
 
         """
         addr_vals = np.zeros(self.num_cols, dtype=int)
@@ -327,45 +217,26 @@ class RefTableau:
             self.data[dq] ^= mask
 
 
-@dataclass
-class _BatchElement:
-    """Internal tracking structure for one element within a synthesis batch."""
+class _BinaryEncodingSynthesizer:
+    """Internal: synthesise a circuit from a binary REF tableau using batched sparse isometry.
 
-    col: int | None
-    """Column index of the element's non-zero entry, or None if the batch row is currently zero."""
-    dense_content: int
-    """Dense-register content of the batch element."""
-
-
-class BinaryEncodingSynthesizer:
-    """Synthesise a circuit from a binary REF tableau using batched sparse isometry.
-
-    The synthesiser executes a two-stage algorithm:
-
-    * **Stage 1 — diagonal encoding**: converts the identity pivot block into
-      a compact binary-counter register via a unary-to-binary ladder.
-    * **Stage 2 — non-pivot processing**: encodes remaining columns using
-      batched Toffoli gates and Partial Unary Iteration (PUI) lookup blocks.
-
+    Two-stage algorithm:
+    * Stage 1 — diagonal encoding: unary-to-binary compression of pivot columns.
+    * Stage 2 — non-pivot processing: batched Toffoli + PUI lookup blocks.
     """
 
     def __init__(
-        self,
-        tableau: RefTableau,
-        *,
-        include_negative_controls: bool = True,
-        measurement_based_uncompute: bool = False,
+        self, tableau: RefTableau, *, include_negative_controls: bool = True, measurement_based_uncompute: bool = False
     ):
-        """Construct solver state for a validated tableau.
+        """Initialize the synthesizer with a REF tableau and configuration.
 
         Args:
-            tableau: Mutable tableau to transform during synthesis.
-            include_negative_controls: If True, include both positive and
-                negative (0-valued) fixed controls in PUI blocks.  If False,
-                only positive (1-valued) controls are emitted.
-            measurement_based_uncompute: If True, emit ``select_and`` ops
-                that use measurement-based AND uncomputation (requires
-                Adaptive_RI target profile or higher).
+            tableau: A validated RefTableau instance to synthesize from.
+            include_negative_controls: Whether to include negative (anti-) controls in PUI blocks.
+            measurement_based_uncompute: Whether to use measurement-based uncomputation (SELECT_AND).
+
+        Raises:
+            ValueError: If the tableau is already dense and binary encoding is not applicable.
 
         """
         self.tableau = tableau
@@ -377,83 +248,81 @@ class BinaryEncodingSynthesizer:
             )
         self.include_negative_controls = include_negative_controls
         self.measurement_based_uncompute = measurement_based_uncompute
-
-        self.batch: list[_BatchElement] = []
+        self.batch: list[tuple[int, int]] = []
         self.batch_index: int = 0
-
         self.circuit: list[tuple[str, Any]] = []
         self.bijection: list[tuple[int, int]] = []
-        self.bad_element_count: int = 0
 
-    @property
-    def dense_size(self) -> int:
-        """Return the number of dense-register rows."""
-        return self.tableau.dense_size
-
-    @classmethod
-    def from_matrix(
-        cls,
-        matrix: np.ndarray,
-        *,
-        include_negative_controls: bool = True,
-        measurement_based_uncompute: bool = False,
-    ) -> BinaryEncodingSynthesizer:
-        """Create a synthesiser, run both stages, and return the solved instance.
-
-        This is the primary entry point.  It validates the input matrix,
-        executes the full two-stage synthesis, and returns the ready-to-export
-        synthesiser.
+    def synthesize(
+        self, *, num_local_qubits: int, active_qubit_indices: list[int], ancilla_start: int
+    ) -> tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]:
+        """Run full synthesis pipeline and return circuit operations.
 
         Args:
-            matrix: Binary (0/1) matrix in REF form, shaped ``(num_qubits, num_determinants)``.
-            include_negative_controls: If True, include both positive and
-                negative (0-valued) fixed controls in PUI blocks.  If False,
-                only positive (1-valued) controls are emitted.
-            measurement_based_uncompute: If True, emit ``select_and`` ops
-                that use measurement-based AND uncomputation (requires
-                Adaptive_RI target profile or higher).
+            num_local_qubits: Number of system (local) qubits in the circuit.
+            active_qubit_indices: Mapping from tableau row indices to global qubit indices.
+            ancilla_start: Global qubit index where ancilla qubits begin.
 
         Returns:
-            A solved :class:`BinaryEncodingSynthesizer`.
-
-        Raises:
-            NotRefError: If *matrix* is not in valid REF form.
+            tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]: A 3-tuple of (ops, bijection, dense_size).
 
         """
-        synth = cls(
-            RefTableau(matrix),
-            include_negative_controls=include_negative_controls,
-            measurement_based_uncompute=measurement_based_uncompute,
+        rank, col_perm = self._permute_columns_pivots_first()
+        self._run_stage1_diagonal_encoding(rank)
+
+        if self.tableau.num_cols - rank > 0:
+            stage_two_start = self._choose_stage_two_start_index(rank)
+            self._run_stage2_non_pivot_col_processing(stage_two_start)
+
+        # Complete bijection for any remaining unmapped columns
+        mapped = {col for _, col in self.bijection}
+        self.bijection.extend(
+            (sum(int(b) << i for i, b in enumerate(reversed(list(self.tableau.data[: self.tableau.dense_size, c])))), c)
+            for c in range(self.tableau.num_cols)
+            if c not in mapped
         )
-        synth.run()
-        return synth
+
+        # Validate final invariants
+        for row in range(self.tableau.dense_size, self.tableau.num_rows):
+            assert not np.any(self.tableau.data[row]), f"Row {row} not zeroed"
+        assert len(self.bijection) == self.tableau.num_cols, "Bijection incomplete"
+
+        # Remap bijection and tableau back to original column order
+        self.bijection = [(dv, col_perm[c]) for dv, c in self.bijection]
+        inv_perm = [0] * len(col_perm)
+        for new_idx, old_idx in enumerate(col_perm):
+            inv_perm[old_idx] = new_idx
+        self.tableau.permute_columns(inv_perm)
+
+        ops = self._to_operations(
+            num_local_qubits=num_local_qubits,
+            active_qubit_indices=active_qubit_indices,
+            ancilla_start=ancilla_start,
+        )
+        return ops, self.bijection, self.tableau.dense_size
 
     def max_batch_size(self) -> int:
-        """Return the maximum batch size supported by the current tableau shape.
+        """Largest power-of-2 batch that fits in the sparse rows.
 
-        The batch size is the largest power of 2 that fits within the number
-        of sparse rows (``num_rows - dense_size``).
+        Returns:
+            int: Maximum batch size as the largest power-of-2 not exceeding the sparse row count.
 
-        Each batch element occupies a dedicated sparse
-        row as a one-hot indicator (element *i* has a 1 at sparse row *i*).
-        Therefore the batch cannot exceed the number of available sparse rows.
         """
-        sparse_size = self.tableau.num_rows - self.dense_size
+        sparse_size = self.tableau.num_rows - self.tableau.dense_size
         assert sparse_size > 0
         if sparse_size & (sparse_size - 1) == 0:
             return sparse_size
         return 1 << (sparse_size.bit_length() - 1)
 
     def _record(self, op: tuple[str, Any]):
-        """Append an operation and update the tableau.
+        """Append an operation and apply it to the tableau.
 
         Args:
-            op: Operation to record, as a tuple of (MatrixCompressionType, qubit_args).
+            op: A tuple of (MatrixCompressionType, qubit_args) representing the gate to record.
 
         """
         self.circuit.append(op)
         compress_type, qubit_args = op
-
         if compress_type is MatrixCompressionType.CX:
             self.tableau.cx(*qubit_args)
         elif compress_type is MatrixCompressionType.SWAP:
@@ -466,100 +335,52 @@ class BinaryEncodingSynthesizer:
         elif compress_type is MatrixCompressionType.X:
             self.tableau.x(*qubit_args)
 
-    def run(self):
-        """Execute full synthesis and restore original column order."""
-        rank, col_perm = self._permute_columns_pivots_first()
-
-        self._run_stage1_diagonal_encoding(rank)
-
-        if self.tableau.num_cols - rank > 0:
-            stage_two_start = self._choose_stage_two_start_index(rank)
-            self._run_stage2_non_pivot_col_processing(stage_two_start)
-
-        self._complete_bijection()
-        self._validate()
-
-        # Remap bijection and tableau back to original column order
-        self.bijection = [(dv, col_perm[c]) for dv, c in self.bijection]
-        inv_perm = [0] * len(col_perm)
-        for new_idx, old_idx in enumerate(col_perm):
-            inv_perm[old_idx] = new_idx
-        self.tableau.permute_columns(inv_perm)
-
-    def _validate(self):
-        """Assert final solver invariants."""
-        for row in range(self.dense_size, self.tableau.num_rows):
-            assert self.tableau.row_is_zero(row), f"Row {row} not zeroed"
-        assert len(self.bijection) == self.tableau.num_cols, "Bijection incomplete"
-
     def _permute_columns_pivots_first(self) -> tuple[int, list[int]]:
-        """Move pivot columns to the front to form a diagonal block.
+        """Move pivot columns to the front; return rank and column permutation.
 
         Returns:
-            Tuple ``(rank, col_perm)`` where ``rank`` is the number of pivot
-            columns and ``col_perm`` is the applied forward permutation.
+            tuple[int, list[int]]: A pair of (rank, col_perm) where rank is the number of pivots
+                and col_perm is the applied column ordering.
 
         """
         pivot_cols = [p[1] for p in self.tableau.pivots]
         rank = len(pivot_cols)
         pivot_set = set(pivot_cols)
         non_pivot_cols = [c for c in range(self.tableau.num_cols) if c not in pivot_set]
-
         col_perm = pivot_cols + non_pivot_cols
         self.tableau.permute_columns(col_perm)
         return rank, col_perm
 
-    # --- Stage 1: Diagonal Encoding ---
-
     def _run_stage1_diagonal_encoding(self, rank: int):
-        """Stage 1: Diagonal encoding.
-
-        Processes only the rank*rank identity pivot block, assigning contiguous
-        integer labels (0, 1, 2, …) to the leading pivot columns.
-
-        Two steps:
-        1. Unary encoding: CX ladder + X + SWAP converts the identity block
-           into an upper-staircase (unary) matrix where column ``c`` has 1s in
-           rows 0 through c-1.
-        2. Binary compression: A divide-and-conquer loop folds the unary rows
-           into binary-counter dense rows using one Toffoli per erased unary
-           bit, with no ancilla waste.
+        """Convert identity pivot block to unary staircase then to binary counter.
 
         Args:
-            rank: Number of pivot columns (size of the identity block).
+            rank: Number of pivot columns (rows with pivots).
 
         """
         if rank == 0:
             return
-
         logical_rows = self._apply_unary_staircase(rank)
         self._convert_unary_to_binary(rank, logical_rows)
 
         # Record bijection for the contiguous pivot columns
-        dense_size = self.dense_size
         for c in range(rank):
-            dense_val = _bits_to_int(self.tableau.data[:dense_size, c])
+            dense_val = sum(
+                int(b) << i for i, b in enumerate(reversed(list(self.tableau.data[: self.tableau.dense_size, c])))
+            )
             self.bijection.append((dense_val, c))
 
     def _apply_unary_staircase(self, rank: int) -> list[int]:
-        """Convert the pivot block into an upper-staircase matrix.
-
-        Inspects each above-diagonal entry in the pivot block (columns
-        0 … rank-1 after pivot permutation) and emits a CX to fill any
-        missing 1
-
-        Processing columns left-to-right ensures side effects on later
-        columns are absorbed when they are reached.
+        """Convert the pivot block into an upper-staircase pattern.
 
         Args:
-            rank: Number of pivot columns (size of the pivot block).
+            rank: Number of pivot rows to process.
 
         Returns:
-            List of logical row indices corresponding to the original pivot rows.
+            list[int]: Logical row indices after staircase transformation.
 
         """
         logical_rows = list(range(rank))
-        # Fill above-diagonal 0s in the pivot block to reach upper-staircase
         for j in range(1, rank):
             for i in range(j):
                 if not self.tableau.data[logical_rows[i], j]:
@@ -568,108 +389,85 @@ class BinaryEncodingSynthesizer:
         return logical_rows
 
     def _convert_unary_to_binary(self, limit: int, logical_rows: list[int]):
-        """Fold unary rows into binary-counter dense rows.
-
-        This is a recursive divide-and-conquer process that iteratively folds
-        unary rows into binary-counter dense rows.
+        """Fold unary rows into binary-counter dense rows via divide-and-conquer.
 
         Args:
-            limit: Number of unary rows to process (initially the rank).
-            logical_rows: Current mapping of logical row indices to physical rows.
+            limit: Number of unary rows to convert.
+            logical_rows: Current logical-to-physical row mapping.
 
         """
         logical_rows = [*logical_rows[1:], logical_rows[0]]
+        if limit <= 1:
+            return
 
-        if limit > 1:
-            active_unary = logical_rows[: limit - 1]
-            leftover_zero = logical_rows[limit - 1]
-            dense_rows, zero_rows = [], []
+        active_unary = logical_rows[: limit - 1]
+        leftover_zero = logical_rows[limit - 1]
+        dense_rows, zero_rows = [], []
 
-            while len(active_unary) > 1:
-                accumulator = active_unary[0]
-                dense_rows.append(accumulator)
-                unary_bits = active_unary[1:]
-                next_active_unary = []
+        while len(active_unary) > 1:
+            accumulator = active_unary[0]
+            dense_rows.append(accumulator)
+            unary_bits = active_unary[1:]
+            next_active_unary = []
 
-                for p in range(len(unary_bits) // 2):
-                    x, y = unary_bits[2 * p], unary_bits[2 * p + 1]
-                    self._record((MatrixCompressionType.CX, (x, accumulator)))
-                    self._record((MatrixCompressionType.CX, (y, accumulator)))
-                    self._record((MatrixCompressionType.CCX, (y, accumulator, x)))
-                    next_active_unary.append(x)
-                    zero_rows.append(y)
+            for p in range(len(unary_bits) // 2):
+                x, y = unary_bits[2 * p], unary_bits[2 * p + 1]
+                self._record((MatrixCompressionType.CX, (x, accumulator)))
+                self._record((MatrixCompressionType.CX, (y, accumulator)))
+                self._record((MatrixCompressionType.CCX, (y, accumulator, x)))
+                next_active_unary.append(x)
+                zero_rows.append(y)
 
-                if len(unary_bits) % 2 == 1:
-                    x = unary_bits[-1]
-                    self._record((MatrixCompressionType.CX, (x, accumulator)))
-                    next_active_unary.append(x)
+            if len(unary_bits) % 2 == 1:
+                x = unary_bits[-1]
+                self._record((MatrixCompressionType.CX, (x, accumulator)))
+                next_active_unary.append(x)
 
-                active_unary = next_active_unary
+            active_unary = next_active_unary
 
-            dense_rows.append(active_unary[0])
-            dense_rows = dense_rows[::-1]  # Reverse to MSB-first
+        dense_rows.append(active_unary[0])
+        dense_rows = dense_rows[::-1]
 
-            all_zero_rows = [*zero_rows, leftover_zero]
-            num_msb_padding = min(self.dense_size - len(dense_rows), len(all_zero_rows))
-            final_physical_rows = all_zero_rows[:num_msb_padding] + dense_rows + all_zero_rows[num_msb_padding:]
+        all_zero_rows = [*zero_rows, leftover_zero]
+        num_msb_padding = min(self.tableau.dense_size - len(dense_rows), len(all_zero_rows))
+        final_physical_rows = all_zero_rows[:num_msb_padding] + dense_rows + all_zero_rows[num_msb_padding:]
 
-            # Cycle sort to align physical permutations
-            current_pos = {i: i for i in range(limit)}
-            row_at = {i: i for i in range(limit)}
-            for i in range(limit):
-                target_row = final_physical_rows[i]
-                if row_at[i] != target_row:
-                    curr_idx = current_pos[target_row]
-                    self._record((MatrixCompressionType.SWAP, (i, curr_idx)))
-                    swapped_row = row_at[i]
-                    row_at[curr_idx], current_pos[swapped_row] = swapped_row, curr_idx
-                    row_at[i], current_pos[target_row] = target_row, i
-
-    # --- Stage 2: Non-Pivot Processing ---
+        # Cycle sort to align physical permutations
+        current_pos = {i: i for i in range(limit)}
+        row_at = {i: i for i in range(limit)}
+        for i in range(limit):
+            target_row = final_physical_rows[i]
+            if row_at[i] != target_row:
+                curr_idx = current_pos[target_row]
+                self._record((MatrixCompressionType.SWAP, (i, curr_idx)))
+                swapped_row = row_at[i]
+                row_at[curr_idx], current_pos[swapped_row] = swapped_row, curr_idx
+                row_at[i], current_pos[target_row] = target_row, i
 
     def _choose_stage_two_start_index(self, rank: int) -> int:
-        """Choose Stage Two start label to reduce first-batch PUI cost.
-
-        Prefer starting at the next ``max_batch_size`` boundary so the first
-        Stage Two batch is already alignment-friendly. This is only safe when
-        enough dense-label capacity remains to encode all non-pivot columns.
-
-        If capacity is insufficient, return ``rank`` and allow Stage Two to
-        flush an early partial batch to reach the next aligned boundary.
+        """Choose start label aligned to max_batch_size boundary when possible.
 
         Args:
-            rank: Number of pivot columns (size of the identity block).
+            rank: Number of pivot columns already encoded in stage 1.
 
         Returns:
-            The chosen start index for Stage Two processing.
+            int: Starting dense-register label for stage 2 processing.
 
         """
         mbs = self.max_batch_size()
         if mbs <= 1:
             return rank
-
         next_aligned = ((rank + mbs - 1) // mbs) * mbs
         if next_aligned == rank:
             return rank
-
         non_pivot_cols = self.tableau.num_cols - rank
-        return next_aligned if (next_aligned + non_pivot_cols) <= (1 << self.dense_size) else rank
+        return next_aligned if (next_aligned + non_pivot_cols) <= (1 << self.tableau.dense_size) else rank
 
     def _run_stage2_non_pivot_col_processing(self, k_start: int):
-        """Stage 2: Non-pivot column processing.
-
-        For each unmapped non-pivot column, locates the next actionable element,
-        synthesises the target dense row pattern via CX adjustments, and
-        normalises the sparse indicator bit into a one-hot batch row.
-
-        Batches are flushed mid-loop (emitting a PUI block) whenever they reach
-        ``max_batch_size`` or would cross an alignment boundary, because sparse
-        indicator rows are reused across batches.  The final (partial) batch is
-        flushed at the end of the loop, and any remaining edge case is resolved.
+        """Process non-pivot columns in batches, flushing PUI blocks at boundaries.
 
         Args:
-            k_start: Starting index for non-pivot columns to process,
-                typically chosen to optimize the first batch's PUI cost.
+            k_start: Starting dense-register label for batch indexing.
 
         """
         mbs = self.max_batch_size()
@@ -679,20 +477,24 @@ class BinaryEncodingSynthesizer:
         while True:
             if self.batch:
                 new_len = len(self.batch) + 1
-                block_shift = _dense_qubits_size(new_len)
-                crosses = (self.batch[0].dense_content >> block_shift) != (self.batch_index >> block_shift)
-
+                block_shift = 1 if new_len < 2 else math.ceil(math.log2(new_len))
+                crosses = (self.batch[0][1] >> block_shift) != (self.batch_index >> block_shift)
                 if new_len > mbs or crosses:
                     self._clear_sparse_bits()
                     self.batch.clear()
 
-            target_row = self.dense_size + len(self.batch)
+            target_row = self.tableau.dense_size + len(self.batch)
             element = self._find_next_non_zero_element(target_row, mapped_cols)
 
             if element is not None:
-                target_col = self._create_target_row(target_row, element)
-                self._permute_col_and_add_to_batch(target_col, target_row)
-                mapped_cols.add(target_col)
+                is_direct, col, row = element
+                if is_direct:
+                    if row != target_row:
+                        self._record((MatrixCompressionType.SWAP, (target_row, row)))
+                else:
+                    self._synthesize_target_row(target_row, col, row)
+                self._permute_col_and_add_to_batch(col, target_row)
+                mapped_cols.add(col)
             else:
                 if self.batch:
                     self._clear_sparse_bits()
@@ -701,84 +503,53 @@ class BinaryEncodingSynthesizer:
                 break
 
     def _find_next_non_zero_element(self, target_row: int, mapped_cols: set[int]) -> tuple[bool, int, int] | None:
-        """Find next actionable non-zero element using fast numpy slicing.
+        """Find next actionable non-zero element in unmapped columns.
 
         Args:
-            target_row: First sparse row to scan for direct one-hot markers.
-            mapped_cols: Column indices already assigned in the bijection;
-                passed by the caller to avoid repeated reconstruction.
+            target_row: Row index to start searching from.
+            mapped_cols: Set of column indices already processed.
 
         Returns:
-            Triple ``(is_direct, col, row)`` for the best candidate, or
-            ``None`` when every unmapped column is fully zeroed in the
-            accessible rows.
+            tuple[bool, int, int] | None: A tuple (is_direct, col, row) or None if no element found.
 
         """
         unmapped_cols = [c for c in range(self.tableau.num_cols) if c not in mapped_cols]
         if not unmapped_cols:
             return None
 
-        # 1. Check direct sparse rows
+        # Direct sparse rows
         sub_data = self.tableau.data[target_row:, unmapped_cols]
         rows, cols = np.nonzero(sub_data)
         if rows.size > 0:
             return (True, unmapped_cols[cols[0]], target_row + rows[0])
 
-        # 2. Check current batch indicators
+        # Batch indicators
         for i, be in enumerate(self.batch):
-            brow = self.dense_size + i
+            brow = self.tableau.dense_size + i
             for col in unmapped_cols:
-                if be.col is not None and col == be.col:
+                if col == be[0]:
                     continue
                 if self.tableau.data[brow, col]:
                     return (False, col, brow)
         return None
 
-    def _create_target_row(self, target_row: int, element: tuple[bool, int, int]) -> int:
-        """Create/normalize the next target-row element and return its column.
-
-        Args:
-            target_row: Sparse row that will host the one-hot batch marker.
-            element: Triple ``(is_direct, col, row)`` from
-                :meth:`_find_next_non_zero_element`.
-
-        Returns:
-            Column index selected for insertion into the current batch.
-
-        """
-        is_direct, col, row = element
-        if is_direct:
-            if row != target_row:
-                self._record((MatrixCompressionType.SWAP, (target_row, row)))
-            return col
-
-        self._synthesize_target_row(target_row, col, row)
-        return col
-
     def _synthesize_target_row(self, target_row: int, col: int, row: int):
-        """Synthesize a target row element utilizing vectorized array masking.
-
-        When the only non-zero entry for an unmapped column lives in an
-        already-batched row, a Toffoli is emitted to create a fresh indicator
-        at ``target_row`` by exploiting a difference between the expected and
-        actual column contents.
+        """Emit Toffoli to create indicator at target_row from a batched row.
 
         Args:
-            target_row: Destination sparse row for the new indicator.
-            col: Unmapped column to process.
-            row: Existing batch row where the non-zero entry was found.
+            target_row: Row index where the indicator bit should be placed.
+            col: Column index being processed.
+            row: Source row index in the current batch that has the non-zero element.
 
         """
-        self.bad_element_count += 1
-        batch_idx = row - self.dense_size
-        batch_element_bits = _int_to_bits(self.batch[batch_idx].dense_content, self.dense_size)
-
-        is_batch_index = [i == batch_idx for i in range(self.tableau.num_rows - self.dense_size)]
+        batch_idx = row - self.tableau.dense_size
+        dense_val = self.batch[batch_idx][1]
+        ds = self.tableau.dense_size
+        batch_element_bits = [bool((dense_val >> i) & 1) for i in range(ds - 1, -1, -1)]
+        is_batch_index = [i == batch_idx for i in range(self.tableau.num_rows - self.tableau.dense_size)]
         combined_idx = np.array(batch_element_bits + is_batch_index, dtype=bool)
 
-        col_data = self.tableau.get_col(col).astype(bool)
-
-        # Find differing row, ignoring the current 'row'
+        col_data = self.tableau.data[:, col].astype(bool)
         diffs = combined_idx != col_data
         diffs[row] = False
 
@@ -792,55 +563,37 @@ class BinaryEncodingSynthesizer:
             self._record((MatrixCompressionType.X, (diff_row,)))
 
     def _permute_col_and_add_to_batch(self, current_col: int, ctrl_row: int):
-        """Normalize a column's dense/sparse bits and append it to the batch.
-
-        Emits CX gates controlled by ``ctrl_row`` to align the dense register
-        to ``batch_index`` and the sparse register to a one-hot marker, then
-        records the new :class:`_BatchElement` and bijection entry.
+        """Normalize column's dense/sparse bits and append to batch.
 
         Args:
-            current_col: Column being processed.
-            ctrl_row: Sparse row whose 1-entry controls the CX corrections.
+            current_col: Column index to normalize and add.
+            ctrl_row: Row index of the control qubit for CX corrections.
 
         """
-        dense_size = self.dense_size
-        k_bits = np.array(_int_to_bits(self.batch_index, dense_size), dtype=bool)
+        dense_size = self.tableau.dense_size
+        k_bits = np.array([bool((self.batch_index >> i) & 1) for i in range(dense_size - 1, -1, -1)], dtype=bool)
 
-        # Align dense qubits
         dense_col_data = self.tableau.data[:dense_size, current_col].astype(bool)
         for d_qubit in np.flatnonzero(dense_col_data != k_bits):
             self._record((MatrixCompressionType.CX, (ctrl_row, int(d_qubit))))
 
-        # Align sparse qubits to isolate the one-hot marker
         sparse_col_data = self.tableau.data[dense_size:, current_col].astype(bool)
         target_bits = np.zeros(self.tableau.num_rows - dense_size, dtype=bool)
         target_bits[len(self.batch)] = True
-
         for s_qubit in np.flatnonzero(sparse_col_data != target_bits):
             self._record((MatrixCompressionType.CX, (ctrl_row, dense_size + int(s_qubit))))
 
-        self.batch.append(_BatchElement(current_col, self.batch_index))
+        self.batch.append((current_col, self.batch_index))
         self.bijection.append((self.batch_index, current_col))
         self.batch_index += 1
 
-    def _complete_bijection(self):
-        """Fill missing bijection entries from current dense column contents."""
-        mapped = {col for _, col in self.bijection}
-        self.bijection.extend(
-            (_bits_to_int(self.tableau.data[: self.dense_size, c]), c)
-            for c in range(self.tableau.num_cols)
-            if c not in mapped
-        )
-
-    # --- PUI Lowering & Exporting ---
-
     def _clear_sparse_bits(self):
-        """Emit a PUI block that zeroes all sparse indicator rows for the current batch."""
+        """Emit PUI block to zero all sparse indicator rows for current batch."""
         assert self.batch
-        dense_size = self.dense_size
-        num_changing = _dense_qubits_size(len(self.batch))
+        dense_size = self.tableau.dense_size
+        num_changing = 1 if len(self.batch) < 2 else math.ceil(math.log2(len(self.batch)))
         num_fixed = dense_size - num_changing
-        k0 = self.batch[0].dense_content
+        k0 = self.batch[0][1]
 
         fixed_controls = [
             (r, bool((k0 >> (dense_size - 1 - r)) & 1))
@@ -851,10 +604,7 @@ class BinaryEncodingSynthesizer:
         rest_entries = []
         for i, be in enumerate(self.batch):
             changing_controls = [
-                (
-                    num_fixed + off,
-                    bool((be.dense_content >> (dense_size - 1 - num_fixed - off)) & 1),
-                )
+                (num_fixed + off, bool((be[1] >> (dense_size - 1 - num_fixed - off)) & 1))
                 for off in range(num_changing)
             ]
             rest_entries.append((i, changing_controls))
@@ -864,96 +614,123 @@ class BinaryEncodingSynthesizer:
         for op in select_ops:
             self._record(op)
 
-    def to_operations(
-        self,
-        num_local_qubits: int,
-        active_qubit_indices: list[int] | None = None,
-        ancilla_start: int | None = None,
-        *,
-        reverse: bool = False,
+    def _flush_pui_lookup_block(self, ops, sbs, fixed_controls, rest_entries):
+        """Convert PUI block into lookup ops, choosing mono vs chunked by cost.
+
+        Args:
+            ops: Output list to append generated operations to.
+            sbs: Sparse block start row index (equal to dense_size).
+            fixed_controls: List of (row, polarity) pairs that are constant across the batch.
+            rest_entries: List of (offset, changing_controls) pairs for each batch element.
+
+        """
+        if not rest_entries:
+            return
+
+        mono_ops, mono_count = self._synthesize_single_pui_lookup_block(sbs, fixed_controls, rest_entries)
+
+        # Split into power-of-two chunks
+        n = len(rest_entries)
+        if n <= 2:
+            ops.extend(mono_ops)
+            return
+
+        chunks, i, remaining = [], 0, n
+        while remaining > 0:
+            chunk_size = 1 << (remaining.bit_length() - 1)
+            chunks.append(rest_entries[i : i + chunk_size])
+            i += chunk_size
+            remaining -= chunk_size
+
+        if len(chunks) <= 1:
+            ops.extend(mono_ops)
+            return
+
+        chunked_ops, chunked_count = [], 0
+        for chunk in chunks:
+            sub_ops, sub_count = self._synthesize_single_pui_lookup_block(sbs, fixed_controls, chunk)
+            chunked_ops.extend(sub_ops)
+            chunked_count += sub_count
+
+        ops.extend(chunked_ops if chunked_count <= mono_count else mono_ops)
+
+    def _synthesize_single_pui_lookup_block(self, sbs, fixed_controls, rest_entries):
+        """Lower one PUI sub-block into lookup ops.
+
+        Args:
+            sbs: Sparse block start row index (equal to dense_size).
+            fixed_controls: List of (row, polarity) pairs that are constant across the chunk.
+            rest_entries: List of (offset, changing_controls) pairs for this chunk.
+
+        Returns:
+            tuple[list[tuple], int]: A pair of (ops_list, toffoli_cost).
+
+        """
+        if not rest_entries:
+            return [], 0
+
+        # Canonicalize: promote chunk-local constants to fixed
+        n_entries = len(rest_entries)
+        fixed_map = dict(fixed_controls)
+        row_info: dict[int, tuple[int, set[bool]]] = {}
+        for _, changing_controls in rest_entries:
+            for row, val in changing_controls:
+                count, vals = row_info.get(row, (0, set()))
+                vals.add(bool(val))
+                row_info[row] = (count + 1, vals)
+        for row, (count, values) in row_info.items():
+            if count == n_entries and len(values) == 1:
+                promoted_val = next(iter(values))
+                if row not in fixed_map or fixed_map[row] == promoted_val:
+                    fixed_map[row] = promoted_val
+        fixed_rows = set(fixed_map)
+        fixed_controls = sorted(fixed_map.items())
+        rest_entries = [(off, [(r, v) for r, v in ctrls if r not in fixed_rows]) for off, ctrls in rest_entries]
+
+        # Collect address qubits
+        all_ctrl_rows = {row for row, _ in fixed_controls}
+        for _, changing_controls in rest_entries:
+            all_ctrl_rows.update(row for row, _ in changing_controls)
+        address_qubits = sorted(all_ctrl_rows)
+        data_qubits = [sbs + offset for offset, _ in rest_entries]
+
+        # Build lookup table
+        n_outputs = len(rest_entries)
+        table: dict[tuple[int, ...], tuple[int, ...]] = {}
+        for i, (_, changing_controls) in enumerate(rest_entries):
+            ctrl_map = {**dict(fixed_controls), **dict(changing_controls)}
+            address = tuple(int(ctrl_map[row]) for row in address_qubits)
+            table[address] = tuple(1 if j == i else 0 for j in range(n_outputs))
+
+        if not table:
+            return [], 0
+
+        lookup_ops = self._lookup_select(
+            table,
+            address_qubits=address_qubits,
+            data_qubits=data_qubits,
+            use_measurement_and=self.measurement_based_uncompute,
+        )
+        gf2x_ops = list(reversed(lookup_ops))
+        toffoli_cost = sum(
+            self._scs_toffoli_cost(data_table, root=True)
+            for name, (data_table, _, _) in lookup_ops
+            if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
+        )
+        return gf2x_ops, toffoli_cost
+
+    def _to_operations(
+        self, num_local_qubits: int, active_qubit_indices: list[int], ancilla_start: int
     ) -> list[MatrixCompressionOp]:
-        """Translate recorded circuit operations into MatrixCompressionOp instances.
+        """Convert internal circuit to reversed MatrixCompressionOp list with global qubit indices.
 
         Args:
-            num_local_qubits: Number of local (active) qubits.
-            active_qubit_indices: Optional mapping from local qubit index (0..num_local_qubits-1)
-                to global qubit index. If provided, operations are translated to global indices.
-            ancilla_start: Optional global starting index for ancillas. Used if
-                active_qubit_indices is provided.
-            reverse: If True, reverse the operation order before returning.
+            num_local_qubits: Number of system (local) qubits.
+            active_qubit_indices: Mapping from local row indices to global qubit indices.
+            ancilla_start: Global qubit index where ancilla qubits begin.
 
         Returns:
-            List of MatrixCompressionOp.
-
-        """
-        raw_ops: list[tuple[str, Any]] = []
-
-        for compress_type, qubit_args in self.circuit:
-            op_type = MatrixCompressionType(compress_type)
-            if op_type is MatrixCompressionType.X:
-                raw_ops.append((op_type, qubit_args[0]))
-            else:
-                raw_ops.append((op_type, qubit_args))
-
-        if active_qubit_indices is not None and ancilla_start is not None:
-            raw_ops = self._translate_ops(raw_ops, num_local_qubits, active_qubit_indices, ancilla_start)
-
-        ops = [self._to_compression_op(op_type, op_args) for op_type, op_args in raw_ops]
-        if reverse:
-            ops.reverse()
-        return ops
-
-    @staticmethod
-    def _to_compression_op(op_type: str, op_args: Any) -> MatrixCompressionOp:
-        """Convert a raw circuit tuple into a MatrixCompressionOp.
-
-        Args:
-            op_type: The gate type.
-            op_args: Gate arguments (qubit indices and optional data).
-
-        Returns:
-            A MatrixCompressionOp instance.
-
-        """
-        op_type = MatrixCompressionType(op_type)
-        if op_type is MatrixCompressionType.X:
-            return MatrixCompressionOp(op_type, [int(op_args)])
-        if op_type in {MatrixCompressionType.CX, MatrixCompressionType.SWAP}:
-            return MatrixCompressionOp(op_type, [int(op_args[0]), int(op_args[1])])
-        if op_type is MatrixCompressionType.CCX:
-            target, ctrl1, ctrl2 = op_args
-            return MatrixCompressionOp(op_type, [int(ctrl1), int(ctrl2), int(target)])
-        if op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
-            data_table, addr_qubits, dat_qubits = op_args
-            qubits = [int(q) for q in addr_qubits] + [int(q) for q in dat_qubits]
-            return MatrixCompressionOp(op_type, qubits, control_state=len(addr_qubits), lookup_data=data_table)
-        if op_type is MatrixCompressionType.MCX:
-            controls, control_state, target_qubit = op_args
-            qubits = [int(q) for q in controls] + [int(target_qubit)]
-            return MatrixCompressionOp(op_type, qubits, control_state=control_state)
-        raise ValueError(f"Unknown op type: {op_type}")
-
-    @staticmethod
-    def _translate_ops(
-        ops: list[tuple[str, Any]],
-        num_local_qubits: int,
-        active_qubit_indices: list[int],
-        ancilla_start: int,
-    ) -> list[tuple[str, Any]]:
-        """Remap local qubit indices to global topological indices.
-
-        Indices below ``num_local_qubits`` are mapped through
-        ``active_qubit_indices``; higher indices are treated as ancillae
-        starting at ``ancilla_start``.
-
-        Args:
-            ops: Operation list with local indices.
-            num_local_qubits: Boundary between active and ancilla indices.
-            active_qubit_indices: Local-to-global mapping for active qubits.
-            ancilla_start: Global start index for ancilla qubits.
-
-        Returns:
-            New operation list with all qubit indices remapped.
+            list[MatrixCompressionOp]: Circuit operations in reversed order with remapped qubit indices.
 
         """
 
@@ -962,353 +739,90 @@ class BinaryEncodingSynthesizer:
                 int(active_qubit_indices[idx]) if idx < num_local_qubits else ancilla_start + (idx - num_local_qubits)
             )
 
-        translated: list[tuple[str, Any]] = []
-        for compress_type, op_args in ops:
+        ops: list[MatrixCompressionOp] = []
+        for compress_type, qubit_args in self.circuit:
             op_type = MatrixCompressionType(compress_type)
             if op_type is MatrixCompressionType.X:
-                translated.append((MatrixCompressionType.X, map_idx(int(op_args))))
+                ops.append(MatrixCompressionOp(op_type, [map_idx(qubit_args[0])]))
             elif op_type in {MatrixCompressionType.CX, MatrixCompressionType.SWAP}:
-                translated.append((op_type, (map_idx(int(op_args[0])), map_idx(int(op_args[1])))))
+                ops.append(MatrixCompressionOp(op_type, [map_idx(int(qubit_args[0])), map_idx(int(qubit_args[1]))]))
             elif op_type is MatrixCompressionType.CCX:
-                translated.append((op_type, tuple(map_idx(int(a)) for a in op_args)))
-            elif op_type is MatrixCompressionType.MCX:
-                controls, ctrl_state, target = op_args
-                translated.append(
-                    (
-                        MatrixCompressionType.MCX,
-                        (
-                            [map_idx(int(q)) for q in controls],
-                            ctrl_state,
-                            map_idx(int(target)),
-                        ),
-                    )
+                target, ctrl1, ctrl2 = qubit_args
+                ops.append(
+                    MatrixCompressionOp(op_type, [map_idx(int(ctrl1)), map_idx(int(ctrl2)), map_idx(int(target))])
                 )
             elif op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
-                data_table, addr_qubits, dat_qubits = op_args
-                translated.append(
-                    (
-                        op_type,
-                        (
-                            data_table,
-                            [map_idx(int(q)) for q in addr_qubits],
-                            [map_idx(int(q)) for q in dat_qubits],
-                        ),
-                    )
-                )
+                data_table, addr_qubits, dat_qubits = qubit_args
+                qubits = [map_idx(int(q)) for q in addr_qubits] + [map_idx(int(q)) for q in dat_qubits]
+                ops.append(MatrixCompressionOp(op_type, qubits, control_state=len(addr_qubits), lookup_data=data_table))
+            elif op_type is MatrixCompressionType.MCX:
+                controls, control_state, target_qubit = qubit_args
+                qubits = [map_idx(int(q)) for q in controls] + [map_idx(int(target_qubit))]
+                ops.append(MatrixCompressionOp(op_type, qubits, control_state=control_state))
             else:
-                translated.append((op_type, op_args))
-        return translated
+                raise ValueError(f"Unknown op type: {op_type}")
+        ops.reverse()
+        return ops
 
-    def _flush_pui_lookup_block(
-        self,
-        ops: list[tuple[str, Any]],
-        sbs: int,
-        fixed_controls: list[tuple[int, bool]],
-        rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-    ) -> None:
-        """Convert one recorded PUI block into lookup-based GF2+X operations.
+    @staticmethod
+    def _scs_toffoli_cost(data: list[list[bool]], *, root: bool = False) -> int:
+        """Toffoli cost of SparseOneHotSCS recursion.
 
         Args:
-            ops: Destination operation list to append into.
-            sbs: Dense-register width.
-            fixed_controls: Shared controls for all block entries.
-            rest_entries: Per-target offsets and changing controls.
+            data: 2-D boolean lookup table to estimate cost for.
+            root: If True, the first binary split is free (no Toffoli needed).
+
+        Returns:
+            int: Estimated Toffoli gate count for the SELECT tree.
 
         """
-        if not rest_entries:
-            return
-
-        mono_ops, mono_count = self._synthesize_single_pui_lookup_block(
-            sbs,
-            fixed_controls,
-            rest_entries,
-        )
-
-        chunked = self._split_rest_entries_into_power_of_two_chunks(rest_entries)
-        if len(chunked) <= 1:
-            ops.extend(mono_ops)
-            return
-
-        chunked_ops, chunked_count = [], 0
-        for chunk in chunked:
-            sub_ops, sub_count = self._synthesize_single_pui_lookup_block(
-                sbs,
-                fixed_controls,
-                chunk,
+        n = len(data)
+        if n == 0 or all(not any(row) for row in data) or n == 1:
+            return 0
+        half = 2 ** (math.ceil(math.log2(n)) - 1)
+        left, right = data[:half], data[half:]
+        left_empty = all(not any(row) for row in left)
+        right_empty = all(not any(row) for row in right)
+        split_cost = 0 if root else 1
+        if not left_empty and not right_empty:
+            return (
+                split_cost
+                + _BinaryEncodingSynthesizer._scs_toffoli_cost(left)
+                + _BinaryEncodingSynthesizer._scs_toffoli_cost(right)
             )
-            chunked_ops.extend(sub_ops)
-            chunked_count += sub_count
-
-        if chunked_count <= mono_count:
-            ops.extend(chunked_ops)
-            return
-
-        ops.extend(mono_ops)
-
-    def _synthesize_single_pui_lookup_block(
-        self,
-        sbs: int,
-        fixed_controls: list[tuple[int, bool]],
-        rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-    ) -> tuple[list[tuple[str, Any]], int]:
-        """Lower one PUI sub-block into lookup ops.
-
-        Args:
-            sbs: Dense-register width.
-            fixed_controls: Shared controls for all block entries.
-            rest_entries: Per-target offsets and changing controls.
-
-        Returns:
-            ``(ops, toffoli_cost)`` where ``toffoli_cost`` is the estimated
-            number of Toffoli gates used by the emitted SELECT operations.
-
-        """
-        if not rest_entries:
-            return [], 0
-
-        fixed_controls, rest_entries = self._canonicalize_pui_controls(fixed_controls, rest_entries)
-        address_qubits = self._collect_pui_address_qubits(fixed_controls, rest_entries)
-        data_qubits = [sbs + offset for offset, _ in rest_entries]
-
-        filtered_table = self._build_pui_lookup_table(fixed_controls, rest_entries, address_qubits)
-        if not filtered_table:
-            return [], 0
-
-        lookup_ops = _lookup_select(
-            filtered_table,
-            address_qubits=address_qubits,
-            data_qubits=data_qubits,
-            use_measurement_and=self.measurement_based_uncompute,
-        )
-
-        gf2x_ops = list(reversed(lookup_ops))
-        toffoli_cost = sum(
-            _select_toffoli_cost(data_table)
-            for name, (data_table, _, _) in lookup_ops
-            if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
-        )
-
-        return gf2x_ops, toffoli_cost
-
-    def _canonicalize_pui_controls(
-        self,
-        fixed_controls: list[tuple[int, bool]],
-        rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-    ) -> tuple[list[tuple[int, bool]], list[tuple[int, list[tuple[int, bool]]]]]:
-        """Promote chunk-local constant controls from changing to fixed.
-
-        For a given block, rows that appear in every entry with the same value
-        do not need to remain in per-entry changing controls.
-
-        Args:
-            fixed_controls: Initial list of fixed controls, as (row, value) pairs.
-            rest_entries: List of (offset, changing_controls) where changing_controls is
-                a list of (row, value) pairs that may differ between entries.
-
-        Returns:
-            Tuple of (new_fixed_controls, new_rest_entries)
-                where new_fixed_controls is the updated list of fixed controls and new_rest_entries
-                is the updated list of entries with promoted controls removed from changing_controls.
-
-        """
-        if not rest_entries:
-            return fixed_controls, rest_entries
-
-        n_entries = len(rest_entries)
-        fixed_map = dict(fixed_controls)
-
-        # Single pass: count occurrences and collect unique values per row
-        row_info: dict[int, tuple[int, set[bool]]] = {}
-        for _, changing_controls in rest_entries:
-            for row, val in changing_controls:
-                count, vals = row_info.get(row, (0, set()))
-                vals.add(bool(val))
-                row_info[row] = (count + 1, vals)
-
-        # Promote rows that appear in all entries with a single value
-        for row, (count, values) in row_info.items():
-            if count == n_entries and len(values) == 1:
-                promoted_val = next(iter(values))
-                if row not in fixed_map or fixed_map[row] == promoted_val:
-                    fixed_map[row] = promoted_val
-
-        fixed_rows = set(fixed_map)
-        simplified_rest = [(off, [(r, v) for r, v in ctrls if r not in fixed_rows]) for off, ctrls in rest_entries]
-        return sorted(fixed_map.items()), simplified_rest
-
-    def _split_rest_entries_into_power_of_two_chunks(
-        self, rest_entries: list[tuple[int, list[tuple[int, bool]]]]
-    ) -> list[list[tuple[int, list[tuple[int, bool]]]]]:
-        """Split entries into contiguous power-of-two chunks.
-
-        This keeps control patterns local while converting expensive
-        non-power-of-two lookup tables into cheaper composable pieces.
-
-        Args:
-            rest_entries: List of (offset, changing_controls) where changing_controls is a list of
-                (row, value) pairs that may differ between entries.
-
-        Returns:
-            List of chunks, where each chunk is a contiguous sublist of rest_entries with length that is a power of two.
-                The original order of entries is preserved.
-
-        """
-        n = len(rest_entries)
-        if n <= 2:
-            return [rest_entries]
-
-        chunks, i, remaining = [], 0, n
-        while remaining > 0:
-            chunk_size = 1 << (remaining.bit_length() - 1)
-            chunks.append(rest_entries[i : i + chunk_size])
-            i += chunk_size
-            remaining -= chunk_size
-        return chunks
-
-    def _collect_pui_address_qubits(
-        self,
-        fixed_controls: list[tuple[int, bool]],
-        rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-    ) -> list[int]:
-        """Collect and sort all control rows that address a PUI lookup table.
-
-        Args:
-            fixed_controls: List of fixed controls, as (row, value) pairs.
-            rest_entries: List of (offset, changing_controls) where changing_controls is a list of
-                (row, value) pairs that may differ between entries.
-
-        Returns:
-            Sorted list of all control rows that address the PUI lookup table.
-
-        """
-        all_ctrl_rows = {row for row, _ in fixed_controls}
-        for _, changing_controls in rest_entries:
-            all_ctrl_rows.update(row for row, _ in changing_controls)
-        return sorted(all_ctrl_rows)
-
-    def _build_pui_lookup_table(
-        self,
-        fixed_controls: list[tuple[int, bool]],
-        rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-        address_qubits: list[int],
-    ) -> dict[tuple[int, ...], tuple[int, ...]]:
-        """Build sparse truth table for one PUI lookup block.
-
-        Args:
-            fixed_controls: List of fixed controls, as (row, value) pairs.
-            rest_entries: List of (offset, changing_controls) where changing_controls is a list of
-                (row, value) pairs that may differ between entries.
-            address_qubits: List of control rows that will serve as address bits for the lookup.
-
-        Returns:
-            Mapping from address bit tuples to one-hot output tuples, with all-zero outputs omitted.
-
-        """
-        n_outputs = len(rest_entries)
-        table: dict[tuple[int, ...], tuple[int, ...]] = {}
-        for i, (_, changing_controls) in enumerate(rest_entries):
-            ctrl_map = {**dict(fixed_controls), **dict(changing_controls)}
-            address = tuple(int(ctrl_map[row]) for row in address_qubits)
-            data = tuple(1 if j == i else 0 for j in range(n_outputs))
-            table[address] = data
-
-        return table
-
-
-def _is_data_all_zeros(data: list[list[bool]]) -> bool:
-    """Return True when every row of data is all-false."""
-    return all(not any(row) for row in data)
-
-
-def _scs_toffoli_cost(data: list[list[bool]]) -> int:
-    """Toffoli cost of the ``SparseOneHotSCS`` recursion (singly-controlled).
-
-    Each non-trivial split (N > 1) uses one AND gate (= 1 Toffoli with
-    measurement-based uncompute).
-    """
-    n = len(data)
-    if n == 0 or _is_data_all_zeros(data) or n == 1:
+        if not right_empty:
+            return split_cost + _BinaryEncodingSynthesizer._scs_toffoli_cost(right)
+        if not left_empty:
+            return split_cost + _BinaryEncodingSynthesizer._scs_toffoli_cost(left)
         return 0
-    k = math.ceil(math.log2(n))
-    half = 2 ** (k - 1)
-    left, right = data[:half], data[half:]
-    left_empty = _is_data_all_zeros(left)
-    right_empty = _is_data_all_zeros(right)
-    if not left_empty and not right_empty:
-        return 1 + _scs_toffoli_cost(left) + _scs_toffoli_cost(right)
-    if not right_empty:
-        return 1 + _scs_toffoli_cost(right)
-    if not left_empty:
-        return 1 + _scs_toffoli_cost(left)
-    return 0
 
+    @staticmethod
+    def _lookup_select(table_dict, address_qubits, data_qubits, *, use_measurement_and=False):
+        """Build dense lookup table and emit a single SELECT op.
 
-def _select_toffoli_cost(data: list[list[bool]]) -> int:
-    """Estimate the Toffoli count for a ``SparseOneHotSelect`` call.
+        Args:
+            table_dict: Mapping from address tuples to data tuples.
+            address_qubits: List of row indices forming the address register.
+            data_qubits: List of row indices forming the data register.
+            use_measurement_and: If True, emit SELECT_AND instead of SELECT.
 
-    The first address-bit split is free (no AND gate); each branch
-    delegates to ``SparseOneHotSCS``.
-    """
-    n = len(data)
-    if n == 0 or _is_data_all_zeros(data) or n == 1:
-        return 0
-    k = math.ceil(math.log2(n))
-    half = 2 ** (k - 1)
-    left, right = data[:half], data[half:]
-    left_empty = _is_data_all_zeros(left)
-    right_empty = _is_data_all_zeros(right)
-    if not left_empty and not right_empty:
-        return _scs_toffoli_cost(left) + _scs_toffoli_cost(right)
-    if not right_empty:
-        return _scs_toffoli_cost(right)
-    if not left_empty:
-        return _scs_toffoli_cost(left)
-    return 0
+        Returns:
+            list[tuple]: List of (op_type, (data_table, address_qubits, data_qubits)) tuples.
 
+        """
+        if not table_dict:
+            return []
 
-def _lookup_select(
-    table_dict: dict[tuple[int, ...], tuple[int, ...]],
-    address_qubits: list[int],
-    data_qubits: list[int],
-    *,
-    use_measurement_and: bool = False,
-) -> list[tuple[str, Any]]:
-    """Synthesize a lookup-based select or select_and operation for a given truth table.
+        n_address = len(address_qubits)
+        n_data = len(data_qubits)
+        n_entries = 1 << n_address
 
-    Args:
-        table_dict: Mapping from address bit tuples to output bit tuples, with all-zero outputs omitted.
-        address_qubits: Qubit indices corresponding to the address bits.
-        data_qubits: Qubit indices corresponding to the data bits.
-        use_measurement_and: If True, emit ``select_and`` ops that use measurement-based AND uncomputation
-            (requires Adaptive_RI target profile or higher).
-            If False, emit standard ``select`` ops with internal ancilla management.
-            The choice affects the number of ancillas used and the structure of the emitted operations.
+        reversed_address = list(reversed(address_qubits))
+        data_table: list[list[bool]] = [[False] * n_data for _ in range(n_entries)]
+        for addr_tuple, data_tuple in table_dict.items():
+            reversed_tuple = tuple(reversed(addr_tuple))
+            addr_int = sum(int(bit) << i for i, bit in enumerate(reversed_tuple))
+            data_table[addr_int] = [bool(b) for b in data_tuple]
 
-    Returns:
-        List of GF2+X operations implementing the lookup.
-
-    """
-    if not table_dict:
-        return []
-
-    operations: list[tuple[str, Any]] = []
-
-    n_address = len(address_qubits)
-    n_data = len(data_qubits)
-    n_entries = 1 << n_address
-
-    # Reverse the address qubit order so that entries that share low-order
-    # address bits are grouped earlier in the tree.
-    reversed_address = list(reversed(address_qubits))
-
-    # Build dense Bool[][] table with reversed bit ordering.
-    data_table: list[list[bool]] = [[False] * n_data for _ in range(n_entries)]
-    for addr_tuple, data_tuple in table_dict.items():
-        reversed_tuple = tuple(reversed(addr_tuple))
-        addr_int = sum(int(bit) << i for i, bit in enumerate(reversed_tuple))
-        data_table[addr_int] = [bool(b) for b in data_tuple]
-
-    op_type = MatrixCompressionType.SELECT_AND if use_measurement_and else MatrixCompressionType.SELECT
-    operations.append((op_type, (data_table, reversed_address, list(data_qubits))))
-
-    return operations
+        op_type = MatrixCompressionType.SELECT_AND if use_measurement_and else MatrixCompressionType.SELECT
+        return [(op_type, (data_table, reversed_address, list(data_qubits)))]
