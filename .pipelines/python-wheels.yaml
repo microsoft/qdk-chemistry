@@ -122,7 +122,7 @@ extends:
               hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
-              name: $(CPU_POOL_ARM)
+              name: aqe-1es-Dpsd_v5-arm-pool
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
