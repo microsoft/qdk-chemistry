@@ -65,8 +65,7 @@ def zassenhaus_steps_naive(
     .. math::
 
         N = \left\lceil
-            \frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p}
-            |t|^{1+1/p}}{\epsilon^{1/p}}
+        \frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p} |t|^{1+1/p}}{\epsilon^{1/p}}
         \right\rceil .
 
     Args:
@@ -75,7 +74,8 @@ def zassenhaus_steps_naive(
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Zassenhaus formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
-        commutator_exponents: Optional precomputed symbolic Zassenhaus exponents
+        commutator_exponents:
+            Optional precomputed symbolic Zassenhaus exponents
             returned by :func:`~qdk_chemistry.utils.zassenhaus_generation.zassenhaus_commutator_plan`
             as its first element. If provided, the mapping must include
             ``order + 1`` so the bound can use the first omitted exponent
