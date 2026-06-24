@@ -28,7 +28,9 @@ from pathlib import Path
 from qdk_chemistry.data import Ansatz, Structure
 
 # Load H2 structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # Run initial SCF to get reference wavefunction
 scf_solver = create("scf_solver")

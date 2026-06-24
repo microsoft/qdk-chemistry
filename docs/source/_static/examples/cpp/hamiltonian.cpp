@@ -6,7 +6,8 @@
 // --------------------------------------------------------------------------------------------
 // start-cell-hamiltonian-creation
 // Load structure from XYZ file
-auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
+auto structure =
+    Structure::from_xyz_file("../data/water.structure.xyz");  // docs:inline-xyz
 
 // Run initial SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();

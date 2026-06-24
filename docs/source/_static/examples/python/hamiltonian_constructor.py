@@ -33,7 +33,9 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 ################################################################################
 # start-cell-construct
 # Load a structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # Run a SCF to get orbitals
 scf_solver = create("scf_solver")

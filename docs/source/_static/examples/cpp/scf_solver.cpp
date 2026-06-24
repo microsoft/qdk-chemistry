@@ -29,7 +29,8 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-run
   // Load structure from XYZ file
-  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
+  auto structure =
+      Structure::from_xyz_file("../data/h2.structure.xyz");  // docs:inline-xyz
 
   // Run the SCF calculation
   auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "def2-tzvpp");

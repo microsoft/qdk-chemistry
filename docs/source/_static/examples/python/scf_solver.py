@@ -29,7 +29,9 @@ scf_solver.settings().set("method", "hf")
 ################################################################################
 # start-cell-run
 # Load structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # Run scf
 E_scf, wfn = scf_solver.run(

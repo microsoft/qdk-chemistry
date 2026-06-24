@@ -32,7 +32,7 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 # Load H2O molecule from XYZ file
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/water.structure.xyz"
-)
+)  # docs:inline-xyz
 
 # Obtain orbitals from SCF
 scf_solver = create("scf_solver")

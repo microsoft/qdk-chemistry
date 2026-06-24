@@ -14,7 +14,7 @@ from qdk_chemistry.data import Structure, SpinChannel
 # Load a structure from XYZ file
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/water.structure.xyz"
-)
+)  # docs:inline-xyz
 
 # Run initial SCF to get orbitals
 scf_solver = create("scf_solver")
