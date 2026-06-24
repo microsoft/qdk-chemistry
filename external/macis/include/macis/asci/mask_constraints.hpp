@@ -686,8 +686,10 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   // Build up higher-order constraints as base if requested
   if (nrec_min < 0 or
-      nrec_min >= static_cast<int64_t>(constraint_sizes.size()))  // nrec_min < 0 implies that you
-                                            // want all the constraints upfront
+      nrec_min >=
+          static_cast<int64_t>(
+              constraint_sizes.size()))  // nrec_min < 0 implies that you
+                                         // want all the constraints upfront
     for (size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
       decltype(constraint_sizes) cur_constraints;
       cur_constraints.reserve(constraint_sizes.size() * norb);
@@ -775,7 +777,8 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   size_t local_average = total_work / world_size;
 
   // Manual refinement of top configurations
-  if (nrec_min > 0 and nrec_min < static_cast<int64_t>(constraint_sizes.size())) {
+  if (nrec_min > 0 and
+      nrec_min < static_cast<int64_t>(constraint_sizes.size())) {
     const size_t nleave = constraint_sizes.size() - nrec_min;
     std::vector<std::pair<constraint_type, size_t>> constraint_to_refine,
         constraint_to_leave;

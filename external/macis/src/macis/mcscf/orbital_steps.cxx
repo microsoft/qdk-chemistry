@@ -18,9 +18,10 @@ void precond_cg_orbital_step(NumOrbital norb, NumInactive ninact,
                              size_t LDFa, const double* F, size_t LDF,
                              const double* A1RDM, size_t LDD, const double* OG,
                              double* K_lin) {
-  [[maybe_unused]] const size_t no = norb.get(), ni = ninact.get(), na = nact.get(),
-               nv = num_virtual_orbitals.get(),
-               orb_rot_sz = nv * (na + ni) + na * ni;
+  [[maybe_unused]] const size_t no = norb.get(), ni = ninact.get(),
+                                na = nact.get(),
+                                nv = num_virtual_orbitals.get(),
+                                orb_rot_sz = nv * (na + ni) + na * ni;
   std::vector<double> DH(orb_rot_sz);
 
   // Compute approximate diagonal hessian

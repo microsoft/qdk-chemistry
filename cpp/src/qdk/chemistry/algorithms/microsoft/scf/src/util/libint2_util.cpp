@@ -508,11 +508,11 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   // also defines _MSC_VER but supports the syntax via libomp. For native
   // MSVC we fall back to #pragma omp atomic on the inner write.
 #if defined(_OPENMP)
-#  if defined(_MSC_VER) && !defined(__clang__)
-#    pragma omp parallel
-#  else
-#    pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
-#  endif
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma omp parallel
+#else
+#pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
 #endif
   {
 #ifdef _OPENMP
@@ -594,11 +594,11 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   const auto& unitshell = libint2::Shell::unit();
   // See note above re: native MSVC OpenMP array-section reductions.
 #if defined(_OPENMP)
-#  if defined(_MSC_VER) && !defined(__clang__)
-#    pragma omp parallel
-#  else
-#    pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
-#  endif
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma omp parallel
+#else
+#pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
 #endif
   {
 #ifdef _OPENMP
