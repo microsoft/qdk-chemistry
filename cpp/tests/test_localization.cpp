@@ -45,7 +45,7 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
 
 TEST_F(LocalizationTest, Factory) {
   auto available_localizers = LocalizerFactory::available();
-  EXPECT_EQ(available_localizers.size(), 4);
+  EXPECT_EQ(available_localizers.size(), 5);
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_pipek_mezey") != available_localizers.end());
@@ -55,6 +55,9 @@ TEST_F(LocalizationTest, Factory) {
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_natural_orbitals") != available_localizers.end());
+  EXPECT_TRUE(std::find(available_localizers.begin(),
+                        available_localizers.end(),
+                        "qdk_qio") != available_localizers.end());
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_vvhv") != available_localizers.end());
@@ -1548,4 +1551,117 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
         localizer->run(wfn, active_alpha, active_alpha);
       },
       std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIO) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  EXPECT_NO_THROW({ auto settings = localizer->settings(); });
+
+  // Get a canonical set of water orbitals.
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "cc-pvdz");
+
+  // Select a (6e, 6o) valence active space.
+  auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space->settings().set("num_active_electrons", 6);
+  active_space->settings().set("num_active_orbitals", 6);
+  auto active_space_wfn = active_space->run(wfn_HF);
+  auto active_orbitals = active_space_wfn->get_orbitals();
+
+  // Run CAS with spin-dependent 1- and 2-RDMs (required by the QIO localizer).
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  auto [E_cas, wfn_cas] = mc_calc->run(
+      hamiltonian_cas, active_space_wfn->get_active_num_electrons().first,
+      active_space_wfn->get_active_num_electrons().second);
+
+  ASSERT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
+
+  const auto& [active_indices_a, active_indices_b] =
+      active_orbitals->get_active_space_indices();
+  EXPECT_EQ(active_indices_b, active_indices_a);
+  std::vector<size_t> active_indices(active_indices_a.begin(),
+                                     active_indices_a.end());
+  ASSERT_TRUE(std::is_sorted(active_indices.begin(), active_indices.end()));
+
+  // Total single-orbital entropy in the input (canonical) basis.
+  const double entropy_before = wfn_cas->get_single_orbital_entropies().sum();
+  EXPECT_GE(entropy_before, 0.0);
+
+  std::shared_ptr<Wavefunction> qio_wfn_ptr;
+  EXPECT_NO_THROW({
+    qio_wfn_ptr = localizer->run(wfn_cas, active_indices, active_indices);
+  });
+  ASSERT_NE(qio_wfn_ptr, nullptr);
+  // The returned wavefunction is a mean-field determinant carrier.
+  ASSERT_TRUE(qdk::chemistry::algorithms::detail::is_mean_field_wavefunction(
+      qio_wfn_ptr));
+
+  auto& qio_orbitals = *qio_wfn_ptr->get_orbitals();
+  const auto& Ca_can = active_orbitals->get_coefficients().first;
+  const auto& Ca_qio = qio_orbitals.get_coefficients().first;
+  // QIO preserves the AO and MO dimensions.
+  EXPECT_EQ(Ca_qio.rows(), Ca_can.rows());
+  EXPECT_EQ(Ca_qio.cols(), Ca_can.cols());
+
+  // The active-space rotation U = Ca_can^T S Ca_qio must be unitary, and the
+  // QIO orbitals orthonormal.
+  const auto& S = active_orbitals->get_overlap_matrix();
+  const size_t num_active = active_indices.size();
+  Eigen::MatrixXd Ca_selected(Ca_can.rows(), num_active);
+  Eigen::MatrixXd Ca_qio_selected(Ca_qio.rows(), num_active);
+  for (size_t i = 0; i < num_active; ++i) {
+    Ca_selected.col(i) = Ca_can.col(active_indices[i]);
+    Ca_qio_selected.col(i) = Ca_qio.col(active_indices[i]);
+  }
+  Eigen::MatrixXd U_selected = Ca_selected.transpose() * S * Ca_qio_selected;
+  EXPECT_NEAR(0.0, testing::norm_diff_from_unitary(U_selected),
+              testing::numerical_zero_tolerance * 10);
+
+  Eigen::MatrixXd overlap_check =
+      Ca_qio_selected.transpose() * S * Ca_qio_selected;
+  EXPECT_NEAR(
+      0.0,
+      (overlap_check - Eigen::MatrixXd::Identity(num_active, num_active))
+          .norm(),
+      testing::numerical_zero_tolerance * 10);
+
+  // The output carries a real spin-traced 1-RDM payload conserving the active
+  // particle number.
+  const auto& output_rdm_variant =
+      qio_wfn_ptr->get_active_one_rdm_spin_traced();
+  const auto* output_rdm = std::get_if<Eigen::MatrixXd>(&output_rdm_variant);
+  ASSERT_NE(output_rdm, nullptr);
+  const auto [nelec_a, nelec_b] = wfn_cas->get_active_num_electrons();
+  EXPECT_NEAR(static_cast<double>(nelec_a + nelec_b), output_rdm->trace(),
+              1e-8);
+}
+
+TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  std::vector<size_t> active_indices({0, 1, 2, 3});
+  std::vector<size_t> inactive_indices({});
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+
+  auto wfn = std::make_shared<Wavefunction>(
+      std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2200"), orbitals));
+
+  // QIO produces a single spatial orbital set: alpha and beta selection
+  // indices must be identical. This check precedes any RDM access.
+  std::vector<size_t> alpha_indices({0, 1, 2, 3});
+  std::vector<size_t> beta_indices({0, 1, 2});
+  EXPECT_THROW(localizer->run(wfn, alpha_indices, beta_indices),
+               std::invalid_argument);
 }
