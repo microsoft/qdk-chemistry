@@ -150,17 +150,13 @@ toc_object_entries_show_parents = "domain"  # Show parent modules in table of co
 # Language and cross-reference settings
 primary_domain = "py"  # Set Python as the primary documentation domain
 
-# Configure intersphinx mappings to link to external documentation.
-# Disabled in CI to avoid transient network timeouts failing the build.
-if os.environ.get("CI", "").lower() in {"1", "true", "yes"}:
-    intersphinx_mapping = {}
-else:
-    intersphinx_mapping = {
-        "python": ("https://docs.python.org/3", None),
-        "numpy": ("https://numpy.org/doc/stable/", None),
-        "scipy": ("https://docs.scipy.org/doc/scipy/", None),
-        "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
-    }
+# Configure intersphinx mappings to link to external documentation
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
+}
 
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
@@ -221,17 +217,6 @@ nitpick_ignore_regex = [
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
     (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
-
-# In CI, intersphinx is disabled so stdlib types can't be resolved.
-# Ignore them only when the inventories are unavailable.
-if not intersphinx_mapping:
-    nitpick_ignore_regex += [
-        (r"py:class", r"collections\.abc\..*"),
-        (r"py:class", r"collections\.Counter"),
-        (r"py:class", r"abc\.ABC"),
-        (r"py:class", r"enum\..*"),
-        (r"py:data", r"typing\.Any"),
-    ]
 
 # Configure output for to-dos
 todo_include_todos = True  # Include todo directives in the output
