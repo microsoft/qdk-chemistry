@@ -94,7 +94,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
         echo "Detected Rosetta on Apple Silicon; re-executing natively as arm64..."
         exec arch -arm64 /bin/bash "$0" "$@"
-        exit 0
     fi
     # -----------------------------------------------------------------------------
 

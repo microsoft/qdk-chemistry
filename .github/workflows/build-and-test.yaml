@@ -256,7 +256,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
+          -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
