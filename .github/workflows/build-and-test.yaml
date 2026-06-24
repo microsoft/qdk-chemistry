@@ -222,7 +222,15 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    # [CACHING]
+    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+      id: cache-cpp-deps
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ env.CPP_DEPS_PREFIX }}
+        key: >-
+          cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -231,6 +239,7 @@ jobs:
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Install C++ dependencies
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
         INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
