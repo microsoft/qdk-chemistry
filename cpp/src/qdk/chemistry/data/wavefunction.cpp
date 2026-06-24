@@ -738,10 +738,10 @@ double WavefunctionContainer::compute_s_squared() const {
       one_sbt.block({axes::beta(), axes::beta()});
   const Eigen::VectorXd& two_rdm_aaaa = two_sbt.block(
       {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
-  const Eigen::VectorXd& two_rdm_aabb = two_sbt.block(
-      {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
-  const Eigen::VectorXd& two_rdm_bbbb = two_sbt.block(
-      {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_aabb =
+      two_sbt.block({axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_bbbb =
+      two_sbt.block({axes::beta(), axes::beta(), axes::beta(), axes::beta()});
 
   int norbs = static_cast<int>(one_rdm_aa.rows());
   double one_rdm_trace = one_rdm_aa.trace() + one_rdm_bb.trace();
