@@ -60,8 +60,7 @@ class HadamardTestCircuitBuilder(Algorithm):
 
         Args:
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-                            ``HadamardTestBasis.Y``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X`` or ``HadamardTestBasis.Y``).
 
         """
         super().__init__()
