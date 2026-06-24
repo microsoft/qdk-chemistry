@@ -460,8 +460,8 @@ Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations_alpha.size() != num_molecular_orbitals ||
-      occupations_beta.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations_alpha.size()) != num_molecular_orbitals ||
+      static_cast<size_t>(occupations_beta.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -488,7 +488,7 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -512,10 +512,10 @@ Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm_alpha.rows() != num_molecular_orbitals ||
-      rdm_alpha.cols() != num_molecular_orbitals ||
-      rdm_beta.rows() != num_molecular_orbitals ||
-      rdm_beta.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm_alpha.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_alpha.cols()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -539,8 +539,8 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm.rows() != num_molecular_orbitals ||
-      rdm.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }

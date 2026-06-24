@@ -611,7 +611,7 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+  for (size_t atom_index = 0; atom_index < static_cast<size_t>(nuclear_charges.size());
        ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
 
@@ -692,7 +692,7 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+  for (size_t atom_index = 0; atom_index < static_cast<size_t>(nuclear_charges.size());
        ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
     auto it = index_to_basis_map.find(atom_index);

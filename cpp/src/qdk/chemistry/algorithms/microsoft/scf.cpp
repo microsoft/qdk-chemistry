@@ -52,7 +52,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
         "basis_or_guess is valueless due to an exception.");
   }
   enum class BasisSetType { Explicit, FromString, FromOrbitals };
-  BasisSetType basis_set_type;
+  BasisSetType basis_set_type = BasisSetType::FromString;
 
   std::string basis_set_name;
   std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;

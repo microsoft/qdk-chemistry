@@ -46,15 +46,15 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   // create discrete bins
   const double bin_width = 1.0 / num_bins;
   QDK_LOGGER().debug("Bin width: {:.6f}", bin_width);
-  std::vector<double> bins(num_bins);
-  for (size_t i = 0; i < num_bins; ++i) {
+  std::vector<double> bins(static_cast<size_t>(num_bins));
+  for (size_t i = 0; i < static_cast<size_t>(num_bins); ++i) {
     bins[i] = i * bin_width;
   }
 
   // Count orbitals above each bin
-  std::vector<size_t> orbitals_above_bin(num_bins);
+  std::vector<size_t> orbitals_above_bin(static_cast<size_t>(num_bins));
   size_t entropy_idx = sorted_entropies.size();
-  for (size_t i = 0; i < num_bins; ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(num_bins); ++i) {
     double bin_threshold = bins[i];
     // Move backwards while entropies are <= threshold
     while (entropy_idx > 0 &&
@@ -66,7 +66,7 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   }
   QDK_LOGGER().debug("Orbitals above each bin threshold:");
   QDK_LOGGER().debug("    Bin   Bin Threshold    #Orbitals Above");
-  for (size_t i = 0; i < num_bins; ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(num_bins); ++i) {
     QDK_LOGGER().debug("  {:>5}    {:>12.6f}    {:>15}", i, bins[i],
                        orbitals_above_bin[i]);
   }
@@ -81,7 +81,7 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     if (orbitals_above_bin[i] != orbitals_above_bin[i - 1]) {
       // end of plateau
       const size_t plateau_size = i - current_bin;
-      if (plateau_size >= min_plateau_size) {
+      if (plateau_size >= static_cast<size_t>(min_plateau_size)) {
         plateaus.emplace_back(current_bin, i - 1);
       }
       current_bin = i;
@@ -89,7 +89,7 @@ std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
   }
   // check last plateau
   const size_t plateau_size = bins.size() - current_bin;
-  if (plateau_size >= min_plateau_size) {
+  if (plateau_size >= static_cast<size_t>(min_plateau_size)) {
     plateaus.emplace_back(current_bin, bins.size() - 1);
   }
   // Logging

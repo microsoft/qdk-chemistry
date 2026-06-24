@@ -56,7 +56,7 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI> eri,
                         RowMajorMatrix& trial_fock, bool rhf_external) {
   QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = ground_density.cols();
-  const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
+  const bool unrestricted = (static_cast<size_t>(ground_density.rows()) == 2 * num_atomic_orbitals);
 
   // Get hybrid coefficients (0,0,0 for HF)
   double alpha = 1.0, beta = 0.0, omega = 0.0;
@@ -182,7 +182,7 @@ class StabilityOperator {
         num_molecular_orbitals - num_alpha_;
     const size_t num_beta_virtual_orbitals = num_molecular_orbitals - num_beta_;
     const bool unrestricted =
-        (ground_density_.rows() == 2 * num_atomic_orbitals);
+        (static_cast<size_t>(ground_density_.rows()) == 2 * num_atomic_orbitals);
 
     const size_t nova = num_alpha_ * num_alpha_virtual_orbitals;
     const size_t eigensize =

@@ -472,10 +472,10 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     Eigen::MatrixXd tmp_one_rdm_aa = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
     Eigen::MatrixXd tmp_one_rdm_bb = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
 
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm_aa(i, i) = 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm_bb(i, i) = 1.0;
     }
 
@@ -581,10 +581,10 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
     Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
     _one_rdm_spin_traced =
@@ -844,7 +844,7 @@ StateVectorContainer::_total_occupations_pair() const {
       get_orbitals()->get_active_space_indices();
 
   for (size_t active_idx = 0; active_idx < alpha_active_indices.size() &&
-                              active_idx < alpha_active_occs.size();
+                              active_idx < static_cast<size_t>(alpha_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = alpha_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
@@ -852,7 +852,7 @@ StateVectorContainer::_total_occupations_pair() const {
     }
   }
   for (size_t active_idx = 0; active_idx < beta_active_indices.size() &&
-                              active_idx < beta_active_occs.size();
+                              active_idx < static_cast<size_t>(beta_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = beta_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {

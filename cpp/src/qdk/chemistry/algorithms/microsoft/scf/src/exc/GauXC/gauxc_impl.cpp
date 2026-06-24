@@ -96,8 +96,8 @@ GauXC::BasisSet<T> to_gauxc_basisset(const BasisSet& aimd_basisset) {
 
   for (size_t ishell = 0; ishell != nshell; ++ishell) {
     auto aimd_shell = aimd_basisset.shells[ishell];
-    prim_array exponents;
-    prim_array coefficients;
+    prim_array exponents{};
+    prim_array coefficients{};
 
     for (size_t iprim = 0; iprim != aimd_shell.contraction; ++iprim) {
       exponents.at(iprim) = aimd_shell.exponents[iprim];

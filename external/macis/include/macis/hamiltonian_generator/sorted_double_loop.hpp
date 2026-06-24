@@ -166,18 +166,13 @@ class SortedDoubleLoopHamiltonianGenerator
 
           // Early exit if the only possible matrix element is 4x alpha
           if (ex_alpha_count == 4) {
-#ifdef _MSC_VER
-            // MSVC /O2 can produce different FP results for the same inline
-            // matrix_element_4 call between the count and fill passes due to
-            // FMA contraction differences.  Force precise FP here to ensure
-            // count == fill.
-#pragma float_control(precise, on, push)
-#endif
-            const double h_el_all_alpha_4 =
+            // On MSVC /O2, FMA contraction can yield bitwise-different results
+            // for the same matrix_element_4 call in the count vs fill pass.
+            // Storing through volatile forces a round-trip to double precision,
+            // making both passes produce identical values without #pragma.
+            volatile double h_el_raw =
                 this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha);
-#ifdef _MSC_VER
-#pragma float_control(pop)
-#endif
+            const double h_el_all_alpha_4 = h_el_raw;
             if (std::abs(h_el_all_alpha_4) < H_thresh) continue;
           }
 
@@ -201,14 +196,9 @@ class SortedDoubleLoopHamiltonianGenerator
 
               // Early exit for all-beta excitations (see alpha comment above)
               if (ex_beta_count == 4) {
-#ifdef _MSC_VER
-#pragma float_control(precise, on, push)
-#endif
-                const double h_el_all_beta_4 =
+                volatile double h_el_raw =
                     this->matrix_element_4(bra_beta, ket_beta, ex_beta);
-#ifdef _MSC_VER
-#pragma float_control(pop)
-#endif
+                const double h_el_all_beta_4 = h_el_raw;
                 if (std::abs(h_el_all_beta_4) < H_thresh) continue;
               }
 
