@@ -72,7 +72,13 @@ if(MSVC AND TARGET libint2_cxx)
   # (target_compile_options rejects IMPORTED targets).
   get_target_property(_libint2_cxx_imported libint2_cxx IMPORTED)
   if(NOT _libint2_cxx_imported)
-    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+    # clang-cl does not support /Zc:preprocessor (MSVC-only); passing it produces
+    # -Wunused-command-line-argument on every TU that consumes libint2_cxx.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
+    else()
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+    endif()
   endif()
 endif()
 # eritest-libint2 links only to libint2-static (C library), so it does not pick
@@ -82,7 +88,11 @@ endif()
 if(MSVC AND TARGET eritest-libint2)
   get_target_property(_eritest_imported eritest-libint2 IMPORTED)
   if(NOT _eritest_imported)
-    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
+    else()
+      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+    endif()
   endif()
 endif()
 
@@ -125,7 +135,7 @@ endif()
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/lorisercole/gauxc.git
-  GIT_TAG 9bae9a439334da23a2a5685f88ca9761c81dbbdf
+  GIT_TAG 1e9d122b5c7d98b3d8187cee2ecb804b0b511136
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
@@ -137,24 +147,11 @@ set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${_old_suppress_dev} CACHE BOOL "" FORCE)
 
 if(MSVC)
-  # Suppress warnings in upstream ecpint/libint2 sources
-  # /wd4018 signed/unsigned mismatch
-  # /wd4068 unknown pragma
-  # /wd4100 unreferenced formal parameter
-  # /wd4101 unreferenced local variable
-  # /wd4127 conditional expression is constant
-  # /wd4242 conversion with possible loss of data
-  # /wd4244 conversion with possible loss of data
-  # /wd4245 conversion, signed/unsigned mismatch
-  # /wd4267 conversion with possible loss of data
-  # /wd4389 signed/unsigned mismatch
-  # /wd4701 potentially uninitialized local variable used
-  # /wd4703 potentially uninitialized local pointer variable used
-  set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4018 /wd4068 /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4245 /wd4267 /wd4389 /wd4701 /wd4703)
+  # Suppress warnings in upstream third-party sources (ecpint, libint2).
   # Helper: apply compile options only to targets actually built by this project.
   # handle_dependency() may resolve a dependency via find_package() to a prior
   # install, producing IMPORTED targets that reject target_compile_options.
-  function(_qdk_msvc_suppress_warnings_if_built target visibility)
+  function(_qdk_suppress_if_built target)
     if(NOT TARGET ${target})
       return()
     endif()
@@ -162,16 +159,35 @@ if(MSVC)
     if(_is_imported)
       return()
     endif()
-    target_compile_options(${target} ${visibility} ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+    # clang-cl: use -Wno-* flags for the specific warnings seen in these sources.
+    # cl.exe: use a fixed set of /wd flags for known warning categories:
+    #   /wd4018 signed/unsigned mismatch
+    #   /wd4068 unknown pragma
+    #   /wd4100 unreferenced formal parameter
+    #   /wd4101 unreferenced local variable
+    #   /wd4127 conditional expression is constant
+    #   /wd4242 conversion with possible loss of data
+    #   /wd4244 conversion with possible loss of data
+    #   /wd4245 conversion, signed/unsigned mismatch
+    #   /wd4267 conversion with possible loss of data
+    #   /wd4389 signed/unsigned mismatch
+    #   /wd4701 potentially uninitialized local variable used
+    #   /wd4703 potentially uninitialized local pointer variable used
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(${target} PRIVATE
+        -Wno-unused-variable -Wno-vla-cxx-extension -Wno-reorder-ctor)
+    else()
+      target_compile_options(${target} PRIVATE
+        /wd4018 /wd4068 /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4245
+        /wd4267 /wd4389 /wd4701 /wd4703)
+    endif()
   endfunction()
 
-  _qdk_msvc_suppress_warnings_if_built(ecpint      PRIVATE)
+  _qdk_suppress_if_built(ecpint)
   # ecpint also builds a `generate` executable at build time for code generation
-  _qdk_msvc_suppress_warnings_if_built(generate    PRIVATE)
+  _qdk_suppress_if_built(generate)
   # libint2 is a wrapper around $<TARGET_OBJECTS:libint2_obj>; the OBJECT
   # library libint2_obj is what actually compiles the auto-generated sources.
-  # libint2_cxx is a header-only INTERFACE target with no compiled sources,
-  # so PRIVATE/INTERFACE options on it have no effect on anything.
-  # _qdk_msvc_suppress_warnings_if_built(libint2_cxx PRIVATE)
-  _qdk_msvc_suppress_warnings_if_built(libint2_obj PRIVATE)
+  # libint2_cxx is a header-only INTERFACE target with no compiled sources.
+  _qdk_suppress_if_built(libint2_obj)
 endif()
