@@ -1,12 +1,16 @@
 # MSVC Debug CRT compatibility patch for lapackpp v2025.05.28.
 # Apply with: git apply lapackpp-msvc-allocator.patch  (run from lapackpp source root)
 #
-# src/NoConstructAllocator.hh: add template rebind constructor.
+# 1. src/NoConstructAllocator.hh: add template rebind constructor.
 # MSVC's _ITERATOR_DEBUG_LEVEL=2 (enabled in Debug builds) causes the std::vector
 # destructor to rebind the allocator from NoConstructAllocator<T> to
 # NoConstructAllocator<std::_ContainerProxy> for iterator validation tracking.
 # The rebind uses a converting constructor that the class lacks, producing C2440
 # errors across all lapackpp source files that use lapack::vector<>.
+#
+# 2. CMakeLists.txt: guard -Wall behind a clang-cl check.
+#    Under clang-cl, -Wall maps to /Wall which is equivalent to -Weverything,
+#    flooding the build log with ~700k pedantic / C++98-compat warnings.
 diff --git a/src/NoConstructAllocator.hh b/src/NoConstructAllocator.hh
 --- a/src/NoConstructAllocator.hh
 +++ b/src/NoConstructAllocator.hh
@@ -22,3 +26,22 @@ diff --git a/src/NoConstructAllocator.hh b/src/NoConstructAllocator.hh
      // Construction given an allocated pointer is a null-op.
      //
      // @tparam Args Parameter pack which handles all possible calling
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -698,9 +698,12 @@
+ 
+ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.15)
+     # Conditionally add -Wall. See CMake tutorial.
+-    set( gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>" )
+-    target_compile_options(
+-        lapackpp PRIVATE "$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall>>" )
++    # Skip clang-cl: it maps -Wall to /Wall (= -Weverything on Clang).
++    if(NOT (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
++        set( gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>" )
++        target_compile_options(
++            lapackpp PRIVATE "$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall>>" )
++    endif()
+ endif()
+ 
+ #-------------------------------------------------------------------------------

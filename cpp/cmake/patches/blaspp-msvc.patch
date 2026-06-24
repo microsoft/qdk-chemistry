@@ -1,13 +1,25 @@
-# MSVC compatibility patches for blaspp v2025.05.28.
-# Apply with: git apply blaspp-msvc.patch  (run from blaspp source root)
-#
-# 1. cmake/BLASFinder.cmake: cache blaspp_defs_ so it survives reconfigure.
-#    blaspp_defs_ (e.g. -DBLAS_FORTRAN_ADD_) was never cached; on reconfigure
-#    detection is skipped (run_=false), blaspp_defs_ is empty, and
-#    blaspp_defines gets overwritten with empty (CACHE INTERNAL implies FORCE),
-#    causing defines.h to lose all BLAS mangling definitions.
-# 2. examples/util.hh, include/blas/symv.hh: replace __PRETTY_FUNCTION__ with
-#    __FUNCSIG__ on MSVC (the GCC/Clang builtin is not available).
+# 3. CMakeLists.txt: guard -Wall behind a clang-cl check.
+#    Under clang-cl, -Wall maps to /Wall which is equivalent to -Weverything,
+#    flooding the build log with ~700k pedantic / C++98-compat warnings.
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -474,9 +474,12 @@
+ 
+ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.15)
+     # Conditionally add -Wall. See CMake tutorial.
+-    set( gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>" )
+-    target_compile_options(
+-        blaspp PRIVATE "$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall>>" )
++    # Skip clang-cl: it maps -Wall to /Wall (= -Weverything on Clang).
++    if(NOT (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
++        set( gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>" )
++        target_compile_options(
++            blaspp PRIVATE "$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall>>" )
++    endif()
+ endif()
+ 
+ #-------------------------------------------------------------------------------
 diff --git a/cmake/BLASFinder.cmake b/cmake/BLASFinder.cmake
 index 2994f85..fa494c9 100644
 --- a/cmake/BLASFinder.cmake

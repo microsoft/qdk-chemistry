@@ -72,14 +72,6 @@ if(NOT lapackpp_FOUND )
     set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4267)
     target_compile_options(blaspp   PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
     target_compile_options(lapackpp PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
-
-    # clang-cl translates -Wall to /Wall which equals -Weverything, producing
-    # ~700k pedantic / C++98-compat noise warnings from blaspp/lapackpp headers.
-    # Silence them all with -Wno-everything.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-      target_compile_options(blaspp   PUBLIC -Wno-everything)
-      target_compile_options(lapackpp PUBLIC -Wno-everything)
-    endif()
   endif()
 endif()
 
