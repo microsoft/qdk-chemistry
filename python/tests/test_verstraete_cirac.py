@@ -8,8 +8,6 @@
 import os
 import tempfile
 
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
-
 import h5py
 import numpy as np
 import pytest
@@ -19,6 +17,8 @@ from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitHamiltonian
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
+
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
 class TestVerstraeteCiracMapping:
@@ -153,6 +153,7 @@ class TestVerstraeteCiracMapping:
         """Verify that stabilizers mutually commute and commute with mapped H for various lattices."""
 
         def commute(p1: str, p2: str) -> bool:
+            """Return True if Pauli strings p1 and p2 commute."""
             assert len(p1) == len(p2)
             anti_commutes = 0
             for c1, c2 in zip(p1, p2, strict=False):
@@ -219,6 +220,7 @@ class TestVerstraeteCiracMapping:
         mapper = create("qubit_mapper", "qdk")
 
         def multiply_pauli_labels(p1: str, p2: str) -> str:
+            """Return the Pauli string resulting from the product of p1 and p2 (ignoring phase)."""
             table = {
                 ("I", "I"): "I",
                 ("I", "X"): "X",
@@ -240,6 +242,7 @@ class TestVerstraeteCiracMapping:
             return "".join(table[(c1, c2)] for c1, c2 in zip(p1, p2, strict=False))
 
         def get_expected_weight(p1: str, p2: str) -> int:
+            """Return the analytical upper bound on the weight of the product of p1 and p2."""
             indices1 = [idx for idx, char in enumerate(p1) if char != "I"]
             indices2 = [idx for idx, char in enumerate(p2) if char != "I"]
             if not indices1 or not indices2:
@@ -263,6 +266,7 @@ class TestVerstraeteCiracMapping:
             thresh: int,
             max_weight: int,
         ) -> None:
+            """Assert that the product weight of a local stabilizer pair does not exceed max_weight."""
             indices1 = [idx for idx, char in enumerate(stabs_list[u_idx]) if char != "I"]
             indices2 = [idx for idx, char in enumerate(stabs_list[v_idx]) if char != "I"]
             if indices1 and indices2:
@@ -274,6 +278,7 @@ class TestVerstraeteCiracMapping:
                     )
 
         def get_mst_edges(stabs_list: list[str], start_idx: int, count: int, root: int) -> list[tuple[int, int]]:
+            """Return MST edges over a subset of stabilizers using Prim's algorithm."""
             if count <= 1:
                 return []
 
