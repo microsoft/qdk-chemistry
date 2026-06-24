@@ -78,6 +78,14 @@ endif()
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )
 target_compile_features( lobpcgxx INTERFACE cxx_std_20 )
+if(NOT MSVC)
+  # On non-MSVC (Linux/macOS), instruct lapack/config.h to use <complex> (C++)
+  # rather than <complex.h> (C99).  The C99 header defines the `I` macro as
+  # `__extension__ _Complex_I`, which conflicts with Boost template parameter
+  # names used in downstream headers.  On MSVC the equivalent is achieved via
+  # /FIcomplex on the lapackpp target directly (see above).
+  target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
+endif()
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
