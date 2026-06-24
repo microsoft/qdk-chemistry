@@ -14,61 +14,17 @@ import pytest
 
 from qdk_chemistry.data import QpeResult
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
 from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 def _ppf_converter(scale: float):
-    """Create an eigenvalue_from_phase bound method for PauliProductFormula with given scale."""
-    c = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=scale)
-    return c.eigenvalue_from_phase
-
-
-class _ConcreteWalkContainer(QuantumWalkContainer):
-    """Minimal concrete QuantumWalkContainer for testing eigenvalue_from_phase."""
-
-    def __init__(self, scale: float = 1.0) -> None:
-        self._scale = scale
-        super().__init__()
-
-    @property
-    def power(self) -> int:
-        return 1
-
-    @property
-    def num_qubits(self) -> int:
-        return 1
-
-    @property
-    def type(self) -> str:
-        return "test_walk"
-
-    def to_json(self, *a, **kw):
-        raise NotImplementedError
-
-    def to_hdf5(self, *a, **kw):
-        raise NotImplementedError
-
-    @classmethod
-    def from_json(cls, *a, **kw):
-        raise NotImplementedError
-
-    @classmethod
-    def from_hdf5(cls, *a, **kw):
-        raise NotImplementedError
-
-    def get_summary(self) -> str:
-        return ""
-
-    def combine(self, other):
-        raise NotImplementedError
+    """Return a callable mapping phase fraction to energy for time evolution: E = angle / t."""
+    return lambda phi: float(((phi % 1.0) * 2 * np.pi - (2 * np.pi if (phi % 1.0) > 0.5 else 0)) / scale)
 
 
 def _qw_converter(scale: float):
-    """Create an eigenvalue_from_phase bound method for QuantumWalk with given scale."""
-    c = _ConcreteWalkContainer(scale=scale)
-    return c.eigenvalue_from_phase
+    """Return a callable mapping phase fraction to energy for quantum walk: E = λ·cos(2πφ)."""
+    return lambda phi: float(scale * np.cos(2 * np.pi * (phi % 1.0)))
 
 
 def test_qpe_result_creation():

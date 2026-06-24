@@ -8,19 +8,23 @@
 ################################################################################
 # start-cell-create-from-time-evolution
 
-from qdk_chemistry.data import QpeResult
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    PauliProductFormulaContainer,
-)
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import QpeResult, QubitHamiltonian
 
 # Time-evolution QPE: U = e^{-iHt}, eigenvalue_from_phase wraps the angle.
+hamiltonian = QubitHamiltonian(
+    pauli_strings=["ZI", "IZ", "XX"], coefficients=[0.5, -0.3, 0.2]
+)
 evolution_time = 0.1
+
+builder = create("hamiltonian_unitary_builder", "trotter", time=evolution_time)
+unitary = builder.run(hamiltonian)
+container = unitary.get_container()
+
 result = QpeResult.from_phase_fraction(
     method="iterative",
     phase_fraction=0.423828125,
-    eigenvalue_from_phase=lambda phi: (
-        PauliProductFormulaContainer.eigenvalue_from_phase(phi, evolution_time)
-    ),
+    eigenvalue_from_phase=container.eigenvalue_from_phase,
     bits_msb_first=(0, 1, 1, 0, 1, 1, 0, 0, 1, 0),
     bitstring_msb_first="0110110010",
 )
@@ -30,19 +34,22 @@ result = QpeResult.from_phase_fraction(
 ################################################################################
 # start-cell-create-from-qubitization
 
-from qdk_chemistry.data import QpeResult
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import (
-    QuantumWalkContainer,
-)
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import QpeResult, QubitHamiltonian
 
 # Qubitization QPE: W = walk operator, E = lambda * cos(2*pi*phi).
-lambda_val = 5.0
+hamiltonian = QubitHamiltonian(
+    pauli_strings=["ZI", "IZ", "XX"], coefficients=[0.5, -0.3, 0.2]
+)
+
+builder = create("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
+unitary = builder.run(hamiltonian)
+walk_container = unitary.get_container()
+
 result_qubitization = QpeResult.from_phase_fraction(
     method="qubitization_qpe",
     phase_fraction=0.25,
-    eigenvalue_from_phase=lambda phi: QuantumWalkContainer.eigenvalue_from_phase(
-        phi, lambda_val
-    ),
+    eigenvalue_from_phase=walk_container.eigenvalue_from_phase,
     bits_msb_first=(0, 1, 0, 0),
     bitstring_msb_first="0100",
 )

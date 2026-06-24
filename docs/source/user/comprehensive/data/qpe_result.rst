@@ -11,7 +11,7 @@ Quantum phase estimation measures a phase fraction :math:`\varphi \in [0, 1)` th
 The relationship between the measured phase and energy depends on the type of unitary being phase-estimated.
 
 QDK/Chemistry uses a unified factory method :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction` that accepts a callable ``eigenvalue_from_phase``
-mapping the measured phase to the Hamiltonian eigenvalue. Each unitary container provides this mapping as a static method.
+mapping the measured phase to the Hamiltonian eigenvalue. Each unitary container provides this mapping as an instance method.
 
 **Time evolution**
 
@@ -111,10 +111,10 @@ They can also be constructed manually using the unified factory method:
 
 - :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction` — accepts an ``eigenvalue_from_phase`` callable that maps the measured phase to the Hamiltonian eigenvalue.
 
-Each container class provides the appropriate ``eigenvalue_from_phase`` static method:
+Each container class provides the appropriate ``eigenvalue_from_phase`` instance method, which uses the container's stored scale:
 
-- :meth:`PauliProductFormulaContainer.eigenvalue_from_phase(phi, t) <qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase>` — for Trotter-based QPE
-- :meth:`QuantumWalkContainer.eigenvalue_from_phase(phi, lambda) <qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase>` — for qubitization QPE
+- :meth:`container.eigenvalue_from_phase(phi) <qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase>` for Trotter-based QPE
+- :meth:`container.eigenvalue_from_phase(phi) <qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase>` for qubitization QPE
 
 Time evolution example
 ~~~~~~~~~~~~~~~~~~~~~~

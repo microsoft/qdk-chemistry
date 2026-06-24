@@ -36,17 +36,7 @@ class QuantumWalkContainer(UnitaryContainer):
     _data_type_name = "quantum_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
-
-    @property
-    def scale(self) -> float:
-        """The 1-norm used for eigenvalue-phase conversion.
-
-        Returns:
-            float: The scale factor.
-
-        """
-        return self._scale
+    _serialization_version = "0.2.0"
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
@@ -95,7 +85,7 @@ class LCUWalkContainer(QuantumWalkContainer):
     _data_type_name = "lcu_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(self, block_encoding: BlockEncodingContainer, power: int = 1, scale: float = 1.0) -> None:
         """Initialize an LCUWalkContainer.
@@ -108,7 +98,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         """
         self._block_encoding = block_encoding
         self._power = power
-        self._scale = scale
+        self.scale = scale
         super().__init__()
 
     @property
@@ -162,6 +152,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
+            "scale": self.scale,
             "block_encoding": self._block_encoding.to_json(),
         }
         return self._add_json_version(data)
@@ -176,6 +167,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
+        group.attrs["scale"] = self.scale
         be_group = group.create_group("block_encoding")
         self._block_encoding.to_hdf5(be_group)
 
@@ -197,6 +189,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         return cls(
             block_encoding=block_encoding,
             power=json_data.get("power", 1),
+            scale=json_data.get("scale", 1.0),
         )
 
     @classmethod
@@ -217,6 +210,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         return cls(
             block_encoding=block_encoding,
             power=power,
+            scale=float(group.attrs.get("scale", 1.0)),
         )
 
     def get_summary(self) -> str:
