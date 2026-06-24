@@ -49,7 +49,6 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [
-    "MPSPreparationData",
     "MPSSequentialStatePreparation",
 ]
 
@@ -249,37 +248,6 @@ class MPSPreparationData:
             "siteULayerAngles": [s.u.layer_angles for s in self.sites],
             "siteULayerShifted": [s.u.layer_shifted for s in self.sites],
             "siteUPhases": [s.u.phases for s in self.sites],
-        }
-        return params
-
-    def to_qsharp_params_uniform(self, rotation_bits: int) -> dict:
-        """Flatten into the dict expected by MakeMPSSequentialCircuitUniform.
-
-        Only passes a single site's decomposition data (the first/representative site).
-        Used with fast_resource_estimation=True to avoid marshaling N-1 copies of
-        identical angle arrays into the Q# runtime.
-        """
-        s = self.sites[0]
-        params: dict = {
-            "initialStateVec": self.initial_state_vec,
-            "numSites": self.num_sites,
-            "rotationBits": rotation_bits,
-            "numAncillaQubits": self.ancilla_bits,
-            "vLayerAngles": s.v.layer_angles,
-            "vLayerShifted": s.v.layer_shifted,
-            "vPhases": s.v.phases,
-            "rot0Angles": s.rot_angles[0],
-            "rot1Angles": s.rot_angles[1],
-            "rot2Angles": s.rot_angles[2],
-            "w0LayerAngles": s.w0.layer_angles,
-            "w0LayerShifted": s.w0.layer_shifted,
-            "w0Phases": s.w0.phases,
-            "w1LayerAngles": s.w1.layer_angles,
-            "w1LayerShifted": s.w1.layer_shifted,
-            "w1Phases": s.w1.phases,
-            "uLayerAngles": s.u.layer_angles,
-            "uLayerShifted": s.u.layer_shifted,
-            "uPhases": s.u.phases,
         }
         return params
 

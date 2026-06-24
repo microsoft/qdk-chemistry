@@ -54,7 +54,6 @@ from .mps_sequential import (
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [
-    "MPSSparsePreparationData",
     "MPSSparseStatePreparation",
 ]
 
