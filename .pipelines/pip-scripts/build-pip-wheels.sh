@@ -90,8 +90,8 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     # it natively so the whole build tree (conda/python/cmake/clang) is arm64.
     # Uses sysctl (reliable under translation) instead of `uname -m` (which lies).
     if [ "$(uname -s)" = "Darwin" ] \
-    && [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] \
-    && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
+    && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ] \
+    && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
         echo "Detected Rosetta on Apple Silicon; re-executing natively as arm64..."
         exec arch -arm64 /bin/bash "$0" "$@"
     fi
