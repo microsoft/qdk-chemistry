@@ -67,17 +67,24 @@ Other data types (for example :class:`~qdk_chemistry.data.Structure`,
 :class:`~qdk_chemistry.data.BasisSet`, and the qubit-level classes) did not
 change format and load directly without conversion.
 
-Cholesky Hamiltonians become four-center
-----------------------------------------
+Cholesky Hamiltonians
+---------------------
 
-The 1.x Cholesky Hamiltonian container did not persist its molecular-orbital
-three-center vectors, so it cannot be reconstructed directly. It did, however,
-store the full four-center two-electron integrals. The converter therefore
-migrates a Cholesky container to a
+The 1.x release shipped a Cholesky Hamiltonian container that derived from the
+four-center container: it stored the full four-center two-electron integrals and
+never persisted its molecular-orbital three-center vectors. Such a container
+cannot be reconstructed as a Cholesky representation, so the converter migrates
+it to a
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`, preserving
 the integrals and dropping the now-unused AO Cholesky vectors. Re-run the
 Cholesky decomposition from the orbitals if a Cholesky representation is needed
 again.
+
+A later Cholesky container stored the molecular-orbital three-center vectors
+directly. Those vectors are the current Cholesky data model, so that container is
+preserved as a :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`, with the
+vectors re-expressed as a symmetry-blocked tensor. The two layouts are detected
+automatically.
 
 Supported formats
 -----------------

@@ -264,6 +264,73 @@ def test_hamiltonian_unrestricted(tmp_path, fmt):
 
 
 # --------------------------------------------------------------------------- #
+# Genuine (three-center) Cholesky -> preserved as a Cholesky container
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+@pytest.mark.parametrize("restricted", [True, False])
+def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
+    # The later v1 Cholesky container stored MO three-center vectors L[pq, aux]
+    # (not a dense four-center). They are the current Cholesky data model, so the
+    # container is preserved and (pq|rs) reconstructs as sum_aux L[pq,aux] L[rs,aux].
+    norb, naux = 2, 3
+    ca, cb = RNG.standard_normal((norb, norb)), RNG.standard_normal((norb, norb))
+    h1a, h1b = _sym(norb), _sym(norb)
+    fa, fb = _sym(norb), _sym(norb)
+    la, lb = RNG.standard_normal((norb * norb, naux)), RNG.standard_normal((norb * norb, naux))
+    if restricted:
+        cb, h1b, fb, lb = ca, h1a, fa, la
+    src = tmp_path / f"chol.hamiltonian.{'json' if fmt == 'json' else 'h5'}"
+    dst = tmp_path / f"chol_new.hamiltonian.{'json' if fmt == 'json' else 'h5'}"
+
+    if fmt == "json":
+        orb = _old_orbitals_json(norb, norb, restricted, (ca, cb), active=[0, 1])
+        three_center = {"aa": la.tolist()} if restricted else {"aa": la.tolist(), "bb": lb.tolist()}
+        container = {
+            "version": "0.1.0",
+            "container_type": "cholesky",
+            "core_energy": 1.23,
+            "type": "Hermitian",
+            "is_restricted": restricted,
+            "one_body_integrals_alpha": h1a.tolist(),
+            "three_center_integrals": three_center,
+            "inactive_fock_matrix_alpha": fa.tolist(),
+            "orbitals": orb,
+        }
+        if not restricted:
+            container["one_body_integrals_beta"] = h1b.tolist()
+            container["inactive_fock_matrix_beta"] = fb.tolist()
+        src.write_text(json.dumps({"version": "0.1.0", "container": container}))
+    else:
+        with h5py.File(src, "w") as handle:
+            handle.attrs["version"] = "0.1.0"
+            group = handle.create_group("container")
+            group.attrs["version"] = "0.1.0"
+            group.attrs["container_type"] = "cholesky"
+            metadata = group.create_group("metadata")
+            metadata.attrs["core_energy"] = 1.23
+            metadata.attrs["type"] = "Hermitian"
+            metadata.attrs["is_restricted"] = restricted
+            _write_matrix(group, "one_body_integrals_alpha", h1a)
+            _write_matrix(group, "three_center_integrals_aa", la)
+            _write_matrix(group, "inactive_fock_matrix_alpha", fa)
+            if not restricted:
+                _write_matrix(group, "one_body_integrals_beta", h1b)
+                _write_matrix(group, "three_center_integrals_bb", lb)
+                _write_matrix(group, "inactive_fock_matrix_beta", fb)
+            _write_old_orbitals_h5(group.create_group("orbitals"), norb, norb, restricted, (ca, cb), active=[0, 1])
+
+    migrate.convert_file(src, dst)
+    ham = Hamiltonian.from_file(str(dst), fmt)
+    assert ham.get_container_type() == "cholesky"
+    assert abs(ham.get_core_energy() - 1.23) < 1e-12
+    assert np.allclose(ham.get_one_body_integrals()[0], h1a)
+    aaaa, aabb, bbbb = ham.get_two_body_integrals()
+    assert np.allclose(np.asarray(aaaa).ravel(), (la @ la.T).ravel())
+    assert np.allclose(np.asarray(aabb).ravel(), (la @ lb.T).ravel())
+    assert np.allclose(np.asarray(bbbb).ravel(), (lb @ lb.T).ravel())
+
+
+# --------------------------------------------------------------------------- #
 # Sparse Hamiltonian
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])

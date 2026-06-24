@@ -30,6 +30,7 @@ def _spin(restricted: bool) -> _sym.SymmetryProduct:
 
 _ALPHA = _sym.SymmetryLabel([_sym.axes.alpha()])
 _BETA = _sym.SymmetryLabel([_sym.axes.beta()])
+_AUX = _sym.SymmetryLabel([])
 
 
 def _serialize(tensor) -> dict:
@@ -127,6 +128,28 @@ def rank4_dict(
         [lb, lb, la, la],
     ]
     return single
+
+
+def rank3_three_center_dict(aa, bb: np.ndarray | None = None) -> dict:
+    """Rank-3 SBT JSON for Cholesky three-center MO integrals.
+
+    Each spin block is the dense ``[norb**2, naux]`` matrix (row index ``p*norb+q``)
+    over two spin-orbital axes and a trivial-symmetry auxiliary axis. ``bb is None``
+    builds the restricted form (the beta block aliases alpha).
+    """
+    a = _as_2d(aa)
+    norb2, naux = a.shape
+    norb = round(norb2**0.5)
+    if norb * norb != norb2:
+        raise ValueError(f"three-center block rows {norb2} is not a perfect square")
+    restricted = bb is None
+    aux = _sym.SymmetryProduct([])
+    syms = [_spin(restricted), _spin(restricted), aux]
+    extents = [{_ALPHA: norb, _BETA: norb}, {_ALPHA: norb, _BETA: norb}, {_AUX: naux}]
+    blocks = [((_ALPHA, _ALPHA, _AUX), a)]
+    if not restricted:
+        blocks.append(((_BETA, _BETA, _AUX), _as_2d(bb)))
+    return _serialize(_sym.SymmetryBlockedTensorRank3(syms, extents, blocks))
 
 
 def sparse_rank4_dict(entries, norb: int) -> dict:
