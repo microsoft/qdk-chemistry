@@ -843,16 +843,18 @@ StateVectorContainer::_total_occupations_pair() const {
   auto [alpha_active_indices, beta_active_indices] =
       get_orbitals()->get_active_space_indices();
 
-  for (size_t active_idx = 0; active_idx < alpha_active_indices.size() &&
-                              active_idx < static_cast<size_t>(alpha_active_occs.size());
+  for (size_t active_idx = 0;
+       active_idx < alpha_active_indices.size() &&
+       active_idx < static_cast<size_t>(alpha_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = alpha_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(orbital_idx) = alpha_active_occs(active_idx);
     }
   }
-  for (size_t active_idx = 0; active_idx < beta_active_indices.size() &&
-                              active_idx < static_cast<size_t>(beta_active_occs.size());
+  for (size_t active_idx = 0;
+       active_idx < beta_active_indices.size() &&
+       active_idx < static_cast<size_t>(beta_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = beta_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {

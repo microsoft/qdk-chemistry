@@ -68,7 +68,8 @@ void nocedal_wright_line_search(Functor& op,
   const auto armijo_test_val = c1 * dgi;
   const auto wolfe_test_curv = -c2 * dgi;
 
-  ret_type step_hi = 0, step_lo = 0, fx_hi = fx0, fx_lo = fx0, dg_hi = dgi, dg_lo = dgi;
+  ret_type step_hi = 0, step_lo = 0, fx_hi = fx0, fx_lo = fx0, dg_hi = dgi,
+           dg_lo = dgi;
 
   int iter = 0;
   const size_t max_iter = 100;

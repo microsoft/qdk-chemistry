@@ -398,7 +398,8 @@ std::vector<unsigned> compute_shell_map(
     const auto l = static_cast<unsigned>(qdk_shell.orbital_type);
     for (size_t j = 0; j < nshells; ++j) {
       const auto& itrn_shell = itrn_shells[j];
-      if (qdk_shell.atom_index != static_cast<size_t>(itrn_shell.atom_index)) continue;
+      if (qdk_shell.atom_index != static_cast<size_t>(itrn_shell.atom_index))
+        continue;
       if (l != static_cast<unsigned>(itrn_shell.angular_momentum)) continue;
       if (nprim != static_cast<size_t>(itrn_shell.contraction)) continue;
       bool exp_equiv = true;
