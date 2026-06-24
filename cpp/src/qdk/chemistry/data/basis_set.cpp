@@ -734,8 +734,8 @@ BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
       _atomic_orbital_type(other._atomic_orbital_type),
       _shells_per_atom(other._shells_per_atom),
-      _ecp_name(other._ecp_name),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
+      _ecp_name(other._ecp_name),
       _ecp_electrons(other._ecp_electrons),
       _ao_symmetries(other._ao_symmetries),
       _ao_extents(other._ao_extents) {
