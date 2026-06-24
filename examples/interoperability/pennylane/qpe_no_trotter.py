@@ -14,11 +14,6 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import (
-    energy_alias_candidates,
-    energy_from_phase,
-    resolve_energy_aliases,
-)
 
 try:
     import pennylane as qml
@@ -171,17 +166,30 @@ phase_fraction = dominant_index / (2**M_PRECISION)
 # 5. Process and display results
 ########################################################################################
 
+
+def _energy_from_phase(phase_fraction: float) -> float:
+    angle = (phase_fraction % 1.0) * (2 * np.pi)
+    if angle > np.pi:
+        angle -= 2 * np.pi
+    return angle / T_TIME
+
+
+def _resolve_energy(raw_energy: float, reference: float) -> tuple[list[float], float]:
+    period = 2 * np.pi / T_TIME
+    candidates = sorted(
+        {s * raw_energy + period * k for k in range(-2, 3) for s in (1, -1)}
+    )
+    return candidates, min(candidates, key=lambda e: abs(e - reference))
+
+
 result = QpeResult.from_phase_fraction(
     method="pennylane_qpe",
     phase_fraction=phase_fraction,
-    eigenvalue_from_phase=lambda phi: energy_from_phase(phi, evolution_time=T_TIME),
+    eigenvalue_from_phase=_energy_from_phase,
     bitstring_msb_first=dominant_bits,
 )
 raw_energy = result.raw_energy
-candidate_energies = energy_alias_candidates(raw_energy, evolution_time=T_TIME)
-resolved_energy = resolve_energy_aliases(
-    raw_energy, evolution_time=T_TIME, reference_energy=casci_energy
-)
+candidate_energies, resolved_energy = _resolve_energy(raw_energy, casci_energy)
 estimated_total_energy = resolved_energy + core_energy
 
 Logger.info(f"\nMost likely phase bitstring: {dominant_bits}")
