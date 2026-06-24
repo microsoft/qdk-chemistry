@@ -29,12 +29,12 @@ class BlockEncodingContainer(UnitaryContainer):
     _data_type_name = "block_encoding_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     @property
     @abstractmethod
     def power(self) -> int:
-        """Number of times to apply the walk operator."""
+        """Number of times to apply the block encoding."""
 
 
 @dataclass(frozen=True)
@@ -155,7 +155,7 @@ class LCUContainer(BlockEncodingContainer):
     _data_type_name = "lcu_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,

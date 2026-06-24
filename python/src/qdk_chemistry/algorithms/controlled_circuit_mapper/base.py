@@ -91,7 +91,7 @@ class ControlledCircuitMapper(Algorithm):
             if len(target_indices) != unitary.get_num_qubits():
                 raise ValueError(
                     f"target_indices length ({len(target_indices)}) "
-                    "must match unitary qubit count ({unitary.get_num_qubits()})."
+                    f"must match unitary qubit count ({unitary.get_num_qubits()})."
                 )
             if any(idx in self._get_control_indices() for idx in target_indices):
                 raise ValueError("target_indices must not overlap with control_indices.")

@@ -15,6 +15,7 @@ from qdk_chemistry.data.base import DataClass
 from .containers.base import UnitaryContainer
 from .containers.block_encoding import LCUContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
+from .containers.quantum_walk import LCUWalkContainer
 
 __all__: list[str] = []
 
@@ -31,7 +32,7 @@ class UnitaryRepresentation(DataClass):
     _data_type_name = "unitary_representation"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(self, container: UnitaryContainer) -> None:
         """Initialize a UnitaryRepresentation."""
@@ -116,6 +117,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_json(json_data)
         elif container_type == "lcu":
             container = LCUContainer.from_json(json_data)
+        elif container_type == "lcu_walk":
+            container = LCUWalkContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
 
@@ -137,6 +140,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_hdf5(group)
         elif container_type == "lcu":
             container = LCUContainer.from_hdf5(group)
+        elif container_type == "lcu_walk":
+            container = LCUWalkContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)
