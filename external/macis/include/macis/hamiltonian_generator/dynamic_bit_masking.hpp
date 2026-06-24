@@ -254,7 +254,7 @@ class DynamicBitMaskHamiltonianGenerator
   // ---- Extract packed masked value for a det under one mask ----
   static uint64_t apply_mask(const WfnType& det,
                              const std::vector<uint32_t>& mbits) {
-    if (mbits.size() >= 64) {
+    if (mbits.size() > 64) {
       throw std::runtime_error("apply_mask: mask has " +
                                std::to_string(mbits.size()) +
                                " bits, exceeding the 64-bit packing limit.");

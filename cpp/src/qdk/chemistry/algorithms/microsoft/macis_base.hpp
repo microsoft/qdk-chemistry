@@ -357,7 +357,7 @@ class Macis : public qdk::chemistry::algorithms::MultiConfigurationCalculator {
    * @return A pair containing the calculated energy and the resulting
    * wavefunction.
    *
-   * @throws std::runtime_error if the number of orbitals exceeds 128
+   * @throws std::runtime_error if the number of orbitals exceeds 2048
    *
    * @see qdk::chemistry::data::Hamiltonian
    * @see qdk::chemistry::data::Wavefunction

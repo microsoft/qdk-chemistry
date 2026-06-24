@@ -164,12 +164,13 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       logger->info("  WARM_START: matched={}/{}, projected_norm={:.4f}",
                    n_matched, wfn.size(), norm);
     }
-    if (norm < asci_settings.min_warm_start_overlap) {
+    if (norm < asci_settings.min_warm_start_overlap ||
+        norm < std::numeric_limits<double>::epsilon()) {
       X_local.clear();  // triggers identity guess in selected_ci_diag
       if (logger)
         logger->info(
-            "  WARM_START: norm {:.4f} < {:.4f} threshold, using diagonal "
-            "guess",
+            "  WARM_START: norm {:.4f} < {:.4f} threshold or < epsilon, "
+            "using diagonal guess",
             norm, asci_settings.min_warm_start_overlap);
     } else {
       blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
