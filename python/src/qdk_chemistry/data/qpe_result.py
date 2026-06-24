@@ -258,11 +258,13 @@ class QpeResult(DataClass):
     ) -> "QpeResult":
         r"""Construct a :class:`QpeResult` from a SOSSA product-walk phase measurement.
 
-        For the SOS product walk the eigenphases encode:
+        For the SOS product walk the eigenphases are
+        (Eq. 11 in :cite:`Low2025`):
 
         .. math::
 
-            \cos(2\pi\varphi) = E_{\text{gap}} / \Lambda - 1
+            e^{\pm i\arccos(E_\text{gap}/\Lambda - 1)},
+            \quad \Lambda \coloneqq \tfrac{1}{2}\lambda_{\text{sqrt}}^2
 
         so the energy gap is recovered as
         :math:`E_{\text{gap}} = \Lambda (1 + \cos(2\pi\varphi))`
@@ -282,7 +284,7 @@ class QpeResult(DataClass):
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
 
         Reference:
-            Eq. 11, 77 in :cite:`Low2025`.
+            Eq. 11 in :cite:`Low2025`.
 
         """
         Logger.trace_entering()

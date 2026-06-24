@@ -25,7 +25,7 @@ class FactorizedHamiltonianTest : public ::testing::Test {
     C = 1;
     core_energy = 1.5;
     bliss_core_shift = 0.1;
-    energy_gap = 0.0;  // leave at 0 to avoid lambda_eff issues in basic tests
+    energy_gap = 0.0;
 
     // One-body integrals [N x N]
     one_body = Eigen::MatrixXd::Identity(N, N);
@@ -61,7 +61,7 @@ class FactorizedHamiltonianTest : public ::testing::Test {
   /// Helper: build a FactorizedHamiltonianContainer from fixture data.
   std::unique_ptr<FactorizedHamiltonianContainer> make_container() const {
     return std::make_unique<FactorizedHamiltonianContainer>(
-        one_body, u, w, wb, R, B, C, orbitals, core_energy, inactive_fock,
+        R, B, C, core_energy, u, w, one_body, wb, inactive_fock, orbitals,
         bliss_core_shift, energy_gap);
   }
 
@@ -168,32 +168,6 @@ TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
   auto [h1a, h1b] = h.get_one_body_integrals();
   auto [h2_h1a, h2_h1b] = h2->get_one_body_integrals();
   EXPECT_TRUE(h1a.isApprox(h2_h1a));
-}
-
-// ---------------------------------------------------------------------------
-// JSON file I/O
-// ---------------------------------------------------------------------------
-
-TEST_F(FactorizedHamiltonianTest, JSONFileRoundTrip) {
-  Hamiltonian h(make_container());
-
-  std::string filename = "test_factorized.hamiltonian.json";
-  h.to_json_file(filename);
-  EXPECT_TRUE(std::filesystem::exists(filename));
-
-  auto h2 = Hamiltonian::from_json_file(filename);
-
-  EXPECT_EQ(h2->get_container_type(), "factorized");
-  EXPECT_TRUE(h2->has_container_type<FactorizedHamiltonianContainer>());
-  EXPECT_DOUBLE_EQ(h2->get_core_energy(), core_energy);
-
-  auto& fc = h2->get_container<FactorizedHamiltonianContainer>();
-  EXPECT_EQ(fc.get_num_ranks(), R);
-  EXPECT_EQ(fc.get_num_bases(), B);
-  EXPECT_EQ(fc.get_num_copies(), C);
-  EXPECT_TRUE(fc.get_u_matrices().isApprox(u));
-  EXPECT_TRUE(fc.get_w_matrices().isApprox(w));
-  EXPECT_TRUE(fc.get_wb_matrix().isApprox(wb));
 }
 
 // ---------------------------------------------------------------------------

@@ -1013,38 +1013,38 @@ Examples:
     >>> w = np.random.rand(R * B * C)
     >>> wb = np.random.rand(R, C)
     >>> container = FactorizedHamiltonianContainer(
-    ...     h1, u, w, wb, R, B, C, orbitals, 10.5, fock
+    ...     R, B, C, 10.5, u, w, h1, wb, fock, orbitals
     ... )
     >>> hamiltonian = Hamiltonian(container)
 )");
 
   factorized_container.def(
-      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
-               const Eigen::VectorXd&, const Eigen::MatrixXd&, size_t, size_t,
-               size_t, std::shared_ptr<Orbitals>, double,
-               const Eigen::MatrixXd&, double, double, HamiltonianType>(),
+      py::init<size_t, size_t, size_t, double, const Eigen::VectorXd&,
+               const Eigen::VectorXd&, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               std::shared_ptr<Orbitals>, double, double, HamiltonianType>(),
       R"(
 Constructor for factorized Hamiltonian.
 
 Args:
-    one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
-    u_matrices (numpy.ndarray): Orbital rotation matrices, flat [R*B*N]
-    w_matrices (numpy.ndarray): Two-body weights, flat [R*B*C]
-    wb_matrix (numpy.ndarray): Identity weights [R x C]
     num_ranks (int): Number of ranks R
     num_bases (int): Number of bases per rank B
     num_copies (int): Number of copies per rank C
-    orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    u_matrices (numpy.ndarray): Orbital rotation matrices, flat [R*B*N]
+    w_matrices (numpy.ndarray): Two-body weights, flat [R*B*C]
+    one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
+    wb_matrix (numpy.ndarray): Identity weights [R x C]
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [N x N]
+    orbitals (Orbitals): Molecular orbital data
     bliss_core_shift (float, optional): BLISS core energy shift (default 0)
     energy_gap (float, optional): E_gap for SOS block encoding (default 0)
     type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
 )",
-      py::arg("one_body_integrals"), py::arg("u_matrices"),
-      py::arg("w_matrices"), py::arg("wb_matrix"), py::arg("num_ranks"),
-      py::arg("num_bases"), py::arg("num_copies"), py::arg("orbitals"),
-      py::arg("core_energy"), py::arg("inactive_fock_matrix"),
+      py::arg("num_ranks"), py::arg("num_bases"), py::arg("num_copies"),
+      py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
+      py::arg("one_body_integrals"), py::arg("wb_matrix"),
+      py::arg("inactive_fock_matrix"), py::arg("orbitals"),
       py::arg("bliss_core_shift") = 0.0, py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 

@@ -19,9 +19,10 @@ __all__: list[str] = ["AliasSamplingStatePreparation"]
 
 
 class AliasSamplingStatePreparation(StatePreparation):
-    r"""State preparation using the Walker alias sampling method.
+    r"""State preparation using the alias sampling method.
 
-    Prepares an arbitrary probability distribution over L terms using:
+    The algorithm implements section III.D. of :cite:`Babbush2018`, to
+    prepares an arbitrary probability distribution over L terms using:
       - :math:`\lceil\log_2 L\rceil` index qubits
       - :math:`\mu` comparison (uniform) qubits
       - 1 flag qubit
@@ -29,7 +30,7 @@ class AliasSamplingStatePreparation(StatePreparation):
 
     Total ancilla: :math:`2\lceil\log_2 L\rceil + 2\mu + 1` qubits.
 
-    The circuit implements (Babbush et al. arXiv:1805.03662):
+    The circuit proceeds:
       1. PrepareUniformSuperposition over L terms
       2. H⊗μ on comparison register
       3. QROM load of (keep_l, alt_l) alias table
@@ -57,14 +58,13 @@ class AliasSamplingStatePreparation(StatePreparation):
         return "alias_sampling"
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        r"""Prepare a PREPARE circuit using alias sampling from a Wavefunction.
+        r"""State preparation using the alias sampling method.
 
         Extracts coefficients from the wavefunction and builds an alias sampling
-        circuit that prepares the state using O(L) Toffoli gates.
+        circuit that prepares the state.
 
         Args:
-            wavefunction: The target wavefunction whose coefficients define the
-                probability distribution for alias sampling.
+            wavefunction: The target wavefunction.
 
         Returns:
             Circuit: A Circuit wrapping the Q# alias sampling callable and factory.
@@ -78,13 +78,9 @@ class AliasSamplingStatePreparation(StatePreparation):
 
         coefficients = coeffs.tolist()
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
-        # Pad to 2^numIndexQubits so PrepareUniformSuperposition uses H⊗n
-        # (no internal ancilla qubits). Zero-weight entries are handled by the
-        # alias table — they get keepCoeff=0 and alias away to valid entries.
         padded_len = 1 << num_index_qubits
         if len(coefficients) < padded_len:
             coefficients = coefficients + [0.0] * (padded_len - len(coefficients))
-        # Total qubits: index + uniform + flag + qrom_output
         total_qubits = 2 * num_index_qubits + 2 * self._bits_precision + 1
 
         params = QSHARP_UTILS.AliasSampling.AliasSamplingParams(

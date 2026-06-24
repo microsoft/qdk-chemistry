@@ -47,12 +47,6 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
         """Initialize SOSSASettings with default values."""
         super().__init__()
         self._set_default(
-            "quantum_walk",
-            "bool",
-            True,
-            "If True, wrap block encoding with quantum walk operator (use with QPE).",
-        )
-        self._set_default(
             "tolerance",
             "float",
             1e-12,
@@ -72,20 +66,16 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     def __init__(
         self,
         power: int = 1,
-        quantum_walk: bool = True,
     ):
         r"""Initialize the SOSSA builder.
 
         Args:
             power: The power to raise the walk operator to. Defaults to 1.
-            quantum_walk: If True, produce a quantum walk operator for QPE.
-                Defaults to True.
 
         """
         super().__init__()
         self._settings = SOSSASettings()
         self._settings.set("power", power)
-        self._settings.set("quantum_walk", quantum_walk)
 
     def _run_impl(self, factorized_hamiltonian: FactorizedHamiltonianContainer) -> UnitaryRepresentation:
         """Build the SOSSA block encoding from a factorized Hamiltonian.
@@ -165,13 +155,13 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         )
 
         select = SOSSASelect(
-            rotation_angles=np.array(dq_angles),
-            sf_rotation_angles=np.array(sf_angles),
+            one_body_rotation_angles=np.array(dq_angles),
+            two_body_rotation_angles=np.array(sf_angles),
             num_orbitals=n_orbitals,
             num_ranks=n_ranks,
             num_copies=n_copies,
             num_bases=n_bases,
-            num_d1=num_d1,
+            num_positive_one_body_terms=num_d1,
         )
 
         # Energy shift: E_SOS + E_nuc for full energy recovery (Eq. 29, :cite:`Low2025`)
@@ -186,7 +176,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             select=select,
             normalization=normalization,
             power=self._settings.get("power"),
-            quantum_walk=self._settings.get("quantum_walk"),
             energy_shift=energy_shift,
         )
 

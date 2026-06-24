@@ -19,20 +19,13 @@ __all__: list[str] = ["QROMStatePreparation"]
 
 
 class QROMStatePreparation(StatePreparation):
-    r"""State preparation using QROM-based multiplexed rotations (SBM decomposition).
+    r"""State preparation using QROM-based multiplexed rotations.
 
     Prepares an arbitrary n-qubit state using n layers of multiplexed Ry rotations,
     where each layer's angles are loaded from a QROM table.
 
-    This approach uses only :math:`n = \lceil\log_2 L\rceil` qubits (no ancilla
-    registers for alias sampling), but requires n QROM lookups.
-
-    For resource estimation, each multiplexed rotation layer costs:
-      - QROM load: O(2^l) Toffolis to load angle bits for layer l
-      - Phase gradient addition: O(b_rot) Toffolis per rotation
-      - QROM uncompute: measurement-based (free in Toffoli cost)
-
-    Total Toffoli cost: :math:`\sum_{l=0}^{n-1} (2^l + b_{rot})` per walk step.
+    This approach uses only :math:`n = \lceil\log_2 L\rceil` qubits, but requires
+    n QROM lookups.
     """
 
     def __init__(self, rotation_bit_precision: int = 10):
@@ -49,17 +42,16 @@ class QROMStatePreparation(StatePreparation):
 
     def name(self) -> str:
         """Return the algorithm name."""
-        return "qrom_state_prep"
+        return "qrom"
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
-        r"""Prepare a PREPARE circuit using QROM-based SBM decomposition from a Wavefunction.
+        r"""State preparation using QROM-based SBM decomposition from a Wavefunction.
 
         Extracts amplitudes from the wavefunction and builds a QROM state prep
         circuit using n layers of multiplexed Ry rotations.
 
         Args:
-            wavefunction: The target wavefunction whose coefficients define
-                the amplitudes for QROM state preparation.
+            wavefunction: The target wavefunction.
 
         Returns:
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.

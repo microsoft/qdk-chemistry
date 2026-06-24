@@ -79,7 +79,7 @@ class SOSSAMapper(ControlledCircuitMapper):
 
     Configuration:
         - ``outer_prepare``: AlgorithmRef for state preparation (like LCU).
-          Supports ``"alias_sampling"``, ``"dense_pure_state"``, ``"qrom_state_prep"``.
+          Supports ``"alias_sampling"``, ``"dense_pure_state"``, ``"qrom"``.
         - ``inner_prepare_algorithm``: ``"controlled_alias_sampling"`` or ``"direct"``.
         - ``select_algorithm``: ``"qrom_phase_gradient"`` or ``"direct"``.
         - ``rotation_bit_precision``: bits for Givens angle precision (b_rot).
@@ -207,9 +207,9 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numRanks": container.select.num_ranks,
             "numBases": container.select.num_bases,
             "numCopies": container.select.num_copies,
-            "numD1": container.select.num_d1,
-            "dqRotationAngles": container.select.rotation_angles.tolist(),
-            "sfRotationAngles": container.select.sf_rotation_angles.tolist(),
+            "numD1": container.select.num_positive_one_body_terms,
+            "dqRotationAngles": container.select.one_body_rotation_angles.tolist(),
+            "sfRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "numFreeRiderBits": num_free_rider_bits,
         }

@@ -233,7 +233,7 @@ def _python_to_qsharp_permutation(num_orbitals):
 _OUTER_PREP_MAP = {
     "alias_sampling": "alias_sampling",
     "dense_pure": "dense_pure_state",
-    "qrom": "qrom_state_prep",
+    "qrom": "qrom",
 }
 
 
@@ -261,7 +261,7 @@ def _sossa_qpe_circuit_builder_ref(
             coefficient_bit_precision=coefficient_bit_precision,
             rotation_bit_precision=rotation_bit_precision,
         ),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa", quantum_walk=True),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
     )
 
 
@@ -307,20 +307,20 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
     orbitals = create_test_orbitals(n_orb)
     inactive_fock = np.zeros((n_orb, n_orb))
     fh = FactorizedHamiltonianContainer(
-        data["h1"],
-        data["basis_vectors"].flatten(),
-        data["two_body_weights"].flatten(),
-        data["identity_weight"],
         n_ranks,
         n_bases,
         n_copies,
-        orbitals,
         0.0,
+        data["basis_vectors"].flatten(),
+        data["two_body_weights"].flatten(),
+        data["h1"],
+        data["identity_weight"],
         inactive_fock,
+        orbitals,
     )
 
     # Build SOSSA unitary and get normalization
-    builder = SOSSABuilder(quantum_walk=True)
+    builder = SOSSABuilder()
     unitary_rep = builder.run(fh)
     container = unitary_rep.get_container()
     lambda_sos = container.normalization
@@ -398,20 +398,20 @@ class TestSOSSAQPEIntegration:
         inactive_fock = np.zeros((n_orb, n_orb))
 
         fh = FactorizedHamiltonianContainer(
-            h1,
-            u_matrices,
-            w_matrices,
-            wb_matrix,
             n_ranks,
             n_bases,
             n_copies,
-            orbitals,
             0.0,
+            u_matrices,
+            w_matrices,
+            h1,
+            wb_matrix,
             inactive_fock,
+            orbitals,
         )
 
         # Build SOSSA unitary representation
-        builder = SOSSABuilder(quantum_walk=True)
+        builder = SOSSABuilder()
         unitary_rep = builder.run(fh)
         assert isinstance(unitary_rep, UnitaryRepresentation)
 
@@ -469,7 +469,7 @@ class TestSOSSAQPEIntegration:
         )
 
         # Build SOSSA
-        builder = SOSSABuilder(quantum_walk=True)
+        builder = SOSSABuilder()
         unitary_rep = builder.run(fh)
         container = unitary_rep.get_container()
         lambda_sos = container.normalization
@@ -527,20 +527,20 @@ class TestSOSSAQPEIntegration:
         orbitals = create_test_orbitals(n_orb)
         inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
-            data["h1"],
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
             n_ranks,
             n_bases,
             n_copies,
-            orbitals,
             0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["h1"],
+            data["identity_weight"],
             inactive_fock,
+            orbitals,
         )
 
         # Step 1: SOSSABuilder → UnitaryRepresentation
-        builder = SOSSABuilder(quantum_walk=True)
+        builder = SOSSABuilder()
         unitary_rep = builder.run(fh)
         container = unitary_rep.get_container()
         assert isinstance(container, SOSSAContainer)
@@ -584,19 +584,19 @@ class TestSOSSAQPEIntegration:
         orbitals = create_test_orbitals(n_orb)
         inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
-            data["h1"],
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
             n_ranks,
             n_bases,
             n_copies,
-            orbitals,
             0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["h1"],
+            data["identity_weight"],
             inactive_fock,
+            orbitals,
         )
 
-        builder = SOSSABuilder(quantum_walk=True)
+        builder = SOSSABuilder()
         unitary_rep = builder.run(fh)
         container = unitary_rep.get_container()
         lambda_sos = container.normalization

@@ -84,16 +84,16 @@ def _make_random_factorized_hamiltonian(
     inactive_fock = np.zeros((n, n))
 
     return FactorizedHamiltonianContainer(
-        h1,
-        u_matrices,
-        w_matrices,
-        wb_matrix,
         r,
         b,
         c,
-        orbitals,
         0.0,
+        u_matrices,
+        w_matrices,
+        h1,
+        wb_matrix,
         inactive_fock,
+        orbitals,
     )
 
 
@@ -149,13 +149,13 @@ def _make_h2_sossa_unitary_representation():
         num_bases=num_bases,
     )
     select = SOSSASelect(
-        rotation_angles=dq_rotation_angles,
-        sf_rotation_angles=sf_rotation_angles,
+        one_body_rotation_angles=dq_rotation_angles,
+        two_body_rotation_angles=sf_rotation_angles,
         num_orbitals=num_orbitals,
         num_ranks=num_ranks,
         num_copies=num_copies,
         num_bases=num_bases,
-        num_d1=num_d1,
+        num_positive_one_body_terms=num_d1,
     )
 
     # Compute normalization
@@ -169,7 +169,6 @@ def _make_h2_sossa_unitary_representation():
         select=select,
         normalization=normalization,
         power=1,
-        quantum_walk=True,
     )
 
     return UnitaryRepresentation(container=container)
@@ -193,7 +192,6 @@ class TestSOSSAContainer:
 
         assert restored.type == container.type
         assert restored.power == container.power
-        assert restored.quantum_walk == container.quantum_walk
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(
             restored.outer_prepare.get_coefficients(),
@@ -206,7 +204,7 @@ class TestSOSSAContainer:
             atol=float_comparison_absolute_tolerance,
         )
         assert np.allclose(
-            restored.select.rotation_angles,
+            restored.select.one_body_rotation_angles,
             container.select.rotation_angles,
             atol=float_comparison_absolute_tolerance,
         )
@@ -227,7 +225,7 @@ class TestSOSSAContainer:
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
-        assert np.allclose(restored.select.sf_rotation_angles, container.select.sf_rotation_angles)
+        assert np.allclose(restored.select.two_body_rotation_angles, container.select.sf_rotation_angles)
 
     def test_unitary_representation_json_dispatch(self):
         """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
@@ -272,7 +270,6 @@ class TestSOSSABuilder:
         assert isinstance(result, UnitaryRepresentation)
         container = result.get_container()
         assert isinstance(container, SOSSAContainer)
-        assert container.quantum_walk is True
 
     def test_run_produces_correct_dimensions(self):
         """Test that run() produces a container with correct dimensions."""
@@ -337,13 +334,6 @@ class TestSOSSABuilder:
         builder = SOSSABuilder(power=3)
         result = builder.run(fh)
         assert result.get_container().power == 3
-
-    def test_quantum_walk_setting(self):
-        """Test quantum_walk parameter passes through to container."""
-        fh = _make_random_factorized_hamiltonian()
-        builder = SOSSABuilder(quantum_walk=False)
-        result = builder.run(fh)
-        assert result.get_container().quantum_walk is False
 
     def test_run_impl_requires_factorized_hamiltonian(self):
         """Test that _run_impl raises on invalid input."""
