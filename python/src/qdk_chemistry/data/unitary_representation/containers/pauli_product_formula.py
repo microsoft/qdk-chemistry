@@ -61,6 +61,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         step_terms: list[ExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
+        scale: float = 1.0,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -68,22 +69,32 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms: The list of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
+            scale: The evolution time used for eigenvalue-phase conversion.
 
         """
         self.step_terms = step_terms
         self.step_reps = step_reps
         self._num_qubits = num_qubits
+        self._scale = scale
         super().__init__()
 
-    @staticmethod
-    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+    @property
+    def scale(self) -> float:
+        """The evolution time used for eigenvalue-phase conversion.
+
+        Returns:
+            float: The scale factor.
+
+        """
+        return self._scale
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
 
         Convert a measured phase fraction to energy using ``E = angle / t``.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
-            scale: The evolution time :math:`t`.
 
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
@@ -92,7 +103,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
-        return float(angle / scale)
+        return float(angle / self.scale)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""

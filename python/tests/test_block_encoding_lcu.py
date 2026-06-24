@@ -350,3 +350,43 @@ class TestLCUContainer:
         assert "LCU Walk Operator Container" in summary
         assert "Power" in summary
         assert "Block Encoding" in summary
+
+    def test_walk_container_scale_equals_schatten_norm(self):
+        """LCUWalkContainer scale should equal the Hamiltonian's Schatten (L1) norm."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        assert isinstance(container, LCUWalkContainer)
+        assert np.isclose(
+            container.scale,
+            hamiltonian.schatten_norm,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_walk_container_eigenvalue_from_phase(self):
+        """LCUWalkContainer eigenvalue_from_phase recovers E = λ·cos(2πφ)."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        lam = hamiltonian.schatten_norm
+
+        # φ=0 → E=λ
+        assert np.isclose(
+            container.eigenvalue_from_phase(0.0),
+            lam,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # φ=0.25 → E=0
+        assert np.isclose(
+            container.eigenvalue_from_phase(0.25),
+            0.0,
+            atol=float_comparison_absolute_tolerance,
+        )

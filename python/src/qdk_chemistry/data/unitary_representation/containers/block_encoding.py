@@ -326,8 +326,7 @@ class LCUContainer(BlockEncodingContainer):
             f" {len(self.select.controlled_operations)} controlled operations"
         )
 
-    @staticmethod
-    def eigenvalue_from_phase(phase_fraction: float, scale: float) -> float:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         """Not applicable for a raw block encoding.
 
         A plain block encoding does not define an eigenvalue-phase

@@ -94,7 +94,7 @@ class ConfigurationSet : public DataClass {
    *
    * @return Non-padded mode count.
    */
-  size_t num_modes() const;
+  size_t capacity() const;
 
   /**
    * @brief Get the number of configurations in the set

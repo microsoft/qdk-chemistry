@@ -126,7 +126,7 @@ class Configuration : public DataClass {
    *
    * For spin-½ (2 bits/mode): @p N must be even; alpha occupations fill the
    * low half, beta the high half.
-   * For bitstring (1 bit/mode): one bit per mode in the low @c num_modes()
+   * For bitstring (1 bit/mode): one bit per mode in the low @c capacity()
    * positions.
    *
    * @tparam N Size of the returned bitset.
@@ -138,12 +138,12 @@ class Configuration : public DataClass {
     if (_bits_per_mode == 2) {
       static_assert(N % 2 == 0, "Bitset size must be even for spin-½");
       constexpr size_t max_spatial_orbs = N / 2;
-      if (num_modes() > max_spatial_orbs) {
+      if (capacity() > max_spatial_orbs) {
         throw std::invalid_argument(
             "Configuration has more modes than bitset capacity");
       }
       std::bitset<N> result;
-      for (size_t i = 0; i < num_modes(); ++i) {
+      for (size_t i = 0; i < capacity(); ++i) {
         OccupationState state = _get_orbital(i);
         if (state == ALPHA || state == DOUBLY) result.set(i);
         if (state == BETA || state == DOUBLY) result.set(max_spatial_orbs + i);
@@ -151,12 +151,12 @@ class Configuration : public DataClass {
       return result;
     }
     // 1-bit: flat mapping
-    if (num_modes() > N) {
+    if (capacity() > N) {
       throw std::invalid_argument(
           "Configuration has more modes than bitset capacity");
     }
     std::bitset<N> result;
-    for (size_t i = 0; i < num_modes(); ++i) {
+    for (size_t i = 0; i < capacity(); ++i) {
       if (_get_mode_raw(i)) result.set(i);
     }
     return result;
@@ -186,7 +186,7 @@ class Configuration : public DataClass {
    * @brief Number of single-particle modes in the configuration.
    * @return Number of modes (same as @ref get_orbital_capacity).
    */
-  size_t num_modes() const;
+  size_t capacity() const;
 
   /**
    * @brief Bits used to encode each mode (1 for spinless, 2 for spin-½).
@@ -198,7 +198,7 @@ class Configuration : public DataClass {
    * @brief Raw state value for mode @p idx (range 0 to 2^bits_per_mode - 1).
    * @param idx Mode index (0-indexed).
    * @return Packed state value for the mode.
-   * @throws std::out_of_range if @p idx >= num_modes().
+   * @throws std::out_of_range if @p idx >= capacity().
    */
   uint8_t get_mode_state(size_t idx) const;
 

@@ -19,8 +19,6 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
@@ -94,19 +92,10 @@ class IterativePhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container type and scale before running iterations
+        # Resolve container before running iterations
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-
-        if isinstance(container, QuantumWalkContainer):
-            scale = qubit_hamiltonian.schatten_norm
-        elif isinstance(container, PauliProductFormulaContainer):
-            scale = unitary_builder.settings().get("time")
-        else:
-            raise NotImplementedError(
-                f"eigenvalue_from_phase not supported for container type: {type(container).__name__}"
-            )
 
         num_bits = circuit_builder.settings().get("num_bits")
         if num_bits <= 0:
@@ -146,7 +135,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         return QpeResult.from_phase_fraction(
             method=self.name(),
             phase_fraction=phase_fraction,
-            eigenvalue_from_phase=lambda phi: type(container).eigenvalue_from_phase(phi, scale),
+            eigenvalue_from_phase=container.eigenvalue_from_phase,
             bits_msb_first=bits,
         )
 

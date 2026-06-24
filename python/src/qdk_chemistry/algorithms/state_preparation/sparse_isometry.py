@@ -117,7 +117,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
         config_set = wavefunction.get_configuration_set()
-        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
+        n_bits = config_set.capacity() * dets[0].bits_per_mode()
         state_vector = [det.to_bits(n_bits) for det in dets]
         n_qubits = len(state_vector[0])
 
