@@ -104,8 +104,8 @@ if [ "$PHASE" = "deps" ]; then
     echo "Setting up Python venv with build requirements..."
     VENV_DIR="${PWD}/.codeql-venv"
     python3 -m venv "${VENV_DIR}"
-    "${VENV_DIR}/bin/pip" install --quiet --upgrade pip
-    "${VENV_DIR}/bin/pip" install --quiet -r .pipelines/requirements.txt
+    "${VENV_DIR}/bin/pip" install --upgrade pip
+    "${VENV_DIR}/bin/pip" install -r .pipelines/requirements.txt
     PYBIND11_CMAKEDIR="$("${VENV_DIR}/bin/python" -m pybind11 --cmakedir)"
     echo "Using pybind11 cmake dir: ${PYBIND11_CMAKEDIR}"
 
