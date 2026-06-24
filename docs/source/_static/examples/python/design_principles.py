@@ -7,6 +7,8 @@
 
 ################################################################################
 # start-cell-scf-create
+from pathlib import Path
+
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -23,13 +25,8 @@ scf_solver.settings().set("max_iterations", 100)
 
 ################################################################################
 # start-cell-data-flow
-# Define a Structure (data classes in QDK/Chemistry are immutable by design)
-structure = Structure.from_xyz("""\
-2
-H2 molecule
-H    0.000000    0.000000    0.000000
-H    0.000000    0.000000    0.740848
-""")
+# Load a Structure from file (data classes in QDK/Chemistry are immutable by design)
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # Configure and run SCF calculation
 scf_solver = create("scf_solver")

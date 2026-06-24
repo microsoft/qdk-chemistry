@@ -28,13 +28,8 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-run
-  // Load a molecular structure (water molecule) from an XYZ string
-  auto structure = Structure::from_xyz(R"(3
-Water molecule
-O    0.000000    0.000000    0.000000
-H    0.758602    0.000000    0.504284
-H   -0.758602    0.000000    0.504284
-)");
+  // Load a molecular structure (water molecule) from XYZ file
+  auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
   int charge = 0;
 
   // First, run SCF to get molecular orbitals

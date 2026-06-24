@@ -26,16 +26,13 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 
 ################################################################################
 # start-cell-run
+from pathlib import Path
 from qdk_chemistry.data import Structure
 
-# Define a molecular structure (water molecule) in XYZ format
-structure = Structure.from_xyz("""\
-3
-Water molecule
-O    0.000000    0.000000    0.000000
-H    0.758602    0.000000    0.504284
-H   -0.758602    0.000000    0.504284
-""")
+# Load a molecular structure (water molecule) from XYZ file
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/water.structure.xyz"
+)
 charge = 0
 
 # First, run SCF to get molecular orbitals
