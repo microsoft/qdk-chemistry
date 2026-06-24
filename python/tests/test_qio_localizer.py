@@ -126,7 +126,7 @@ class TestQIOLocalizerBindings:
         # Transform the input RDMs into the QIO basis and recompute the entropy.
         ga_rot = u.T @ ga @ u
         gb_rot = u.T @ gb @ u
-        g2_rot = np.einsum("pqrl,pi,qj,rk,ls->ijkl", g2, u, u, u, u, optimize=True)
+        g2_rot = np.einsum("pqrl,pi,qj,rk,lm->ijkm", g2, u, u, u, u, optimize=True)
         entropy_after = _single_orbital_entropy_sum(ga_rot, gb_rot, g2_rot)
 
         # The QIO objective must not increase under the optimized rotation.
