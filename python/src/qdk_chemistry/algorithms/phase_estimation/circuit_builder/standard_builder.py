@@ -108,7 +108,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
-        ancilla_prep_op = QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
+        ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
             circuit, num_anc, prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
@@ -161,7 +161,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         if ancilla_prep_op is None:
-            ancilla_prep_op = QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
+            ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {

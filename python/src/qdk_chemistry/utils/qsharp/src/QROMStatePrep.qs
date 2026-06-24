@@ -2,18 +2,15 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// QROM-based state preparation for block encoding PREPARE oracles.
-///
-/// Implements state preparation using Quantum Read-Only Memory (QROM):
-///   |0⟩ → Σ_ℓ √(p_ℓ) |ℓ⟩
+/// QROM-based state preparation.
 ///
 /// Uses SBM (Shende-Bullock-Markov) decomposition: n layers of multiplexed
 /// Ry rotations. Each layer's rotation angles are loaded via SelectSwap QROM
 /// and applied via phase gradient addition (RyViaPhaseGradient).
 ///
 /// References:
-///   - arXiv:2502.15882v1, Section C (SBM decomposition)
-///   - Low, Kliuchnikov, Schaeffer (arXiv:1812.00954): QROM state prep
+///   - Low et al. (arXiv:2502.15882v1), Section C SBM decomposition
+///   - Low, Kliuchnikov, Schaeffer (arXiv:1812.00954): QROM
 ///   - Sanders et al. (arXiv:2007.07391): Phase gradient rotation
 namespace QDKChemistry.Utils.QROMStatePrep {
 
@@ -36,18 +33,17 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     struct QROMStatePrepParams {
         /// Target amplitudes (real, need not be normalized), length L.
         amplitudes : Double[],
-        /// Number of bits for rotation angle precision (phase gradient size).
+        /// Number of bits for rotation angle precision.
         rotationBitPrecision : Int,
         /// Number of qubits for the state register: ⌈log₂ L⌉.
         numStateQubits : Int,
     }
 
-    /// QROM state preparation using SBM decomposition with SelectSwap + phase gradient.
+    /// QROM state preparation using SBM decomposition.
     ///
     /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
     ///
     /// Allocates phase gradient and angle ancilla registers internally.
-    /// Qubit ordering: target[n-1] = MSB (first layer target), target[0] = LSB.
     operation QROMStatePrepare(
         params : QROMStatePrepParams,
         target : Qubit[],
@@ -62,7 +58,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         }
     }
 
-    /// Core state preparation with externally provided ancillae.
+    /// Core QROM state preparation.
     ///
     /// Each layer l targets qubit target[l] and uses Reversed(target[0..l-1])
     /// as the LE address register for SelectSwap QROM lookup.
@@ -105,7 +101,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                 // target[0] = MSB, so Reversed gives LE for Select.
                 let address = Reversed(target[0..level - 1]);
 
-                // Build QROM data table: Bool[2^level][bRot].
                 let startIdx = 1 <<< level;
                 let numAngles = 1 <<< level;
                 let data = ComputeQROMData(angleTree, startIdx, numAngles, bRot);
@@ -152,7 +147,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         QROMStatePrepare(params, qs);
     }
 
-    // --- Classical helper functions ---
+    // --- helper functions ---
 
     /// Compute the SBM rotation angles as quantized integers in a binary heap.
     ///
@@ -250,8 +245,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
-    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // Test wrappers
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: run QROM state preparation and leave state for dump_machine.

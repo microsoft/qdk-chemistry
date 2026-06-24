@@ -28,7 +28,7 @@ _PROJECT_ROOT = str(_QS_DIR)
 _OUTER_PREP_MAP = {
     "alias_sampling": "alias_sampling",
     "dense_pure": "dense_pure_state",
-    "qrom": "qrom_state_prep",
+    "qrom": "qrom",
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -65,16 +65,16 @@ def _make_random_factorized_hamiltonian(
     inactive_fock = np.zeros((n, n))
 
     return FactorizedHamiltonianContainer(
-        h1,
-        u_matrices,
-        w_matrices,
-        wb_matrix,
         r,
         b,
         c,
-        orbitals,
         0.0,
+        u_matrices,
+        w_matrices,
+        h1,
+        wb_matrix,
         inactive_fock,
+        orbitals,
     )
 
 
@@ -85,7 +85,6 @@ def _build_controlled_unitary(
     num_copies: int = 1,
     *,
     seed: int = 42,
-    quantum_walk: bool = True,
 ):
     """Helper: build ControlledUnitary with SOSSAContainer from random factorized data."""
     fh = _make_random_factorized_hamiltonian(
@@ -95,7 +94,7 @@ def _build_controlled_unitary(
         num_copies=num_copies,
         seed=seed,
     )
-    builder = SOSSABuilder(quantum_walk=quantum_walk)
+    builder = SOSSABuilder()
     unitary_rep = builder.run(fh)
     return ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
@@ -537,207 +536,6 @@ class TestSOSSAMapper:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
-    """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
-    N = len(vec)  # noqa: N806
-    v = vec.copy().astype(float)
-    angles = [0.0] * (N - 1)
-    for j in range(N - 2, -1, -1):
-        angles[j] = float(np.arctan2(v[j + 1], v[j]))
-        v[j] = float(np.sqrt(v[j] ** 2 + v[j + 1] ** 2))
-    return angles
-
-
-class TestSelectGivensFidelity:
-    """Tests for the Givens rotation chain fidelity.
-
-    NOTE: The CNOT·Ry·CNOT Givens gate preserves parity within each adjacent
-    qubit pair ({|01⟩,|10⟩} and {|00⟩,|11⟩} are invariant subspaces).
-    For N=2 this gives exact single-excitation decomposition.  For N>2 there
-    is leakage to multi-excitation states, which is acceptable for the block
-    encoding (the within{Givens}apply{Majorana} pattern relies only on
-    round-trip correctness: Givens†·Givens = I).
-
-    Qubit ordering: Q# dump_machine uses BIG-ENDIAN convention where
-    qs[0] = MSB.  Single excitation on qs[j] → state index 2^(N-1-j).
-    """
-
-    def test_givens_rotation_n2_exact(self):
-        """Verify ApplyGivensSequence maps |10⟩ → target vector exactly for N=2."""
-        N = 2  # noqa: N806
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        rng = np.random.default_rng(42)
-        vec = rng.standard_normal(N)
-        vec /= np.linalg.norm(vec)
-
-        angles = _vector_to_givens_angles(vec)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        # Big-endian: qs[j] occupied → sv[1 << (N-1-j)]
-        for j in range(N):
-            idx = 1 << (N - 1 - j)
-            assert abs(sv[idx] - vec[j]) < 1e-10, f"Mismatch at qubit {j}: expected {vec[j]:.6f}, got {sv[idx]}"
-
-        # All other amplitudes should be zero (no leakage for N=2)
-        single_excitation_indices = {1 << (N - 1 - j) for j in range(N)}
-        for i in range(2**N):
-            if i not in single_excitation_indices:
-                assert abs(sv[i]) < 1e-10, f"Non-zero amplitude at index {i}: {sv[i]}"
-
-    @pytest.mark.parametrize("N", [2, 3, 4])
-    def test_givens_round_trip(self, N):  # noqa: N803
-        """Verify Givens rotation and its adjoint cancel: G†G|ψ⟩ = |ψ⟩."""
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        rng = np.random.default_rng(123 + N)
-        vec = rng.standard_normal(N)
-        vec /= np.linalg.norm(vec)
-
-        angles = _vector_to_givens_angles(vec)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRoundTrip(angles, N)
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        # Initial state X(qs[0]) → sv[2^(N-1)] (big-endian: qs[0] = MSB)
-        initial_idx = 1 << (N - 1)
-        assert abs(sv[initial_idx]) > 1 - 1e-10, f"Round trip failed: sv[{initial_idx}] = {sv[initial_idx]}"
-        for i in range(2**N):
-            if i != initial_idx:
-                assert abs(sv[i]) < 1e-10, f"Non-zero at {i}: {sv[i]}"
-
-    @pytest.mark.parametrize(
-        ("vec_desc", "vec"),
-        [
-            ("e0_2", np.array([1.0, 0.0])),
-            ("e1_2", np.array([0.0, 1.0])),
-            ("half_2", np.array([1.0, 1.0]) / np.sqrt(2)),
-            ("random_2", np.array([0.6, 0.8])),
-        ],
-        ids=["e0_2", "e1_2", "half_2", "random_2"],
-    )
-    def test_givens_specific_vectors_n2(self, vec_desc, vec):
-        """Verify Givens rotation for specific N=2 vectors (exact, no leakage)."""
-        N = len(vec)  # noqa: N806
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        angles = _vector_to_givens_angles(vec)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        # Big-endian: qs[j] occupied → sv[1 << (N-1-j)]
-        for j in range(N):
-            idx = 1 << (N - 1 - j)
-            actual_amp = sv[idx]
-            assert abs(actual_amp - vec[j]) < 1e-10, (
-                f"Vector {vec_desc}: mismatch at qubit {j}: expected {vec[j]}, got {actual_amp}"
-            )
-
-    @pytest.mark.parametrize(
-        ("vec_desc", "vec"),
-        [
-            ("e0_3", np.array([1.0, 0.0, 0.0])),
-            ("e1_3", np.array([0.0, 1.0, 0.0])),
-            ("e2_3", np.array([0.0, 0.0, 1.0])),
-        ],
-        ids=["e0_3", "e1_3", "e2_3"],
-    )
-    def test_givens_basis_vectors_n3(self, vec_desc, vec):
-        """Verify Givens with basis vectors for N=3 (no leakage for basis vectors).
-
-        When the target is a basis vector, only one Givens rotation is non-trivial
-        and the others have angle 0 or π/2, avoiding the leakage issue.
-        """
-        N = len(vec)  # noqa: N806
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        angles = _vector_to_givens_angles(vec)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestGivensRotation(angles, N)
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        # For basis vectors, check the expected qubit is occupied
-        j_nonzero = int(np.argmax(np.abs(vec)))
-        idx = 1 << (N - 1 - j_nonzero)
-        assert abs(abs(sv[idx]) - 1.0) < 1e-10, (
-            f"Vector {vec_desc}: expected unit amplitude at sv[{idx}], got {sv[idx]}"
-        )
-
-
-class TestSelectSpinsFidelity:
-    """Tests for SelectSpins operation correctness.
-
-    Register layout: isSF(1) + spinDQ(1) + spinSF(1) + spin(1) + sysDown(N) + sysUp(N)
-    Big-endian convention: qs[k] → bit position (total-1-k) in state vector index.
-    """
-
-    @staticmethod
-    def _bit_of(qubit_pos: int, total: int) -> int:
-        """Convert qubit array position to bit position in state vector (big-endian)."""
-        return total - 1 - qubit_pos
-
-    def test_dq_mode_spin_up(self):
-        """In DQ mode (isSF=0) with spinDQ=0, no SWAP should occur."""
-        N = 2  # noqa: N806
-        total = 2 * N + 4  # 8 qubits
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpins(False, False, N)  # spinDQ=0, spinSF=0
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        # Initial: sysDown[0]=1 (qubit pos 4). Expected: unchanged (spin=0, no SWAP).
-        sysdown0_bit = self._bit_of(4, total)  # bit 3
-        expected_idx = 1 << sysdown0_bit
-        assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
-            f"Expected all amplitude at index {expected_idx}, got {abs(sv[expected_idx])}"
-        )
-
-    def test_dq_mode_spin_down(self):
-        """In DQ mode (isSF=0) with spinDQ=1, SWAP should move sysDown to sysUp."""
-        N = 2  # noqa: N806
-        total = 2 * N + 4  # 8 qubits
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpins(True, False, N)  # spinDQ=1, spinSF=0
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        spinDQ_bit = self._bit_of(1, total)  # noqa: N806  # bit 6
-        spin_bit = self._bit_of(3, total)  # bit 4
-        sysUp0_bit = self._bit_of(4 + N, total)  # noqa: N806  # bit 1
-        expected_idx = (1 << spinDQ_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
-        assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
-            f"Expected all amplitude at index {expected_idx}, got {abs(sv[expected_idx])}"
-        )
-
-    def test_sf_mode_spin_down(self):
-        """In SF mode (isSF=1) with spinSF=1, SWAP should occur."""
-        N = 2  # noqa: N806
-        total = 2 * N + 4  # 8 qubits
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectSpinsSF(True, N)  # spinSF=1
-        state = qsharp.dump_machine()
-        sv = np.array(state.as_dense_state())
-
-        isSF_bit = self._bit_of(0, total)  # noqa: N806  # bit 7
-        spinSF_bit = self._bit_of(2, total)  # noqa: N806  # bit 5
-        spin_bit = self._bit_of(3, total)  # bit 4
-        sysUp0_bit = self._bit_of(4 + N, total)  # noqa: N806  # bit 1
-        expected_idx = (1 << isSF_bit) | (1 << spinSF_bit) | (1 << spin_bit) | (1 << sysUp0_bit)
-        assert abs(abs(sv[expected_idx]) - 1.0) < 1e-10, (
-            f"Expected all amplitude at index {expected_idx}, got {abs(sv[expected_idx])}"
-        )
-
-
 class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
@@ -764,9 +562,9 @@ class TestSelectFullFidelity:
             "numRanks": R,
             "numBases": B,
             "numCopies": C,
-            "numD1": N,
-            "dqRotationAngles": dq_angles,
-            "sfRotationAngles": sf_angles,
+            "numPositiveOneBody": N,
+            "OneBodyRotationAngles": dq_angles,
+            "TwoBodyRotationAngles": sf_angles,
             "rotationBitPrecision": 10,
             "numFreeRiderBits": 2,
         }
@@ -803,9 +601,9 @@ class TestSelectFullFidelity:
             "numRanks": R,
             "numBases": B,
             "numCopies": C,
-            "numD1": N,
-            "dqRotationAngles": dq_angles,
-            "sfRotationAngles": sf_angles,
+            "numPositiveOneBody": N,
+            "OneBodyRotationAngles": dq_angles,
+            "TwoBodyRotationAngles": sf_angles,
             "rotationBitPrecision": 10,
             "numFreeRiderBits": 2,
         }

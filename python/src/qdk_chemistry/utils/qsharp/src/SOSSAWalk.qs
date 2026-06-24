@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// SOSSA (Sum of Squares Spectral Amplification) walk operator.
+/// Sum of Squares Spectral Amplification (SOSSA) walk operator.
 ///
 /// Composable design: each sub-operation (OuterPrepare, InnerPrepare, Select)
 /// is built independently as a Q# callable. The walk step composes them with
@@ -12,7 +12,8 @@
 ///   W = Ref_{a,B} · U† · Ref_B · U
 /// where U = OuterPREP · within{InnerPREP} apply{SELECT}.
 ///
-/// For QPE, only reflections are controlled:
+/// For QPE, we need controlled walk operators, where reflections are
+/// controlled (arXiv:1805.03662, fig 1)
 ///   c-W = c-Ref_{a,B} · U† · c-Ref_B · U
 namespace QDKChemistry.Utils.SOSSAWalk {
 
@@ -36,16 +37,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.ResourceEstimation.SingleVariant;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
     import Std.Arithmetic.RippleCarryCGIncByLE;
-    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.PhaseGradient.MakePhaseGradientAncillaPrep;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Type aliases for composable sub-operations
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Outer PREPARE: (outerReg: Qubit[]) => Unit is Adj + Ctl
-    /// Inner PREPARE: (outerReg: Qubit[], innerReg: Qubit[]) => Unit is Adj + Ctl
-    /// SELECT: (outerReg: Qubit[], innerReg: Qubit[], spinReg: Qubit[], systemReg: Qubit[]) => Unit is Adj + Ctl
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Inner PREPARE factories
@@ -146,9 +141,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numRanks : Int,
         numBases : Int,
         numCopies : Int,
-        numD1 : Int,
-        dqRotationAngles : Double[][],
-        sfRotationAngles : Double[][],
+        numPositiveOneBody : Int,
+        OneBodyRotationAngles : Double[][],
+        TwoBodyRotationAngles : Double[][],
         rotationBitPrecision : Int,
         /// Number of free-rider bits at the end of innerReg loaded by inner PREPARE QROM.
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
@@ -158,7 +153,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build a SELECT using QROM + phase gradient rotation.
     ///
-    /// Givens rotations are applied via split DQ/SF Select QROM + RyViaPhaseGradient.
+    /// Givens rotations are applied via split OneBody/TwoBody Select QROM + RyViaPhaseGradient.
     /// This is the production implementation for fault-tolerant resource estimation.
     /// The phase gradient register is allocated and prepared externally by QPE.
     function MakeSelectPhaseGradient(
@@ -173,7 +168,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// Givens rotations are applied via multi-controlled Ry gates.
     /// Useful for simulation and testing (no ancilla overhead).
-    /// The phaseGradientReg argument is accepted but ignored (unused for direct rotations).
+    /// The phaseGradientReg argument is accepted but ignored.
     function MakeSelectDirectRotation(
         params : SelectParams
     ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
@@ -182,13 +177,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
-    /// Shared SELECT implementation (arXiv:2502.15882v1, Section 5 / Appendix B.5-B.6).
+    /// SELECT implementation (arXiv:2502.15882v1, Appendix B.3, B.5-B.6).
     ///
     /// Implements: within{SelectSpins} apply{ within{GivensRotations} apply{MajoranaOp} }
     ///
     /// isSF and dvsq are read from the free-rider register at the end of innerReg,
     /// loaded by inner PREPARE's conditional alias sampling QROM.
-    /// H(spinSF) is applied externally in the walk step as part of inner preparation.
+    /// spinDQ and spinSF are initialized during outer and inner preparation steps.
     ///
     /// # Parameters
     /// ## usePhaseGradient
@@ -256,28 +251,27 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         bReg,
                         rBits,
                         sysRegDown,
-                        phaseGradientReg
+                        phaseGradientReg,
+                        bEqBQubit
                     );
                 } else {
-                    ApplyConditionalGivensRotations(
+                    ApplyMultiControlledRotations(
                         params,
                         N,
                         numSF,
                         numBp1,
                         numRotAngles,
                         xoBits,
+                        isSF,
                         xoReg,
                         bReg,
-                        sysRegDown
+                        sysRegDown,
+                        bEqBQubit
                     );
                 }
-                // Set bEqB flag: 1 when (isSF AND b == B)
-                ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
             } apply {
                 // Majorana operator (Fig. 4 / Appendix B.6)
                 MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
-                // DQ phase correction on spinSF (arXiv:2502.15882v1, Appendix B.6)
-                // For DQ mode (isSF=0): Z(spinSF) ensures correct walk eigenphase.
                 within { X(isSF); } apply {
                     Controlled Z([isSF], spinSF);
                 }
@@ -329,7 +323,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             // Ref_B: inner reflection on bReg + spinSF (excludes freeRider)
             Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
 
-            // U†: must undo inner BE first (needs outerReg superposition), then outer
+            // U†: undo inner BE first, then outer
             within {
                 innerPrepareOp(outerIndexReg, innerReg);
                 H(spinReg[1]); // H(spinSF)
@@ -500,25 +494,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // Helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Build an ancillaPrep callback that prepares the phase gradient state
-    /// on the last `numPhaseGradientQubits` qubits of the beAncillas array.
-    /// Returns a no-op when numPhaseGradientQubits == 0.
-    function MakePhaseGradientAncillaPrep(numPhaseGradientQubits : Int) : Qubit[] => Unit is Adj {
-        (beAncillas) => {
-            if numPhaseGradientQubits > 0 {
-                let n = Length(beAncillas);
-                let pgReg = beAncillas[n - numPhaseGradientQubits..n - 1];
-                PreparePhaseGradientState(pgReg);
-            }
-        }
-    }
-
-    /// No-op ancilla preparation (used when no persistent ancilla init is needed).
-    function MakeNoOpAncillaPrep() : Qubit[] => Unit is Adj {
-        (beAncillas) => {}
-    }
-
-
     /// Select spin qubit and SWAP up/down registers (arXiv:2502.15882v1, Step 4).
     ///
     /// Coherently computes `spin` from (isSF, spinDQ, spinSF):
@@ -556,16 +531,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// DQ rotations: controlled on xoReg ∈ [0, N), unconditional on b.
     /// SF rotations: controlled on (xoReg, bReg) jointly.
-    operation ApplyConditionalGivensRotations(
+    operation ApplyMultiControlledRotations(
         params : SelectParams,
         N : Int,
         numSF : Int,
         numBp1 : Int,
         numRotAngles : Int,
         xoBits : Int,
+        isSF : Qubit,
         xoReg : Qubit[],
         bReg : Qubit[],
-        sysRegDown : Qubit[]
+        sysRegDown : Qubit[],
+        bEqBQubit : Qubit
     ) : Unit is Adj + Ctl {
         for j in 0..numRotAngles - 1 {
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
@@ -576,7 +553,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             // act on ALL sectors (0, 1, 2 excitations) so that its adjoint
             // properly uncomputes after MajoranaOp changes the particle number.
             for a in 0..N - 1 {
-                let angle = params.dqRotationAngles[a][j];
+                let angle = params.OneBodyRotationAngles[a][j];
                 ApplyControlledOnInt(a, Ry(-2.0 * angle, _), xoReg, sysRegDown[j]);
             }
 
@@ -586,8 +563,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 let r = xoIdx / params.numCopies;
                 for b in 0..numBp1 - 1 {
                     let angleIdx = b * params.numRanks + r;
-                    if angleIdx < Length(params.sfRotationAngles) and j < Length(params.sfRotationAngles[angleIdx]) {
-                        let angle = params.sfRotationAngles[angleIdx][j];
+                    if angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
+                        let angle = params.TwoBodyRotationAngles[angleIdx][j];
                         let condValue = xo + b * (1 <<< xoBits);
                         ApplyControlledOnInt(condValue, Ry(-2.0 * angle, _), xoReg + bReg, sysRegDown[j]);
                     }
@@ -596,6 +573,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
         }
+        // Set bEqB flag: 1 when (isSF AND b == B)
+        ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
     }
 
     /// Givens rotation chain using split DQ/SF QROM bulk-load + phase gradient rotation.
@@ -622,6 +601,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         rBits : Qubit[],
         sysRegDown : Qubit[],
         phaseGradientReg : Qubit[],
+        bEqBQubit : Qubit,
     ) : Unit is Adj + Ctl {
         let bRot = params.rotationBitPrecision;
         let bBits = Length(bReg);
@@ -632,18 +612,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
         let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
 
-        // SF table: R*2^bBits entries × (N-1)*bRot bits, addressed by bReg++rBits
+        // SF table: R*2^bBits entries × ((N-1)*bRot + 1) bits, addressed by bReg++rBits
+        // The +1 bit is the bEqB flag (1 when b == B).
         let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits);
 
-        // Allocate rotation target register (all angles loaded at once).
-        use rotTarget = Qubit[nRotBits];
+        // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
+        use rotTarget = Qubit[nRotBits + 1];
 
         // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg
+        // DQ entries have only rotation bits (no bEqB), so target excludes last qubit.
         within { X(isSF); } apply {
-            Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget));
+            Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget[0..nRotBits - 1]));
         }
         // SF load: fires when isSF=1, addressed by (bReg ++ rBits)
+        // SF entries include bEqB flag at position nRotBits.
         Controlled Select([isSF], (sfData, bReg + rBits, rotTarget));
+
+        // Copy bEqB flag from QROM output to persistent qubit.
+        // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
+        CNOT(rotTarget[nRotBits], bEqBQubit);
 
         // Apply all Givens rotations from the loaded register.
         // Uses DFTHC-style conjugation: CNOT(j+1→j) + S†H converts Rz→Ry
@@ -653,16 +640,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         for j in 0..numRotAngles - 1 {
             within {
                 CNOT(sysRegDown[j + 1], sysRegDown[j]);
-                Adjoint S(sysRegDown[j]);
-                H(sysRegDown[j]);
             } apply {
-                for k in 0..Length(phaseGradientReg) - 1 {
-                    CNOT(sysRegDown[j], phaseGradientReg[k]);
-                }
-                RippleCarryCGIncByLE(rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
-                for k in 0..Length(phaseGradientReg) - 1 {
-                    CNOT(sysRegDown[j], phaseGradientReg[k]);
-                }
+                RyViaPhaseGradient(sysRegDown[j], rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
             }
         }
     }
@@ -679,8 +658,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         for xo in 0..N - 1 {
             mutable bits : Bool[] = [];
             for j in 0..numRotAngles - 1 {
-                let angle = if j < Length(params.dqRotationAngles[xo]) {
-                    params.dqRotationAngles[xo][j]
+                let angle = if j < Length(params.OneBodyRotationAngles[xo]) {
+                    params.OneBodyRotationAngles[xo][j]
                 } else {
                     0.0
                 };
@@ -691,7 +670,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         return table;
     }
 
-    /// Build SF bulk rotation data: R*2^bBits entries, each containing all (N-1) quantized angles.
+    /// Build SF bulk rotation data: R*2^bBits entries, each containing all (N-1) quantized angles
+    /// plus a 1-bit bEqB flag indicating b == numBases.
     /// Address layout: bReg (low bBits) ++ rBits (high), so addr = b + r * 2^bBits.
     /// Matches DFTHC paper cost formula: R*(B+1) entries.
     internal function BuildSFBulkRotationData(
@@ -712,13 +692,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             mutable bits : Bool[] = [];
             for j in 0..numRotAngles - 1 {
                 let angleIdx = b * params.numRanks + r;
-                let angle = if r < R and angleIdx < Length(params.sfRotationAngles) and j < Length(params.sfRotationAngles[angleIdx]) {
-                    params.sfRotationAngles[angleIdx][j]
+                let angle = if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
+                    params.TwoBodyRotationAngles[angleIdx][j]
                 } else {
                     0.0
                 };
                 set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
             }
+            // Append bEqB flag: true when b == numBases (the identity term)
+            set bits += [b == params.numBases];
             set table += [bits];
         }
         return table;
@@ -753,35 +735,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             Controlled Z([sf_vs_dq, bEqB], system_reg_0);
         }
         // DQ: X on system_reg_0 with spin-dependent Z
-        // spin in |+⟩ creates LCU: (X + XZ)/√2 = √2·a† or (X - XZ)/√2 = √2·a
         within { X(sf_vs_dq); } apply {
             CNOT(sf_vs_dq, system_reg_0);
             Controlled Z([sf_vs_dq, spin], system_reg_0);
         }
         // DQ Q1 sign flip: Z(spin) when sf_vs_dq=0 AND d_vs_q=1
-        // Flips |+⟩→|−⟩ on spin to switch between a† (D1) and a (Q1)
         within { X(sf_vs_dq); } apply {
             Controlled Z([sf_vs_dq, d_vs_q], spin);
         }
     }
 
-    /// Apply a sequence of Givens rotations to target qubits (standalone, no CNOT sandwich).
-    /// Used for testing individual orbital rotations.
-    operation ApplyGivensSequence(angles : Double[], target : Qubit[]) : Unit is Adj + Ctl {
-        let numAngles = Length(angles);
-        let numQubits = Length(target);
-        for j in 0..numAngles - 1 {
-            if j + 1 < numQubits {
-                CNOT(target[j], target[j + 1]);
-                Ry(-2.0 * angles[j], target[j]);
-                CNOT(target[j], target[j + 1]);
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Exported helper operations for unit testing
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Build an outer PREPARE that applies PreparePureStateD (pure-state amplitude encoding).
     /// Returns a callable (Qubit[]) => Unit is Adj + Ctl.
@@ -792,8 +755,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
-    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // Test wrappers
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Generic wrapper: applies an operation to a freshly allocated register.
@@ -872,7 +834,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         xoValue : Int,
     ) : Unit {
         let N = selectData.numOrbitals;
-        let numD1 = selectData.numD1;
+        let numPositiveOneBody = selectData.numPositiveOneBody;
         let numSF = selectData.numRanks * selectData.numCopies;
         let Xo = N + numSF;
         let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
@@ -902,7 +864,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         let frStart = bBits;
         if xoValue >= N { X(innerReg[frStart]); }
-        if xoValue >= numD1 { X(innerReg[frStart + 1]); }
+        if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
 
         X(systemReg[0]);
 
@@ -915,7 +877,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         xoValue : Int,
     ) : Unit {
         let N = selectData.numOrbitals;
-        let numD1 = selectData.numD1;
+        let numPositiveOneBody = selectData.numPositiveOneBody;
         let numSF = selectData.numRanks * selectData.numCopies;
         let Xo = N + numSF;
         let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
@@ -942,7 +904,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         let frStart = bBits;
         if xoValue >= N { X(innerReg[frStart]); }
-        if xoValue >= numD1 { X(innerReg[frStart + 1]); }
+        if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
 
         X(systemReg[0]);
 
@@ -1002,9 +964,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use control = Qubit();
         use allQubits = Qubit[numSystemQubits + totalAncilla];
         let walkOp = MakeControlledSOSSAWalkOp(
-            outerPrepareOp, innerPrepareOp, selectOp,
-            numSystemQubits, numOuterQubits, numOuterIndexQubits,
-            numInnerQubits, numReflectInner, numPhaseGradientQubits, 1);
+            outerPrepareOp,
+            innerPrepareOp,
+            selectOp,
+            numSystemQubits,
+            numOuterQubits,
+            numOuterIndexQubits,
+            numInnerQubits,
+            numReflectInner,
+            numPhaseGradientQubits,
+            1
+        );
         H(control);
         walkOp(control, allQubits);
         H(control);
