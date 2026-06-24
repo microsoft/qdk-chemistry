@@ -99,7 +99,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -130,7 +130,7 @@ class SortedDoubleLoopHamiltonianGenerator
     // 1. First pass - Count non-zero matrix elements per row
     // 2. Second pass - Compute and fill the CSR matrix directly
 
-    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
     // First pass: Count non-zeros per row to allocate CSR structure
     std::vector<index_t> row_nnz(nbra_dets, 0);
@@ -306,7 +306,9 @@ class SortedDoubleLoopHamiltonianGenerator
               index_t offset_row;
 #ifdef _OPENMP
 #pragma omp critical
-              { offset_row = row_offsets[ibra]++; }
+              {
+                offset_row = row_offsets[ibra]++;
+              }
 #else
               offset_row = row_offsets[ibra]++;
 #endif /* _OPENMP */
@@ -318,7 +320,9 @@ class SortedDoubleLoopHamiltonianGenerator
                 index_t offset_col;
 #ifdef _OPENMP
 #pragma omp critical
-                { offset_col = row_offsets[iket]++; }
+                {
+                  offset_col = row_offsets[iket]++;
+                }
 #else
                 offset_col = row_offsets[iket]++;
 #endif /* _OPENMP */
@@ -492,7 +496,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -519,7 +523,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -610,7 +614,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -637,7 +641,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -733,7 +737,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto [[maybe_unused]] setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -760,7 +764,7 @@ class SortedDoubleLoopHamiltonianGenerator
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto [[maybe_unused]] count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {

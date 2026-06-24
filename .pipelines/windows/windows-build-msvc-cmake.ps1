@@ -17,8 +17,8 @@
 #   -SkipConfigure  # Skip CMake configure, incremental build only
 #   -SkipPython     # Skip Python build, only do C++
 #   -SkipTests      # Skip test runs
-#   -DebugBuild     # Build C++ in Debug mode (build-msvc-debug/, enables MSVC iterator checks).
-#                   # Python build is skipped automatically.
+#   -BuildType       # CMake build type: Release (default), RelWithDebInfo, or Debug.
+#                   # Debug build skips the Python build (not usable for the Python extension).
 
 param(
     [switch]$DynamicDeps,
@@ -27,7 +27,8 @@ param(
     [switch]$SkipConfigure,
     [switch]$SkipPython,
     [switch]$SkipTests,
-    [switch]$DebugBuild
+    [ValidateSet("Release", "RelWithDebInfo", "Debug")]
+    [string]$BuildType = "Release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,16 +37,11 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-if ($DebugBuild) {
-    $BuildDir   = "$RepoRoot\cpp\build-msvc-debug"
-    $InstallDir = "$RepoRoot\install-msvc-debug"
-    $BuildType  = "Debug"
-    $SkipPython = $true   # Debug build is not usable for the Python extension
-} else {
-    $BuildDir   = "$RepoRoot\cpp\build-msvc"
-    $InstallDir = "$RepoRoot\install-msvc"
-    $BuildType  = "Release"
-}
+$buildTypeLower = $BuildType.ToLower()
+$BuildDir   = "$RepoRoot\cpp\build-msvc" + $(if ($BuildType -ne "Release") { "-$buildTypeLower" } else { "" })
+$InstallDir = "$RepoRoot\install-msvc"  + $(if ($BuildType -ne "Release") { "-$buildTypeLower" } else { "" })
+# Debug build is not usable for the Python extension
+if ($BuildType -eq "Debug") { $SkipPython = $true }
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
 # Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
