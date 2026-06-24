@@ -30,7 +30,9 @@ from pathlib import Path
 from qdk_chemistry.data import Structure
 
 # Read a molecular structure from XYZ file
-structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(".") / "../data/water.structure.xyz"
+)  # docs:inline-xyz
 
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")

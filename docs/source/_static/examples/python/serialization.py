@@ -19,7 +19,9 @@ from qdk_chemistry.data import (
 )
 
 # Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # For demonstration: create a structure with custom masses and charges
 # (requires explicit coordinates, here in Bohr)

@@ -32,7 +32,7 @@ from qdk_chemistry.data import Structure
 # Load a molecular structure (water molecule) from XYZ file
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/water.structure.xyz"
-)
+)  # docs:inline-xyz
 charge = 0
 
 # First, run SCF to get molecular orbitals

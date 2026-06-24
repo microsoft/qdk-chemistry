@@ -60,7 +60,7 @@ from qdk_chemistry.utils import compute_valence_space_parameters
 # Load nitrogen molecule structure
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/n2_stretched.structure.xyz"
-)
+)  # docs:inline-xyz
 charge = 0
 
 # First, run SCF to get molecular orbitals

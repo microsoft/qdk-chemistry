@@ -13,7 +13,9 @@ from qdk_chemistry.data.symmetry import spin_index_set
 ################################################################################
 # start-cell-create
 # Load H2 molecule from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")

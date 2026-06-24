@@ -12,7 +12,9 @@ from qdk_chemistry.data import Ansatz, Structure
 from qdk_chemistry.algorithms import create
 
 # Load H2 molecule structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # SCF
 scf_solver = create("scf_solver")

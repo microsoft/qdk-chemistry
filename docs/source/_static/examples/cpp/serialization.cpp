@@ -13,7 +13,7 @@ int main() {
   // Load structure from XYZ file (the file uses Angstrom, converted to Bohr
   // internally)
   Structure structure_from_file =
-      Structure::from_xyz_file("../data/h2.structure.xyz");
+      Structure::from_xyz_file("../data/h2.structure.xyz");  // docs:inline-xyz
 
   // For demonstration: create a structure with custom masses and charges
   // (requires explicit coordinates, here in Bohr)

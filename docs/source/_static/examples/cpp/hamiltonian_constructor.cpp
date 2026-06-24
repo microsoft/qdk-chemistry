@@ -28,7 +28,7 @@ hamiltonian_constructor->settings().set("eri_method", "direct");
 // start-cell-construct
 // Load structure from XYZ file
 auto structure = std::make_shared<Structure>(
-    Structure::from_xyz_file("../data/h2.structure.xyz"));
+    Structure::from_xyz_file("../data/h2.structure.xyz"));  // docs:inline-xyz
 
 // Run a SCF to get orbitals
 auto scf_solver = ScfSolverFactory::create();

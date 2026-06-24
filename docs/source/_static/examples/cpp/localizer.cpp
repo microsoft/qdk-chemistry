@@ -30,7 +30,8 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-localize
   // Load H2O molecule from XYZ file
-  auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
+  auto structure = Structure::from_xyz_file(
+      "../data/water.structure.xyz");  // docs:inline-xyz
 
   // Obtain orbitals from SCF calculation
   auto scf_solver = ScfSolverFactory::create();

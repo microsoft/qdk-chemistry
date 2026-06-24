@@ -14,7 +14,7 @@ from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 # Load a water molecule structure from XYZ file
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/water.structure.xyz"
-)
+)  # docs:inline-xyz
 
 # Create basis sets from the library using basis set name
 basis_from_name = BasisSet.from_basis_name("sto-3g", structure)

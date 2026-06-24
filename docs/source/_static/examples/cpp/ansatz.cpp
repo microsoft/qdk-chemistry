@@ -13,7 +13,8 @@ using namespace qdk::chemistry::algorithms;
 
 int main() {
   // Load H2 structure from XYZ file
-  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
+  auto structure =
+      Structure::from_xyz_file("../data/h2.structure.xyz");  // docs:inline-xyz
 
   // SCF
   auto scf_solver = ScfSolverFactory::create();

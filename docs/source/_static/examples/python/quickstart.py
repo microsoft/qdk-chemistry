@@ -16,7 +16,7 @@ from qdk_chemistry.data import AlgorithmRef, Structure
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
     Path(__file__).parent / "../data/para_benzyne.structure.xyz"
-)
+)  # docs:inline-xyz
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
 print(f"Elements: {structure.get_elements()}")

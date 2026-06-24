@@ -28,7 +28,9 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Load H2 structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(
+    Path(__file__).parent / "../data/h2.structure.xyz"
+)  # docs:inline-xyz
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")
