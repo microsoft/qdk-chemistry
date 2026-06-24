@@ -66,29 +66,29 @@ jobs:
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.10'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-test-threads: 4
+          python-test-threads: 4
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-test-threads: 4
+          python-test-threads: 4
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.14'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-test-threads: 4
+          python-test-threads: 4
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
           python-version: '3.13'
-          cpp-test-threads: 16
-          python-test-threads: 16
+          cpp-test-threads: 4
+          python-test-threads: 4
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
