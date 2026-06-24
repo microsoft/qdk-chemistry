@@ -77,7 +77,14 @@ if(MSVC AND TARGET libint2_cxx)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
       target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
     else()
-      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor
+        # Libint2 headers fire these warnings in every TU that includes them.
+        # Scope: INTERFACE so the suppression travels only to direct consumers
+        # of libint2_cxx, not globally.
+        # /wd4018 signed/unsigned mismatch (<, >, <=, >=)
+        # /wd4068 unknown pragma (GCC pragmas inside libint2 headers)
+        # /wd4389 signed/unsigned mismatch (==, !=)
+        /wd4018 /wd4068 /wd4389)
     endif()
   endif()
 endif()
