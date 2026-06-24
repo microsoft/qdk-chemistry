@@ -142,6 +142,12 @@ class TestOuterPrep:
         Simulates the Q# callable in the global Q# session and checks fidelity
         against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
+
+        Note: MakeOuterPreparePureState (dense_pure) uses Reversed(register) to
+        convert PreparePureStateD's big-endian convention to little-endian for
+        Select. dump_machine() reports in big-endian order, so coefficient[k]
+        appears at dump index bit_reverse(k). We account for this by building
+        expected in LE-address space.
         """
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
@@ -161,7 +167,13 @@ class TestOuterPrep:
         expected = np.zeros(n_states)
         for j, amp in enumerate(coefficients):
             if j < n_states:
-                expected[j] = amp
+                if algorithm == "dense_pure":
+                    # MakeOuterPreparePureState uses Reversed(register):
+                    # coefficient[k] → LE address k → BE dump index bit_reverse(k)
+                    be_idx = int(format(j, f"0{num_qubits}b")[::-1], 2)
+                    expected[be_idx] = amp
+                else:
+                    expected[j] = amp
         expected /= np.linalg.norm(expected)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
