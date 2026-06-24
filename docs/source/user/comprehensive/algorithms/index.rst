@@ -120,18 +120,18 @@ Discovering implementations
 Each algorithm class exposes multiple implementations that can be discovered at runtime.
 Use ``available()`` to list registered implementations:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
-      :language: cpp
-      :start-after: // start-cell-discover-implementations
-      :end-before: // end-cell-discover-implementations
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
       :start-after: # start-cell-discover-implementations
       :end-before: # end-cell-discover-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-discover-implementations
+      :end-before: // end-cell-discover-implementations
 
 For details on creating, loading, and using custom algorithm implementations, see the :doc:`plugin system <../plugins>` and :doc:`factory pattern <factory_pattern>` documentation.
