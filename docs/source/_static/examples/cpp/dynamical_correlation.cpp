@@ -25,12 +25,8 @@ auto mp2_calculator =
 
 // -----------------------------------------------------------------------------
 // start-cell-run
-// Load H2 structure from an XYZ string
-auto structure = Structure::from_xyz(R"(2
-H2 molecule
-H    0.000000    0.000000    0.000000
-H    0.000000    0.000000    0.740848
-)");
+// Load H2 structure from XYZ file
+auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
 
 // Run initial SCF to get reference wavefunction
 auto scf_solver = ScfSolverFactory::create();

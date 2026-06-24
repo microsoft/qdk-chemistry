@@ -7,16 +7,12 @@
 
 ################################################################################
 # start-cell-create
+from pathlib import Path
 from qdk_chemistry.data import Ansatz, Structure
 from qdk_chemistry.algorithms import create
 
-# Define the H2 molecule in XYZ format
-structure = Structure.from_xyz("""\
-2
-H2 molecule
-H    0.000000    0.000000    0.000000
-H    0.000000    0.000000    0.740848
-""")
+# Load H2 molecule structure from XYZ file
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # SCF
 scf_solver = create("scf_solver")
