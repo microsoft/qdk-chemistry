@@ -83,19 +83,19 @@ To create an algorithm instance, call the appropriate factory method with an opt
 If no name is provided, the default implementation is used.
 See :ref:`discovering-implementations` below for how to list available implementations programmatically.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
-      :language: cpp
-      :start-after: // start-cell-scf-localizer
-      :end-before: // end-cell-scf-localizer
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
       :language: python
       :start-after: # start-cell-scf-localizer
       :end-before: # end-cell-scf-localizer
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-scf-localizer
+      :end-before: // end-cell-scf-localizer
 
 .. _discovering-implementations:
 
@@ -108,19 +108,19 @@ This is useful for exploring what's available at runtime, building dynamic UIs, 
 Listing algorithm types and implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
-      :language: cpp
-      :start-after: // start-cell-list-algorithms
-      :end-before: // end-cell-list-algorithms
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
       :language: python
       :start-after: # start-cell-list-algorithms
       :end-before: # end-cell-list-algorithms
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-list-algorithms
+      :end-before: // end-cell-list-algorithms
 
 Inspecting settings
 ~~~~~~~~~~~~~~~~~~~
@@ -129,19 +129,19 @@ Each algorithm implementation has configurable settings.
 You can discover available settings programmatically as shown below.
 For comprehensive documentation on working with settings, see :doc:`settings`.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
-      :language: cpp
-      :start-after: // start-cell-inspect-settings
-      :end-before: // end-cell-inspect-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
       :language: python
       :start-after: # start-cell-inspect-settings
       :end-before: # end-cell-inspect-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-inspect-settings
+      :end-before: // end-cell-inspect-settings
 
 Connection to the plugin system
 -------------------------------
