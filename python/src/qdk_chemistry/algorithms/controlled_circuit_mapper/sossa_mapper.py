@@ -207,9 +207,9 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numRanks": container.select.num_ranks,
             "numBases": container.select.num_bases,
             "numCopies": container.select.num_copies,
-            "numD1": container.select.num_positive_one_body_terms,
-            "dqRotationAngles": container.select.one_body_rotation_angles.tolist(),
-            "sfRotationAngles": container.select.two_body_rotation_angles.tolist(),
+            "numPositiveOneBody": container.select.num_positive_one_body_terms,
+            "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
+            "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "numFreeRiderBits": num_free_rider_bits,
         }
@@ -355,8 +355,8 @@ class SOSSAMapper(ControlledCircuitMapper):
         """
         if self.select_needs_phase_gradient:
             rot_bits = self._settings.get("rotation_bit_precision")
-            return QSHARP_UTILS.SOSSAWalk.MakePhaseGradientAncillaPrep(rot_bits)
-        return QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
+            return QSHARP_UTILS.PhaseGradient.MakePhaseGradientAncillaPrep(rot_bits)
+        return QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
 
     def build_estimate_circuit(
         self,

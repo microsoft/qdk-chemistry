@@ -2,19 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// Alias sampling state preparation for block encoding PREPARE oracles.
-///
-/// Implements the Walker alias method for quantum state preparation:
-///   |0⟩ → Σ_ℓ √(p_ℓ) |ℓ⟩|garbage⟩
-///
-/// Uses O(log N) qubits and O(N) classical preprocessing.
-/// The quantum circuit uses:
-///   1. PrepareUniformSuperposition over N terms
-///   2. Hadamard on μ comparison qubits
-///   3. QROM to load (keep_ℓ, alt_ℓ) alias table
-///   4. Comparison: flag = (σ ≥ keep_ℓ)
-///   5. Conditional swap: if flag, index ↔ alt_ℓ
-///
+/// Alias sampling state preparation.
 /// Reference: Babbush et al. arXiv:1805.03662, Fig. 11.
 namespace QDKChemistry.Utils.AliasSampling {
 
@@ -38,7 +26,7 @@ namespace QDKChemistry.Utils.AliasSampling {
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
-        /// Unnormalized probability weights (positive real values), length L.
+        /// Unnormalized probability weights, length L.
         coefficients : Double[],
         /// Number of bits μ for keep-coefficient precision.
         bitsPrecision : Int,
@@ -53,8 +41,6 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Returns (keepCoefficients, alternateIndices) where:
     ///   keepCoefficients[i] = discretized probability of keeping index i
     ///   alternateIndices[i] = alias index to swap to if comparison fails
-    ///
-    /// Uses Walker's alias method (Vose's O(n) implementation).
     function DiscretizedProbabilityDistribution(
         bitsPrecision : Int,
         coefficients : Double[],
@@ -117,9 +103,14 @@ namespace QDKChemistry.Utils.AliasSampling {
         return (keepCoeff, altIndex);
     }
 
-    /// Alias sampling PREPARE operation.
+    /// Alias sampling state preparation.
     ///
-    /// Prepares: |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage⟩
+    /// Prepares: |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩
+    ///
+    /// **Warning:** The index register is entangled with the ancilla qubits (garbage).
+    /// This operation is only useful as the PREPARE subroutine in a block encoding
+    /// (LCU or qubitization), where PREPARE† is applied to uncompute the garbage
+    /// and project onto the correct subspace.
     ///
     /// Register layout:
     ///   indexRegister[numIndexQubits] — output: sampled index ℓ
@@ -179,7 +170,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         AliasSamplingPrepare(params, _)
     }
 
-    /// Circuit entry point for alias sampling (allocates qubits).
+    /// Circuit entry point for alias sampling.
     operation MakeAliasSamplingCircuit(
         coefficients : Double[],
         bitsPrecision : Int,
@@ -286,7 +277,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         );
     }
 
-    /// Conditional alias sampling PREPARE with free-rider data — prepares
+    /// Conditional alias sampling state preparation with free-rider data — prepares
     /// |c⟩|0⟩ → |c⟩ Σ_ℓ √(p̃_{c,ℓ}) e^{iπ·sign_{c,ℓ}} |ℓ⟩|garbage⟩ ⊗ |data_c⟩.
     ///
     /// "Free rider" = classical data that depends only on the conditional register

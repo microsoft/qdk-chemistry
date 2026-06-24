@@ -205,7 +205,7 @@ class TestSOSSAContainer:
         )
         assert np.allclose(
             restored.select.one_body_rotation_angles,
-            container.select.rotation_angles,
+            container.select.one_body_rotation_angles,
             atol=float_comparison_absolute_tolerance,
         )
 
@@ -225,7 +225,7 @@ class TestSOSSAContainer:
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
-        assert np.allclose(restored.select.two_body_rotation_angles, container.select.sf_rotation_angles)
+        assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
 
     def test_unitary_representation_json_dispatch(self):
         """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
@@ -324,9 +324,9 @@ class TestSOSSABuilder:
         container = result.get_container()
 
         # DQ angles: [N, N-1]
-        assert container.select.rotation_angles.shape == (n, n - 1)
+        assert container.select.one_body_rotation_angles.shape == (n, n - 1)
         # SF angles: [R*(B+1), N] (N-1 Givens + 1 bEqB flag)
-        assert container.select.sf_rotation_angles.shape == (r * (b + 1), n)
+        assert container.select.two_body_rotation_angles.shape == (r * (b + 1), n)
 
     def test_power_setting(self):
         """Test power parameter passes through to container."""
@@ -388,11 +388,20 @@ class TestOuterPrepareQSharp:
         """Test MakeOuterPreparePureState produces the correct statevector.
 
         Applies PreparePureStateD to |0⟩ and verifies amplitudes via dump_machine.
+        MakeOuterPreparePureState uses Reversed(register) so coefficient[k]
+        appears at bit-reversed dump index.
         """
         coefficients = [0.5, 0.3, 0.7, 0.1]
         norm = np.sqrt(sum(c**2 for c in coefficients))
-        expected = [c / norm for c in coefficients]
         n_qubits = 2
+
+        # Build expected in dump_machine order (big-endian):
+        # coefficient[k] → bit_reverse(k) in dump output
+        n_states = 2**n_qubits
+        expected = np.zeros(n_states)
+        for k, c in enumerate(coefficients):
+            be_idx = int(format(k, f"0{n_qubits}b")[::-1], 2)
+            expected[be_idx] = c / norm
 
         sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
         qsharp.eval(f"use qs = Qubit[{n_qubits}];")

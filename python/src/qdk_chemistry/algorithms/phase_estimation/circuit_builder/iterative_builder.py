@@ -208,7 +208,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
         if ancilla_prep_op is None:
-            ancilla_prep_op = QSHARP_UTILS.SOSSAWalk.MakeNoOpAncillaPrep()
+            ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": ctrl_unitary_op,

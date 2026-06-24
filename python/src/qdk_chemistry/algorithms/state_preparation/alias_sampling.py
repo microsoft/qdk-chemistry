@@ -39,6 +39,14 @@ class AliasSamplingStatePreparation(StatePreparation):
 
     The Toffoli cost scales as O(L) for the QROM, independent of precision μ.
 
+    .. warning::
+
+        The prepared state is :math:`\sum_\ell \sqrt{\tilde{p}_\ell}\,|\ell\rangle|\text{garbage}_\ell\rangle`,
+        i.e. the index register is entangled with the ancilla qubits. This circuit is only
+        useful as the PREPARE subroutine in a block encoding (LCU or qubitization), where
+        PREPARE\ :sup:`†` is subsequently applied to uncompute the garbage and project onto
+        the correct subspace.
+
     """
 
     def __init__(self, bits_precision: int = 10):

@@ -456,16 +456,16 @@ class TestSOSSAQPEIntegration:
         inactive_fock = np.zeros((n_orb, n_orb))
 
         fh = FactorizedHamiltonianContainer(
-            h1,
-            u_matrices,
-            w_matrices,
-            wb_matrix,
             n_ranks,
             n_bases,
             n_copies,
-            orbitals,
             0.0,
+            u_matrices,
+            w_matrices,
+            h1,
+            wb_matrix,
             inactive_fock,
+            orbitals,
         )
 
         # Build SOSSA
