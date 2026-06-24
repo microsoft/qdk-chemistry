@@ -153,10 +153,15 @@ def _inline_xyz_in_text(text: str, example_dir: Path, suffix: str) -> str:
             continue
         inner = text[open_paren + 1 : close_paren]
         path_match = _XYZ_PATH_RE.search(inner)
-        if path_match is None:
-            continue
-        xyz_path = (example_dir / path_match.group(1)).resolve()
-        if not xyz_path.is_file():
+        xyz_path = (example_dir / path_match.group(1)).resolve() if path_match else None
+        if xyz_path is None or not xyz_path.is_file():
+            # The call opted in but we cannot inline it; warn rather than
+            # silently leaving ``from_xyz_file`` in the rendered output.
+            logger.warning(
+                "inline_xyz: %s marker present but no readable .xyz file found: %s",
+                _INLINE_MARKER,
+                text[call_span_start:call_span_end].strip(),
+            )
             continue
         contents = xyz_path.read_text(encoding="utf-8")
         pieces.append(text[pos : match.start()])
