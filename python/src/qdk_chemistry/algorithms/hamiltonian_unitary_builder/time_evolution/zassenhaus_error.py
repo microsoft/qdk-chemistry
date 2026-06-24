@@ -74,7 +74,7 @@ def zassenhaus_steps_naive(
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Zassenhaus formula.
         weight_threshold: Absolute threshold below which coefficients are discarded.
-        commutator_exponents: Precomputed mapping from zassenhaus_commutator_plan; must include order + 1.
+        commutator_exponents: Optional mapping from zassenhaus_commutator_plan; must include order + 1.
 
     Returns:
         The minimum number of Zassenhaus steps (at least 1).
