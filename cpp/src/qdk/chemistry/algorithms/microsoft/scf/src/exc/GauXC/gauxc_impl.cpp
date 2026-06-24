@@ -249,8 +249,6 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
 void GAUXC::eval_dd_psi(int lmax, const double* D, double* dd_psi) {
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = integrator_->load_balancer().basis().nbf();
-  auto natom = integrator_->load_balancer().molecule().size();
-  auto nharmonics = (lmax + 1) * (lmax + 1);
   Eigen::MatrixXd D_eigen = Eigen::Map<const Eigen::MatrixXd>(
       D, num_atomic_orbitals, num_atomic_orbitals);
   auto dd_psi_vec = integrator_->eval_dd_psi(D_eigen, lmax);
