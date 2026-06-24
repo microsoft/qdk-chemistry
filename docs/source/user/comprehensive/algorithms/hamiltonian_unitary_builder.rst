@@ -143,6 +143,64 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
 
+.. _zassenhaus-builder:
+
+Zassenhaus product formulas
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"zassenhaus"``
+
+The Zassenhaus decomposition approximates the time-evolution operator by recursively generating commutator correction terms.
+For a Hamiltonian :math:`H = \sum_j \alpha_j P_j`, the first-order approximation is the Trotter product, and higher-order approximations introduce explicit product-formula factors for lower-order commutator corrections:
+
+**First-order Zassenhaus** (:math:`p = 1`):
+Matches the first-order Trotter product formula.
+
+**Second-order Zassenhaus** (:math:`p = 2`):
+
+.. math::
+
+   e^{-iHt} \approx \left[ \prod_{j > k} e^{-\frac{1}{2} [H_j, H_k] t^2} \cdot \prod_j e^{-i H_j t} \right]^N
+
+**Higher orders** (up to :math:`p = 4`) recursively construct explicit nested-commutator terms. Unlike Trotter-Suzuki formulas where step count is used to reduce commutator errors, the Zassenhaus builder computes low-order corrections explicitly.
+
+The number of divisions can be specified directly (``num_divisions``) or computed automatically from a ``target_accuracy`` using one of two bounds:
+
+Commutator bound (default)
+   A tighter bound based on nested commutators of the first omitted exponent:
+   :math:`N = \lceil \frac{\|C_{p+1}(-iH_1, \dots, -iH_m)\|^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil`
+
+Naive bound
+   A looser bound using the absolute coefficient sum of the first omitted exponent and the 1-norm of the Hamiltonian:
+   :math:`N = \lceil \frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil`
+
+When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 3, and 4 to select the order that minimizes the total gate count (product of step reps and step terms) for the target accuracy.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Zassenhaus order (0 for auto, or 1 to 4). Default is 0.
+   * - ``target_accuracy``
+     - float
+     - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
+   * - ``num_divisions``
+     - int
+     - Explicit number of Zassenhaus steps :math:`N`. When set to 0 (default), determined from ``target_accuracy``.
+   * - ``error_bound``
+     - str
+     - Error bound strategy: ``"commutator"`` (default, tighter) or ``"naive"`` (simpler).
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+
+
 Consuming term partitions
 -------------------------
 
