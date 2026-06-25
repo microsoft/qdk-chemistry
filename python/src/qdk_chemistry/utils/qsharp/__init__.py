@@ -11,18 +11,7 @@ from qdk import qsharp
 
 __all__ = ["QSHARP_UTILS"]
 
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "CircuitComposition.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "StandardPhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "HadamardTest.qs",
-    Path(__file__).parent / "PauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-    Path(__file__).parent / "PrepSelPrep.qs",
-    Path(__file__).parent / "Select.qs",
-]
+_PROJECT_ROOT = str(Path(__file__).parent)
 
 
 def get_qsharp_utils():
@@ -30,8 +19,7 @@ def get_qsharp_utils():
     try:
         return qdk.code.QDKChemistry.Utils
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _QS_FILES)
-        qsharp.eval(code)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
         return qdk.code.QDKChemistry.Utils
 
 

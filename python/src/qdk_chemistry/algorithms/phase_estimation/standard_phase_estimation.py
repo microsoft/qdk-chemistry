@@ -16,6 +16,7 @@ References:
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
+    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -67,15 +68,16 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
+        """Run the standard phase estimation algorithm given the state preparation and Hamiltonian.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

@@ -220,6 +220,7 @@ class TestDensePureStatePreparation:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
+    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     def test_energy_matches_sparse_isometry(self, wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
         """Verify that dense preparation yields the same energy as sparse isometry."""
         from qiskit.quantum_info import SparsePauliOp  # noqa: PLC0415
