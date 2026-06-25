@@ -4,6 +4,7 @@
 
 // Orbitals usage examples.
 // --------------------------------------------------------------------------------------------
+// docs:xyz ../data/h2.structure.xyz
 // start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
@@ -14,8 +15,11 @@ using namespace qdk::chemistry::algorithms;
 int main() {
   // Obtain orbitals from a SCF calculation
   // Load H2 molecule from XYZ file
-  auto structure =
-      Structure::from_xyz_file("../data/h2.structure.xyz");  // docs:inline-xyz
+  auto structure = Structure::from_xyz(R"(2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+)");
 
   // Obtain orbitals from a SCF calculation
   auto scf_solver = ScfSolverFactory::create();

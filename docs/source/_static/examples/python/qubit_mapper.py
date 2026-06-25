@@ -24,15 +24,19 @@ qubit_mapper.settings().set("integral_threshold", 1e-12)
 ################################################################################
 
 ################################################################################
+# docs:xyz ../data/water.structure.xyz
 # start-cell-run
-from pathlib import Path
 
 from qdk_chemistry.data import Structure
 
 # Read a molecular structure from XYZ file
-structure = Structure.from_xyz_file(
-    Path(".") / "../data/water.structure.xyz"
-)  # docs:inline-xyz
+structure = Structure.from_xyz("""\
+3
+Water molecule
+O    0.000000    0.000000    0.000000
+H    0.758602    0.000000    0.504284
+H   -0.758602    0.000000    0.504284
+""")
 
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")
