@@ -38,7 +38,6 @@ namespace macis {
  * @param[in] T_pq One-electron integral matrix (kinetic + nuclear attraction)
  * @param[in] G_red Reduced two-electron repulsion integrals (same-spin)
  * @param[in] V_red Reduced two-electron exchange integrals (same-spin)
- * @param[in] G_pqrs Full two-electron repulsion integral tensor (same-spin)
  * @param[in] V_pqrs Full two-electron repulsion integral tensor (opposite-spin)
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution
@@ -63,8 +62,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                            wavefunction_iterator_t<N> cdets_end,
                            const double E_ASCI, const std::vector<double>& C,
                            size_t norb, const double* T_pq, const double* G_red,
-                           const double* V_red, const double* G_pqrs,
-                           const double* V_pqrs,
+                           const double* V_red, const double* V_pqrs,
                            HamiltonianGenerator<wfn_t<N>>& ham_gen,
                            MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
@@ -244,7 +242,11 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   //     5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.pt2_max_constraint_level, norb, n_sing_beta, n_doub_beta,
+#ifdef _OPENMP
       uniq_alpha, world_size * omp_get_max_threads(),
+#else
+      uniq_alpha, world_size,
+#endif
       asci_settings.pt2_min_constraint_level,
       asci_settings.pt2_constraint_refine_force);
   auto gen_c_en = clock_type::now();
@@ -322,7 +324,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
             // AABB excitations
@@ -341,7 +343,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
                   ham_gen, asci_pairs);
 
               // No excitation (push inf to remove from list)
@@ -412,9 +414,15 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        if (asci_settings.pt2_print_progress)
+        if (asci_settings.pt2_print_progress) {
+#ifdef _OPENMP
+          const int tid = omp_get_thread_num();
+#else
+          const int tid = 0;
+#endif
           logger->info("[pt2_small rank {:4d} tid:{:4d}] {:10d} / {:10d}",
-                       world_rank, omp_get_thread_num(), ic, ncon_total);
+                       world_rank, tid, ic, ncon_total);
+        }
 
         for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const size_t old_pair_size = asci_pairs.size();
@@ -456,7 +464,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
             // AABB excitations
@@ -475,7 +483,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
                   ham_gen, asci_pairs);
 
               // No excitation (push inf to remove from list)
@@ -490,12 +498,18 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                              asci_pairs.end());
             asci_pairs.erase(uit, asci_pairs.end());
-            if (asci_settings.pt2_print_progress)
+            if (asci_settings.pt2_print_progress) {
+#ifdef _OPENMP
+              const int tid_prune = omp_get_thread_num();
+#else
+              const int tid_prune = 0;
+#endif
               logger->info(
                   "[pt2_prune rank {:4d} tid:{:4d}] IC = {} / {} IA = {} / {} "
                   "SZ = {}",
-                  world_rank, omp_get_thread_num(), ic, ncon_total, i_alpha,
-                  nuniq_alpha, asci_pairs.size());
+                  world_rank, tid_prune, ic, ncon_total, i_alpha, nuniq_alpha,
+                  asci_pairs.size());
+            }
 
             if (asci_pairs.size() > asci_settings.pt2_reserve_count) {
               logger->warn("PRUNED SIZE LARGER THAN RESERVE COUNT");
