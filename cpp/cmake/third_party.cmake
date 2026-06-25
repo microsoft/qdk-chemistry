@@ -77,14 +77,7 @@ if(MSVC AND TARGET libint2_cxx)
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
       target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
     else()
-      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor
-        # Libint2 headers fire these warnings in every TU that includes them.
-        # Scope: INTERFACE so the suppression travels only to direct consumers
-        # of libint2_cxx, not globally.
-        # /wd4018 signed/unsigned mismatch (<, >, <=, >=)
-        # /wd4068 unknown pragma (GCC pragmas inside libint2 headers)
-        # /wd4389 signed/unsigned mismatch (==, !=)
-        /wd4018 /wd4068 /wd4389)
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
     endif()
   endif()
 endif()
@@ -146,49 +139,3 @@ handle_dependency(gauxc
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${_old_suppress_dev} CACHE BOOL "" FORCE)
-
-if(MSVC)
-  # Suppress warnings in upstream third-party sources (ecpint, libint2).
-  # Helper: apply compile options only to targets actually built by this project.
-  # handle_dependency() may resolve a dependency via find_package() to a prior
-  # install, producing IMPORTED targets that reject target_compile_options.
-  function(_qdk_suppress_if_built target)
-    if(NOT TARGET ${target})
-      return()
-    endif()
-    get_target_property(_is_imported ${target} IMPORTED)
-    if(_is_imported)
-      return()
-    endif()
-    # clang-cl: use -Wno-* flags for the specific warnings seen in these sources.
-    # cl.exe: use a fixed set of /wd flags for known warning categories:
-    #   /wd4018 signed/unsigned mismatch
-    #   /wd4068 unknown pragma
-    #   /wd4100 unreferenced formal parameter
-    #   /wd4101 unreferenced local variable
-    #   /wd4127 conditional expression is constant
-    #   /wd4242 conversion with possible loss of data
-    #   /wd4244 conversion with possible loss of data
-    #   /wd4245 conversion, signed/unsigned mismatch
-    #   /wd4267 conversion with possible loss of data
-    #   /wd4389 signed/unsigned mismatch
-    #   /wd4701 potentially uninitialized local variable used
-    #   /wd4703 potentially uninitialized local pointer variable used
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-      target_compile_options(${target} PRIVATE
-        -Wno-unused-variable -Wno-vla-cxx-extension -Wno-reorder-ctor)
-    else()
-      target_compile_options(${target} PRIVATE
-        /wd4018 /wd4068 /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4245
-        /wd4267 /wd4389 /wd4701 /wd4703)
-    endif()
-  endfunction()
-
-  _qdk_suppress_if_built(ecpint)
-  # ecpint also builds a `generate` executable at build time for code generation
-  _qdk_suppress_if_built(generate)
-  # libint2 is a wrapper around $<TARGET_OBJECTS:libint2_obj>; the OBJECT
-  # library libint2_obj is what actually compiles the auto-generated sources.
-  # libint2_cxx is a header-only INTERFACE target with no compiled sources.
-  _qdk_suppress_if_built(libint2_obj)
-endif()
