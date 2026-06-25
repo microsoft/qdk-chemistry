@@ -438,6 +438,7 @@ if (-not $SkipPython) {
         Write-Host ""
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
         $env:OMP_NUM_THREADS = 2
+        $env:QDK_CHEMISTRY_RUN_SLOW_TESTS = 1
         pytest -v --tb=short 2>&1 *> pytest.log
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {
