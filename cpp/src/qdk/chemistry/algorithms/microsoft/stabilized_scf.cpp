@@ -7,19 +7,11 @@
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
-#include <stdexcept>
 #include <string>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-namespace {
-bool is_stabilized_scf_ref(const data::AlgorithmRef& ref) {
-  return ref.get_algorithm_type() == ScfSolverFactory::algorithm_type_name() &&
-         (ref.get_algorithm_name() == "qdk_stabilized" ||
-          ref.get_algorithm_name() == "stabilized" ||
-          ref.get_algorithm_name() == "stabilized_scf");
-}
-
+namespace detail {
 void copy_common_scf_settings(const data::Settings& source,
                               data::Settings& destination) {
   for (const auto& [key, value] : source.get_all_settings()) {
@@ -31,14 +23,20 @@ void copy_common_scf_settings(const data::Settings& source,
 
 bool can_check_external_stability(
     const std::shared_ptr<data::Wavefunction>& wavefunction) {
-  if (!wavefunction->get_orbitals()->is_restricted()) {
+  const auto& symmetries = wavefunction->get_orbitals()->symmetries();
+  if (!symmetries || !symmetries->has_axis(data::AxisName::Spin)) {
     return false;
   }
-  auto [num_alpha, num_beta] = wavefunction->get_total_num_electrons();
+  if (!symmetries->axis(data::AxisName::Spin).equivalent()) {
+    return false;
+  }
+  const auto counts = wavefunction->total_num_particles();
+  const auto num_alpha = counts->value(data::axes::alpha());
+  const auto num_beta = counts->value(data::axes::beta());
   return num_alpha == num_beta;
 }
 
-}  // namespace
+}  // namespace detail
 
 StabilizedScfSettings::StabilizedScfSettings()
     : qdk::chemistry::algorithms::ElectronicStructureSettings() {
@@ -54,7 +52,7 @@ StabilizedScfSettings::StabilizedScfSettings()
   set_default("check_internal", true,
               "Check internal orbital-rotation stability.");
   set_default("check_external", true,
-              "Check restricted-to-unrestricted stability when applicable.");
+              "Check external orbital-rotation stability when applicable.");
   set_default("fail_on_unstable", true,
               "Throw if the final wavefunction remains unstable after the "
               "configured stability cycles.");
@@ -73,12 +71,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>>
 StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
                                int charge, int spin_multiplicity,
                                BasisOrGuessType basis_or_guess) const {
-  auto scf_ref = _settings->get<data::AlgorithmRef>("scf_solver");
-  if (is_stabilized_scf_ref(scf_ref)) {
-    throw std::invalid_argument(
-        "qdk_stabilized cannot use itself as its nested scf_solver");
-  }
-
   const int64_t max_stability_iterations =
       _settings->get<int64_t>("max_stability_iterations");
   const bool check_internal = _settings->get<bool>("check_internal");
@@ -89,7 +81,7 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
   auto create_scf_solver = [&](const std::string& scf_type_override = "") {
     auto solver = _create_nested<ScfSolverFactory>("scf_solver");
-    copy_common_scf_settings(*_settings, solver->settings());
+    detail::copy_common_scf_settings(*_settings, solver->settings());
     if (!scf_type_override.empty()) {
       solver->settings().set("scf_type", scf_type_override);
     }
@@ -119,7 +111,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   for (int64_t iteration = 0; iteration < max_stability_iterations;
        ++iteration) {
     const bool check_external =
-        check_external_setting && can_check_external_stability(wavefunction);
+        check_external_setting &&
+        detail::can_check_external_stability(wavefunction);
     auto stability_checker = create_stability_checker(check_external);
 
     std::shared_ptr<data::StabilityResult> result;
@@ -159,7 +152,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
   if (max_stability_iterations > 0) {
     auto stability_checker = create_stability_checker(
-        check_external_setting && can_check_external_stability(wavefunction));
+        check_external_setting &&
+        detail::can_check_external_stability(wavefunction));
     std::tie(is_stable, std::ignore) = stability_checker->run(wavefunction);
   }
 
