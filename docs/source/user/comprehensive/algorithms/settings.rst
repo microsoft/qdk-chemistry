@@ -22,19 +22,19 @@ Runtime inspection
 
 The following example demonstrates how to discover available algorithms and inspect their settings:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-discover-settings
-      :end-before: // end-cell-discover-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-discover-settings
       :end-before: # end-cell-discover-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-discover-settings
+      :end-before: // end-cell-discover-settings
 
 Working with settings
 ---------------------
@@ -57,18 +57,6 @@ Settings are validated at execution time, allowing modifications at any point be
 
 .. rubric:: Accessing and modifying settings
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-get-settings
-      :end-before: // end-cell-get-settings
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-set-settings
-      :end-before: // end-cell-set-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
@@ -80,6 +68,18 @@ Settings are validated at execution time, allowing modifications at any point be
       :language: python
       :start-after: # start-cell-set-settings
       :end-before: # end-cell-set-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-get-settings
+      :end-before: // end-cell-get-settings
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-set-settings
+      :end-before: // end-cell-set-settings
 
 .. rubric:: Passing settings at creation time (Python only)
 
@@ -99,13 +99,6 @@ The C++ API does not provide this shorthand; settings must be configured explici
 The :class:`~qdk_chemistry.data.Settings` class provides methods for safely checking and retrieving values.
 Use ``has()`` to verify existence, ``get()`` for direct access (raises an exception if the key is missing), or ``get_or_default()`` to specify a fallback value.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-misc-settings
-      :end-before: // end-cell-misc-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
@@ -113,18 +106,18 @@ Use ``has()`` to verify existence, ``get()`` for direct access (raises an except
       :start-after: # start-cell-misc-settings
       :end-before: # end-cell-misc-settings
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-misc-settings
+      :end-before: // end-cell-misc-settings
+
 Serialization
 -------------
 
 Settings can be serialized to JSON (human-readable) or HDF5 (efficient, type-preserving) formats to support reproducibility and configuration sharing.
 For additional information on data persistence, see :doc:`Serialization <../data/serialization>`.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-serialization
-      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
@@ -132,6 +125,13 @@ For additional information on data persistence, see :doc:`Serialization <../data
       :language: python
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. rubric:: Example formats
 
@@ -161,19 +161,19 @@ Algorithm developers can create specialized settings classes by extending :class
 Default values are established during construction using the ``set_default`` method, ensuring that configurations are discoverable and well-documented.
 This pattern integrates with the :doc:`Factory Pattern <factory_pattern>` and :ref:`plugin system <plugin-system>`.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-extend-settings
-      :end-before: // end-cell-extend-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-extend-settings
       :end-before: # end-cell-extend-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-extend-settings
+      :end-before: // end-cell-extend-settings
 
 Supported types
 ---------------
@@ -252,19 +252,19 @@ Constraints are established when algorithm developers define settings using ``se
 
 Constraints can be queried using ``has_limits()`` and ``get_limits()``:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-inspect-constraints
-      :end-before: // end-cell-inspect-constraints
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-inspect-constraints
       :end-before: # end-cell-inspect-constraints
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-inspect-constraints
+      :end-before: // end-cell-inspect-constraints
 
 The ``print_settings()`` and ``inspect_settings()`` functions include constraint information in their output, making it easy to understand the valid configuration options for any algorithm.
 
@@ -277,19 +277,19 @@ The :class:`~qdk_chemistry.data.Settings` class raises descriptive exceptions to
 - ``SettingTypeMismatch``: Raised when the key exists but the requested type does not match the stored type.
 - ``SettingsAreLocked``: Raised when attempting to modify settings after ``run()`` has been called.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
-      :language: cpp
-      :start-after: // start-cell-settings-errors
-      :end-before: // end-cell-settings-errors
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-settings-errors
       :end-before: # end-cell-settings-errors
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
+      :language: cpp
+      :start-after: // start-cell-settings-errors
+      :end-before: // end-cell-settings-errors
 
 See also
 --------

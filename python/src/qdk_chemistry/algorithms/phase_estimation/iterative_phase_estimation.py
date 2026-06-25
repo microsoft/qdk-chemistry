@@ -13,9 +13,8 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+import numpy as np
+
 from qdk_chemistry.data import (
     Circuit,
     FactorizedHamiltonianContainer,
@@ -23,9 +22,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 from .circuit_builder.base import IterativeQpeCircuitBuilder
@@ -97,6 +94,12 @@ class IterativePhaseEstimation(PhaseEstimation):
                 f"Expected qpe_circuit_builder to be an instance of IterativeQpeCircuitBuilder, "
                 f"but got {type(circuit_builder)} instead."
             )
+
+        # Resolve container before running iterations
+        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        container = unitary_rep.get_container()
+
         num_bits = circuit_builder.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
@@ -128,50 +131,16 @@ class IterativePhaseEstimation(PhaseEstimation):
             bits.append(measured_bit)
 
             # Update the phase feedback for next iteration
-            phase_feedback = iterative_phase_feedback_update(phase_feedback, measured_bit)
+            phase_feedback = phase_feedback / 2.0 + np.pi * measured_bit / 2.0
 
         # Compute the final phase fraction
-        phase_fraction = phase_fraction_from_feedback(phase_feedback)
-        # Create and return the result
+        phase_fraction = phase_feedback / np.pi
 
-        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
-        if isinstance(unitary_builder, TimeEvolutionBuilder):
-            evolution_time = unitary_builder.settings().get("time")
-            return QpeResult.from_time_evolution_result(
-                method=self.name(),
-                phase_fraction=phase_fraction,
-                evolution_time=evolution_time,
-                bits_msb_first=bits,
-            )
-        if isinstance(unitary_builder, LCUBuilder):
-            # For block-encoding builders (qubitization), use E = λ cos(2πφ).
-            lambda_val = qubit_hamiltonian.schatten_norm  # type: ignore[union-attr]
-            return QpeResult.from_qubitization_result(
-                method=self.name(),
-                phase_fraction=phase_fraction,
-                lambda_val=lambda_val,
-                bits_msb_first=bits,
-            )
-        if isinstance(unitary_builder, SOSSABuilder):
-            # For SOSSA block encoding, use E = Λ(1 + cos(2πφ)) + E_SOS.
-            # Build the unitary once more to access the container's normalization.
-            hamiltonian = qubit_hamiltonian
-            unitary_rep = unitary_builder.run(hamiltonian)
-            container = unitary_rep.get_container()
-            if not isinstance(container, SOSSAContainer):
-                raise TypeError(f"Expected SOSSAContainer, got {type(container)}")
-            lambda_val = container.normalization
-            energy_shift = container.energy_shift
-            return QpeResult.from_sossa_result(
-                method=self.name(),
-                phase_fraction=phase_fraction,
-                lambda_val=lambda_val,
-                energy_shift=energy_shift,
-                bits_msb_first=bits,
-            )
-        raise NotImplementedError(
-            "IQPE result construction currently only supports post-processing from time evolution. "
-            f"Got {type(unitary_builder)} instead."
+        return QpeResult.from_phase_fraction(
+            method=self.name(),
+            phase_fraction=phase_fraction,
+            eigenvalue_from_phase=container.eigenvalue_from_phase,
+            bits_msb_first=bits,
         )
 
     def name(self) -> str:

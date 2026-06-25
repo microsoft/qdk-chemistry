@@ -115,6 +115,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 return [circuit]
 
         ctrl_unitary_circuits = []
+        num_ancilla_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
             circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
@@ -177,7 +178,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
             "statePrep": state_prep_op,
-            "controlledEvolutions": ctrl_unitary_ops,
+            "controlledUnitary": ctrl_unitary_ops,
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,
