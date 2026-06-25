@@ -11,6 +11,8 @@ from typing import Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str
+
 from .base import UnitaryContainer
 from .block_encoding import BlockEncodingContainer
 
@@ -223,3 +225,11 @@ class LCUWalkContainer(QuantumWalkContainer):
         be_summary = self._block_encoding.get_summary()
         indented = "\n".join("    " + line for line in be_summary.splitlines())
         return f"LCU Walk Operator Container:\n  Power: {self.power}\n  Block Encoding:\n{indented}"
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "lcu_walk_container")
+        _hash_int(h, self._power)
+        _hash_float(h, self.scale)
+        # Delegate to block encoding's content_hash
+        _hash_str(h, self._block_encoding.content_hash(truncate_chars=0))

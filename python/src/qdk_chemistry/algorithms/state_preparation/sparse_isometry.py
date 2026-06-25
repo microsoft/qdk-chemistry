@@ -356,25 +356,25 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
     def _prepare_single_reference_state(self, bitstring: list[int]) -> Circuit:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
-        Args:
-            bitstring: List of 0/1 ints representing the occupation of qubits.
+        The input bitstring is in big-endian order: ``bitstring[0]`` corresponds to
+        the highest-indexed qubit (MSB) and ``bitstring[N-1]`` corresponds to qubit 0
+        (LSB). The function reverses the bitstring internally so that in the circuit,
+        ``bitstring[i]`` maps to qubit ``N-1-i``.
 
+        Args:
+            bitstring: List of 0/1 ints in big-endian order (MSB first).
                 1 means apply X gate, 0 means leave in |0⟩ state.
 
         Returns:
-                A Circuit object containing an OpenQASM3 string with the prepared single reference state
+                A Circuit object with the prepared single reference state
 
         Example:
-                bitstring = [1, 0, 1, 0] creates a circuit with X gates on qubits 1 and 3:
+                bitstring = [1, 0, 1, 0] produces X gates on qubit 0 and qubit 2:
 
-                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-                (qubit 0, corresponds to rightmost bit 0)
-                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-                (qubit 1, corresponds to bit 1)
-                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-                (qubit 2, corresponds to bit 0)
-                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-                (qubit 3, corresponds to leftmost bit 1)
+                * qubit 0 ← bitstring[0] = 1 → X → :math:`\left| 1 \right\rangle`
+                * qubit 1 ← bitstring[1] = 0 → :math:`\left| 0 \right\rangle`
+                * qubit 2 ← bitstring[2] = 1 → X → :math:`\left| 1 \right\rangle`
+                * qubit 3 ← bitstring[3] = 0 → :math:`\left| 0 \right\rangle`
 
         """
         # Input validation

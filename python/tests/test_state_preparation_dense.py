@@ -9,7 +9,7 @@ import json
 
 import numpy as np
 import pytest
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
@@ -21,9 +21,11 @@ from .reference_tolerances import estimator_energy_tolerance, float_comparison_a
 from .test_helpers import create_test_orbitals
 
 try:
+    from qdk._interpreter import get_config
     from qdk._native import Circuit as QdkCircuitType
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._qsharp import get_config
 
 
 def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
@@ -39,7 +41,8 @@ def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
 
     """
     # Re-initialize to clear any stale qubits from prior calls
-    qsharp.init()
+    current_profile = get_config().get_target_profile()
+    qsharp.init(target_profile=TargetProfile.from_str(current_profile))
     # Trigger lazy reload of Q# sources after interpreter reset
     _ = QSHARP_UTILS.StatePreparation
 
@@ -223,7 +226,8 @@ class TestDensePureStatePreparation:
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415
 
         # Re-init with Base profile required for QIR compilation (get_qiskit_circuit)
-        qsharp.init(target_profile=qsharp.TargetProfile.Base)
+        current_profile = get_config().get_target_profile()
+        qsharp.init(target_profile=TargetProfile.from_str(current_profile))
         _ = QSHARP_UTILS.StatePreparation
 
         dense_prep = create("state_prep", "dense_pure_state")
