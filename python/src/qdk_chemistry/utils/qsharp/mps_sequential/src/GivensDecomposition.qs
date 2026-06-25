@@ -11,9 +11,8 @@ import Std.ResourceEstimation.*;
 import QDKChemistry.Utils.SelectSwap.ControlledQroamCleanRotation;
 import QDKChemistry.Utils.SelectSwap.QroamCleanRotation;
 import PhaseGradient.RyViaPhaseGradient;
-import PhaseGradient.RzViaPhaseGradient;
 
-export ApplyGivensLayer, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, ApplyBlockDiagUnitaryViaGivens, IncrementByOne, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial, ComputePhasePolynomialCoeffs;
+export ApplyGivensLayer, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, ApplyBlockDiagUnitaryViaGivens, IncrementByOne, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial;
 
 /// # Summary
 /// Increments a little-endian register by 1 (mod 2^n).

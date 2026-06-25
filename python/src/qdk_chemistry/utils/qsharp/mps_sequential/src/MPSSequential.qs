@@ -14,56 +14,7 @@ import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, SiteUnitary, ApplyUCR, ApplyControlledUCR;
-
-// =============================================================================
-// Helper operations for the decomposition
-// =============================================================================
-
-/// Helper: Apply uniformly controlled Y-rotation (UCR).
-///
-/// For each ancilla LE value k, applies Ry(angles[k]) to targetQubit.
-operation ApplyUCR(
-    angles : Double[],
-    ancilla : Qubit[],
-    targetQubit : Qubit
-) : Unit {
-    for k in 0..Length(angles) - 1 {
-        if AbsD(angles[k]) > 1e-15 {
-            within {
-                for i in 0..Length(ancilla) - 1 {
-                    if ((k >>> i) &&& 1) == 0 {
-                        X(ancilla[i]);
-                    }
-                }
-            } apply {
-                Controlled Ry(ancilla, (angles[k], targetQubit));
-            }
-        }
-    }
-}
-
-/// Helper: Apply uniformly controlled Y-rotation, additionally controlled by controlQubit.
-operation ApplyControlledUCR(
-    controlQubit : Qubit,
-    angles : Double[],
-    ancilla : Qubit[],
-    targetQubit : Qubit
-) : Unit {
-    for k in 0..Length(angles) - 1 {
-        if AbsD(angles[k]) > 1e-15 {
-            within {
-                for i in 0..Length(ancilla) - 1 {
-                    if ((k >>> i) &&& 1) == 0 {
-                        X(ancilla[i]);
-                    }
-                }
-            } apply {
-                Controlled Ry([controlQubit] + ancilla, (angles[k], targetQubit));
-            }
-        }
-    }
-}
+export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, SiteUnitary;
 
 // =============================================================================
 // CSD decomposition (Givens + QROAM + phase gradient)
@@ -382,89 +333,11 @@ operation MakeMPSSequentialCircuit(
     );
 }
 
-/// Circuit wrapper for fast resource estimation — accepts only a single site's data.
-///
-/// When all sites use the same decomposition (uniform bond dimension), this avoids
-/// passing N-1 copies of identical angle arrays. The Q# resource estimator caches
-/// the first SiteUnitary call and reuses it for all subsequent sites.
-operation MakeMPSSequentialCircuitUniform(
-    initialStateVec : Double[],
-    numSites : Int,
-    rotationBits : Int,
-    numAncillaQubits : Int,
-    vLayerAngles : Double[][],
-    vLayerShifted : Bool[],
-    vPhases : Bool[],
-    rot0Angles : Double[],
-    rot1Angles : Double[],
-    rot2Angles : Double[],
-    w0LayerAngles : Double[][],
-    w0LayerShifted : Bool[],
-    w0Phases : Bool[],
-    w1LayerAngles : Double[][],
-    w1LayerShifted : Bool[],
-    w1Phases : Bool[],
-    uLayerAngles : Double[][],
-    uLayerShifted : Bool[],
-    uPhases : Bool[]
-) : Unit {
-    use state = Qubit[2 * numSites];
-    use ancilla = Qubit[numAncillaQubits];
-
-    // Initialize phase gradient register
-    use phaseGradient = Qubit[rotationBits];
-    PreparePhaseGradientState(phaseGradient);
-
-    // Single shared angle register for QROM-loaded angles (reused by all operations)
-    use angleReg = Qubit[rotationBits];
-
-    // Prepare initial state
-    let initReg = ancilla + state[0..1];
-    QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
-
-    // Apply site unitaries — all sites use the same single set of angles.
-    // BeginEstimateCaching ensures the first site is analyzed and the rest are cached.
-    for siteIdx in 0..numSites - 2 {
-        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
-        if BeginEstimateCaching("SiteUnitary", SingleVariant()) {
-            SiteUnitary(
-                vLayerAngles,
-                vLayerShifted,
-                vPhases,
-                rot0Angles,
-                rot1Angles,
-                rot2Angles,
-                w0LayerAngles,
-                w0LayerShifted,
-                w0Phases,
-                w1LayerAngles,
-                w1LayerShifted,
-                w1Phases,
-                uLayerAngles,
-                uLayerShifted,
-                uPhases,
-                newSite,
-                ancilla,
-                phaseGradient,
-                angleReg
-            );
-            EndEstimateCaching();
-        }
-    }
-
-    // Undo phase gradient state
-    Adjoint PreparePhaseGradientState(phaseGradient);
-}
-
 /// Circuit wrapper for accurate fast resource estimation with non-uniform bond dimensions.
 ///
 /// Groups sites by their effective ancilla dimension (shape). For each unique shape,
 /// one representative set of angle data is provided. The resource estimator evaluates
 /// each shape once and caches the cost, then replicates it for all sites of that shape.
-///
-/// This is more accurate than MakeMPSSequentialCircuitUniform (which uses the largest
-/// site's cost for all sites) while still being fast (only evaluates unique shapes,
-/// not all sites individually).
 ///
 /// # Input
 /// ## siteShapeIndices

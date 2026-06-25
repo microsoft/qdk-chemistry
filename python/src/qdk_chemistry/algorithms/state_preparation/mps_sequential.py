@@ -1,4 +1,4 @@
-"""MPS (Matrix Product State) state preparation via sequential site unitary synthesis.
+"""Matrix Product State (MPS) state preparation via sequential site unitary synthesis.
 
 Implements the MPS state preparation algorithm based on
 :cite:`Berry2025`. Each site unitary is decomposed based on Appendix B in
@@ -59,18 +59,18 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the MPSSequentialStatePreparationSettings."""
         super().__init__()
-        self._set_default("rotation_bits", "int", 10, "Phase gradient precision (number of bits).")
+        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.")
         self._set_default(
             "fast_resource_estimation",
             "bool",
             False,
-            "Only synthesize one site unitary and replicate it for all sites. "
+            "Only synthesize one site unitary to reduce classical preprocessing overhead. "
             "Valid for resource estimation (with BeginEstimateCaching) but not simulation.",
         )
 
 
 class MPSSequentialStatePreparation(StatePreparation):
-    r"""MPS (Matrix Product State) state preparation using sequential unitary synthesis.
+    r"""Matrix Product State (MPS) state preparation using sequential unitary synthesis.
 
     Prepare the state sequentially, qubit-by-qubit (2 qubits per site), using an
     ancilla register that stores the virtual bond dimension. Each site unitary
@@ -122,8 +122,6 @@ class MPSSequentialStatePreparation(StatePreparation):
         rotation_bits = self._settings.get("rotation_bits")
 
         if fast_re:
-            # Use the grouped Q# operation that passes one representative per shape.
-            # This avoids marshaling redundant data and enables accurate per-shape caching.
             params = data.to_qsharp_params_grouped(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
         else:
@@ -139,7 +137,7 @@ class MPSSequentialStatePreparation(StatePreparation):
 
 
 # ---------------------------------------------------------------------------
-# Data containers for structured decomposition results
+# Data containers for unitary decomposition
 # ---------------------------------------------------------------------------
 
 
@@ -165,7 +163,7 @@ class GivensLayerData:
 class SiteUnitaryData:
     r"""Decomposition data for a single MPS site unitary.
 
-    Holds the 7-matrix CSD (Cosine-Sine Decomposition) from Appendix B of
+    Holds the 7-matrix Cosine-Sine Decomposition(CSD) from Appendix B of
     :cite:`Rupprecht2026` and the Givens-layer synthesis of each component.
 
     The circuit applies these components in order (see Fig. 5 of the paper)::
@@ -204,27 +202,29 @@ class MPSPreparationData:
     :meth:`MPSSequentialStatePreparation._run_impl`.
     """
 
-    initial_state_vec: list[float]
-    """Flattened initial state vector for the first site (state-preparation)."""
-
     num_sites: int
     """Number of MPS sites."""
 
     ancilla_bits: int
-    """Number of ancilla qubits (log2 of ancilla dimension)."""
+    """Number of ancilla qubits."""
+
+    initial_state_vec: list[float]
+    """Flattened initial state vector for the first site."""
 
     sites: list[SiteUnitaryData] = field(default_factory=list)
-    """Per-site decomposition data (one entry per site 1..num_sites-1).
+    """Per-site decomposition data.
 
-    In grouped mode (when site_shape_indices is not None), this contains
-    one entry per unique shape rather than per site.
+    In resource estimation mode, this contains one entry per unique unitary
+    shape rather than per site.
     """
 
     site_shape_indices: list[int] | None = None
-    """Per-site mapping to shape group index (0-based). None means ungrouped."""
+    """In resource estimation mode, this maps each site to its corresponding shape group.
+    None means ungrouped."""
 
     shape_effective_bits: list[int] | None = None
-    """Effective ancilla bits per shape group. None means ungrouped."""
+    """In resource estimation mode, effective ancilla bits per shape group.
+    None means ungrouped."""
 
     def to_qsharp_params(self, rotation_bits: int) -> dict:
         """Flatten into the dict expected by the MakeMPSSequentialCircuit Q# operation."""
@@ -307,10 +307,9 @@ def generate_mps_preparation_data(
     tensors : sequence of np.ndarray
         MPS tensors. ``tensors[i]`` has shape ``(chi_left, d, chi_right)``.
     fast_resource_estimation : bool
-        If True, only decompose a single representative site unitary and
-        replicate its data for all sites.  This is valid for resource
-        estimation (where ``BeginEstimateCaching`` caches the first site
-        and reuses its cost) but NOT for simulation.
+        If True, for each unitary of a certain shapes, only decompose a single
+        representative site unitary and replicate its data for all sites.
+        This is valid for resource estimation but NOT for simulation.
 
     Returns
     -------
@@ -336,15 +335,14 @@ def generate_mps_preparation_data(
 
     # Per-site decomposition — process in reverse order to propagate V matrices.
     # Each site's V is absorbed into the previous site's target matrix (via v_from_next),
-    # eliminating the explicit V unitary application. This mirrors Qualtran's approach.
+    # eliminating the explicit V unitary application.
     sites: list[SiteUnitaryData] = []
     v_from_next: np.ndarray | None = None
     site_shape_indices: list[int] | None = None
     unique_bits: list[int] | None = None
     if fast_resource_estimation and num_sites > 2:
-        # Group sites by effective ancilla dimension (shape).
-        # Sites with the same max(chi_left, chi_right) have the same circuit cost.
-        # For RE, only array SHAPES matter (not values) — skip expensive decomposition.
+        # Group sites by shape.
+        # Sites with the same max(chi_left, chi_right) have the similar circuit cost.
         site_effective_bits: list[int] = []
         for i in range(1, num_sites):
             chi_left, _, chi_right = tensors[i].shape
@@ -356,13 +354,13 @@ def generate_mps_preparation_data(
         shape_to_idx = {b: idx for idx, b in enumerate(unique_bits)}
         site_shape_indices = [shape_to_idx[b] for b in site_effective_bits]
 
-        # Generate dummy data of the correct shape for each unique dimension.
-        # No SVD/QR/Givens needed — resource estimator only uses array lengths.
+        # Generate dummy data at the padded ancilla dimension for all shapes.
+        # Normal mode pads all sites to ancilla_dim, so fast mode must match.
         shape_representatives: list[SiteUnitaryData] = []
-        for shape_bits in unique_bits:
-            effective_dim = 1 << shape_bits
-            site_data = _make_dummy_site_data(effective_dim)
+        for _ in unique_bits:
+            site_data = _make_dummy_site_data(ancilla_dim)
             shape_representatives.append(site_data)
+        unique_bits = [ancilla_bits] * len(unique_bits)
 
         sites = shape_representatives
     else:
@@ -376,14 +374,13 @@ def generate_mps_preparation_data(
 
     # Initial state from first tensor, absorbing V from site 1's decomposition.
     if fast_resource_estimation:
-        # For RE, only the vector length matters (determines QroamStatePrep cost).
-        # Length = d * ancilla_dim entries, addressed by ancilla + site[0..1].
-        initial_state_vec = [0.0] * (d * ancilla_dim)
-        initial_state_vec[0] = 1.0  # valid normalized state
+        rng = np.random.default_rng(0)
+        vec = rng.standard_normal(d * ancilla_dim)
+        vec /= np.linalg.norm(vec)
+        initial_state_vec = vec.tolist()
     else:
         first_tensor = tensors[0]
         chi_1 = first_tensor.shape[2]
-        # Transpose to (d, chi_right, chi_left) then sum over chi_left → (d, chi_right)
         init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
         init_padded = np.zeros((d, ancilla_dim))
         init_padded[:, :chi_1] = init_state
@@ -410,48 +407,43 @@ def generate_mps_preparation_data(
 
 
 def _make_dummy_site_data(effective_dim: int) -> SiteUnitaryData:
-    """Generate dummy site unitary data of the correct shape for resource estimation.
+    """Generate representative site unitary data for resource estimation.
 
-    Only array sizes matter for the Q# resource estimator — actual angle values
-    are irrelevant. This skips all expensive SVD/QR/Givens decomposition.
+    Uses random orthogonal matrices to produce realistic Givens layer counts
+    and array dimensions, matching what the full CSD pipeline would produce
+    for a generic (non-trivial) unitary. This is much cheaper than the full
+    pipeline (skips tensor reshaping, multi-block QR, and 3* SVD) while
+    giving accurate resource estimates.
     """
     dim = effective_dim
+    rng = np.random.default_rng(0)  # fixed seed for reproducibility
 
-    # V is never applied in the circuit (always propagated to previous site)
+    # V is always empty (absorbed into previous site)
     v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
 
-    # W0, W1: dim x dim Givens -> dim layers alternating even/odd
-    def _dummy_givens(d: int) -> GivensLayerData:
-        n_even = d // 2
-        n_odd = (d - 1) // 2
-        angles = []
-        shifted = []
-        for i in range(d):
-            s = i % 2 == 1
-            angles.append([1.0] * (n_odd if s else n_even))
-            shifted.append(s)
-        return GivensLayerData(layer_angles=angles, layer_shifted=shifted, phases=[False] * d)
+    # W0, W1: decompose random dim x dim orthogonal matrices
+    w0_angles, w0_shifted, w0_phases = decompose_unitary_to_givens(_random_orthogonal(dim, rng))
+    w0_givens = GivensLayerData(layer_angles=w0_angles, layer_shifted=w0_shifted, phases=w0_phases)
 
-    w0_givens = _dummy_givens(dim)
-    w1_givens = _dummy_givens(dim)
+    w1_angles, w1_shifted, w1_phases = decompose_unitary_to_givens(_random_orthogonal(dim, rng))
+    w1_givens = GivensLayerData(layer_angles=w1_angles, layer_shifted=w1_shifted, phases=w1_phases)
 
-    # UCR angles: dim entries each (3 rotation steps)
-    rot_angles = [[1.0] * dim, [1.0] * dim, [1.0] * dim]
+    # UCR rotation angles: random values (resource cost depends on array length, not values)
+    rot_angles = [rng.uniform(-1, 1, size=dim).tolist() for _ in range(3)]
 
-    # U: block-diagonal (4 blocks of dim x dim), total_dim = 4*dim
-    # Blocks parallelize → dim layers, each with total_dim//2 or (total_dim-1)//2 angles
-    total_dim = 4 * dim
-    n_even_u = total_dim // 2
-    n_odd_u = (total_dim - 1) // 2
-    u_angles = []
-    u_shifted = []
-    for i in range(dim):
-        s = i % 2 == 1
-        u_angles.append([1.0] * (n_odd_u if s else n_even_u))
-        u_shifted.append(s)
-    u_givens = GivensLayerData(layer_angles=u_angles, layer_shifted=u_shifted, phases=[False] * total_dim)
+    # U: block-diagonal of 4 random dim x dim orthogonal blocks
+    blocks = [_random_orthogonal(dim, rng) for _ in range(4)]
+    u_angles, u_shifted, u_phases = decompose_block_diagonal_to_givens(blocks)
+    u_givens = GivensLayerData(layer_angles=u_angles, layer_shifted=u_shifted, phases=u_phases)
 
     return SiteUnitaryData(v=v_givens, rot_angles=rot_angles, w0=w0_givens, w1=w1_givens, u=u_givens)
+
+
+def _random_orthogonal(dim: int, rng: np.random.Generator) -> np.ndarray:
+    """Generate a random orthogonal matrix via QR decomposition."""
+    raw = rng.standard_normal((dim, dim))
+    q, _ = np.linalg.qr(raw)
+    return q
 
 
 def _pad_and_givens(mat: np.ndarray, dim: int) -> GivensLayerData:
@@ -468,18 +460,6 @@ def _d_prime_to_ucr_angles(d_prime: np.ndarray, dim: int) -> list[float]:
     Each angle is ``2*arcsin(d'[k])``.
     """
     return [2.0 * float(np.arcsin(np.clip(d_prime[k] if k < len(d_prime) else 0.0, -1, 1))) for k in range(dim)]
-
-
-def _decompose_site(tensor: np.ndarray, ancilla_dim: int, v_from_next: np.ndarray | None = None) -> SiteUnitaryData:
-    """CSD-decompose one MPS site tensor and Givens-decompose all components.
-
-    Combines ``compute_site_unitary_dense_data``
-    (CSD = Cosine-Sine Decomposition) with Givens decomposition of each
-    resulting unitary, returning a single ``SiteUnitaryData`` ready for
-    circuit synthesis.
-    """
-    site_data, _ = _decompose_site_with_v(tensor, ancilla_dim, v_from_next=v_from_next)
-    return site_data
 
 
 def _decompose_site_with_v(
@@ -717,97 +697,6 @@ def _pad_to_power_of_2(arr: np.ndarray, target_len: int) -> np.ndarray:
     if len(arr) >= target_len:
         return arr[:target_len]
     return np.concatenate([arr, np.zeros(target_len - len(arr))])
-
-
-def _organize_into_layers(rotations: list[tuple[int, float]], dim: int) -> tuple[list[list[float]], list[bool]]:
-    """Assign Givens rotations to parallel layers (Clements layout).
-
-    Maps a sequence of (pair_index, angle) rotations into layers that
-    alternate between even and odd pair placements, ensuring no two
-    rotations in the same layer share a qubit index.
-
-    Parameters
-    ----------
-    rotations : list of (int, float)
-        Each entry is (pair_index, angle) where pair_index indicates the
-        rotation acts on rows pair_index and pair_index+1.
-    dim : int
-        Dimension of the unitary (determines number of slots per layer).
-
-    Returns
-    -------
-    layer_angles : list[list[float]]
-        Angles for each slot in each layer.
-    layer_shifted : list[bool]
-        Whether the layer uses odd-indexed pairs.
-
-    """
-    if not rotations:
-        return [], []
-
-    num_even_slots = dim // 2
-    num_odd_slots = (dim - 1) // 2
-
-    pair_latest: list[int] = [-1] * (dim - 1)
-    layers_slots: list[set] = []
-    assignments: list[int] = []
-
-    for pair, _angle in rotations:
-        is_odd = pair % 2 == 1
-        min_layer = 0
-        for p in range(max(0, pair - 1), min(dim - 1, pair + 2)):
-            if pair_latest[p] >= 0:
-                min_layer = max(min_layer, pair_latest[p] + 1)
-
-        if (is_odd and min_layer % 2 == 0) or (not is_odd and min_layer % 2 == 1):
-            min_layer += 1
-
-        layer_idx = min_layer
-        while True:
-            while layer_idx >= len(layers_slots):
-                layers_slots.append(set())
-            if pair not in layers_slots[layer_idx]:
-                break
-            layer_idx += 2
-
-        while layer_idx >= len(layers_slots):
-            layers_slots.append(set())
-
-        layers_slots[layer_idx].add(pair)
-        assignments.append(layer_idx)
-        pair_latest[pair] = layer_idx
-
-    num_layers = len(layers_slots)
-    layer_rotations: list[list[tuple[int, float]]] = [[] for _ in range(num_layers)]
-    for idx, (pair, angle) in enumerate(rotations):
-        layer_rotations[assignments[idx]].append((pair, angle))
-
-    result_angles: list[list[float]] = []
-    result_shifted: list[bool] = []
-
-    for layer_idx in range(num_layers):
-        if not layer_rotations[layer_idx]:
-            continue
-
-        shifted = layer_idx % 2 == 1
-        if shifted:
-            num_slots = num_odd_slots
-            slot_pairs = [2 * k + 1 for k in range(num_slots)]
-        else:
-            num_slots = num_even_slots
-            slot_pairs = [2 * k for k in range(num_slots)]
-
-        pair_to_slot = {p: i for i, p in enumerate(slot_pairs)}
-        angles = [0.0] * num_slots
-
-        for pair, angle in layer_rotations[layer_idx]:
-            slot = pair_to_slot[pair]
-            angles[slot] = angle
-
-        result_angles.append(angles)
-        result_shifted.append(shifted)
-
-    return result_angles, result_shifted
 
 
 def decompose_unitary_to_givens(matrix: np.ndarray):

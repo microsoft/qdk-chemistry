@@ -1,4 +1,4 @@
-"""MPS Wavefunction container for Matrix Product State representations."""
+"""Wavefunction container for Matrix Product State representations."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

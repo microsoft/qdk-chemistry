@@ -1,16 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 
-/// MPS state preparation exploiting block sparsity.
-///
-/// Each site unitary is decomposed as U = P_row · V_blockdiag · P_col
-/// where P_row, P_col are permutations (via QROAM + SWAP + X-measure)
-/// and V_blockdiag is block-diagonal (via Givens rotation layers).
-///
-/// References:
-///   Rupprecht & Woelk (2026). Faster matrix product state preparation by
-///   exploiting symmetry-induced block-sparsity. arXiv:2605.28489.
-
 import Std.Math.*;
 import Std.Convert.*;
 import Std.Arrays.*;
@@ -159,15 +149,20 @@ operation SparseSiteUnitary(
 // =============================================================================
 
 /// # Summary
-/// MPS state preparation via block-sparsity exploitation.
+/// MPS state preparation exploiting block sparsity.
+///
+/// Each site unitary is decomposed as U = P_row · V_blockdiag · P_col
+/// where P_row, P_col are permutations (via QROAM + SWAP + X-measure)
+/// and V_blockdiag is block-diagonal (via Givens rotation layers).
 ///
 /// # Description
 /// Prepares an MPS by:
 ///   1. Preparing the initial state (first site) via QROAM state prep
 ///   2. Applying sparse site unitaries for sites 1..N-1
 ///
-/// Each sparse site unitary is decomposed as P_col -> V_blockdiag -> P_row,
-/// exploiting U(1) symmetries of the MPS tensors.
+/// References:
+///   Rupprecht & Woelk (2026). Faster matrix product state preparation by
+///   exploiting symmetry-induced block-sparsity. arXiv:2605.28489.
 operation MPSSparse(
     initialStateVec : Double[],
     numSites : Int,

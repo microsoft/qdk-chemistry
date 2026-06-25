@@ -1,4 +1,4 @@
-"""MPS (Matrix Product State) state preparation exploiting block sparsity.
+"""Matrix Product State (MPS) state preparation exploiting block sparsity.
 
 Implements the sparse MPS preparation method from :cite:`Rupprecht2026`.
 Each site unitary is decomposed as ``U = P_row · V_blockdiag · P_col``
@@ -20,10 +20,6 @@ References
     Felix Rupprecht and Sabine Wölk. (2026). Faster matrix product state preparation by
     exploiting symmetry-induced block-sparsity.
     https://arxiv.org/pdf/2605.28489. Zenodo: https://zenodo.org/records/20393500.
-
-    Dominic W. Berry et al. (2025). Rapid Initial-State Preparation for the Quantum Simulation of
-    Strongly Correlated Molecules. PRX Quantum 6, 020327.
-    https://doi.org/10.1103/PRXQuantum.6.020327.
 
 """
 
@@ -64,7 +60,7 @@ class MPSSparseStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the MPSSparseStatePreparationSettings."""
         super().__init__()
-        self._set_default("rotation_bits", "int", 10, "Phase gradient precision (number of bits).")
+        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.")
 
 
 class MPSSparseStatePreparation(StatePreparation):
@@ -319,9 +315,6 @@ def _decompose_sparse_site(tensor: np.ndarray, ancilla_dim: int) -> SparseSiteUn
     # Returns inverted ordering permutation and sorted blocks
     ordering_perm, blocks = _order_blocks(blocks, active_dim)
 
-    # Compose final permutations following Qualtran convention:
-    # Qualtran: (a @ b)(i) = b[a[i]], so composed = perm_b[perm_a[i]]
-    # Final col_perm = invert(composed_col), final row_perm = composed_row
     col_composed = [col_perm[ordering_perm[i]] for i in range(active_dim)]
     col_perm_final = _invert_perm(col_composed)
     row_perm_final = [row_perm[ordering_perm[i]] for i in range(active_dim)]
@@ -475,7 +468,7 @@ def _find_column_permutation(rectangles: list[np.ndarray], dim: int) -> list[int
     Returns
     -------
     list[int]
-        Column permutation (inverted mapping, matching Qualtran convention).
+        Column permutation.
 
     """
     mapping = list(range(dim))
@@ -532,8 +525,6 @@ def _expand_to_unitary(rectangle: np.ndarray) -> np.ndarray:
 def _order_blocks(blocks: list[np.ndarray], dim: int) -> tuple[list[int], list[np.ndarray]]:
     """Sort blocks by size (largest first) and return the reordering permutation.
 
-    Returns the inverted ordering permutation (matching Qualtran convention).
-
     Parameters
     ----------
     blocks : list[np.ndarray]
@@ -570,7 +561,7 @@ def _order_blocks(blocks: list[np.ndarray], dim: int) -> tuple[list[int], list[n
             mapping[old_start + k] = new_offset + k
         new_offset += block_size
 
-    # Return inverted mapping (Qualtran returns Permutation(mapping).invert())
+    # Return inverted mapping
     sorted_blocks = [blocks[i] for i in sorted_indices]
     return _invert_perm(mapping), sorted_blocks
 
@@ -667,20 +658,3 @@ def _perm_to_bitstrings(perm_targets: list[int], num_bits: int) -> list[list[boo
         bits = [(target >> b) & 1 == 1 for b in range(num_bits)]
         result.append(bits)
     return result
-
-
-def _sign_fixes_to_bitstrings(sign_fixes: list[bool]) -> list[list[bool]]:
-    """Encode sign fixes as Bool[][1] for Q# Select.
-
-    Parameters
-    ----------
-    sign_fixes : list[bool]
-        Per-basis-state sign fix flags.
-
-    Returns
-    -------
-    list[list[bool]]
-        Bool[N][1] encoding for Q#.
-
-    """
-    return [[s] for s in sign_fixes]
