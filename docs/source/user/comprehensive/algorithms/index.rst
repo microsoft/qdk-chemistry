@@ -21,6 +21,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    scf_solver
    stability_checker
    state_preparation
+   hadamard_test
    phase_estimation
    qpe_circuit_builder
    hamiltonian_unitary_builder
@@ -67,6 +68,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StatePreparation <state_preparation>`
      - Quantum state preparation
      - Wavefunction → Circuit
+   * - :doc:`HadamardTest <hadamard_test>`
+     - Controlled-unitary overlap estimation
+     - Circuit + UnitaryRepresentation → CircuitExecutorData
    * - :doc:`EnergyEstimator <energy_estimator>`
      - Quantum energy expectation values
      - Circuit + QubitHamiltonian → Energy

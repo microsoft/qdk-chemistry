@@ -680,6 +680,10 @@ def _register_python_factories():
         ControlledCircuitMapperFactory,
     )
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
+        HadamardTestCircuitBuilderFactory,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
@@ -704,6 +708,8 @@ def _register_python_factories():
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(HadamardTestFactory())
+    register_factory(HadamardTestCircuitBuilderFactory())
     register_factory(PropagatorFactory())
 
 
@@ -766,6 +772,10 @@ def _register_python_algorithms():
         ControlledPSPMapper,
     )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
+        QdkHadamardTestCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
     )
@@ -825,6 +835,8 @@ def _register_python_algorithms():
     register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: QdkStandardQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: HadamardTest())
+    register(lambda: QdkHadamardTestCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
 
 

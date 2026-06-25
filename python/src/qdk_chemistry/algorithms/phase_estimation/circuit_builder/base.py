@@ -119,6 +119,7 @@ class QpeCircuitBuilder(Algorithm):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
+        circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
 

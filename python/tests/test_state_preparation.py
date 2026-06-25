@@ -105,7 +105,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     # Create a wavefunction with coefficients that will be filtered out
     test_orbitals = create_test_orbitals(2)
 
-    det = Configuration.from_spin_half_string("du")
+    det = Configuration.from_spin_half_string("u2")
     dets = [det]
     coeffs = [1.0]
 
@@ -128,14 +128,15 @@ def test_sparse_isometry_gf2x_single_reference_state():
                 "components"
             ]
         )
-        == 2
-    )  # 2 operations
-    assert all(
-        child["gate"] == "X"
-        for child in single_ref_qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0][
-            "children"
-        ][0]["components"]
-    )
+        == 3
+    )  # 3 operations
+    x_components = single_ref_qsc_json["componentGrid"][0]["components"][0]["children"][0]["components"][0]["children"][
+        0
+    ]["components"]
+    assert all(child["gate"] == "X" for child in x_components)
+    # JW qubit order: [α₀, α₁, β₀, β₁] = [1, 1, 0, 1] → X on q[0], q[2], and q[3]
+    x_qubit_targets = sorted(comp["targets"][0]["qubit"] for comp in x_components)
+    assert x_qubit_targets == [0, 1, 3]
 
 
 def test_gf2x_bitstrings_to_binary_matrix():
