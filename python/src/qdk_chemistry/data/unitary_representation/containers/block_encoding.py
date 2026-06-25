@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_array, _hash_int, _hash_str, _hash_uint
+
 from .base import UnitaryContainer
 
 if TYPE_CHECKING:
@@ -330,6 +332,21 @@ class LCUContainer(BlockEncodingContainer):
             f"  Select: {self.num_prepare_ancillas} control qubits, {self.select.num_target_qubits} target qubits,"
             f" {len(self.select.controlled_operations)} controlled operations"
         )
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "lcu_container")
+        _hash_int(h, self._power)
+        # Hash prepare wavefunction via its own content_hash
+        _hash_str(h, self.prepare.content_hash(truncate_chars=0))
+        # Hash select oracle
+        _hash_uint(h, len(self.select.controlled_operations))
+        for op in self.select.controlled_operations:
+            _hash_int(h, op.ctrl_state)
+            _hash_str(h, op.operation)
+        _hash_array(h, self.select.phases)
+        _hash_int(h, self.select.num_prepare_ancillas)
+        _hash_int(h, self.select.num_target_qubits)
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         """Not applicable for a raw block encoding.
