@@ -153,7 +153,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         _validate_iteration_inputs(iteration, total_iterations)
         num_system_qubits = qubit_hamiltonian.num_qubits
 
-
         power = 2 ** (total_iterations - iteration - 1)
 
         ctrl_unitary_circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
