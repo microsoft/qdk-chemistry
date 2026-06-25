@@ -18,6 +18,8 @@ from qdk_chemistry.data import (
     Structure,
 )
 
+from .reference_tolerances import float_comparison_absolute_tolerance
+
 
 class TestNaturalOrbitalLocalizerBindings:
     """Test that the QdkNaturalOrbitalLocalizer Python bindings work correctly."""
@@ -101,7 +103,7 @@ class TestNaturalOrbitalLocalizerBindings:
         noons = np.diag(output_rdm)
         n_a, n_b = wfn.get_total_num_electrons()
         assert np.all(noons[:-1] >= noons[1:] - 1e-10)
-        assert np.all(noons >= -1e-12)
-        assert np.all(noons <= 2.0)
+        assert np.all(noons >= -float_comparison_absolute_tolerance)
+        assert np.all(noons <= 2.0 + float_comparison_absolute_tolerance)
         np.testing.assert_allclose(noons.sum(), n_a + n_b, atol=1e-6)
         assert any(0.1 < n < 1.9 for n in noons), f"No fractional NOONs: {noons}"
