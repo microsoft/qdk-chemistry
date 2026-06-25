@@ -1046,8 +1046,18 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
 
 std::pair<double, RowMajorMatrix>
 SCFImpl::evaluate_trial_density_energy_and_fock(
-    const RowMajorMatrix& P_matrix, double* J_out, double* K_out,
-    const std::source_location& loc) const {
+    const RowMajorMatrix& P_matrix, const std::source_location& loc) const {
+  RowMajorMatrix J_out = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix K_out = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  return evaluate_trial_density_energy_and_fock(P_matrix, J_out, K_out, loc);
+}
+
+std::pair<double, RowMajorMatrix>
+SCFImpl::evaluate_trial_density_energy_and_fock(
+    const RowMajorMatrix& P_matrix, RowMajorMatrix& J_out,
+    RowMajorMatrix& K_out, const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
 
   if (ctx_.cfg->mpi.world_size > 1) {
@@ -1069,22 +1079,8 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 
   RowMajorMatrix H_matrix = H_.eval();
   RowMajorMatrix F_matrix = H_matrix;
-  auto [alpha, beta, omega] = get_hyb_coeff_();
-  RowMajorMatrix J_matrix = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix K_matrix = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  eri_->build_JK(P_matrix.data(), J_matrix.data(), K_matrix.data(), alpha, beta,
-                 omega);
+  build_jk_matrices(P_matrix, J_out, K_out);
 
-  if (J_out != nullptr) {
-    std::memcpy(J_out, J_matrix.data(),
-                sizeof(double) * static_cast<size_t>(J_matrix.size()));
-  }
-  if (K_out != nullptr) {
-    std::memcpy(K_out, K_matrix.data(),
-                sizeof(double) * static_cast<size_t>(K_matrix.size()));
-  }
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   throw std::runtime_error("PCM is not supported in trial density evaluation.");
 #endif
@@ -1093,13 +1089,13 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
     if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
         ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       F_matrix +=
-          (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
-           J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
-                          num_atomic_orbitals_))
+          (J_out.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
+           J_out.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                       num_atomic_orbitals_))
               .replicate(2, 1) -
-          K_matrix;
+          K_out;
     } else {
-      F_matrix += J_matrix - 0.5 * K_matrix;
+      F_matrix += J_out - 0.5 * K_out;
     }
   }
 

@@ -536,8 +536,8 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
   RowMajorMatrix F_trial;
   if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
     std::tie(energy, F_trial) =
-        scf_impl_.evaluate_trial_density_energy_and_fock(
-            cached_P_, cached_J_.data(), cached_K_.data());
+        scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_, cached_J_,
+                                                         cached_K_);
   } else {
     std::tie(energy, F_trial) =
         scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
@@ -1254,7 +1254,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   // but build_jk_matrices requires participation from all MPI ranks.
   if (cfg->mpi.world_size > 1) {
     throw std::runtime_error(
-        "Temporary limitation: evaluate_trial_density_energy_and_fock is not "
+        "Temporary limitation: build_jk_matrices is not "
         "supported with MPI world_size > 1.");
   }
   const int num_molecular_orbitals =
