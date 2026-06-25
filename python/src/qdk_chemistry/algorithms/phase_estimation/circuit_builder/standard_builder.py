@@ -122,7 +122,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         if (
             ctrl_unitary_circuits
-            and state_preparation._qsharp_op
+            and state_preparation._qsharp_op  # noqa: SLF001
             and all(
                 c._qsharp_op  # noqa: SLF001
                 for c in ctrl_unitary_circuits
@@ -204,8 +204,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         """Create a QPE Circuit using a single walk op repeated with RepeatEstimates.
 
         Instead of building num_bits separate controlled circuits, this passes a single
-        controlled walk operation to MakeRepeatedQPECircuit, which loops with powers of 2
-        and uses RepeatEstimates for efficient resource estimation.
+        controlled walk operation to MakeRepeatedQPECircuit.
 
         Args:
             state_preparation: Circuit object containing a Q# operation for state preparation.

@@ -8,6 +8,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     import Std.Canon.ApplyQFT;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.RepeatEstimates;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -163,14 +164,37 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
         // Step 3: Apply controlled walk with powers of 2 per ancilla.
         // ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
-        // RepeatEstimates tells the resource estimator to multiply the single-step
-        // cost by `power` without tracing through each repetition.
+        //
+        // Detect execution mode: In simulation, BeginEstimateCaching always returns
+        // true. In resource estimation, the second call with the same key returns
+        // false (cache hit). This lets us choose the optimal strategy for each mode.
+        mutable useRepeatEstimates = false;
+        if BeginEstimateCaching("__mode_probe__", 0) {
+            EndEstimateCaching();
+            if not BeginEstimateCaching("__mode_probe__", 0) {
+                // Second call returned false => resource estimation mode
+                set useRepeatEstimates = true;
+            } else {
+                EndEstimateCaching();
+            }
+        }
+
         for ancillaIdx in 0..numBits - 1 {
             let power = 1 <<< (numBits - 1 - ancillaIdx);
-            for _ in 0..power - 1 {
-                if BeginEstimateCaching("controlled_walk", numAncillas) {
+            if useRepeatEstimates {
+                // Resource estimation: RepeatEstimates multiplies the single-step
+                // cost by `power` without looping. BeginEstimateCaching ensures the
+                // walk is traced only once across all ancilla iterations.
+                within { RepeatEstimates(power); } apply {
+                    if BeginEstimateCaching("controlled_walk", numAncillas) {
+                        controlledUnitary(phaseAncillas[ancillaIdx], allTargets);
+                        EndEstimateCaching();
+                    }
+                }
+            } else {
+                // Simulation: actually apply the walk `power` times.
+                for _ in 0..power - 1 {
                     controlledUnitary(phaseAncillas[ancillaIdx], allTargets);
-                    EndEstimateCaching();
                 }
             }
         }
