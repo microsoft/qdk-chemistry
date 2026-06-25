@@ -160,18 +160,20 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     // in the new determinant space.  Near 1.0 → excellent guess; near 0.0
     // → most weight was on determinants that were dropped.
     double norm = blas::nrm2(X_local.size(), X_local.data(), 1);
+    const double overlap_norm_tol =
+        std::max(asci_settings.min_warm_start_overlap,
+                 std::numeric_limits<double>::epsilon());
     if (logger) {
       logger->info("  WARM_START: matched={}/{}, projected_norm={:.4f}",
                    n_matched, wfn.size(), norm);
     }
-    if (norm < asci_settings.min_warm_start_overlap ||
-        norm < std::numeric_limits<double>::epsilon()) {
+    if (norm < overlap_norm_tol) {
       X_local.clear();  // triggers identity guess in selected_ci_diag
       if (logger)
         logger->info(
-            "  WARM_START: norm {:.4f} < {:.4f} threshold or < epsilon, "
+            "  WARM_START: norm {:.4f} < {:.4f} threshold, "
             "using diagonal guess",
-            norm, asci_settings.min_warm_start_overlap);
+            norm, overlap_norm_tol);
     } else {
       blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
     }
