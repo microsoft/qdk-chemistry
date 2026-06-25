@@ -137,6 +137,8 @@ def export_scf_files(
     ao_tilesize: int = 30,
     runcontext_prefix: str | Path | None = None,
     basis_set=None,
+    mo_coeff_beta: np.ndarray | None = None,
+    density_beta: np.ndarray | None = None,
 ) -> list[Path]:
     """Write SCF restart files for ExaChem's ``noscf`` mode.
 
@@ -148,13 +150,21 @@ def export_scf_files(
     density matrices are reordered from qdk-chemistry's convention to
     ExaChem's convention (see :func:`reorder_ao_qdk_to_exachem`).
 
+    For a restricted (closed-shell) reference, pass only the alpha quantities;
+    ExaChem reads the total density from ``.alpha.density`` (so ``density_alpha``
+    should be the total alpha+beta density). For an unrestricted reference, also
+    pass ``mo_coeff_beta`` and ``density_beta``; ExaChem then reads the per-spin
+    densities from ``.alpha.density`` and ``.beta.density`` separately.
+
     Args:
-        files_prefix: Path prefix for output files (e.g. ``"workdir/scf/h2o.cc-pvdz"``). Files will be named ``<prefix>.alpha.movecs``, etc.
+        files_prefix: Path prefix for output files; files are named ``<prefix>.alpha.movecs`` etc.
         mo_coeff_alpha: Alpha MO coefficient matrix, shape ``(nbf, nmo)``.
-        density_alpha: Alpha density matrix in AO basis, shape ``(nbf, nbf)``.
+        density_alpha: Alpha (or total, for restricted) AO density matrix, shape ``(nbf, nbf)``.
         ao_tilesize: AO tile size for ExaChem (default: 30).
         runcontext_prefix: Path prefix for the run context JSON. If None, uses ``files_prefix``.
-        basis_set: A :class:`~qdk_chemistry.data.BasisSet` instance for AO reordering. If None, no reordering is applied.
+        basis_set: A :class:`~qdk_chemistry.data.BasisSet` for AO reordering; None disables reordering.
+        mo_coeff_beta: Beta MO coefficients (unrestricted), shape ``(nbf, nmo)``; None writes no beta files.
+        density_beta: Beta AO density (unrestricted), shape ``(nbf, nbf)``; None writes no beta density.
 
     Returns:
         List of paths to the created files.
@@ -172,6 +182,10 @@ def export_scf_files(
         perm = reorder_ao_qdk_to_exachem(basis_set)
         mo_coeff_alpha = mo_coeff_alpha[perm, :]
         density_alpha = density_alpha[np.ix_(perm, perm)]
+        if mo_coeff_beta is not None:
+            mo_coeff_beta = mo_coeff_beta[perm, :]
+        if density_beta is not None:
+            density_beta = density_beta[np.ix_(perm, perm)]
 
     created: list[Path] = []
 
@@ -183,6 +197,16 @@ def export_scf_files(
     density_path = Path(str(files_prefix) + ".alpha.density")
     write_exachem_matrix(density_path, density_alpha)
     created.append(density_path)
+
+    # Beta movecs and density (unrestricted references only)
+    if mo_coeff_beta is not None:
+        beta_movecs_path = Path(str(files_prefix) + ".beta.movecs")
+        write_exachem_matrix(beta_movecs_path, mo_coeff_beta)
+        created.append(beta_movecs_path)
+    if density_beta is not None:
+        beta_density_path = Path(str(files_prefix) + ".beta.density")
+        write_exachem_matrix(beta_density_path, density_beta)
+        created.append(beta_density_path)
 
     # Run context JSON (required by ExaChem's scf_restart to read ao_tilesize)
     rc_prefix = Path(runcontext_prefix) if runcontext_prefix is not None else files_prefix

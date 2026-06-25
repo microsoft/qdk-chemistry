@@ -117,6 +117,7 @@ class DuccInputConfig:
     cd_diagtol: float = 1e-5
     scf_type: str = "restricted"
     noscf: bool = False
+    input_prefix: str = "ducc_input"
     extra_cc_options: dict = field(default_factory=dict)
     extra_scf_options: dict = field(default_factory=dict)
 
@@ -165,6 +166,96 @@ class DuccInputConfig:
 
 
 @dataclass
+class CcsdtInputConfig:
+    """Configuration for an ExaChem CCSD(T) calculation.
+
+    Unlike :class:`DuccInputConfig`, CCSD(T) is a full-space total-energy method
+    (no active-space downfolding), so there are no ``nactive_*`` or ``ducc_lvl``
+    options. Frozen core/virtual orbitals are supported via the CC ``freeze``
+    block. Both restricted (RHF) and unrestricted (UHF) references are supported;
+    ExaChem requires ``scf_type="unrestricted"`` whenever ``multiplicity > 1``.
+
+    Attributes:
+        atoms: List of atom lines, e.g. ``["H 0.0 0.0 0.0", "O 0.0 0.0 1.0"]``.
+        basis: Gaussian basis set name, e.g. ``"cc-pvdz"``.
+        charge: Molecular charge.
+        multiplicity: Spin multiplicity (2S+1).
+        units: Coordinate units (``"angstrom"`` or ``"bohr"``).
+        ccsd_threshold: CCSD convergence threshold.
+        ccsd_maxiter: Maximum CCSD iterations.
+        cd_diagtol: Cholesky decomposition diagonal tolerance.
+        freeze_core: Number of frozen core orbitals (0 = none).
+        freeze_virtual: Number of frozen virtual orbitals (0 = none).
+        scf_type: SCF type (``"restricted"`` or ``"unrestricted"``).
+        noscf: Whether ExaChem should skip its internal SCF and restart.
+        input_prefix: Base name for the ExaChem input file and restart directory.
+        extra_cc_options: Additional CC block options merged into the input.
+        extra_scf_options: Additional SCF block options merged into the input.
+
+    """
+
+    atoms: list[str] = field(default_factory=list)
+    basis: str = "cc-pvdz"
+    charge: int = 0
+    multiplicity: int = 1
+    units: str = "angstrom"
+    ccsd_threshold: float = 1e-6
+    ccsd_maxiter: int = 100
+    cd_diagtol: float = 1e-5
+    freeze_core: int = 0
+    freeze_virtual: int = 0
+    scf_type: str = "restricted"
+    noscf: bool = False
+    input_prefix: str = "ccsdt_input"
+    extra_cc_options: dict = field(default_factory=dict)
+    extra_scf_options: dict = field(default_factory=dict)
+
+    def to_json(self) -> dict:
+        """Convert to ExaChem JSON input format."""
+        cc_block: dict = {
+            "threshold": self.ccsd_threshold,
+            "ccsd_maxiter": self.ccsd_maxiter,
+            "writet": False,
+        }
+        if self.freeze_core or self.freeze_virtual:
+            cc_block["freeze"] = {
+                "core": self.freeze_core,
+                "virtual": self.freeze_virtual,
+            }
+        cc_block.update(self.extra_cc_options)
+
+        return {
+            "geometry": {
+                "coordinates": list(self.atoms),
+                "units": self.units,
+            },
+            "basis": {
+                "basisset": self.basis,
+            },
+            "common": {
+                "maxiter": 100,
+            },
+            "SCF": {
+                "charge": self.charge,
+                "multiplicity": self.multiplicity,
+                "conve": 1e-9,
+                "convd": 1e-8,
+                "scf_type": self.scf_type,
+                **(({"noscf": True}) if self.noscf else {}),
+                **self.extra_scf_options,
+            },
+            "CD": {
+                "diagtol": self.cd_diagtol,
+            },
+            "CC": cc_block,
+            "TASK": {
+                "scf": not self.noscf,
+                "ccsd_t": True,
+            },
+        }
+
+
+@dataclass
 class ExachemResult:
     """Result from an ExaChem DUCC run.
 
@@ -191,7 +282,7 @@ class ExachemResult:
 
 
 def run_exachem(
-    config: DuccInputConfig,
+    config: DuccInputConfig | CcsdtInputConfig,
     *,
     nprocs: int = 1,
     work_dir: Path | None = None,
@@ -200,10 +291,10 @@ def run_exachem(
     timeout: int | None = None,
     scf_files_prefix: Path | None = None,
 ) -> ExachemResult:
-    """Run an ExaChem DUCC calculation.
+    """Run an ExaChem DUCC or CCSD(T) calculation.
 
     Args:
-        config: DUCC input configuration.
+        config: ExaChem input configuration (:class:`DuccInputConfig` or :class:`CcsdtInputConfig`).
         nprocs: Number of MPI processes.
         work_dir: Working directory. If None, creates a temporary directory.
         exachem_binary: Path to ExaChem binary. If None, auto-detects.
@@ -234,7 +325,7 @@ def run_exachem(
         _setup_noscf_directory(work_dir, config, scf_files_prefix)
 
     # Write input JSON
-    input_path = work_dir / "ducc_input.json"
+    input_path = work_dir / f"{config.input_prefix}.json"
     input_dict = config.to_json()
     input_path.write_text(json.dumps(input_dict, indent=2))
 
@@ -286,20 +377,20 @@ def run_exachem(
     return exachem_result
 
 
-def _setup_noscf_directory(work_dir: Path, config: DuccInputConfig, scf_files_prefix: Path) -> None:
+def _setup_noscf_directory(work_dir: Path, config: DuccInputConfig | CcsdtInputConfig, scf_files_prefix: Path) -> None:
     """Set up ExaChem directory structure for noscf restart.
 
     ExaChem expects SCF restart files at a specific path derived from the
     input file name and basis set::
 
-        <work_dir>/ducc_input.<basis>_files/<scf_type>/scf/ducc_input.<basis>.<ext>
+        <work_dir>/<input_prefix>.<basis>_files/<scf_type>/scf/<input_prefix>.<basis>.<ext>
 
-    This function creates that directory structure and symlinks the
+    This function creates that directory structure and copies the
     pre-computed SCF files into it.
     """
     import shutil
 
-    prefix_name = f"ducc_input.{config.basis}"
+    prefix_name = f"{config.input_prefix}.{config.basis}"
     scf_dir = work_dir / f"{prefix_name}_files" / config.scf_type / "scf"
     scf_dir.mkdir(parents=True, exist_ok=True)
 
