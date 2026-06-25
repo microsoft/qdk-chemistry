@@ -10,7 +10,7 @@ from typing import Any
 
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -270,25 +270,26 @@ class SOSSAMapper(ControlledCircuitMapper):
     # Circuit construction
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def _run_impl(self, controlled_unitary: ControlledUnitary) -> Circuit:
+    def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled SOSSA walk step circuit.
 
         Args:
-            controlled_unitary: The controlled unitary containing the SOSSA
+            unitary: The unitary representation containing the SOSSA
                 decomposition (outer/inner PREPARE and SELECT data).
 
         Returns:
             Circuit: A quantum circuit implementing the controlled SOSSA walk step.
 
         """
-        unitary_container = controlled_unitary.unitary.get_container()
+        unitary_container = unitary.get_container()
         if not isinstance(unitary_container, SOSSAContainer):
             raise ValueError(
-                f"The {controlled_unitary.get_unitary_container_type()} container type is not supported. "
+                f"The {unitary.get_container_type()} container type is not supported. "
                 "SOSSAMapper only supports SOSSAContainer."
             )
 
-        if len(controlled_unitary.control_indices) != 1:
+        control_indices = self._get_control_indices()
+        if len(control_indices) != 1:
             raise ValueError("SOSSAMapper currently only supports a single control qubit.")
 
         power = unitary_container.power

@@ -17,6 +17,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu imp
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -135,18 +136,19 @@ class TestLCUBuilder:
         assert np.array_equal(container.select.phases, expected_phases)
 
     def test_quantum_walk_flag(self):
-        """Verify quantum_walk setting produces container with quantum_walk=True."""
+        """Verify quantum_walk setting produces LCUWalkContainer."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
         builder = LCUBuilder(quantum_walk=True)
         container = builder.run(hamiltonian).get_container()
-        assert container.quantum_walk is True
+        assert isinstance(container, LCUWalkContainer)
 
         builder_no_walk = LCUBuilder()
         container_no_walk = builder_no_walk.run(hamiltonian).get_container()
-        assert container_no_walk.quantum_walk is False
+        assert isinstance(container_no_walk, LCUContainer)
+        assert not isinstance(container_no_walk, LCUWalkContainer)
 
     def test_rejects_zero_l1_norm(self):
         """Verify LCUBuilder raises ValueError when all coefficients are zero."""
@@ -249,7 +251,6 @@ class TestLCUContainer:
 
             assert restored.type == container.type
             assert restored.power == container.power
-            assert restored.quantum_walk == container.quantum_walk
             assert restored.num_prepare_ancillas == container.num_prepare_ancillas
             original_coeffs = np.array(container.prepare.get_coefficients())
             restored_coeffs = np.array(restored.prepare.get_coefficients())
@@ -278,4 +279,114 @@ class TestLCUContainer:
         assert "Power" in summary
         assert "Prepare" in summary
         assert "Select" in summary
-        assert "Quantum Walk" in summary
+
+    def test_lcu_walk_container_json_roundtrip(self):
+        """Test JSON serialization round-trip for LCUWalkContainer."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, -0.5, 0.3]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        assert isinstance(container, LCUWalkContainer)
+
+        json_data = container.to_json()
+        restored = LCUWalkContainer.from_json(json_data)
+
+        assert isinstance(restored, LCUWalkContainer)
+        assert restored.power == container.power
+        assert restored.block_encoding.power == container.block_encoding.power
+        original_coeffs = np.array(container.block_encoding.prepare.get_coefficients())
+        restored_coeffs = np.array(restored.block_encoding.prepare.get_coefficients())
+        assert np.allclose(
+            restored_coeffs,
+            original_coeffs,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    def test_lcu_walk_container_hdf5_roundtrip(self):
+        """Test HDF5 serialization round-trip for LCUWalkContainer."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+
+        with tempfile.NamedTemporaryFile(suffix=".hdf5", delete=False) as tmp:
+            filename = tmp.name
+
+        try:
+            with h5py.File(filename, "w") as f:
+                container.to_hdf5(f)
+
+            with h5py.File(filename, "r") as f:
+                restored = LCUWalkContainer.from_hdf5(f)
+
+            assert isinstance(restored, LCUWalkContainer)
+            assert restored.power == container.power
+            original_coeffs = np.array(container.block_encoding.prepare.get_coefficients())
+            restored_coeffs = np.array(restored.block_encoding.prepare.get_coefficients())
+            assert np.allclose(
+                restored_coeffs,
+                original_coeffs,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            )
+        finally:
+            Path(filename).unlink()
+
+    def test_lcu_walk_container_get_summary(self):
+        """Test that LCUWalkContainer.get_summary returns a descriptive string."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+
+        summary = container.get_summary()
+        assert "LCU Walk Operator Container" in summary
+        assert "Power" in summary
+        assert "Block Encoding" in summary
+
+    def test_walk_container_scale_equals_schatten_norm(self):
+        """LCUWalkContainer scale should equal the Hamiltonian's Schatten (L1) norm."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        assert isinstance(container, LCUWalkContainer)
+        assert np.isclose(
+            container.scale,
+            hamiltonian.schatten_norm,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_walk_container_eigenvalue_from_phase(self):
+        """LCUWalkContainer eigenvalue_from_phase recovers E = λ·cos(2πφ)."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        lam = hamiltonian.schatten_norm
+
+        # φ=0 → E=λ
+        assert np.isclose(
+            container.eigenvalue_from_phase(0.0),
+            lam,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # φ=0.25 → E=0
+        assert np.isclose(
+            container.eigenvalue_from_phase(0.25),
+            0.0,
+            atol=float_comparison_absolute_tolerance,
+        )

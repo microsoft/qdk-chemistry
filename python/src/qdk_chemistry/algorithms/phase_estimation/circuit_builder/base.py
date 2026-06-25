@@ -11,7 +11,6 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledUnitary,
     FactorizedHamiltonianContainer,
     QubitHamiltonian,
     Settings,
@@ -121,18 +120,17 @@ class QpeCircuitBuilder(Algorithm):
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
+        circuit_mapper.settings().update("control_indices", [0])
+        circuit = circuit_mapper.run(unitary_rep)
 
         # Use mapper's num_ancillary_qubits if available (e.g. SOSSAMapper computes
         # alias-sampling-aware register sizes); fall back to container num_qubits.
         if hasattr(circuit_mapper, "num_ancillary_qubits"):
-            container = controlled_unitary.unitary.get_container()
+            container = unitary_rep.get_container()
             num_ancilla_qubits = circuit_mapper.num_ancillary_qubits(container)
         else:
-            num_system_qubits = qubit_hamiltonian.num_qubits
-            num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
+            num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
 
         # Get ancilla prep circuit from mapper if available (e.g. phase gradient init).
         if hasattr(circuit_mapper, "get_ancilla_prep_op"):

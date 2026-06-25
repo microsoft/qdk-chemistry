@@ -33,13 +33,8 @@ except ImportError as ex:
     ) from ex
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import QpeResult, Structure
-from qdk_chemistry.data import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping, QpeResult, Structure
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import (
-    iterative_phase_feedback_update,
-    phase_fraction_from_feedback,
-)
 
 Logger.set_global_level("info")
 
@@ -167,9 +162,9 @@ def run_iterative_exact_qpe(
         measured_bit = 0 if counts.get("0", 0) >= counts.get("1", 0) else 1
 
         bits.append(measured_bit)
-        phase_feedback = iterative_phase_feedback_update(phase_feedback, measured_bit)
+        phase_feedback = phase_feedback / 2.0 + np.pi * measured_bit / 2.0
 
-    phase_fraction = phase_fraction_from_feedback(phase_feedback)
+    phase_fraction = phase_feedback / np.pi
     return bits, phase_fraction
 
 
@@ -269,36 +264,41 @@ bits, phase_fraction = run_iterative_exact_qpe(
 ########################################################################################
 # 5. Process and display results
 ########################################################################################
-result = QpeResult.from_time_evolution_result(
+def _energy_from_phase(phase_fraction: float) -> float:
+    angle = (phase_fraction % 1.0) * (2 * np.pi)
+    if angle > np.pi:
+        angle -= 2 * np.pi
+    return angle / T_TIME
+
+
+def _resolve_energy(raw_energy: float, reference: float) -> tuple[list[float], float]:
+    period = 2 * np.pi / T_TIME
+    candidates = sorted(
+        {s * raw_energy + period * k for k in range(-2, 3) for s in (1, -1)}
+    )
+    return candidates, min(candidates, key=lambda e: abs(e - reference))
+
+
+result = QpeResult.from_phase_fraction(
     method="iterative_exact",
     phase_fraction=phase_fraction,
-    evolution_time=T_TIME,
+    eigenvalue_from_phase=_energy_from_phase,
     bits_msb_first=bits,
-    reference_energy=casci_energy,
 )
 
-phase_angle_measured = result.phase_angle
-phase_angle_canonical = result.canonical_phase_angle
 raw_energy = result.raw_energy
-candidate_energies = result.branching
-estimated_electronic_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
-estimated_total_energy = estimated_electronic_energy + core_energy
+candidate_energies, resolved_energy = _resolve_energy(raw_energy, casci_energy)
+estimated_total_energy = resolved_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
 Logger.info(
-    f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)"
+    f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {result.phase_angle:.6f} rad)"
 )
-if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
-    Logger.info(
-        f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
-    )
 Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
 Logger.info("Candidate energies (alias checks):")
 for energy in candidate_energies:
     Logger.info(f"  E = {energy:+.8f} Hartree")
-Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
+Logger.info(f"Estimated electronic energy: {resolved_energy:.8f} Hartree")
 Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy

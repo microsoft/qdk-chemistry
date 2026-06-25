@@ -166,18 +166,31 @@ phase_fraction = dominant_index / (2**M_PRECISION)
 # 5. Process and display results
 ########################################################################################
 
-result = QpeResult.from_time_evolution_result(
+
+def _energy_from_phase(phase_fraction: float) -> float:
+    angle = (phase_fraction % 1.0) * (2 * np.pi)
+    if angle > np.pi:
+        angle -= 2 * np.pi
+    return angle / T_TIME
+
+
+def _resolve_energy(raw_energy: float, reference: float) -> tuple[list[float], float]:
+    period = 2 * np.pi / T_TIME
+    candidates = sorted(
+        {s * raw_energy + period * k for k in range(-2, 3) for s in (1, -1)}
+    )
+    return candidates, min(candidates, key=lambda e: abs(e - reference))
+
+
+result = QpeResult.from_phase_fraction(
     method="pennylane_qpe",
     phase_fraction=phase_fraction,
-    evolution_time=T_TIME,
+    eigenvalue_from_phase=_energy_from_phase,
     bitstring_msb_first=dominant_bits,
-    reference_energy=casci_energy,
 )
 raw_energy = result.raw_energy
-candidate_energies = result.branching
-estimated_total_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
+candidate_energies, resolved_energy = _resolve_energy(raw_energy, casci_energy)
+estimated_total_energy = resolved_energy + core_energy
 
 Logger.info(f"\nMost likely phase bitstring: {dominant_bits}")
 Logger.info(f"Phase fraction φ (measured): {result.phase_fraction:.4f} rad")

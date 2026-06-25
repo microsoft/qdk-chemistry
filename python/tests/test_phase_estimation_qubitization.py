@@ -94,7 +94,7 @@ def h2_hamiltonian() -> QubitHamiltonian:
     )
 
 
-class TestIQPEWithQubitization:
+class TestQPEWithQubitization:
     """Integration tests for iterative QPE with qubitization (LCU quantum walk)."""
 
     def test_iterative_qpe_with_qubitization_two_qubit(self):
@@ -275,6 +275,118 @@ class TestIQPEWithQubitization:
         # Conjugate branch (QPE may measure either)
         phi_disc_alt = 1.0 - phi_disc
         # Discretized energy (same for both branches)
+        energy_disc = lambda_norm * np.cos(2 * np.pi * phi_disc)
+        assert np.isclose(
+            result.phase_fraction,
+            phi_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        ) or np.isclose(
+            result.phase_fraction,
+            phi_disc_alt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            result.raw_energy,
+            energy_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(result.raw_energy, reference_energy, atol=0.02)
+
+    def test_standard_qpe_with_qubitization_two_qubit(self):
+        """Verify standard QPE with qubitization recovers energy for a 2-qubit Hamiltonian.
+
+        Uses H = (pi/4)*ZI + (pi/4)*IZ, a 2-term diagonal Hamiltonian.
+        Eigenstate |00> has eigenvalue (pi/4) + (pi/4) = pi/2.
+        lambda = pi/2, cos(2*pi*phi) = 1, phi = 0,
+        exactly representable with 4 bits.
+        """
+        coeff = np.pi / 4.0
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["ZI", "IZ"],
+            coefficients=np.array([coeff, coeff]),
+        )
+
+        state_vector = [1.0, 0.0, 0.0, 0.0]
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": state_vector,
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        qpe = StandardPhaseEstimation(shots=3)
+        qpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4, builder="qdk_standard"))
+        qpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+
+        result = qpe.run(
+            qubit_hamiltonian=hamiltonian,
+            state_preparation=state_prep,
+        )
+
+        expected_energy = np.pi / 2.0
+        assert np.isclose(
+            result.raw_energy,
+            expected_energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=qpe_energy_tolerance,
+        )
+
+    def test_standard_qpe_with_qubitization_h2_qdk(self, h2_hamiltonian):
+        """Verify QDK-native standard QPE with qubitization recovers H2 ground-state energy.
+
+        Same test as test_standard_qpe_with_qubitization_h2 but uses the QDK
+        native circuit builder and sparse state simulator instead of Qiskit.
+        """
+        solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
+        reference_energy, ground_state_vector = solver.run(h2_hamiltonian)
+        ground_state_vector = ground_state_vector.real.tolist()
+
+        num_qubits = h2_hamiltonian.num_qubits
+        state_prep_params = {
+            "rowMap": [3, 2, 1, 0],
+            "stateVector": ground_state_vector,
+            "expansionOps": [],
+            "numQubits": num_qubits,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        num_bits = 4
+        qpe = StandardPhaseEstimation(shots=3)
+        qpe.settings().set(
+            "qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=num_bits, builder="qdk_standard")
+        )
+        qpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+
+        result = qpe.run(
+            qubit_hamiltonian=h2_hamiltonian,
+            state_preparation=state_prep,
+        )
+
+        lambda_norm = np.sum(np.abs(h2_hamiltonian.coefficients))
+        phi_exact = np.arccos(reference_energy / lambda_norm) / (2 * np.pi)
+        num_levels = 2**num_bits
+        phi_disc = round(phi_exact * num_levels) / num_levels
+        phi_disc_alt = 1.0 - phi_disc
         energy_disc = lambda_norm * np.cos(2 * np.pi * phi_disc)
         assert np.isclose(
             result.phase_fraction,

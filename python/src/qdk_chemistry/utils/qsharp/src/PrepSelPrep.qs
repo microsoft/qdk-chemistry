@@ -140,7 +140,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// # Summary
-    /// Quantum walk step: W = REFLECT · B[H].
+    /// PSP-based quantum walk: W = REFLECT · B[H].
     ///
     /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
     /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
@@ -149,7 +149,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// $$
     ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
     /// $$
-    operation QuantumWalkStep(
+    operation PSPWalk(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         targetRegister : Qubit[],
@@ -183,7 +183,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
-                if BeginEstimateCaching("Controlled_PrepSelPrepOp", SingleVariant()) {
+                if BeginEstimateCaching("ControlledPrepSelPrep", SingleVariant()) {
                     Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
                     EndEstimateCaching();
                 }
@@ -192,11 +192,11 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// # Summary
-    /// Creates a controlled quantum-walk callable.
+    /// Creates a controlled PSP-based quantum-walk callable.
     ///
     /// System and ancilla qubits are passed together; the caller is responsible
     /// for allocation since the walk operator leaves ancilla entangled.
-    function MakeControlledQuantumWalkOp(
+    function MakeControlledPSPWalkOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -207,8 +207,8 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
-                if BeginEstimateCaching("Controlled_QuantumWalkOp", SingleVariant()) {
-                    Controlled QuantumWalkStep([control], (prepareOp, selectOp, systems, ancilla));
+                if BeginEstimateCaching("ControlledPSPWalk", SingleVariant()) {
+                    Controlled PSPWalk([control], (prepareOp, selectOp, systems, ancilla));
                     EndEstimateCaching();
                 }
             }
@@ -230,7 +230,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// Circuit entry point for quantum walk (allocates qubits).
-    operation MakeControlledQuantumWalkCircuit(
+    operation MakeControlledPSPWalkCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -239,7 +239,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledQuantumWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 }

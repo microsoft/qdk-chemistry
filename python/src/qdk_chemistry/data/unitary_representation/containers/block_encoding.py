@@ -34,17 +34,12 @@ class BlockEncodingContainer(UnitaryContainer):
     _data_type_name = "block_encoding_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     @property
     @abstractmethod
     def power(self) -> int:
-        """Number of times to apply the walk operator."""
-
-    @property
-    @abstractmethod
-    def quantum_walk(self) -> bool:
-        """Whether to wrap with a quantum walk operator."""
+        """Number of times to apply the block encoding."""
 
 
 @dataclass(frozen=True)
@@ -165,52 +160,37 @@ class LCUContainer(BlockEncodingContainer):
     _data_type_name = "lcu_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,
         prepare: "Wavefunction",
         select: Select,
         power: int = 1,
-        quantum_walk: bool = False,
     ) -> None:
         r"""Initialize an LCUContainer.
 
         Args:
             prepare: The prepare wavefunction encoding coefficients for the block encoded Hamiltonian.
             select: The select oracle for controlled operations.
-            power: Number of times to apply the walk operator (for W^power in QPE).
-            quantum_walk: When True, the circuit mapper wraps the block encoding with a
-                quantum walk operator (use with QPE). When False, the plain block
-                encoding is used (use with Hadamard test).
+            power: Number of times to apply the block encoding (for B[H]^power).
 
         """
         self._power = power
         self.prepare = prepare
         self.select = select
-        self._quantum_walk = quantum_walk
 
         super().__init__()
 
     @property
     def power(self) -> int:
-        """Number of times to apply the walk operator.
+        """Number of times to apply the block encoding.
 
         Returns:
             int: The power value.
 
         """
         return self._power
-
-    @property
-    def quantum_walk(self) -> bool:
-        """Whether to wrap with a quantum walk operator.
-
-        Returns:
-            bool: True if quantum walk is enabled.
-
-        """
-        return self._quantum_walk
 
     @property
     def num_prepare_ancillas(self) -> int:
@@ -249,7 +229,7 @@ class LCUContainer(BlockEncodingContainer):
 
         Returns:
             dict[str, Any]: Dictionary representation including container type, power,
-                prepare, select, and quantum_walk fields.
+                prepare, and select fields.
 
         """
         data: dict[str, Any] = {
@@ -257,7 +237,6 @@ class LCUContainer(BlockEncodingContainer):
             "power": self.power,
             "prepare": self.prepare.to_json(),
             "select": asdict(self.select) | {"phases": self.select.phases.tolist()},
-            "quantum_walk": self.quantum_walk,
         }
 
         return self._add_json_version(data)
@@ -272,7 +251,6 @@ class LCUContainer(BlockEncodingContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
-        group.attrs["quantum_walk"] = self.quantum_walk
 
         _wavefunction_to_hdf5(self.prepare, group.create_group("prepare"))
         self.select.to_hdf5(group.create_group("select"))
@@ -315,7 +293,6 @@ class LCUContainer(BlockEncodingContainer):
             power=json_data.get("power", 1),
             prepare=prepare,
             select=select,
-            quantum_walk=bool(json_data.get("quantum_walk", json_data.get("reflect", False))),
         )
 
     @classmethod
@@ -332,20 +309,18 @@ class LCUContainer(BlockEncodingContainer):
         prepare = _wavefunction_from_hdf5(group["prepare"])
 
         select = Select.from_hdf5(group["select"])
-        quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
         power = int(group.attrs["power"])
         return cls(
             power=power,
             prepare=prepare,
             select=select,
-            quantum_walk=quantum_walk,
         )
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the LCU container.
 
         Returns:
-            str: Multi-line summary describing power, prepare, select, and quantum_walk settings.
+            str: Multi-line summary describing power, prepare, and select settings.
 
         """
         return (
@@ -353,8 +328,23 @@ class LCUContainer(BlockEncodingContainer):
             f"  Power: {self.power}\n"
             f"  Prepare: {self.num_prepare_ancillas} qubits, statevector shape {len(self.prepare.get_coefficients())}\n"
             f"  Select: {self.num_prepare_ancillas} control qubits, {self.select.num_target_qubits} target qubits,"
-            f" {len(self.select.controlled_operations)} controlled operations\n"
-            f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
+            f" {len(self.select.controlled_operations)} controlled operations"
+        )
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        """Not applicable for a raw block encoding.
+
+        A plain block encoding does not define an eigenvalue-phase
+        relationship on its own.  Use
+        :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`
+        for QPE with qubitization.
+
+        Raises:
+            NotImplementedError: Always.
+
+        """
+        raise NotImplementedError(
+            "LCUContainer does not define an eigenvalue-phase relationship. Wrap it in an LCUWalkContainer to use QPE."
         )
 
 

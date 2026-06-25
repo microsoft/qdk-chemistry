@@ -40,13 +40,6 @@ All QDK/Chemistry data classes implement a consistent serialization interface as
 JSON serialization
 ~~~~~~~~~~~~~~~~~~
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
-      :language: cpp
-      :start-after: // start-cell-json
-      :end-before: // end-cell-json
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/serialization.py
@@ -54,15 +47,15 @@ JSON serialization
       :start-after: # start-cell-json
       :end-before: # end-cell-json
 
-HDF5 serialization
-~~~~~~~~~~~~~~~~~~
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
       :language: cpp
-      :start-after: // start-cell-hdf5
-      :end-before: // end-cell-hdf5
+      :start-after: // start-cell-json
+      :end-before: // end-cell-json
+
+HDF5 serialization
+~~~~~~~~~~~~~~~~~~
 
 .. tab:: Python API
 
@@ -70,6 +63,13 @@ HDF5 serialization
       :language: python
       :start-after: # start-cell-hdf5
       :end-before: # end-cell-hdf5
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-hdf5
+      :end-before: // end-cell-hdf5
 
 File extensions
 ---------------

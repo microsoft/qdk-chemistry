@@ -5,9 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import ControlledCircuitMapperFactory
+from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
-from .prep_sel_prep_mapper import PrepSelPrepMapper, PrepSelPrepSettings
+from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
 from .sossa_mapper import (
     SOSSAMapper,
     SOSSAMapperSettings,
@@ -15,9 +15,10 @@ from .sossa_mapper import (
 
 __all__ = [
     "ControlledCircuitMapperFactory",
+    "ControlledCircuitMapperSettings",
+    "ControlledPSPMapper",
+    "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",
-    "PrepSelPrepMapper",
-    "PrepSelPrepSettings",
     "SOSSAMapper",
     "SOSSAMapperSettings",
 ]

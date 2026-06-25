@@ -9,10 +9,9 @@ import numpy as np
 import pytest
 from qdk import qsharp
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import PrepSelPrepMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitHamiltonian
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -23,12 +22,11 @@ if QDK_CHEMISTRY_HAS_QISKIT:
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
-def _build_controlled_unitary(pauli_strings, coefficients, *, quantum_walk=False):
-    """Helper: build ControlledUnitary from Pauli strings and coefficients."""
+def _build_unitary_rep(pauli_strings, coefficients, *, quantum_walk=False):
+    """Helper: build UnitaryRepresentation from Pauli strings and coefficients."""
     hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
     builder = LCUBuilder(quantum_walk=quantum_walk)
-    unitary_rep = builder.run(hamiltonian)
-    return ControlledUnitary(unitary=unitary_rep, control_indices=[0])
+    return builder.run(hamiltonian)
 
 
 def _extract_block_encoding_submatrix(full_unitary, num_target, num_ancilla):
@@ -60,22 +58,22 @@ class TestPrepareSelectMapper:
 
     def test_name_and_type(self):
         """Test that name and type_name return correct values."""
-        mapper = PrepSelPrepMapper()
+        mapper = ControlledPSPMapper()
         assert mapper.name() == "prepare_select_prepare"
         assert mapper.type_name() == "controlled_circuit_mapper"
 
     def test_basic_mapping_produces_circuit_with_factory(self):
         """Test that mapping produces a Circuit with both qsharp_op and qsharp_factory."""
-        controlled_unitary = _build_controlled_unitary(["XX", "ZZ"], np.array([0.25, 0.5]))
-        mapper = PrepSelPrepMapper()
-        circuit = mapper.run(controlled_unitary)
+        unitary_rep = _build_unitary_rep(["XX", "ZZ"], np.array([0.25, 0.5]))
+        mapper = ControlledPSPMapper()
+        circuit = mapper.run(unitary_rep)
 
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
     def test_rejects_non_block_encoding_container(self):
-        """Verify PrepSelPrepMapper raises ValueError for non-BlockEncoding containers."""
+        """Verify ControlledPSPMapper raises ValueError for non-BlockEncoding containers."""
 
         class MockContainer:
             """Mock container that is not a BlockEncodingContainer."""
@@ -85,20 +83,19 @@ class TestPrepareSelectMapper:
                 return "mock"
 
         unitary_rep = UnitaryRepresentation(container=MockContainer())
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
-        mapper = PrepSelPrepMapper()
+        mapper = ControlledPSPMapper()
         with pytest.raises(ValueError, match="not supported"):
-            mapper.run(controlled_unitary)
+            mapper.run(unitary_rep)
 
     def test_rejects_multiple_control_qubits(self):
-        """Verify PrepSelPrepMapper raises ValueError for multiple control qubits."""
-        controlled_unitary = _build_controlled_unitary(["XX", "ZZ"], np.array([0.25, 0.5]))
-        controlled_unitary = ControlledUnitary(unitary=controlled_unitary.unitary, control_indices=[0, 1])
+        """Verify ControlledPSPMapper raises ValueError for multiple control qubits."""
+        unitary_rep = _build_unitary_rep(["XX", "ZZ"], np.array([0.25, 0.5]))
 
-        mapper = PrepSelPrepMapper()
+        mapper = ControlledPSPMapper()
+        mapper.settings().set("control_indices", [0, 1])
         with pytest.raises(ValueError, match="single control qubit"):
-            mapper.run(controlled_unitary)
+            mapper.run(unitary_rep)
 
     @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
@@ -132,9 +129,9 @@ class TestPrepareSelectMapper:
         hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
         num_target = hamiltonian.num_qubits
 
-        controlled_unitary = _build_controlled_unitary(pauli_strings, coefficients)
-        mapper = PrepSelPrepMapper()
-        circuit = mapper.run(controlled_unitary)
+        unitary_rep = _build_unitary_rep(pauli_strings, coefficients)
+        mapper = ControlledPSPMapper()
+        circuit = mapper.run(unitary_rep)
         qc = circuit.get_qiskit_circuit()
         full_u = Operator(qc).data
 
@@ -162,10 +159,10 @@ class TestPrepareSelectMapper:
         \lambda = 0.8. The phases are arccos(+-sqrt(0.34)/0.8).
         """
         coeffs = np.array([0.5, 0.3])
-        controlled_unitary = _build_controlled_unitary(["X", "Z"], coeffs, quantum_walk=True)
+        unitary_rep = _build_unitary_rep(["X", "Z"], coeffs, quantum_walk=True)
 
-        mapper = PrepSelPrepMapper()
-        circuit = mapper.run(controlled_unitary)
+        mapper = ControlledPSPMapper()
+        circuit = mapper.run(unitary_rep)
         full_u = Operator(circuit.get_qiskit_circuit()).data
 
         # Extract the ctrl=1 block (the full walk operator W acting on system+ancilla)
