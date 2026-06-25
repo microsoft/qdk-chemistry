@@ -25,6 +25,11 @@ constexpr int kFineSamples = 201;           // fine-refinement samples
 constexpr double kImproveTol = 1e-12;       // minimum accepted entropy decrease
 constexpr double kPi = 3.14159265358979323846;
 
+// Minimum active-space dimension at which the 2-RDM rotation is threaded.
+// Below this, the tensor is small enough that OpenMP fork/join overhead
+// outweighs the benefit and the loop runs serially (bitwise-identical results).
+constexpr std::size_t kParallelMinDim = 32;
+
 // Boguslawski & Tecmer (2015), doi:10.1002/qua.24832 single-orbital (von
 // Neumann) entropy from the orbital occupation eigenvalues
 // {1 - na - nb + d, na - d, nb - d, d}.
@@ -59,6 +64,11 @@ void rotate_two_rdm_axis(std::vector<double>& g2, std::size_t n, int axis,
       other[t++] = ax;
     }
   }
+  // Each (x, y, z, active in {i, j}) maps to a unique flat index, so every
+  // touched element is written at most once: the (x, y) iterations are
+  // independent and safe to run in parallel.
+#pragma omp parallel for collapse(2) schedule(static) \
+    if (n >= kParallelMinDim)
   for (std::size_t x = 0; x < n; ++x) {
     for (std::size_t y = 0; y < n; ++y) {
       for (std::size_t z = 0; z < n; ++z) {

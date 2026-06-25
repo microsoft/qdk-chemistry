@@ -1792,3 +1792,119 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
   EXPECT_THROW(localizer->run(wfn, idx, idx), std::invalid_argument);
 }
 
+TEST_F(LocalizationTest, QIOThreadedPathLargeActiveSpace) {
+  // Active space large enough (n >= kParallelMinDim = 32) to exercise the
+  // OpenMP-parallel 2-RDM rotation. A synthetic mean-field (uncorrelated) state
+  // with fractional occupations in a scrambled basis makes QIO perform real
+  // rotations toward the lower-entropy natural-orbital basis, driving the
+  // threaded kernel.
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  const size_t n = 32;
+
+  // Fractional closed-shell occupations + a mild orthogonal scramble (one layer
+  // of disjoint Givens rotations). The scramble is undone in a few sweeps, so
+  // the test stays fast while still driving many threaded rotations.
+  Eigen::VectorXd occ(n);
+  for (size_t i = 0; i < n; ++i) {
+    occ(static_cast<Eigen::Index>(i)) =
+        0.9 - 0.8 * static_cast<double>(i) / static_cast<double>(n - 1);
+  }
+  Eigen::MatrixXd u0 = Eigen::MatrixXd::Identity(n, n);
+  const double c = std::cos(0.35), s = std::sin(0.35);
+  for (size_t p = 0; p + 1 < n; p += 2) {
+    const Eigen::Index pi = static_cast<Eigen::Index>(p);
+    const Eigen::Index pj = static_cast<Eigen::Index>(p + 1);
+    Eigen::VectorXd col_i = u0.col(pi);
+    Eigen::VectorXd col_j = u0.col(pj);
+    u0.col(pi) = c * col_i + s * col_j;
+    u0.col(pj) = -s * col_i + c * col_j;
+  }
+  Eigen::MatrixXd ga = u0 * occ.asDiagonal() * u0.transpose();
+  Eigen::MatrixXd gb = ga;  // closed shell
+
+  // Mean-field spin-dependent 2-RDM blocks (Wick from the 1-RDM), flattened
+  // row-major as i*n^3 + j*n^2 + k*n + l.
+  std::vector<double> a(n * n), b(n * n);
+  for (size_t p = 0; p < n; ++p) {
+    for (size_t q = 0; q < n; ++q) {
+      a[p * n + q] =
+          ga(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q));
+      b[p * n + q] =
+          gb(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q));
+    }
+  }
+  const size_t n4 = n * n * n * n;
+  Eigen::VectorXd aabb(n4), aaaa(n4), bbbb(n4);
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < n; ++j) {
+      for (size_t k = 0; k < n; ++k) {
+        for (size_t l = 0; l < n; ++l) {
+          const Eigen::Index e =
+              static_cast<Eigen::Index>(((i * n + j) * n + k) * n + l);
+          aabb(e) = a[i * n + k] * b[j * n + l];
+          aaaa(e) = a[i * n + k] * a[j * n + l] - a[i * n + l] * a[j * n + k];
+          bbbb(e) = b[i * n + k] * b[j * n + l] - b[i * n + l] * b[j * n + k];
+        }
+      }
+    }
+  }
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(n, n);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(n, n);
+  auto basis_set = testing::create_random_basis_set(n, "test");
+  std::vector<size_t> active(n);
+  std::iota(active.begin(), active.end(), 0);
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active, std::vector<size_t>({})));
+
+  // Two configurations, each with n/2 doubly-occupied orbitals (n electrons),
+  // matching the provided 1-RDM trace.
+  std::string config_a(n, '0');
+  for (size_t i = 0; i < n / 2; ++i) config_a[i] = '2';
+  std::string config_b = config_a;
+  config_b[n / 2 - 1] = '0';
+  config_b[n / 2] = '2';
+  std::vector<Configuration> dets(
+      {Configuration::from_spin_half_string(config_a),
+       Configuration::from_spin_half_string(config_b)});
+  Eigen::VectorXd ci_coeffs(2);
+  ci_coeffs << 0.9, std::sqrt(1.0 - 0.81);
+
+  auto wfn = std::make_shared<Wavefunction>(
+      std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
+          std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
+          std::optional<ContainerTypes::MatrixVariant>(
+              ContainerTypes::MatrixVariant(ga)),
+          std::optional<ContainerTypes::MatrixVariant>(
+              ContainerTypes::MatrixVariant(gb)),
+          std::optional<ContainerTypes::VectorVariant>(std::nullopt),
+          std::optional<ContainerTypes::VectorVariant>(
+              ContainerTypes::VectorVariant(aaaa)),
+          std::optional<ContainerTypes::VectorVariant>(
+              ContainerTypes::VectorVariant(aabb)),
+          std::optional<ContainerTypes::VectorVariant>(
+              ContainerTypes::VectorVariant(bbbb))));
+
+  ASSERT_TRUE(wfn->has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wfn->has_two_rdm_spin_dependent());
+  const double entropy_before = wfn->get_single_orbital_entropies().sum();
+  EXPECT_GT(entropy_before, 0.0);
+
+  std::shared_ptr<Wavefunction> qio_wfn;
+  EXPECT_NO_THROW({ qio_wfn = localizer->run(wfn, active, active); });
+  ASSERT_NE(qio_wfn, nullptr);
+  ASSERT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          qio_wfn));
+
+  // A non-trivial, unitary rotation must have occurred (the n >= 32 threaded
+  // rotation kernel ran and produced a valid result).
+  const auto& Ca_qio = qio_wfn->get_orbitals()->get_coefficients().first;
+  Eigen::MatrixXd u_rot = coeffs.transpose() * overlap * Ca_qio;
+  EXPECT_NEAR(0.0, testing::norm_diff_from_unitary(u_rot),
+              testing::numerical_zero_tolerance * 100);
+  EXPECT_GT((u_rot - Eigen::MatrixXd::Identity(n, n)).norm(), 0.1);
+}
+
