@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 from qdk import qsharp
@@ -102,10 +100,7 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(controlled_unitary)
 
-    @pytest.mark.xfail(
-        reason="QIR-to-Qiskit converter does not support dynamic qubit references from Adaptive_RIFLA profile",
-        raises=Exception,
-    )
+    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
@@ -154,10 +149,7 @@ class TestPrepareSelectMapper:
             h_over_lam, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         ), f"Block encoding identity failed for: {description}"
 
-    @pytest.mark.xfail(
-        reason="QIR-to-Qiskit converter does not support dynamic qubit references from Adaptive_RIFLA profile",
-        raises=Exception,
-    )
+    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_quantum_walk_eigenvalues(self):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.
@@ -207,12 +199,6 @@ class TestPrepareSelectMapper:
         Uses ``qsharp.eval`` + ``qsharp.dump_machine()`` to inspect the quantum
         state after applying Reflect.
         """
-        # Re-initialize Q# interpreter to ensure a clean state (no leftover qubits
-        # from prior tests in the session).
-        qsharp.init(
-            project_root=str(Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"),
-            target_profile=qsharp.TargetProfile.Adaptive_RIFLA,
-        )
         # Ensure Q# sources are loaded
         _ = QSHARP_UTILS.PrepSelPrep.Reflect
 

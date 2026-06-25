@@ -235,8 +235,7 @@ _builder_params = [
         marks=[
             pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
             pytest.mark.xfail(
-                reason="QIR-to-Qiskit converter does not support backward branches/dynamic qubit refs"
-                " from Adaptive_RIFLA profile"
+                reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile"
             ),
         ],
     ),

@@ -1085,6 +1085,16 @@ Returns:
     int: Number of spatial orbitals
 )");
 
+  factorized_container.def_property_readonly("num_qubits",
+      [](const FactorizedHamiltonianContainer& self) -> size_t {
+          return 2 * self.get_num_orbitals();
+      }, R"(
+Number of qubits (2N spin-orbitals).
+
+Returns:
+    int: Number of qubits required
+)");
+
   factorized_container.def("get_num_ranks",
                            &FactorizedHamiltonianContainer::get_num_ranks, R"(
 Number of ranks (R).
