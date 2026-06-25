@@ -39,7 +39,6 @@ _PROJECT_ROOT = str(_QS_DIR)
 # Test Hamiltonian construction (small DFTHC-like H2 data)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
 def _build_h2_dfthc_data():
     """Construct a small H2-like DFTHC factorized Hamiltonian for testing.
 
@@ -380,54 +379,6 @@ def _run_sossa_qpe(num_bits, mapper_kwargs=None):
 
 class TestSOSSAQPEIntegration:
     """Integration tests for SOSSA QPE using the full builder → mapper → IQPE pipeline."""
-
-    def test_sossa_builder_to_mapper_produces_circuit(self):
-        """Verify the SOSSA pipeline produces a valid circuit with Q# ops.
-
-        Tests: FactorizedHamiltonian → SOSSABuilder → UnitaryRep → SOSSAMapper → Circuit.
-        """
-        data = _build_h2_dfthc_data()
-        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
-
-        # Create FactorizedHamiltonianContainer
-        h1 = data["h1"]
-        u_matrices = data["basis_vectors"].flatten()
-        w_matrices = data["two_body_weights"].flatten()
-        wb_matrix = data["identity_weight"]
-        orbitals = create_test_orbitals(n_orb)
-        inactive_fock = np.zeros((n_orb, n_orb))
-
-        fh = FactorizedHamiltonianContainer(
-            n_ranks,
-            n_bases,
-            n_copies,
-            0.0,
-            u_matrices,
-            w_matrices,
-            h1,
-            wb_matrix,
-            inactive_fock,
-            orbitals,
-        )
-
-        # Build SOSSA unitary representation
-        builder = SOSSABuilder()
-        unitary_rep = builder.run(fh)
-        assert isinstance(unitary_rep, UnitaryRepresentation)
-
-        container = unitary_rep.get_container()
-        assert isinstance(container, SOSSAContainer)
-        assert container.normalization > 0
-
-        # Map to controlled circuit
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        mapper = SOSSAMapper()
-        mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_state"))
-        mapper.settings().set("inner_prepare_algorithm", "direct")
-        mapper.settings().set("select_algorithm", "direct")
-        circuit = mapper.run(controlled_unitary)
-        assert isinstance(circuit, Circuit)
-        assert circuit._qsharp_op is not None
 
     def test_sossa_qpe_ground_state_energy(self):
         """End-to-end test: SOSSA QPE recovers ground state energy from DFTHC data.

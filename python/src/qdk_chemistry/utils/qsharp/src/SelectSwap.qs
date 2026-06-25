@@ -413,25 +413,4 @@ namespace QDKChemistry.Utils.SelectSwap {
 
         allCorrect
     }
-
-    /// Resource estimation wrapper for 1D SelectSwap.
-    operation EstimateSelectSwap1D(nData : Int, nBits : Int, numSwapBits : Int) : Unit {
-        let data = Repeated(Repeated(false, nBits), nData);
-        let nAddr = Ceiling(Lg(IntAsDouble(nData)));
-        use address = Qubit[nAddr];
-        use output = Qubit[nBits];
-        SelectSwap(numSwapBits, data, address, output);
-    }
-
-    /// Resource estimation wrapper for 2D Select2DLoad.
-    operation EstimateSelect2DLoad(nOuter : Int, nInner : Int, nBits : Int, numSwapBits : Int) : Unit {
-        let data = Repeated(Repeated(Repeated(false, nBits), nInner), nOuter);
-        let nOuterAddr = Ceiling(Lg(IntAsDouble(nOuter)));
-        let nInnerAddr = Ceiling(Lg(IntAsDouble(nInner)));
-        let nTarget = if numSwapBits > 0 { nBits * (1 <<< numSwapBits) } else { nBits };
-        use outerAddr = Qubit[nOuterAddr];
-        use innerAddr = Qubit[nInnerAddr];
-        use target = Qubit[nTarget];
-        Select2DLoad(data, outerAddr, innerAddr, numSwapBits, target);
-    }
 }
