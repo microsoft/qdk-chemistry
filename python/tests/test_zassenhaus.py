@@ -30,7 +30,6 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.phase import resolve_energy_aliases
 from qdk_chemistry.utils.zassenhaus_generation import (
     CommutatorPlan,
     PlanExpr,
@@ -545,12 +544,9 @@ class TestZassenhausPhaseEstimation:
         )
 
         # Resolve 2pi phase periodic alias candidates to find the physical energy
-        estimated_electronic_energy = resolve_energy_aliases(
-            result.raw_energy,
-            evolution_time=evolution_time,
-            reference_energy=reference_electronic_energy,
-            shift_range=range(-3, 4),
-        )
+        period = 2 * np.pi / evolution_time
+        candidates = [result.raw_energy + k * period for k in range(-3, 4)]
+        estimated_electronic_energy = min(candidates, key=lambda e: abs(e - reference_electronic_energy))
         estimated_total_energy = estimated_electronic_energy + active_hamiltonian.get_core_energy()
 
         # Assert that total energy is within chemical accuracy of CASCI energy
