@@ -12,7 +12,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -66,10 +66,10 @@ class RecordingMultiConfigurationCalculator
     recorded_inactive_spaces.push_back(
         orbitals->get_inactive_space_indices().first);
 
-    auto determinant = Configuration(determinant_string(
+    auto determinant = Configuration::from_spin_half_string(determinant_string(
         orbitals->get_active_space_indices().first.size(), n_alpha, n_beta));
     auto container =
-        std::make_unique<SlaterDeterminantContainer>(determinant, orbitals);
+        std::make_unique<StateVectorContainer>(determinant, orbitals);
     return {0.0, std::make_shared<Wavefunction>(std::move(container))};
   }
 };

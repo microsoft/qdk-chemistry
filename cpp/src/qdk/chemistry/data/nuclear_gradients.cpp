@@ -216,4 +216,11 @@ std::shared_ptr<NuclearGradients> NuclearGradients::_from_hdf5_file(
   return from_hdf5(file);
 }
 
+void NuclearGradients::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, get_structure()->content_hash());
+  hash_value(ctx, values_);
+}
+
 }  // namespace qdk::chemistry::data

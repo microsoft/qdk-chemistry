@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
@@ -304,10 +304,11 @@ std::shared_ptr<data::Wavefunction> wavefunction_from_orbitals(
         "Reference orbital localization requires matching alpha and beta "
         "active spaces");
   }
-  auto determinant = data::Configuration(hartree_fock_determinant_string(
-      active_a.size(), n_active_alpha, n_active_beta));
+  auto determinant = data::Configuration::from_spin_half_string(
+      hartree_fock_determinant_string(active_a.size(), n_active_alpha,
+                                      n_active_beta));
   auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(determinant, orbitals);
+      std::make_unique<data::StateVectorContainer>(determinant, orbitals);
   return std::make_shared<data::Wavefunction>(std::move(container));
 }
 

@@ -205,4 +205,11 @@ std::shared_ptr<NuclearHessian> NuclearHessian::_from_hdf5_file(
   return from_hdf5(file);
 }
 
+void NuclearHessian::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, get_structure()->content_hash());
+  hash_value(ctx, matrix_);
+}
+
 }  // namespace qdk::chemistry::data

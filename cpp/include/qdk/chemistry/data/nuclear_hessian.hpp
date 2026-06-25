@@ -121,6 +121,7 @@ class NuclearHessian : public DataClass,
       const std::string& filename);
   static std::shared_ptr<NuclearHessian> _from_hdf5_file(
       const std::string& filename);
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   std::shared_ptr<Structure> structure_;
   Eigen::MatrixXd matrix_;
