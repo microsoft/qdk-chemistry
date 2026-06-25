@@ -6,6 +6,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -15,8 +17,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices representing the phase ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits (state prep target).
-    /// - `numBlockEncodingAncillas`: Number of extra ancillas needed by block encoding (0 for LCU/Trotter).
-    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas (e.g., phase gradient state).
+    /// - `numAncillas`: Number of extra ancillas needed.
+    /// - `ancillaPrep`: A function to prepare persistent ancillas (e.g., phase gradient state).
     ///   Called once before the walk steps; adjoint is applied after measurements. No-op when not needed.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit,
@@ -25,7 +27,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
-        numBlockEncodingAncillas : Int,
+        numAncillas : Int,
         ancillaPrep : Qubit[] => Unit is Adj,
     }
 
@@ -36,23 +38,23 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// # Returns
     /// - `Result[]`: The measurement results of the ancilla qubits (MSB first).
     operation RunStandardQPE(params : StandardPhaseEstimationParams) : Result[] {
-        let totalQubits = params.numBits + Length(params.systems) + params.numBlockEncodingAncillas;
+        let totalQubits = params.numBits + Length(params.systems) + params.numAncillas;
         use qs = Qubit[totalQubits];
         let phaseAncillas = Subarray(params.ancillas, qs);
         let systems = Subarray(params.systems, qs);
-        // Block encoding ancillas sit after phase ancillas and system qubits
-        let beAncillas = if params.numBlockEncodingAncillas == 0 {
+
+        let ancillas = if params.numAncillas == 0 {
             []
         } else {
             qs[params.numBits + Length(params.systems)..Length(qs) - 1]
         };
-        let allTargets = systems + beAncillas;
+        let allTargets = systems + ancillas;
 
         // Step 1: Prepare the initial state on system qubits only
         params.statePrep(systems);
 
-        // Step 1.5: Prepare persistent block-encoding ancillas (e.g., phase gradient)
-        params.ancillaPrep(beAncillas);
+        // Step 1.5: Prepare persistent ancillas (e.g., phase gradient)
+        params.ancillaPrep(ancillas);
 
         // Step 2: Prepare phase (ancilla) qubits
         params.phaseQubitPrep(phaseAncillas);
@@ -85,8 +87,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `ancillas`: An array of indices for the phase ancilla qubits.
     /// - `systems`: An array of indices for the system qubits (state prep target).
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
-    /// - `numBlockEncodingAncillas`: Number of extra ancillas for block encoding (0 for LCU/Trotter).
-    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas.
+    /// - `numAncillas`: Number of extra ancillas.
+    /// - `ancillaPrep`: A function to prepare persistent ancillas.
     /// # Returns
     /// The measurement results of the phase ancilla qubits.
     operation MakeStandardQPECircuit(
@@ -96,7 +98,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         ancillas : Int[],
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit,
-        numBlockEncodingAncillas : Int,
+        numAncillas : Int,
         ancillaPrep : Qubit[] => Unit is Adj,
     ) : Result[] {
         return RunStandardQPE(new StandardPhaseEstimationParams {
@@ -106,8 +108,82 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             numBits = numBits,
             ancillas = ancillas,
             systems = systems,
-            numBlockEncodingAncillas = numBlockEncodingAncillas,
+            numAncillas = numAncillas,
             ancillaPrep = ancillaPrep,
         });
+    }
+
+    /// Standard QPE that takes a single controlled walk operator and repeats it
+    /// with powers of 2 for each ancilla qubit.
+    ///
+    /// This avoids building num_bits separate controlled circuits on the Python side,
+    /// which is expensive for large chemistry systems.
+    ///
+    /// # Parameters
+    /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
+    /// - `controlledUnitary`: A single controlled unitary operation (control, targets) => Unit.
+    ///   This is NOT pre-powered — the QPE loop applies it 2^(n-1-k) times for ancilla k.
+    /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
+    /// - `ancillas`: An array of indices for the phase ancilla qubits.
+    /// - `systems`: An array of indices for the system qubits (state prep target).
+    /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
+    /// - `numAncillas`: Number of extra ancillas.
+    /// - `ancillaPrep`: A function to prepare persistent ancillas.
+    /// # Returns
+    /// The measurement results of the phase ancilla qubits.
+    operation MakeRepeatedQPECircuit(
+        statePrep : Qubit[] => Unit,
+        controlledUnitary : (Qubit, Qubit[]) => Unit,
+        numBits : Int,
+        ancillas : Int[],
+        systems : Int[],
+        phaseQubitPrep : Qubit[] => Unit,
+        numAncillas : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
+    ) : Result[] {
+        let totalQubits = numBits + Length(systems) + numAncillas;
+        use qs = Qubit[totalQubits];
+        let phaseAncillas = Subarray(ancillas, qs);
+        let systemQubits = Subarray(systems, qs);
+        let beAncillas = if numAncillas == 0 {
+            []
+        } else {
+            qs[numBits + Length(systems)..Length(qs) - 1]
+        };
+        let allTargets = systemQubits + beAncillas;
+
+        // Step 1: Prepare the initial state on system qubits
+        statePrep(systemQubits);
+
+        // Step 1.5: Prepare persistent ancillas
+        ancillaPrep(beAncillas);
+
+        // Step 2: Prepare phase (ancilla) qubits
+        phaseQubitPrep(phaseAncillas);
+
+        // Step 3: Apply controlled walk with powers of 2 per ancilla.
+        // ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
+        // RepeatEstimates tells the resource estimator to multiply the single-step
+        // cost by `power` without tracing through each repetition.
+        for ancillaIdx in 0..numBits - 1 {
+            let power = 1 <<< (numBits - 1 - ancillaIdx);
+            for _ in 0..power - 1 {
+                if BeginEstimateCaching("controlled_walk", numAncillas) {
+                    controlledUnitary(phaseAncillas[ancillaIdx], allTargets);
+                    EndEstimateCaching();
+                }
+            }
+        }
+
+        // Step 4: Apply inverse QFT on phase ancilla qubits
+        Adjoint ApplyQFT(phaseAncillas);
+
+        // Step 5: Measure phase ancilla qubits and reset everything else
+        ResetAll(allTargets);
+        mutable results = [Zero, size = numBits];
+        for idx in 0..numBits - 1 {
+            set results w/= idx <- MResetZ(phaseAncillas[idx]);
+        }
+        return results;
     }
 }

@@ -11,8 +11,6 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
-
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -98,48 +96,37 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
-        # Determine system and block-encoding ancilla qubit counts.
         num_system_qubits = qubit_hamiltonian.num_qubits
-
-        # Build the full pipeline once with power=1 and reuse the Q# op with varied power.
-        ctrl_unitary_circuits = []
         ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
 
         if isinstance(qubit_hamiltonian, FactorizedHamiltonianContainer):
-            # Fast path: reuse sub-oracles, only vary power.
+            # Fast path: build walk op once, use MakeRepeatedQPECircuit.
             base_circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=1)
-            base_factory = base_circuit._qsharp_factory  # noqa: SLF001
-            bp = base_factory.parameter
-            for k in range(num_bits):
-                power = 2 ** (num_bits - 1 - k)
-                powered_params = {**bp, "power": power}
-                qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(
-                    bp["outerPrepareOp"],
-                    bp["innerPrepareOp"],
-                    bp["selectOp"],
-                    bp["numSystemQubits"],
-                    bp["numOuterQubits"],
-                    bp["numOuterIndexQubits"],
-                    bp["numInnerQubits"],
-                    bp["numReflectInner"],
-                    bp["numPhaseGradientQubits"],
-                    power,
+            if state_preparation._qsharp_op and base_circuit._qsharp_op:  # noqa: SLF001
+                circuit = self._create_repeated_qpe_circuit(
+                    state_preparation,
+                    base_circuit,
+                    num_bits,
+                    num_system_qubits,
+                    num_anc,
+                    ancilla_prep_op,
                 )
-                powered_circuit = Circuit(
-                    qsharp_factory=QsharpFactoryData(program=base_factory.program, parameter=powered_params),
-                    qsharp_op=qsharp_op,
-                )
-                ctrl_unitary_circuits.append(powered_circuit)
-        else:
-            # Fallback: rebuild for each power (e.g. Trotter with "rescale" strategy).
-            for k in range(num_bits):
-                power = 2 ** (num_bits - 1 - k)
-                circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
-                ctrl_unitary_circuits.append(circuit)
+                Logger.info(f"Built repeated QPE circuit with {num_bits} ancilla qubits.")
+                return [circuit]
 
-        if state_preparation._qsharp_op and all(  # noqa: SLF001
-            c._qsharp_op  # noqa: SLF001
-            for c in ctrl_unitary_circuits
+        ctrl_unitary_circuits = []
+        for k in range(num_bits):
+            power = 2 ** (num_bits - 1 - k)
+            circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            ctrl_unitary_circuits.append(circuit)
+
+        if (
+            ctrl_unitary_circuits
+            and state_preparation._qsharp_op
+            and all(
+                c._qsharp_op  # noqa: SLF001
+                for c in ctrl_unitary_circuits
+            )
         ):
             circuit = self._create_circuit_from_qsharp_op(
                 state_preparation,
@@ -163,8 +150,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         controlled_unitary_circuits: list[Circuit],
         num_bits: int,
         num_system_qubits: int,
-        num_be_ancillas: int = 0,
-        ancilla_prep_op: Any = None,
+        num_ancilla_qubits: int = 0,
+        ancilla_prep_op: Circuit | None = None,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
@@ -174,7 +161,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 Q# operations for controlled-U^(2^k).
             num_bits: Number of phase ancilla qubits (phase bits).
             num_system_qubits: Number of bare system qubits (state prep target).
-            num_be_ancillas: Number of block-encoding ancilla qubits (0 for LCU/Trotter).
+            num_ancilla_qubits: Number of ancilla qubits (0 for LCU/Trotter).
             ancilla_prep_op: Q# callable to initialize block-encoding ancillas (None for no-op).
 
         Returns:
@@ -195,13 +182,64 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "ancillas": ancillas,
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
-            "numBlockEncodingAncillas": num_be_ancillas,
+            "numAncillas": num_ancilla_qubits,
             "ancillaPrep": ancilla_prep_op,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPECircuit,
                 parameter=standard_parameters,
+            )
+        )
+
+    def _create_repeated_qpe_circuit(
+        self,
+        state_preparation: Circuit,
+        base_controlled_circuit: Circuit,
+        num_bits: int,
+        num_system_qubits: int,
+        num_ancilla_qubits: int = 0,
+        ancilla_prep_op: Circuit | None = None,
+    ) -> Circuit:
+        """Create a QPE Circuit using a single walk op repeated with RepeatEstimates.
+
+        Instead of building num_bits separate controlled circuits, this passes a single
+        controlled walk operation to MakeRepeatedQPECircuit, which loops with powers of 2
+        and uses RepeatEstimates for efficient resource estimation.
+
+        Args:
+            state_preparation: Circuit object containing a Q# operation for state preparation.
+            base_controlled_circuit: A single Circuit object for the controlled walk (power=1).
+            num_bits: Number of phase ancilla qubits (phase bits).
+            num_system_qubits: Number of bare system qubits (state prep target).
+            num_ancilla_qubits: Number of ancilla qubits (0 for LCU/Trotter).
+            ancilla_prep_op: Q# callable to initialize block-encoding ancillas (None for no-op).
+
+        Returns:
+            A Circuit object representing the repeated QPE circuit.
+
+        """
+        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
+        walk_op = base_controlled_circuit._qsharp_op  # noqa: SLF001
+        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        if ancilla_prep_op is None:
+            ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
+        ancillas = list(range(num_bits))
+        systems = [i + num_bits for i in range(num_system_qubits)]
+        repeated_parameters = {
+            "statePrep": state_prep_op,
+            "controlledUnitary": walk_op,
+            "numBits": num_bits,
+            "ancillas": ancillas,
+            "systems": systems,
+            "phaseQubitPrep": phase_qubit_prep_op,
+            "numAncillas": num_ancilla_qubits,
+            "ancillaPrep": ancilla_prep_op,
+        }
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StandardPhaseEstimation.MakeRepeatedQPECircuit,
+                parameter=repeated_parameters,
             )
         )
 
