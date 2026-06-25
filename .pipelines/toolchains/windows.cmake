@@ -17,9 +17,9 @@ set(_qdk_msvc_warnings
 string(JOIN " " _qdk_msvc_warnings ${_qdk_msvc_warnings})
 
 foreach(_lang C CXX)
-  set(CMAKE_${_lang}_FLAGS_DEBUG_INIT          "/Zi /Od /RTC1 ${_qdk_msvc_warnings}")
-  set(CMAKE_${_lang}_FLAGS_RELWITHDEBINFO_INIT "/Zi /O2 /DNDEBUG ${_qdk_msvc_warnings}")
-  set(CMAKE_${_lang}_FLAGS_RELEASE_INIT        "/O2 /DNDEBUG ${_qdk_msvc_warnings}")
+  set(CMAKE_${_lang}_FLAGS_DEBUG          "/Zi /Od /RTC1 ${_qdk_msvc_warnings}"   CACHE STRING "" FORCE)
+  set(CMAKE_${_lang}_FLAGS_RELWITHDEBINFO "/Zi /O2 /DNDEBUG ${_qdk_msvc_warnings}" CACHE STRING "" FORCE)
+  set(CMAKE_${_lang}_FLAGS_RELEASE        "/O2 /DNDEBUG ${_qdk_msvc_warnings}"    CACHE STRING "" FORCE)
 endforeach()
 
 unset(_qdk_msvc_warnings)
