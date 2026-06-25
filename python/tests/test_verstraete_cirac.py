@@ -399,7 +399,11 @@ class TestVerstraeteCiracMapping:
 class TestVerstraeteCiracSpectral:
     """Tests covering the spectral validation of the Verstraete-Cirac mapping."""
 
-    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
+    @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_spectral_validation_2x2_hubbard(self) -> None:
         """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and JW mappings.
 
