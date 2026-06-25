@@ -501,7 +501,6 @@ class TestZassenhausPhaseEstimation:
 
         mc_calculator = create("multi_configuration_calculator")
         casci_total_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, 1, 1)
-        reference_electronic_energy = casci_total_energy - active_hamiltonian.get_core_energy()
 
         n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
         qubit_hamiltonian = create("qubit_mapper", "qdk").run(
@@ -542,12 +541,7 @@ class TestZassenhausPhaseEstimation:
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
         )
-
-        # Resolve 2pi phase periodic alias candidates to find the physical energy
-        period = 2 * np.pi / evolution_time
-        candidates = [result.raw_energy + k * period for k in range(-3, 4)]
-        estimated_electronic_energy = min(candidates, key=lambda e: abs(e - reference_electronic_energy))
-        estimated_total_energy = estimated_electronic_energy + active_hamiltonian.get_core_energy()
+        estimated_total_energy = result.raw_energy + active_hamiltonian.get_core_energy()
 
         # Assert that total energy is within chemical accuracy of CASCI energy
         assert np.isclose(

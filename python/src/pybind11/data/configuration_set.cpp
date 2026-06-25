@@ -175,8 +175,8 @@ Returns:
 
 )");
 
-  bind_getter_as_property(configuration_set, "capacity",
-                          &ConfigurationSet::capacity,
+  bind_getter_as_property(configuration_set, "num_modes",
+                          &ConfigurationSet::num_modes,
                           R"(
 Actual (non-padded) number of single-particle modes per configuration.
 
