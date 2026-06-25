@@ -17,7 +17,6 @@ from qdk import qsharp
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     Configuration,
-    FactorizedHamiltonianContainer,
     ModelOrbitals,
     StateVectorContainer,
     Wavefunction,
@@ -39,7 +38,7 @@ from .test_helpers import create_random_factorized_hamiltonian
 
 
 def _make_sossa_unitary_representation():
-    """Build a UnitaryRepresentation with SOSSAContainer"""
+    """Build a UnitaryRepresentation with SOSSAContainer."""
     num_orbitals = 2
     num_ranks = 2
     num_bases = 1
@@ -198,7 +197,6 @@ class TestSOSSABuilder:
         assert builder.name() == "sossa"
         assert builder.type_name() == "hamiltonian_unitary_builder"
 
-
     def test_run_produces_correct_dimensions(self):
         """Test that run() produces a container with correct dimensions."""
         n, r, b, c = 4, 3, 2, 2
@@ -329,7 +327,6 @@ class TestOuterPrepareQSharp:
             atol=float_comparison_absolute_tolerance,
         )
         qsharp.eval("ResetAll(qs)")
-
 
 
 class TestInnerPrepareQSharp:

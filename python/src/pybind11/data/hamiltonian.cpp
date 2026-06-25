@@ -1085,10 +1085,12 @@ Returns:
     int: Number of spatial orbitals
 )");
 
-  factorized_container.def_property_readonly("num_qubits",
+  factorized_container.def_property_readonly(
+      "num_qubits",
       [](const FactorizedHamiltonianContainer& self) -> size_t {
-          return 2 * self.get_num_orbitals();
-      }, R"(
+        return 2 * self.get_num_orbitals();
+      },
+      R"(
 Number of qubits (2N spin-orbitals).
 
 Returns:
@@ -1451,8 +1453,7 @@ Returns:
           return self.get_container<FactorizedHamiltonianContainer>();
         } else if (self.has_container_type<
                        CanonicalFourCenterHamiltonianContainer>()) {
-          return self
-              .get_container<CanonicalFourCenterHamiltonianContainer>();
+          return self.get_container<CanonicalFourCenterHamiltonianContainer>();
         } else if (self.has_container_type<CholeskyHamiltonianContainer>()) {
           return self.get_container<CholeskyHamiltonianContainer>();
         } else if (self.has_container_type<SparseHamiltonianContainer>()) {

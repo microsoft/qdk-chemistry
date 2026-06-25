@@ -114,6 +114,7 @@ class TestQROMStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
+
 def _make_ctx() -> qdk.Context:
     return qdk.Context(project_root=str(_QS_DIR))
 

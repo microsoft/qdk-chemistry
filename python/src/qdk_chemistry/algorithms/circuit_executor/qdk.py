@@ -60,9 +60,7 @@ def _process_raw_results(
         for x in reversed(one_run):
             label = str(x)
             if label not in _map:
-                raise ValueError(
-                    f"Unexpected measurement result '{label}'; expected one of {set(_map)}"
-                )
+                raise ValueError(f"Unexpected measurement result '{label}'; expected one of {set(_map)}")
             c = _map[label]
             if c == "L":
                 has_loss = True
@@ -89,9 +87,7 @@ class QdkFullStateSimulatorSettings(Settings):
             "Type of simulator to use: 'cpu', 'gpu', or 'clifford'",
             ["cpu", "gpu", "clifford"],
         )
-        self._set_default(
-            "seed", "int", 42, "Random seed for simulation reproducibility"
-        )
+        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
 
 
 class QdkFullStateSimulator(CircuitExecutor):
@@ -172,9 +168,7 @@ class QdkSparseStateSimulatorSettings(Settings):
         """Initialize QDK Sparse State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default(
-            "seed", "int", 42, "Random seed for simulation reproducibility"
-        )
+        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
 
 
 class QdkSparseStateSimulator(CircuitExecutor):

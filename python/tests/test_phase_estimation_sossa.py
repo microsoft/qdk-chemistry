@@ -25,7 +25,6 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -38,6 +37,7 @@ _PROJECT_ROOT = str(_QS_DIR)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _build_h2_dfthc_data():
     """Construct a small H2-like DFTHC factorized Hamiltonian for testing.

@@ -140,17 +140,13 @@ class SOSSASelect:
     def from_json(cls, data: dict[str, Any]) -> "SOSSASelect":
         """Load from a JSON dictionary."""
         return cls(
-            one_body_rotation_angles=np.array(
-                data.get("one_body_rotation_angles", data.get("one_body_rotation_angles")), dtype=float
-            ),
-            two_body_rotation_angles=np.array(
-                data.get("two_body_rotation_angles", data.get("two_body_rotation_angles")), dtype=float
-            ),
+            one_body_rotation_angles=np.array(data["one_body_rotation_angles"], dtype=float),
+            two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float),
             num_orbitals=data["num_orbitals"],
             num_ranks=data["num_ranks"],
             num_copies=data["num_copies"],
             num_bases=data["num_bases"],
-            num_positive_one_body_terms=data.get("num_positive_one_body_terms", data.get("num_positive_one_body_terms")),
+            num_positive_one_body_terms=data["num_positive_one_body_terms"],
         )
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -234,7 +230,7 @@ class SOSSAContainer(BlockEncodingContainer):
 
         System register: 2N spin-orbitals.
         Ancilla: x_o register + inner register (b + free-rider) + 2 spin qubits.
-        This doesn't equal the total qubits of SOSSA since the SOSSA circuit allocate 
+        This doesn't equal the total qubits of SOSSA since the SOSSA circuit allocate
         and free ancillary qubits internally.
         """
         num_system = 2 * self.select.num_orbitals

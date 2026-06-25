@@ -15,9 +15,10 @@ from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+
 from .test_helpers import create_random_factorized_hamiltonian
 
 _QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
@@ -252,6 +253,7 @@ class TestInnerPrep:
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
 
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main SOSSAMapper tests
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -450,6 +452,7 @@ class TestSelectFullFidelity:
 # Walk operator logical resource count tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestSOSSAWalkLogicalCounts:
     """Verify logical resource counts of the SOSSA walk operator match paper formulas.
 
@@ -513,6 +516,7 @@ class TestSOSSAWalkLogicalCounts:
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
 
+
 def _make_context():
     """Create a fresh qdk.Context with all Q# sources loaded."""
     return qdk.Context(project_root=_PROJECT_ROOT)
@@ -541,9 +545,13 @@ def _make_random_data_2d(n_outer: int, n_inner: int, n_bits: int, seed: int = 42
     rng = np.random.default_rng(seed)
     return [[_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_inner)] for _ in range(n_outer)]
 
+
 _NS = "QDKChemistry.Utils.SelectSwap"
+
+
 class TestSelectSwapCorrectness:
     """Verify SelectSwap loads the correct data for each address."""
+
     @pytest.mark.parametrize(
         ("n_data", "n_bits", "num_swap_bits"),
         [
