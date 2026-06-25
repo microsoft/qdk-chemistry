@@ -52,7 +52,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
         "basis_or_guess is valueless due to an exception.");
   }
   enum class BasisSetType { Explicit, FromString, FromOrbitals };
-  BasisSetType basis_set_type = BasisSetType::FromString;
+  BasisSetType basis_set_type;
 
   std::string basis_set_name;
   std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
@@ -93,6 +93,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
+  } else {
+    throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
 
   // Extract geometry from structure object
