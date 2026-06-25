@@ -113,7 +113,10 @@ class MPSSparseStatePreparation(StatePreparation):
             parameter=params,
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
+        op_params = QSHARP_UTILS.MPSSparse.MPSSparseParams(**params)
+        qsharp_op = QSHARP_UTILS.MPSSparse.MakeMPSSparseOp(op_params)
+
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
 
 
 # ---------------------------------------------------------------------------

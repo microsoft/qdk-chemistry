@@ -24,7 +24,7 @@ try:
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
     SparseIsometryGF2XStatePreparation,

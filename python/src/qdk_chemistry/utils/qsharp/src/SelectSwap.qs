@@ -42,6 +42,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Math.MinI;
     import Std.Measurement.MResetEachZ;
     import Std.TableLookup.Select;
+    import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
 
     // ═══════════════════════════════════════════════════════════════════════════
     //  1D SELECT-SWAP
@@ -60,6 +61,156 @@ namespace QDKChemistry.Utils.SelectSwap {
         } else {
             WithSelectSwap(numSwapBits, data, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  1D CONTROLLED QROAM-CLEAN (forward-only Select+Swap with Unlookup)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// # Summary
+    /// Controlled QROM load using forward-only SelectSwap with measurement-based
+    /// uncomputation (QROAMClean pattern with blocking).
+    ///
+    /// # Description
+    /// Loads `data[address]` into an internal register controlled on `control`,
+    /// applies Ry rotation on `activeQubit` using the loaded angle, then
+    /// uncomputes the loaded data using measurement-based Adjoint Select.
+    ///
+    /// When `control = |0⟩`: no data loaded, Ry(0) = identity.
+    /// When `control = |1⟩`: loads data[address], applies Ry, uncomputes.
+    operation ControlledQroamCleanRotation(
+        data : Bool[][],
+        address : Qubit[],
+        control : Qubit,
+        activeQubit : Qubit,
+        phaseGradient : Qubit[]
+    ) : Unit {
+        let N = Length(data);
+        Fact(N > 0, "data cannot be empty");
+        let m = Length(data[0]);
+        let nRequired = Ceiling(Lg(IntAsDouble(N)));
+        let addressFitted = address[...nRequired - 1];
+        let lambda = ComputeOptimalLambdaControlled1D(N, m);
+
+        if lambda == 0 {
+            let zeros = Repeated(Repeated(false, m), N);
+            let extendedData = zeros + data;
+            use angleReg = Qubit[m];
+            Controlled Select([control], (data, addressFitted, angleReg));
+            RyViaPhaseGradient(activeQubit, angleReg, phaseGradient);
+            Adjoint Select(extendedData, addressFitted + [control], angleReg);
+        } else {
+            let k = nRequired - lambda;
+            let addressParts = Partitioned([k, lambda], addressFitted);
+
+            let paddedData = CreatePaddedData(data, nRequired, m, k);
+            let zeros = Repeated(Repeated(false, m), N);
+            let extPaddedData = CreatePaddedData(zeros + data, nRequired + 1, m, k + 1);
+
+            use dataReg = Qubit[m * (1 <<< lambda)];
+            let chunks = Chunks(m, dataReg);
+
+            Controlled Select([control], (paddedData, addressParts[0], dataReg));
+            SwapDataOutputs(addressParts[1], chunks);
+            RyViaPhaseGradient(activeQubit, chunks[0], phaseGradient);
+            Adjoint Select(extPaddedData, addressParts[0] + addressParts[1] + [control], dataReg);
+        }
+    }
+
+    internal function ComputeOptimalLambdaControlled1D(numData : Int, numBits : Int) : Int {
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+
+        mutable best = ControlledQroamCleanCost(0, numData, numBits);
+        mutable bestLambda = 0;
+
+        for lambda in 1..addressBits - 1 {
+            let cost = ControlledQroamCleanCost(lambda, numData, numBits);
+            if cost < best {
+                set bestLambda = lambda;
+                set best = cost;
+            }
+        }
+
+        return bestLambda;
+    }
+
+    internal function ControlledQroamCleanCost(lambda : Int, numData : Int, numBits : Int) : Int {
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+        let ctrlSelectCost = 2^(addressBits - lambda) - 2 + 1;
+        let swapCost = (2^lambda - 1) * numBits;
+        let unlookupAddrBits = addressBits - lambda + 1;
+        let n1 = unlookupAddrBits / 2;
+        let n2 = unlookupAddrBits - n1;
+        let unlookupCost = MaxI(0, 2^n1 - n1 - 1) + MaxI(0, 2^n2 - n2 - 1);
+        return ctrlSelectCost + swapCost + unlookupCost;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  1D UNCONTROLLED QROAM-CLEAN (forward-only Select+Swap with Unlookup)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// # Summary
+    /// QROM-clean rotation: loads angle data, applies Ry rotation, then
+    /// uncomputes using measurement-based Adjoint Select.
+    operation QroamCleanRotation(
+        data : Bool[][],
+        address : Qubit[],
+        activeQubit : Qubit,
+        phaseGradient : Qubit[]
+    ) : Unit {
+        let N = Length(data);
+        Fact(N > 0, "data cannot be empty");
+        let m = Length(data[0]);
+        let nRequired = Ceiling(Lg(IntAsDouble(N)));
+        let addressFitted = address[...nRequired - 1];
+        let lambda = ComputeOptimalLambdaQroamClean1D(N, m);
+
+        if lambda == 0 {
+            use angleReg = Qubit[m];
+            Select(data, addressFitted, angleReg);
+            RyViaPhaseGradient(activeQubit, angleReg, phaseGradient);
+            Adjoint Select(data, addressFitted, angleReg);
+        } else {
+            let k = nRequired - lambda;
+            let addressParts = Partitioned([k, lambda], addressFitted);
+            let paddedData = CreatePaddedData(data, nRequired, m, k);
+
+            use dataReg = Qubit[m * (1 <<< lambda)];
+            let chunks = Chunks(m, dataReg);
+
+            Select(paddedData, addressParts[0], dataReg);
+            SwapDataOutputs(addressParts[1], chunks);
+            RyViaPhaseGradient(activeQubit, chunks[0], phaseGradient);
+            Adjoint Select(paddedData, addressParts[0] + addressParts[1], dataReg);
+        }
+    }
+
+    internal function ComputeOptimalLambdaQroamClean1D(numData : Int, numBits : Int) : Int {
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+
+        mutable best = QroamCleanCost(0, numData, numBits);
+        mutable bestLambda = 0;
+
+        for lambda in 1..addressBits - 1 {
+            let cost = QroamCleanCost(lambda, numData, numBits);
+            if cost < best {
+                set bestLambda = lambda;
+                set best = cost;
+            }
+        }
+
+        return bestLambda;
+    }
+
+    internal function QroamCleanCost(lambda : Int, numData : Int, numBits : Int) : Int {
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+        let selectCost = 2^(addressBits - lambda) - 2;
+        let swapCost = (2^lambda - 1) * numBits;
+        let unlookupAddrBits = addressBits - lambda;
+        let n1 = unlookupAddrBits / 2;
+        let n2 = unlookupAddrBits - n1;
+        let unlookupCost = MaxI(0, 2^n1 - n1 - 1) + MaxI(0, 2^n2 - n2 - 1);
+        return selectCost + swapCost + unlookupCost;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -395,7 +546,12 @@ namespace QDKChemistry.Utils.SelectSwap {
 
                 within {
                     Select2DLoad(
-                        data, outerAddr, innerAddr, numSwapBits, target);
+                        data,
+                        outerAddr,
+                        innerAddr,
+                        numSwapBits,
+                        target
+                    );
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(target[0..m - 1], copy));
                 }

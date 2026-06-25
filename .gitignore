@@ -235,3 +235,7 @@ python/VERSION
 
 # Claude
 .claude
+
+examples/fe2*
+examples/p450*
+MPSPrep
