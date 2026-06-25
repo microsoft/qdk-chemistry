@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data import Orbitals, Wavefunction
 from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 
@@ -80,6 +80,75 @@ def generate_cube_data_with_info(
             "info": {
                 "Energy (Ha)": f"{energies[idx]:.4f}",
                 "Occupation": "occupied" if idx < n_occupied else "virtual",
+            },
+        }
+
+    return cube_data_with_info
+
+
+def generate_cube_data_with_correlation_info(
+    wavefunction: Wavefunction,
+    grid_size: tuple[int, int, int] = (40, 40, 40),
+    margin: float = 10.0,
+) -> dict[str, dict]:
+    """Generate cube data with natural-occupation and entropy overlays for the MoleculeViewer widget.
+
+    Builds the ``cube_data`` dictionary for the active-space orbitals of a
+    correlated ``Wavefunction``, attaching each orbital's natural occupation
+    number and single-orbital entropy as metadata. This is a useful overlay for
+    multi-reference systems, where fractional occupations and large entropies
+    highlight the strongly-correlated orbitals.
+
+    The wavefunction must carry one- and two-particle reduced density matrices
+    (e.g. produced with ``calculate_one_rdm=True`` and ``calculate_two_rdm=True``)
+    so that occupations and entropies are available.
+
+    Args:
+        wavefunction: Correlated wavefunction with 1- and 2-RDMs and an active space.
+        grid_size: Grid dimensions for cube file generation.
+        margin: Margin in Bohr around the molecule for the cube grid.
+
+    Returns:
+        Dictionary suitable for passing as ``cube_data`` to ``MoleculeViewer``.
+
+    """
+    orbitals = wavefunction.get_orbitals()
+    if orbitals.is_unrestricted():
+        raise ValueError(
+            "generate_cube_data_with_correlation_info only supports restricted orbitals. "
+            "Unrestricted orbitals have separate alpha/beta channels that require different handling."
+        )
+
+    active_indices, _ = orbitals.get_active_space_indices()
+    active_indices = list(active_indices)
+
+    # Natural occupation number per active orbital (alpha + beta, ranges 0 to 2).
+    occ_alpha, occ_beta = wavefunction.get_active_orbital_occupations()
+    occupations = [float(a) + float(b) for a, b in zip(occ_alpha, occ_beta)]
+
+    # Single-orbital (von Neumann) entropy per active orbital (requires 1- and 2-RDMs).
+    entropies = wavefunction.get_single_orbital_entropies()
+
+    cube_data_raw = generate_cubefiles_from_orbitals(
+        orbitals=orbitals,
+        grid_size=grid_size,
+        margin=margin,
+        indices=active_indices,
+    )
+
+    # Cube labels carry the full MO index; map them back to active-space position,
+    # which is the index used by the occupation and entropy arrays.
+    mo_to_active_pos = {mo_idx: pos for pos, mo_idx in enumerate(active_indices)}
+
+    cube_data_with_info: dict[str, dict] = {}
+    for raw_label, cube_str in cube_data_raw.items():
+        mo_idx = int(raw_label.split("_")[1]) - 1
+        pos = mo_to_active_pos[mo_idx]
+        cube_data_with_info[f"MO {mo_idx + 1}"] = {
+            "data": cube_str,
+            "info": {
+                "Occupation": f"{occupations[pos]:.3f}",
+                "Entropy": f"{float(entropies[pos]):.3f}",
             },
         }
 
