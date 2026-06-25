@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <memory>
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
@@ -217,6 +218,11 @@ Initializes a Pipek-Mezey localizer with default settings.
              py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
 QDK MP2 natural orbital transformer.
 
+.. deprecated:: 2.0.0
+    Use :class:`QdkNaturalOrbitalLocalizer` (``qdk_natural_orbitals``) with a
+    wavefunction that already contains the active-space one-particle reduced
+    density matrix (1-RDM).
+
 This class provides a concrete implementation that transforms canonical
 molecular orbitals into natural orbitals derived from second-order
 Møller-Plesset perturbation theory (MP2). Natural orbitals are eigenfunctions
@@ -246,7 +252,13 @@ See Also:
     :class:`qdk_chemistry.data.Wavefunction`
 
 )")
-      .def(py::init<>(), R"(
+      .def(py::init([]() {
+             auto instance =
+                 std::make_unique<microsoft::MP2NaturalOrbitalLocalizer>();
+             qdk::chemistry::python::warn_if_deprecated_algorithm(*instance);
+             return instance;
+           }),
+           R"(
 Default constructor.
 
 Initializes an MP2 natural orbital transformer with default settings.
