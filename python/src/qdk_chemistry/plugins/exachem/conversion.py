@@ -201,6 +201,64 @@ def parse_energy_shift(stdout: str) -> float | None:
     return shift
 
 
+@dataclass
+class CcsdtEnergies:
+    """Energies parsed from an ExaChem CCSD(T) run.
+
+    All energies are absolute totals (including nuclear repulsion) in Hartree,
+    except the ``*_correction`` and ``*_correlation`` fields. The perturbative
+    triples result is ``ccsd_pt_total`` (the canonical "CCSD(T)" energy); the
+    ``ccsd_bracket_t_*`` fields hold the related "CCSD[T]" bracket variant.
+
+    Attributes:
+        ccsd_correlation: CCSD correlation energy.
+        ccsd_total: CCSD total energy.
+        ccsd_bracket_t_correction: [T] correction energy (bracket variant).
+        ccsd_bracket_t_total: CCSD[T] total energy.
+        ccsd_pt_correction: (T) perturbative correction energy.
+        ccsd_pt_total: CCSD(T) total energy (the canonical result).
+
+    """
+
+    ccsd_correlation: float | None = None
+    ccsd_total: float | None = None
+    ccsd_bracket_t_correction: float | None = None
+    ccsd_bracket_t_total: float | None = None
+    ccsd_pt_correction: float | None = None
+    ccsd_pt_total: float | None = None
+
+
+def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
+    """Parse CCSD and CCSD(T) energies from ExaChem stdout.
+
+    ExaChem prints the CCSD and CCSD(T)/CCSD[T] energies as labeled lines (at
+    15-digit precision). This extracts them into a :class:`CcsdtEnergies`.
+
+    Args:
+        stdout: Captured ExaChem stdout text.
+
+    Returns:
+        Parsed :class:`CcsdtEnergies`. Fields that could not be found are ``None``.
+
+    """
+    num = r"(-?\d+\.\d+)"
+    patterns = {
+        "ccsd_correlation": rf"\bCCSD correlation energy / hartree\s*=\s*{num}",
+        "ccsd_total": rf"\bCCSD total energy / hartree\s*=\s*{num}",
+        "ccsd_bracket_t_correction": rf"\bCCSD\[T\] correction energy / hartree\s*=\s*{num}",
+        "ccsd_bracket_t_total": rf"\bCCSD\[T\] total energy / hartree\s*=\s*{num}",
+        "ccsd_pt_correction": rf"\bCCSD\(T\) correction energy / hartree\s*=\s*{num}",
+        "ccsd_pt_total": rf"\bCCSD\(T\) total energy / hartree\s*=\s*{num}",
+    }
+    energies = CcsdtEnergies()
+    for field_name, pattern in patterns.items():
+        match = re.search(pattern, stdout)
+        if match:
+            setattr(energies, field_name, float(match.group(1)))
+    return energies
+
+
+
 def _parse_ducc_blocks(text: str) -> dict[str, list[tuple]]:
     """Parse block-labeled DUCC results into a dict of integral lists."""
     blocks: dict[str, list[tuple]] = {}
