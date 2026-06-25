@@ -9,6 +9,7 @@ from typing import Any
 
 import h5py
 
+from qdk_chemistry.data._hashing import _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 
 from .unitary_representation.base import UnitaryRepresentation
@@ -53,6 +54,18 @@ class ControlledUnitary(DataClass):
                 raise ValueError("target_indices and control_indices must not overlap.")
         self._target_indices = target_indices
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "controlled_unitary")
+        _hash_str(h, self.unitary.content_hash())
+        _hash_uint(h, len(self.control_indices))
+        for idx in self.control_indices:
+            _hash_int(h, idx)
+        targets = self.target_indices
+        _hash_uint(h, len(targets))
+        for idx in targets:
+            _hash_int(h, idx)
 
     @property
     def target_indices(self) -> list[int]:

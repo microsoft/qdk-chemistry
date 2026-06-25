@@ -5,7 +5,7 @@
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
@@ -944,6 +944,22 @@ std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
     throw std::runtime_error("Unable to read Ansatz data from HDF5 file '" +
                              filename + "'. " +
                              "HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void Ansatz::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  if (_hamiltonian) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _hamiltonian->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
   }
 }
 

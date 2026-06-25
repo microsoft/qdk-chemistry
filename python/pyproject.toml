@@ -34,9 +34,9 @@ dependencies = [
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]>=1.27.0",
+  "qdk[jupyter]>=1.28.0",
   "pybind11-stubgen>=2.5.1",
-  "h5py>=3.0.0"
+  "h5py>=3.0.0",
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }
@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,test]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
 ]
 coverage = [
   "coverage",
@@ -98,8 +98,11 @@ qiskit-extras = [
   "pylatexenc==2.10; python_version < '3.14'",
   "requests>=2.33.0; python_version < '3.14'"
 ]
+qre = [
+  "qdk[qre,jupyter]>=1.29.1; python_version >= '3.11'"
+]
 test = [
-  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
+  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "nbclient",
   "nbformat",
   "pennylane",

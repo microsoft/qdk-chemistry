@@ -57,13 +57,6 @@ Wavefunction
 
 .. rubric:: Creating a stability checker
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/stability_checker_workflow.py
@@ -71,18 +64,18 @@ Wavefunction
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
 .. rubric:: Configuring settings
 
 Settings can be modified using the ``settings()`` object.
 See `Available settings`_ below for a complete list of options.
 Key settings include whether to perform internal and external stability checks, and the tolerance for determining stability.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
-      :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
@@ -90,6 +83,13 @@ Key settings include whether to perform internal and external stability checks, 
       :language: python
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. rubric:: Running the stability check and iterative workflow
 
@@ -99,19 +99,19 @@ This includes running an initial :term:`SCF` calculation, checking stability, an
 The workflow handles both internal instabilities (requiring orbital rotation within the same calculation type) and external instabilities (requiring a switch from restricted to unrestricted calculation).
 Note that the Davidson eigenvalue solver used in stability analysis may occasionally fail to converge; when this occurs, increasing ``max_subspace`` or adjusting ``davidson_tolerance`` can help.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
-      :language: cpp
-      :start-after: // start-cell-run
-      :end-before: // end-cell-run
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/stability_checker_workflow.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
+      :language: cpp
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
 
 
 Available settings
@@ -161,19 +161,19 @@ Available implementations
 QDK/Chemistry's :class:`~qdk_chemistry.algorithms.StabilityChecker` provides a unified interface to stability analysis across various quantum chemistry packages.
 You can discover available implementations programmatically:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/stability_checker_workflow.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/stability_checker_workflow.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. _qdk-stability-native:
 

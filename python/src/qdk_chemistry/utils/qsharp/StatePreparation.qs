@@ -132,4 +132,18 @@ namespace QDKChemistry.Utils.StatePreparation {
     function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
         PrepareSingleReferenceState(params, _)
     }
+
+    /// Applies Hadamard to each qubit in the array.
+    operation PrepareHadamardAll(qubits : Qubit[]) : Unit {
+        for q in qubits {
+            H(q);
+        }
+    }
+
+    /// Returns a callable that applies Hadamard to each qubit in the array.
+    /// # Returns
+    /// - `Qubit[] => Unit`: A callable that prepares the uniform superposition on the given qubits.
+    function MakePrepareHadamardAllOp() : Qubit[] => Unit {
+        PrepareHadamardAll(_)
+    }
 }
