@@ -22,15 +22,18 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 ################################################################################
 
 ################################################################################
+# docs:xyz ../data/h2.structure.xyz
 # start-cell-run
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Load H2 structure from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
-)  # docs:inline-xyz
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Run SCF to get orbitals
 scf_solver = create("scf_solver")

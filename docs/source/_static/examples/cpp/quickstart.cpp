@@ -24,11 +24,23 @@ using namespace qdk::chemistry;
 
 int main() {
   // ---------------------------------------------------------------------------
+  // docs:xyz ../data/para_benzyne.structure.xyz
   // start-cell-structure
   // Load para-benzyne structure from XYZ file
   auto structure =
-      std::make_shared<data::Structure>(data::Structure::from_xyz_file(
-          "../data/para_benzyne.structure.xyz"));  // docs:inline-xyz
+      std::make_shared<data::Structure>(data::Structure::from_xyz(R"(10
+para-Benzyne
+C    0.000000    1.396000    0.000000
+C    1.209077    0.698000    0.000000
+C    1.209077   -0.698000    0.000000
+C    0.000000   -1.396000    0.000000
+C   -1.209077   -0.698000    0.000000
+C   -1.209077    0.698000    0.000000
+H    2.151000    1.242000    0.000000
+H    2.151000   -1.242000    0.000000
+H   -2.151000   -1.242000    0.000000
+H   -2.151000    1.242000    0.000000
+)"));
 
   std::cout << "Created structure with " << structure->get_num_atoms()
             << " atoms" << std::endl;

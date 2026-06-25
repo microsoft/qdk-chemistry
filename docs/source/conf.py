@@ -43,9 +43,6 @@ os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 # compiled C++ extension (_core) from the installed package is preferred.
 sys.path.append(str(_repo_root / "python" / "src"))
 
-# Add the local Sphinx extension directory (docs/source/_ext).
-sys.path.insert(0, str(Path(__file__).resolve().parent / "_ext"))
-
 # Check if Graphviz 'dot' executable is available
 if shutil.which("dot") is None:
     sys.stderr.write("ERROR: Graphviz 'dot' executable not found.\n")
@@ -73,8 +70,6 @@ extensions = [
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
     "sphinxcontrib.bibtex",  # Support for bibliographic references
     "sphinx_copybutton",  # Add "copy" buttons to code blocks
-    # Local extensions (docs/source/_ext)
-    "inline_xyz",  # Inline .xyz files into example snippets at build time
 ]
 
 # Configure viewcode to only show source for project modules, not dependencies

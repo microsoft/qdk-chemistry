@@ -4,7 +4,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from pathlib import Path
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
@@ -31,11 +30,15 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 ################################################################################
 
 ################################################################################
+# docs:xyz ../data/h2.structure.xyz
 # start-cell-construct
 # Load a structure from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
-)  # docs:inline-xyz
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Run a SCF to get orbitals
 scf_solver = create("scf_solver")
