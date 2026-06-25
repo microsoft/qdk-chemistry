@@ -53,7 +53,7 @@ if ($DynamicDeps) {
     $VcpkgTriplet = "x64-windows-static-md"
 }
 $QDK_UARCH = "x86-64-v3"
-$NCPUS = [System.Environment]::ProcessorCount - 2
+$NCPUS = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
@@ -359,7 +359,7 @@ if (-not $SkipPython) {
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
         $env:OMP_NUM_THREADS = 2
         $env:QDK_CHEMISTRY_RUN_SLOW_TESTS = 1
-        pytest -v --tb=short 2>&1 *> pytest.log
+        pytest -v --tb=short 2>&1 *> pytest_msvc.log
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {
             Write-Warning "Some Python tests failed (exit code: $pytestExit)"

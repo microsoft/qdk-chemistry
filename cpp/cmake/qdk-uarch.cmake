@@ -8,7 +8,11 @@ if(DEFINED QDK_UARCH)
   message(STATUS "Using user-defined uarch: ${QDK_UARCH}")
 else()
   # Auto-detect based on the target platform
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    # Native MSVC cl has no generic baseline /arch: flag; leave QDK_UARCH unset.
+    message(STATUS "Native MSVC: use compiler default ISA.")
+    return()
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
     set(QDK_UARCH "x86-64" CACHE STRING "Target microarchitecture")
     message(STATUS "Auto-detected x86_64 architecture, using: ${QDK_UARCH}")
   elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")

@@ -1795,7 +1795,6 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   });
 
   // Verify file was created and has correct NORB (should be 2, not 3).
-  // Scope the stream so it closes before remove() (Windows file lock).
   {
     std::ifstream file("test_active_space.hamiltonian.fcidump");
     EXPECT_TRUE(file.is_open());

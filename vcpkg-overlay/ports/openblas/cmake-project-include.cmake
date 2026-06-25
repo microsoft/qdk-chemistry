@@ -1,7 +1,7 @@
 # TARGET: The target architecture
 #
 # Originally, OpenBLAS tries to optimize for the host CPU unless
-# - being given an explixit TARGET, and
+# - being given an explicit TARGET, and
 # - CMAKE_CROSSCOMPILING, and
 # - not building for uwp (aka WINDOWSSTORE)
 # For this optimization, it runs 'getarch' and 'getarch_2nd' which it builds
