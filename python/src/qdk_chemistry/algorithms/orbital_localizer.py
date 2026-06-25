@@ -16,4 +16,5 @@ from qdk_chemistry._core._algorithms import (
     QdkNaturalOrbitalLocalizer,  # noqa: F401 - re-export
     QdkPipekMezeyLocalizer,  # noqa: F401 - re-export
     QdkVVHVLocalizer,  # noqa: F401 - re-export
+    new_mean_field_wavefunction,  # noqa: F401 - re-export
 )

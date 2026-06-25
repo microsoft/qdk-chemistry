@@ -1230,10 +1230,10 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  if (!detail::is_mean_field_wavefunction(wavefunction)) {
-    throw std::invalid_argument(
-        "VVHVLocalizer requires the initial wavefunction to be the "
-        "mean-field determinant.");
+  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+
+  if (loc_indices_a.empty() && loc_indices_b.empty()) {
+    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
   }
 
   // Get electron counts from settings

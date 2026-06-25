@@ -10,6 +10,7 @@
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <string>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
@@ -26,6 +27,20 @@ namespace detail {
  */
 bool is_mean_field_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction);
+
+/**
+ * @brief Log a warning when a localizer receives a non-mean-field wavefunction.
+ *
+ * Localizers transform orbitals and return a single-reference wavefunction;
+ * correlated-state coefficients from a multi-determinant input are not carried
+ * through the transformation.
+ *
+ * @param wavefunction The wavefunction to check.
+ * @param localizer_name Name of the localizer issuing the warning.
+ */
+void warn_if_not_mean_field_wavefunction(
+    std::shared_ptr<data::Wavefunction> wavefunction,
+    const std::string& localizer_name);
 
 /**
  * @brief Create a mean-field determinant wavefunction with updated orbitals.

@@ -82,6 +82,40 @@ TEST_F(LocalizationTest, Factory) {
   EXPECT_FALSE(LocalizerFactory::unregister_instance("_dummy_localizer"));
 }
 
+TEST_F(LocalizationTest,
+       EmptyIndicesReturnSingleReferenceWithUnchangedOrbitals) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E, wfn] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  const auto& [coeffs_alpha, coeffs_beta] =
+      wfn->get_orbitals()->get_coefficients();
+  const std::vector<size_t> empty_indices;
+  const std::vector<std::string> localizer_names = {
+      "qdk_pipek_mezey", "qdk_mp2_natural_orbitals", "qdk_natural_orbitals",
+      "qdk_vvhv"};
+
+  for (const auto& localizer_name : localizer_names) {
+    auto localizer = LocalizerFactory::create(localizer_name);
+    auto localized_wfn = localizer->run(wfn, empty_indices, empty_indices);
+
+    ASSERT_NE(localized_wfn, nullptr) << localizer_name;
+    EXPECT_NE(localized_wfn.get(), wfn.get()) << localizer_name;
+    EXPECT_TRUE(qdk::chemistry::algorithms::detail::is_mean_field_wavefunction(
+        localized_wfn))
+        << localizer_name;
+
+    const auto& [localized_alpha, localized_beta] =
+        localized_wfn->get_orbitals()->get_coefficients();
+    EXPECT_NEAR(0.0, (localized_alpha - coeffs_alpha).norm(),
+                testing::numerical_zero_tolerance)
+        << localizer_name;
+    EXPECT_NEAR(0.0, (localized_beta - coeffs_beta).norm(),
+                testing::numerical_zero_tolerance)
+        << localizer_name;
+  }
+}
+
 TEST_F(LocalizationTest, WaterPipekMezey) {
   auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });

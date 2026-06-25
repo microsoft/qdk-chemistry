@@ -19,6 +19,10 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
+  if (loc_indices_a.empty() && loc_indices_b.empty()) {
+    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
+  }
+
   // Natural orbitals are a single spatial orbital set.
   if (loc_indices_a != loc_indices_b) {
     throw std::invalid_argument(

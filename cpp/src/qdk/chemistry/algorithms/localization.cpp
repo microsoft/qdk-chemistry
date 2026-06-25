@@ -107,6 +107,20 @@ bool is_mean_field_wavefunction(
   }
 }
 
+void warn_if_not_mean_field_wavefunction(
+    std::shared_ptr<data::Wavefunction> wavefunction,
+    const std::string& localizer_name) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!is_mean_field_wavefunction(wavefunction)) {
+    QDK_LOGGER().warn(
+        "{} received a wavefunction that is not the single mean-field "
+        "determinant. The returned wavefunction will contain a single "
+        "reference built from the transformed orbitals; correlated-state "
+        "coefficients are not preserved.",
+        localizer_name);
+  }
+}
+
 std::shared_ptr<data::Wavefunction> new_mean_field_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,

@@ -22,11 +22,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  if (!detail::is_mean_field_wavefunction(wavefunction)) {
-    throw std::invalid_argument(
-        "MP2NaturalOrbitalLocalizer requires the initial wavefunction to be "
-        "the mean-field determinant.");
-  }
+  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
 
   // Get electron counts from settings
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();

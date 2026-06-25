@@ -20,11 +20,7 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  if (!detail::is_mean_field_wavefunction(wavefunction)) {
-    throw std::invalid_argument(
-        "PipekMezeyLocalizer requires the initial wavefunction to be the "
-        "mean-field determinant.");
-  }
+  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
 
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
