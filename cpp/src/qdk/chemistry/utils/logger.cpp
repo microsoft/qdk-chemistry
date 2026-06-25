@@ -56,7 +56,6 @@ class stdout_fd_sink final : public spdlog::sinks::base_sink<std::mutex> {
     spdlog::memory_buf_t formatted;
     formatter_->format(msg, formatted);
     std::fwrite(formatted.data(), 1, formatted.size(), stdout);
-    std::fflush(stdout);
   }
   void flush_() override { std::fflush(stdout); }
 };
