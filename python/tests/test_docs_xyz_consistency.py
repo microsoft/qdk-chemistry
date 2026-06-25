@@ -50,8 +50,10 @@ def test_inline_blobs_match_xyz_files(path: Path):
 
     assert len(tags) == len(blobs), f"{path}: {len(tags)} docs:xyz tag(s) but {len(blobs)} from_xyz blob(s)"
 
+    data_root = (EXAMPLES_DIR / "data").resolve()
     for rel, blob in zip(tags, blobs, strict=True):
         xyz_file = (path.parent / rel).resolve()
+        assert xyz_file.is_relative_to(data_root), f"{path}: docs:xyz target must be under {data_root}: {rel}"
         assert xyz_file.is_file(), f"{path}: docs:xyz target not found: {rel}"
         expected = xyz_file.read_text(encoding="utf-8").rstrip("\n")
         assert blob.rstrip("\n") == expected, f"{path}: inline blob does not match {rel}"
