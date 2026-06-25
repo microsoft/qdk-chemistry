@@ -13,7 +13,12 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 
 from typing import Any
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer, QubitHamiltonian
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    FactorizedHamiltonianContainer,
+    QubitHamiltonian,
+)
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -107,16 +112,53 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
+        #
+        # Optimization: for block encodings (SOSSA), the sub-oracles are power-independent.
+        # Build the full pipeline once with power=1 and reuse the Q# op with varied power.
         ctrl_unitary_circuits = []
         ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
-        for k in range(num_bits):
-            power = 2 ** (num_bits - 1 - k)
-            circuit, num_anc, prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
-            ctrl_unitary_circuits.append(circuit)
-            num_be_ancillas = max(num_be_ancillas, num_anc)
-            ancilla_prep_op = prep_op
 
-        if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
+        # Build once with power=1 to get the base circuit and check reusability.
+        base_circuit, num_anc, prep_op = self._create_controlled_circuit(
+            qubit_hamiltonian, power=1
+        )
+        num_be_ancillas = max(num_be_ancillas, num_anc)
+        ancilla_prep_op = prep_op
+
+        # Check if the base circuit's Q# op supports power reuse (has walk_params with "power" key).
+        base_factory = base_circuit._qsharp_factory  # noqa: SLF001
+        can_reuse = (
+            base_factory is not None
+            and isinstance(base_factory.parameter, dict)
+            and "power" in base_factory.parameter
+        )
+
+        if can_reuse:
+            # Fast path: reuse sub-oracles, only vary power.
+            for k in range(num_bits):
+                power = 2 ** (num_bits - 1 - k)
+                powered_params = {**base_factory.parameter, "power": power}
+                powered_circuit = Circuit(
+                    qsharp_factory=QsharpFactoryData(
+                        program=base_factory.program, parameter=powered_params
+                    ),
+                    qsharp_op=base_circuit._qsharp_op,  # noqa: SLF001
+                )
+                ctrl_unitary_circuits.append(powered_circuit)
+        else:
+            # Fallback: rebuild for each power (e.g. Trotter with "rescale" strategy).
+            for k in range(num_bits):
+                power = 2 ** (num_bits - 1 - k)
+                circuit, num_anc, prep_op = self._create_controlled_circuit(
+                    qubit_hamiltonian, power=power
+                )
+                ctrl_unitary_circuits.append(circuit)
+                num_be_ancillas = max(num_be_ancillas, num_anc)
+                ancilla_prep_op = prep_op
+
+        if state_preparation._qsharp_op and all(
+            c._qsharp_op for c in ctrl_unitary_circuits
+        ):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
                 state_preparation,
                 ctrl_unitary_circuits,
@@ -158,7 +200,9 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
+        ctrl_unitary_ops = [
+            c._qsharp_op for c in controlled_unitary_circuits
+        ]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         if ancilla_prep_op is None:
             ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()

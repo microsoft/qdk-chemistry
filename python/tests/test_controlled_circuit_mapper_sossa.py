@@ -536,6 +536,17 @@ class TestSOSSAMapper:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
+    """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
+    N = len(vec)  # noqa: N806
+    v = vec.copy().astype(float)
+    angles = [0.0] * (N - 1)
+    for j in range(N - 2, -1, -1):
+        angles[j] = float(np.arctan2(v[j + 1], v[j]))
+        v[j] = float(np.sqrt(v[j] ** 2 + v[j + 1] ** 2))
+    return angles
+
+
 class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 

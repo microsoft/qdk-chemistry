@@ -778,21 +778,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         innerOp(outerReg, innerReg);
     }
 
-    /// Apply Givens rotation chain to |10...0⟩ and leave state for dump_machine.
-    operation TestGivensRotation(angles : Double[], n : Int) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(n);
-        X(qs[0]);
-        ApplyGivensSequence(angles, qs);
-    }
-
-    /// Apply Adjoint Givens rotation to a prepared state (spread excitation) to verify round-trip.
-    operation TestGivensRoundTrip(angles : Double[], n : Int) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(n);
-        X(qs[0]);
-        ApplyGivensSequence(angles, qs);
-        Adjoint ApplyGivensSequence(angles, qs);
-    }
-
     /// Apply SelectSpins and dump state to verify SWAP logic.
     operation TestSelectSpins(spinDQVal : Bool, spinSFVal : Bool, n : Int) : Unit {
         let qs = QIR.Runtime.AllocateQubitArray(2 * n + 4);

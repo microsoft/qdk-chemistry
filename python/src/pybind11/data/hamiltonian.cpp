@@ -1434,6 +1434,41 @@ Returns:
 )");
 
   // Container access
+  hamiltonian.def(
+      "get_container",
+      [](const Hamiltonian& self) -> const HamiltonianContainer& {
+        if (self.has_container_type<FactorizedHamiltonianContainer>()) {
+          return self.get_container<FactorizedHamiltonianContainer>();
+        } else if (self.has_container_type<
+                       CanonicalFourCenterHamiltonianContainer>()) {
+          return self
+              .get_container<CanonicalFourCenterHamiltonianContainer>();
+        } else if (self.has_container_type<CholeskyHamiltonianContainer>()) {
+          return self.get_container<CholeskyHamiltonianContainer>();
+        } else if (self.has_container_type<SparseHamiltonianContainer>()) {
+          return self.get_container<SparseHamiltonianContainer>();
+        } else {
+          throw std::runtime_error("Unknown container type: " +
+                                   self.get_container_type());
+        }
+      },
+      R"(
+Get the underlying Hamiltonian container.
+
+Returns:
+    HamiltonianContainer: The underlying container (FactorizedHamiltonianContainer,
+        CanonicalFourCenterHamiltonianContainer, CholeskyHamiltonianContainer, or
+        SparseHamiltonianContainer)
+
+Raises:
+    RuntimeError: If the container type is unknown
+
+Examples:
+    >>> container = hamiltonian.get_container()
+    >>> print(container.get_container_type())
+)",
+      py::return_value_policy::reference_internal);
+
   hamiltonian.def("get_container_type", &Hamiltonian::get_container_type,
                   R"(
 Get the type of the underlying container.
