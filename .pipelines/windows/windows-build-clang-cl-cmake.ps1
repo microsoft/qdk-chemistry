@@ -356,6 +356,7 @@ if (-not $SkipCpp) {
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
             -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+            -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$RepoRoot\.pipelines\toolchains\windows.cmake" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
             -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
             -DFETCHCONTENT_QUIET=OFF
@@ -424,6 +425,7 @@ if (-not $SkipPython) {
         -C cmake.define.CMAKE_C_COMPILER="$clangClExe" `
         -C cmake.define.CMAKE_CXX_COMPILER="$clangClExe" `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+        -C cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE="$RepoRoot\.pipelines\toolchains\windows.cmake" `
         -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
         -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
     if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Error "Python package install failed"; exit 1 }
