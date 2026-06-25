@@ -105,13 +105,6 @@ Hamiltonian Construction
 
 The below example illustrates the typical access to Orbitals (via a :term:`SCF`):
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/orbitals.py
@@ -119,14 +112,14 @@ The below example illustrates the typical access to Orbitals (via a :term:`SCF`)
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Similar patterns are described below for ModelOrbitals.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
       :language: cpp
-      :start-after: // start-cell-model-orbitals-create
-      :end-before: // end-cell-model-orbitals-create
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+Similar patterns are described below for ModelOrbitals.
 
 .. tab:: Python API
 
@@ -135,6 +128,13 @@ Similar patterns are described below for ModelOrbitals.
       :start-after: # start-cell-model-orbitals-create
       :end-before: # end-cell-model-orbitals-create
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
+      :language: cpp
+      :start-after: // start-cell-model-orbitals-create
+      :end-before: // end-cell-model-orbitals-create
+
 Accessing Orbital data
 ----------------------
 
@@ -142,19 +142,19 @@ The :class:`~qdk_chemistry.data.Orbitals` class provides methods to access orbit
 Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
-      :language: cpp
-      :start-after: // start-cell-access
-      :end-before: // end-cell-access
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
       :start-after: # start-cell-access
       :end-before: # end-cell-access
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
+      :language: cpp
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
 
 
 Orbital transformations and applications
