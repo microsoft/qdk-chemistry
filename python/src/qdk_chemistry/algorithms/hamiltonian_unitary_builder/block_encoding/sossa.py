@@ -15,7 +15,7 @@ where
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from math import atan2, ceil, log2, sqrt
+from math import ceil, log2, sqrt
 
 import numpy as np
 
@@ -324,43 +324,55 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         Reference: Appendix B.5, Eq. 115 in :cite:`Low2025`.
 
         """
-        dq_angles: list[list[float]] = []
-        for x_o in range(n_orbitals):
-            if x_o < num_one_body_plus:
-                angles = SOSSABuilder._vector_to_givens_angles(one_body_basis_plus[x_o])
-            else:
-                angles = SOSSABuilder._vector_to_givens_angles(one_body_basis_minus[x_o - num_one_body_plus])
-            dq_angles.append(angles)
+        # Stack all DQ vectors into a single [N, n_orbitals] matrix for batch processing
+        num_q1 = n_orbitals - num_one_body_plus
+        dq_vectors = np.empty((n_orbitals, n_orbitals))
+        if num_one_body_plus > 0:
+            dq_vectors[:num_one_body_plus] = one_body_basis_plus[:num_one_body_plus]
+        if num_q1 > 0:
+            dq_vectors[num_one_body_plus:] = one_body_basis_minus[:num_q1]
+        dq_angles_arr = SOSSABuilder._batch_vector_to_givens_angles(dq_vectors)
+        dq_angles = dq_angles_arr.tolist()
 
-        sf_angles_3d: list[list[list[float]]] = []
+        # Stack all SF vectors: R*B real vectors + R zero vectors for b==B
+        n_sf = n_ranks * (n_bases + 1)
+        sf_vectors = np.zeros((n_sf, n_orbitals))
         for r in range(n_ranks):
-            b_entries: list[list[float]] = []
-            for b in range(n_bases + 1):
-                angles = (
-                    SOSSABuilder._vector_to_givens_angles(basis_vectors[r, b])
-                    if b < n_bases
-                    else [0.0] * (n_orbitals - 1)
-                )
-                angles.append(1.0 if b == n_bases else 0.0)
-                b_entries.append(angles)
-            sf_angles_3d.append(b_entries)
+            sf_vectors[r * (n_bases + 1) : r * (n_bases + 1) + n_bases] = basis_vectors[r, :n_bases]
+            # row r*(B+1)+B stays zero (b==B case)
 
-        # Flatten: iterate b in outer loop, r in inner (Q# QROM addressing).
-        n_r = len(sf_angles_3d)
-        n_bp1 = len(sf_angles_3d[0]) if n_r > 0 else 0
-        sf_flat = [sf_angles_3d[r][b] for b in range(n_bp1) for r in range(n_r)]
+        sf_angles_arr = SOSSABuilder._batch_vector_to_givens_angles(sf_vectors)
+
+        # Append bEqB flag column and reorder to [b*R + r] addressing
+        b_eq_b_flags = np.zeros(n_sf)
+        for r in range(n_ranks):
+            b_eq_b_flags[r * (n_bases + 1) + n_bases] = 1.0
+        sf_with_flag = np.column_stack([sf_angles_arr, b_eq_b_flags])
+
+        # Flatten: iterate b in outer loop, r in inner (Q# QROM addressing)
+        n_bp1 = n_bases + 1
+        flat_indices = [r * n_bp1 + b for b in range(n_bp1) for r in range(n_ranks)]
+        sf_flat = sf_with_flag[flat_indices].tolist()
 
         return dq_angles, sf_flat
 
     @staticmethod
-    def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
-        """Convert a unit vector to Givens rotation angles via bottom-up elimination."""
-        n_orbitals = len(vec)
-        v = vec.copy().astype(float)
-        angles: list[float] = [0.0] * (n_orbitals - 1)
-        for j in range(n_orbitals - 2, -1, -1):
-            angles[j] = float(atan2(v[j + 1], v[j]))
-            v[j] = float(np.sqrt(v[j] ** 2 + v[j + 1] ** 2))
+    def _batch_vector_to_givens_angles(vectors: np.ndarray) -> np.ndarray:
+        """Convert multiple unit vectors to Givens rotation angles via batch bottom-up elimination.
+
+        Args:
+            vectors: shape [M, N] where M is number of vectors.
+
+        Returns:
+            angles: shape [M, N-1].
+
+        """
+        n = vectors.shape[1]
+        v = vectors.copy()
+        angles = np.empty((vectors.shape[0], n - 1))
+        for j in range(n - 2, -1, -1):
+            angles[:, j] = np.arctan2(v[:, j + 1], v[:, j])
+            v[:, j] = np.hypot(v[:, j], v[:, j + 1])
         return angles
 
     @staticmethod

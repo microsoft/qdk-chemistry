@@ -131,10 +131,7 @@ class QpeCircuitBuilder(Algorithm):
             container = controlled_unitary.unitary.get_container()
             num_ancilla_qubits = circuit_mapper.num_ancillary_qubits(container)
         else:
-            if isinstance(qubit_hamiltonian, QubitHamiltonian):
-                num_system_qubits = qubit_hamiltonian.num_qubits
-            else:
-                num_system_qubits = 2 * qubit_hamiltonian.get_num_orbitals()
+            num_system_qubits = qubit_hamiltonian.num_qubits
             num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
 
         # Get ancilla prep circuit from mapper if available (e.g. phase gradient init).

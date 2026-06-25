@@ -479,7 +479,7 @@ class TestSOSSAWalkLogicalCounts:
     )
     def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify numQubits matches the paper formula bounds."""
-        qsharp.init(project_root=_PROJECT_ROOT)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,

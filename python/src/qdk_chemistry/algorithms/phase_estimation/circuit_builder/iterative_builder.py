@@ -11,8 +11,6 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
-
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -153,13 +151,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
+        num_system_qubits = qubit_hamiltonian.num_qubits
 
-        # Determine num_system_qubits based on hamiltonian type
-        if isinstance(qubit_hamiltonian, QubitHamiltonian):
-            num_system_qubits = qubit_hamiltonian.num_qubits
-        else:
-            # FactorizedHamiltonianContainer: system is 2*N spin-orbitals
-            num_system_qubits = 2 * qubit_hamiltonian.get_num_orbitals()
 
         power = 2 ** (total_iterations - iteration - 1)
 
@@ -189,7 +182,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         phase_correction: float,
         num_system_qubits: int,
         num_ancilla_qubits: int = 0,
-        ancilla_prep_op: Any = None,
+        ancilla_prep_op: Circuit | None = None,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 

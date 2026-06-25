@@ -279,57 +279,45 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
   // Spin-free h1 = 0.5*(h1_alpha + h1_beta); for restricted they're equal
   Eigen::MatrixXd h1 = 0.5 * (h1_alpha + h1_beta);
 
-  // Reconstruct h2 for the contraction terms
-  if (!_cached_two_body) {
-    _build_two_body_cache();
-  }
-  // Map h2 as 4D: h2[p][q][r][s]
-  const double* h2 = _cached_two_body->data();
-  auto H2 = [&](size_t p, size_t q, size_t r, size_t s) -> double {
-    return h2[p * norb * norb * norb + q * norb * norb + r * norb + s];
-  };
-
-  // h1 -= 0.5 * einsum("prrq -> pq", h2)
-  for (size_t p = 0; p < norb; ++p) {
-    for (size_t q = 0; q < norb; ++q) {
-      double sum = 0.0;
-      for (size_t r = 0; r < norb; ++r) {
-        sum += H2(p, r, r, q);
-      }
-      h1(p, q) -= 0.5 * sum;
-    }
-  }
-
-  // Majorana: h1 += einsum("pqrr -> pq", h2)
-  for (size_t p = 0; p < norb; ++p) {
-    for (size_t q = 0; q < norb; ++q) {
-      double sum = 0.0;
-      for (size_t r = 0; r < norb; ++r) {
-        sum += H2(p, q, r, r);
-      }
-      h1(p, q) += sum;
-    }
-  }
-
-  // h1 -= einsum("rc, rbc, rbp, rbq -> pq", wb, w, u, u)
-  auto U = [&](size_t r, size_t b, size_t p) -> double {
-    return _u(r * B * norb + b * norb + p);
-  };
-  auto W = [&](size_t r, size_t b, size_t c) -> double {
-    return _w(r * B * C + b * C + c);
-  };
+  // Compute h2 contractions directly from factored form, avoiding the O(N^4)
+  // reconstruction of the full two-body tensor.
+  //
+  // h2[p,q,r,s] = Σ_rank Σ_c M_rc[p,q] * M_rc[r,s]
+  // where M_rc[p,q] = Σ_b W[rank,b,c] * U[rank,b,p] * U[rank,b,q]
+  //                  = (U_r^T * diag(w_c) * U_r)[p,q]
+  //
+  // The three contractions applied to h1 are:
+  //   h1 -= 0.5 * Σ_{rank,c} M_rc^2           [from einsum("prrq", h2)]
+  //   h1 += Σ_{rank,c} tr(M_rc) * M_rc         [from einsum("pqrr", h2)]
+  //   h1 -= Σ_{rank,c} wb[rank,c] * M_rc        [original wb term]
+  //
+  // Cost: O(R * C * (B*N^2 + N^3)) vs O(N^4) for full reconstruction.
 
   for (size_t r = 0; r < R; ++r) {
+    // Map U_r as [B x norb] row-major: _u[r*B*norb + b*norb + p]
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        Ur(_u.data() + r * B * norb, B, norb);
+
     for (size_t c = 0; c < C; ++c) {
+      // Build scaled = diag(w[r,:,c]) * U_r,  shape [B x norb]
+      Eigen::MatrixXd scaled(B, norb);
       for (size_t b = 0; b < B; ++b) {
-        double coeff = _wb(r, c) * W(r, b, c);
-        for (size_t p = 0; p < norb; ++p) {
-          double cu = coeff * U(r, b, p);
-          for (size_t q = 0; q < norb; ++q) {
-            h1(p, q) -= cu * U(r, b, q);
-          }
-        }
+        double w_rbc = _w(r * B * C + b * C + c);
+        scaled.row(b) = w_rbc * Ur.row(b);
       }
+
+      // M_rc = U_r^T * scaled = U_r^T * diag(w_c) * U_r,  shape [N x N]
+      Eigen::MatrixXd Mrc = Ur.transpose() * scaled;
+
+      // h1 -= 0.5 * M_rc^2  (contraction of einsum "prrq")
+      h1.noalias() -= 0.5 * (Mrc * Mrc);
+
+      // h1 += tr(M_rc) * M_rc  (contraction of einsum "pqrr")
+      h1 += Mrc.trace() * Mrc;
+
+      // h1 -= wb[r,c] * M_rc  (wb term)
+      h1 -= _wb(r, c) * Mrc;
     }
   }
 
