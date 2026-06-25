@@ -136,6 +136,7 @@ class TestAliasSamplingStatePreparation:
         atol = 2.0 / (2**bits_precision)
         np.testing.assert_allclose(marginal_probs[: len(coefficients)], expected_probs, atol=atol)
 
+
 def _run_conditional_alias_fr_and_dump(
     coefficients: list[list[float]],
     free_rider_data: list[list[bool]],
@@ -149,6 +150,7 @@ def _run_conditional_alias_fr_and_dump(
     )
     state = qdk.dump_machine()
     return np.array(state.as_dense_state())
+
 
 def _compute_conditional_marginal_probs(
     full_sv: np.ndarray,
@@ -179,6 +181,7 @@ def _compute_conditional_marginal_probs(
         probs[idx_val] += abs(amp) ** 2
 
     return probs
+
 
 class TestConditionalAliasSamplingWithFreeRider:
     """Tests for conditional alias sampling with free-rider data."""

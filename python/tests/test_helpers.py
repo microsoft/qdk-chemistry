@@ -12,6 +12,7 @@ from qdk_chemistry.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
     Orbitals,
     OrbitalType,
@@ -19,7 +20,6 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Structure,
     Wavefunction,
-    FactorizedHamiltonianContainer
 )
 
 

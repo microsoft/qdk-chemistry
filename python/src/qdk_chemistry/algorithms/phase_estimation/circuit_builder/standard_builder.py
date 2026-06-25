@@ -138,8 +138,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(  # noqa: SLF001
-            c._qsharp_op
-            for c in ctrl_unitary_circuits  # noqa: SLF001
+            c._qsharp_op  # noqa: SLF001
+            for c in ctrl_unitary_circuits
         ):
             circuit = self._create_circuit_from_qsharp_op(
                 state_preparation,
@@ -182,7 +182,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]
+        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         if ancilla_prep_op is None:
             ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
