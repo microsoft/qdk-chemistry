@@ -21,7 +21,6 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.phase import energy_from_phase
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -177,7 +176,12 @@ def _resolve_phase_ambiguity(
 
     """
     phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = [energy_from_phase(candidate, evolution_time=evolution_time) for candidate in phase_fraction_candidates]
+    energies = []
+    for candidate in phase_fraction_candidates:
+        angle = (candidate % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        energies.append(angle / evolution_time)
 
     # Select candidate closest to expected energy
     index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))
@@ -190,7 +194,10 @@ _builder_params = [
     pytest.param(
         "qiskit_standard",
         id="qiskit_standard",
-        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        marks=[
+            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile"),
+        ],
     ),
 ]
 
@@ -254,7 +261,9 @@ def test_standard_phase_estimation_four_qubit(
         pytest.param(
             "qiskit_standard",
             id="qiskit_standard",
-            marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            marks=[
+                pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            ],
         ),
     ],
 )

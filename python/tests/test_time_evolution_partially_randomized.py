@@ -378,3 +378,25 @@ class TestPartiallyRandomizedPauliLabelToMap:
         mapping = builder._pauli_label_to_map("XYZ")
         # Little-endian: rightmost char -> qubit 0
         assert mapping == {0: "Z", 1: "Y", 2: "X"}
+
+
+class TestPartiallyRandomizedScale:
+    """Tests that the PartiallyRandomized builder sets scale correctly."""
+
+    def test_scale_equals_time(self):
+        """Container scale should equal the evolution time."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
+        t = 0.6
+        builder = PartiallyRandomized(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert container.scale == t
+
+    def test_eigenvalue_from_phase_roundtrip(self):
+        """Verify E -> phase -> E roundtrip for a known energy."""
+        t = 1.0
+        energy = -0.4
+        phi = (energy * t / (2 * np.pi)) % 1.0
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
+        builder = PartiallyRandomized(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert np.isclose(container.eigenvalue_from_phase(phi), energy, rtol=1e-10, atol=1e-12)

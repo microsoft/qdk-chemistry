@@ -695,7 +695,7 @@ StateVectorContainer::_active_occupations_pair() const {
       Eigen::VectorXd alpha_occ = Eigen::VectorXd::Zero(num_orbitals);
       Eigen::VectorXd beta_occ = Eigen::VectorXd::Zero(num_orbitals);
       const auto& det = determinants[0];
-      for (size_t i = 0; i < num_orbitals && i < det.num_modes(); ++i) {
+      for (size_t i = 0; i < num_orbitals && i < det.capacity(); ++i) {
         if (det.bits_per_mode() == 2) {
           if (det.has_alpha_electron(i)) alpha_occ(i) = 1.0;
           if (det.has_beta_electron(i)) beta_occ(i) = 1.0;
@@ -720,7 +720,7 @@ StateVectorContainer::_active_occupations_pair() const {
     const auto& det = determinants[0];
     if (det.bits_per_mode() == 2) {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         if (det.has_alpha_electron(active_idx))
           alpha_occupations(active_idx) = 1.0;
@@ -729,7 +729,7 @@ StateVectorContainer::_active_occupations_pair() const {
       }
     } else {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         alpha_occupations(active_idx) =
             det.get_mode_state(active_idx) ? 1.0 : 0.0;

@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledUnitary,
+    FactorizedHamiltonianContainer,
     QubitHamiltonian,
     Settings,
 )
@@ -82,13 +82,14 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to build circuits.
 
         Returns:
             A list of quantum circuits for phase estimation.
@@ -97,28 +98,47 @@ class QpeCircuitBuilder(Algorithm):
 
     def _create_controlled_circuit(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
         power: int,
-    ) -> Circuit:
+    ) -> tuple[Circuit, int, Circuit | None]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            qubit_hamiltonian: The qubit Hamiltonian (or FactorizedHamiltonianContainer) to evolve under.
             power: The power to which the unitary should be raised.
 
         Returns:
-            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
+            A tuple of (circuit, num_ancilla_qubits, ancilla_prep_op) where circuit implements
+            controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the number
+            of ancilla qubits used by the unitary beyond the system qubits, and
+            ancilla_prep_op is a Q# callable to initialize the ancillas (no-op if not needed).
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        return circuit_mapper.run(controlled_unitary=controlled_unitary)
+        circuit_mapper.settings().update("control_indices", [0])
+        circuit = circuit_mapper.run(unitary_rep)
+
+        # Use mapper's num_ancillary_qubits if available (e.g. SOSSAMapper computes
+        # alias-sampling-aware register sizes); fall back to container num_qubits.
+        if hasattr(circuit_mapper, "num_ancillary_qubits"):
+            container = unitary_rep.get_container()
+            num_ancilla_qubits = circuit_mapper.num_ancillary_qubits(container)
+        else:
+            num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
+
+        # Get ancilla prep circuit from mapper if available (e.g. phase gradient init).
+        if hasattr(circuit_mapper, "get_ancilla_prep_op"):
+            ancilla_prep_circuit = circuit_mapper.get_ancilla_prep_op()
+        else:
+            ancilla_prep_circuit = None
+
+        return circuit, num_ancilla_qubits, ancilla_prep_circuit
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):

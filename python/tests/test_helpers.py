@@ -12,6 +12,7 @@ from qdk_chemistry.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
     Orbitals,
     OrbitalType,
@@ -247,3 +248,62 @@ def create_test_ansatz(num_orbitals: int = 2):
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def create_random_factorized_hamiltonian(
+    num_orbitals: int = 2,
+    num_ranks: int = 2,
+    num_bases: int = 1,
+    num_copies: int = 1,
+    *,
+    seed: int = 42,
+):
+    """Create a random FactorizedHamiltonianContainer for testing.
+
+    Args:
+        num_orbitals: Number of spatial orbitals (N).
+        num_ranks: Number of ranks (R).
+        num_bases: Number of bases (B).
+        num_copies: Number of copies (C).
+        seed: Random seed for reproducibility.
+
+    Returns:
+        FactorizedHamiltonianContainer from C++ pybind11.
+
+    """
+    rng = np.random.default_rng(seed)
+    n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
+
+    # Symmetric one-body integrals
+    h1 = rng.standard_normal((n, n))
+    h1 = (h1 + h1.T) / 2
+
+    # Random orthogonal basis vectors (U), flattened [R*B*N]
+    u_matrices = np.zeros(r * b * n)
+    for ri in range(r):
+        for bi in range(b):
+            v = rng.standard_normal(n)
+            v /= np.linalg.norm(v)
+            u_matrices[ri * b * n + bi * n : ri * b * n + (bi + 1) * n] = v
+
+    # Two-body weights W [R*B*C]
+    w_matrices = rng.standard_normal(r * b * c)
+
+    # Identity weights WB [R, C]
+    wb_matrix = rng.standard_normal((r, c))
+
+    orbitals = create_test_orbitals(n)
+    inactive_fock = np.zeros((n, n))
+
+    return FactorizedHamiltonianContainer(
+        r,
+        b,
+        c,
+        0.0,
+        u_matrices,
+        w_matrices,
+        h1,
+        wb_matrix,
+        inactive_fock,
+        orbitals,
+    )

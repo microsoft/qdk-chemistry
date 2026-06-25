@@ -29,7 +29,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation StatePreparation(
         params : StatePreparationParams,
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
         for op in params.expansionOps {
             if Length(op) == 2 {
@@ -47,7 +47,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
     /// # Returns
     /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
-    function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit {
+    function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit is Adj + Ctl {
         StatePreparation(params, _)
     }
 
@@ -145,5 +145,10 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// - `Qubit[] => Unit`: A callable that prepares the uniform superposition on the given qubits.
     function MakePrepareHadamardAllOp() : Qubit[] => Unit {
         PrepareHadamardAll(_)
+    }
+
+    /// No-op ancilla preparation (used when no persistent ancilla init is needed).
+    function MakeNoOpAncillaPrep() : Qubit[] => Unit is Adj {
+        (beAncillas) => {}
     }
 }

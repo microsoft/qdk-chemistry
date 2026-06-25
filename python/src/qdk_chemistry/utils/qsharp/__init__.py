@@ -12,16 +12,7 @@ from qdk import TargetProfile, qsharp
 
 __all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "CircuitComposition.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "StandardPhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "HadamardTest.qs",
-    Path(__file__).parent / "PauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-]
+_PROJECT_ROOT = str(Path(__file__).parent)
 
 _MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
 
@@ -41,8 +32,7 @@ def _ensure_base_session():
     try:
         _ = qdk.code.QDKChemistry.Utils.StatePreparation
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _QS_FILES)
-        qsharp.eval(code)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
     _state["mode"] = "base"
 
 
@@ -55,8 +45,6 @@ def _ensure_mps_session():
         except AttributeError:
             _state["mode"] = None  # stale — interpreter was reset externally
     qsharp.init(project_root=_MPS_PROJECT_ROOT)
-    code = "\n".join(f.read_text() for f in _QS_FILES)
-    qsharp.eval(code)
     _state["mode"] = "mps"
 
 
