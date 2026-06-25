@@ -31,13 +31,6 @@ Creating an ansatz
 
 An :class:`~qdk_chemistry.data.Ansatz` object can be created from existing Hamiltonian and Wavefunction objects:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/ansatz.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/ansatz.py
@@ -45,17 +38,17 @@ An :class:`~qdk_chemistry.data.Ansatz` object can be created from existing Hamil
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Accessing ansatz data
----------------------
-
-The :class:`~qdk_chemistry.data.Ansatz` class provides methods to access its components and perform calculations:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/ansatz.cpp
       :language: cpp
-      :start-after: // start-cell-access
-      :end-before: // end-cell-access
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+Accessing ansatz data
+---------------------
+
+The :class:`~qdk_chemistry.data.Ansatz` class provides methods to access its components and perform calculations:
 
 .. tab:: Python API
 
@@ -63,6 +56,13 @@ The :class:`~qdk_chemistry.data.Ansatz` class provides methods to access its com
       :language: python
       :start-after: # start-cell-access
       :end-before: # end-cell-access
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/ansatz.cpp
+      :language: cpp
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
 
 
 Further reading
