@@ -250,4 +250,111 @@ Examples:
   });
 }
 
+/**
+ * @brief Add on_remote() method to algorithm class for remote execution
+ *
+ * This template function adds the on_remote() method to any algorithm class,
+ * enabling fluent API for remote execution:
+ * create("algo").on_remote("ssh")
+ *
+ * @tparam PyClass The pybind11 class type (e.g., py::class_<ScfSolver, ...>)
+ * @param py_class Reference to the pybind11 class object
+ *
+ * Example usage:
+ * @code
+ * py::class_<ScfSolver, ...> scf_solver(m, "ScfSolver");
+ * // ... bind other methods ...
+ * add_on_remote_method(scf_solver);
+ * @endcode
+ */
+template <typename PyClass>
+void add_on_remote_method(PyClass& py_class) {
+  py_class.def(
+      "on_remote",
+      [](py::object self, py::object remote, py::kwargs config) {
+        py::module_ remote_module = py::module_::import("qdk_chemistry.remote");
+        py::object RemoteAlgorithmProxy =
+            remote_module.attr("RemoteAlgorithmProxy");
+        // Call RemoteAlgorithmProxy(self, remote, **config)
+        py::tuple args = py::make_tuple(self, remote);
+        return RemoteAlgorithmProxy(*args, **config);
+      },
+      py::arg("remote"),
+      R"(
+Configure this algorithm to execute on a remote system.
+
+This method returns a proxy that intercepts the run() call and executes
+the algorithm on a remote system instead of locally.
+
+Args:
+    remote: Either a backend name (str) like "ssh" or "local",
+        or a pre-configured RemoteBackend instance.
+    **config: Backend-specific configuration options.
+
+Returns:
+    RemoteAlgorithmProxy: A proxy that executes on the remote system.
+
+Examples:
+    >>> algo = create("scf_solver").on_remote("ssh")
+    >>> result = algo.run(structure, charge=0, spin_multiplicity=1)
+
+    >>> # With configuration
+    >>> algo = create("scf_solver").on_remote("ssh", host="compute-server.example.com")
+
+    >>> # With pre-configured backend
+    >>> from qdk_chemistry.remote import create_remote
+    >>> ssh_remote = create_remote("ssh", host="compute-server.example.com")
+    >>> algo = create("scf_solver").on_remote(ssh_remote)
+
+)");
+}
+
+/**
+ * @brief Add a hash() method to an algorithm class binding.
+ *
+ * Adds hash(*args, **kwargs) -> str that computes a deterministic content
+ * hash for a run() call with the same inputs.  Delegates to
+ * qdk_chemistry.algorithms.hashing.run_content_hash.
+ *
+ * @tparam PyClass The pybind11 class type
+ * @param py_class Reference to the pybind11 class object
+ */
+template <typename PyClass>
+void add_hash_method(PyClass& py_class) {
+  py_class.def(
+      "hash",
+      [](py::object self, py::args args, py::kwargs kwargs) -> std::string {
+        py::module_ hashing_module =
+            py::module_::import("qdk_chemistry.algorithms.hashing");
+        py::object run_content_hash = hashing_module.attr("run_content_hash");
+        py::object type_name = self.attr("type_name")();
+        py::object name = self.attr("name")();
+        py::object settings = self.attr("settings")();
+        // Build positional args: (type_name, name, settings, *args)
+        py::tuple base_args = py::make_tuple(type_name, name, settings);
+        py::tuple all_args = py::tuple(base_args.size() + args.size());
+        for (size_t i = 0; i < base_args.size(); ++i)
+          all_args[i] = base_args[i];
+        for (size_t i = 0; i < args.size(); ++i)
+          all_args[base_args.size() + i] = args[i];
+        py::object result = run_content_hash(*all_args, **kwargs);
+        return result.cast<std::string>();
+      },
+      R"(
+Compute a deterministic content hash for a run() call with these inputs.
+
+Same signature as run() but returns a hex hash string instead of
+executing the algorithm.  Identical inputs produce identical hashes.
+
+Returns:
+    str: 16-character hex content hash.
+
+Examples:
+    >>> scf = create("scf_solver", "pyscf")
+    >>> h = scf.hash(structure, 0, 1, "sto-3g")
+    >>> print(h)  # e.g. "a1b2c3d4e5f67890"
+
+)");
+}
+
 }  // namespace qdk::chemistry::python

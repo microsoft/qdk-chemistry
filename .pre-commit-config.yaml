@@ -87,6 +87,7 @@ repos:
   hooks:
   - id: markdownlint
     args: [--fix, --disable=line-length, --disable=MD024, --disable=MD029, --disable=MD033]
+    exclude: agent_configs/
     files: &all_md >
       (?x)^(
         .*\.md$|
