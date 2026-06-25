@@ -1,8 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "qdk-chemistry",
-  "version-string": "1.1.0",
-  "description": "Quantum Development Kit - Chemistry Library (Windows build dependencies)",
+  "description": "Quantum Development Kit - Chemistry Library build dependencies",
   "dependencies": [
     "eigen3",
     {
