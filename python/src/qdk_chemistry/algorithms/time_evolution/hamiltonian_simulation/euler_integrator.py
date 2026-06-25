@@ -205,19 +205,28 @@ class EulerIntegrator(HamiltonianSimulation):
 
         return UnitaryRepresentation(container=combined_container)
 
-    def get_circuit(self) -> Circuit:
-        """Get the evolution circuit generated during algorithm execution.
+    def build_evolution_circuit(
+        self,
+        hamiltonian: TimeDependentQubitHamiltonian,
+        state_prep: Circuit,
+    ) -> Circuit:
+        """Build the evolution circuit without executing it.
+
+        Constructs the combined state-preparation + time-evolution circuit
+        using the configured propagator, evolution builder, and circuit mapper.
+        This is analogous to ``QpeCircuitBuilder.run()`` — it produces a
+        circuit suitable for resource estimation or further analysis without
+        requiring a circuit executor.
+
+        Args:
+            hamiltonian: Time-dependent Hamiltonian.
+            state_prep: Circuit that prepares the initial state.
 
         Returns:
-            The evolution circuit.
-
-        Raises:
-            ValueError: If no evolution circuit has been generated.
+            The combined state-prep + evolution circuit.
 
         """
-        if self._evolution_circuit is not None:
-            return self._evolution_circuit
-        raise ValueError("No evolution circuit has been generated. Please run the algorithm first.")
+        return self._build_evolution_circuit(hamiltonian, state_prep)
 
     def name(self) -> str:
         """Return ``euler_integrator`` as the algorithm name."""

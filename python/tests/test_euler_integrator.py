@@ -174,12 +174,6 @@ class TestEulerIntegratorValidation:
         with pytest.raises(ValueError, match="same number of qubits"):
             algo.run(td, observables=[obs3], state_prep=self._dummy_state_prep())
 
-    def test_get_circuit_before_run_raises(self):
-        """get_circuit() before run() should raise ValueError."""
-        algo = EulerIntegrator()
-        with pytest.raises(ValueError, match="No evolution circuit"):
-            algo.get_circuit()
-
     def test_dt_exceeds_total_time_raises(self):
         """Dt > total_time should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
