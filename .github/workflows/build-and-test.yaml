@@ -251,8 +251,14 @@ jobs:
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/macos.cmake"
+        else
+          TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake"
+        fi
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
+          -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
