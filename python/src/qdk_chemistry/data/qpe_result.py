@@ -26,7 +26,7 @@ class QpeResult(DataClass):
     _data_type_name = "qpe_result"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,

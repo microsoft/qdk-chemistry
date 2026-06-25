@@ -264,7 +264,8 @@ When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :
 
 where :math:`\lambda = \sum_j |\alpha_j|` is the L1 norm of the Hamiltonian coefficients.
 
-For qubitization, ``branching`` is a single-element tuple and ``resolved_energy`` is ``None``.
+To use qubitization QPE, the :ref:`LCU builder <lcu-builder>` must be configured with ``quantum_walk=True``.
+This wraps the raw block encoding in a quantum walk operator :math:`W = (2|0\rangle\langle 0| - I) \cdot B[H]`, which is required for the :math:`\arccos` eigenvalue-phase relationship.
 
 .. tab:: Python API (Qubitization configuration)
 

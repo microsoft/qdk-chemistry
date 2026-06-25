@@ -107,6 +107,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             _hash_float(h, term.angle)
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
+        _hash_float(h, self.scale)
 
     @property
     def type(self) -> str:
