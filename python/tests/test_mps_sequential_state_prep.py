@@ -687,6 +687,81 @@ class TestMPSSequentialQualtranCostComparison:
         assert counts["cczCount"] <= qualtran_cost["toffoli"] * 10
 
 
+class TestMPSSequentialFastEstimation:
+    """Test that fast resource estimation mode produces similar results to normal mode."""
+
+    @pytest.mark.parametrize(
+        "tensors",
+        [_qualtran_mps_tensors, _qualtran_mps_tensors_non_zero_spin],
+        ids=["standard", "non_zero_spin"],
+    )
+    def test_fast_vs_normal_resource_estimates(self, tensors):
+        """Verify fast estimation produces similar qubit and Toffoli counts as normal mode."""
+        mps = MPSWavefunction(tensors)
+
+        # Normal mode (full CSD decomposition per site)
+        algo_normal = MPSSequentialStatePreparation()
+        circuit_normal = algo_normal.run(mps)
+        result_normal = circuit_normal.estimate()
+        counts_normal = result_normal.logical_counts
+
+        # Fast mode (one representative per shape group)
+        algo_fast = MPSSequentialStatePreparation()
+        algo_fast.settings().update("fast_resource_estimation", True)
+        circuit_fast = algo_fast.run(mps)
+        result_fast = circuit_fast.estimate()
+        counts_fast = result_fast.logical_counts
+
+        # Qubit counts should be identical (same register layout)
+        assert counts_fast["numQubits"] == counts_normal["numQubits"]
+
+        # Toffoli counts should be close — fast mode uses dummy angles of the
+        # correct array dimensions, so QROAM table sizes and rotation counts match.
+        # Allow up to 30% deviation since shape grouping may merge sites with
+        # slightly different effective dimensions.
+        normal_ccz = counts_normal["cczCount"]
+        fast_ccz = counts_fast["cczCount"]
+        assert fast_ccz > 0
+        ratio = fast_ccz / normal_ccz
+        assert 0.9 <= ratio <= 1.1, (
+            f"Fast/normal CCZ ratio {ratio:.3f} outside [0.9, 1.1]: fast={fast_ccz}, normal={normal_ccz}"
+        )
+
+    @pytest.mark.parametrize(
+        ("num_sites", "bond_dim", "seed"),
+        [
+            (3, 2, 42),
+            (3, 4, 99),
+            (4, 2, 7),
+        ],
+    )
+    def test_fast_vs_normal_small_random_mps(self, num_sites, bond_dim, seed):
+        """Verify fast estimation agrees with normal mode on small random MPS circuits."""
+        rng = np.random.default_rng(seed)
+        mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+
+        algo_normal = MPSSequentialStatePreparation()
+        circuit_normal = algo_normal.run(mps)
+        result_normal = circuit_normal.estimate()
+        counts_normal = result_normal.logical_counts
+
+        algo_fast = MPSSequentialStatePreparation()
+        algo_fast.settings().update("fast_resource_estimation", True)
+        circuit_fast = algo_fast.run(mps)
+        result_fast = circuit_fast.estimate()
+        counts_fast = result_fast.logical_counts
+
+        assert counts_fast["numQubits"] == counts_normal["numQubits"]
+
+        normal_ccz = counts_normal["cczCount"]
+        fast_ccz = counts_fast["cczCount"]
+        assert fast_ccz > 0
+        ratio = fast_ccz / normal_ccz
+        assert 0.9 <= ratio <= 1.1, (
+            f"Fast/normal CCZ ratio {ratio:.3f} outside [0.9, 1.1]: fast={fast_ccz}, normal={normal_ccz}"
+        )
+
+
 # =============================================================================
 # Helper functions for Q# literal generation
 # =============================================================================

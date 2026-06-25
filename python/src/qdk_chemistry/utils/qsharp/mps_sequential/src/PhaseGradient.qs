@@ -7,7 +7,7 @@ import Std.Arrays.*;
 import Std.Arithmetic.RippleCarryCGIncByLE;
 import Std.Canon.ApplyQFT;
 
-export PreparePhaseGradientState, RyViaPhaseGradient, RzViaPhaseGradient;
+export PreparePhaseGradientState, RyViaPhaseGradient;
 
 /// # Summary
 /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.

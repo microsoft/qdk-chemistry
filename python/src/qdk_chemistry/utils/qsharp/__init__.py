@@ -8,9 +8,9 @@ import re
 from pathlib import Path
 
 import qdk
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 
-__all__ = ["QSHARP_UTILS"]
+__all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
 _QS_FILES = [
     Path(__file__).parent / "StatePreparation.qs",
@@ -24,20 +24,42 @@ _QS_FILES = [
 
 _MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
 
+_state: dict[str, str | None] = {"mode": None}  # "base", "mps", or None
+
+
+def _ensure_base_session():
+    """Ensure interpreter is in Base mode with utility Q# files loaded."""
+    if _state["mode"] == "base":
+        return
+    if _state["mode"] == "mps":
+        qsharp.init(target_profile=TargetProfile.Base)
+    try:
+        _ = qdk.code.QDKChemistry.Utils.StatePreparation
+    except AttributeError:
+        code = "\n".join(f.read_text() for f in _QS_FILES)
+        qsharp.eval(code)
+    _state["mode"] = "base"
+
+
+def _ensure_mps_session():
+    """Ensure interpreter has MPS project loaded (Unrestricted) plus utility files."""
+    if _state["mode"] == "mps":
+        return
+    qsharp.init(project_root=_MPS_PROJECT_ROOT)
+    code = "\n".join(f.read_text() for f in _QS_FILES)
+    qsharp.eval(code)
+    _state["mode"] = "mps"
+
 
 def get_qsharp_utils():
     """Returns the Q# namespace for chemistry operations (lazy-loaded).
 
     Initializes the global Q# interpreter with the MPS project on first call,
-    then loads additional Q# utility files via eval.
+    then loads additional Q# utility files via eval. Use this when the MPS
+    project must be available (e.g. for resource estimation of MPS circuits).
     """
-    try:
-        return qdk.code.QDKChemistry.Utils
-    except AttributeError:
-        qsharp.init(project_root=_MPS_PROJECT_ROOT)
-        code = "\n".join(f.read_text() for f in _QS_FILES)
-        qsharp.eval(code)
-        return qdk.code.QDKChemistry.Utils
+    _ensure_mps_session()
+    return qdk.code.QDKChemistry.Utils
 
 
 class _QSharpUtilsProxy:
@@ -53,13 +75,13 @@ class _QSharpUtilsProxy:
 
         """
         if name == "MPSSequential":
-            get_qsharp_utils()  # ensure initialized
+            _ensure_mps_session()
             return qdk.code.MPSSequential
         if name == "MPSSparse":
-            get_qsharp_utils()  # ensure initialized
+            _ensure_mps_session()
             return qdk.code.MPSSparse
-        utils = get_qsharp_utils()
-        return getattr(utils, name)
+        _ensure_base_session()
+        return getattr(qdk.code.QDKChemistry.Utils, name)
 
 
 QSHARP_UTILS = _QSharpUtilsProxy()
