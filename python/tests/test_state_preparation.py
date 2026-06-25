@@ -134,7 +134,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
         0
     ]["components"]
     assert all(child["gate"] == "X" for child in x_components)
-    # JW qubit order: [α₀, α₁, β₀, β₁] = [1, 1, 0, 1] → X on q[0], q[2], and q[3]
+    # Bitstrings: [α₀, α₁, β₀, β₁] = [1, 1, 0, 1] → X on q[0], q[1], and q[3]
     x_qubit_targets = sorted(comp["targets"][0]["qubit"] for comp in x_components)
     assert x_qubit_targets == [0, 1, 3]
 

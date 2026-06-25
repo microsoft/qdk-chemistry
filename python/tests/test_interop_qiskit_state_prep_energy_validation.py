@@ -194,5 +194,5 @@ def test_single_reference_state_basic(bitstring):
     test_cls = SparseIsometryGF2XStatePreparation()
     circuit = test_cls._prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
-    expected = "".join(str(b) for b in bitstring)
+    expected = "".join(str(b) for b in bitstring[::-1])  # Reverse for Qiskit's little-endian format
     assert result_bitstring == expected, f"Expected {expected}, got {result_bitstring}"
