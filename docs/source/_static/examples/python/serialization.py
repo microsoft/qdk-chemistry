@@ -18,7 +18,7 @@ from qdk_chemistry.data import (
     ModelOrbitals,
 )
 
-# Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
+# Load structure from inline XYZ file (the data uses Angstrom, which is converted to Bohr internally)
 structure = Structure.from_xyz("""\
 2
 H2 molecule

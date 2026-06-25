@@ -26,7 +26,7 @@ int main() {
   // ---------------------------------------------------------------------------
   // docs:xyz ../data/para_benzyne.structure.xyz
   // start-cell-structure
-  // Load para-benzyne structure from XYZ file
+  // Load para-benzyne structure from inline XYZ file
   auto structure =
       std::make_shared<data::Structure>(data::Structure::from_xyz(R"(10
 para-Benzyne

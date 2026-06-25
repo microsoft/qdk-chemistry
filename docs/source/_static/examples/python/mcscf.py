@@ -57,7 +57,7 @@ mcscf.settings().set("max_cycle_macro", 50)
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import compute_valence_space_parameters
 
-# Load nitrogen molecule structure
+# Load nitrogen molecule structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 

@@ -11,8 +11,8 @@
 using namespace qdk::chemistry::data;
 
 int main() {
-  // Load structure from XYZ file (the file uses Angstrom, converted to Bohr
-  // internally)
+  // Load structure from inline XYZ file (the data uses Angstrom, converted to
+  // Bohr internally)
   Structure structure_from_file = Structure::from_xyz(R"(2
 H2 molecule
 H    0.000000    0.000000    0.000000

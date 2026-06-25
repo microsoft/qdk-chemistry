@@ -29,7 +29,7 @@ qubit_mapper.settings().set("integral_threshold", 1e-12)
 
 from qdk_chemistry.data import Structure
 
-# Read a molecular structure from XYZ file
+# Read a molecular structure from inline XYZ file
 structure = Structure.from_xyz("""\
 3
 Water molecule

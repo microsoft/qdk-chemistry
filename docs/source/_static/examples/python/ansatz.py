@@ -11,7 +11,7 @@
 from qdk_chemistry.data import Ansatz, Structure
 from qdk_chemistry.algorithms import create
 
-# Load H2 molecule structure from XYZ file
+# Load H2 molecule structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 H2 molecule

@@ -13,7 +13,7 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
 int main() {
-  // Load H2 structure from XYZ file
+  // Load H2 structure from inline XYZ file
   auto structure = Structure::from_xyz(R"(2
 H2 molecule
 H    0.000000    0.000000    0.000000

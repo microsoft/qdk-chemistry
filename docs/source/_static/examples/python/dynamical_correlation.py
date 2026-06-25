@@ -27,7 +27,7 @@ mp2_calculator = create("dynamical_correlation_calculator")
 
 from qdk_chemistry.data import Ansatz, Structure
 
-# Load H2 structure from XYZ file
+# Load H2 structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 H2 molecule

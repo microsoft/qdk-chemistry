@@ -27,7 +27,7 @@ hamiltonian_constructor->settings().set("eri_method", "direct");
 // --------------------------------------------------------------------------------------------
 // docs:xyz ../data/h2.structure.xyz
 // start-cell-construct
-// Load structure from XYZ file
+// Load structure from inline XYZ file
 auto structure = std::make_shared<Structure>(Structure::from_xyz(R"(2
 H2 molecule
 H    0.000000    0.000000    0.000000

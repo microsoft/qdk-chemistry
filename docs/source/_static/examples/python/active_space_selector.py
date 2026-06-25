@@ -29,7 +29,7 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 # start-cell-run
 from qdk_chemistry.data import Structure
 
-# Load a molecular structure (water molecule) from XYZ file
+# Load a molecular structure (water molecule) from inline XYZ file
 structure = Structure.from_xyz("""\
 3
 Water molecule

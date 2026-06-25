@@ -32,7 +32,7 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 ################################################################################
 # docs:xyz ../data/h2.structure.xyz
 # start-cell-construct
-# Load a structure from XYZ file
+# Load a structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 H2 molecule

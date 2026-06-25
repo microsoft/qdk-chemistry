@@ -14,7 +14,7 @@ using namespace qdk::chemistry::algorithms;
 
 int main() {
   // Obtain orbitals from a SCF calculation
-  // Load H2 molecule from XYZ file
+  // Load H2 molecule from inline XYZ file
   auto structure = Structure::from_xyz(R"(2
 H2 molecule
 H    0.000000    0.000000    0.000000
