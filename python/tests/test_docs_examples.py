@@ -151,22 +151,21 @@ class TestExampleScripts(unittest.TestCase):
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
-        tmpdir = TemporaryDirectory(dir=example_file.parent.parent)
-        result = subprocess.run(
-            [sys.executable, str(example_file)],
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=360,
-            cwd=tmpdir.name,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-        )
+        with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            result = subprocess.run(
+                [sys.executable, str(example_file)],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=360,
+                cwd=tmpdir,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
 
-        if result.returncode == 0:
-            tmpdir.cleanup()
-        else:
-            self.fail(f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+            assert result.returncode == 0, (
+                f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
 
 
 # Dynamically create test methods for each example file
