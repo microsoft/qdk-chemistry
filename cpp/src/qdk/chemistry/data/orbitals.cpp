@@ -1327,7 +1327,11 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     try {
       H5::Group metadata_group = group.openGroup("metadata");
       H5::DataSet ds = metadata_group.openDataSet("is_restricted");
-      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
+      // hbool_t is typically unsigned int (4 bytes) while C++ bool is 1 byte.
+      // Reading into a bool* with NATIVE_HBOOL is UB; stage through hbool_t.
+      hbool_t hb_restricted = 0;
+      ds.read(&hb_restricted, H5::PredType::NATIVE_HBOOL);
+      restricted = (hb_restricted != 0);
     } catch (const H5::Exception&) {
       throw std::invalid_argument(
           "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
