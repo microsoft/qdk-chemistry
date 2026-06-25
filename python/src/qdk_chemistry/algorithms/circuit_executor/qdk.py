@@ -24,13 +24,20 @@ except ImportError:
     from qsharp._simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
+from qdk_chemistry.data import (
+    Circuit,
+    CircuitExecutorData,
+    QuantumErrorProfile,
+    Settings,
+)
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
 
-def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, int] | None]:
+def _process_raw_results(
+    raw_results: list,
+) -> tuple[dict[str, int], dict[str, int] | None]:
     """Convert raw measurement results into bitstring counts, separating clean and lost shots.
 
     Reorders bits to Little Endian convention and uses 'L' to mark lost qubits.
@@ -53,7 +60,9 @@ def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, i
         for x in reversed(one_run):
             label = str(x)
             if label not in _map:
-                raise ValueError(f"Unexpected measurement result '{label}'; expected one of {set(_map)}")
+                raise ValueError(
+                    f"Unexpected measurement result '{label}'; expected one of {set(_map)}"
+                )
             c = _map[label]
             if c == "L":
                 has_loss = True
@@ -74,9 +83,15 @@ class QdkFullStateSimulatorSettings(Settings):
         """Initialize QDK Full State Simulator settings."""
         super().__init__()
         self._set_default(
-            "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
+            "type",
+            "string",
+            "cpu",
+            "Type of simulator to use: 'cpu', 'gpu', or 'clifford'",
+            ["cpu", "gpu", "clifford"],
         )
-        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
+        self._set_default(
+            "seed", "int", 42, "Random seed for simulation reproducibility"
+        )
 
 
 class QdkFullStateSimulator(CircuitExecutor):
@@ -117,12 +132,25 @@ class QdkFullStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-        qir = circuit.get_qir()
-        Logger.debug("QIR compiled")
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
-        raw_results = run_qir(
-            qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
-        )
+        if circuit._qsharp_factory is not None:  # noqa: SLF001
+            raw_results = qsharp.run(
+                circuit._qsharp_factory.program,  # noqa: SLF001
+                shots,
+                *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
+                noise=noise_config,
+                seed=self._settings.get("seed"),
+            )
+        else:
+            qir = circuit.get_qir()
+            Logger.debug("QIR compiled")
+            raw_results = run_qir(
+                qir,
+                shots=shots,
+                noise=noise_config,
+                seed=self._settings.get("seed"),
+                type=self._settings.get("type"),
+            )
         bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
@@ -144,7 +172,9 @@ class QdkSparseStateSimulatorSettings(Settings):
         """Initialize QDK Sparse State Simulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
+        self._set_default(
+            "seed", "int", 42, "Random seed for simulation reproducibility"
+        )
 
 
 class QdkSparseStateSimulator(CircuitExecutor):

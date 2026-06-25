@@ -19,6 +19,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Structure,
     Wavefunction,
+    FactorizedHamiltonianContainer
 )
 
 
@@ -249,62 +250,60 @@ def create_test_ansatz(num_orbitals: int = 2):
     return Ansatz(hamiltonian, wavefunction)
 
 
-def create_random_dfthc_data(
-    num_orbitals: int = 4,
+def create_random_factorized_hamiltonian(
+    num_orbitals: int = 2,
     num_ranks: int = 2,
-    num_bases: int = 2,
-    num_copies: int = 2,
+    num_bases: int = 1,
+    num_copies: int = 1,
+    *,
     seed: int = 42,
-    core_energy: float = 0.0,
-) -> dict:
-    """Create random DFTHC factorization data for testing.
-
-    Generates random DFTHC-like factorization arrays with physically sensible
-    structure: symmetric h1_majorana, row-normalized U matrices, and small W/WB
-    amplitudes.  Returns a dict suitable for constructing a
-    DFTHCHamiltonianContainer once the C++ binding is available.
+):
+    """Create a random FactorizedHamiltonianContainer for testing.
 
     Args:
         num_orbitals: Number of spatial orbitals (N).
         num_ranks: Number of ranks (R).
-        num_bases: Number of bases per rank (B).
-        num_copies: Number of copies per rank (C).
+        num_bases: Number of bases (B).
+        num_copies: Number of copies (C).
         seed: Random seed for reproducibility.
-        core_energy: Nuclear repulsion energy.
 
     Returns:
-        Dict with keys: num_orbitals, num_ranks, num_bases, num_copies,
-        h1_majorana, basis_vectors, two_body_weights, identity_weight,
-        core_energy.
+        FactorizedHamiltonianContainer from C++ pybind11.
 
     """
     rng = np.random.default_rng(seed)
     n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
 
-    # Symmetric one-body matrix (Majorana-adjusted)
-    raw = rng.standard_normal((n, n)) * 0.3
-    h1_majorana = (raw + raw.T) / 2
+    # Symmetric one-body integrals
+    h1 = rng.standard_normal((n, n))
+    h1 = (h1 + h1.T) / 2
 
-    # Row-normalized U matrices: shape [R, B, N]
-    basis_vectors = rng.standard_normal((r, b, n))
-    norms = np.linalg.norm(basis_vectors, axis=2, keepdims=True)
-    norms = np.where(norms > 1e-12, norms, 1.0)
-    basis_vectors = basis_vectors / norms
+    # Random orthogonal basis vectors (U), flattened [R*B*N]
+    u_matrices = np.zeros(r * b * n)
+    for ri in range(r):
+        for bi in range(b):
+            v = rng.standard_normal(n)
+            v /= np.linalg.norm(v)
+            u_matrices[ri * b * n + bi * n : ri * b * n + (bi + 1) * n] = v
 
-    # Two-body weights: shape [R, B, C]
-    two_body_weights = rng.standard_normal((r, b, c)) * 0.1
+    # Two-body weights W [R*B*C]
+    w_matrices = rng.standard_normal(r * b * c)
 
-    # Identity weights: shape [R, C]
-    identity_weight = rng.standard_normal((r, c)) * 0.1
+    # Identity weights WB [R, C]
+    wb_matrix = rng.standard_normal((r, c))
 
-    return {
-        "num_orbitals": n,
-        "num_ranks": r,
-        "num_bases": b,
-        "num_copies": c,
-        "h1_majorana": h1_majorana,
-        "basis_vectors": basis_vectors,
-        "two_body_weights": two_body_weights,
-        "identity_weight": identity_weight,
-        "core_energy": core_energy,
-    }
+    orbitals = create_test_orbitals(n)
+    inactive_fock = np.zeros((n, n))
+
+    return FactorizedHamiltonianContainer(
+        r,
+        b,
+        c,
+        0.0,
+        u_matrices,
+        w_matrices,
+        h1,
+        wb_matrix,
+        inactive_fock,
+        orbitals,
+    )

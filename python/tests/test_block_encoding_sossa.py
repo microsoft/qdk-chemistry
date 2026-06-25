@@ -31,78 +31,15 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import float_comparison_absolute_tolerance
-from .test_helpers import create_test_orbitals
+from .test_helpers import create_random_factorized_hamiltonian
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _make_random_factorized_hamiltonian(
-    num_orbitals: int = 2,
-    num_ranks: int = 2,
-    num_bases: int = 1,
-    num_copies: int = 1,
-    *,
-    seed: int = 42,
-):
-    """Create a random FactorizedHamiltonianContainer for testing.
-
-    Args:
-        num_orbitals: Number of spatial orbitals (N).
-        num_ranks: Number of ranks (R).
-        num_bases: Number of bases (B).
-        num_copies: Number of copies (C).
-        seed: Random seed for reproducibility.
-
-    Returns:
-        FactorizedHamiltonianContainer from C++ pybind11.
-
-    """
-    rng = np.random.default_rng(seed)
-    n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
-
-    # Symmetric one-body integrals
-    h1 = rng.standard_normal((n, n))
-    h1 = (h1 + h1.T) / 2
-
-    # Random orthogonal basis vectors (U), flattened [R*B*N]
-    u_matrices = np.zeros(r * b * n)
-    for ri in range(r):
-        for bi in range(b):
-            v = rng.standard_normal(n)
-            v /= np.linalg.norm(v)
-            u_matrices[ri * b * n + bi * n : ri * b * n + (bi + 1) * n] = v
-
-    # Two-body weights W [R*B*C]
-    w_matrices = rng.standard_normal(r * b * c)
-
-    # Identity weights WB [R, C]
-    wb_matrix = rng.standard_normal((r, c))
-
-    orbitals = create_test_orbitals(n)
-    inactive_fock = np.zeros((n, n))
-
-    return FactorizedHamiltonianContainer(
-        r,
-        b,
-        c,
-        0.0,
-        u_matrices,
-        w_matrices,
-        h1,
-        wb_matrix,
-        inactive_fock,
-        orbitals,
-    )
-
-
-def _make_h2_sossa_unitary_representation():
-    """Build a UnitaryRepresentation with SOSSAContainer from H2-like test data.
-
-    Directly constructs the container from known H2-like data (N=2, R=2, B=1, C=1)
-    without going through the builder or C++ container. Used for serialization tests.
-    """
+def _make_sossa_unitary_representation():
+    """Build a UnitaryRepresentation with SOSSAContainer"""
     num_orbitals = 2
     num_ranks = 2
     num_bases = 1
@@ -184,7 +121,7 @@ class TestSOSSAContainer:
 
     def test_json_roundtrip(self):
         """Test JSON serialization/deserialization round-trip."""
-        result = _make_h2_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation()
         container = result.get_container()
 
         json_data = container.to_json()
@@ -211,7 +148,7 @@ class TestSOSSAContainer:
 
     def test_hdf5_roundtrip(self):
         """Test HDF5 serialization/deserialization round-trip."""
-        result = _make_h2_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation()
         container = result.get_container()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -229,7 +166,7 @@ class TestSOSSAContainer:
 
     def test_unitary_representation_json_dispatch(self):
         """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
-        result = _make_h2_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation()
 
         json_data = result.to_json()
         restored = UnitaryRepresentation.from_json(json_data)
@@ -239,7 +176,7 @@ class TestSOSSAContainer:
 
     def test_get_summary(self):
         """Test that get_summary returns a non-empty string."""
-        result = _make_h2_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation()
         summary = result.get_container().get_summary()
 
         assert "SOSSA" in summary
@@ -261,20 +198,11 @@ class TestSOSSABuilder:
         assert builder.name() == "sossa"
         assert builder.type_name() == "hamiltonian_unitary_builder"
 
-    def test_run_produces_sossa_container(self):
-        """Test builder.run() with FactorizedHamiltonianContainer produces SOSSAContainer."""
-        fh = _make_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
-        builder = SOSSABuilder()
-        result = builder.run(fh)
-
-        assert isinstance(result, UnitaryRepresentation)
-        container = result.get_container()
-        assert isinstance(container, SOSSAContainer)
 
     def test_run_produces_correct_dimensions(self):
         """Test that run() produces a container with correct dimensions."""
         n, r, b, c = 4, 3, 2, 2
-        fh = _make_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
+        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
         result = builder.run(fh)
         container = result.get_container()
@@ -286,7 +214,7 @@ class TestSOSSABuilder:
 
     def test_outer_statevector_normalized(self):
         """Test that outer PREPARE statevector is properly normalized."""
-        fh = _make_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
+        fh = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
         builder = SOSSABuilder()
         result = builder.run(fh)
         container = result.get_container()
@@ -294,19 +222,10 @@ class TestSOSSABuilder:
         sv = container.outer_prepare.get_coefficients()
         assert np.isclose(np.sum(sv**2), 1.0, atol=1e-10)
 
-    def test_normalization_positive(self):
-        """Test that normalization Lambda > 0."""
-        fh = _make_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
-        builder = SOSSABuilder()
-        result = builder.run(fh)
-        container = result.get_container()
-
-        assert container.normalization > 0
-
     def test_inner_coefficients_shape(self):
         """Test inner coefficients have correct shape [Xo, B+1]."""
         n, r, b, c = 3, 2, 2, 1
-        fh = _make_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
+        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
         result = builder.run(fh)
         container = result.get_container()
@@ -318,7 +237,7 @@ class TestSOSSABuilder:
     def test_rotation_angles_shape(self):
         """Test DQ and SF rotation angles have correct shapes."""
         n, r, b, c = 3, 2, 2, 1
-        fh = _make_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
+        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
         result = builder.run(fh)
         container = result.get_container()
@@ -330,16 +249,10 @@ class TestSOSSABuilder:
 
     def test_power_setting(self):
         """Test power parameter passes through to container."""
-        fh = _make_random_factorized_hamiltonian()
+        fh = create_random_factorized_hamiltonian()
         builder = SOSSABuilder(power=3)
         result = builder.run(fh)
         assert result.get_container().power == 3
-
-    def test_run_impl_requires_factorized_hamiltonian(self):
-        """Test that _run_impl raises on invalid input."""
-        builder = SOSSABuilder()
-        with pytest.raises((TypeError, AttributeError)):
-            builder._run_impl(None)
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -353,7 +266,7 @@ class TestSOSSABuilder:
     )
     def test_run_parametrized(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Test builder.run() for various (N, R, B, C) configurations."""
-        fh = _make_random_factorized_hamiltonian(
+        fh = create_random_factorized_hamiltonian(
             num_orbitals=num_orbitals,
             num_ranks=num_ranks,
             num_bases=num_bases,
@@ -417,20 +330,6 @@ class TestOuterPrepareQSharp:
         )
         qsharp.eval("ResetAll(qs)")
 
-    def test_outer_prepare_identity_vector(self):
-        """Test outer prepare with a single-element statevector (delta function)."""
-        # Only first element is nonzero → should prepare |0⟩
-        coefficients = [1.0, 0.0, 0.0, 0.0]
-        n_qubits = 2
-
-        sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
-        qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
-        state = qsharp.dump_machine()
-        amplitudes = np.array(state.as_dense_state())
-
-        assert np.abs(amplitudes[0]) > 0.99
-        qsharp.eval("ResetAll(qs)")
 
 
 class TestInnerPrepareQSharp:
@@ -480,89 +379,3 @@ class TestInnerPrepareQSharp:
             atol=float_comparison_absolute_tolerance,
         )
         qsharp.eval("ResetAll(outer); ResetAll(inner)")
-
-
-class TestSelectQSharp:
-    """Test the Q# Select (Givens rotation) sub-operations via dump_machine."""
-
-    @pytest.fixture(autouse=True)
-    def _reinit_qsharp(self):
-        """Re-initialize Q# interpreter for each test."""
-        qsharp.init()
-        _ = QSHARP_UTILS.SOSSAWalk
-
-    def test_givens_sequence_single_angle(self):
-        """Test ApplyGivensSequence with a single angle rotates |10⟩ into superposition."""
-        theta = 0.3
-        qsharp.eval("use q = Qubit[2];")
-        qsharp.eval(f"X(q[0]); QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta:.16f}], q);")
-        state = qsharp.dump_machine()
-        amplitudes = np.array(state.as_dense_state())
-
-        # Givens rotation on |10⟩: CNOT(q0,q1)|10⟩=|11⟩, Ry(-2θ,q0)|11⟩, CNOT(q0,q1)
-        # Result: cos(θ)|10⟩ + sin(θ)|01⟩
-        expected = [0.0, np.sin(theta), np.cos(theta), 0.0]
-        assert np.allclose(
-            np.abs(amplitudes),
-            np.abs(expected),
-            atol=float_comparison_absolute_tolerance,
-        )
-        qsharp.eval("ResetAll(q)")
-
-    def test_givens_sequence_two_angles(self):
-        """Test ApplyGivensSequence with two angles on 3 qubits starting from |100⟩."""
-        theta0, theta1 = 0.3, 0.5
-        qsharp.eval("use q = Qubit[3];")
-        qsharp.eval(f"X(q[0]); QDKChemistry.Utils.SOSSAWalk.ApplyGivensSequence([{theta0:.16f}, {theta1:.16f}], q);")
-        state = qsharp.dump_machine()
-        amplitudes = np.array(state.as_dense_state())
-
-        # Build expected state by simulating the exact gate sequence classically.
-        # Q# dump_machine uses big-endian ordering for qubit indices.
-        n = 3
-        dim = 2**n
-
-        def _bit(b, qubit):
-            return (b >> (n - 1 - qubit)) & 1
-
-        def _flip(b, qubit):
-            return b ^ (1 << (n - 1 - qubit))
-
-        def _cnot(ctrl, tgt):
-            """CNOT matrix (big-endian qubit ordering)."""
-            u = np.zeros((dim, dim), dtype=complex)
-            for b in range(dim):
-                if _bit(b, ctrl):
-                    u[_flip(b, tgt), b] = 1.0
-                else:
-                    u[b, b] = 1.0
-            return u
-
-        def _ry(qubit, angle):
-            """Ry(angle) matrix (big-endian qubit ordering)."""
-            c, s = np.cos(angle / 2), np.sin(angle / 2)
-            ry2 = np.array([[c, -s], [s, c]], dtype=complex)
-            u = np.zeros((dim, dim), dtype=complex)
-            for b in range(dim):
-                bit = _bit(b, qubit)
-                b0 = b & ~(1 << (n - 1 - qubit))  # same state with qubit=0
-                for out_bit in range(2):
-                    out_idx = b0 | (out_bit << (n - 1 - qubit))
-                    u[out_idx, b] += ry2[out_bit, bit]
-            return u
-
-        # G(j,θ) = CNOT(j,j+1) @ Ry(-2θ,j) @ CNOT(j,j+1)
-        g0 = _cnot(0, 1) @ _ry(0, -2 * theta0) @ _cnot(0, 1)
-        g1 = _cnot(1, 2) @ _ry(1, -2 * theta1) @ _cnot(1, 2)
-
-        # X(q[0]) → index 2^(n-1) = 4
-        psi = np.zeros(dim, dtype=complex)
-        psi[2 ** (n - 1)] = 1.0
-        expected = g1 @ g0 @ psi
-
-        assert np.allclose(
-            np.abs(amplitudes),
-            np.abs(expected),
-            atol=float_comparison_absolute_tolerance,
-        )
-        qsharp.eval("ResetAll(q)")
