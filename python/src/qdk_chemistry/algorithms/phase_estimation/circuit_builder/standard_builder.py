@@ -178,7 +178,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
             "statePrep": state_prep_op,
-            "controlledUnitary": ctrl_unitary_ops,
+            "controlledEvolutions": ctrl_unitary_ops,
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,

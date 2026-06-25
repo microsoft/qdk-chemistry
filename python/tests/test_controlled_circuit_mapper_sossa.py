@@ -16,7 +16,6 @@ from qdk import qsharp
 from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
 from .test_helpers import create_random_factorized_hamiltonian
@@ -32,8 +31,8 @@ def _build_controlled_unitary(
     num_copies: int = 1,
     *,
     seed: int = 42,
-):
-    """Helper: build ControlledUnitary with SOSSAContainer from random factorized data."""
+) -> UnitaryRepresentation:
+    """Helper: build UnitaryRepresentation with SOSSAContainer from random factorized data."""
     fh = create_random_factorized_hamiltonian(
         num_orbitals=num_orbitals,
         num_ranks=num_ranks,
@@ -42,8 +41,7 @@ def _build_controlled_unitary(
         seed=seed,
     )
     builder = SOSSABuilder()
-    unitary_rep = builder.run(fh)
-    return ControlledUnitary(unitary=unitary_rep, control_indices=[0])
+    return builder.run(fh)
 
 
 def _make_sossa_mapper(
@@ -75,7 +73,7 @@ class TestOuterPrep:
     def test_build_outer_prep_returns_callable(self, algorithm):
         """Verify build_outer_prep produces a Q# callable for each algorithm."""
         controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.unitary.get_container()
+        container = controlled_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
         op = mapper.build_outer_prep(container)
         assert op is not None
@@ -97,7 +95,7 @@ class TestOuterPrep:
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.unitary.get_container()
+        container = controlled_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
         op = mapper.build_outer_prep(container)
 
@@ -134,7 +132,7 @@ class TestOuterPrep:
         qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
 
         controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.unitary.get_container()
+        container = controlled_unitary.get_container()
         bit_precision = 10
         mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
         op = mapper.build_outer_prep(container)
@@ -180,7 +178,7 @@ class TestInnerPrep:
 
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         controlled_unitary = _build_controlled_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
-        container = controlled_unitary.unitary.get_container()
+        container = controlled_unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
@@ -288,20 +286,19 @@ class TestSOSSAMapper:
                 return "mock"
 
         unitary_rep = UnitaryRepresentation(container=MockContainer())
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
         mapper = SOSSAMapper()
         with pytest.raises(ValueError, match="not supported"):
-            mapper.run(controlled_unitary)
+            mapper.run(unitary_rep)
 
     def test_rejects_multiple_control_qubits(self):
         """Verify SOSSAMapper raises ValueError for multiple control qubits."""
-        controlled_unitary = _build_controlled_unitary()
-        controlled_unitary = ControlledUnitary(unitary=controlled_unitary.unitary, control_indices=[0, 1])
+        unitary_rep = _build_controlled_unitary()
 
         mapper = SOSSAMapper()
+        mapper.settings().set("control_indices", [0, 1])
         with pytest.raises(ValueError, match="single control qubit"):
-            mapper.run(controlled_unitary)
+            mapper.run(unitary_rep)
 
     @pytest.mark.parametrize(
         ("outer_alg", "inner_alg", "select_alg"),
@@ -378,10 +375,9 @@ class TestSOSSAMapper:
         fh = create_random_factorized_hamiltonian()
         builder = SOSSABuilder(power=5)
         unitary_rep = builder.run(fh)
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
         mapper = SOSSAMapper()
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary_rep)
 
         params = circuit._qsharp_factory.parameter
         assert params["power"] == 5

@@ -326,3 +326,31 @@ class SOSSAContainer(BlockEncodingContainer):
             f"  Inner PREPARE: {self.inner_prepare.num_inner_qubits} qubits, {b + 1} basis entries\n"
             f"  System: {2 * n} spin-orbitals\n"
         )
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from the SOSSA walk operator phase.
+
+        For the SOSSA walk operator, QPE measures :math:`\varphi` such that:
+
+        .. math::
+
+            E = \Lambda (1 + \cos 2\pi\varphi) + E_{\text{SOS}}
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+        phi = phase_fraction % 1.0
+        return float(self.normalization * (1.0 + np.cos(2.0 * np.pi * phi)) + self.energy_shift)
+
+    def combine(self, other: "SOSSAContainer") -> "SOSSAContainer":  # type: ignore[override]
+        """Not supported for SOSSA containers.
+
+        Raises:
+            NotImplementedError: Always.
+
+        """
+        raise NotImplementedError("SOSSAContainer does not support combining containers.")

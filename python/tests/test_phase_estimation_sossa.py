@@ -2,7 +2,7 @@
 
 Tests the full pipeline:
     FactorizedHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
-    → ControlledUnitary → SOSSAMapper → Circuit → IQPE → energy
+    → SOSSAMapper → Circuit → IQPE → energy
 
 Reference: arXiv:2502.15882v1 (Low et al. 2025)
 """
@@ -26,7 +26,6 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -603,12 +602,11 @@ class TestSOSSAQPEIntegration:
         assert isinstance(container, SOSSAContainer)
 
         # Step 2: SOSSAMapper → Circuit
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         mapper = SOSSAMapper()
         mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_state"))
         mapper.settings().set("inner_prepare_algorithm", "direct")
         mapper.settings().set("select_algorithm", "direct")
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary_rep)
 
         # Verify circuit has all required components
         assert circuit._qsharp_op is not None
