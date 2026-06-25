@@ -344,9 +344,7 @@ def test_json_serialization():
     assert basis_in.get_num_atomic_orbitals() == 4
 
     # Test file-based serialization.
-    # NOTE: Use delete=False so the file handle is closed when the with-block exits, allowing C++ code to open it.
-    # On Windows the default (delete=True) keeps an exclusive lock on the file. We delete the file manually in `finally`
-    # via Path.unlink(). This pattern is used throughout the test suite.
+    # delete=False + manual unlink() avoids the Windows file lock from NamedTemporaryFile.
     # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
         filename = tmp.name

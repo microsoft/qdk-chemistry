@@ -5,26 +5,21 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# On Windows, native DLL dependencies (OpenBLAS, HDF5, etc.) may not be on the default DLL search path.
-# Register additional directories *before* any import of the C++ extension module (_core).
+# On Windows, register extra DLL directories (QDK_DLL_DIR) before importing _core.
 import os as _os
 import sys as _sys
 from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _get_version
 from pathlib import Path
 
-# Ensure UTF-8 encoding for stdout/stderr on all platforms (especially Windows).
-# Q# circuit diagrams contain special characters that cannot be encoded in Windows' default cp1252 encoding.
+# Force UTF-8 stdout/stderr; Windows' default cp1252 can't encode Q# circuit diagrams.
 if hasattr(_sys.stdout, "reconfigure"):
     _sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(_sys.stderr, "reconfigure"):
     _sys.stderr.reconfigure(encoding="utf-8")
 
 if _sys.platform == "win32":
-    # Allow users / CI to point to extra DLL directories via a semicolon-
-    # separated environment variable (e.g. the vcpkg bin directory).
-    # Note: DLLs bundled next to _core.pyd are found automatically by the
-    # Windows loader, so no add_dll_directory() is needed for those.
+    # QDK_DLL_DIR: semicolon-separated extra DLL dirs; bundled DLLs are found automatically.
     _dll_dirs = _os.environ.get("QDK_DLL_DIR", "")
     _dll_dir_handles = []
     for _d in _dll_dirs.split(";"):

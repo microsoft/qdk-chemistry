@@ -12,14 +12,13 @@ import sys
 # Uses setdefault so an explicit env override is still respected.
 os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
 
-# Ensure UTF-8 output on all platforms, especially Windows (for circuit diagrams with special characters)
+# Force UTF-8 stdout/stderr (Windows cp1252 breaks circuit diagrams).
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
 
-# Use non-interactive matplotlib backend to avoid Tk/display dependencies in tests.
-# Must be set before any matplotlib.pyplot import.
+# Non-interactive backend; must precede any matplotlib.pyplot import.
 import matplotlib
 
 matplotlib.use("Agg")

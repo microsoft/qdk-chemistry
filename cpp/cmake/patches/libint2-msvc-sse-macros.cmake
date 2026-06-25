@@ -1,16 +1,7 @@
 # libint2-msvc-sse-macros.cmake
-# Patch script to fix missing __SSE__ / __SSE2__ macro guards in libint2's
-# vector_x86.h when compiling with native MSVC cl.exe.
-#
-# MSVC on x64 always supports SSE2, but does NOT define __SSE__ or __SSE2__.
-# It does define __AVX__ / __AVX2__ when /arch:AVX2 is used.  This means the
-# AVX section (which references VectorSSEDouble) compiles, but the SSE2 section
-# that *defines* VectorSSEDouble is skipped.
-#
-# Fix: after the `#include <intrin.h>` block, add MSVC-specific macro
-# definitions so that the SSE/SSE2 guards work correctly.
-#
-# Applied via PATCH_COMMAND in FetchContent.
+# MSVC x64 supports SSE2 but doesn't define __SSE__/__SSE2__, so libint2's
+# vector_x86.h skips the SSE2 section that defines VectorSSEDouble. Patch
+# vector_x86.h to define these macros. Applied via PATCH_COMMAND in FetchContent.
 # Usage: cmake -P libint2-msvc-sse-macros.cmake  (run from libint2 source root)
 
 set(_file "libint-2.9.0/include/libint2/util/vector_x86.h")

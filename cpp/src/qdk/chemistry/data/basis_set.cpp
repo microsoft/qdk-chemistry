@@ -63,12 +63,8 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   }
 
   // unpack the tar.gz file
-  // On Windows, GNU tar (typically from Git for Windows / MSYS, which is what
-  // ends up in PATH when Git is installed) interprets paths with a colon, e.g.
-  // "C:/...", as remote host:path syntax and fails with
-  // "Cannot connect to C: resolve failed". --force-local disables that parsing.
-  // BSD tar (Windows 10+ System32\tar.exe) does not need this flag and does not
-  // recognize it. Detect at runtime which tar is available.
+  // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
+  // host:path. BSD tar (System32\tar.exe) rejects the flag, so detect at runtime.
 #ifdef _WIN32
   static const bool tar_has_force_local =
       (std::system("tar --force-local --version > nul 2>&1") == 0);

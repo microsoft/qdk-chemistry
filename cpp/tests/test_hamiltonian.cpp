@@ -1420,8 +1420,7 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
   std::string filename = "test.sparse.hamiltonian.fcidump";
   EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
 
-  // Scope the ifstream so it closes before remove() — Windows does not
-  // allow deleting a file while a handle is open.
+  // Scope the stream so it closes before remove() (Windows file lock).
   {
     std::ifstream file(filename);
     EXPECT_TRUE(file.is_open());
@@ -1796,8 +1795,7 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   });
 
   // Verify file was created and has correct NORB (should be 2, not 3).
-  // Scope the ifstream so it closes before remove() — Windows does not
-  // allow deleting a file while a handle is open.
+  // Scope the stream so it closes before remove() (Windows file lock).
   {
     std::ifstream file("test_active_space.hamiltonian.fcidump");
     EXPECT_TRUE(file.is_open());

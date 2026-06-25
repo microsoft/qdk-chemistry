@@ -113,8 +113,7 @@ find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)
-# When the vcpkg toolchain is active its find_package wrapper may not search the isolated build environment where pip
-# installed pybind11. Ask pybind11 itself for its CMake config directory so the wrapper can find it.
+# vcpkg's find_package wrapper may miss pip-installed pybind11; ask pybind11 for its cmakedir.
 if(NOT pybind11_DIR)
   execute_process(
     COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir

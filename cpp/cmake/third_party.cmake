@@ -44,9 +44,7 @@ set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
 if(APPLE)
     set(_libint2_source_subdir "")
 endif()
-# MSVC native cl does not define __SSE__ / __SSE2__ macros on x64, which causes
-# the AVX section of vector_x86.h to reference VectorSSEDouble before it's defined.
-# Apply a patch to define these macros under MSVC x64.
+# MSVC x64 doesn't define __SSE__/__SSE2__; patch vector_x86.h to define them.
 set(_libint2_patch_args "")
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(_libint2_patch_args FETCHCONTENT_ARGS
@@ -63,17 +61,11 @@ handle_dependency(libint2
   REQUIRED
 )
 if(MSVC AND TARGET libint2_cxx)
-  # /Zc:__cplusplus: MSVC reports __cplusplus as 199711L by default; libint2's
-  # cxxstd.h checks __cplusplus >= 201103L for C++11 support.
-  # /Zc:preprocessor: enables conforming preprocessor; libint2's engine.impl.h
-  # uses Boost.Preprocessor macros that require correct expansion order (the
-  # legacy preprocessor concatenates tokens incorrectly). Available since VS 2019 16.5.
-  # Skip when libint2_cxx is an IMPORTED target from a previous install
-  # (target_compile_options rejects IMPORTED targets).
+  # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor (Boost.Preprocessor).
+  # Skip IMPORTED targets (target_compile_options rejects them).
   get_target_property(_libint2_cxx_imported libint2_cxx IMPORTED)
   if(NOT _libint2_cxx_imported)
-    # clang-cl does not support /Zc:preprocessor (MSVC-only); passing it produces
-    # -Wunused-command-line-argument on every TU that consumes libint2_cxx.
+    # clang-cl rejects /Zc:preprocessor; omit it to avoid -Wunused-command-line-argument.
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
       target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
     else()
@@ -81,10 +73,8 @@ if(MSVC AND TARGET libint2_cxx)
     endif()
   endif()
 endif()
-# eritest-libint2 links only to libint2-static (C library), so it does not pick
-# up the INTERFACE flags from libint2_cxx. The test source includes libint2/boys.h
-# which requires C++11 detection via __cplusplus. Only present when libint2 is
-# built from source.
+# eritest-libint2 links only to libint2-static (C library), so it misses the
+# INTERFACE flags from libint2_cxx but still needs C++11 detection.
 if(MSVC AND TARGET eritest-libint2)
   get_target_property(_eritest_imported eritest-libint2 IMPORTED)
   if(NOT _eritest_imported)
@@ -99,8 +89,7 @@ endif()
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
 set(LIBECPINT_USE_PUGIXML OFF CACHE BOOL "Use pugixml for ECPINT" FORCE)
-# MSVC native cl does not support C99 VLAs used throughout ecpint.
-# Apply a patch script that replaces them with std::vector.
+# MSVC doesn't support the C99 VLAs ecpint uses; patch replaces them with std::vector.
 set(_ecpint_patch_args "")
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(_ecpint_patch_args FETCHCONTENT_ARGS
