@@ -29,7 +29,7 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // docs:xyz ../data/h2.structure.xyz
   // start-cell-run
-  // Load structure from XYZ file
+  // Load structure from inline XYZ file
   auto structure = Structure::from_xyz(R"(2
 H2 molecule
 H    0.000000    0.000000    0.000000

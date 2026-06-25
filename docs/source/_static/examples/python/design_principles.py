@@ -25,7 +25,7 @@ scf_solver.settings().set("max_iterations", 100)
 ################################################################################
 # docs:xyz ../data/h2.structure.xyz
 # start-cell-data-flow
-# Load a Structure from file (data classes in QDK/Chemistry are immutable by design)
+# Load a Structure from inline XYZ file (data classes in QDK/Chemistry are immutable by design)
 structure = Structure.from_xyz("""\
 2
 H2 molecule

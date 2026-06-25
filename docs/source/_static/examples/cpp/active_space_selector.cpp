@@ -29,7 +29,7 @@ int main() {
   // --------------------------------------------------------------------------------------------
   // docs:xyz ../data/water.structure.xyz
   // start-cell-run
-  // Load a molecular structure (water molecule) from XYZ file
+  // Load a molecular structure (water molecule) from inline XYZ file
   auto structure = Structure::from_xyz(R"(3
 Water molecule
 O    0.000000    0.000000    0.000000

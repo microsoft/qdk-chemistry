@@ -13,7 +13,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Structure
 
-# Load para-benzyne structure from XYZ file
+# Load para-benzyne structure from inline XYZ file
 structure = Structure.from_xyz("""\
 10
 para-Benzyne

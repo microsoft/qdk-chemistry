@@ -27,7 +27,7 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
-# Load H2 structure from XYZ file
+# Load H2 structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 H2 molecule

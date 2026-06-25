@@ -6,7 +6,7 @@
 // --------------------------------------------------------------------------------------------
 // docs:xyz ../data/water.structure.xyz
 // start-cell-hamiltonian-creation
-// Load structure from XYZ file
+// Load structure from inline XYZ file
 auto structure = Structure::from_xyz(R"(3
 Water molecule
 O    0.000000    0.000000    0.000000

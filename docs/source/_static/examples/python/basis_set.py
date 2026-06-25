@@ -12,7 +12,7 @@ import numpy as np
 from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
-# Load a water molecule structure from XYZ file
+# Load a water molecule structure from inline XYZ file
 structure = Structure.from_xyz("""\
 3
 Water molecule

@@ -28,7 +28,7 @@ scf_solver.settings().set("method", "hf")
 ################################################################################
 # docs:xyz ../data/h2.structure.xyz
 # start-cell-run
-# Load structure from XYZ file
+# Load structure from inline XYZ file
 structure = Structure.from_xyz("""\
 2
 H2 molecule

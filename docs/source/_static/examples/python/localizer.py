@@ -29,7 +29,7 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 ################################################################################
 # docs:xyz ../data/water.structure.xyz
 # start-cell-localize
-# Load H2O molecule from XYZ file
+# Load H2O molecule from inline XYZ file
 structure = Structure.from_xyz("""\
 3
 Water molecule

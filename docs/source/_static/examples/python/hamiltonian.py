@@ -11,7 +11,7 @@
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, SpinChannel
 
-# Load a structure from XYZ file
+# Load a structure from inline XYZ file
 structure = Structure.from_xyz("""\
 3
 Water molecule
