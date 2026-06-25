@@ -10,7 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
@@ -312,7 +312,10 @@ ScfCalculationResult ScfSolver::_run_with_options(
   if (basis_set_type == BasisSetType::FromOrbitals) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
-    auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();
+    const auto& coeff_alpha = initial_guess->coefficients()->block(
+        {data::axes::alpha(), data::axes::alpha()});
+    const auto& coeff_beta = initial_guess->coefficients()->block(
+        {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
     auto [n_alpha, n_beta] =
@@ -446,15 +449,9 @@ ScfCalculationResult ScfSolver::_run_with_options(
     Eigen::VectorXd energies_alpha = eps.row(0);
     Eigen::VectorXd energies_beta = eps.row(1);
 
-    // Construct orbitals with correct parameter order:
-    // (coeff_alpha, coeff_beta,
-    //  energies_alpha, energies_beta, ao_overlap,
-    //  basis_set_name, active_indices_alpha,
-    //  active_indices_beta)
-    orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(C_alpha, C_beta, energies_alpha,
+                                                energies_beta, ao_overlap,
+                                                qdk_raw_basis_set);
 
   } else {
     // Restricted case - store matrices first to avoid
@@ -466,12 +463,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
-    // Construct orbitals with correct parameter order:
-    // (coefficients, energies, ao_overlap, basis_set_name,
-    // active_space_indices)
-    orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(coefficients, energies,
+                                                ao_overlap, qdk_raw_basis_set);
   }
 
   // Create canonical Hartree-Fock Configuration
@@ -490,11 +483,11 @@ ScfCalculationResult ScfSolver::_run_with_options(
     }
   }
   // Create Configuration object
-  data::Configuration hf_det(config_str);
+  auto hf_det = data::Configuration::from_spin_half_string(config_str);
 
-  // Create SlaterDeterminantContainer
-  auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(hf_det, orbitals);
+  // Create StateVectorContainer
+  auto container = std::make_unique<data::StateVectorContainer>(
+      hf_det, orbitals, "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

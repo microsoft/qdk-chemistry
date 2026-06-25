@@ -68,6 +68,42 @@ class TestQubitHamiltonian:
         with pytest.raises(ValueError, match="empty"):
             QubitHamiltonian(pauli_strings=[], coefficients=[])
 
+    def test_content_hash_includes_fermion_mode_order(self):
+        """Content hash changes when fermion_mode_order changes."""
+        blocked = QubitHamiltonian(["IX", "ZI"], np.array([1.0, 0.5]), fermion_mode_order="blocked")
+        interleaved = QubitHamiltonian(["IX", "ZI"], np.array([1.0, 0.5]), fermion_mode_order="interleaved")
+        assert blocked.content_hash() != interleaved.content_hash()
+
+    def test_content_hash_includes_term_partition(self):
+        """Content hash changes when term_partition changes."""
+        grouped = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            term_partition=FlatPartition(strategy="commuting", groups=((0, 1),)),
+        )
+        ungrouped = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            term_partition=FlatPartition(strategy="commuting", groups=((0,), (1,))),
+        )
+        assert grouped.content_hash() != ungrouped.content_hash()
+
+    def test_content_hash_includes_tapering(self):
+        """Content hash changes when tapering metadata changes."""
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
+
+        h1 = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
+        )
+        h2 = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, 1)),
+        )
+        assert h1.content_hash() != h2.content_hash()
+
     def test_group_commuting(self):
         """Test full-commuting term grouper produces correct groups."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])

@@ -11,7 +11,7 @@
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -117,7 +117,8 @@ struct pmc_helper {
     std::vector<data::Configuration> dets_configs;
     for (auto det : dets) {
       // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, num_molecular_orbitals);
+      dets_configs.push_back(data::Configuration::from_spin_half_bitset(
+          det, num_molecular_orbitals));
     }
     std::copy(C_pmc.begin(), C_pmc.end(), C_vector.data());
 
@@ -152,17 +153,15 @@ struct pmc_helper {
                 num_molecular_orbitals * num_molecular_orbitals);
 
         // Create wavefunction with RDMs
-        return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), std::move(one_rdm),
-                std::move(two_rdm)));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), std::move(one_rdm), std::move(two_rdm),
+            "electrons"));
       } else {
         // Create wavefunction without RDMs
-        return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals()));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), "electrons"));
       }
     }();
 

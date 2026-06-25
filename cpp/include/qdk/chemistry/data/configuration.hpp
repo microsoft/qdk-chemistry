@@ -20,62 +20,63 @@ namespace qdk::chemistry::data {
 /**
  * @class Configuration
  * @brief Represents a configuration (or occupation number vector) with
- * efficient bit-packing
+ * efficient bit-packing.
  * @details The Configuration class provides a memory-efficient representation
- * of orbital occupations for calculations. Each orbital can be in one of four
- * states: unoccupied, alpha-occupied, beta-occupied, or doubly-occupied. The
- * implementation uses bit-packing (2 bits per orbital) for memory efficiency.
+ * of single-particle mode occupations. For spin-½ systems (2 bits per mode),
+ * each mode can be unoccupied, alpha-occupied, beta-occupied, or doubly
+ * occupied. For generic systems (1 bit per mode), each mode is simply occupied
+ * or unoccupied.
  */
 
 class Configuration : public DataClass {
  public:
   /**
-   * @brief Default constructor
-   * @details Creates a configuration with 0 orbitals
+   * @brief Default constructor.
+   * @details Creates an empty spin-½ configuration with 0 modes.
    */
   Configuration() = default;
 
-  /**
-   * @brief Constructor from string representation
-   * @param str String representation of configuration (e.g., "22du0d00")
-   * where '0' = unoccupied, 'u' = alpha, 'd' = beta, '2' = doubly
-   * occupied
-   *
-   * @note The length of the string determines the number of orbitals
-   * @note Orbital indexing is from left to right
-   *
-   * @throws std::invalid_argument If the string contains invalid characters
-   */
-  Configuration(const std::string& str);
+  // ---- Factories ----------------------------------------------------------
 
   /**
-   * @brief Constructor from bitset representation
-   * @tparam N Size of the bitset (must be even)
-   * @param orbs Bitset representation of the state
-   * @param num_orbitals Number of spatial orbitals to use from the bitset
-   *
-   * @note First half of bitset (indices 0 to N/2-1) represents alpha orbitals
-   * Second half (indices N/2 to N-1) represents beta orbitals
-   *
-   * @note Orbital ordering is little-endian (right to left) within each word.
-   *
-   * @throws std::invalid_argument If num_orbitals exceeds N/2
+   * @brief Construct from a spin-½ string representation.
+   * @param str String with alphabet @c '0'/@c 'u'/@c 'd'/@c '2'.
+   * @return Configuration with bits_per_mode() == 2.
+   * @throws std::invalid_argument If the string contains invalid characters.
+   */
+  static Configuration from_spin_half_string(const std::string& str);
+
+  /**
+   * @brief Construct from a bitstring (1 bit per mode).
+   * @param str String with alphabet @c '0'/@c '1'.
+   * @return Configuration with bits_per_mode() == 1.
+   * @throws std::invalid_argument If the string contains invalid characters.
+   */
+  static Configuration from_bitstring(const std::string& str);
+
+  /**
+   * @brief Construct from an alpha/beta bitset (spin-½).
+   * @tparam N Size of the bitset (must be even).
+   * @param orbs Bitset with alpha in the low half and beta in the high half.
+   * @param num_orbitals Number of spatial orbitals to extract.
+   * @return Configuration with bits_per_mode() == 2.
+   * @throws std::invalid_argument If num_orbitals exceeds N/2.
    */
   template <size_t N>
-  Configuration(const std::bitset<N>& orbs, size_t num_orbitals) {
-    // Check that N is even
+  static Configuration from_spin_half_bitset(const std::bitset<N>& orbs,
+                                             size_t num_orbitals) {
     static_assert(N % 2 == 0, "Bitset size must be even");
-    constexpr size_t max_spatial_orbs = N / 2;  // Half for alpha, half for beta
+    constexpr size_t max_spatial_orbs = N / 2;
 
     if (num_orbitals > max_spatial_orbs) {
       throw std::invalid_argument("Number of orbitals exceeds bitset capacity");
     }
 
-    _packed_orbs.resize((num_orbitals + 3) / 4,
-                        0);  // Each byte stores 4 orbitals
+    Configuration result;
+    result._bits_per_mode = 2;
+    result._packed_orbs.resize(_packed_bytes(num_orbitals, 2), 0);
 
     for (size_t i = 0; i < num_orbitals; ++i) {
-      // Convention: lo-word (alpha) / hi-word (beta)
       bool has_alpha = orbs[i];
       bool has_beta = orbs[max_spatial_orbs + i];
 
@@ -90,89 +91,140 @@ class Configuration : public DataClass {
         state = UNOCCUPIED;
       }
 
-      _set_orbital(i, state);
+      result._set_orbital(i, state);
     }
-  }
-
-  /**
-   * @brief Convert the configuration to a bitset representation
-   * @tparam N Size of the bitset (must be even)
-   * @return Bitset representation of the configuration
-   *
-   * @note The returned bitset will have the first half (indices 0 to N/2-1)
-   * representing alpha orbitals and the second half (indices N/2 to N-1)
-   * representing beta orbitals
-   *
-   * @note Orbital ordering is little-endian (right to left) within each word.
-   *
-   * @throws std::invalid_argument If the configuration has more orbitals than
-   * N/2
-   */
-  template <size_t N>
-  std::bitset<N> to_bitset() const {
-    // check that N is even
-    static_assert(N % 2 == 0, "Bitset size must be even");
-    constexpr size_t max_spatial_orbs = N / 2;  // Half for alpha, half for beta
-
-    size_t num_orbitals = _packed_orbs.size() * 4;
-    if (num_orbitals > max_spatial_orbs) {
-      throw std::invalid_argument(
-          "Configuration has larger capacity than bitset capacity");
-    }
-
-    std::bitset<N> result;
-    // Process each spatial orbital in the configuration
-    for (size_t i = 0; i < num_orbitals; ++i) {
-      OccupationState state = _get_orbital(i);
-
-      // Set alpha bit (lo-word)
-      if (state == ALPHA || state == DOUBLY) {
-        result.set(i);
-      }
-
-      // Set beta bit (hi-word)
-      if (state == BETA || state == DOUBLY) {
-        result.set(max_spatial_orbs + i);
-      }
-    }
-
     return result;
   }
 
   /**
-   * @brief Convert the configuration to a string representation
-   * @return String representation where each character represents an orbital:
-   *         '0' = unoccupied, 'u' = alpha, 'd' = beta, '2' = doubly occupied
+   * @brief Construct from a flat bitset (1 bit per mode).
+   * @tparam N Size of the bitset.
+   * @param orbs Bitset with one bit per mode.
+   * @param num_modes Number of modes to extract.
+   * @return Configuration with bits_per_mode() == 1.
+   * @throws std::invalid_argument If num_modes exceeds N.
+   */
+  template <size_t N>
+  static Configuration from_bitstring_bitset(const std::bitset<N>& orbs,
+                                             size_t num_modes) {
+    if (num_modes > N) {
+      throw std::invalid_argument("Number of modes exceeds bitset capacity");
+    }
+    Configuration result;
+    result._bits_per_mode = 1;
+    result._packed_orbs.resize(_packed_bytes(num_modes, 1), 0);
+    for (size_t i = 0; i < num_modes; ++i) {
+      if (orbs[i]) result._set_mode_raw(i, 1);
+    }
+    return result;
+  }
+
+  // ---- Conversions --------------------------------------------------------
+
+  /**
+   * @brief Convert to a bitset representation.
+   *
+   * For spin-½ (2 bits/mode): @p N must be even; alpha occupations fill the
+   * low half, beta the high half.
+   * For bitstring (1 bit/mode): one bit per mode in the low @c num_modes()
+   * positions.
+   *
+   * @tparam N Size of the returned bitset.
+   * @return Bitset representation of the configuration.
+   * @throws std::invalid_argument If the configuration doesn't fit in N bits.
+   */
+  template <size_t N>
+  std::bitset<N> to_bitset() const {
+    if (_bits_per_mode == 2) {
+      static_assert(N % 2 == 0, "Bitset size must be even for spin-½");
+      constexpr size_t max_spatial_orbs = N / 2;
+      if (num_modes() > max_spatial_orbs) {
+        throw std::invalid_argument(
+            "Configuration has more modes than bitset capacity");
+      }
+      std::bitset<N> result;
+      for (size_t i = 0; i < num_modes(); ++i) {
+        OccupationState state = _get_orbital(i);
+        if (state == ALPHA || state == DOUBLY) result.set(i);
+        if (state == BETA || state == DOUBLY) result.set(max_spatial_orbs + i);
+      }
+      return result;
+    }
+    // 1-bit: flat mapping
+    if (num_modes() > N) {
+      throw std::invalid_argument(
+          "Configuration has more modes than bitset capacity");
+    }
+    std::bitset<N> result;
+    for (size_t i = 0; i < num_modes(); ++i) {
+      if (_get_mode_raw(i)) result.set(i);
+    }
+    return result;
+  }
+
+  /**
+   * @brief Convert the configuration to a string representation.
+   * @return For spin-½ (2 bits/mode): @c '0'/@c 'u'/@c 'd'/@c '2'.
+   *         For bitstring (1 bit/mode): @c '0'/@c '1'.
    */
   std::string to_string() const;
 
   /**
    * @brief Create a canonical Hartree-Fock configuration using the Aufbau
-   * principle
+   * principle (spin-½ only).
    * @param n_alpha Number of alpha electrons
    * @param n_beta Number of beta electrons
    * @param n_orbitals Total number of orbitals
-   * @return Configuration representing the HF ground state
-   * @details Fills orbitals from lowest energy according to the Aufbau
-   * principle:
-   *          - Doubly occupied orbitals for paired electrons
-   *          - Singly occupied orbitals for unpaired electrons (alpha first if
-   * n_alpha > n_beta)
-   *          - Unoccupied orbitals for remaining positions
+   * @return Configuration representing the HF ground state (2 bits/mode)
    */
   static Configuration canonical_hf_configuration(size_t n_alpha, size_t n_beta,
                                                   size_t n_orbitals);
 
+  // ---- Generic (statistics-agnostic) accessors ----------------------------
+
   /**
-   * @brief Get the number of alpha and beta electrons in the configuration
+   * @brief Number of single-particle modes in the configuration.
+   * @return Number of modes (same as @ref get_orbital_capacity).
+   */
+  size_t num_modes() const;
+
+  /**
+   * @brief Bits used to encode each mode (1 for spinless, 2 for spin-½).
+   * @return Bits per mode.
+   */
+  uint8_t bits_per_mode() const;
+
+  /**
+   * @brief Raw state value for mode @p idx (range 0 to 2^bits_per_mode - 1).
+   * @param idx Mode index (0-indexed).
+   * @return Packed state value for the mode.
+   * @throws std::out_of_range if @p idx >= num_modes().
+   */
+  uint8_t get_mode_state(size_t idx) const;
+
+  /**
+   * @brief Total occupation summed over all modes.
+   *
+   * For spin-½ modes the per-mode occupation is the popcount of the 2-bit
+   * state (0, 1, 1, or 2). For spinless modes it is the 1-bit value itself.
+   *
+   * @return Sum of per-mode occupations.
+   */
+  size_t total_occupation() const;
+
+  // ---- Spin-½ specific accessors (throw if bits_per_mode != 2) ------------
+
+  /**
+   * @brief Get the number of alpha and beta electrons in the configuration.
    * @return A tuple containing (number of alpha electrons, number of beta
    * electrons)
+   * @throws std::runtime_error if bits_per_mode() != 2
    */
   std::tuple<size_t, size_t> get_n_electrons() const;
 
   /**
-   * @brief Get the max orbital capacity of the configuration
-   * @return Number of spatial orbitals the configuration can represent
+   * @brief Get the max orbital capacity of the configuration.
+   * @return Number of modes the configuration can represent.
    */
   size_t get_orbital_capacity() const;
 
@@ -185,18 +237,31 @@ class Configuration : public DataClass {
   }
 
   /**
-   * @brief Check if a specific orbital has an alpha electron
+   * @brief Check if a specific orbital has an alpha electron (spin-½ only).
    * @param orbital_idx The orbital index (0-indexed)
    * @return true if the orbital has an alpha electron, false otherwise
+   * @throws std::runtime_error if bits_per_mode() != 2
    */
   bool has_alpha_electron(size_t orbital_idx) const;
 
   /**
-   * @brief Check if a specific orbital has a beta electron
+   * @brief Check if a specific orbital has a beta electron (spin-½ only).
    * @param orbital_idx The orbital index (0-indexed)
    * @return true if the orbital has a beta electron, false otherwise
+   * @throws std::runtime_error if bits_per_mode() != 2
    */
   bool has_beta_electron(size_t orbital_idx) const;
+
+  /**
+   * @brief Whether the configuration is closed-shell (spin-½ only).
+   *
+   * Closed-shell means every spatial orbital is either unoccupied or doubly
+   * occupied — there are no singly-occupied (open-shell) orbitals. The
+   * resulting alpha and beta occupation patterns are identical.
+   *
+   * @return @c true iff no orbital is singly occupied.
+   */
+  bool is_closed_shell() const;
 
   /**
    * @brief Equality comparison operator
@@ -301,71 +366,62 @@ class Configuration : public DataClass {
 
   /**
    * @brief Convert configuration to separate alpha and beta binary strings in
-   * little-endian format
-   * @param num_orbitals How many orbitals to extract (if we want to slice for
-   * active space)
-   * @return Pair of binary strings (alpha, beta) where '1' indicates occupied
-   *         and '0' indicates unoccupied for each spin channel, in little
-   *         endian format
-   * @details Converts the compact representation to two binary strings:
-   *          - Alpha string: '1' if orbital has alpha or doubly occupied
-   *          - Beta string: '1' if orbital has beta or doubly occupied
-   *          Example: "2du0" -> ("1010", "1100")
-   * @throws std::runtime_error If num_orbitals exceeds configuration capacity
+   * little-endian format (spin-½ only).
+   * @param num_orbitals How many orbitals to extract
+   * @return Pair of binary strings (alpha, beta)
+   * @throws std::runtime_error If bits_per_mode() != 2 or num_orbitals exceeds
+   * capacity
    */
   std::pair<std::string, std::string> to_binary_strings(
       size_t num_orbitals) const;
 
   /**
-   * @brief Convert separate alpha and beta binary strings in little-endian
-   * format to a Configuration
-   * @param alpha_string Alpha string where '1' indicates occupied
-   *         and '0' indicates unoccupied for each spin channel, in little
-   *         endian format
-   * @param beta_string Beta string where '1' indicates occupied
-   *         and '0' indicates unoccupied for each spin channel, in little
-   *         endian format
-   * @return Configuration object
+   * @brief Convert separate alpha and beta binary strings to a spin-½
+   * Configuration (2 bits/mode).
+   * @param alpha_string Alpha occupation string ('0'/'1')
+   * @param beta_string Beta occupation string ('0'/'1')
+   * @return Configuration object with bits_per_mode() == 2
    */
   static Configuration from_binary_strings(std::string alpha_string,
                                            std::string beta_string);
 
  private:
-  // Friend classes that need direct access to packed data for efficient
-  // serialization
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   friend class ConfigurationSet;
 
-  /**
-   * @brief Enumeration of possible orbital occupation states
-   * @details Each state is stored using 2 bits in the packed representation
-   */
+  /// Spin-½ occupation states (2-bit interpretation layer).
   enum OccupationState : uint8_t {
-    UNOCCUPIED = 0,  // 00 in binary - No electrons
-    ALPHA = 1,       // 01 in binary - One alpha electron
-    BETA = 2,        // 10 in binary - One beta electron
-    DOUBLY = 3       // 11 in binary - Both alpha and beta electrons
+    UNOCCUPIED = 0,
+    ALPHA = 1,
+    BETA = 2,
+    DOUBLY = 3
   };
 
-  /**
-   * @brief Get the occupation state of a specific orbital
-   * @param pos The orbital position (0-indexed)
-   * @return The occupation state (UNOCCUPIED, ALPHA, BETA, or DOUBLY)
-   */
+  /// Get the 2-bit occupation state of a spin-½ mode (asserts
+  /// _bits_per_mode==2).
   OccupationState _get_orbital(size_t pos) const;
 
-  /**
-   * @brief Set the occupation state of a specific orbital
-   * @param pos The orbital position (0-indexed)
-   * @param value The occupation state to set (UNOCCUPIED, ALPHA, BETA, or
-   * DOUBLY)
-   */
+  /// Set the 2-bit occupation state of a spin-½ mode.
   void _set_orbital(size_t pos, OccupationState value);
 
-  /**
-   * @brief Storage for packed orbital occupation data
-   * @details Each byte stores 4 orbitals (2 bits per orbital occupation state)
-   */
+  /// Generic mode read — returns the raw _bits_per_mode-wide value at @p pos.
+  uint8_t _get_mode_raw(size_t pos) const;
+
+  /// Generic mode write — stores a _bits_per_mode-wide @p value at @p pos.
+  void _set_mode_raw(size_t pos, uint8_t value);
+
+  /// Throw if _bits_per_mode != 2 with a message naming @p caller.
+  void _require_spin_half(const char* caller) const;
+
+  /// Number of packed bytes needed for @p n_modes at @p bpm bits per mode.
+  static size_t _packed_bytes(size_t n_modes, uint8_t bpm);
+
+  /// Packed mode data. Layout depends on _bits_per_mode.
   std::vector<uint8_t> _packed_orbs;
+
+  /// Bits used to encode each single-particle mode (1 or 2).
+  uint8_t _bits_per_mode = 2;
 };
 
 // Enforce inheritance from base class and presence of required methods.

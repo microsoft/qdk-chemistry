@@ -21,11 +21,13 @@ target_sources(chemistry PRIVATE
     settings.cpp
     stability_result.cpp
     structure.cpp
+    symmetry/symmetry.cpp
+    symmetry/symmetry_blocked_sparse_map.cpp
+    symmetry/symmetry_blocked_scalar.cpp
+    symmetry/symmetry_blocked_tensor.cpp
+    symmetry/symmetry_blocked_index_set.cpp
     tapering.cpp
     wavefunction.cpp
-    wavefunction_containers/cas.cpp
-    wavefunction_containers/cc.cpp
-    wavefunction_containers/mp2.cpp
-    wavefunction_containers/sci.cpp
-    wavefunction_containers/sd.cpp
+    wavefunction_containers/amplitude_container.cpp
+    wavefunction_containers/state_vector.cpp
 )
