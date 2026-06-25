@@ -19,20 +19,11 @@ To run the slow tests (including notebook e2e tests), set the environment variab
 # --------------------------------------------------------------------------------------------
 
 import os
-import sys
 from pathlib import Path
 
 import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-
-# qdk.qre requires Python >= 3.11 at runtime
-try:
-    import qdk.qre  # noqa: F401
-
-    _HAS_QRE_AND_PYTHON_GE_311 = sys.version_info >= (3, 11)
-except (ImportError, TypeError):
-    _HAS_QRE_AND_PYTHON_GE_311 = False
 
 # Optional dependencies for notebook execution
 try:
@@ -42,6 +33,13 @@ try:
     _HAS_NOTEBOOK_DEPS = True
 except ImportError:
     _HAS_NOTEBOOK_DEPS = False
+
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
 
 _requires_notebook_deps = pytest.mark.xfail(
     not _HAS_NOTEBOOK_DEPS,
@@ -289,8 +287,8 @@ def test_state_prep_energy():
     reason="Qiskit dependencies not available",
 )
 @pytest.mark.skipif(
-    not _HAS_QRE_AND_PYTHON_GE_311,
-    reason="qdk.qre not available or Python < 3.11",
+    not _HAS_QRE,
+    reason="qdk.qre not available",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
