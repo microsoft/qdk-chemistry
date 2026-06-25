@@ -8,7 +8,6 @@ vcpkg_from_github(
         disable-testing.diff
         getarch.diff
         system-check-msvc.diff
-        win32-uwp.diff
 )
 
 vcpkg_check_features(OUT_FEATURE_OPTIONS OPTIONS
