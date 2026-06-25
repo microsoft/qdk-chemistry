@@ -502,17 +502,8 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
 #endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
-  // Native MSVC cl.exe (/openmp:llvm /openmp:experimental) does not support
-  // OpenMP 4.5 array-section reductions on raw pointers (e.g.
-  // reduction(+:dJ[:N])). Detected via _MSC_VER && !__clang__ — clang-cl
-  // also defines _MSC_VER but supports the syntax via libomp. For native
-  // MSVC we fall back to #pragma omp atomic on the inner write.
-#if defined(_OPENMP)
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma omp parallel
-#else
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
-#endif
 #endif
   {
 #ifdef _OPENMP
@@ -559,9 +550,6 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
                   dJ_coord +=
                       P[pp * num_atomic_orbitals + qq] * shset[int_ipq] * X[ii];
             if (q > p) dJ_coord *= 2.0;  // use symmetry of (I|pq) D(p,q)
-#if defined(_OPENMP) && defined(_MSC_VER) && !defined(__clang__)
-#pragma omp atomic
-#endif
             dJ[coord] += dJ_coord;
           }
         }
@@ -592,13 +580,8 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
-  // See note above re: native MSVC OpenMP array-section reductions.
-#if defined(_OPENMP)
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma omp parallel
-#else
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
-#endif
 #endif
   {
 #ifdef _OPENMP
@@ -635,9 +618,6 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
             for (size_t jj = j_st; jj < j_st + nj; ++jj, int_ij++)
               dJ_coord += X[jj] * shset[int_ij] * X[ii];
           if (j > i) dJ_coord *= 2.0;  // use symmetry of (I|J)
-#if defined(_OPENMP) && defined(_MSC_VER) && !defined(__clang__)
-#pragma omp atomic
-#endif
           dJ[coord] += fact * dJ_coord;
         }
       }

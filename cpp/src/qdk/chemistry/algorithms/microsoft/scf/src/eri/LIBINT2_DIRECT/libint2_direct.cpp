@@ -14,22 +14,6 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-// Memory-order modifiers on OpenMP atomic directives (e.g. `atomic update
-// relaxed`) are an OpenMP 5.0 feature. Native MSVC cl.exe with /openmp:llvm
-// does not parse them. Drop the `relaxed` clause for native MSVC; the
-// default (seq_cst) is stricter, so semantics remain correct. Detected via
-// _MSC_VER && !__clang__ so clang-cl (which also defines _MSC_VER) keeps
-// the relaxed form via libomp.
-#ifdef _OPENMP
-#if defined(_MSC_VER) && !defined(__clang__)
-#define QDK_OMP_ATOMIC_UPDATE_RELAXED _Pragma("omp atomic update")
-#else
-#define QDK_OMP_ATOMIC_UPDATE_RELAXED _Pragma("omp atomic update relaxed")
-#endif
-#else
-#define QDK_OMP_ATOMIC_UPDATE_RELAXED
-#endif
 #include <blas.hh>
 #include <stdexcept>
 #include <unordered_set>
@@ -446,7 +430,7 @@ class ERI {
                                 P_ij * value;
                           } else {
 #ifdef _OPENMP
-                            QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                             J_cur[bf3 * num_atomic_orbitals + bf4] +=
                                 P_ij * value;
@@ -460,7 +444,7 @@ class ERI {
                         J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
                       } else {
 #ifdef _OPENMP
-                        QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                         J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
                       }
@@ -509,12 +493,12 @@ class ERI {
                                 P_ik * value;
                           } else {
 #ifdef _OPENMP
-                            QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                             K_cur[bf1 * num_atomic_orbitals + bf4] +=
                                 P_jk * value;
 #ifdef _OPENMP
-                            QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                             K_cur[bf2 * num_atomic_orbitals + bf4] +=
                                 P_ik * value;
@@ -528,11 +512,11 @@ class ERI {
                           K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
                         } else {
 #ifdef _OPENMP
-                          QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                           K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
 #ifdef _OPENMP
-                          QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                           K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
                         }
@@ -782,7 +766,7 @@ class ERI {
                           out_thread[idx1] += C[bf4 * nt + p] * value * s12_deg;
                         } else {
 #ifdef _OPENMP
-                          QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                           out[idx1] += C[bf4 * nt + p] * value * s12_deg;
                         }
@@ -798,7 +782,7 @@ class ERI {
                                 C[bf3 * nt + p] * value * s12_deg;
                           } else {
 #ifdef _OPENMP
-                            QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                             out[idx2] += C[bf3 * nt + p] * value * s12_deg;
                           }
@@ -812,7 +796,7 @@ class ERI {
                           out_thread[idx3] += C[bf2 * nt + p] * value * s34_deg;
                         } else {
 #ifdef _OPENMP
-                          QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                           out[idx3] += C[bf2 * nt + p] * value * s34_deg;
                         }
@@ -827,7 +811,7 @@ class ERI {
                                 C[bf1 * nt + p] * value * s34_deg;
                           } else {
 #ifdef _OPENMP
-                            QDK_OMP_ATOMIC_UPDATE_RELAXED
+#pragma omp atomic update relaxed
 #endif
                             out[idx4] += C[bf1 * nt + p] * value * s34_deg;
                           }
@@ -856,7 +840,7 @@ class ERI {
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),
 // then cut half due to s12_34_deg
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for collapse(2)
 #endif
     for (size_t i = 0; i < num_atomic_orbitals; ++i)
       for (size_t j = 0; j <= i; ++j) {

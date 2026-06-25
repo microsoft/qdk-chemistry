@@ -106,39 +106,6 @@ message(STATUS "Final CMAKE_C_FLAGS_RELEASE:              ${CMAKE_C_FLAGS_RELEAS
 message(STATUS "Final CMAKE_C_FLAGS_RELWITHDEBINFO:       ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 message(STATUS "Final CMAKE_C_FLAGS:                      ${CMAKE_C_FLAGS}")
 
-if(MSVC)
-
-    # # lapackpp's lartg.cc uses std::complex without #include <complex>.
-    # # On libstdc++ it's transitively included; on MSVC STL it isn't.
-    # # CMAKE_CXX_FLAGS only applies to C++ files, so GauXC's C sources are safe.
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FIcomplex")
-    #
-    # # gau2grid_helper.c calls exit() without #include <stdlib.h>.
-    # # Clang-cl treats implicit function declarations as errors in C99+.
-    # # Native MSVC cl.exe allows them by default, so no flag needed there.
-    # if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    #     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
-    # endif()
-    #
-    # # blaspp's BLASFinder.cmake uses try_run() to detect Fortran name mangling,
-    # # but on Windows the test executable can't find openblas.dll at runtime,
-    # # leaving blas/defines.h empty and breaking lapackpp.
-    # # OpenBLAS uses lowercase + trailing underscore (see OPENBLAS_FUNDERSCORE).
-    # add_compile_definitions(BLAS_FORTRAN_ADD_)
-
-    # Native MSVC /openmp is OpenMP 2.0 only, which requires signed loop indices.
-    # blaspp uses size_t (unsigned) in #pragma omp parallel for, valid in 3.0+.
-    # /openmp:llvm enables the LLVM runtime with unsigned indices (OpenMP 3.0+).
-    # /openmp:experimental enables #pragma omp simd (used in pipek_mezey.cpp).
-    # Both flags together give full coverage; may produce duplicate-flag warnings.
-    # See: https://developercommunity.visualstudio.com/t/openmp:llvm-doesnt-imply-openmp:exper/1520948
-    # Available since VS 2019 16.9+. clang-cl already uses libomp natively.
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        set(OpenMP_CXX_FLAGS "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
-        set(OpenMP_C_FLAGS   "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
-    endif()
-endif()
-
 # Options
 option(QDK_CHEMISTRY_ENABLE_COVERAGE    "Enable coverage build" OFF)
 option(QDK_CHEMISTRY_ENABLE_GPU         "Enable GPU acceleration in QDK" OFF)
@@ -149,16 +116,11 @@ option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
-# Enable OpenMP by default, except on Apple platforms with AppleClang
-# On Windows with clang-cl, CMake resolves OpenMP to:
-#   OpenMP_CXX_FLAGS = -Xclang -fopenmp
-#   OpenMP_libomp_LIBRARY = .../VC/Tools/MSVC/.../lib/x64/libomp.lib
-# This uses LLVM's libomp runtime (not MSVC's vcomp*.dll). libomp.dll must
-# be present at runtime alongside the built binaries. It is found in:
-#   %VS_INSTALL_DIR%\VC\Tools\Llvm\x64\bin\libomp.dll
+# Enable OpenMP by default, except on Apple platforms with AppleClang and on
+# Windows (OpenMP + MSVC/clang-cl is not currently supported).
 cmake_dependent_option(QDK_ENABLE_OPENMP
     "Enable OpenMP support" ON
-    "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
+    "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\");NOT WIN32" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 

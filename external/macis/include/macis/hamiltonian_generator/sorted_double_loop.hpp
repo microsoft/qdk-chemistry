@@ -8,7 +8,6 @@
  */
 
 #pragma once
-#include <atomic>
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
@@ -166,13 +165,8 @@ class SortedDoubleLoopHamiltonianGenerator
 
           // Early exit if the only possible matrix element is 4x alpha
           if (ex_alpha_count == 4) {
-            // On MSVC /O2, FMA contraction can yield bitwise-different results
-            // for the same matrix_element_4 call in the count vs fill pass.
-            // Storing through volatile forces a round-trip to double precision,
-            // making both passes produce identical values without #pragma.
-            volatile double h_el_raw =
+            const double h_el_all_alpha_4 =
                 this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha);
-            const double h_el_all_alpha_4 = h_el_raw;
             if (std::abs(h_el_all_alpha_4) < H_thresh) continue;
           }
 
@@ -194,14 +188,16 @@ class SortedDoubleLoopHamiltonianGenerator
               // Skip if total excitation level too high
               if ((ex_alpha_count + ex_beta_count) > 4) continue;
 
-              // Early exit for all-beta excitations (see alpha comment above)
+              // Integral lookups are cheap
               if (ex_beta_count == 4) {
-                volatile double h_el_raw =
+                const double h_el_all_beta_4 =
                     this->matrix_element_4(bra_beta, ket_beta, ex_beta);
-                const double h_el_all_beta_4 = h_el_raw;
                 if (std::abs(h_el_all_beta_4) < H_thresh) continue;
               }
 
+              // Need to consider the threshold here to ensure accurate count
+              // For this first counting pass, we'll just count everything
+              // that could potentially be non-zero based on excitation rank
               row_nnz_local[ibra]++;
 
               // For symmetric matrices, count both entries
@@ -324,19 +320,33 @@ class SortedDoubleLoopHamiltonianGenerator
                 h_el = this->matrix_element_diag(bra_occ_alpha, bra_occ_beta);
               }
 
-              // std::atomic_ref: lock-free on all platforms, avoids the
-              // omp atomic capture crash on MSVC + /openmp:llvm (64-bit types).
-              const index_t offset_row =
-                  std::atomic_ref<index_t>(row_offsets[ibra])
-                      .fetch_add(1, std::memory_order_relaxed);
+              // Direct insertion into the CSR arrays using atomic operations
+              // Get the current insertion position for this row and atomically
+              // increment
+              index_t offset_row;
+#ifdef _OPENMP
+// Use OpenMP atomic capture to safely get current value and increment
+#pragma omp atomic capture
+              offset_row = row_offsets[ibra]++;
+#else
+              // Sequential fallback
+              offset_row = row_offsets[ibra]++;
+#endif /* _OPENMP */
 
+              // Insert values (no synchronization needed as each thread writes
+              // to unique locations)
               colind[offset_row] = iket;
               nzval[offset_row] = h_el;
 
+              // For symmetric matrices, also handle the symmetric entry
               if (is_symm && ibra != iket) {
-                const index_t offset_col =
-                    std::atomic_ref<index_t>(row_offsets[iket])
-                        .fetch_add(1, std::memory_order_relaxed);
+                index_t offset_col;
+#ifdef _OPENMP
+#pragma omp atomic capture
+                offset_col = row_offsets[iket]++;
+#else
+                offset_col = row_offsets[iket]++;
+#endif /* _OPENMP */
 
                 colind[offset_col] = ibra;
                 nzval[offset_col] = h_el;

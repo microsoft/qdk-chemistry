@@ -77,15 +77,6 @@ endif()
 
 # list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 
-# On MSVC, force the LLVM OpenMP runtime (/openmp:llvm) so that the Python
-# extension uses the same runtime (libomp) as the installed C++ library.
-# Without this, FindOpenMP defaults to classic /openmp (vcomp140.dll) which
-# crashes when both runtimes are loaded in the same process.
-if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(OpenMP_CXX_FLAGS "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
-    set(OpenMP_C_FLAGS   "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
-endif()
-
 # First try to find an installed qdk library
 find_package(qdk QUIET COMPONENTS chemistry)
 
@@ -258,7 +249,7 @@ if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
 else()
     set(_bundle_dlls_default ON)
 endif()
-option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg and OpenMP DLLs into the install tree (Windows only)" ${_bundle_dlls_default})
+option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg runtime DLLs into the install tree (Windows only)" ${_bundle_dlls_default})
 
 if(WIN32 AND QDK_BUNDLE_RUNTIME_DLLS)
     message(STATUS "Bundling runtime DLLs into install tree")
