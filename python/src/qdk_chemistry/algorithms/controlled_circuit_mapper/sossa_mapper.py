@@ -8,13 +8,13 @@
 from math import ceil, log2
 from typing import Any
 
-from qdk_chemistry.data import AlgorithmRef, Settings
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledCircuitMapper
+from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
 
 __all__: list[str] = [
     "SOSSAMapper",
@@ -22,7 +22,7 @@ __all__: list[str] = [
 ]
 
 
-class SOSSAMapperSettings(Settings):
+class SOSSAMapperSettings(ControlledCircuitMapperSettings):
     """Settings for the SOSSAMapper."""
 
     def __init__(self):
