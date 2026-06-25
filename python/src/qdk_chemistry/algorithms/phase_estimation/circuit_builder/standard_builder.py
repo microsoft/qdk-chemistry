@@ -101,24 +101,30 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         if isinstance(qubit_hamiltonian, FactorizedHamiltonianContainer):
             # Fast path: build walk op once, use MakeRepeatedQPECircuit.
-            base_circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=1)
+            base_circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
+                qubit_hamiltonian, power=1
+            )
             if state_preparation._qsharp_op and base_circuit._qsharp_op:  # noqa: SLF001
                 circuit = self._create_repeated_qpe_circuit(
                     state_preparation,
                     base_circuit,
                     num_bits,
                     num_system_qubits,
-                    num_anc,
+                    num_ancilla_qubits,
                     ancilla_prep_op,
                 )
                 Logger.info(f"Built repeated QPE circuit with {num_bits} ancilla qubits.")
                 return [circuit]
 
+        # Build one controlled circuit per ancilla with power=2^k,
+        # respecting the unitary builder's power_strategy (e.g. "rescale").
+        # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
-        num_ancilla_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, num_anc, ancilla_prep_op = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
+                qubit_hamiltonian, power=power
+            )
             ctrl_unitary_circuits.append(circuit)
 
         if (
@@ -134,7 +140,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 ctrl_unitary_circuits,
                 num_bits,
                 num_system_qubits,
-                num_anc,
+                num_ancilla_qubits,
                 ancilla_prep_op,
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")

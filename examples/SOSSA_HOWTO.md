@@ -75,14 +75,12 @@ The `SOSSAMapper` has five configurable settings that control the circuit sub-co
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.data import AlgorithmRef
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 
 # Step 1: Build the SOSSA unitary representation
 builder = SOSSABuilder()
 unitary_rep = builder.run(factorized_hamiltonian)
 
 # Step 2: Map to a controlled circuit
-controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 mapper = SOSSAMapper()
 
 # Configure sub-components (see Settings Reference below)
@@ -90,7 +88,7 @@ mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_st
 mapper.settings().set("inner_prepare_algorithm", "direct")
 mapper.settings().set("select_algorithm", "direct")
 
-circuit = mapper.run(controlled_unitary)
+circuit = mapper.run(unitary_rep)
 ```
 
 ### Visualize the circuit
