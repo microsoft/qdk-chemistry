@@ -59,7 +59,7 @@ ConfigurationSet::sector_layout() const {
   return _sector_layout;
 }
 
-size_t ConfigurationSet::capacity() const {
+size_t ConfigurationSet::num_modes() const {
   QDK_LOG_TRACE_ENTERING();
 
   if (_orbitals && _orbitals->has_active_space()) {

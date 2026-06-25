@@ -244,12 +244,7 @@ When QPE acts on :math:`U = e^{-iHt}`, the phase angle :math:`\theta = 2\pi\varp
 
    E = \frac{\theta}{t}
 
-Because the phase is periodic, multiple energy values — called *aliases* — differing by :math:`2\pi / t` can produce the same measured phase.
-QDK/Chemistry handles this automatically:
-
-- ``branching`` contains all alias energy candidates :math:`E + k \cdot 2\pi/t` for :math:`k \in \{-2, -1, 0, 1, 2\}` by default
-- If a ``reference_energy`` is provided (e.g., the :term:`CASCI` energy), the alias closest to the reference is selected as ``resolved_energy``
-- ``canonical_phase_fraction`` and ``canonical_phase_angle`` reflect the alias-resolved phase
+Aliasing can be resolved by enumerating candidates :math:`E_{\mathrm{raw}} + k \cdot 2\pi/t` and selecting the one closest to a reference energy (e.g., :term:`CASCI`).
 
 .. tab:: Python API (Time evolution configuration)
 

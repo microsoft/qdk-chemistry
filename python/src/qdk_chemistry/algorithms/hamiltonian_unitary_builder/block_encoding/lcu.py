@@ -122,6 +122,8 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
 
         coefficients = qubit_hamiltonian.coefficients
         num_terms = len(coefficients)
+        if num_terms == 0:
+            raise ValueError("LCU block encoding requires a non-empty Hamiltonian.")
         num_prepare_ancillas = int(np.ceil(np.log2(num_terms)))
 
         prepare_wfn = self._build_prepare(qubit_hamiltonian, num_prepare_ancillas, self._settings.get("tolerance"))

@@ -107,14 +107,7 @@ Construction
 ------------
 
 :class:`~qdk_chemistry.data.QpeResult` objects are typically created by the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm.
-They can also be constructed manually using the unified factory method:
-
-- :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction` — accepts an ``eigenvalue_from_phase`` callable that maps the measured phase to the Hamiltonian eigenvalue.
-
-Each container class provides the appropriate ``eigenvalue_from_phase`` instance method, which uses the container's stored scale:
-
-- :meth:`container.eigenvalue_from_phase(phi) <qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase>` for Trotter-based QPE
-- :meth:`container.eigenvalue_from_phase(phi) <qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase>` for qubitization QPE
+They can also be constructed manually using :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction`, passing ``container.eigenvalue_from_phase`` as the phase-to-energy mapping.
 
 Time evolution example
 ~~~~~~~~~~~~~~~~~~~~~~
