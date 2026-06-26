@@ -59,13 +59,13 @@ extensions = [
     "sphinx.ext.autosummary",  # Create summary tables for modules/classes
     "sphinx.ext.intersphinx",  # Link to other projects' documentation
     "sphinx.ext.viewcode",  # Add links to view source code
+    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     # Additional extensions
     "sphinx_autodoc_typehints",  # Better support for Python type annotations
     "sphinx_inline_tabs",  # Support for tabbed content in docs
     # C++ documentation
     "breathe",  # Bridge between Sphinx and Doxygen
     # Enable Google-style docstrings parsing
-    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     "sphinx.ext.todo",  # Support for listing to-dos
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
     "sphinxcontrib.bibtex",  # Support for bibliographic references

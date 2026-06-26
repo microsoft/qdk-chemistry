@@ -96,7 +96,7 @@ def test_append_measurement_to_circuit_qasm(basis, n_qubits, expect_measure, exp
 
 def test_create_measurement_circuits_basic(wavefunction_4e4o):
     """Test measurement circuit generation for a simple observable."""
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     circuit = state_prep.run(wavefunction_4e4o)
 
     # Define observable
@@ -261,7 +261,7 @@ def test_create_energy_estimator_qdk():
 
 def test_estimator_fewer_shots(wavefunction_4e4o):
     """Test estimator raises error when total shots is less than number of observables."""
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     circuit = state_prep.run(wavefunction_4e4o)
     observable = QubitHamiltonian(["IIIIIIZZ", "IIIIIIXX", "IIIIIIYY"], np.array([2, 3, 4]))
     estimator = QdkEnergyEstimator()
@@ -293,7 +293,7 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     The energy offset and test Hamiltonian are derived from classical wavefunction information,
     which is used to pre-screen the qubit Hamiltonian and identify terms requiring quantum measurement.
     """
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     state_prep_circuit = state_prep.run(wavefunction_4e4o)
     energy_offset = -4.19142869944708
     test_hamiltonian = QubitHamiltonian(
@@ -413,7 +413,7 @@ def test_estimator_mixed_identity_and_pauli_terms():
 
 def test_estimator_multiple_identity_terms(wavefunction_4e4o):
     """Test energy estimator with multiple identity terms having different coefficients."""
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     circuit = state_prep.run(wavefunction_4e4o)
     # Multiple identity terms: sum of coefficients should be the energy
     observable = QubitHamiltonian(["IIIIIIII", "IIIIIIII", "IIIIIIII"], np.array([1.5, -0.5, 2.0]))
