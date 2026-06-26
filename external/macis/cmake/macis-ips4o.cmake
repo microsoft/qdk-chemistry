@@ -13,4 +13,6 @@ FetchContent_Declare( ips4o
 FetchContent_MakeAvailable( ips4o )
 add_library( ips4o INTERFACE )
 target_include_directories( ips4o INTERFACE ${ips4o_SOURCE_DIR} )
-target_link_libraries( ips4o INTERFACE atomic )
+if(NOT APPLE)
+  target_link_libraries( ips4o INTERFACE atomic )
+endif()
