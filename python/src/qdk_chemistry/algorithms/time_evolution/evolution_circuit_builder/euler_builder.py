@@ -55,9 +55,9 @@ class EulerEvolutionCircuitBuilder(EvolutionCircuitBuilder):
     configured propagator evaluates the effective Hamiltonian, the evolution
     builder Trotterizes it, and the circuit mapper compiles it to QIR.
     The resulting per-step circuits are combined via
-    :meth:`UnitaryContainer.combine`.
+    :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.combine`.
 
-    The output is a single :class:`Circuit` (state-prep + evolution) that
+    The output is a single :class:`~qdk_chemistry.data.circuit.Circuit` (state-prep + evolution) that
     can be passed to ``circuit.get_qre_application()`` for resource
     estimation.
 
