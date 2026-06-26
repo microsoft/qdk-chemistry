@@ -417,20 +417,18 @@ const RowMajorMatrix& SCFAlgorithm::get_rohf_convergence_density_matrix()
   return rohf_total_density_;
 }
 
-RowMajorMatrix& SCFAlgorithm::rohf_convergence_fock_matrix() {
-  QDK_LOG_TRACE_ENTERING();
-  if (rohf_effective_fock_.size() == 0) {
-    throw std::logic_error("ROHF convergence cache not initialized");
-  }
-  return rohf_effective_fock_;
-}
-
 RowMajorMatrix& SCFAlgorithm::rohf_convergence_density_matrix() {
   QDK_LOG_TRACE_ENTERING();
   if (rohf_total_density_.size() == 0) {
     throw std::logic_error("ROHF convergence cache not initialized");
   }
   return rohf_total_density_;
+}
+
+void SCFAlgorithm::set_rohf_convergence_cache(const RowMajorMatrix& fock,
+                                              const RowMajorMatrix& density) {
+  rohf_effective_fock_ = fock;
+  rohf_total_density_ = density;
 }
 
 double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,

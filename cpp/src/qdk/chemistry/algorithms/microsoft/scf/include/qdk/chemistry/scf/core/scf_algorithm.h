@@ -219,14 +219,19 @@ class SCFAlgorithm {
   const RowMajorMatrix& get_rohf_convergence_density_matrix() const;
 
   /**
-   * @brief Mutable access to cached ROHF effective Fock matrix
-   */
-  RowMajorMatrix& rohf_convergence_fock_matrix();
-
-  /**
    * @brief Mutable access to cached ROHF total density matrix
    */
   RowMajorMatrix& rohf_convergence_density_matrix();
+
+  /**
+   * @brief Copy precomputed ROHF convergence matrices into this object's cache
+   *
+   * Used by composite algorithms (e.g. DIIS_GDM) to propagate the
+   * already-computed ROHF matrices from the outer algorithm to inner
+   * sub-algorithm objects without expensive recomputation.
+   */
+  void set_rohf_convergence_cache(const RowMajorMatrix& fock,
+                                  const RowMajorMatrix& density);
 
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context

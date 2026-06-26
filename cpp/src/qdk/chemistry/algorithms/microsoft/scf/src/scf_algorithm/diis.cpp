@@ -329,9 +329,10 @@ std::pair<RowMajorMatrix&, const RowMajorMatrix&> DIIS::select_working_matrices(
     SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    // The effective Fock and total density were already computed and cached
-    // by check_convergence() which always runs before iterate().
-    return {rohf_convergence_density_matrix(), rohf_convergence_fock_matrix()};
+    // Cache is populated by check_convergence() for pure DIIS, or by
+    // DIIS_GDM::iterate via set_rohf_convergence_cache() for composite use.
+    return {rohf_convergence_density_matrix(),
+            get_rohf_convergence_fock_matrix()};
   }
   return {scf_impl.density_matrix(), scf_impl.get_fock_matrix()};
 }
