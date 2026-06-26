@@ -100,6 +100,9 @@ qiskit-extras = [
 ]
 qre = [
   "qdk[qre]>=1.29.5.dev0",  # workaround - TODO: switch to stable version
+  "qsharp>=1.29.5.dev0",  # workaround - TODO: remove
+  "qsharp-jupyterlab>=1.29.5.dev0",  # workaround - TODO: remove
+  "qsharp-widgets>=1.29.5.dev0"  # workaround - TODO: remove
 ]
 test = [
   "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
