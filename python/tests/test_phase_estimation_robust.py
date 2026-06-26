@@ -25,6 +25,7 @@ import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import RobustPhaseEstimation
 from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.utils.rpe import num_rounds
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -146,9 +147,9 @@ def _patch_with_ideal_signal(monkeypatch: pytest.MonkeyPatch, driver: RobustPhas
 
 @pytest.mark.parametrize("energy", [0.4, -0.3, 0.75, 0.0])
 def test_driver_recovers_energy_exact_mode(monkeypatch: pytest.MonkeyPatch, energy: float) -> None:
-    """randomized=False: the RPE loop + linear energy map recover the injected energy."""
+    """energy_correction='linear': the RPE loop + linear energy map recover the injected energy."""
     hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
-    driver = RobustPhaseEstimation(target_accuracy=1e-4, randomized=False)
+    driver = RobustPhaseEstimation(target_accuracy=1e-4, energy_correction="linear")
     _patch_with_ideal_signal(monkeypatch, driver, energy)
 
     result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
@@ -157,9 +158,9 @@ def test_driver_recovers_energy_exact_mode(monkeypatch: pytest.MonkeyPatch, ener
 
 @pytest.mark.parametrize("energy", [0.4, -0.3, 0.75])
 def test_driver_recovers_energy_qdrift_mode(monkeypatch: pytest.MonkeyPatch, energy: float) -> None:
-    """randomized=True: the tangent de-biasing leaves an ideal signal essentially unchanged."""
+    """energy_correction='qdrift_tangent': the tangent de-biasing leaves an ideal signal unchanged."""
     hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
-    driver = RobustPhaseEstimation(target_accuracy=1e-4, randomized=True)
+    driver = RobustPhaseEstimation(target_accuracy=1e-4, energy_correction="qdrift_tangent")
     _patch_with_ideal_signal(monkeypatch, driver, energy)
 
     result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
@@ -170,7 +171,7 @@ def test_driver_uses_explicit_base_time(monkeypatch: pytest.MonkeyPatch) -> None
     """A user-provided base_time is honoured and still recovers the energy."""
     energy = 0.6
     hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
-    driver = RobustPhaseEstimation(target_accuracy=1e-4, base_time=np.pi / 4, randomized=False)
+    driver = RobustPhaseEstimation(target_accuracy=1e-4, base_time=np.pi / 4, energy_correction="linear")
     _patch_with_ideal_signal(monkeypatch, driver, energy)
 
     result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
@@ -180,6 +181,76 @@ def test_driver_uses_explicit_base_time(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_robust_phase_estimation_name() -> None:
     assert RobustPhaseEstimation().name() == "qdk_robust"
+
+
+def test_energy_correction_auto_selection() -> None:
+    """'auto' maps qDRIFT to the tangent map and every other family to linear."""
+    auto = RobustPhaseEstimation()
+    assert auto._select_correction("qdrift") == "qdrift_tangent"
+    assert auto._select_correction("partial_randomized") == "linear"
+    assert auto._select_correction("deterministic_or_exact") == "linear"
+    # An explicit mode overrides the inference.
+    forced = RobustPhaseEstimation(energy_correction="qdrift_tangent")
+    assert forced._select_correction("partial_randomized") == "qdrift_tangent"
+
+
+def test_budget_split_drives_rounds_and_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The RPE round count uses epsilon_rpe and both budgets are recorded in metadata."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
+    driver = RobustPhaseEstimation(target_accuracy=1e-2, unitary_accuracy_fraction=0.25, energy_correction="linear")
+    _patch_with_ideal_signal(monkeypatch, driver, 0.3)
+
+    result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
+    metadata = result.metadata
+    lambda_norm = 1.0  # |0.5| + |0.5|
+    assert metadata["epsilon_unitary"] == pytest.approx(0.25e-2)
+    assert metadata["epsilon_rpe"] == pytest.approx(0.75e-2)
+    assert metadata["unitary_accuracy_fraction"] == pytest.approx(0.25)
+    assert metadata["energy_correction"] == "linear"
+    assert metadata["unitary_builder"] == "partial_randomized"  # the fake settings expose num_random_samples
+    # Round count is sized from epsilon_rpe, not the full target_accuracy.
+    assert metadata["num_rounds"] == num_rounds(lambda_norm, 0.75e-2) + 1
+
+
+def test_partial_builder_receives_unitary_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A partially-randomized builder gets target_accuracy=epsilon_unitary per round (no num_samples)."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
+    driver = RobustPhaseEstimation(
+        target_accuracy=1e-2, unitary_accuracy_fraction=0.5, energy_correction="linear", seed=5
+    )
+    records: list[dict[str, object]] = []
+
+    class _RecordingPartialBuilder:
+        """Fake builder that classifies as partial and records each round's settings."""
+
+        def __init__(self) -> None:
+            self._settings = _FakeSettings()
+
+        def settings(self) -> _FakeSettings:
+            return self._settings
+
+        def run(self, qubit_hamiltonian: object) -> _FakeUnitary:  # noqa: ARG002
+            records.append(dict(self._settings._values))
+            return _FakeUnitary(float(self._settings.get("time")))
+
+    def fake_create_nested(setting_key: str):
+        if setting_key == "unitary_builder":
+            return _RecordingPartialBuilder()
+        if setting_key == "hadamard_test":
+            return _FakeHadamardTest(0.3)
+        raise KeyError(setting_key)
+
+    monkeypatch.setattr(driver, "_create_nested", fake_create_nested)
+    driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
+
+    assert records, "unitary builder was never run"
+    eps_unitary = 0.5e-2
+    tau = float(np.pi / (2 * 1.0))
+    for round_index, record in enumerate(records):
+        assert record["target_accuracy"] == pytest.approx(eps_unitary)
+        assert record["time"] == pytest.approx((2**round_index) * tau)
+        assert "num_samples" not in record  # partial path must not use the qDRIFT sample knob
+        assert record["seed"] == 5 + round_index
 
 
 # =============================================================================
@@ -234,7 +305,13 @@ def test_robust_qpe_deterministic_control_recovers_gse() -> None:
     hamiltonian, ground_vector, ground_energy = _ground_state_problem()
     state_prep = _make_state_prep(ground_vector, num_qubits=2)
 
-    driver = create("phase_estimation", "qdk_robust", target_accuracy=1e-3, randomized=False)
+    driver = create(
+        "phase_estimation",
+        "qdk_robust",
+        target_accuracy=1e-3,
+        unitary_accuracy_fraction=0.0,
+        energy_correction="linear",
+    )
     # XX and ZZ commute, so Trotter is exact for this Hamiltonian.
     driver.settings().set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter"))
     driver.settings().set(
@@ -267,7 +344,14 @@ def test_robust_qpe_qdrift_recovers_gse() -> None:
     trial = trial / np.linalg.norm(trial)
     state_prep = _make_state_prep(trial, num_qubits=2)
 
-    driver = create("phase_estimation", "qdk_robust", target_accuracy=1e-2, randomized=True, seed=42)
+    driver = create(
+        "phase_estimation",
+        "qdk_robust",
+        target_accuracy=1e-2,
+        unitary_accuracy_fraction=0.0,
+        energy_correction="qdrift_tangent",
+        seed=42,
+    )
     driver.settings().set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "qdrift"))
     driver.settings().set(
         "hadamard_test",
