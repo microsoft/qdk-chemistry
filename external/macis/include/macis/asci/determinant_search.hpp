@@ -452,7 +452,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   // Precompute cumulative alpha offsets for direct indexing
   std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
   std::transform_exclusive_scan(
-      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), 0ul,
+      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), size_t{0},
       std::plus<size_t>(), [](const auto& p) { return p.second; });
 
   const auto num_alpha_occupied_orbitals =

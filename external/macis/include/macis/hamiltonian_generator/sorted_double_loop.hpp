@@ -113,7 +113,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -121,7 +121,7 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
@@ -540,7 +540,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -548,7 +548,7 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
@@ -662,7 +662,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -670,7 +670,7 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
@@ -795,7 +795,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -803,7 +803,7 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 

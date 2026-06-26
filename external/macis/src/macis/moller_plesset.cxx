@@ -27,10 +27,10 @@ void mp2_t2(NumCanonicalOccupied _num_occupied_orbitals,
   const size_t LDV3 = LDV2 * LDV;
 
   // T2(i,j,a,b) = (ia|jb) / (eps[i] + eps[j] - eps[a] - eps[b])
-  for (auto i = 0ul; i < num_occupied_orbitals; ++i)
-    for (auto j = 0ul; j < num_occupied_orbitals; ++j)
-      for (auto a = 0ul; a < num_virtual_orbitals; ++a)
-        for (auto b = 0ul; b < num_virtual_orbitals; ++b) {
+  for (size_t i = 0; i < num_occupied_orbitals; ++i)
+    for (size_t j = 0; j < num_occupied_orbitals; ++j)
+      for (size_t a = 0; a < num_virtual_orbitals; ++a)
+        for (size_t b = 0; b < num_virtual_orbitals; ++b) {
           const auto a_off = a + num_occupied_orbitals;
           const auto b_off = b + num_occupied_orbitals;
 

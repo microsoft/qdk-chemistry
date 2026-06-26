@@ -835,7 +835,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   // Compute average work per worker.
   size_t total_work =
-      std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
+      std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), size_t{0},
                       [](auto s, const auto& p) { return s + p.second; });
   size_t local_average = std::max<size_t>(1, total_work / world_size);
 
@@ -945,7 +945,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
                 std::back_inserter(constraint_sizes));
 
     size_t tmp =
-        std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
+        std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), size_t{0},
                         [](auto s, const auto& p) { return s + p.second; });
     if (tmp != total_work) throw std::runtime_error("Incorrect Refinement");
   }  // Selective refinement logic
@@ -999,7 +999,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     // Recompute average with updated total_work and constraint count
     total_work =
-        std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
+        std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), size_t{0},
                         [](auto s, const auto& p) { return s + p.second; });
     local_average = std::max<size_t>(1, total_work / world_size);
 
