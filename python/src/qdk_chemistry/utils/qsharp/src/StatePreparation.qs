@@ -154,16 +154,6 @@ namespace QDKChemistry.Utils.StatePreparation {
         PreparePureStateD(stateVector, Subarray(rowMap, qs));
     }
 
-    /// Circuit entry point for the dense state preparation stage.
-    operation MakeDenseStatePreparation(
-        rowMap : Int[],
-        stateVector : Double[],
-        numQubits : Int,
-    ) : Unit {
-        use qs = Qubit[numQubits];
-        ApplyDensePreparation(rowMap, stateVector, qs);
-    }
-
     /// Applies the GF2+X expansion operations (CX / X gates) to the full register.
     operation ApplyExpansion(
         expansionOps : MatrixCompressionOp[],
@@ -174,12 +164,36 @@ namespace QDKChemistry.Utils.StatePreparation {
         }
     }
 
-    /// Circuit entry point for the expansion (isometry) stage.
-    operation MakeExpansion(
+    /// Composes a dense preparation operation with expansion operations.
+    /// The denseOp is applied to the subregister specified by embeddingMap,
+    /// then expansion operations are applied to the full register.
+    operation ComposeSparseIsometry(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
+        expansionOps : MatrixCompressionOp[],
+        qs : Qubit[],
+    ) : Unit {
+        denseOp(Subarray(embeddingMap, qs));
+        ApplyExpansion(expansionOps, qs);
+    }
+
+    /// Returns a callable that applies sparse isometry composition.
+    function MakeComposeSparseIsometryOp(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
+        expansionOps : MatrixCompressionOp[],
+    ) : Qubit[] => Unit {
+        ComposeSparseIsometry(denseOp, embeddingMap, expansionOps, _)
+    }
+
+    /// Circuit entry point for sparse isometry composition.
+    operation MakeComposeSparseIsometryCircuit(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];
-        ApplyExpansion(expansionOps, qs);
+        ComposeSparseIsometry(denseOp, embeddingMap, expansionOps, qs);
     }
 }

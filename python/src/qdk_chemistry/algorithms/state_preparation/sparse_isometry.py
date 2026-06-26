@@ -38,9 +38,18 @@ from dataclasses import dataclass
 
 import numpy as np
 
-import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
-from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    BasisSet,
+    Circuit,
+    Configuration,
+    Orbitals,
+    OrbitalType,
+    Shell,
+    StateVectorContainer,
+    Wavefunction,
+)
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -57,10 +66,13 @@ class SparseIsometryStatePreparationSettings(StatePreparationSettings):
         """Initialize the StatePreparationSettings."""
         super().__init__()
         self._set_default(
-            "dense_preparation_method", "string", "qdk", "The dense state preparation method to use.", ["qdk", "qiskit"]
+            "dense_state_prep",
+            "algorithm_ref",
+            AlgorithmRef("state_prep", "dense_pure_state"),
+            "State preparation algorithm used for the dense subspace.",
         )
         self._set_default(
-            "use_binary_encoding",
+            "binary_encoding",
             "bool",
             False,
             "Use binary encoding instead of dense state preparation for the reduced subspace.",
@@ -82,9 +94,8 @@ class SparseIsometryStatePreparationSettings(StatePreparationSettings):
 class SparseIsometryStatePreparation(StatePreparation):
     """State preparation using sparse isometry with enhanced GF2+X elimination.
 
-    This class implements "GF2+X" state preparation for electronic structure problems using
-    the ``gf2x_with_tracking`` function which performs smart preprocessing
-    before GF2 Gaussian elimination. The preprocessing includes:
+    This class implements sparse isometry state preparation for electronic structure problems.
+    The preprocessing includes:
 
         1. Removing duplicate rows using CX operations
         2. Removing all-ones rows using X operations
@@ -94,14 +105,6 @@ class SparseIsometryStatePreparation(StatePreparation):
     This enhanced approach can be more efficient than standard GF2 Gaussian elimination,
     particularly for matrices with duplicate rows or all-ones rows. The algorithm
     tracks both CX and X operations for proper circuit reconstruction.
-
-    The algorithm:
-
-        1. Reads the wavefunction to get coefficients and bitstrings
-        2. Converts bitstrings to a binary matrix
-        3. Applies enhanced GF2+X elimination (duplicate removal + all-ones removal + GF2)
-        4. Performs dense state preparation on the reduced space
-        5. Applies recorded operations (both CX and X) in reverse order to expand back to full space
 
     Key References:
 
@@ -141,37 +144,24 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         Logger.debug(f"Using {len(state_vector)} determinants for state preparation")
 
-        if self._settings.get("use_binary_encoding"):
+        if self._settings.get("binary_encoding"):
             circuit = self._run_binary_encoding(state_vector, coeffs, n_qubits)
             if circuit is not None:
                 return circuit
-
-        if (
-            self._settings.get("dense_preparation_method") == "qiskit"
-            and not qdk_chemistry.plugins.qiskit.QDK_CHEMISTRY_HAS_QISKIT
-        ):
-            raise ImportError(
-                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
-            )
 
         # Perform GF2+X elimination with tracking
         gf2x_operation_results, statevector_data = self._perform_gf2x(state_vector, coeffs)
         Logger.debug(f"gf2x_operation_results dense qubit: {gf2x_operation_results.row_map}")
         Logger.debug(f"gf2x_operation_results state vector: {statevector_data}")
 
-        if self._settings.get("dense_preparation_method") == "qiskit":
-            return self._qiskit_dense_preparation(gf2x_operation_results, statevector_data, n_qubits)
+        # Build reduced wavefunction and delegate dense preparation to nested algorithm
+        reduced_wf = self._create_reduced_wavefunction(statevector_data, gf2x_operation_results.rank)
+        dense_algo = self._create_nested("dense_state_prep")
+        dense_circuit = dense_algo.run(reduced_wf)
 
-        params = self._build_qsharp_state_prep_params(gf2x_operation_results, statevector_data, n_qubits)
-
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            parameter=params,
-        )
-
-        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**params)
-        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
+        # Build expansion ops and compose with dense circuit
+        expansion_ops = self._build_expansion_ops(gf2x_operation_results)
+        return self._compose_with_expansion(dense_circuit, expansion_ops, gf2x_operation_results.row_map, n_qubits)
 
     def _run_binary_encoding(self, state_vector: list[list[int]], coeffs: np.ndarray, n_qubits: int) -> Circuit | None:
         """Prepare a quantum circuit using binary encoding.
@@ -196,21 +186,27 @@ class SparseIsometryStatePreparation(StatePreparation):
             )
             return None
 
-        params = self._build_binary_encoding_params(gf2x_result, coeffs, n_qubits, len(state_vector))
+        synthesis = self._synthesize_binary_encoding(gf2x_result, coeffs, n_qubits, len(state_vector))
 
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
-            parameter=params,
+        # Build reduced wavefunction and delegate dense prep to nested algorithm
+        reduced_wf = self._create_reduced_wavefunction(synthesis["compressed_sv"], synthesis["dense_size"])
+        dense_algo = self._create_nested("dense_state_prep")
+        dense_circuit = dense_algo.run(reduced_wf)
+
+        # Compose with binary encoding + Gaussian elimination expansion.
+        # Reverse dense_row_map because DensePureStatePreparation internally reverses
+        # its rowMap; the reversed embedding cancels out that reversal so the net effect
+        # matches the original ApplyDensePreparation(dense_row_map, sv, qs) behavior.
+        return self._compose_binary_encoding(
+            dense_circuit,
+            list(reversed(synthesis["dense_row_map"])),
+            synthesis["binary_encoding_ops"],
+            synthesis["gaussian_elimination_ops"],
+            synthesis["ancilla_pool"],
+            n_qubits,
         )
-        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
 
-        return Circuit(
-            qsharp_factory=qsharp_factory,
-            qsharp_op=qsharp_op,
-            encoding="jordan-wigner",
-        )
-
-    def _build_binary_encoding_params(
+    def _synthesize_binary_encoding(
         self,
         gf2x_result: "GF2XEliminationResult",
         coeffs: np.ndarray,
@@ -226,7 +222,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             n_dets: Number of determinants (used for logging only).
 
         Returns:
-            A dict of parameters for Q# binary-encoding circuit construction.
+            A dict with synthesis results for composing the binary-encoding circuit.
 
         """
         include_negative_controls = self._settings.get("include_negative_controls")
@@ -248,7 +244,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         if norm > 0:
             compressed_sv /= norm
 
-        dense_row_map = gf2x_result.row_map[:dense_size]
+        dense_row_map = list(gf2x_result.row_map[:dense_size])
 
         gaussian_elimination_ops: list[MatrixCompressionOp] = []
         for operation in reversed(gf2x_result.operations):
@@ -262,55 +258,56 @@ class SparseIsometryStatePreparation(StatePreparation):
         active_qubits_set = {int(q) for q in gf2x_result.row_map}
         ancilla_pool = sorted(set(range(n_qubits)) - active_qubits_set)
 
-        state_prep_params = QSHARP_UTILS.BinaryEncoding.BinaryEncodingStatePreparationParams(
-            rowMap=list(dense_row_map),
-            stateVector=compressed_sv.tolist(),
-            gaussianEliminationOps=[op.to_qsharp_parameter() for op in gaussian_elimination_ops],
-            binaryEncodingOps=[op.to_qsharp_parameter() for op in encoded_ops],
-            numQubits=n_qubits,
-            ancillaPool=ancilla_pool,
-        )
-        params = vars(state_prep_params)
-
         Logger.info(
-            f"Binary encoding produced {len(params['binaryEncodingOps'])} operations "
+            f"Binary encoding produced {len(encoded_ops)} operations "
             f"for {n_qubits}-qubit system with {n_dets} determinants "
-            f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
+            f"using {len(ancilla_pool)} pre-existing qubits as ancilla pool"
         )
-        return params
+        return {
+            "compressed_sv": compressed_sv,
+            "dense_size": dense_size,
+            "dense_row_map": dense_row_map,
+            "binary_encoding_ops": list(encoded_ops),
+            "gaussian_elimination_ops": gaussian_elimination_ops,
+            "ancilla_pool": ancilla_pool,
+        }
 
-    def _wavefunction_to_bitstrings_and_coeffs(self, wavefunction: Wavefunction) -> tuple[list[str], np.ndarray]:
-        """Extract bitstrings and coefficients from a wavefunction.
+    def _create_reduced_wavefunction(self, statevector_data: np.ndarray, rank: int) -> Wavefunction:
+        """Construct a reduced Wavefunction from the GF2+X statevector.
+
+        Creates a synthetic Wavefunction using 1-bit-per-mode configurations
+        that represents the dense subspace after GF2+X elimination.
 
         Args:
-            wavefunction: The target wavefunction to prepare.
+            statevector_data: Amplitude vector of length 2^rank (normalized).
+            rank: Number of qubits in the reduced space.
 
         Returns:
-            A tuple containing a list of bitstrings and a corresponding array of coefficients.
+            A Wavefunction suitable for passing to a dense state preparation algorithm.
 
         """
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
-            bitstrings.append(bitstring)
-        return bitstrings, coeffs
+        configs = []
+        coeffs_list = []
+        for idx in range(len(statevector_data)):
+            if statevector_data[idx] != 0.0:
+                bits_str = "".join(str((idx >> i) & 1) for i in range(rank))
+                configs.append(Configuration.from_bitstring(bits_str))
+                coeffs_list.append(statevector_data[idx])
 
-    def _build_qsharp_state_prep_params(
-        self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, n_qubits: int
-    ) -> dict:
-        """Build state preparation parameters from pre-computed GF2+X results.
+        coeffs_arr = np.array(coeffs_list, dtype=float)
+        shells = [Shell(0, OrbitalType.S, np.array([1.0]), np.array([1.0])) for _ in range(rank)]
+        basis_set = BasisSet("reduced", shells)
+        orbitals = Orbitals(np.eye(rank), None, None, basis_set)
+        return Wavefunction(StateVectorContainer(coeffs_arr, configs, orbitals))
+
+    def _build_expansion_ops(self, gf2x_operation_results: "GF2XEliminationResult") -> list[MatrixCompressionOp]:
+        """Build expansion operations from GF2+X elimination results.
 
         Args:
             gf2x_operation_results: The result of GF2+X elimination.
-            statevector_data: The statevector corresponding to the reduced matrix.
-            n_qubits: The total number of qubits in the original space.
 
         Returns:
-            A parameter dict for Q# circuit construction.
+            List of MatrixCompressionOp representing the expansion gates.
 
         """
         expansion_ops: list[MatrixCompressionOp] = []
@@ -321,110 +318,136 @@ class SparseIsometryStatePreparation(StatePreparation):
                     expansion_ops.append(MatrixCompressionOp(MatrixCompressionType("CX"), [control, target]))
             elif operation[0] == "x" and isinstance(operation[1], int):
                 expansion_ops.append(MatrixCompressionOp(MatrixCompressionType("X"), [operation[1]]))
+        return expansion_ops
 
-        # State vector indexing is in little-endian order, the row map is reversed for Q# convention
-        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
-            rowMap=gf2x_operation_results.row_map[::-1],
-            stateVector=statevector_data.tolist(),
-            expansionOps=[op.to_dict() for op in expansion_ops],
-            numQubits=n_qubits,
-        )
-        return vars(state_prep_params)
-
-    def _create_dense(self, params: dict) -> Circuit:
-        """Create a standalone dense state preparation circuit.
-
-        Args:
-            params: The parameter dict for Q# circuit construction.
-
-        Returns:
-            A dense state preparation circuit on the reduced qubit subset.
-
-        """
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeDenseStatePreparation,
-            parameter={
-                "rowMap": params["rowMap"],
-                "stateVector": params["stateVector"],
-                "numQubits": params["numQubits"],
-            },
-        )
-        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
-
-    def _create_isometry(self, params: dict) -> Circuit:
-        """Create a standalone isometry circuit.
-
-        Args:
-            params: The parameter dict for Q# circuit construction.
-
-        Returns:
-            A Circuit containing the GF2+X expansion operations.
-
-        """
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeExpansion,
-            parameter={
-                "expansionOps": params["expansionOps"],
-                "numQubits": params["numQubits"],
-            },
-        )
-        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
-
-    def _qiskit_dense_preparation(
-        self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, num_qubits: int
+    def _compose_with_expansion(
+        self,
+        dense_circuit: Circuit,
+        expansion_ops: list[MatrixCompressionOp],
+        embedding_map: list[int],
+        n_qubits: int,
     ) -> Circuit:
-        """Perform dense state preparation using Qiskit and apply GF2+X operations in reverse.
+        """Compose a dense preparation circuit with expansion operations.
+
+        Embeds the dense circuit (operating on the reduced qubit subset) into
+        the full register, then applies GF2+X expansion operations.
 
         Args:
-            gf2x_operation_results: The result of GF2+X elimination containing the reduced matrix and operations.
-            statevector_data: The statevector corresponding to the reduced matrix.
-            num_qubits: The total number of qubits in the original space.
+            dense_circuit: Circuit from the nested dense state prep algorithm.
+            expansion_ops: GF2+X expansion operations for the full register.
+            embedding_map: Maps reduced qubit indices to full register positions.
+            n_qubits: Total number of qubits in the full register.
 
         Returns:
-            A Circuit object containing the quantum circuit that prepares the desired state using Qiskit
-            for dense preparation.
+            Composed Circuit operating on the full qubit register.
 
         """
-        from qiskit import QuantumCircuit, qasm3, transpile  # noqa: PLC0415
-        from qiskit.circuit.library import (  # noqa: PLC0415
-            StatePreparation as QiskitStatePreparation,
+        if dense_circuit._qsharp_op is not None:  # noqa: SLF001
+            return self._compose_qsharp(dense_circuit, expansion_ops, embedding_map, n_qubits)
+        return self._compose_qiskit(dense_circuit, expansion_ops, embedding_map, n_qubits)
+
+    def _compose_qsharp(
+        self,
+        dense_circuit: Circuit,
+        expansion_ops: list[MatrixCompressionOp],
+        embedding_map: list[int],
+        n_qubits: int,
+    ) -> Circuit:
+        """Compose via Q# — embed dense op on subregister, then apply expansion."""
+        serialized_ops = [op.to_dict() for op in expansion_ops]
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryOp(
+            dense_circuit._qsharp_op,  # noqa: SLF001
+            embedding_map,
+            serialized_ops,
         )
-        from qiskit.quantum_info import Statevector  # noqa: PLC0415
-        from qiskit.transpiler import PassManager  # noqa: PLC0415
-
-        from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
-            MergeZBasisRotations,
-            RemoveZBasisOnZeroState,
-            SubstituteCliffordRz,
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryCircuit,
+            parameter={
+                "denseOp": dense_circuit._qsharp_op,  # noqa: SLF001
+                "embeddingMap": embedding_map,
+                "expansionOps": serialized_ops,
+                "numQubits": n_qubits,
+            },
         )
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
 
-        # Use Qiskit dense state preparation
-        qc = QuantumCircuit(num_qubits)
-        statevector = Statevector(statevector_data)
-        qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
-        for operation in reversed(gf2x_operation_results.operations):
-            if operation[0] == "cx":
-                # operation[1] should be a tuple for CX operations
-                if isinstance(operation[1], tuple):
-                    target, control = operation[1]
-                    qc.cx(control, target)
-            elif operation[0] == "x" and isinstance(operation[1], int):
-                # operation[1] should be an int for X operations
-                qubit = operation[1]
-                qc.x(qubit)
+    def _compose_qiskit(
+        self,
+        dense_circuit: Circuit,
+        expansion_ops: list[MatrixCompressionOp],
+        embedding_map: list[int],
+        n_qubits: int,
+    ) -> Circuit:
+        """Compose via Qiskit — embed dense circuit on subregister, then apply expansion gates."""
+        from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
 
-        basis_gates = self._settings.get("basis_gates")
-        do_transpile = self._settings.get("transpile")
-        if do_transpile and basis_gates:
-            opt_level = self._settings.get("transpile_optimization_level")
-            qc = transpile(qc, basis_gates=basis_gates, optimization_level=opt_level)
-            pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
-            qc = pass_manager.run(qc)
+        from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
 
-            Logger.info(
-                f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
+        dense_qc = dense_circuit.get_qiskit_circuit()
+        full_qc = QuantumCircuit(n_qubits)
+        full_qc.compose(dense_qc, qubits=embedding_map, inplace=True)
+        apply_matrix_compression_ops(full_qc, expansion_ops)
+
+        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
+
+    def _compose_binary_encoding(
+        self,
+        dense_circuit: Circuit,
+        dense_row_map: list[int],
+        binary_encoding_ops: list[MatrixCompressionOp],
+        gaussian_elimination_ops: list[MatrixCompressionOp],
+        ancilla_pool: list[int],
+        n_qubits: int,
+    ) -> Circuit:
+        """Compose a dense circuit with binary-encoding and GF2+X expansion operations.
+
+        Args:
+            dense_circuit: Circuit from the nested dense state prep algorithm.
+            dense_row_map: Maps reduced qubit indices to full register positions.
+            binary_encoding_ops: Binary-encoding gate sequence.
+            gaussian_elimination_ops: GF2+X expansion operations.
+            ancilla_pool: Idle qubit indices available as ancillas.
+            n_qubits: Total number of qubits in the full register.
+
+        Returns:
+            Composed Circuit operating on the full qubit register.
+
+        """
+        if dense_circuit._qsharp_op is not None:  # noqa: SLF001
+            serialized_be = [op.to_qsharp_parameter() for op in binary_encoding_ops]
+            serialized_ge = [op.to_qsharp_parameter() for op in gaussian_elimination_ops]
+            qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeComposeBinaryEncodingOp(
+                dense_circuit._qsharp_op,  # noqa: SLF001
+                dense_row_map,
+                serialized_be,
+                serialized_ge,
+                ancilla_pool,
             )
-        return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
+            qsharp_factory = QsharpFactoryData(
+                program=QSHARP_UTILS.BinaryEncoding.MakeComposeBinaryEncodingCircuit,
+                parameter={
+                    "denseOp": dense_circuit._qsharp_op,  # noqa: SLF001
+                    "embeddingMap": dense_row_map,
+                    "binaryEncodingOps": serialized_be,
+                    "gaussianEliminationOps": serialized_ge,
+                    "numQubits": n_qubits,
+                    "ancillaPool": ancilla_pool,
+                },
+            )
+            return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
+
+        # Qiskit path
+        from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
+
+        dense_qc = dense_circuit.get_qiskit_circuit()
+        full_qc = QuantumCircuit(n_qubits)
+        full_qc.compose(dense_qc, qubits=dense_row_map, inplace=True)
+        apply_matrix_compression_ops(full_qc, binary_encoding_ops)
+        apply_matrix_compression_ops(full_qc, gaussian_elimination_ops)
+
+        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
 
     def _perform_gf2x(
         self, bitstrings: list[list[int]], coeffs: np.ndarray

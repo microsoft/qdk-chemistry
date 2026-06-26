@@ -12,7 +12,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.Measurement.MResetX;
-    import QDKChemistry.Utils.StatePreparation.ApplyDensePreparation;
 
     /// A single gate produced by the matrix compression pipeline.
     ///
@@ -28,23 +27,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         qubits : Int[],
         controlState : Int,
         lookupData : Bool[][],
-    }
-
-    /// Parameters for the binary-encoding state preparation.
-    struct BinaryEncodingStatePreparationParams {
-        /// Qubit indices for the dense state preparation (row map).
-        rowMap : Int[],
-        /// Amplitudes of the reduced-space statevector.
-        stateVector : Double[],
-        /// GF2+X expansion operations (CX / X) to reverse the GF2+X elimination.
-        gaussianEliminationOps : MatrixCompressionOp[],
-        /// Binary-encoding gate sequence (already reversed by Python).
-        binaryEncodingOps : MatrixCompressionOp[],
-        /// Total number of qubits.
-        numQubits : Int,
-        /// Qubit indices (into the main register) that are idle during binary encoding
-        /// and can be borrowed as ancillas by SparseOneHotSelect.
-        ancillaPool : Int[],
     }
 
     /// Apply a single matrix-compression gate to a qubit register.
@@ -311,64 +293,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         }
     }
 
-    /// Prepare a quantum state using GF2+X elimination followed by binary-encoding circuit synthesis.
-    ///
-    /// The procedure is:
-    ///   1. Prepare the dense statevector on the reduced qubit subset.
-    ///   2. Apply the binary-encoding operations (already reversed by Python).
-    ///      SELECT gates borrow ancillas from ``params.ancillaPool`` (qubits that
-    ///      are idle during binary encoding and start in |0⟩) to avoid allocating
-    ///      extra qubits.
-    ///   3. Apply the GF2+X expansion operations (CX / X).
-    operation BinaryEncodingStatePreparation(
-        params : BinaryEncodingStatePreparationParams,
-        qs : Qubit[],
-    ) : Unit {
-        // Step 1: Dense state prep on reduced subspace
-        ApplyDensePreparation(params.rowMap, params.stateVector, qs);
-        // Step 2 & 3: Apply binary-encoding operations and GF2+X operations
-        ApplyExpansion(params.binaryEncodingOps, params.gaussianEliminationOps, qs, params.ancillaPool);
-    }
-
-    /// Create a callable for the binary-encoding state preparation.
-    function MakeBinaryEncodingStatePreparationOp(
-        rowMap : Int[],
-        stateVector : Double[],
-        gaussianEliminationOps : MatrixCompressionOp[],
-        binaryEncodingOps : MatrixCompressionOp[],
-        numQubits : Int,
-        ancillaPool : Int[],
-    ) : Qubit[] => Unit {
-        BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
-            rowMap = rowMap,
-            stateVector = stateVector,
-            gaussianEliminationOps = gaussianEliminationOps,
-            binaryEncodingOps = binaryEncodingOps,
-            numQubits = numQubits,
-            ancillaPool = ancillaPool,
-        }, _)
-    }
-
-    /// Top-level circuit entry point for binary-encoding state preparation.
-    operation MakeBinaryEncodingStatePreparationCircuit(
-        rowMap : Int[],
-        stateVector : Double[],
-        gaussianEliminationOps : MatrixCompressionOp[],
-        binaryEncodingOps : MatrixCompressionOp[],
-        numQubits : Int,
-        ancillaPool : Int[],
-    ) : Unit {
-        use qs = Qubit[numQubits];
-        BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
-            rowMap = rowMap,
-            stateVector = stateVector,
-            gaussianEliminationOps = gaussianEliminationOps,
-            binaryEncodingOps = binaryEncodingOps,
-            numQubits = numQubits,
-            ancillaPool = ancillaPool,
-        }, qs);
-    }
-
     /// Applies the binary-encoding operations followed by GF2+X expansion operations.
     operation ApplyExpansion(
         binaryEncodingOps : MatrixCompressionOp[],
@@ -385,16 +309,42 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         }
     }
 
-    /// Circuit entry point for the isometry stage of binary-encoding
-    /// state preparation.
-    /// Allocates qubits and delegates to ApplyExpansion.
-    operation MakeBinaryEncodingExpansion(
+    /// Composes a dense preparation operation with binary-encoding expansion.
+    /// The denseOp is applied to the subregister specified by embeddingMap,
+    /// then binary-encoding and GF2+X expansion operations are applied.
+    operation ComposeBinaryEncoding(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
+        binaryEncodingOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
+        ancillaPool : Int[],
+        qs : Qubit[],
+    ) : Unit {
+        denseOp(Subarray(embeddingMap, qs));
+        ApplyExpansion(binaryEncodingOps, gaussianEliminationOps, qs, ancillaPool);
+    }
+
+    /// Returns a callable that applies binary-encoding composition.
+    function MakeComposeBinaryEncodingOp(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
+        binaryEncodingOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
+        ancillaPool : Int[],
+    ) : Qubit[] => Unit {
+        ComposeBinaryEncoding(denseOp, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, _)
+    }
+
+    /// Circuit entry point for binary-encoding composition.
+    operation MakeComposeBinaryEncodingCircuit(
+        denseOp : Qubit[] => Unit,
+        embeddingMap : Int[],
         binaryEncodingOps : MatrixCompressionOp[],
         gaussianEliminationOps : MatrixCompressionOp[],
         numQubits : Int,
         ancillaPool : Int[],
     ) : Unit {
         use qs = Qubit[numQubits];
-        ApplyExpansion(binaryEncodingOps, gaussianEliminationOps, qs, ancillaPool);
+        ComposeBinaryEncoding(denseOp, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, qs);
     }
 }

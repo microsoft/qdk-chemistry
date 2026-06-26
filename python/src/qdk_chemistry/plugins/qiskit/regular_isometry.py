@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
 from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 from qiskit.compiler import transpile
@@ -47,22 +48,12 @@ class RegularIsometryStatePreparation(StatePreparation):
 
         """
         Logger.trace_entering()
-        # Active Space Consistency Check
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
 
-        num_orbitals = len(alpha_indices)
-        n_qubits = num_orbitals * 2
+        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
+        n_qubits = int(np.log2(len(statevector_data)))
+
         num_dets = wavefunction.size()
         Logger.debug(f"Using {num_dets} determinants for state preparation")
-
-        # Create statevector using Python conversion function
-        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
 
         # Create the circuit
         circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")

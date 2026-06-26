@@ -38,7 +38,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
+from qdk_chemistry.data import AlgorithmRef, Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_test_orbitals
@@ -85,7 +85,9 @@ def test_sparse_isometry_basic(wavefunction_4e4o):
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_sparse_isometry_qiskit_dense_prepare(wavefunction_4e4o):
     """Test the sparse isometry GF(2^X) StatePreparation algorithm basic functionality."""
-    prep = create("state_prep", "sparse_isometry", dense_preparation_method="qiskit")
+    prep = create(
+        "state_prep", "sparse_isometry", dense_state_prep=AlgorithmRef("state_prep", "qiskit_regular_isometry")
+    )
     # Test circuit creation
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)

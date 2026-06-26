@@ -12,7 +12,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryStatePreparation
-from qdk_chemistry.data import Circuit
+from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -84,9 +84,12 @@ def test_sparse_isometry_energy_validation(wavefunction_10e6o, hamiltonian_10e6o
     qiskit_sparse_prep = create(
         "state_prep",
         algorithm_name="sparse_isometry",
-        basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
-        transpile_optimization_level=1,
-        dense_preparation_method="qiskit",
+        dense_state_prep=AlgorithmRef(
+            "state_prep",
+            "qiskit_regular_isometry",
+            basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
+            transpile_optimization_level=1,
+        ),
     )
 
     circuit = sparse_prep.run(wavefunction_10e6o).get_qiskit_circuit()
