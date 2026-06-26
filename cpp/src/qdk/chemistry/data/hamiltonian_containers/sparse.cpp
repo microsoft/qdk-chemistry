@@ -617,11 +617,9 @@ void SparseHamiltonianContainer::_materialize_dense_two_body() const {
 
 std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
     int n) {
-  std::vector<size_t> active(static_cast<size_t>(n));
-  std::iota(active.begin(), active.end(), size_t{0});
-  return std::make_shared<ModelOrbitals>(
-      static_cast<size_t>(n),
-      Orbitals::RestrictedCASIndices{std::move(active), {}});
+  // Model Hamiltonian basis: a full active space over n modes with no spin
+  // axis. The container itself is always restricted (is_restricted() == true).
+  return std::make_shared<ModelOrbitals>(static_cast<size_t>(n));
 }
 
 Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(
@@ -645,6 +643,19 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
           if (val != 0.0) m[{p, q, r, s}] = val;
         }
   return m;
+}
+
+void SparseHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  HamiltonianContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _one_body_sparse);
+  if (_two_body_sparse) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _two_body_sparse->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
 }
 
 const SymmetryBlockedSparseMap<4>&

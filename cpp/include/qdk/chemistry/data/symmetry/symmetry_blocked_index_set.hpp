@@ -225,6 +225,9 @@ class SymmetryBlockedIndexSet
   static std::shared_ptr<SymmetryBlockedIndexSet> from_file(
       const std::string& filename, const std::string& type);
 
+ protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   static Base::BlockMap _build_block_map(
       std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>& indices);

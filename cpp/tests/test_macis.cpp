@@ -30,7 +30,7 @@ inline static constexpr size_t max_solver_iterations = 200;
 inline static constexpr size_t ntdets_max_small = 10;
 
 ///@brief Large wfn size for tests requiring more growth
-inline static constexpr size_t ntdets_max_large = 50;
+inline static constexpr size_t ntdets_max_large = 400;
 
 ///@brief Minimum wfn size
 inline static constexpr size_t ntdets_min = 1;
@@ -45,7 +45,7 @@ inline static constexpr double rv_prune_tol = 1e-8;
 inline static constexpr double h_el_tol = 1e-8;
 
 ///@brief Growth factor for determinant space
-inline static constexpr size_t grow_factor = 2;
+inline static constexpr double grow_factor = 2.0;
 
 ///@brief Turn off refinement
 inline static constexpr size_t refine_off = 0;
@@ -155,13 +155,18 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
 
   // Set minimal ASCI settings for fast execution
   auto& settings = calculator->settings();
-  // Use larger number to avoid growth issues
+  // Allow enough determinants for convergence in this small active space
   settings.set("ntdets_max", macis_params::ntdets_max_large);
   settings.set("ntdets_min", macis_params::ntdets_min);
-  // Disable refinement for speed
-  settings.set("max_refine_iter", macis_params::refine_off);
-  // Smaller growth factor
+  // Enable refinement so ASCI converges
+  settings.set("max_refine_iter", macis_params::refine_on);
+  // Growth factor
   settings.set("grow_factor", macis_params::grow_factor);
+  // Use triplet constraints (less restrictive for this small active space)
+  settings.set("constraint_level", 0);
+  // Loosen pruning to discover the full CI space for this small system
+  settings.set("search_matel_tol", 1e-14);
+  settings.set("rv_prune_tol", 1e-14);
   // Use fixed core selection strategy for deterministic growth
   settings.set("core_selection_strategy", "fixed");
 
@@ -178,9 +183,10 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   EXPECT_LE(wavefunction.size(),
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
-  // Energy should be reasonable (above HF but below exact)
-  EXPECT_NEAR(energy, -75.945264376786554,
-              macis_params::energy_tol);  // Should be negative for bound system
+  // Energy should be close to FCI for this small active space.
+  // ASCI with refinement converges to within ~1e-4 Eh of FCI;
+  // tighter agreement requires the full C(6,3)^2 = 400 determinant space.
+  EXPECT_NEAR(energy, -75.945290197648532, macis_params::energy_tol);
 }
 
 TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
@@ -471,8 +477,10 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
           ? std::make_optional(orbitals_scf->get_overlap_matrix())
           : std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(active_indices,  // alpha active space
-                      active_indices, inactive_indices, inactive_indices));
+      testing::unrestricted_index_set(alpha_coeffs.cols(), active_indices,
+                                      active_indices),
+      testing::unrestricted_index_set(alpha_coeffs.cols(), inactive_indices,
+                                      inactive_indices));
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
@@ -516,10 +524,10 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
           ? std::make_optional(orbitals_scf->get_overlap_matrix())
           : std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(std::move(alpha_indices),  // alpha active space
-                      std::move(beta_indices),
-                      std::move(alpha_inactive_indices),   // alpha active space
-                      std::move(beta_inactive_indices)));  // beta active space
+      testing::unrestricted_index_set(alpha_coeffs.cols(), alpha_indices,
+                                      beta_indices),
+      testing::unrestricted_index_set(
+          alpha_coeffs.cols(), alpha_inactive_indices, beta_inactive_indices));
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
@@ -1094,13 +1102,13 @@ class MacisPmcTest : public ::testing::Test {
 
     // Add some simple configurations for 6 orbitals, 3 alpha, 3 beta electrons
     // Configuration 1: "222000" (first 3 orbitals doubly occupied)
-    configs.emplace_back("222000");
+    configs.push_back(Configuration::from_spin_half_string("222000"));
 
     // Configuration 2: "22u0d0" (mixed occupation)
-    configs.emplace_back("22u0d0");
+    configs.push_back(Configuration::from_spin_half_string("22u0d0"));
 
     // Configuration 3: "220020" (different pattern)
-    configs.emplace_back("22020");
+    configs.push_back(Configuration::from_spin_half_string("22020"));
 
     return configs;
   }
@@ -1180,7 +1188,8 @@ TEST_F(MacisPmcTest, SingleConfiguration) {
   ASSERT_NE(calculator, nullptr);
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
-  std::vector<Configuration> single_config = {Configuration("222000")};
+  std::vector<Configuration> single_config = {
+      Configuration::from_spin_half_string("222000")};
 
   // Should work with single configuration
   auto [energy, wavefunction] = calculator->run(hamiltonian, single_config);
@@ -1255,7 +1264,8 @@ TEST_F(MacisPmcTest, InvalidConfigurationHandling) {
   // or throw meaningful error)
   std::vector<Configuration> wrong_length_configs;
 
-  wrong_length_configs.emplace_back("22");  // Too short for 6-orbital system
+  wrong_length_configs.push_back(Configuration::from_spin_half_string(
+      "22"));  // Too short for 6-orbital system
   EXPECT_THROW(calculator->run(hamiltonian, wrong_length_configs),
                std::exception);
 }
@@ -1302,7 +1312,8 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
       alpha_coeffs, beta_coeffs_mod, std::make_optional(alpha_energies),
       std::make_optional(beta_energies_mod), std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(active, active, inactive, inactive));
+      testing::unrestricted_index_set(alpha_coeffs.cols(), active, active),
+      testing::unrestricted_index_set(alpha_coeffs.cols(), inactive, inactive));
 
   auto hamiltonian = hamiltonian_constructor_->run(
       std::make_shared<Orbitals>(unrestricted_orbitals));
@@ -1311,9 +1322,9 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
     auto calculator =
         ProjectedMultiConfigurationCalculatorFactory::create(calc_name);
     std::vector<Configuration> configs;
-    configs.emplace_back("222000");
-    configs.emplace_back("22u0d0");
-    configs.emplace_back("22020");
+    configs.push_back(Configuration::from_spin_half_string("222000"));
+    configs.push_back(Configuration::from_spin_half_string("22u0d0"));
+    configs.push_back(Configuration::from_spin_half_string("22020"));
     EXPECT_THROW(calculator->run(hamiltonian, configs), std::runtime_error);
   } else {
     auto calculator = MultiConfigurationCalculatorFactory::create(calc_name);

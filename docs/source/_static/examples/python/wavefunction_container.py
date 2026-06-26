@@ -7,19 +7,17 @@
 
 import numpy as np
 from qdk_chemistry.data import (
-    Orbitals,
-    SlaterDeterminantContainer,
-    CasWavefunctionContainer,
-    SciWavefunctionContainer,
-    CoupledClusterContainer,
-    MP2Container,
-    Configuration,
-    Wavefunction,
-    Hamiltonian,
-    CanonicalFourCenterHamiltonianContainer,
+    AmplitudeContainer,
+    AmplitudeType,
     BasisSet,
-    Shell,
+    CanonicalFourCenterHamiltonianContainer,
+    Configuration,
+    Hamiltonian,
+    Orbitals,
     OrbitalType,
+    Shell,
+    StateVectorContainer,
+    Wavefunction,
 )
 
 
@@ -92,10 +90,10 @@ orbitals = make_minimal_orbitals()
 
 # Create a simple Slater determinant wavefunction for H2 ground state
 # 2 electrons in bonding sigma orbital
-det = Configuration("20")
+det = Configuration.from_spin_half_string("20")
 
 # Constructor takes single determinant and orbitals as input
-sd_container = SlaterDeterminantContainer(det, orbitals)
+sd_container = StateVectorContainer(det, orbitals)
 sd_wavefunction = Wavefunction(sd_container)
 # end-cell-create-slater
 ################################################################################
@@ -106,10 +104,12 @@ sd_wavefunction = Wavefunction(sd_container)
 # CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
 # All possible configurations:
 cas_dets = [
-    Configuration("20"),  # both electrons in bonding MO (ground state)
-    Configuration("ud"),  # alpha in bonding, beta in antibonding
-    Configuration("du"),  # beta in bonding, alpha in antibonding
-    Configuration("02"),  # both electrons in antibonding
+    Configuration.from_spin_half_string(
+        "20"
+    ),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string("ud"),  # alpha in bonding, beta in antibonding
+    Configuration.from_spin_half_string("du"),  # beta in bonding, alpha in antibonding
+    Configuration.from_spin_half_string("02"),  # both electrons in antibonding
 ]
 
 # Coefficients (normalized later by container)
@@ -117,7 +117,7 @@ cas_coeffs = np.array([0.95, 0.15, 0.15, 0.05])
 
 # Create a CAS wavefunction: requires all coefficients and determinants,
 # as well as orbitals, in constructor
-cas_container = CasWavefunctionContainer(cas_coeffs, cas_dets, orbitals)
+cas_container = StateVectorContainer(cas_coeffs, cas_dets, orbitals)
 cas_wavefunction = Wavefunction(cas_container)
 # end-cell-create-cas
 ################################################################################
@@ -127,9 +127,11 @@ cas_wavefunction = Wavefunction(cas_container)
 # Create an SCI wavefunction for H2
 # SCI selects only the most important configurations/determinants from the full space
 sci_dets = [
-    Configuration("20"),  # both electrons in bonding MO (ground state)
-    Configuration("du"),  # alpha in bonding, beta in antibonding
-    Configuration("ud"),  # beta in bonding, alpha in antibonding
+    Configuration.from_spin_half_string(
+        "20"
+    ),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string("du"),  # alpha in bonding, beta in antibonding
+    Configuration.from_spin_half_string("ud"),  # beta in bonding, alpha in antibonding
 ]
 
 # Coefficients for selected determinants
@@ -137,7 +139,7 @@ sci_coeffs = np.array([0.96, 0.15, 0.15])
 
 # Create a SCI wavefunction: requires selected coefficients and determinants, as well
 # as orbitals, in constructor
-sci_container = SciWavefunctionContainer(sci_coeffs, sci_dets, orbitals)
+sci_container = StateVectorContainer(sci_coeffs, sci_dets, orbitals)
 sci_wavefunction = Wavefunction(sci_container)
 # end-cell-create-sci
 ################################################################################
@@ -145,18 +147,21 @@ sci_wavefunction = Wavefunction(sci_container)
 ################################################################################
 # start-cell-create-mp2
 # Create an MP2 wavefunction for H2
-# MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on demand
+# In practice the MP2 algorithm computes the amplitudes; here we store them
+# directly in an AmplitudeContainer. T1 is zero for MP2.
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-hamiltonian = make_minimal_hamiltonian(orbitals)
-ref_det = Configuration("20")
-sd_container = SlaterDeterminantContainer(ref_det, orbitals)
+ref_det = Configuration.from_spin_half_string("20")
+sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
-# Create MP2 container: requires Hamiltonian and reference wavefunction
-# Amplitudes are computed lazily when first requested
-mp2_container = MP2Container(hamiltonian, ref_wavefunction, "mp")
+# MP2 amplitudes (T1 is zero for MP2)
+t1_mp2 = np.zeros(1)
+t2_mp2 = np.array([0.1])
+mp2_container = AmplitudeContainer(
+    orbitals, ref_wavefunction, AmplitudeType.MollerPlesset, t1_mp2, t2_mp2
+)
 mp2_wavefunction = Wavefunction(mp2_container)
 # end-cell-create-mp2
 ################################################################################
@@ -168,8 +173,8 @@ mp2_wavefunction = Wavefunction(mp2_container)
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-ref_det = Configuration("20")
-sd_container = SlaterDeterminantContainer(ref_det, orbitals)
+ref_det = Configuration.from_spin_half_string("20")
+sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
 # Create example T1 and T2 amplitudes
@@ -181,8 +186,12 @@ t1_amplitudes = np.array([0.05])
 t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
-cc_container = CoupledClusterContainer(
-    orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes
+cc_container = AmplitudeContainer(
+    orbitals,
+    ref_wavefunction,
+    AmplitudeType.CoupledCluster,
+    t1_amplitudes,
+    t2_amplitudes,
 )
 cc_wavefunction = Wavefunction(cc_container)
 # end-cell-create-cc

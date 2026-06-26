@@ -47,7 +47,7 @@ TEST_F(OrbitalsTest, Constructors) {
   energies << -1.0, -0.5, 0.2;
 
   auto basis_set = testing::create_random_basis_set(n_basis);
-  Orbitals orb1(coeffs, energies, std::nullopt, basis_set, std::nullopt);
+  Orbitals orb1(coeffs, energies, std::nullopt, basis_set);
 
   EXPECT_EQ(n_basis, orb1.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb1.get_num_molecular_orbitals());
@@ -59,7 +59,7 @@ TEST_F(OrbitalsTest, Constructors) {
             orb2.get_num_molecular_orbitals());
 
   // Test constructor with restricted calculation
-  Orbitals orb3(coeffs, energies, std::nullopt, basis_set, std::nullopt);
+  Orbitals orb3(coeffs, energies, std::nullopt, basis_set);
   EXPECT_EQ(n_basis, orb3.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb3.get_num_molecular_orbitals());
 }
@@ -72,7 +72,7 @@ TEST_F(OrbitalsTest, CoefficientManagement) {
   coeffs << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
 
   auto basis_set = testing::create_random_basis_set(n_basis);
-  Orbitals orb(coeffs, std::nullopt, std::nullopt, basis_set, std::nullopt);
+  Orbitals orb(coeffs, std::nullopt, std::nullopt, basis_set);
 
   EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
@@ -99,7 +99,7 @@ TEST_F(OrbitalsTest, EnergyManagement) {
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
 
   auto basis_set = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, std::nullopt, basis_set, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, basis_set);
 
   const auto& [alpha_energies, beta_energies] = orb.get_energies();
   EXPECT_EQ(energies.size(), alpha_energies.size());
@@ -122,7 +122,7 @@ TEST_F(OrbitalsTest, AOOverlap) {
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(n_basis, n_basis);
 
   auto basis_set = testing::create_random_basis_set(n_basis);
-  Orbitals orb(coeffs, std::nullopt, overlap, basis_set, std::nullopt);
+  Orbitals orb(coeffs, std::nullopt, overlap, basis_set);
 
   const auto& retrieved_overlap = orb.get_overlap_matrix();
   EXPECT_EQ(overlap.rows(), retrieved_overlap.rows());
@@ -149,8 +149,7 @@ TEST_F(OrbitalsTest, SizeAndDimensionQueries) {
   // Test that empty matrices throw exception during construction
   Eigen::MatrixXd empty_coeffs(0, 0);
   auto empty_basis = testing::create_random_basis_set(1);  // Still need a basis
-  EXPECT_THROW(Orbitals(empty_coeffs, std::nullopt, std::nullopt, empty_basis,
-                        std::nullopt),
+  EXPECT_THROW(Orbitals(empty_coeffs, std::nullopt, std::nullopt, empty_basis),
                std::runtime_error);
 
   // Set up data
@@ -163,7 +162,7 @@ TEST_F(OrbitalsTest, SizeAndDimensionQueries) {
   energies.setRandom();
 
   auto basis_set = testing::create_random_basis_set(n_basis);
-  Orbitals orb(coeffs, energies, std::nullopt, basis_set, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, basis_set);
 
   EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
@@ -184,8 +183,7 @@ TEST_F(OrbitalsTest, OpenShellAndRestrictedQueries) {
   energies << -1.0, 0.5;
 
   auto basis_set = testing::create_random_basis_set(2);
-  Orbitals restricted_orb(coeffs, energies, std::nullopt, basis_set,
-                          std::nullopt);
+  Orbitals restricted_orb(coeffs, energies, std::nullopt, basis_set);
 
   // Should be restricted and closed shell
   EXPECT_TRUE(restricted_orb.is_restricted());
@@ -203,8 +201,7 @@ TEST_F(OrbitalsTest, HasEnergies) {
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
 
   auto basis_set = testing::create_random_basis_set(3);
-  Orbitals orb_no_energies(coeffs, std::nullopt, std::nullopt, basis_set,
-                           std::nullopt);
+  Orbitals orb_no_energies(coeffs, std::nullopt, std::nullopt, basis_set);
 
   EXPECT_FALSE(orb_no_energies.has_energies());
 
@@ -212,8 +209,7 @@ TEST_F(OrbitalsTest, HasEnergies) {
   Eigen::VectorXd energies(3);
   energies << -1.0, 0.0, 1.0;
 
-  Orbitals orb_with_energies(coeffs, energies, std::nullopt, basis_set,
-                             std::nullopt);
+  Orbitals orb_with_energies(coeffs, energies, std::nullopt, basis_set);
 
   // Check has_energies() after setting
   EXPECT_TRUE(orb_with_energies.has_energies());
@@ -228,7 +224,7 @@ TEST_F(OrbitalsTest, HasEnergies) {
 
   auto basis_set_2x2 = testing::create_random_basis_set(2);
   Orbitals orb2(coeffs, coeffs, alpha_energies, beta_energies, std::nullopt,
-                basis_set_2x2, std::nullopt);
+                basis_set_2x2);
 
   // Check has_energies() after setting unrestricted energies
   EXPECT_TRUE(orb2.has_energies());
@@ -238,9 +234,9 @@ TEST_F(OrbitalsTest, Validation) {
   // Empty orbitals should throw exception during construction
   Eigen::MatrixXd empty_coeffs(0, 0);
   auto empty_basis_val = testing::create_random_basis_set(1);
-  EXPECT_THROW(Orbitals(empty_coeffs, std::nullopt, std::nullopt,
-                        empty_basis_val, std::nullopt),
-               std::runtime_error);
+  EXPECT_THROW(
+      Orbitals(empty_coeffs, std::nullopt, std::nullopt, empty_basis_val),
+      std::runtime_error);
 
   // Set minimal valid data
   Eigen::MatrixXd coeffs(2, 2);
@@ -249,7 +245,7 @@ TEST_F(OrbitalsTest, Validation) {
   energies << -1.0, 0.5;
 
   auto valid_basis = testing::create_random_basis_set(2);
-  Orbitals valid_orb(coeffs, energies, std::nullopt, valid_basis, std::nullopt);
+  Orbitals valid_orb(coeffs, energies, std::nullopt, valid_basis);
 }
 
 TEST_F(OrbitalsTest, JSONSerialization) {
@@ -262,7 +258,7 @@ TEST_F(OrbitalsTest, JSONSerialization) {
   occupations << 2.0, 0.0;
 
   auto json_basis = testing::create_random_basis_set(2);
-  Orbitals orb(coeffs, energies, std::nullopt, json_basis, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, json_basis);
 
   // Test JSON conversion
   auto json_data = orb.to_json();
@@ -300,7 +296,7 @@ TEST_F(OrbitalsTest, HDF5Serialization) {
   energies.setRandom();
 
   auto hdf5_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, std::nullopt, hdf5_basis, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, hdf5_basis);
 
   // Test HDF5 conversion - use correct filename format
   std::string hdf5_filename = "test.orbitals.h5";
@@ -333,7 +329,7 @@ TEST_F(OrbitalsTest, UnrestrictedCalculations) {
   // Create the orbitals object with unrestricted data
   auto unrestricted_basis = testing::create_random_basis_set(n_basis);
   Orbitals orb(alpha_coeffs, beta_coeffs, alpha_energies, beta_energies,
-               std::nullopt, unrestricted_basis, std::nullopt);
+               std::nullopt, unrestricted_basis);
 
   // Verify unrestricted nature
   EXPECT_FALSE(orb.is_restricted());
@@ -366,9 +362,8 @@ TEST_F(OrbitalsTest, BasisSetManagement) {
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(2, 2);
 
   // Test that basis set is now required (should throw with nullptr)
-  EXPECT_THROW(
-      Orbitals(coeffs, std::nullopt, std::nullopt, nullptr, std::nullopt),
-      std::runtime_error);
+  EXPECT_THROW(Orbitals(coeffs, std::nullopt, std::nullopt, nullptr),
+               std::runtime_error);
 
   // Create a minimal structure for the basis set
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
@@ -380,8 +375,7 @@ TEST_F(OrbitalsTest, BasisSetManagement) {
   shells.emplace_back(
       Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
   auto basis = std::make_shared<BasisSet>("test", shells, structure);
-  Orbitals orb_with_basis(coeffs, std::nullopt, std::nullopt, basis,
-                          std::nullopt);
+  Orbitals orb_with_basis(coeffs, std::nullopt, std::nullopt, basis);
   EXPECT_TRUE(orb_with_basis.has_basis_set());
 
   // Test retrieval
@@ -397,7 +391,7 @@ TEST_F(OrbitalsTest, SummaryString) {
   energies << -1.0, 0.5;
 
   auto summary_basis = testing::create_random_basis_set(2);
-  Orbitals orb(coeffs, energies, std::nullopt, summary_basis, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, summary_basis);
 
   // Test that summary string is non-empty and contains relevant information
   std::string summary = orb.get_summary();
@@ -407,16 +401,15 @@ TEST_F(OrbitalsTest, SummaryString) {
 TEST_F(OrbitalsTest, ErrorHandling) {
   // Test that constructor throws for empty data
   Eigen::MatrixXd empty_coeffs(0, 0);
-  EXPECT_THROW(
-      Orbitals(empty_coeffs, std::nullopt, std::nullopt, nullptr, std::nullopt),
-      std::runtime_error);
+  EXPECT_THROW(Orbitals(empty_coeffs, std::nullopt, std::nullopt, nullptr),
+               std::runtime_error);
 
   // Create a valid orbital object without energies or overlap for testing
   // getter exceptions
   Eigen::MatrixXd coeffs(2, 2);
   coeffs.setIdentity();
   auto error_basis = testing::create_random_basis_set(2);
-  Orbitals orb(coeffs, std::nullopt, std::nullopt, error_basis, std::nullopt);
+  Orbitals orb(coeffs, std::nullopt, std::nullopt, error_basis);
 
   // Test accessing missing data throws exceptions
   EXPECT_THROW(orb.get_energies(), std::runtime_error);
@@ -488,7 +481,7 @@ TEST_F(OrbitalsTest, FileIOSpecific) {
   overlap(0, 1) = 0.1;
   overlap(1, 0) = 0.1;
   auto hdf5_specific_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, overlap, hdf5_specific_basis, std::nullopt);
+  Orbitals orb(coeffs, energies, overlap, hdf5_specific_basis);
 
   // Test HDF5 file I/O methods
   orb.to_hdf5_file("test.orbitals.h5");
@@ -536,8 +529,7 @@ TEST_F(OrbitalsTest, FileIOValidation) {
   Eigen::MatrixXd coeffs(2, 2);
   coeffs.setIdentity();
   auto validation_basis = testing::create_random_basis_set(2);
-  Orbitals orb(coeffs, std::nullopt, std::nullopt, validation_basis,
-               std::nullopt);
+  Orbitals orb(coeffs, std::nullopt, std::nullopt, validation_basis);
 
   // Test filename validation for JSON files
   EXPECT_THROW(orb.to_json_file("test.json"), std::invalid_argument);
@@ -563,8 +555,10 @@ TEST_F(OrbitalsTest, ActiveSpaceManagement) {
   energies << -1.0, -0.5, 0.5, 1.0;
   std::vector<size_t> active_indices = {1, 2};
   auto active_basis = testing::create_random_basis_set(4);
-  Orbitals orb(coeffs, energies, std::nullopt, active_basis,
-               std::make_tuple(active_indices, std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, active_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Check active space is set
   EXPECT_TRUE(orb.has_active_space());
@@ -585,8 +579,10 @@ TEST_F(OrbitalsTest, InactiveSpaceManagement) {
   energies << -1.0, -0.5, 0.5, 1.0;
   std::vector<size_t> inactive_indices = {0, 1};
   auto basis_set = testing::create_random_basis_set(4);
-  Orbitals orb(coeffs, energies, std::nullopt, basis_set,
-               std::make_tuple(std::vector<size_t>{}, inactive_indices));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, basis_set,
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}),
+      testing::restricted_index_set(coeffs.cols(), inactive_indices));
 
   // Check inactive space is set
   EXPECT_TRUE(orb.has_inactive_space());
@@ -607,8 +603,10 @@ TEST_F(OrbitalsTest, ActiveSpaceSerialization) {
   energies << -1.0, 0.5;
   std::vector<size_t> active_indices = {0, 1};
   auto active_serial_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, std::nullopt, active_serial_basis,
-               std::make_tuple(active_indices, std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, active_serial_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Test JSON serialization
   orb.to_json_file("test.orbitals.json");
@@ -646,10 +644,13 @@ TEST_F(OrbitalsTest, UnrestrictedActiveSpaceSerialization) {
   std::vector<size_t> alpha_active_indices = {0};
   std::vector<size_t> beta_active_indices = {1};
   auto unrestricted_active_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs_alpha, coeffs_beta, energies_alpha, energies_beta,
-               std::nullopt, unrestricted_active_basis,
-               std::make_tuple(alpha_active_indices, beta_active_indices,
-                               std::vector<size_t>{}, std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, std::nullopt,
+      unrestricted_active_basis,
+      testing::unrestricted_index_set(coeffs_alpha.cols(), alpha_active_indices,
+                                      beta_active_indices),
+      testing::unrestricted_index_set(
+          coeffs_alpha.cols(), std::vector<size_t>{}, std::vector<size_t>{}));
 
   // Test JSON round-trip
   orb.to_json_file("test.orbitals.json");
@@ -681,8 +682,10 @@ TEST_F(OrbitalsTest, CopyConstructorWithActiveSpace) {
   coeffs << 0.9, 0.1, 0.1, -0.9, 0.0, 0.0;
   std::vector<size_t> active_indices = {0, 1};
   auto copy_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, Eigen::VectorXd::Random(2), std::nullopt, copy_basis,
-               std::make_tuple(active_indices, std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, Eigen::VectorXd::Random(2), std::nullopt, copy_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Create a copy via copy constructor
   Orbitals orb_copy(orb);
@@ -728,7 +731,7 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
 
   auto roundtrip_basis = testing::create_random_basis_set(3);
   Orbitals orb(coeffs_alpha, coeffs_beta, energies_alpha, energies_beta,
-               overlap, roundtrip_basis, std::nullopt);
+               overlap, roundtrip_basis);
 
   // Test JSON round-trip
   orb.to_json_file("test.orbitals.json");

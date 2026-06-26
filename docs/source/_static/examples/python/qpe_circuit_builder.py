@@ -26,12 +26,10 @@ iqpe_circuit_builder.settings().set("unitary_builder", unitary_builder)
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef
 
-# Create standard QPE with circuit builder configuration
+# Create standard QPE circuit builder
 controlled_circuit_mapper = AlgorithmRef("controlled_circuit_mapper", "pauli_sequence")
 unitary_builder = AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1)
-qpe_circuit_builder = create(
-    "qpe_circuit_builder", "qiskit_standard", num_bits=10, qft_do_swaps=True
-)
+qpe_circuit_builder = create("qpe_circuit_builder", "qdk_standard", num_bits=10)
 qpe_circuit_builder.settings().set(
     "controlled_circuit_mapper", controlled_circuit_mapper
 )
@@ -93,9 +91,23 @@ iqpe_circuits = iqpe_circuit_builder.run(
     qubit_hamiltonian=qubit_ham,
 )
 
-# 8. Print the generated circuits for each bit
+# 8. Print the generated circuits for each bit (iterative)
 for idx, circ in enumerate(iqpe_circuits):
     print(f"Bit {idx}:")
     print(circ.get_qsharp_circuit())
+
+# 9. Create and run standard QPE circuit builder
+standard_builder = create("qpe_circuit_builder", "qdk_standard", num_bits=4)
+standard_builder.settings().set("controlled_circuit_mapper", controlled_circuit_mapper)
+standard_builder.settings().set("unitary_builder", unitary_builder)
+
+standard_circuits = standard_builder.run(
+    state_preparation=circuit,
+    qubit_hamiltonian=qubit_ham,
+)
+
+# 10. Print the standard QPE circuit (single circuit with all ancillas)
+print("Standard QPE circuit:")
+print(standard_circuits[0].get_qsharp_circuit())
 # end-cell-run
 ################################################################################

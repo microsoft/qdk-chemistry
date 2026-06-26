@@ -155,6 +155,9 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  localizer.def("hash", &Localizer::hash, py::arg("wavefunction"),
+                py::arg("loc_indices_a"), py::arg("loc_indices_b"));
+
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
