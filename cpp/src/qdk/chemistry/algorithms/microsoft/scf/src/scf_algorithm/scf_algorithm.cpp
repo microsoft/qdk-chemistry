@@ -262,7 +262,7 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
 }
 
 std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
-SCFAlgorithm::try_get_rohf_convergence_matrices(const SCFImpl& scf_impl) {
+SCFAlgorithm::build_rohf_convergence_matrices(const SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
     throw std::logic_error(
@@ -417,6 +417,14 @@ const RowMajorMatrix& SCFAlgorithm::get_rohf_convergence_density_matrix()
   return rohf_total_density_;
 }
 
+RowMajorMatrix& SCFAlgorithm::rohf_convergence_fock_matrix() {
+  QDK_LOG_TRACE_ENTERING();
+  if (rohf_effective_fock_.size() == 0) {
+    throw std::logic_error("ROHF convergence cache not initialized");
+  }
+  return rohf_effective_fock_;
+}
+
 RowMajorMatrix& SCFAlgorithm::rohf_convergence_density_matrix() {
   QDK_LOG_TRACE_ENTERING();
   if (rohf_total_density_.size() == 0) {
@@ -485,7 +493,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const RowMajorMatrix* P_ptr = nullptr;
 
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    const auto rohf_matrices = try_get_rohf_convergence_matrices(scf_impl);
+    const auto rohf_matrices = build_rohf_convergence_matrices(scf_impl);
     F_ptr = &rohf_matrices.first;
     P_ptr = &rohf_matrices.second;
   } else {

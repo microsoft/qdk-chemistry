@@ -622,7 +622,7 @@ void SCFImpl::iterate_() {
 
     if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       const auto rohf_convergence_matrices =
-          scf_algorithm_->try_get_rohf_convergence_matrices(*this);
+          scf_algorithm_->build_rohf_convergence_matrices(*this);
       const auto& effective_fock = std::get<0>(rohf_convergence_matrices);
       scf_algorithm_->solve_fock_eigenproblem(
           effective_fock, S_, X_, C_, eigenvalues_, P_, nelec_,

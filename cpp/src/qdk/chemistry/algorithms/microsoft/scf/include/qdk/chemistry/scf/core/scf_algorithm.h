@@ -158,7 +158,7 @@ class SCFAlgorithm {
    * @throws std::logic_error If ROHF convergence matrices are unavailable
    */
   std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
-  try_get_rohf_convergence_matrices(const SCFImpl& scf_impl);
+  build_rohf_convergence_matrices(const SCFImpl& scf_impl);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
@@ -217,6 +217,11 @@ class SCFAlgorithm {
    * @brief Access cached ROHF total density matrix
    */
   const RowMajorMatrix& get_rohf_convergence_density_matrix() const;
+
+  /**
+   * @brief Mutable access to cached ROHF effective Fock matrix
+   */
+  RowMajorMatrix& rohf_convergence_fock_matrix();
 
   /**
    * @brief Mutable access to cached ROHF total density matrix

@@ -15,10 +15,10 @@
 #include <vector>
 
 #include "../scf/scf_impl.h"
+#include "line_search.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 #include "qdk/chemistry/scf/core/types.h"
-#include "line_search.h"
 #include "util/matrix_exp.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include "util/gpu/cuda_helper.h"
@@ -387,10 +387,6 @@ class GDMLineFunctor {
         num_electrons_(num_electrons),
         rotation_offset_(rotation_offset),
         rotation_size_(rotation_size),
-        num_orbital_spin_blocks_(
-            scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1),
-        num_density_matrices_(
-            scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2),
         num_atomic_orbitals_(scf_orbital_type == SCFOrbitalType::Unrestricted
                                  ? static_cast<int>(C_pseudo_canonical.rows()) /
                                        2
@@ -461,11 +457,16 @@ class GDMLineFunctor {
   const std::vector<int>& rotation_size_;
 
   // Value parameters
-  const int num_orbital_spin_blocks_;
-  const int num_density_matrices_;
   const int num_atomic_orbitals_;
   const int num_molecular_orbitals_;
   const SCFOrbitalType scf_orbital_type_;
+
+  int num_orbital_spin_blocks() const {
+    return scf_orbital_type_ == SCFOrbitalType::Unrestricted ? 2 : 1;
+  }
+  int num_density_matrices() const {
+    return scf_orbital_type_ == SCFOrbitalType::Restricted ? 1 : 2;
+  }
 
   // Cache for avoiding redundant Fock matrix computation
   Eigen::VectorXd cached_kappa_;  // Cached kappa vector
@@ -493,20 +494,20 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
     apply_restricted_open_shell_orbital_rotation(cached_C_, num_electrons_,
                                                  kappa_trial);
   } else {
-    for (int i = 0; i < num_orbital_spin_blocks_; i++) {
+    for (int i = 0; i < num_orbital_spin_blocks(); i++) {
       auto kappa_spin =
           kappa_trial.segment(rotation_offset_[i], rotation_size_[i]);
       apply_restricted_unrestricted_orbital_rotation(cached_C_, i, kappa_spin,
                                                      num_electrons_[i],
-                                                     num_orbital_spin_blocks_);
+                                                     num_orbital_spin_blocks());
     }
   }
 
   // Compute P_trial from rotated C (for all spins)
-  cached_P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                                   num_atomic_orbitals_);
+  cached_P_ = RowMajorMatrix::Zero(
+      num_density_matrices() * num_atomic_orbitals_, num_atomic_orbitals_);
 
-  for (int i = 0; i < num_density_matrices_; i++) {
+  for (int i = 0; i < num_density_matrices(); i++) {
     const int num_occupied_orbitals = num_electrons_[i];
     const double occupation_factor =
         (scf_orbital_type_ == SCFOrbitalType::Restricted) ? 2.0 : 1.0;
@@ -566,7 +567,7 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
   } else {
     compute_restricted_unrestricted_gradient(
         cached_F_, cached_C_, num_electrons_, rotation_offset_, rotation_size_,
-        num_orbital_spin_blocks_, gradient);
+        num_orbital_spin_blocks(), gradient);
   }
 
   return gradient;
@@ -735,17 +736,17 @@ class GDM {
   double last_accepted_energy_;
   int gdm_step_count_;  // GDM iteration counter
 
-  // Number of spin blocks (1 for restricted, 2 for unrestricted)
-  const int num_orbital_spin_blocks_;
+  /// Derive number of orbital spin blocks from context
+  int num_orbital_spin_blocks() const {
+    return ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1;
+  }
 };
 
 GDM::GDM(const SCFContext& ctx, int history_size_limit)
     : ctx_(ctx),
       history_size_limit_(history_size_limit),
       last_accepted_energy_(std::numeric_limits<double>::infinity()),
-      gdm_step_count_(0),
-      num_orbital_spin_blocks_(
-          ctx.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1) {
+      gdm_step_count_(0) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
   const auto& mol = *ctx.mol;
@@ -774,8 +775,8 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
                      history_size_limit_);
 
   // Calculate rotation sizes for each spin
-  rotation_size_.resize(num_orbital_spin_blocks_);
-  rotation_offset_.resize(num_orbital_spin_blocks_);
+  rotation_size_.resize(num_orbital_spin_blocks());
+  rotation_offset_.resize(num_orbital_spin_blocks());
 
   if (cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
     int num_closed_orbitals = num_electrons_[1];
@@ -797,7 +798,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
     total_rotation_size_ = rotation_size_[0];
   } else {
     total_rotation_size_ = 0;
-    for (int spin_index = 0; spin_index < num_orbital_spin_blocks_;
+    for (int spin_index = 0; spin_index < num_orbital_spin_blocks();
          spin_index++) {
       const int num_occupied_orbitals = num_electrons_[spin_index];
       const int num_virtual_orbitals =
@@ -1022,7 +1023,7 @@ void GDM::build_restricted_unrestricted_pseudo_canonical_orbitals_hessian_(
     Eigen::VectorXd& initial_hessian) {
   initial_hessian.setZero(total_rotation_size_);
 
-  for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
+  for (int i = 0; i < num_orbital_spin_blocks(); ++i) {
     const int num_occupied_orbitals = num_electrons_[i];
     const int num_virtual_orbitals =
         num_molecular_orbitals - num_occupied_orbitals;
@@ -1036,7 +1037,7 @@ void GDM::build_restricted_unrestricted_pseudo_canonical_orbitals_hessian_(
 
     // Generate pseudo-canonical orbitals and transform gradient and history
     generate_restricted_unrestricted_pseudo_canonical_orbital_(
-        F, C, i, num_orbital_spin_blocks_, history_kappa_spin,
+        F, C, i, num_orbital_spin_blocks(), history_kappa_spin,
         history_dgrad_spin, current_gradient_spin);
 
     // Build this spin's segment of initial Hessian
@@ -1045,7 +1046,7 @@ void GDM::build_restricted_unrestricted_pseudo_canonical_orbitals_hessian_(
     // 4.0 is for restricted closed-shell system. For unrestricted systems, the
     // gradient is computed separately for each spin component, in that case the
     // coefficient should be 2.0
-    double initial_hessian_coeff = (num_orbital_spin_blocks_ == 2) ? 2.0 : 4.0;
+    double initial_hessian_coeff = (num_orbital_spin_blocks() == 2) ? 2.0 : 4.0;
     for (int j = 0; j < num_occupied_orbitals; j++) {
       for (int v = 0; v < num_virtual_orbitals; v++) {
         int index = rotation_offset_[i] + j * num_virtual_orbitals + v;
@@ -1278,7 +1279,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   } else {
     compute_restricted_unrestricted_gradient(
         F, C, num_electrons_, rotation_offset_, rotation_size_,
-        num_orbital_spin_blocks_, current_gradient_);
+        num_orbital_spin_blocks(), current_gradient_);
   }
 
   if (gdm_step_count_ != 0) {
