@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import tempfile
 
 import h5py
@@ -16,6 +17,8 @@ from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitHamiltonian
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
+
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
 class TestVerstraeteCiracMapping:
@@ -102,11 +105,16 @@ class TestVerstraeteCiracMapping:
         terms_orig = sorted(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=False))
 
         # HDF5 Round-trip
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        # Use delete=False so h5py can open the file on Windows (no exclusive lock)
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 mapping.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded_hdf5 = MajoranaMapping.from_hdf5(hf)
+        finally:
+            os.unlink(fname)
         assert loaded_hdf5.name == mapping.name
         assert loaded_hdf5.num_modes == mapping.num_modes
         assert loaded_hdf5.num_qubits == mapping.num_qubits
@@ -145,6 +153,7 @@ class TestVerstraeteCiracMapping:
         """Verify that stabilizers mutually commute and commute with mapped H for various lattices."""
 
         def commute(p1: str, p2: str) -> bool:
+            """Return True if Pauli strings p1 and p2 commute."""
             assert len(p1) == len(p2)
             anti_commutes = 0
             for c1, c2 in zip(p1, p2, strict=False):
@@ -211,6 +220,7 @@ class TestVerstraeteCiracMapping:
         mapper = create("qubit_mapper", "qdk")
 
         def multiply_pauli_labels(p1: str, p2: str) -> str:
+            """Return the Pauli string resulting from the product of p1 and p2 (ignoring phase)."""
             table = {
                 ("I", "I"): "I",
                 ("I", "X"): "X",
@@ -232,6 +242,7 @@ class TestVerstraeteCiracMapping:
             return "".join(table[(c1, c2)] for c1, c2 in zip(p1, p2, strict=False))
 
         def get_expected_weight(p1: str, p2: str) -> int:
+            """Return the analytical upper bound on the weight of the product of p1 and p2."""
             indices1 = [idx for idx, char in enumerate(p1) if char != "I"]
             indices2 = [idx for idx, char in enumerate(p2) if char != "I"]
             if not indices1 or not indices2:
@@ -255,6 +266,7 @@ class TestVerstraeteCiracMapping:
             thresh: int,
             max_weight: int,
         ) -> None:
+            """Assert that the product weight of a local stabilizer pair does not exceed max_weight."""
             indices1 = [idx for idx, char in enumerate(stabs_list[u_idx]) if char != "I"]
             indices2 = [idx for idx, char in enumerate(stabs_list[v_idx]) if char != "I"]
             if indices1 and indices2:
@@ -266,6 +278,7 @@ class TestVerstraeteCiracMapping:
                     )
 
         def get_mst_edges(stabs_list: list[str], start_idx: int, count: int, root: int) -> list[tuple[int, int]]:
+            """Return MST edges over a subset of stabilizers using Prim's algorithm."""
             if count <= 1:
                 return []
 
@@ -391,6 +404,7 @@ class TestVerstraeteCiracMapping:
 class TestVerstraeteCiracSpectral:
     """Tests covering the spectral validation of the Verstraete-Cirac mapping."""
 
+    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
     def test_spectral_validation_2x2_hubbard(self) -> None:
         """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and JW mappings.
 

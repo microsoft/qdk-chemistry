@@ -676,8 +676,14 @@ def _register_python_factories():
     """
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledCircuitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledCircuitMapperFactory,
+    )
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
+        HadamardTestCircuitBuilderFactory,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
@@ -702,6 +708,8 @@ def _register_python_factories():
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(HadamardTestFactory())
+    register_factory(HadamardTestCircuitBuilderFactory())
     register_factory(PropagatorFactory())
 
 
@@ -759,8 +767,18 @@ def _register_python_algorithms():
         QdkSparseStateSimulator,
     )
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPauliSequenceMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledPauliSequenceMapper,
+        ControlledPSPMapper,
+    )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
+        QdkHadamardTestCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
+        LCUBuilder,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
@@ -785,6 +803,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -804,7 +823,10 @@ def _register_python_algorithms():
     register(lambda: Zassenhaus())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
+    register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
+    register(lambda: ControlledPSPMapper())
+    register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: MagnusPropagator())
@@ -813,6 +835,8 @@ def _register_python_algorithms():
     register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: QdkStandardQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: HadamardTest())
+    register(lambda: QdkHadamardTestCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
 
 

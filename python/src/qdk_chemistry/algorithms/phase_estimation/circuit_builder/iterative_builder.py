@@ -147,11 +147,12 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         _validate_iteration_inputs(iteration, total_iterations)
         num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
+
+        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
+                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits, num_ancilla_qubits
             )
 
         raise RuntimeError(
@@ -165,6 +166,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         controlled_unitary_circuit: Circuit,
         phase_correction: float,
         num_system_qubits: int,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
@@ -173,6 +175,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             controlled_unitary_circuit: Circuit object containing a Q# operation for the controlled unitary.
             phase_correction: Feedback phase angle to apply before controlled unitary.
             num_system_qubits: Number of system qubits.
+            num_ancilla_qubits: Number of ancilla qubits within the unitary (0 for Trotter).
 
         Returns:
             A Circuit object representing the IQPE iteration.
@@ -182,10 +185,11 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
         iterative_parameters = {
             "statePrep": state_prep_op,
-            "repControlledEvolution": ctrl_unitary_op,
+            "repControlledUnitary": ctrl_unitary_op,
             "accumulatePhase": phase_correction,
-            "control": 0,
+            "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
+            "numAncillaQubits": num_ancilla_qubits,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

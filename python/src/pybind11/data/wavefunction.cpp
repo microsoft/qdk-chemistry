@@ -557,6 +557,31 @@ Examples:
 )",
                    py::return_value_policy::reference_internal);
 
+  wavefunction.def(
+      "get_configuration_set",
+      [](const Wavefunction& self) -> const ConfigurationSet& {
+        if (self.has_container_type<StateVectorContainer>()) {
+          return self.get_container<StateVectorContainer>()
+              .get_configuration_set();
+        } else if (self.has_container_type<AmplitudeContainer>()) {
+          return self.get_container<AmplitudeContainer>()
+              .get_configuration_set();
+        }
+        throw std::runtime_error(
+            "Wavefunction container does not support get_configuration_set");
+      },
+      R"(
+Get the configuration set associated with this wavefunction.
+
+Returns:
+    ConfigurationSet: The configuration set containing all determinant metadata
+
+Examples:
+    >>> config_set = wf.get_configuration_set()
+    >>> n_modes = config_set.num_modes()
+)",
+      py::return_value_policy::reference_internal);
+
   wavefunction.def("get_total_determinants",
                    &Wavefunction::get_total_determinants,
                    R"(
