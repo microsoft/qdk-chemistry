@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+import os
 
 import numpy as np
 import pytest
@@ -26,6 +27,20 @@ from qdk_chemistry.utils.model_hamiltonians import (
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+# The Monte-Carlo accuracy tests below average over hundreds of seeds, each building a
+# dense unitary via expm; gate them behind the shared slow-test switch so the default
+# CI run stays fast (same QDK_CHEMISTRY_RUN_SLOW_TESTS convention used elsewhere).
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+def _slow_test(func):
+    """Mark a Monte-Carlo accuracy test as slow and gate it behind QDK_CHEMISTRY_RUN_SLOW_TESTS."""
+    func = pytest.mark.slow(func)
+    return pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )(func)
 
 
 def _container_to_unitary(container) -> np.ndarray:
@@ -749,6 +764,7 @@ class TestPartiallyRandomizedOutputAccuracy:
 
         assert err_at(0.01) < err_at(0.1)
 
+    @_slow_test
     def test_partial_state_trace_within_tolerance(self):
         """Seed-averaged output state stays within a small multiple of ε."""
         # X deterministic; Z and Y random (non-commuting -> genuine qDRIFT noise).
@@ -758,6 +774,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         err = _partial_state_trace_error(hamiltonian, eps=eps, t=time, weight_threshold=0.6, seeds=range(400))
         assert err <= self.TOLERANCE_FACTOR * eps
 
+    @_slow_test
     def test_partial_error_scales_with_epsilon(self):
         """Tightening ε reduces the seed-averaged output-state error."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
@@ -767,6 +784,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         err_tight = _partial_state_trace_error(hamiltonian, eps=0.02, t=time, weight_threshold=0.6, seeds=seeds)
         assert err_tight < err_loose
 
+    @_slow_test
     def test_partial_accuracy_multi_step(self):
         """Multi-step (r > 1) partial evolution stays within tolerance.
 
@@ -790,6 +808,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         )
         assert err <= self.TOLERANCE_FACTOR * eps
 
+    @_slow_test
     def test_partial_two_qubit_accuracy(self):
         """Two-qubit partial evolution with a multi-term deterministic part.
 
@@ -812,6 +831,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         )
         assert err <= self.TOLERANCE_FACTOR * eps
 
+    @_slow_test
     def test_partial_state_trace_strict(self):
         """Strict tier: seed-averaged output state stays within ε (no slack).
 
@@ -827,6 +847,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         err = _partial_state_trace_error(hamiltonian, eps=eps, t=time, weight_threshold=0.6, seeds=range(500))
         assert err <= eps
 
+    @_slow_test
     def test_partial_first_order_accuracy(self):
         """First-order partial evolution stays within tolerance.
 
@@ -857,6 +878,7 @@ class TestPartiallyRandomizedModelHamiltonians:
 
     TOLERANCE_FACTOR = 3
 
+    @_slow_test
     def test_transverse_field_ising_chain(self):
         """TFIM 4-site chain: deterministic ZZ couplings, randomized X fields."""
         lattice = LatticeGraph.chain(4)
@@ -874,6 +896,7 @@ class TestPartiallyRandomizedModelHamiltonians:
         )
         assert err <= self.TOLERANCE_FACTOR * eps
 
+    @_slow_test
     def test_heisenberg_chain(self):
         """Heisenberg 4-site chain: deterministic XYZ couplings, randomized Z fields."""
         lattice = LatticeGraph.chain(4)
