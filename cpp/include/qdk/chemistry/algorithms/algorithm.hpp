@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -15,6 +16,7 @@
 
 #include "qdk/chemistry/data/settings.hpp"
 #include "qdk/chemistry/utils/hash_context.hpp"
+#include "qdk/chemistry/utils/logger.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -106,6 +108,19 @@ class Algorithm {
    * @return A vector of name aliases
    */
   virtual std::vector<std::string> aliases() const { return {this->name()}; }
+
+  /**
+   * @brief Return a deprecation message if this algorithm is deprecated.
+   *
+   * Factories and language bindings use this to emit deprecation warnings
+   * without hard-coding algorithm-specific checks outside the deprecated
+   * implementation.
+   *
+   * @return Deprecation guidance, or std::nullopt when not deprecated.
+   */
+  virtual std::optional<std::string> deprecation_message() const {
+    return std::nullopt;
+  }
 
   /**
    * @brief Access the algorithm's type name
@@ -241,7 +256,11 @@ class AlgorithmFactory {
           })());
     }
 
-    return it->second();
+    auto instance = it->second();
+    if (const auto message = instance->deprecation_message()) {
+      QDK_LOGGER().warn(*message);
+    }
+    return instance;
   }
 
   /**

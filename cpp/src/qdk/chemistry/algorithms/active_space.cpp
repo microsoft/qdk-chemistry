@@ -10,7 +10,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <unordered_map>
-#include <variant>
 
 #include "microsoft/active_space/autocas_active_space.hpp"
 #include "microsoft/active_space/entropy_active_space.hpp"

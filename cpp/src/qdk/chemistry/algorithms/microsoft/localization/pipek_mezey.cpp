@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <blas.hh>
 #include <iostream>
-#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../utils.hpp"
@@ -21,9 +20,11 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
+  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return wavefunction;
+    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
   }
 
   // Early validation: Check that indices are sorted
@@ -113,7 +114,7 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
   } else {
     // Localize selected orbitals
     Eigen::MatrixXd C_lmo = do_loc(coeffs_alpha, loc_indices_a);
@@ -124,7 +125,7 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
   }
 }
 

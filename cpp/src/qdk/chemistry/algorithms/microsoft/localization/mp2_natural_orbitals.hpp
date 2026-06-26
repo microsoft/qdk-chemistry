@@ -8,10 +8,19 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+#define QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE              \
+  "MP2NaturalOrbitalLocalizer is deprecated; use NaturalOrbitalLocalizer " \
+  "(qdk_natural_orbitals) with a wavefunction that already contains the "  \
+  "active-space 1-RDM."
+
 /**
  * @class MP2NaturalOrbitalLocalizer
  * @brief Localizer implementation that transforms orbitals to MP2 natural
  * orbitals
+ *
+ * @deprecated Use NaturalOrbitalLocalizer (qdk_natural_orbitals) with a
+ * wavefunction that already contains the active-space one-particle reduced
+ * density matrix (1-RDM).
  *
  * This class provides a concrete implementation of the Localizer interface
  * that transforms canonical molecular orbitals into natural orbitals derived
@@ -37,7 +46,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  *    single configuration of the input wavefunction or a single aufbau
  *    configuration if the input wavefunction has multiple configurations.
  */
-class MP2NaturalOrbitalLocalizer : public Localizer {
+class [[deprecated(QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE)]]
+MP2NaturalOrbitalLocalizer : public Localizer {
  public:
   /**
    * @brief Default constructor
@@ -55,6 +65,10 @@ class MP2NaturalOrbitalLocalizer : public Localizer {
    * @return The algorithm's name
    */
   virtual std::string name() const final { return "qdk_mp2_natural_orbitals"; };
+
+  std::optional<std::string> deprecation_message() const final {
+    return QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE;
+  }
 
  protected:
   /**
@@ -89,5 +103,7 @@ class MP2NaturalOrbitalLocalizer : public Localizer {
       const std::vector<size_t>& loc_indices_a,
       const std::vector<size_t>& loc_indices_b) const override;
 };
+
+#undef QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE
 
 }  // namespace qdk::chemistry::algorithms::microsoft

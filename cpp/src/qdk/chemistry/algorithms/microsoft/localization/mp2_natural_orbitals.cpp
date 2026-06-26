@@ -8,7 +8,6 @@
 #include <blas.hh>
 #include <macis/mcscf/orbital_energies.hpp>
 #include <macis/util/moller_plesset.hpp>
-#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -22,6 +21,9 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     const std::vector<size_t>& loc_indices_b) const {
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
+
+  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+
   // Get electron counts from settings
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();
 
@@ -41,7 +43,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
 
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return wavefunction;
+    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
   }
 
   if (nalpha == 0 && nbeta == 0) {
@@ -163,7 +165,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
       orbitals->active_indices(), orbitals->inactive_indices());
-  return detail::new_wavefunction(wavefunction, new_orbitals);
+  return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
