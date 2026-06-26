@@ -115,26 +115,22 @@ class SparseIsometryStatePreparation(StatePreparation):
                 "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
             )
 
-        # Active Space Consistency Check
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
+        dets = wavefunction.get_active_determinants()
+        coeffs = np.asarray(wavefunction.get_coefficients())
+        config_set = wavefunction.get_configuration_set()
+        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
+        state_vector = [det.to_bits(n_bits) for det in dets]
+        n_qubits = len(state_vector[0])
 
-        bitstrings, coeffs = self._wavefunction_to_bitstrings_and_coeffs(wavefunction)
         # Check for single determinant case after filtering
-        if len(bitstrings) == 1:
+        if len(state_vector) == 1:
             Logger.info("After filtering, only 1 determinant remains, using single reference state preparation")
-            return self._prepare_single_reference_state(bitstrings[0])
+            return self._prepare_single_reference_state(state_vector[0])
 
-        n_qubits = len(bitstrings[0])
-        Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
+        Logger.debug(f"Using {len(state_vector)} determinants for state preparation")
 
         # Perform GF2+X elimination with tracking
-        gf2x_operation_results, statevector_data = self._perform_gf2x(bitstrings, coeffs)
+        gf2x_operation_results, statevector_data = self._perform_gf2x(state_vector, coeffs)
         Logger.debug(f"gf2x_operation_results dense qubit: {gf2x_operation_results.row_map}")
         Logger.debug(f"gf2x_operation_results state vector: {statevector_data}")
 
@@ -299,11 +295,13 @@ class SparseIsometryStatePreparation(StatePreparation):
             )
         return Circuit(qasm=qasm3.dumps(qc), encoding="jordan-wigner")
 
-    def _perform_gf2x(self, bitstrings: list[str], coeffs: np.ndarray) -> tuple["GF2XEliminationResult", np.ndarray]:
+    def _perform_gf2x(
+        self, bitstrings: list[list[int]], coeffs: np.ndarray
+    ) -> tuple["GF2XEliminationResult", np.ndarray]:
         """Perform Gaussian elimination over GF(2^x) on the given bitstrings.
 
         Args:
-            bitstrings: The list of bitstrings representing the wavefunction.
+            bitstrings: The list of bit vectors (0/1 ints) representing the wavefunction.
             coeffs: The coefficients corresponding to each determinant.
 
         Returns:
@@ -380,16 +378,15 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         return gf2x_operation_results, statevector_data
 
-    def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
-        """Convert a list of bitstrings to a binary matrix.
+    def _bitstrings_to_binary_matrix(self, bitstrings: list[list[int]]) -> np.ndarray:
+        """Convert a list of bit vectors to a binary matrix.
 
-        This function converts a list of bitstrings (determinants) into a binary matrix
+        This function converts a list of bit vectors (determinants) into a binary matrix
         where each column represents a determinant and each row represents a qubit.
 
         Args:
-            bitstrings (list[str]): List of bitstrings in little-endian order.
-                Each bitstring represents a determinant where the string is ordered
-                as "q[N-1]...q[0]" (most significant bit first in the string).
+            bitstrings (list[list[int]]): List of bit vectors, each a list of 0/1 ints
+                in qubit order q[0]...q[N-1] (as returned by Configuration.to_bits()).
 
         Returns:
             Binary matrix M of shape (N, k) where
@@ -400,14 +397,8 @@ class SparseIsometryStatePreparation(StatePreparation):
             The matrix follows top-down convention with row ordering "q[0]...q[N-1]"
             (qubit 0 at the top).
 
-        Note:
-            The input bitstrings are in little-endian order ("q[N-1]...q[0]"),
-            but the output binary matrix follows the top-down convention with
-            row ordering "q[0]...q[N-1]". This means each bitstring is reversed
-            when converting to a column in the matrix.
-
         Example:
-            >>> bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
+            >>> bitstrings = [[1, 0, 1], [0, 1, 0]]
             >>> matrix = _bitstrings_to_binary_matrix(bitstrings)
             >>> print(matrix)
             [[1 0]  # q[0]
@@ -421,60 +412,54 @@ class SparseIsometryStatePreparation(StatePreparation):
         n_qubits = len(bitstrings[0])
         n_dets = len(bitstrings)
 
-        # Validate all bitstrings have the same length
+        # Validate all bit vectors have the same length
         for i, bitstring in enumerate(bitstrings):
             if len(bitstring) != n_qubits:
                 raise ValueError(
-                    f"All bitstrings must have the same length. "
-                    f"Bitstring {i} has length {len(bitstring)}, expected {n_qubits}"
+                    f"All bit vectors must have the same length. "
+                    f"Bit vector {i} has length {len(bitstring)}, expected {n_qubits}"
                 )
 
-        # Create binary matrix with correct row ordering (reverse each bitstring)
+        # Create binary matrix: each bit vector is already in q[0]...q[N-1] order
         bitstring_matrix = np.zeros((n_qubits, n_dets), dtype=np.int8)
         for i, bitstring in enumerate(bitstrings):
-            # Reverse the bitstring to get correct qubit ordering
-            # Input: "q[N-1]...q[0]" -> Output: column with q[0] at top
-            reversed_bitstring = bitstring[::-1]
-            bitstring_matrix[:, i] = np.array(list(map(int, reversed_bitstring)), dtype=np.int8)
+            bitstring_matrix[:, i] = np.array(bitstring, dtype=np.int8)
 
         return bitstring_matrix
 
-    def _prepare_single_reference_state(self, bitstring: str) -> Circuit:
+    def _prepare_single_reference_state(self, bitstring: list[int]) -> Circuit:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
-        Args:
-            bitstring: Binary string representing the occupation of qubits.
+        The input bitstring is in big-endian order: ``bitstring[0]`` corresponds to
+        the highest-indexed qubit (MSB) and ``bitstring[N-1]`` corresponds to qubit 0
+        (LSB). The function reverses the bitstring internally so that in the circuit,
+        ``bitstring[i]`` maps to qubit ``N-1-i``.
 
-                '1' means apply X gate, '0' means leave in |0⟩ state.
+        Args:
+            bitstring: List of 0/1 ints in big-endian order (MSB first).
+                1 means apply X gate, 0 means leave in |0⟩ state.
 
         Returns:
-                A Circuit object containing an OpenQASM3 string with the prepared single reference state
+                A Circuit object with the prepared single reference state
 
         Example:
-                bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
+                bitstring = [1, 0, 1, 0] produces X gates on qubit 0 and qubit 2:
 
-                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-                (qubit 0, corresponds to rightmost bit '0')
-                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-                (qubit 1, corresponds to bit '1')
-                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-                (qubit 2, corresponds to bit '0')
-                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-                (qubit 3, corresponds to leftmost bit '1')
+                * qubit 0 ← bitstring[0] = 1 → X → :math:`\left| 1 \right\rangle`
+                * qubit 1 ← bitstring[1] = 0 → :math:`\left| 0 \right\rangle`
+                * qubit 2 ← bitstring[2] = 1 → X → :math:`\left| 1 \right\rangle`
+                * qubit 3 ← bitstring[3] = 0 → :math:`\left| 0 \right\rangle`
 
         """
         # Input validation
         if not bitstring:
             raise ValueError("Bitstring cannot be empty")
 
-        if not all(bit in "01" for bit in bitstring):
-            raise ValueError("Bitstring must contain only '0' and '1' characters")
+        if not all(bit in (0, 1) for bit in bitstring):
+            raise ValueError("Bitstring must contain only 0 and 1 values")
 
-        bitstring_array = [int(bit) for bit in bitstring]
-        num_qubits = len(bitstring_array)
-        params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(
-            bitStrings=bitstring_array[::-1], numQubits=num_qubits
-        )
+        num_qubits = len(bitstring)
+        params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(bitStrings=bitstring, numQubits=num_qubits)
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameter=vars(params)
         )

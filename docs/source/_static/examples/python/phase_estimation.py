@@ -138,3 +138,31 @@ implementations = registry.available("phase_estimation")
 print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
 # end-cell-list-implementations
 ################################################################################
+
+################################################################################
+# start-cell-configure-qubitization
+# Configure phase estimation with qubitization (LCU block encoding)
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import AlgorithmRef
+
+# Use LCU builder with quantum_walk=True for qubitization
+iqpe_qubitization = create("phase_estimation", "qdk_iterative", shots_per_bit=5)
+
+iqpe_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_iterative",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "prepare_select_prepare"
+    ),
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+    ),
+)
+iqpe_qubitization.settings().set("qpe_circuit_builder", iqpe_circuit_builder)
+iqpe_qubitization.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=42),
+)
+# end-cell-configure-qubitization
+################################################################################

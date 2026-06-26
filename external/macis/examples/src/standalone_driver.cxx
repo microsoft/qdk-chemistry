@@ -436,7 +436,7 @@ int main(int argc, char** argv) {
           EPT2 = macis::asci_pt2_constraint(
               asci_settings, dets.begin(), dets.end(),
               E0 - (E_inactive + E_core), C, n_active, ham_gen.T(),
-              ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(), ham_gen.V(),
+              ham_gen.G_red(), ham_gen.V_red(), ham_gen.V(),
               ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
           MPI_Barrier(MPI_COMM_WORLD);
           auto pt2_en = hrt_t::now();
