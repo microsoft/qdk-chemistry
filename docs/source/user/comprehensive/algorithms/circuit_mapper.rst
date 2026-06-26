@@ -2,7 +2,8 @@ Controlled circuit mapper
 =========================
 
 The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` algorithm in QDK/Chemistry converts a :class:`~qdk_chemistry.data.UnitaryRepresentation` into a *controlled* quantum circuit.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.ControlledUnitary` as input and produces a :class:`~qdk_chemistry.data.Circuit` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.UnitaryRepresentation` as input and produces a :class:`~qdk_chemistry.data.Circuit` as output.
+Control and target qubit indices are configured via settings.
 
 Overview
 --------
@@ -21,7 +22,9 @@ This is a core component of algorithms such as :doc:`PhaseEstimation <phase_esti
 
 The mapper takes inputs:
 
-1. A :class:`~qdk_chemistry.data.ControlledUnitary` — which pairs a :class:`~qdk_chemistry.data.UnitaryRepresentation` with the control qubit indices
+1. A :class:`~qdk_chemistry.data.UnitaryRepresentation` — produced by a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
+
+Control and target qubit indices are configured via the mapper's settings (``control_indices`` and ``target_indices``).
 
 The resulting :class:`~qdk_chemistry.data.Circuit` implements the controlled unitary and can be executed by a :doc:`CircuitExecutor <circuit_executor>`.
 
@@ -39,8 +42,12 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` requires:
 
-ControlledUnitary
-   A :class:`~qdk_chemistry.data.ControlledUnitary` wrapping a :class:`~qdk_chemistry.data.UnitaryRepresentation` and specifying which qubits serve as controls.
+UnitaryRepresentation
+   A :class:`~qdk_chemistry.data.UnitaryRepresentation` specifying the unitary to be controlled.
+
+Settings
+   ``control_indices`` (list of int): Which qubits serve as controls (default: ``[0]``).
+   ``target_indices`` (list of int): Which qubits the unitary acts on (default: auto-filled).
 
 .. rubric:: Creating a mapper
 
@@ -92,8 +99,7 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.ControlledUnitary`: Input — pairs a unitary with control qubit indices
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: The underlying unitary representation
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: The underlying unitary representation (input)
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Produces the :class:`~qdk_chemistry.data.UnitaryRepresentation` that this mapper consumes
 

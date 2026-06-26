@@ -541,6 +541,36 @@ class TestTrotter:
         assert error_actual <= naive_error_bound
         assert commutator_error_bound <= naive_error_bound
 
+    def test_scale_equals_time(self):
+        """Container scale should equal the evolution time passed to Trotter."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        t = 1.7
+        builder = Trotter(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert container.scale == t
+
+    def test_eigenvalue_from_phase_zero(self):
+        """Phase fraction 0 should give eigenvalue 0."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = Trotter(time=2.0)
+        container = builder.run(hamiltonian).get_container()
+        assert np.isclose(container.eigenvalue_from_phase(0.0), 0.0, atol=float_comparison_absolute_tolerance)
+
+    def test_eigenvalue_from_phase_roundtrip(self):
+        """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
+        t = 2.0
+        energy = 0.5
+        phi = (energy * t / (2 * np.pi)) % 1.0
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = Trotter(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert np.isclose(
+            container.eigenvalue_from_phase(phi),
+            energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
 
 class TestTrotterAccuracyAware:
     """Tests for accuracy-aware Trotter parameterization."""
