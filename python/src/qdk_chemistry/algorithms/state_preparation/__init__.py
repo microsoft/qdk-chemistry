@@ -13,9 +13,6 @@ from qdk_chemistry.algorithms.state_preparation.identity import identity_state_p
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryStatePreparation,
 )
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import (
-    SparseIsometryBinaryEncodingStatePreparation,
-)
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
     StatePreparation,
     StatePreparationFactory,
@@ -24,7 +21,6 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 
 __all__ = [
     "DensePureStatePreparation",
-    "SparseIsometryBinaryEncodingStatePreparation",
     "SparseIsometryStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",

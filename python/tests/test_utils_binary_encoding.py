@@ -10,12 +10,12 @@ import math
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
-from qdk_chemistry.utils.binary_encoding import (
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
     MatrixCompressionType,
     RefTableau,
     _BinaryEncodingSynthesizer,
 )
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 
 from .test_helpers import create_random_bitstring_matrix
 

@@ -804,9 +804,6 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import (  # noqa: PLC0415
-        SparseIsometryBinaryEncodingStatePreparation,
-    )
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -816,7 +813,6 @@ def _register_python_algorithms():
 
     register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryStatePreparation())
-    register(lambda: SparseIsometryBinaryEncodingStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())

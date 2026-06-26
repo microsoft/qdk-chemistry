@@ -249,105 +249,13 @@ def create_test_ansatz(num_orbitals: int = 2):
     return Ansatz(hamiltonian, wavefunction)
 
 
-def _hf_determinant(n_alpha: int, n_beta: int, n_orbitals: int) -> np.ndarray:
-    """Build the Hartree-Fock reference determinant [alpha|beta].
-
-    Args:
-        n_alpha: Number of alpha electrons.
-        n_beta: Number of beta electrons.
-        n_orbitals: Number of spatial orbitals.
-
-    Returns:
-        Occupation array of shape ``(2 * n_orbitals,)`` with 1s for occupied
-        alpha/beta orbitals and 0s elsewhere.
-
-    """
-    det = np.zeros(2 * n_orbitals, dtype=np.int8)
-    det[:n_alpha] = 1
-    det[n_orbitals : n_orbitals + n_beta] = 1
-    return det
-
-
-def _random_excitation(det: np.ndarray, n_orbitals: int, rng: np.random.Generator) -> np.ndarray | None:
-    """Apply a random excitation independently in alpha and beta channels.
-
-    Args:
-        det: Base determinant occupation array.
-        n_orbitals: Number of spatial orbitals.
-        rng: NumPy random generator.
-
-    Returns:
-        New determinant array, or ``None`` if no excitation was applied.
-
-    """
-    new_det = det.copy()
-    for channel_start in (0, n_orbitals):
-        channel = det[channel_start : channel_start + n_orbitals]
-        occupied = np.where(channel == 1)[0]
-        virtual = np.where(channel == 0)[0]
-        if len(occupied) == 0 or len(virtual) == 0:
-            continue
-        order = rng.integers(0, min(len(occupied), len(virtual)) + 1)
-        if order == 0:
-            continue
-        occ = rng.choice(occupied, size=order, replace=False)
-        vir = rng.choice(virtual, size=order, replace=False)
-        new_det[channel_start + occ] = 0
-        new_det[channel_start + vir] = 1
-    return None if np.array_equal(new_det, det) else new_det
-
-
-def _generate_determinant_matrix(
-    n_electrons: int,
-    n_orbitals: int,
-    n_dets: int,
-    seed: int = 0,
-) -> np.ndarray:
-    """Generate a determinant occupation matrix from HF + random excitations.
-
-    Builds the Hartree-Fock reference determinant and applies random
-    single/double excitations to produce ``n_dets`` distinct determinants.
-
-    Args:
-        n_electrons: Total number of electrons (split equally between alpha/beta).
-        n_orbitals: Number of spatial orbitals.
-        n_dets: Target number of determinants.
-        seed: Random seed for reproducibility.
-
-    Returns:
-        Occupation matrix of shape ``(n_dets, 2 * n_orbitals)`` where each row
-        is a determinant with alpha and beta occupation blocks.
-
-    """
-    n_alpha = n_electrons // 2
-    n_beta = n_electrons - n_alpha
-    rng = np.random.default_rng(seed)
-    hf = _hf_determinant(n_alpha, n_beta, n_orbitals)
-
-    seen: set[bytes] = {hf.tobytes()}
-    dets = [hf]
-    for _ in range(n_dets * 200):
-        if len(dets) >= n_dets:
-            break
-        exc = _random_excitation(hf, n_orbitals, rng)
-        if exc is not None and exc.tobytes() not in seen:
-            seen.add(exc.tobytes())
-            dets.append(exc)
-
-    return np.array(dets, dtype=np.int8)
-
-
 def create_random_bitstring_matrix(
     n_electrons: int,
     n_orbitals: int,
     n_dets: int,
     seed: int = 0,
 ) -> np.ndarray:
-    """Generate a random bitstring matrix suitable for GF2+X elimination.
-
-    Builds physically meaningful determinants from the Hartree-Fock reference
-    plus random excitations, then transposes to the binary matrix form
-    expected by ``gf2x_with_tracking`` and ``synthesize``.
+    """Generate a random bitstring matrix for sparse isometry testing.
 
     Args:
         n_electrons: Total number of electrons.
@@ -360,8 +268,38 @@ def create_random_bitstring_matrix(
         qubits and columns are determinants.
 
     """
-    det_matrix = _generate_determinant_matrix(n_electrons, n_orbitals, n_dets, seed)
-    return det_matrix.T
+    n_alpha = n_electrons // 2
+    n_beta = n_electrons - n_alpha
+    rng = np.random.default_rng(seed)
+
+    hf = np.zeros(2 * n_orbitals, dtype=np.int8)
+    hf[:n_alpha] = 1
+    hf[n_orbitals : n_orbitals + n_beta] = 1
+
+    seen: set[bytes] = {hf.tobytes()}
+    dets = [hf]
+    for _ in range(n_dets * 200):
+        if len(dets) >= n_dets:
+            break
+        new_det = hf.copy()
+        for channel_start in (0, n_orbitals):
+            channel = hf[channel_start : channel_start + n_orbitals]
+            occupied = np.where(channel == 1)[0]
+            virtual = np.where(channel == 0)[0]
+            if len(occupied) == 0 or len(virtual) == 0:
+                continue
+            order = rng.integers(0, min(len(occupied), len(virtual)) + 1)
+            if order == 0:
+                continue
+            occ = rng.choice(occupied, size=order, replace=False)
+            vir = rng.choice(virtual, size=order, replace=False)
+            new_det[channel_start + occ] = 0
+            new_det[channel_start + vir] = 1
+        if not np.array_equal(new_det, hf) and new_det.tobytes() not in seen:
+            seen.add(new_det.tobytes())
+            dets.append(new_det)
+
+    return np.array(dets, dtype=np.int8).T
 
 
 def create_random_wavefunction(
@@ -373,8 +311,7 @@ def create_random_wavefunction(
     """Generate a random normalised Wavefunction for testing.
 
     Builds physically meaningful determinants from the Hartree-Fock reference
-    plus random excitations, assigns random normalised coefficients, and wraps
-    them in a :class:`Wavefunction`.
+    plus random excitations, assigns random normalised coefficients.
 
     Args:
         n_electrons: Total number of electrons.
@@ -386,7 +323,7 @@ def create_random_wavefunction(
         A normalised :class:`Wavefunction` with ``n_dets`` determinants.
 
     """
-    det_matrix = _generate_determinant_matrix(n_electrons, n_orbitals, n_dets, seed)
+    det_matrix = create_random_bitstring_matrix(n_electrons, n_orbitals, n_dets, seed).T
     actual_n_dets = det_matrix.shape[0]
 
     mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}

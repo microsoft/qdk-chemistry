@@ -33,6 +33,7 @@ Algorithm Details:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -42,8 +43,9 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePr
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.binary_encoding import MatrixCompressionOp, MatrixCompressionType
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from ._binary_encoding_utils import MatrixCompressionOp, MatrixCompressionType, RefTableau, _BinaryEncodingSynthesizer
 
 __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 
@@ -56,6 +58,24 @@ class SparseIsometryStatePreparationSettings(StatePreparationSettings):
         super().__init__()
         self._set_default(
             "dense_preparation_method", "string", "qdk", "The dense state preparation method to use.", ["qdk", "qiskit"]
+        )
+        self._set_default(
+            "use_binary_encoding",
+            "bool",
+            False,
+            "Use binary encoding instead of dense state preparation for the reduced subspace.",
+        )
+        self._set_default(
+            "include_negative_controls",
+            "bool",
+            True,
+            "Include both positive and negative fixed controls in PUI construction.",
+        )
+        self._set_default(
+            "measurement_based_uncompute",
+            "bool",
+            False,
+            "Use measurement-based AND uncomputation in PUI blocks.",
         )
 
 
@@ -107,14 +127,6 @@ class SparseIsometryStatePreparation(StatePreparation):
         """
         Logger.trace_entering()
 
-        if (
-            self._settings.get("dense_preparation_method") == "qiskit"
-            and not qdk_chemistry.plugins.qiskit.QDK_CHEMISTRY_HAS_QISKIT
-        ):
-            raise ImportError(
-                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
-            )
-
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
         config_set = wavefunction.get_configuration_set()
@@ -128,6 +140,19 @@ class SparseIsometryStatePreparation(StatePreparation):
             return self._prepare_single_reference_state(state_vector[0])
 
         Logger.debug(f"Using {len(state_vector)} determinants for state preparation")
+
+        if self._settings.get("use_binary_encoding"):
+            circuit = self._run_binary_encoding(state_vector, coeffs, n_qubits)
+            if circuit is not None:
+                return circuit
+
+        if (
+            self._settings.get("dense_preparation_method") == "qiskit"
+            and not qdk_chemistry.plugins.qiskit.QDK_CHEMISTRY_HAS_QISKIT
+        ):
+            raise ImportError(
+                "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
+            )
 
         # Perform GF2+X elimination with tracking
         gf2x_operation_results, statevector_data = self._perform_gf2x(state_vector, coeffs)
@@ -147,6 +172,112 @@ class SparseIsometryStatePreparation(StatePreparation):
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**params)
         state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
+
+    def _run_binary_encoding(self, state_vector: list[list[int]], coeffs: np.ndarray, n_qubits: int) -> Circuit | None:
+        """Prepare a quantum circuit using binary encoding.
+
+        Args:
+            state_vector: List of bit vectors (determinants), each a list of 0/1 ints.
+            coeffs: Wavefunction coefficients aligned with the determinants.
+            n_qubits: Total number of qubits in the system.
+
+        Returns:
+            A Circuit if binary encoding is applicable, or None to fall back to the standard path.
+
+        """
+        bitstring_matrix = self._bitstrings_to_binary_matrix(state_vector)
+        gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, forward_only=True)
+
+        num_rows, num_cols = gf2x_result.reduced_matrix.shape
+        dense_register_width = 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
+        if not dense_register_width < num_rows:
+            Logger.info(
+                "Binary encoding is not applicable for this wavefunction; falling back to standard sparse isometry."
+            )
+            return None
+
+        params = self._build_binary_encoding_params(gf2x_result, coeffs, n_qubits, len(state_vector))
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
+            parameter=params,
+        )
+        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
+
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
+            encoding="jordan-wigner",
+        )
+
+    def _build_binary_encoding_params(
+        self,
+        gf2x_result: "GF2XEliminationResult",
+        coeffs: np.ndarray,
+        n_qubits: int,
+        n_dets: int,
+    ) -> dict:
+        """Build binary-encoding state preparation parameters from an already-computed REF result.
+
+        Args:
+            gf2x_result: Forward-only REF result from GF2+X elimination.
+            coeffs: Wavefunction coefficients aligned with matrix columns.
+            n_qubits: Total number of qubits in the original space.
+            n_dets: Number of determinants (used for logging only).
+
+        Returns:
+            A dict of parameters for Q# binary-encoding circuit construction.
+
+        """
+        include_negative_controls = self._settings.get("include_negative_controls")
+        encoded_ops, bijection, dense_size = _BinaryEncodingSynthesizer(
+            RefTableau(gf2x_result.reduced_matrix),
+            include_negative_controls=include_negative_controls,
+            measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
+        ).synthesize(
+            num_local_qubits=n_qubits,
+            active_qubit_indices=gf2x_result.row_map,
+            ancilla_start=n_qubits,
+        )
+
+        compressed_sv = np.zeros(2**dense_size, dtype=float)
+        for dense_val, orig_col in bijection:
+            if orig_col < len(coeffs):
+                compressed_sv[dense_val] = coeffs[orig_col]
+        norm = np.linalg.norm(compressed_sv)
+        if norm > 0:
+            compressed_sv /= norm
+
+        dense_row_map = gf2x_result.row_map[:dense_size]
+
+        gaussian_elimination_ops: list[MatrixCompressionOp] = []
+        for operation in reversed(gf2x_result.operations):
+            if operation[0] in ("cx", "cnot"):
+                if isinstance(operation[1], tuple):
+                    target, control = operation[1]
+                    gaussian_elimination_ops.append(MatrixCompressionOp(MatrixCompressionType("CX"), [control, target]))
+            elif operation[0] == "x" and isinstance(operation[1], int):
+                gaussian_elimination_ops.append(MatrixCompressionOp(MatrixCompressionType("X"), [operation[1]]))
+
+        active_qubits_set = {int(q) for q in gf2x_result.row_map}
+        ancilla_pool = sorted(set(range(n_qubits)) - active_qubits_set)
+
+        state_prep_params = QSHARP_UTILS.BinaryEncoding.BinaryEncodingStatePreparationParams(
+            rowMap=list(dense_row_map),
+            stateVector=compressed_sv.tolist(),
+            gaussianEliminationOps=[op.to_qsharp_parameter() for op in gaussian_elimination_ops],
+            binaryEncodingOps=[op.to_qsharp_parameter() for op in encoded_ops],
+            numQubits=n_qubits,
+            ancillaPool=ancilla_pool,
+        )
+        params = vars(state_prep_params)
+
+        Logger.info(
+            f"Binary encoding produced {len(params['binaryEncodingOps'])} operations "
+            f"for {n_qubits}-qubit system with {n_dets} determinants "
+            f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
+        )
+        return params
 
     def _wavefunction_to_bitstrings_and_coeffs(self, wavefunction: Wavefunction) -> tuple[list[str], np.ndarray]:
         """Extract bitstrings and coefficients from a wavefunction.
@@ -187,9 +318,9 @@ class SparseIsometryStatePreparation(StatePreparation):
             if operation[0] == "cx":
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
-                    expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.CX, [control, target]))
+                    expansion_ops.append(MatrixCompressionOp(MatrixCompressionType("CX"), [control, target]))
             elif operation[0] == "x" and isinstance(operation[1], int):
-                expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.X, [operation[1]]))
+                expansion_ops.append(MatrixCompressionOp(MatrixCompressionType("X"), [operation[1]]))
 
         # State vector indexing is in little-endian order, the row map is reversed for Q# convention
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(

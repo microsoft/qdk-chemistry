@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import gc
 import json
 
 import numpy as np
@@ -228,10 +229,10 @@ class TestDensePureStatePreparation:
         # Re-init with Base profile required for QIR compilation (get_qiskit_circuit)
         current_profile = get_config().get_target_profile()
         qsharp.init(target_profile=TargetProfile.from_str(current_profile))
-        _ = QSHARP_UTILS.StatePreparation
+        gc.collect()
 
         dense_prep = create("state_prep", "dense_pure_state")
-        sparse_prep = create("state_prep", "sparse_isometry_gf2x")
+        sparse_prep = create("state_prep", "sparse_isometry")
 
         # Dense prep with identity rowMap produces Qiskit circuit with standard
         # qubit ordering matching the Hamiltonian convention.

@@ -12,7 +12,11 @@ import pytest
 from qdk.estimator import EstimatorResult
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncodingStatePreparation
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
+    MatrixCompressionType,
+    RefTableau,
+    _BinaryEncodingSynthesizer,
+)
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -23,9 +27,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.binary_encoding import MatrixCompressionType, RefTableau, _BinaryEncodingSynthesizer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.phase import energy_from_phase
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -53,7 +55,7 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
     matrix = np.array([[int(b) for b in bs] for bs in bitstrings], dtype=np.int8).T
     gf2x_result = gf2x_with_tracking(matrix, skip_diagonal_reduction=True, forward_only=True)
 
-    ops, bijection, dense_size = _BinaryEncodingSynthesizer(
+    ops, _, _ = _BinaryEncodingSynthesizer(
         RefTableau(gf2x_result.reduced_matrix),
     ).synthesize(
         num_local_qubits=n_system,
@@ -89,7 +91,7 @@ class TestSparseIsometryBinaryEncoding:
 
     def test_ozone(self, ozone_wf):
         """End-to-end: ozone SCI wavefunction → run() → Circuit → estimate()."""
-        binary_encoding_prep = create("state_prep", "sparse_isometry_binary_encoding")
+        binary_encoding_prep = create("state_prep", "sparse_isometry", use_binary_encoding=True)
         circuit = binary_encoding_prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
@@ -116,7 +118,7 @@ class TestSparseIsometryBinaryEncoding:
 
         from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
 
-        binary_encoding_prep = create("state_prep", "sparse_isometry_binary_encoding")
+        binary_encoding_prep = create("state_prep", "sparse_isometry", use_binary_encoding=True)
         circuit = binary_encoding_prep.run(ozone_wf)
         expected_sv = create_statevector_from_wavefunction(ozone_wf, normalize=True)
         n_system = int(np.log2(len(expected_sv)))
@@ -152,7 +154,7 @@ class TestSparseIsometryBinaryEncoding:
             seed=seed,
         )
 
-        binary_encoding_prep = create("state_prep", "sparse_isometry_binary_encoding")
+        binary_encoding_prep = create("state_prep", "sparse_isometry", use_binary_encoding=True)
         circuit = binary_encoding_prep.run(wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
@@ -171,13 +173,13 @@ class TestSparseIsometryBinaryEncoding:
 
     def test_default_settings(self):
         """Default settings: include_negative_controls=True, measurement_based_uncompute=False."""
-        state_prep = SparseIsometryBinaryEncodingStatePreparation()
+        state_prep = create("state_prep", "sparse_isometry", use_binary_encoding=True)
         assert state_prep.settings().get("include_negative_controls") is True
         assert state_prep.settings().get("measurement_based_uncompute") is False
 
     def test_ozone_negative_controls_disabled(self, ozone_wf):
         """Ozone with include_negative_controls=False produces different resource counts."""
-        prep = create("state_prep", "sparse_isometry_binary_encoding", include_negative_controls=False)
+        prep = create("state_prep", "sparse_isometry", use_binary_encoding=True, include_negative_controls=False)
         circuit = prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         lc = circuit.estimate()["logicalCounts"]
@@ -207,7 +209,7 @@ class TestSparseIsometryBinaryEncoding:
             n_dets=n_dets,
             seed=seed,
         )
-        circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         expected_sv = create_statevector_from_wavefunction(wf, normalize=True)
         n_system = 2 * n_orbitals
 
@@ -254,7 +256,7 @@ class TestSparseIsometryBinaryEncoding:
         dense_size = 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
         assert dense_size >= num_rows, f"Expected fallback: dense_size={dense_size} must be >= num_rows={num_rows}"
 
-        circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
 
@@ -289,7 +291,7 @@ class TestSparseIsometryBinaryEncoding:
             n_dets=n_dets,
             seed=seed,
         )
-        circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         expected_sv = create_statevector_from_wavefunction(wf, normalize=True)
         n_system = 2 * n_orbitals
 
@@ -317,7 +319,7 @@ class TestBinaryEncodingWithQPE:
         wf = create_random_wavefunction(n_electrons=6, n_orbitals=6, n_dets=20, seed=42)
 
         # Build binary encoding state prep — requires ancilla beyond the pool
-        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        state_prep_circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 2 * 6  # 12 system qubits
         state_prep_total_qubits = sp_lc["numQubits"]
@@ -365,7 +367,7 @@ class TestBinaryEncodingWithQPE:
         """
         wf = create_random_wavefunction(n_electrons=6, n_orbitals=6, n_dets=20, seed=42)
 
-        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        state_prep_circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 12
         state_prep_total_qubits = sp_lc["numQubits"]
@@ -461,7 +463,7 @@ class TestBinaryEncodingWithQPE:
         wf = Wavefunction(StateVectorContainer(top_amps, configs, orbitals))
 
         # Binary encoding state prep — must require ancilla
-        state_prep_circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        state_prep_circuit = create("state_prep", "sparse_isometry", use_binary_encoding=True).run(wf)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         state_prep_qubits = sp_lc["numQubits"]
         extra_ancilla = state_prep_qubits - n
@@ -490,7 +492,12 @@ class TestBinaryEncodingWithQPE:
 
         # Resolve phase ambiguity and verify energy
         phase_candidates = [result.phase_fraction % 1.0, (1.0 - result.phase_fraction) % 1.0]
-        energies = [energy_from_phase(p, evolution_time=evolution_time) for p in phase_candidates]
+        energies = []
+        for p in phase_candidates:
+            angle = (p % 1.0) * (2 * np.pi)
+            if angle > np.pi:
+                angle -= 2 * np.pi
+            energies.append(angle / evolution_time)
         resolved_energy = energies[int(np.argmin([abs(e - gs_energy) for e in energies]))]
 
         # Energy resolution with num_bits: 2*pi / (t * 2^num_bits)
