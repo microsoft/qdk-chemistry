@@ -117,10 +117,18 @@ def generate_cube_data_with_correlation_info(
             "Unrestricted orbitals have separate alpha/beta channels that require different handling."
         )
 
-    if not wavefunction.has_single_orbital_entropies():
+    try:
+        entropies = wavefunction.get_single_orbital_entropies()
+    except RuntimeError as exc:
         raise ValueError(
             "Wavefunction does not have single-orbital entropies. "
             "Ensure the calculator was run with calculate_one_rdm=True and calculate_two_rdm=True."
+        ) from exc
+
+    if indices is None and not orbitals.has_active_space():
+        raise ValueError(
+            "No active space is defined on the wavefunction's orbitals. "
+            "Set an active space on the Orbitals, or pass indices explicitly."
         )
 
     if indices is None:
@@ -137,7 +145,6 @@ def generate_cube_data_with_correlation_info(
             "Occupations and entropies are only available for active-space orbitals."
         )
     occ_alpha, occ_beta = wavefunction.get_active_orbital_occupations()
-    entropies = wavefunction.get_single_orbital_entropies()
     mo_to_pos = {mo_idx: pos for pos, mo_idx in enumerate(active_indices)}
 
     cube_data_raw = generate_cubefiles_from_orbitals(
