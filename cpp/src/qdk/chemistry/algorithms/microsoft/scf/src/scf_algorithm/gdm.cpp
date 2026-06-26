@@ -268,6 +268,9 @@ static void compute_restricted_open_shell_gradient(
         "(size >= 2 * num_atomic_orbitals^2).");
   }
 
+  // H_ is stored as (num_density_matrices * num_atomic_orbitals) x
+  // num_atomic_orbitals, but the core Hamiltonian is spin-independent so both
+  // blocks are identical. We only use the first block via .data().
   const auto& H_ao_full = scf_impl.get_core_hamiltonian();
 
   const auto J_alpha_ao = Eigen::Map<const RowMajorMatrix>(
