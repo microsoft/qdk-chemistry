@@ -24,6 +24,8 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    phase_estimation
    qpe_circuit_builder
    hamiltonian_unitary_builder
+   propagator
+   hamiltonian_simulation
    circuit_mapper
    circuit_executor
 
@@ -82,6 +84,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
      - QubitHamiltonian → UnitaryRepresentation
+   * - :doc:`Propagator <propagator>`
+     - Effective Hamiltonians for time-dependent evolution
+     - TimeDependentQubitHamiltonian → QubitHamiltonian
+   * - :doc:`HamiltonianSimulation <hamiltonian_simulation>`
+     - Time-dependent Hamiltonian simulation
+     - TimeDependentQubitHamiltonian + Observables → Energy
    * - :doc:`ControlledCircuitMapper <circuit_mapper>`
      - Controlled-unitary circuit synthesis
      - UnitaryRepresentation → Circuit

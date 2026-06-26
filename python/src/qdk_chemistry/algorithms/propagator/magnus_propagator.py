@@ -46,11 +46,7 @@ Hamiltonians of the form :math:`H(t) = H_0 + f(t)\,H_1`.  Requesting an
 
 Accuracy
 --------
-For smooth drives the neglected :math:`\Omega_2` term is
-:math:`O(\Delta t^3)` over a single step (the commutator
-:math:`[H(t'), H(t'')]` vanishes as :math:`t' \to t''`), so using the
-order-1 propagator as the per-step propagator of a time-stepping
-integrator yields :math:`O(\Delta t^2)` global accuracy.
+The order-1 propagator gives :math:`O(\Delta t^2)` accuracy.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -112,8 +108,7 @@ class MagnusPropagator(Propagator):
     :math:`H_\text{eff} = \Omega_1 / \delta t` (the time-averaged exponent
     divided by :math:`\delta t = t_2 - t_1`) so that a time-stepping
     integrator that multiplies by :math:`\delta t` recovers the full
-    exponent :math:`\Omega_1`.  Dropping the order-2 commutator term gives
-    :math:`O(\Delta t^2)` global accuracy for smooth drives.
+    exponent :math:`\Omega_1`.  This gives :math:`O(\Delta t^2)` accuracy.
 
     Requesting an ``order`` greater than 1, or passing any other container
     type, raises :class:`NotImplementedError`.
@@ -195,10 +190,8 @@ class MagnusPropagator(Propagator):
         time-stepping integrator (which multiplies by ``dt``) recovers the
         full exponent :math:`\Omega_1`.
 
-        Only the leading-order term is computed; the order-2 commutator
-        correction :math:`\propto [H_0, H_1]` is :math:`O(\delta t^3)` per
-        step for smooth drives and is neglected, giving
-        :math:`O(\delta t^2)` global accuracy.
+        Only the leading-order term is computed; this gives
+        :math:`O(\delta t^2)` accuracy.
 
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
         :meth:`~qdk_chemistry.data.QubitHamiltonian.__mul__` and
