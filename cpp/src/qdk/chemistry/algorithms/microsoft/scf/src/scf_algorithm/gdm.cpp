@@ -514,17 +514,14 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
     auto P_block = cached_P_.block(num_atomic_orbitals_ * i, 0,
                                    num_atomic_orbitals_, num_atomic_orbitals_);
 
-    double* C_block_data = nullptr;
-    if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
-      auto C_block =
-          cached_C_.block(0, 0, num_atomic_orbitals_, num_occupied_orbitals);
-      C_block_data = C_block.data();
-    } else {
-      auto C_block =
-          cached_C_.block(num_atomic_orbitals_ * i, 0, num_atomic_orbitals_,
-                          num_occupied_orbitals);
-      C_block_data = C_block.data();
-    }
+    // For ROHF, both alpha and beta densities share the same C block (row 0).
+    // For UHF, each spin has its own C block offset by num_atomic_orbitals_.
+    const int C_row_offset =
+        (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell)
+            ? 0
+            : num_atomic_orbitals_ * i;
+    const double* C_block_data =
+        cached_C_.data() + C_row_offset * num_molecular_orbitals_;
     blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::Trans,
                num_atomic_orbitals_, num_atomic_orbitals_,
                num_occupied_orbitals, occupation_factor, C_block_data,
