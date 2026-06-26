@@ -74,8 +74,8 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
     : ctx_(ctx),
       step_count_(0),
       last_energy_(0.0),
-      density_rms_(std::numeric_limits<double>::infinity()),
-      delta_energy_(std::numeric_limits<double>::infinity()) {
+      delta_energy_(std::numeric_limits<double>::infinity()),
+      density_rms_(std::numeric_limits<double>::infinity()) {
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices =
