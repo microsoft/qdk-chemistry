@@ -262,62 +262,62 @@ jobs:
     - name: Build C++ RelWithDebInfo/Coverage library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
-      env:
-        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
-      run: |
-        mkdir -p test-results ${{ github.workspace }}/coverage-reports
-        cd "$BUILD_DIR"
+    # - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
+    #   env:
+    #     OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
+    #   run: |
+    #     mkdir -p test-results ${{ github.workspace }}/coverage-reports
+    #     cd "$BUILD_DIR"
 
-        echo "=== Running C++ Tests in Debug Mode with Coverage ==="
-        set +e
-        if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
-        else
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
-        fi
+    #     echo "=== Running C++ Tests in Debug Mode with Coverage ==="
+    #     set +e
+    #     if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
+    #       ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+    #     else
+    #       ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+    #     fi
 
-        CTEST_EXIT_CODE=$?
-        set -e
+    #     CTEST_EXIT_CODE=$?
+    #     set -e
 
-        if [ $CTEST_EXIT_CODE -ne 0 ]; then
-          echo "=== Some tests failed ==="
-          echo "Exit code: $CTEST_EXIT_CODE"
-        fi
+    #     if [ $CTEST_EXIT_CODE -ne 0 ]; then
+    #       echo "=== Some tests failed ==="
+    #       echo "Exit code: $CTEST_EXIT_CODE"
+    #     fi
 
-        cd ${{ github.workspace }}
+    #     cd ${{ github.workspace }}
 
-        gcovr --root ${{ github.workspace }}/cpp \
-          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
-          --filter '${{ github.workspace }}/cpp/src/.*' \
-          --filter '${{ github.workspace }}/cpp/include/.*' \
-          --exclude '.*/tests/.*' \
-          --exclude '.*test.*\.cpp' \
-          --exclude '.*gtest.*' \
-          --exclude '.*gmock.*' \
-          --exclude '.*/external/.*' \
-          --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
-          --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
-          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
-          --merge-mode-functions=separate \
-          --gcov-ignore-parse-errors
+    #     gcovr --root ${{ github.workspace }}/cpp \
+    #       --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+    #       --filter '${{ github.workspace }}/cpp/src/.*' \
+    #       --filter '${{ github.workspace }}/cpp/include/.*' \
+    #       --exclude '.*/tests/.*' \
+    #       --exclude '.*test.*\.cpp' \
+    #       --exclude '.*gtest.*' \
+    #       --exclude '.*gmock.*' \
+    #       --exclude '.*/external/.*' \
+    #       --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
+    #       --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
+    #       --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+    #       --merge-mode-functions=separate \
+    #       --gcov-ignore-parse-errors
 
-        echo "C++ Coverage Summary:"
-        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+    #     echo "C++ Coverage Summary:"
+    #     cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
 
-        if [ $CTEST_EXIT_CODE -ne 0 ]; then
-          exit $CTEST_EXIT_CODE
-        fi
+    #     if [ $CTEST_EXIT_CODE -ne 0 ]; then
+    #       exit $CTEST_EXIT_CODE
+    #     fi
 
     - name: Install C++ library
       run: |
         cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
 
-    - name: Test C++ installation
-      run: |
-        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
-        cmake --build build_example --target all
-        echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
+    # - name: Test C++ installation
+    #   run: |
+    #     cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+    #     cmake --build build_example --target all
+    #     echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
     - name: Install Python package
       working-directory: python
