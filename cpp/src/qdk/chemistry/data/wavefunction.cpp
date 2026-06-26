@@ -702,6 +702,83 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
       "entropies.");
 }
 
+double WavefunctionContainer::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+  //       - sum_{ij} Gamma^{aabb}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{aaaa}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{bbbb}(i,j,j,i)
+  //       - 1/2 * sum_{ij} Gamma^{aabb}(i,i,j,j)
+  //
+  // Uses QDK convention: Gamma(p,q,r,s) = <a†_p a†_r a_s a_q>
+  // Flat index: p*n^3 + q*n^2 + r*n + s
+
+  if (!has_one_rdm_spin_dependent() || !has_two_rdm_spin_dependent()) {
+    throw std::runtime_error(
+        "Spin-dependent one- and two-body RDMs must be set to compute <S^2>");
+  }
+
+  const auto& one_rdm = active_one_rdm();
+  const auto& two_rdm = active_two_rdm();
+
+  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+          one_rdm) ||
+      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
+          two_rdm)) {
+    throw std::runtime_error("Complex <S^2> calculation not yet implemented");
+  }
+
+  const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+  const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+
+  const Eigen::MatrixXd& one_rdm_aa =
+      one_sbt.block({axes::alpha(), axes::alpha()});
+  const Eigen::MatrixXd& one_rdm_bb =
+      one_sbt.block({axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_aaaa = two_sbt.block(
+      {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+  const Eigen::VectorXd& two_rdm_aabb =
+      two_sbt.block({axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd& two_rdm_bbbb =
+      two_sbt.block({axes::beta(), axes::beta(), axes::beta(), axes::beta()});
+
+  int norbs = static_cast<int>(one_rdm_aa.rows());
+  double one_rdm_trace = one_rdm_aa.trace() + one_rdm_bb.trace();
+
+  // sum_{ij} Gamma(i,j,j,i): O(n^2)
+  auto sum_ijji = [norbs](const Eigen::VectorXd& vec) -> double {
+    double sum = 0.0;
+    for (int i = 0; i < norbs; ++i) {
+      for (int j = 0; j < norbs; ++j) {
+        int idx = i * norbs * norbs * norbs + j * norbs * norbs + j * norbs + i;
+        sum += vec[idx];
+      }
+    }
+    return sum;
+  };
+
+  // sum_{ij} Gamma(i,i,j,j): O(n^2)
+  auto sum_iijj = [norbs](const Eigen::VectorXd& vec) -> double {
+    double sum = 0.0;
+    for (int i = 0; i < norbs; ++i) {
+      for (int j = 0; j < norbs; ++j) {
+        int idx = i * norbs * norbs * norbs + i * norbs * norbs + j * norbs + j;
+        sum += vec[idx];
+      }
+    }
+    return sum;
+  };
+
+  double aabb_ijji = sum_ijji(two_rdm_aabb);
+  double aaaa_ijji = sum_ijji(two_rdm_aaaa);
+  double bbbb_ijji = sum_ijji(two_rdm_bbbb);
+  double aabb_iijj = sum_iijj(two_rdm_aabb);
+
+  return 0.75 * one_rdm_trace - aabb_ijji - 0.25 * aaaa_ijji -
+         0.25 * bbbb_ijji - 0.5 * aabb_iijj;
+}
+
 void WavefunctionContainer::_clear_rdms() const {
   QDK_LOG_TRACE_ENTERING();
   _one_rdm_spin_traced.reset();
@@ -1350,6 +1427,11 @@ bool Wavefunction::has_two_rdm_spin_dependent() const {
 bool Wavefunction::has_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->has_two_rdm_spin_traced();
+}
+
+double Wavefunction::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->compute_s_squared();
 }
 
 // Cache management
