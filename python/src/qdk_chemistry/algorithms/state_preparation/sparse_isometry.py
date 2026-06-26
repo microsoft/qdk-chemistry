@@ -6,7 +6,7 @@ leverage the sparsity of quantum states to create optimized circuits that
 prepare only the non-zero amplitude components, significantly reducing circuit
 depth and gate count compared to dense state preparation methods.
 
-**SparseIsometryStatePrep**: Enhanced sparse isometry using GF2+X elimination.
+**SparseIsometryStatePrep**: Enhanced sparse isometry method.
 This method performs duplicate row removal, all-ones row removal, and diagonal
 matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both
 CNOT and X operations for optimal circuit reconstruction and can be more
@@ -22,8 +22,8 @@ compared to traditional isometry methods.
 
 Algorithm Details:
 
-* SparseIsometry: Applies enhanced GF2+X elimination (preprocessing + GF2
-  + postprocessing), performs dense state preparation on the reduced space,
+* SparseIsometry: Applies enhanced preprocessing, GF2 Gaussian elimination,
+  and postprocessing, performs dense state preparation on the reduced space,
   then applies recorded operations (CX and X) in reverse to expand back to
   the full space.
 """
@@ -92,7 +92,7 @@ class SparseIsometryStatePreparationSettings(StatePreparationSettings):
 
 
 class SparseIsometryStatePreparation(StatePreparation):
-    """State preparation using sparse isometry with enhanced GF2+X elimination.
+    """State preparation using sparse isometry with enhanced GF2 Gaussian elimination.
 
     This class implements sparse isometry state preparation for electronic structure problems.
     The preprocessing includes:
@@ -149,7 +149,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             if circuit is not None:
                 return circuit
 
-        # Perform GF2+X elimination with tracking
+        # Perform GF2 Gaussian elimination with tracking
         gf2x_operation_results, statevector_data = self._perform_gf2x(state_vector, coeffs)
         Logger.debug(f"gf2x_operation_results dense qubit: {gf2x_operation_results.row_map}")
         Logger.debug(f"gf2x_operation_results state vector: {statevector_data}")
@@ -216,7 +216,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         """Build binary-encoding state preparation parameters from an already-computed REF result.
 
         Args:
-            gf2x_result: Forward-only REF result from GF2+X elimination.
+            gf2x_result: Forward-only REF result from GF2 Gaussian elimination.
             coeffs: Wavefunction coefficients aligned with matrix columns.
             n_qubits: Total number of qubits in the original space.
             n_dets: Number of determinants (used for logging only).
@@ -273,10 +273,10 @@ class SparseIsometryStatePreparation(StatePreparation):
         }
 
     def _create_reduced_wavefunction(self, statevector_data: np.ndarray, rank: int) -> Wavefunction:
-        """Construct a reduced Wavefunction from the GF2+X statevector.
+        """Construct a reduced Wavefunction from the statevector.
 
         Creates a synthetic Wavefunction using 1-bit-per-mode configurations
-        that represents the dense subspace after GF2+X elimination.
+        that represents the dense subspace after GF2 Gaussian elimination.
 
         Args:
             statevector_data: Amplitude vector of length 2^rank (normalized).
@@ -301,10 +301,10 @@ class SparseIsometryStatePreparation(StatePreparation):
         return Wavefunction(StateVectorContainer(coeffs_arr, configs, orbitals))
 
     def _build_expansion_ops(self, gf2x_operation_results: "GF2XEliminationResult") -> list[MatrixCompressionOp]:
-        """Build expansion operations from GF2+X elimination results.
+        """Build expansion operations from GF2 Gaussian elimination results.
 
         Args:
-            gf2x_operation_results: The result of GF2+X elimination.
+            gf2x_operation_results: The result of GF2 Gaussian elimination.
 
         Returns:
             List of MatrixCompressionOp representing the expansion gates.
@@ -330,11 +330,11 @@ class SparseIsometryStatePreparation(StatePreparation):
         """Compose a dense preparation circuit with expansion operations.
 
         Embeds the dense circuit (operating on the reduced qubit subset) into
-        the full register, then applies GF2+X expansion operations.
+        the full register, then applies GF2 Gaussian elimination expansion operations.
 
         Args:
             dense_circuit: Circuit from the nested dense state prep algorithm.
-            expansion_ops: GF2+X expansion operations for the full register.
+            expansion_ops: GF2 Gaussian elimination expansion operations for the full register.
             embedding_map: Maps reduced qubit indices to full register positions.
             n_qubits: Total number of qubits in the full register.
 
@@ -399,13 +399,13 @@ class SparseIsometryStatePreparation(StatePreparation):
         ancilla_pool: list[int],
         n_qubits: int,
     ) -> Circuit:
-        """Compose a dense circuit with binary-encoding and GF2+X expansion operations.
+        """Compose a dense circuit with binary-encoding and GF2 Gaussian elimination expansion operations.
 
         Args:
             dense_circuit: Circuit from the nested dense state prep algorithm.
             dense_row_map: Maps reduced qubit indices to full register positions.
             binary_encoding_ops: Binary-encoding gate sequence.
-            gaussian_elimination_ops: GF2+X expansion operations.
+            gaussian_elimination_ops: GF2 Gaussian elimination expansion operations.
             ancilla_pool: Idle qubit indices available as ancillas.
             n_qubits: Total number of qubits in the full register.
 
@@ -468,7 +468,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         # Step 1: Convert bitstrings to binary matrix
         bitstring_matrix = self._bitstrings_to_binary_matrix(bitstrings)
 
-        # Step 2: Apply enhanced GF2+X
+        # Step 2: Apply enhanced GF2 Gaussian elimination with tracking of operations
         # (includes duplicate removal, all-ones removal, and GF2)
         gf2x_operation_results = gf2x_with_tracking(bitstring_matrix)
 

@@ -83,7 +83,7 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
 @pytest.fixture
 def ozone_wf(test_data_files_path) -> Wavefunction:
     """Load the ozone SCI wavefunction from test data."""
-    return Wavefunction.from_json_file(str(test_data_files_path / "ozone_sparse_ci_wavefunction.wavefunction.json"))
+    return Wavefunction.from_hdf5_file(str(test_data_files_path / "ozone_sparse_ci_wavefunction.wavefunction.h5"))
 
 
 class TestSparseIsometryBinaryEncoding:
