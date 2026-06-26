@@ -264,6 +264,7 @@ class QDrift(TimeEvolutionBuilder):
                 step_terms=terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
+                scale=time,
             )
         )
 

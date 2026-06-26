@@ -20,6 +20,8 @@ _QS_FILES = [
     Path(__file__).parent / "HadamardTest.qs",
     Path(__file__).parent / "PauliExp.qs",
     Path(__file__).parent / "MeasurementBasis.qs",
+    Path(__file__).parent / "PrepSelPrep.qs",
+    Path(__file__).parent / "Select.qs",
 ]
 
 
