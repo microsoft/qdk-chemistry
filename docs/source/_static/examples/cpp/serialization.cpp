@@ -4,16 +4,20 @@
 
 // Serialization usage examples.
 // --------------------------------------------------------------------------------------------
+// docs:xyz ../data/h2.structure.xyz
 // start-cell-json
 #include <filesystem>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
 int main() {
-  // Load structure from XYZ file (the file uses Angstrom, converted to Bohr
-  // internally)
-  Structure structure_from_file =
-      Structure::from_xyz_file("../data/h2.structure.xyz");
+  // Load structure from inline XYZ file (the data uses Angstrom, converted to
+  // Bohr internally)
+  Structure structure_from_file = Structure::from_xyz(R"(2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+)");
 
   // For demonstration: create a structure with custom masses and charges
   // (requires explicit coordinates, here in Bohr)
