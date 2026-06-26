@@ -72,8 +72,8 @@ set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI S
 set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
 
 handle_dependency(gauxc
-  GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG 62fea07c9306dbd83dd18b6957358827ac9b3da0
+  GIT_REPOSITORY https://github.com/ConradJohnston/gauxc.git
+  GIT_TAG 10f59a8f42ae5f66e72c287831980a6448e36aa2
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
