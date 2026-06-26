@@ -1,6 +1,7 @@
 # How-To: SOSSA & MPS Resource Estimation with QDK Chemistry
 
 **Branch:** `scratch/mps_sossa`
+- Notebooks: `examples/mps_resource_estimation.ipynb`, `examples/sossa.ipynb`
 
 This guide walks through using QDK Chemistry to:
 
@@ -313,4 +314,3 @@ display(qre_sparse.as_frame())
 - Berry, D.W. et al. (2025). "Rapid Initial-State Preparation for the Quantum Simulation of Strongly Correlated Molecules." PRX Quantum 6, 020327. <https://doi.org/10.1103/PRXQuantum.6.020327>
 - Rupprecht, F. and Wölk, S. (2026). "Faster matrix product state preparation by exploiting symmetry-induced block-sparsity." <https://arxiv.org/pdf/2605.28489>. Zenodo: <https://zenodo.org/records/20393500>
 - Low, G.H. et al. (2025). "Fast Quantum Simulation of Electronic Structure by Spectral Amplification." (cited as `Low2025` in the codebase)
-- Notebooks: `examples/mps_resource_estimation.ipynb`, `examples/sossa.ipynb`
