@@ -360,7 +360,7 @@ TEST_CASE("Constraints") {
   using constraint_type = macis::alpha_constraint<wfn_traits>;
 
   const size_t norb = 10;
-  size_t nalpha, nbeta;
+  size_t nalpha = 0, nbeta = 0;
 
   SECTION("Closed Shell") {
     nalpha = 6;

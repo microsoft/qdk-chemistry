@@ -2,7 +2,10 @@
 include(DependencyManager)
 
 # Extract QDK_UARCH FLAGS
-set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
+set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS}")
+if(NOT MSVC)
+    set(DEPENDENCY_BUILD_FLAGS "${DEPENDENCY_BUILD_FLAGS} -fPIC")
+endif()
 
 # Save current warning settings
 get_property(_old_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE)
@@ -41,26 +44,68 @@ set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
 if(APPLE)
     set(_libint2_source_subdir "")
 endif()
+# MSVC x64 doesn't define __SSE__/__SSE2__; patch vector_x86.h to define them.
+set(_libint2_patch_args "")
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_libint2_patch_args FETCHCONTENT_ARGS
+        PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/libint2-msvc-sse-macros.cmake"
+    )
+endif()
 handle_dependency(libint2
   URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
   ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_libint2_patch_args}
   REQUIRED
 )
+if(MSVC AND TARGET libint2_cxx)
+  # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor (Boost.Preprocessor).
+  # Skip IMPORTED targets (target_compile_options rejects them).
+  get_target_property(_libint2_cxx_imported libint2_cxx IMPORTED)
+  if(NOT _libint2_cxx_imported)
+    # clang-cl rejects /Zc:preprocessor; omit it to avoid -Wunused-command-line-argument.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
+    else()
+      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+    endif()
+  endif()
+endif()
+# eritest-libint2 links only to libint2-static (C library), so it misses the
+# INTERFACE flags from libint2_cxx but still needs C++11 detection.
+if(MSVC AND TARGET eritest-libint2)
+  get_target_property(_eritest_imported eritest-libint2 IMPORTED)
+  if(NOT _eritest_imported)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
+    else()
+      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+    endif()
+  endif()
+endif()
 
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
 set(LIBECPINT_USE_PUGIXML OFF CACHE BOOL "Use pugixml for ECPINT" FORCE)
+# MSVC doesn't support the C99 VLAs ecpint uses; patch replaces them with std::vector.
+set(_ecpint_patch_args "")
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_ecpint_patch_args FETCHCONTENT_ARGS
+        PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/ecpint-msvc-vla.cmake"
+    )
+endif()
 handle_dependency(ecpint
   GIT_REPOSITORY https://github.com/robashaw/libecpint
   GIT_TAG v1.0.7
   BUILD_TARGET ECPINT::ecpint
   INSTALL_TARGET ECPINT::ecpint
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_ecpint_patch_args}
   REQUIRED
 )
+
 
 # gauxc for XC evaluation
 set(EXCHCXX_ENABLE_LIBXC OFF CACHE BOOL "Enable LibXC Support"         FORCE)
@@ -73,7 +118,7 @@ set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Sup
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG 62fea07c9306dbd83dd18b6957358827ac9b3da0
+  GIT_TAG f05cd68e1fd549cc45a318e6d039f49d044d3e1d
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
