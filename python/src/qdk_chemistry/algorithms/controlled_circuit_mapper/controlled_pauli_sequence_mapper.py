@@ -8,7 +8,7 @@
 from qdk import qsharp
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -48,13 +48,13 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         """Return controlled_circuit_mapper as the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    def _run_impl(self, controlled_unitary: ControlledUnitary) -> Circuit:
+    def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled unitary.
 
         Args:
-            controlled_unitary: The controlled unitary containing the Hamiltonian
-            and evolution parameters. Target indices are read from
-            controlled_unitary.target_indices.
+            unitary: The unitary representation containing the Hamiltonian
+                and evolution parameters. Control and target indices are
+                read from settings.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled unitary :math:`U`
@@ -65,17 +65,18 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If multiple control qubits are provided.
 
         """
-        unitary_container = controlled_unitary.unitary.get_container()
+        unitary_container = unitary.get_container()
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
-                f"The {controlled_unitary.get_unitary_container_type()} container type is not supported. "
+                f"The {unitary.get_container_type()} container type is not supported. "
                 "PauliSequenceMapper only supports PauliProductFormula container for the unitary."
             )
 
-        if len(controlled_unitary.control_indices) != 1:
+        control_indices = self._get_control_indices()
+        if len(control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
-        target_indices = controlled_unitary.target_indices
+        target_indices = self._get_target_indices(unitary)
 
         pauli_terms: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
@@ -90,7 +91,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             pauliExponents=pauli_terms,
             pauliCoefficients=angles,
             repetitions=unitary_container.step_reps,
-            control=controlled_unitary.control_indices[0],
+            control=control_indices[0],
             systems=target_indices,
         )
 
