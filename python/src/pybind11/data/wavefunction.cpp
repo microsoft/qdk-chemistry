@@ -905,8 +905,10 @@ Returns:
     float: The expectation value <S^2> (real-valued wavefunctions only)
 
 Raises:
-    RuntimeError: If spin-dependent 1-RDMs or 2-RDMs are not available, or if
-                  the underlying RDMs are complex-valued (not yet supported)
+    RuntimeError: If the required spin-resolved active-space RDMs are
+                  unavailable (in particular if the orbitals do not define an MO
+                  spin axis), or if the RDMs are complex-valued (not yet
+                  supported)
 Examples:
     >>> s_squared = wf.compute_s_squared()
 )");
