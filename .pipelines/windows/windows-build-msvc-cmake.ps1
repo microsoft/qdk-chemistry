@@ -303,7 +303,7 @@ if (-not $SkipCpp) {
         Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
         Push-Location "$BuildDir"
         $env:OMP_NUM_THREADS = 2
-        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST" 2>&1 *> ctest_msvc.log
+        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml 2>&1 *> ctest_msvc.log
         $ctestExit = $LASTEXITCODE
         Pop-Location
         if ($ctestExit -ne 0) {

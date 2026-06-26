@@ -64,7 +64,7 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
 
   // unpack the tar.gz file
   // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
-  // host:path. BSD tar (System32\tar.exe) rejects the flag, so detect at runtime.
+  // host:path. BSD tar (System32\tar.exe) rejects the flag, detect at runtime.
 #ifdef _WIN32
   static const bool tar_has_force_local =
       (std::system("tar --force-local --version > nul 2>&1") == 0);
