@@ -141,7 +141,7 @@ class EulerEvolutionCircuitBuilder(EvolutionCircuitBuilder):
             else:
                 combined_container = combined_container.combine(time_step_container)
 
-        if residual > 0.0:
+        if residual != 0.0:
             t_start = num_full_steps * dt
             t_end = total_time
             h_snapshot = propagator.run(hamiltonian, t_start, t_end)
