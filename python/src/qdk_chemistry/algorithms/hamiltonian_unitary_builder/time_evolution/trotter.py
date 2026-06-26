@@ -209,6 +209,7 @@ class Trotter(TimeEvolutionBuilder):
             step_terms=terms,
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
+            scale=time,
         )
 
         return UnitaryRepresentation(container=container)
