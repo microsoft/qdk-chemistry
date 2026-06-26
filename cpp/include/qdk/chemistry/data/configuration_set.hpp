@@ -86,6 +86,17 @@ class ConfigurationSet : public DataClass {
   sector_layout() const;
 
   /**
+   * @brief Get the actual number of single-particle modes represented by each
+   * configuration (not byte-padded).
+   *
+   * This is derived from the orbital basis: the active-space size if an active
+   * space is defined, otherwise the total number of molecular orbitals.
+   *
+   * @return Non-padded mode count.
+   */
+  size_t num_modes() const;
+
+  /**
    * @brief Get the number of configurations in the set
    * @return Number of configurations
    */
