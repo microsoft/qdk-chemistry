@@ -103,9 +103,9 @@ void approx_diag_hessian(NumOrbital norb, NumInactive ninact, NumActive nact,
                          const double* A1RDM, size_t LDD1, const double* A2RDM,
                          size_t LDD2, Args&&... args) {
   const size_t no = norb.get();
-  const size_t ni = ninact.get();
+  [[maybe_unused]] const size_t ni = ninact.get();
   const size_t na = nact.get();
-  const size_t nv = num_virtual_orbitals.get();
+  [[maybe_unused]] const size_t nv = num_virtual_orbitals.get();
 
   // Compute inactive Fock
   std::vector<double> Fi(no * no);

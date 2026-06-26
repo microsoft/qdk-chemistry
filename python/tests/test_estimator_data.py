@@ -49,7 +49,7 @@ def test_measurement_data_serialization():
         tmpfile_path = tmpfile.name
 
     # Load from json file and verify contents
-    with open(tmpfile_path) as f:
+    with open(tmpfile_path, encoding="utf-8") as f:
         data = json.load(f)
     assert data == measurement_data_dict
 

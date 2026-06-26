@@ -183,7 +183,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   logger->info("  * NUNIQ_ALPHA = {}", nuniq_alpha);
   std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
   std::transform_exclusive_scan(
-      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), 0ul,
+      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), size_t{0},
       std::plus<size_t>(), [](const auto& p) { return p.second; });
 
   using unique_alpha_data = std::vector<beta_coeff_data>;
@@ -208,9 +208,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     logger->info("MEM REQ DETS = {:.2e}", ncdets * sizeof(wfn_t<N>) / gib);
     logger->info("MEM REQ C    = {:.2e}", ncdets * sizeof(double) / gib);
     size_t mem_alpha = 0;
-    for (auto i = 0ul; i < nuniq_alpha; ++i) {
+    for (size_t i = 0; i < nuniq_alpha; ++i) {
       mem_alpha += sizeof(spin_wfn_type);
-      for (auto j = 0ul; j < uad[i].size(); ++j) {
+      for (size_t j = 0; j < uad[i].size(); ++j) {
         mem_alpha += uad[i][j].mem();
       }
     }
