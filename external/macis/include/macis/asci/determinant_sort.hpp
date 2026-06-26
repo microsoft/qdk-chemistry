@@ -54,7 +54,7 @@ void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   std::vector<double> reorder_C(nlocal);
   std::vector<WfnT> reorder_dets(ndets);
   assert(nlocal == ndets);
-  for (auto i = 0ul; i < ndets; ++i) {
+  for (size_t i = 0; i < ndets; ++i) {
     reorder_C[i] = C[idx[i]];
     reorder_dets[i] = dets[idx[i]];
   }
@@ -91,7 +91,7 @@ void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
 
   std::vector<double> reorder_C(ndets);
   std::vector<wfn_type> reorder_dets(ndets);
-  for (auto i = 0ul; i < ndets; ++i) {
+  for (size_t i = 0; i < ndets; ++i) {
     reorder_C[i] = C[idx[i]];
     reorder_dets[i] = *(begin + idx[i]);
   }

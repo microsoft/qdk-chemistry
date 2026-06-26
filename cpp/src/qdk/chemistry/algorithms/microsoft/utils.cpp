@@ -394,13 +394,14 @@ std::vector<unsigned> compute_shell_map(
   const auto& itrn_shells = itrn_basis_set.shells;
   for (size_t i = 0; i < nshells; ++i) {
     const auto& qdk_shell = qdk_shells[i];
-    const auto nprim = qdk_shell.exponents.size();
+    const auto nprim = static_cast<size_t>(qdk_shell.exponents.size());
     const auto l = static_cast<unsigned>(qdk_shell.orbital_type);
     for (size_t j = 0; j < nshells; ++j) {
       const auto& itrn_shell = itrn_shells[j];
-      if (qdk_shell.atom_index != itrn_shell.atom_index) continue;
-      if (l != itrn_shell.angular_momentum) continue;
-      if (nprim != itrn_shell.contraction) continue;
+      if (qdk_shell.atom_index != static_cast<size_t>(itrn_shell.atom_index))
+        continue;
+      if (l != static_cast<unsigned>(itrn_shell.angular_momentum)) continue;
+      if (nprim != static_cast<size_t>(itrn_shell.contraction)) continue;
       bool exp_equiv = true;
       for (size_t k = 0; k < nprim; ++k) {
         exp_equiv &= std::abs(qdk_shell.exponents[k] -
