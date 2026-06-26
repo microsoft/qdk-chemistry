@@ -348,7 +348,12 @@ def test_asymmetric_active_space_error():
             return len(self.get_active_determinants())
 
     mock_wfn = MockWavefunction()
+    # Skip MPS algorithms — they require MPSWavefunction and raise TypeError
+    # before reaching the asymmetric active space validation.
+    mps_keys = {"mps_sequential", "mps_sparse"}
     for sp_key in available("state_prep"):
+        if sp_key in mps_keys:
+            continue
         prep = create("state_prep", sp_key)
         with pytest.raises(
             ValueError,

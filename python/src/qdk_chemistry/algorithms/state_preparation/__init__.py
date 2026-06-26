@@ -9,6 +9,12 @@ quantum states from classical wavefunctions.
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
+from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
+    MPSSequentialStatePreparation,
+)
+from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
+    MPSSparseStatePreparation,
+)
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryGF2XStatePreparation,
 )
@@ -19,6 +25,8 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 )
 
 __all__ = [
+    "MPSSequentialStatePreparation",
+    "MPSSparseStatePreparation",
     "SparseIsometryGF2XStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",

@@ -1,0 +1,212 @@
+"""Wavefunction container for Matrix Product State representations."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+__all__ = ["MPSWavefunction"]
+
+
+class MPSWavefunction:
+    """Container for wavefunctions represented as Matrix Product States (MPS).
+
+    Stores the MPS tensors and provides methods for computing the full state vector
+    and metadata needed by the MPS state preparation algorithm.
+
+    Parameters
+    ----------
+    tensors : sequence of np.ndarray
+        MPS tensors. ``tensors[i]`` has shape ``(chi_left_i, d, chi_right_i)``
+        where ``d`` is the local Hilbert space dimension (typically 4 for
+        two-qubit sites in Jordan-Wigner encoding) and ``chi`` are the bond
+        dimensions.
+    site_dim : int, optional
+        Local site dimension (default 4, i.e. 2 qubits per site).
+
+    Attributes
+    ----------
+    tensors : list[np.ndarray]
+        The MPS tensors.
+    num_sites : int
+        Number of MPS sites.
+    site_dim : int
+        Local Hilbert space dimension per site.
+    bond_dims : list[int]
+        Bond dimensions ``[chi_0, chi_1, ..., chi_N]`` where ``chi_0 = chi_N = 1``
+        for open boundary conditions.
+
+    """
+
+    def __init__(self, tensors: Sequence[np.ndarray], site_dim: int = 4):
+        """Initialize the MPS wavefunction container.
+
+        Args:
+            tensors: Sequence of MPS tensors with shapes (chi_left, d, chi_right).
+            site_dim: Local Hilbert space dimension per site (default 4).
+
+        Raises:
+            ValueError: If tensors are empty, have inconsistent dimensions,
+                or violate open boundary conditions.
+
+        """
+        if not tensors:
+            raise ValueError("MPS tensors must not be empty.")
+
+        self.site_dim = site_dim
+        self.tensors = [np.asarray(t, dtype=np.float64) for t in tensors]
+        self.num_sites = len(self.tensors)
+
+        # Validate tensor shapes
+        for i, t in enumerate(self.tensors):
+            if t.ndim != 3:
+                raise ValueError(f"Tensor {i} must be 3-dimensional, got shape {t.shape}.")
+            if t.shape[1] != site_dim:
+                raise ValueError(f"Tensor {i} has site dimension {t.shape[1]}, expected {site_dim}.")
+
+        # Note: chi_left > 1 on the first tensor is allowed for non-zero spin
+        # systems (singlet embedding), where the left boundary represents
+        # multiple spin projection states.
+
+        # Validate bond dimension consistency
+        for i in range(self.num_sites - 1):
+            chi_right = self.tensors[i].shape[2]
+            chi_left_next = self.tensors[i + 1].shape[0]
+            if chi_right != chi_left_next:
+                raise ValueError(
+                    f"Bond dimension mismatch between site {i} (chi_right={chi_right}) "
+                    f"and site {i + 1} (chi_left={chi_left_next})."
+                )
+
+        self.bond_dims = [self.tensors[0].shape[0]]
+        for t in self.tensors:
+            self.bond_dims.append(t.shape[2])
+
+    @property
+    def max_bond_dim(self) -> int:
+        """Maximum bond dimension (chi_max) across all bonds."""
+        return max(self.bond_dims)
+
+    @property
+    def num_qubits(self) -> int:
+        """Total number of qubits (2 per site for d=4)."""
+        qubits_per_site = int(np.log2(self.site_dim))
+        return self.num_sites * qubits_per_site
+
+    def contract(self) -> np.ndarray:
+        """Contract the MPS to obtain the full state vector.
+
+        Returns
+        -------
+        np.ndarray
+            Normalized state vector of length ``site_dim ** num_sites``.
+
+        """
+        state = self.tensors[0]  # (chi_left, d, chi_1)
+        for tensor in self.tensors[1:]:
+            # state: (chi_left, d^k, chi_prev), tensor: (chi_prev, d, chi_next)
+            left = state.shape[0]
+            num_states = state.shape[1]
+            chi_prev = state.shape[2]
+            chi_in, d, chi_next = tensor.shape
+
+            state_flat = state.reshape(left * num_states, chi_prev)
+            tensor_flat = tensor.reshape(chi_in, d * chi_next)
+            result = state_flat @ tensor_flat
+            state = result.reshape(left, num_states * d, chi_next)
+
+        # Sum over the left boundary index (chi_left) and squeeze chi_right=1.
+        # For chi_left=1 this is equivalent to flatten; for chi_left > 1
+        # (non-zero spin) it sums the spin projection contributions.
+        vec = state.sum(axis=0).flatten()
+        norm = np.linalg.norm(vec)
+        if norm > 1e-15:
+            vec = vec / norm
+        return vec
+
+    @classmethod
+    def random(
+        cls,
+        num_sites: int,
+        bond_dim: int,
+        site_dim: int = 4,
+        rng: np.random.Generator | None = None,
+        right_canonical: bool = True,
+    ) -> MPSWavefunction:
+        """Generate a random MPS with specified bond dimension.
+
+        Parameters
+        ----------
+        num_sites : int
+            Number of sites.
+        bond_dim : int
+            Internal bond dimension (capped by dimensional constraints).
+        site_dim : int
+            Local site dimension (default 4).
+        rng : np.random.Generator or None
+            Random number generator. If None, uses default.
+        right_canonical : bool
+            If True, put the MPS in right-canonical form (default True).
+
+        Returns
+        -------
+        MPSWavefunction
+            A random MPS wavefunction.
+
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+
+        # Determine bond dimensions respecting boundary constraints
+        bond_dims = [1]
+        for i in range(1, num_sites):
+            max_left = bond_dims[-1] * site_dim
+            max_right = site_dim ** min(i, num_sites - i)
+            chi = min(bond_dim, max_left, max_right)
+            bond_dims.append(chi)
+        bond_dims.append(1)
+
+        tensors = []
+        for i in range(num_sites):
+            chi_l = bond_dims[i]
+            chi_r = bond_dims[i + 1]
+            t = rng.standard_normal((chi_l, site_dim, chi_r))
+            tensors.append(t)
+
+        if right_canonical:
+            tensors = _make_right_canonical(tensors)
+
+        return cls(tensors, site_dim=site_dim)
+
+
+def _make_right_canonical(tensors: list[np.ndarray]) -> list[np.ndarray]:
+    """Put MPS tensors in right-canonical form via successive QR decompositions.
+
+    Sweeps from right to left. After this, all tensors except the first
+    satisfy A†A = I (right-isometric).
+    """
+    result = [t.copy() for t in tensors]
+    num_sites = len(result)
+
+    for i in range(num_sites - 1, 0, -1):
+        chi_l, d, chi_r = result[i].shape
+        # Reshape to (chi_l, d * chi_r) and do QR from the right
+        mat = result[i].reshape(chi_l, d * chi_r)
+        # SVD-based right canonicalization: mat = U @ S @ Vt
+        # Vt becomes the new tensor, U @ S is absorbed left
+        q_mat, r_mat = np.linalg.qr(mat.T, mode="reduced")
+        result[i] = q_mat.T.reshape(chi_l, d, chi_r)
+        chi_l_prev, d_prev, _ = result[i - 1].shape
+        left_mat = result[i - 1].reshape(chi_l_prev * d_prev, chi_l)
+        result[i - 1] = (left_mat @ r_mat.T).reshape(chi_l_prev, d_prev, chi_l)
+
+    return result
