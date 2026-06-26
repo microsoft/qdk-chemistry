@@ -11,7 +11,6 @@ from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBas
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledUnitary,
     Settings,
     UnitaryRepresentation,
 )
@@ -109,9 +108,8 @@ class HadamardTestCircuitBuilder(Algorithm):
     def _create_controlled_circuit(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Map a target unitary into a controlled evolution circuit.
 
-        Wraps ``unitary`` in a :class:`~qdk_chemistry.data.ControlledUnitary` controlled on the
-        Hadamard test control qubit (index 0) and runs the nested ``controlled_circuit_mapper``
-        to synthesize the controlled-:math:`U` circuit.
+        Map ``unitary`` controlled on the Hadamard test control qubit (index 0)
+        and runs the nested ``controlled_circuit_mapper`` to synthesize the controlled-:math:`U` circuit.
 
         Args:
             unitary: Unitary representation :math:`U` to map into a controlled circuit.
@@ -120,7 +118,6 @@ class HadamardTestCircuitBuilder(Algorithm):
             The controlled circuit implementing controlled-:math:`U`.
 
         """
-        controlled_unitary = ControlledUnitary(unitary=unitary, control_indices=[0])
         circuit_mapper_ref = self._settings.get("controlled_circuit_mapper")
         if circuit_mapper_ref.algorithm_type != "controlled_circuit_mapper":
             raise ValueError(
@@ -129,7 +126,8 @@ class HadamardTestCircuitBuilder(Algorithm):
             )
 
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        return circuit_mapper.run(controlled_unitary=controlled_unitary)
+        circuit_mapper.settings().update("control_indices", [0])
+        return circuit_mapper.run(unitary=unitary)
 
 
 class HadamardTestCircuitBuilderFactory(AlgorithmFactory):
