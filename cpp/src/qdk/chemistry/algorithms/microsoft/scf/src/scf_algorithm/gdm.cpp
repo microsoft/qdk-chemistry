@@ -18,7 +18,7 @@
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 #include "qdk/chemistry/scf/core/types.h"
-#include "scf_helper.h"
+#include "line_search.h"
 #include "util/matrix_exp.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include "util/gpu/cuda_helper.h"
@@ -737,8 +737,6 @@ class GDM {
 
   // Number of spin blocks (1 for restricted, 2 for unrestricted)
   const int num_orbital_spin_blocks_;
-  // Number of density matrices (1 for closed shell, 2 for open shell)
-  const int num_density_matrices_;
 };
 
 GDM::GDM(const SCFContext& ctx, int history_size_limit)
@@ -747,9 +745,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
       last_accepted_energy_(std::numeric_limits<double>::infinity()),
       gdm_step_count_(0),
       num_orbital_spin_blocks_(
-          ctx.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1),
-      num_density_matrices_(
-          ctx.cfg->scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2) {
+          ctx.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
   const auto& mol = *ctx.mol;
