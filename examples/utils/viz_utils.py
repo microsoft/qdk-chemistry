@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data import Orbitals, Wavefunction
 from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 
@@ -80,6 +80,89 @@ def generate_cube_data_with_info(
             "info": {
                 "Energy (Ha)": f"{energies[idx]:.4f}",
                 "Occupation": "occupied" if idx < n_occupied else "virtual",
+            },
+        }
+
+    return cube_data_with_info
+
+
+def generate_cube_data_with_correlation_info(
+    wavefunction: Wavefunction,
+    indices: list[int] | None = None,
+    grid_size: tuple[int, int, int] = (40, 40, 40),
+    margin: float = 10.0,
+) -> dict[str, dict]:
+    """Generate cube data with natural-occupation and entropy overlays for the MoleculeViewer widget.
+
+    Builds the ``cube_data`` dictionary for the orbitals of a ``Wavefunction``,
+    attaching each orbital's natural occupation number and single-orbital entropy as metadata.
+
+    The wavefunction must carry one- and two-particle RDMs
+    so that occupations and entropies are available.
+
+    Args:
+        wavefunction: wavefunction with 1- and 2-RDMs and an active space.
+        indices: Orbital indices to include. If None, all active-space orbitals are included.
+        grid_size: Grid dimensions for cube file generation.
+        margin: Margin in Bohr around the molecule for the cube grid.
+
+    Returns:
+        Dictionary suitable for passing as ``cube_data`` to ``MoleculeViewer``.
+
+    """
+    orbitals = wavefunction.get_orbitals()
+    if orbitals.is_unrestricted():
+        raise ValueError(
+            "generate_cube_data_with_correlation_info only supports restricted orbitals. "
+            "Unrestricted orbitals have separate alpha/beta channels that require different handling."
+        )
+
+    try:
+        entropies = wavefunction.get_single_orbital_entropies()
+    except RuntimeError as exc:
+        raise ValueError(
+            "Wavefunction does not have single-orbital entropies. "
+            "Ensure the calculator was run with calculate_one_rdm=True and calculate_two_rdm=True."
+        ) from exc
+
+    if indices is None and not orbitals.has_active_space():
+        raise ValueError(
+            "No active space is defined on the wavefunction's orbitals. "
+            "Set an active space on the Orbitals, or pass indices explicitly."
+        )
+
+    if indices is None:
+        indices, _ = orbitals.get_active_space_indices()
+        indices = list(indices)
+
+    # Occupations and entropies are indexed by active-space position.
+    # Build a lookup from MO index to position for direct access.
+    active_indices, _ = orbitals.get_active_space_indices()
+    invalid = [i for i in indices if i not in active_indices]
+    if invalid:
+        raise ValueError(
+            f"indices {invalid} are not in the active space {list(active_indices)}. "
+            "Occupations and entropies are only available for active-space orbitals."
+        )
+    occ_alpha, occ_beta = wavefunction.get_active_orbital_occupations()
+    mo_to_pos = {mo_idx: pos for pos, mo_idx in enumerate(active_indices)}
+
+    cube_data_raw = generate_cubefiles_from_orbitals(
+        orbitals=orbitals,
+        grid_size=grid_size,
+        margin=margin,
+        indices=indices,
+    )
+
+    cube_data_with_info: dict[str, dict] = {}
+    for raw_label, cube_str in cube_data_raw.items():
+        mo_idx = int(raw_label.split("_")[1]) - 1
+        pos = mo_to_pos[mo_idx]
+        cube_data_with_info[f"MO {mo_idx + 1}"] = {
+            "data": cube_str,
+            "info": {
+                "Occupation": f"{float(occ_alpha[pos]) + float(occ_beta[pos]):.3f}",
+                "Entropy": f"{float(entropies[pos]):.3f}",
             },
         }
 
