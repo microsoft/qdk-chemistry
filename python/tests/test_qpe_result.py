@@ -9,8 +9,22 @@ import tempfile
 from pathlib import Path
 
 import h5py
+import numpy as np
+import pytest
 
 from qdk_chemistry.data import QpeResult
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
+from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _ppf_converter(scale: float):
+    """Return a callable mapping phase fraction to energy for time evolution: E = angle / t."""
+    return lambda phi: float(((phi % 1.0) * 2 * np.pi - (2 * np.pi if (phi % 1.0) > 0.5 else 0)) / scale)
+
+
+def _qw_converter(scale: float):
+    """Return a callable mapping phase fraction to energy for quantum walk: E = λ·cos(2πφ)."""
+    return lambda phi: float(scale * np.cos(2 * np.pi * (phi % 1.0)))
 
 
 def test_qpe_result_creation():
@@ -18,13 +32,12 @@ def test_qpe_result_creation():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        evolution_time=1.0,
+        eigenvalue_from_phase=_ppf_converter(1.0),
         bits_msb_first=[0, 1],
     )
 
     assert result.method == "IQPE"
     assert result.phase_fraction == 0.25
-    assert result.evolution_time == 1.0
     assert result.bits_msb_first == (0, 1)
     assert result.bitstring_msb_first == "01"
 
@@ -34,8 +47,7 @@ def test_qpe_result_json_serialization():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.125,
-        evolution_time=2.0,
-        reference_energy=-1.5,
+        eigenvalue_from_phase=_ppf_converter(2.0),
         bits_msb_first=[0, 0, 1],
     )
 
@@ -44,7 +56,6 @@ def test_qpe_result_json_serialization():
     assert isinstance(json_dict, dict)
     assert json_dict["method"] == "IQPE"
     assert json_dict["phase_fraction"] == 0.125
-    assert json_dict["evolution_time"] == 2.0
     assert "raw_energy" in json_dict
     assert "branching" in json_dict
 
@@ -54,7 +65,7 @@ def test_qpe_result_json_file_io():
     result = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.5,
-        evolution_time=1.0,
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.json", delete=False) as tmp:
@@ -71,7 +82,6 @@ def test_qpe_result_json_file_io():
         # Verify data
         assert loaded_result.method == result.method
         assert loaded_result.phase_fraction == result.phase_fraction
-        assert loaded_result.evolution_time == result.evolution_time
         assert loaded_result.raw_energy == result.raw_energy
     finally:
         Path(filename).unlink()
@@ -82,8 +92,7 @@ def test_qpe_result_hdf5_file_io():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.375,
-        evolution_time=3.0,
-        reference_energy=-2.0,
+        eigenvalue_from_phase=_ppf_converter(3.0),
         metadata={"test": "data"},
     )
 
@@ -101,7 +110,6 @@ def test_qpe_result_hdf5_file_io():
         # Verify data
         assert loaded_result.method == result.method
         assert loaded_result.phase_fraction == result.phase_fraction
-        assert loaded_result.evolution_time == result.evolution_time
         assert loaded_result.resolved_energy == result.resolved_energy
     finally:
         Path(filename).unlink()
@@ -112,20 +120,23 @@ def test_qpe_result_summary():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        evolution_time=1.0,
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     summary = result.get_summary()
     assert isinstance(summary, str)
     assert "IQPE" in summary
-    assert "Evolution time" in summary
     assert "Phase fraction" in summary
     assert "Raw energy" in summary
 
 
 def test_qpe_result_immutability():
     """Test that QpeResult is immutable after construction."""
-    qpe = QpeResult.from_phase_fraction(method="IQPE", phase_fraction=0.25, evolution_time=1.0)
+    qpe = QpeResult.from_phase_fraction(
+        method="IQPE",
+        phase_fraction=0.25,
+        eigenvalue_from_phase=_ppf_converter(1.0),
+    )
 
     try:
         qpe.method = "different"
@@ -139,7 +150,6 @@ def test_qpe_result_from_json():
     json_data = {
         "version": QpeResult._serialization_version,
         "method": "IQPE",
-        "evolution_time": 1.5,
         "phase_fraction": 0.25,
         "phase_angle": 1.5707963267948966,
         "canonical_phase_fraction": 0.25,
@@ -155,7 +165,6 @@ def test_qpe_result_from_json():
     result = QpeResult.from_json(json_data)
 
     assert result.method == "IQPE"
-    assert result.evolution_time == 1.5
     assert result.phase_fraction == 0.25
     assert result.raw_energy == -1.0
     assert result.branching == (-1.0, -0.5, 0.0)
@@ -170,7 +179,6 @@ def test_qpe_result_from_json_minimal():
     json_data = {
         "version": QpeResult._serialization_version,
         "method": "QPE",
-        "evolution_time": 2.0,
         "phase_fraction": 0.5,
         "phase_angle": 3.141592653589793,
         "canonical_phase_fraction": 0.5,
@@ -182,7 +190,6 @@ def test_qpe_result_from_json_minimal():
     result = QpeResult.from_json(json_data)
 
     assert result.method == "QPE"
-    assert result.evolution_time == 2.0
     assert result.phase_fraction == 0.5
     assert result.resolved_energy is None
     assert result.bits_msb_first is None
@@ -195,8 +202,7 @@ def test_qpe_result_json_roundtrip():
     original = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.375,
-        evolution_time=2.5,
-        reference_energy=-1.2,
+        eigenvalue_from_phase=_ppf_converter(2.5),
         bits_msb_first=[1, 1, 0],
         metadata={"source": "test", "iteration": 5},
     )
@@ -209,7 +215,6 @@ def test_qpe_result_json_roundtrip():
 
     # Verify all fields match
     assert restored.method == original.method
-    assert restored.evolution_time == original.evolution_time
     assert restored.phase_fraction == original.phase_fraction
     assert restored.phase_angle == original.phase_angle
     assert restored.canonical_phase_fraction == original.canonical_phase_fraction
@@ -227,8 +232,7 @@ def test_qpe_result_hdf5_roundtrip():
     original = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.125,
-        evolution_time=1.0,
-        reference_energy=-0.5,
+        eigenvalue_from_phase=_ppf_converter(1.0),
         bits_msb_first=[0, 0, 1],
         metadata={"tag": "experiment_1"},
     )
@@ -247,7 +251,6 @@ def test_qpe_result_hdf5_roundtrip():
 
         # Verify all fields match
         assert restored.method == original.method
-        assert restored.evolution_time == original.evolution_time
         assert restored.phase_fraction == original.phase_fraction
         assert restored.phase_angle == original.phase_angle
         assert restored.canonical_phase_fraction == original.canonical_phase_fraction
@@ -267,7 +270,7 @@ def test_qpe_result_from_file_json():
     result = QpeResult.from_phase_fraction(
         method="IQPE",
         phase_fraction=0.25,
-        evolution_time=1.0,
+        eigenvalue_from_phase=_ppf_converter(1.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.json", delete=False) as tmp:
@@ -279,7 +282,6 @@ def test_qpe_result_from_file_json():
 
         assert loaded.method == result.method
         assert loaded.phase_fraction == result.phase_fraction
-        assert loaded.evolution_time == result.evolution_time
     finally:
         Path(filename).unlink()
 
@@ -289,7 +291,7 @@ def test_qpe_result_from_file_hdf5():
     result = QpeResult.from_phase_fraction(
         method="QPE",
         phase_fraction=0.5,
-        evolution_time=2.0,
+        eigenvalue_from_phase=_ppf_converter(2.0),
     )
 
     with tempfile.NamedTemporaryFile(suffix=".qpe_result.hdf5", delete=False) as tmp:
@@ -301,6 +303,105 @@ def test_qpe_result_from_file_hdf5():
 
         assert loaded.method == result.method
         assert loaded.phase_fraction == result.phase_fraction
-        assert loaded.evolution_time == result.evolution_time
     finally:
         Path(filename).unlink()
+
+
+def test_qpe_result_from_phase_fraction_qubitization():
+    """Test QpeResult creation from qubitization phase measurement via from_phase_fraction."""
+    lambda_val = 5.0
+    phase_fraction = 0.25
+    expected_energy = 0.0  # λ·cos(π/2)
+
+    result = QpeResult.from_phase_fraction(
+        method="qubitization_qpe",
+        phase_fraction=phase_fraction,
+        eigenvalue_from_phase=_qw_converter(lambda_val),
+        bits_msb_first=[0, 1, 0, 0],
+    )
+
+    assert result.method == "qubitization_qpe"
+    assert result.phase_fraction == phase_fraction
+    assert np.isclose(
+        result.raw_energy,
+        expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert result.branching == (result.raw_energy,)
+    assert result.resolved_energy is None
+    assert result.bits_msb_first == (0, 1, 0, 0)
+    assert result.bitstring_msb_first == "0100"
+    assert result.metadata is None
+
+
+@pytest.mark.parametrize(
+    ("phi", "scale", "expected"),
+    [
+        (0.0, 2.0, 0.0),
+        (0.1, 2.0, 0.3141592653589793),
+        (0.75, 1.0, -1.5707963267948966),
+    ],
+    ids=["zero_phase", "positive_energy", "negative_wrap"],
+)
+def test_ppf_eigenvalue_from_phase(phi, scale, expected):
+    """Time evolution eigenvalue_from_phase maps phase fraction to correct energy."""
+    assert np.isclose(
+        _ppf_converter(scale)(phi),
+        expected,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+def test_ppf_eigenvalue_from_phase_roundtrip():
+    """Verify roundtrip: E → phase → E for time evolution (principal branch)."""
+    t = 2.0
+    energy = 0.5  # |E*t| = 1.0 < π, stays in principal branch
+    # Convention: U = e^{iHt}, so eigenvalue = e^{iEt}, phase_fraction = Et/(2π)
+    phi = (energy * t / (2 * np.pi)) % 1.0
+    assert np.isclose(
+        _ppf_converter(t)(phi),
+        energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+@pytest.mark.parametrize(
+    ("phi", "scale", "expected"),
+    [
+        (0.0, 5.0, 5.0),
+        (0.25, 3.0, 0.0),
+        (0.5, 4.0, -4.0),
+    ],
+    ids=["zero_phase", "quarter_phase", "half_phase"],
+)
+def test_qw_eigenvalue_from_phase(phi, scale, expected):
+    """Quantum walk eigenvalue_from_phase maps phase fraction to correct energy."""
+    assert np.isclose(
+        _qw_converter(scale)(phi),
+        expected,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+def test_qw_eigenvalue_from_phase_roundtrip():
+    """Verify roundtrip: E → phase → E for quantum walk."""
+    lam = 6.0
+    energy = -2.5
+    phi = np.arccos(energy / lam) / (2 * np.pi)
+    assert np.isclose(
+        _qw_converter(lam)(phi),
+        energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+def test_lcu_eigenvalue_from_phase_raises():
+    """LCUContainer.eigenvalue_from_phase raises NotImplementedError."""
+    c = LCUContainer.__new__(LCUContainer)
+    with pytest.raises(NotImplementedError):
+        c.eigenvalue_from_phase(0.25)
