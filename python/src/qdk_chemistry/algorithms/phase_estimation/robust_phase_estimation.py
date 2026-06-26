@@ -76,10 +76,20 @@ class RobustPhaseEstimationSettings(Settings):
             "Base evolution time tau (round-0 time). 0.0 selects pi/(2*lambda) automatically.",
         )
         self._set_default(
-            "randomized",
-            "bool",
-            True,
-            "If True, apply the qDRIFT tangent de-biasing to the recovered phase.",
+            "unitary_accuracy_fraction",
+            "double",
+            0.5,
+            "Fraction f of the total target_accuracy budget assigned to the unitary builder: "
+            "epsilon_unitary = f * target_accuracy and epsilon_rpe = (1 - f) * target_accuracy. "
+            "Use a value in [0, 1); 0.5 splits the budget evenly.",
+        )
+        self._set_default(
+            "energy_correction",
+            "string",
+            "auto",
+            "Phase-to-energy map: 'auto' (qDRIFT -> tangent de-biasing, otherwise linear), "
+            "'linear', or 'qdrift_tangent'.",
+            ["auto", "linear", "qdrift_tangent"],
         )
         self._set_default(
             "seed",
@@ -96,15 +106,22 @@ class RobustPhaseEstimation(PhaseEstimation):
         self,
         target_accuracy: float = 1e-3,
         base_time: float = 0.0,
-        randomized: bool = True,
+        unitary_accuracy_fraction: float = 0.5,
+        energy_correction: str = "auto",
         seed: int = -1,
     ):
         """Initialize RobustPhaseEstimation.
 
         Args:
-            target_accuracy: Target absolute accuracy on the energy.
+            target_accuracy: Total target absolute accuracy on the energy. It is
+                split into a unitary-builder budget and an RPE budget via
+                ``unitary_accuracy_fraction``.
             base_time: Base evolution time ``tau``. ``0.0`` selects ``pi/(2*lambda)``.
-            randomized: Whether to apply the qDRIFT tangent de-biasing.
+            unitary_accuracy_fraction: Fraction ``f`` of ``target_accuracy`` given
+                to the unitary builder (``epsilon_unitary = f * target_accuracy``,
+                ``epsilon_rpe = (1 - f) * target_accuracy``). Use a value in ``[0, 1)``.
+            energy_correction: Phase-to-energy map: ``"auto"`` (qDRIFT -> tangent,
+                otherwise linear), ``"linear"``, or ``"qdrift_tangent"``.
             seed: Random seed for the evolution builder (``-1`` for non-deterministic).
 
         """
@@ -113,7 +130,8 @@ class RobustPhaseEstimation(PhaseEstimation):
         self._settings = RobustPhaseEstimationSettings()
         self._settings.set("target_accuracy", target_accuracy)
         self._settings.set("base_time", base_time)
-        self._settings.set("randomized", randomized)
+        self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
+        self._settings.set("energy_correction", energy_correction)
         self._settings.set("seed", seed)
 
     def _run_impl(
@@ -138,17 +156,29 @@ class RobustPhaseEstimation(PhaseEstimation):
         if noise is not None:
             Logger.warning("RobustPhaseEstimation does not support noise yet; ignoring the noise model.")
 
-        epsilon = self._settings.get("target_accuracy")
-        randomized = self._settings.get("randomized")
+        epsilon_total = self._settings.get("target_accuracy")
         seed = self._settings.get("seed")
+
+        fraction = min(max(float(self._settings.get("unitary_accuracy_fraction")), 0.0), 1.0)
+        epsilon_unitary = fraction * epsilon_total
+        epsilon_rpe = (1.0 - fraction) * epsilon_total
+        if epsilon_rpe <= 0.0:
+            # Degenerate split (fraction == 1): keep the RPE ladder finite.
+            epsilon_rpe = epsilon_total
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
         base_time = self._settings.get("base_time")
         if base_time <= 0.0:
             base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
 
-        total = num_rounds(lambda_norm, epsilon)
-        Logger.info(f"RobustPhaseEstimation: lambda={lambda_norm:.6g}, base_time={base_time:.6g}, rounds={total + 1}.")
+        category = self._classify_builder()
+        correction = self._select_correction(category)
+        total = num_rounds(lambda_norm, epsilon_rpe)
+        Logger.info(
+            f"RobustPhaseEstimation: lambda={lambda_norm:.6g}, base_time={base_time:.6g}, "
+            f"rounds={total + 1}, builder={category}, correction={correction}, "
+            f"eps_rpe={epsilon_rpe:.3g}, eps_unitary={epsilon_unitary:.3g}."
+        )
 
         theta = 0.0
         final_samples = 1
@@ -157,7 +187,9 @@ class RobustPhaseEstimation(PhaseEstimation):
             evolution_time = (2**m) * base_time
             final_samples = samples
 
-            unitary = self._build_unitary(qubit_hamiltonian, evolution_time, samples, seed, m)
+            unitary = self._build_unitary(
+                qubit_hamiltonian, evolution_time, samples, seed, m, category, epsilon_unitary
+            )
             real_part = self._sample_signal(state_preparation, unitary, shots, "X")
             imag_part = self._sample_signal(state_preparation, unitary, shots, "Y")
 
@@ -165,12 +197,17 @@ class RobustPhaseEstimation(PhaseEstimation):
             theta = rpe_angle_update(theta, measured_phase, m)
             Logger.debug(f"Round {m}: shots={shots}, samples={samples}, phi={measured_phase:.6f}, theta={theta:.6f}.")
 
-        energy = self._resolve_energy(theta, base_time, total, lambda_norm, final_samples, randomized=randomized)
+        energy = self._resolve_energy(theta, base_time, total, lambda_norm, final_samples, correction=correction)
         metadata = {
             "lambda": lambda_norm,
             "base_time": base_time,
             "num_rounds": total + 1,
-            "randomized": bool(randomized),
+            "target_accuracy": float(epsilon_total),
+            "epsilon_rpe": float(epsilon_rpe),
+            "epsilon_unitary": float(epsilon_unitary),
+            "unitary_accuracy_fraction": float(fraction),
+            "unitary_builder": category,
+            "energy_correction": correction,
         }
         return QpeResult.from_energy(
             method=self.name(),
@@ -179,6 +216,33 @@ class RobustPhaseEstimation(PhaseEstimation):
             metadata=metadata,
         )
 
+    def _classify_builder(self) -> str:
+        """Classify the configured unitary builder by its sample-count settings.
+
+        Returns ``"partial_randomized"`` when the builder exposes
+        ``num_random_samples`` (the partially randomized family), ``"qdrift"``
+        when it exposes ``num_samples`` (pure qDRIFT), and otherwise
+        ``"deterministic_or_exact"`` (Trotter / Zassenhaus).
+        """
+        settings = self._create_nested("unitary_builder").settings()
+        if settings.has("num_random_samples"):
+            return "partial_randomized"
+        if settings.has("num_samples"):
+            return "qdrift"
+        return "deterministic_or_exact"
+
+    def _select_correction(self, category: str) -> str:
+        """Resolve the phase-to-energy correction mode for the builder category.
+
+        ``"auto"`` maps pure qDRIFT to the tangent de-biasing and every other
+        builder family (partially randomized, deterministic) to the linear map;
+        an explicit ``"linear"`` / ``"qdrift_tangent"`` overrides the inference.
+        """
+        mode = self._settings.get("energy_correction")
+        if mode != "auto":
+            return mode
+        return "qdrift_tangent" if category == "qdrift" else "linear"
+
     def _build_unitary(
         self,
         qubit_hamiltonian: QubitHamiltonian,
@@ -186,15 +250,27 @@ class RobustPhaseEstimation(PhaseEstimation):
         samples: int,
         seed: int,
         round_index: int,
+        category: str,
+        epsilon_unitary: float,
     ):
-        """Create and size the time-evolution unitary for one round."""
+        """Create and size the time-evolution unitary for one round.
+
+        qDRIFT keeps the explicit per-round sample schedule (paired with the
+        tangent energy map). Accuracy-aware builders (partially randomized or
+        deterministic) instead receive the per-round unitary accuracy budget
+        ``epsilon_unitary`` and self-size their internal resolution.
+        """
         builder = self._create_nested("unitary_builder")
-        builder.settings().set("time", evolution_time)
-        if builder.settings().has("num_samples"):
-            builder.settings().set("num_samples", int(samples))
-        if seed >= 0 and builder.settings().has("seed"):
+        settings = builder.settings()
+        settings.set("time", evolution_time)
+        if category == "qdrift":
+            if settings.has("num_samples"):
+                settings.set("num_samples", int(samples))
+        elif settings.has("target_accuracy"):
+            settings.set("target_accuracy", float(epsilon_unitary))
+        if seed >= 0 and settings.has("seed"):
             # Offset per round so successive rounds draw independent samples.
-            builder.settings().set("seed", int(seed) + round_index)
+            settings.set("seed", int(seed) + round_index)
         return builder.run(qubit_hamiltonian)
 
     def _sample_signal(self, state_preparation: Circuit, unitary, shots: int, test_basis: str) -> float:
@@ -212,10 +288,10 @@ class RobustPhaseEstimation(PhaseEstimation):
         lambda_norm: float,
         final_samples: int,
         *,
-        randomized: bool,
+        correction: str,
     ) -> float:
         """Map the recovered per-base-time phase to an energy."""
-        if not randomized:
+        if correction != "qdrift_tangent":
             return energy_from_rpe_angle(theta, base_time)
         # Apply the qDRIFT tangent de-biasing at the final (largest-time) round,
         # using the unwrapped phase consistent with the principal per-base phase.
