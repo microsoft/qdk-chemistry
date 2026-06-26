@@ -133,7 +133,15 @@ class MPSSequentialStatePreparation(StatePreparation):
             parameter=params,
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
+        # Build composable op for QPE composition
+        if fast_re:
+            op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedParams(**params)
+            qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGrouped(op_params)
+        else:
+            op_params = QSHARP_UTILS.MPSSequential.MPSSequentialParams(**params)
+            qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOp(op_params)
+
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
 
 
 # ---------------------------------------------------------------------------

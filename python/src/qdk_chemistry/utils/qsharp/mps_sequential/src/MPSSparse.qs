@@ -15,7 +15,7 @@ import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSparse, MakeMPSSparseCircuit, SparseSiteUnitary, PermutationViaQROAM;
+export MPSSparse, MakeMPSSparseCircuit, MakeMPSSparseOp, ApplyMPSSparse, MPSSparseParams, SparseSiteUnitary, PermutationViaQROAM;
 
 // =============================================================================
 // Permutation via QROAM
@@ -243,4 +243,47 @@ operation MakeMPSSparseCircuit(
         state,
         ancilla
     );
+}
+
+/// Parameters struct for MPS sparse state preparation.
+struct MPSSparseParams {
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteColPermTargets : Bool[][][],
+    siteColInvPermTargets : Bool[][][],
+    siteRowPermTargets : Bool[][][],
+    siteRowInvPermTargets : Bool[][][],
+    siteBlockLayerAngles : Double[][][],
+    siteBlockLayerShifted : Bool[][],
+    siteBlockPhases : Bool[][],
+}
+
+/// Applies MPS sparse state preparation on the system qubit array.
+/// Ancilla qubits are allocated internally (they start and end in |0⟩).
+operation ApplyMPSSparse(
+    params : MPSSparseParams,
+    qubits : Qubit[]
+) : Unit {
+    use ancilla = Qubit[params.numAncillaQubits];
+    MPSSparse(
+        params.initialStateVec,
+        params.numSites,
+        params.rotationBits,
+        params.siteColPermTargets,
+        params.siteColInvPermTargets,
+        params.siteRowPermTargets,
+        params.siteRowInvPermTargets,
+        params.siteBlockLayerAngles,
+        params.siteBlockLayerShifted,
+        params.siteBlockPhases,
+        qubits,
+        ancilla
+    );
+}
+
+/// Returns a Qubit[] => Unit callable for MPS sparse state preparation.
+function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
+    ApplyMPSSparse(params, _)
 }
