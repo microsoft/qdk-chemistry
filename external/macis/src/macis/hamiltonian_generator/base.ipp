@@ -11,11 +11,15 @@
 #include <macis/hamiltonian_generator/base.hpp>
 #include <spdlog/spdlog.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
+#ifndef _MSC_VER
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 #include <blas.hh>
 #include <lapack.hh>
-#pragma GCC diagnostic pop
+#ifndef _MSC_VER
+#  pragma GCC diagnostic pop
+#endif
 
 namespace macis {
 
