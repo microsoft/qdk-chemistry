@@ -837,7 +837,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   size_t total_work =
       std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
                       [](auto s, const auto& p) { return s + p.second; });
-  size_t local_average = std::max(1ul, total_work / world_size);
+  size_t local_average = std::max<size_t>(1, total_work / world_size);
 
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
@@ -1001,7 +1001,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     total_work =
         std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
                         [](auto s, const auto& p) { return s + p.second; });
-    local_average = std::max(1ul, total_work / world_size);
+    local_average = std::max<size_t>(1, total_work / world_size);
 
     if (cgen_logger) {
       size_t max_w = 0;
