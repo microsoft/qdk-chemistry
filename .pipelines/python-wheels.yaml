@@ -179,6 +179,9 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -202,6 +205,9 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
@@ -223,6 +229,9 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
                 runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user

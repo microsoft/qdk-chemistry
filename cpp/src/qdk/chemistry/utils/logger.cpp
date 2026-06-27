@@ -4,6 +4,11 @@
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#ifdef _WIN32
+#include <spdlog/sinks/base_sink.h>
+#endif
+
+#include <cstdio>
 #include <mutex>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -14,6 +19,21 @@
 #include <vector>
 
 namespace qdk::chemistry::utils {
+
+#ifdef _WIN32
+// spdlog's Windows stdout sink caches a HANDLE at construction, so pytest's
+// fd-1 dup2() redirection bypasses it. Write via fwrite(stdout) instead, which
+// respects fd redirection (this is what spdlog already does on Linux).
+class stdout_fd_sink final : public spdlog::sinks::base_sink<std::mutex> {
+ protected:
+  void sink_it_(const spdlog::details::log_msg& msg) override {
+    spdlog::memory_buf_t formatted;
+    formatter_->format(msg, formatted);
+    std::fwrite(formatted.data(), 1, formatted.size(), stdout);
+  }
+  void flush_() override { std::fflush(stdout); }
+};
+#endif
 
 // Track our own global level to avoid spdlog::get_level() issues
 // Map compile-time level to spdlog level
@@ -197,7 +217,13 @@ static void apply_spdlog_global_level_and_flush_policy(
 
 static void init_global_logger() {
   try {
+#ifdef _WIN32
+    auto sink = std::make_shared<stdout_fd_sink>();
+    g_logger = std::make_shared<spdlog::logger>("qdk-chemistry", sink);
+    spdlog::register_logger(g_logger);
+#else
     g_logger = spdlog::stdout_color_mt("qdk-chemistry");
+#endif
   } catch (const spdlog::spdlog_ex&) {
     g_logger = spdlog::get("qdk-chemistry");
   }
