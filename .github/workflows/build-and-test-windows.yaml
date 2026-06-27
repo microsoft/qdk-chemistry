@@ -28,12 +28,13 @@ env:
 
 jobs:
   # ----------------------------------------------------------------------------
-  # Job 1: build and cache the (slow) C++ dependencies.
+  # Job 1: build and cache the (slow) external C++ dependencies.
   #
-  # GitHub-hosted windows runners have a hard 6h per-job limit. The first
-  # uncached build of libint2/gauxc/etc. can approach that, so the dependency
-  # build gets its own job (and 6h budget); the build-test job below restores
-  # the warmed cache and only rebuilds qdk + runs the tests.
+  # GitHub-hosted windows runners have a hard 6h per-job limit. With MSVC a full
+  # build (deps + qdk + tests) exceeds it, so this job builds ONLY the slow
+  # FetchContent dependency targets (libint2/gauxc/ecpint/blaspp/lapackpp) to warm
+  # the cache. qdk, macis, and the tests are built in the build-test job below,
+  # which restores the warmed cache.
   # ----------------------------------------------------------------------------
   deps:
     name: ${{ matrix.compiler }} - Build & cache dependencies
@@ -78,7 +79,7 @@ jobs:
           --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
         if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
-    - name: Configure & build dependencies (full warm build)
+    - name: Configure & build dependency targets
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
@@ -101,8 +102,8 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
-        cmake --build "cpp/build-${{ matrix.compiler }}"
-        if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
+        cmake --build "cpp/build-${{ matrix.compiler }}" --target int2 ecpint gauxc blaspp lapackpp
+        if ($LASTEXITCODE -ne 0) { throw "CMake dependency build failed ($LASTEXITCODE)" }
 
   # ----------------------------------------------------------------------------
   # Job 2: rebuild qdk against the cached dependencies, then run the C++ and
