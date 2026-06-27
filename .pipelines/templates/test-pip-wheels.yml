@@ -17,6 +17,9 @@ parameters:
 - name: runSlowTests
   type: boolean
   default: true
+- name: condition
+  type: string
+  default: succeeded()
 
 steps:
 - ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
@@ -34,6 +37,7 @@ steps:
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
     displayName: Test wheel (Docker linux/amd64)
+    condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -52,6 +56,7 @@ steps:
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
     displayName: Test wheel (Docker ${{ parameters.imageTag }})
+    condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -63,5 +68,6 @@ steps:
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
     displayName: Test wheel (native)
+    condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
