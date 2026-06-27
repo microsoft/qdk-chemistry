@@ -6,13 +6,24 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import sys
 
 # Disable telemetry before any qdk_chemistry imports.
 # Uses setdefault so an explicit env override is still respected.
 os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
 
+# Force UTF-8 stdout/stderr (Windows cp1252 breaks circuit diagrams).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
+
+# Non-interactive backend; must precede any matplotlib.pyplot import.
+import matplotlib
+
+matplotlib.use("Agg")
+
 import platform as plt
-import sys
 import tempfile
 from pathlib import Path
 
