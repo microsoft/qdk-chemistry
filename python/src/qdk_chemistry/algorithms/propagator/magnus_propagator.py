@@ -1,15 +1,29 @@
 r"""Time-averaged propagator with Magnus expansion.
 
-Computes the effective Hamiltonian for a time interval via the Magnus
-expansion truncated at a configurable order.
-
-**Order 1** (default) is the time-averaged Hamiltonian:
+Computes the effective (time-independent) Hamiltonian for a time interval
+:math:`[t_1, t_2]` via the Magnus expansion of the time-ordered
+propagator :math:`U(t_2, t_1) = \exp(\Omega(t_2, t_1))`, where
 
 .. math::
 
-    \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
+    \Omega = \Omega_1 + \Omega_2 + \Omega_3 + \cdots
 
-Higher orders add commutator corrections computed recursively via
+is a series of nested time integrals of :math:`H(t)`.  The leading
+(order-1) term is the time-averaged Hamiltonian
+
+.. math::
+
+    \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t',
+
+while higher orders add nested-commutator corrections, e.g.
+
+.. math::
+
+    \Omega_2 = -\frac{1}{2}
+        \int_{t_1}^{t_2}\!\mathrm{d}t'
+        \int_{t_1}^{t'}\!\mathrm{d}t''\,[H(t'), H(t'')],
+
+and in general the :math:`\Omega_n` follow the recursion
 
 .. math::
 
@@ -17,9 +31,22 @@ Higher orders add commutator corrections computed recursively via
     = \sum_{k=1}^{n-1} \frac{B_k}{k!}
       \sum_{j_1+\cdots+j_k=n-1}
       \mathrm{ad}_{\Omega_{j_1}} \cdots
-      \mathrm{ad}_{\Omega_{j_k}}(H(t))
+      \mathrm{ad}_{\Omega_{j_k}}(H(t)),
 
 where :math:`B_k` are Bernoulli numbers.
+
+Implementation status
+---------------------
+Only the leading-order (order-1) term is currently implemented, and only
+for
+:class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
+Hamiltonians of the form :math:`H(t) = H_0 + f(t)\,H_1`.  Requesting an
+``order`` greater than 1, or passing any other container type, raises
+:class:`NotImplementedError`.
+
+Accuracy
+--------
+The order-1 propagator gives :math:`O(\Delta t^2)` accuracy.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -45,7 +72,15 @@ __all__: list[str] = ["MagnusPropagator", "MagnusPropagatorSettings"]
 
 
 class MagnusPropagatorSettings(Settings):
-    """Settings for the Magnus propagator."""
+    """Settings for the Magnus propagator.
+
+    Attributes:
+        order (int): Magnus expansion order (default = 1). Only the
+            leading-order term (order 1, time averaging) is currently
+            implemented; any larger value raises
+            :class:`NotImplementedError` when the propagator runs.
+
+    """
 
     def __init__(self):
         """Initialize settings with default Magnus expansion order."""
@@ -57,12 +92,26 @@ class MagnusPropagator(Propagator):
     r"""Magnus propagator for time-dependent Hamiltonian simulation.
 
     Evaluates the effective Hamiltonian for an interval :math:`[t_1, t_2]`
-    via the Magnus expansion.  Currently only **order 1** (time averaging)
-    is implemented: :math:`H_\text{eff} = H_0 + \bar f\,H_1`.  Orders
-    higher than 1 raise :class:`NotImplementedError`.
+    via the Magnus expansion.  Currently only the leading-order
+    (**order 1**, time averaging) term is implemented, and only for
+    :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
+    Hamiltonians :math:`H(t) = H_0 + f(t)\,H_1`, for which the drive
+    integral reduces to a scalar quadrature and
 
-    For :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
-    Hamiltonians the drive integral reduces to a scalar quadrature.
+    .. math::
+
+        H_\text{eff} = H_0 + \bar f\,H_1,
+        \qquad
+        \bar f = \frac{1}{\delta t}\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'.
+
+    The propagator returns this
+    :math:`H_\text{eff} = \Omega_1 / \delta t` (the time-averaged exponent
+    divided by :math:`\delta t = t_2 - t_1`) so that a time-stepping
+    integrator that multiplies by :math:`\delta t` recovers the full
+    exponent :math:`\Omega_1`.  This gives :math:`O(\Delta t^2)` accuracy.
+
+    Requesting an ``order`` greater than 1, or passing any other container
+    type, raises :class:`NotImplementedError`.
 
     """
 
@@ -89,6 +138,10 @@ class MagnusPropagator(Propagator):
 
         Raises:
             ValueError: If *t_end* is not greater than *t_start*.
+            NotImplementedError: If the Hamiltonian container is not a
+                :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`,
+                or if the requested Magnus expansion ``order`` is greater
+                than 1.
 
         """
         if t_end <= t_start:
@@ -118,21 +171,34 @@ class MagnusPropagator(Propagator):
     ) -> QubitHamiltonian:
         r"""Order-1 Magnus expansion (time averaging) for driven Hamiltonians.
 
-        For the driven case :math:`H(t) = H_0 + f(t)\,H_1` every Magnus term
-        reduces to a linear combination of nested commutators of :math:`H_0`
-        and :math:`H_1` with scalar coefficients that are iterated integrals
-        over the drive function.  The propagator returns
-        :math:`\Omega / \delta t` so that the builder (which multiplies by
-        ``dt``) recovers the full exponent.
+        For the driven case :math:`H(t) = H_0 + f(t)\,H_1` the order-1
+        (leading) Magnus term is the time-averaged Hamiltonian
 
-        Computes :math:`H_\text{eff} = \frac{1}{\delta t} \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'`
-        where :math:`H(t) = H_0 + f(t)\,H_1`.
+        .. math::
+
+            \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
+                = \delta t\,H_0
+                + \left(\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'\right) H_1,
+
+        because :math:`H_0` is constant and only the scalar drive
+        :math:`f(t)` carries the time dependence.  The drive integral is
+        evaluated by numerical quadrature.
+
+        The propagator returns
+        :math:`H_\text{eff} = \Omega_1 / \delta t = H_0 + \bar f\,H_1`,
+        the exponent divided by :math:`\delta t = t_2 - t_1`, so that a
+        time-stepping integrator (which multiplies by ``dt``) recovers the
+        full exponent :math:`\Omega_1`.
+
+        Only the leading-order term is computed; this gives
+        :math:`O(\delta t^2)` accuracy.
 
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
         :meth:`~qdk_chemistry.data.QubitHamiltonian.__mul__` and
         :meth:`~qdk_chemistry.data.QubitHamiltonian.__add__`.
 
-        Returns :math:`H_\text{eff}`.
+        Returns the effective time-independent Hamiltonian
+        :math:`H_\text{eff}`.
 
         """
         dt = t_end - t_start
