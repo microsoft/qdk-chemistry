@@ -215,6 +215,12 @@ static void apply_spdlog_global_level_and_flush_policy(
   spdlog::flush_on(level);
 }
 
+static void set_global_level_locked(spdlog::level::level_enum level) {
+  g_global_level = level;
+  apply_logger_instance_level_and_flush_policy(g_logger, level);
+  apply_spdlog_global_level_and_flush_policy(level);
+}
+
 static void init_global_logger() {
   try {
 #ifdef _WIN32
@@ -277,17 +283,22 @@ std::string Logger::get_source_context(const std::source_location& location) {
 
 void Logger::set_global_level(LogLevel level) {
   auto spdlog_level = to_spdlog_level(level);
-  std::shared_ptr<spdlog::logger> logger;
+  std::lock_guard<std::mutex> lock(g_level_mutex);
+  set_global_level_locked(spdlog_level);
+}
 
-  // Update both our tracked level and spdlog's global level
-  {
-    std::lock_guard<std::mutex> lock(g_level_mutex);
-    g_global_level = spdlog_level;
-    logger = g_logger;
+bool Logger::restore_global_level_if_unchanged(LogLevel expected_current,
+                                               LogLevel restored_level) {
+  auto expected_spdlog_level = to_spdlog_level(expected_current);
+  auto restored_spdlog_level = to_spdlog_level(restored_level);
+
+  std::lock_guard<std::mutex> lock(g_level_mutex);
+  if (g_global_level != expected_spdlog_level) {
+    return false;
   }
 
-  apply_logger_instance_level_and_flush_policy(logger, spdlog_level);
-  apply_spdlog_global_level_and_flush_policy(spdlog_level);
+  set_global_level_locked(restored_spdlog_level);
+  return true;
 }
 
 LogLevel Logger::get_global_level() {

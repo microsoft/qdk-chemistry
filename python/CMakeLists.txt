@@ -146,6 +146,8 @@ pybind11_add_module(_core
     src/pybind11/data/configuration_set.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
+    src/pybind11/data/nuclear_gradients.cpp
+    src/pybind11/data/nuclear_hessian.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
@@ -157,6 +159,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/mcscf.cpp
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
+    src/pybind11/algorithms/nuclear_derivative.cpp
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/davidson_solver.cpp

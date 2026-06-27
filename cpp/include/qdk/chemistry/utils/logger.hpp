@@ -109,6 +109,20 @@ class Logger {
   static void set_global_level(LogLevel level);
 
   /**
+   * @brief Restore the global log level if it has not changed.
+   *
+   * Atomically compares the current global log level with expected_current. If
+   * they match, restores restored_level and returns true. Otherwise leaves the
+   * current level unchanged and returns false.
+   *
+   * @param expected_current The level that must still be current
+   * @param restored_level The level to restore when expected_current matches
+   * @return Whether restored_level was applied
+   */
+  static bool restore_global_level_if_unchanged(LogLevel expected_current,
+                                                LogLevel restored_level);
+
+  /**
    * @brief Get the current global log level
    *
    * Returns the current global logging level. This uses mutex protection
