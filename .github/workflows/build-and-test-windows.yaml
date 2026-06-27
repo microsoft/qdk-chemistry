@@ -102,7 +102,7 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
-        cmake --build "cpp/build-${{ matrix.compiler }}" --target int2 ecpint gauxc blaspp lapackpp
+        cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2 ecpint gauxc blaspp lapackpp
         if ($LASTEXITCODE -ne 0) { throw "CMake dependency build failed ($LASTEXITCODE)" }
 
   # ----------------------------------------------------------------------------
