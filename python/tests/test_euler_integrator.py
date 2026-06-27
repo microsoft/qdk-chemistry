@@ -255,6 +255,29 @@ class TestEulerIntegratorValidation:
         assert builder.settings().get("total_time") == 2.0
         assert builder.settings().get("dt") == 0.5
 
+    def test_builder_run_produces_valid_circuit(self):
+        """Standalone builder.run() produces a Circuit suitable for QRE."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        num_qubits = 2
+        h = self._make_hamiltonian(num_qubits=num_qubits)
+        td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
+
+        builder = registry.create(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=2, order=1),
+            total_time=1.0,
+            dt=1.0,
+        )
+        circuit = builder.run(td, identity_state_prep(num_qubits=num_qubits))
+
+        assert circuit.get_qir() is not None
+        app = circuit.get_qre_application()  # the advertised use case must not throw
+        assert app is not None
+        # Combined circuit should operate on the correct number of qubits
+        assert f'"required_num_qubits"="{num_qubits}"' in str(circuit.get_qir())
+
 
 # ---------------------------------------------------------------------------
 # Time-dependent Trotter tests with smooth driving functions

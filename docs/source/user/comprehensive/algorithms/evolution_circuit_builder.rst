@@ -69,20 +69,10 @@ Once configured, the builder can be executed:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import create
-      from qdk_chemistry.data import AlgorithmRef
-
-      circuit_builder = create(
-          "evolution_circuit_builder", "euler",
-          evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=4, num_divisions=2),
-          propagator=AlgorithmRef("propagator", "magnus", order=1),
-          total_time=1.0,
-          dt=1.0,
-      )
-
-      circuit = circuit_builder.run(td_hamiltonian, state_prep)
+   .. literalinclude:: ../../../_static/examples/python/evolution_circuit_builder.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 Available Implementations
 -------------------------
@@ -100,28 +90,10 @@ The default propagator (``magnus``) computes the Magnus-expanded Hamiltonian ove
 
 **Usage example:**
 
-.. code-block:: python
-
-   from qdk_chemistry.algorithms import create
-   from qdk_chemistry.algorithms.state_preparation import identity_state_prep
-   from qdk_chemistry.data import AlgorithmRef, DrivenQubitHamiltonian
-
-   # Configure the builder
-   circuit_builder = create(
-       "evolution_circuit_builder", "euler",
-       evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=4, num_divisions=2),
-       propagator=AlgorithmRef("propagator", "magnus", order=1),
-       circuit_mapper=AlgorithmRef("circuit_mapper", "pauli_sequence"),
-       total_time=1.0,
-       dt=1.0,  # single Euler step = full time
-   )
-
-   # Build the circuit
-   state_prep = identity_state_prep(num_qubits=td_hamiltonian.num_qubits)
-   circuit = circuit_builder.run(td_hamiltonian, state_prep)
-
-   # Use for resource estimation
-   app = circuit.get_qre_application()
+.. literalinclude:: ../../../_static/examples/python/evolution_circuit_builder.py
+   :language: python
+   :start-after: start-cell-configure-euler
+   :end-before: end-cell-configure-euler
 
 Circuit Composition Details
 ---------------------------
