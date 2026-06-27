@@ -1,0 +1,94 @@
+name: Set up Windows MSVC / clang-cl environment
+description: >
+  Import the Visual Studio x64 developer environment (vcvarsall) into the job so
+  cl/clang-cl/ninja and the MSVC headers and libraries are available to later
+  steps. Exposes the resolved C++ compiler path and the MSVC toolset version for
+  use in cache keys.
+
+inputs:
+  compiler:
+    description: Compiler to set up - "msvc" (cl) or "clang-cl".
+    required: true
+
+outputs:
+  toolset:
+    description: MSVC toolset version (stable identifier for cache keys).
+    value: ${{ steps.setup.outputs.toolset }}
+  cxx-path:
+    description: Full path to the resolved C++ compiler.
+    value: ${{ steps.setup.outputs.cxx-path }}
+
+runs:
+  using: composite
+  steps:
+  - id: setup
+    shell: pwsh
+    run: |
+      $ErrorActionPreference = 'Stop'
+
+      $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+      if (-not (Test-Path $vswhere)) { throw "vswhere not found at $vswhere" }
+      $vsPath = & $vswhere -latest -products * -property installationPath
+      if (-not $vsPath) { throw "No Visual Studio installation found" }
+      Write-Host "Visual Studio: $vsPath"
+
+      $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
+      if (-not (Test-Path $vcvarsall)) { throw "vcvarsall.bat not found at $vcvarsall" }
+
+      # Snapshot the environment, run vcvarsall x64, then diff to capture its changes.
+      $before = @{}
+      Get-ChildItem env: | ForEach-Object { $before[$_.Name] = $_.Value }
+
+      $tmp = [System.IO.Path]::GetTempFileName()
+      cmd /c "`"$vcvarsall`" x64 && set > `"$tmp`""
+      if ($LASTEXITCODE -ne 0) { throw "vcvarsall.bat failed with exit code $LASTEXITCODE" }
+      $after = @{}
+      Get-Content $tmp | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') { $after[$matches[1]] = $matches[2] }
+      }
+      Remove-Item $tmp
+
+      # clang-cl is shipped with the VS LLVM component but is not added by vcvarsall.
+      $clangDir = $null
+      if ('${{ inputs.compiler }}' -eq 'clang-cl') {
+        $candidates = @(
+          "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+          "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
+        )
+        foreach ($c in $candidates) { if (Test-Path $c) { $clangDir = Split-Path $c; break } }
+        if (-not $clangDir) { throw "clang-cl.exe not found under $vsPath\VC\Tools\Llvm" }
+      }
+
+      # Apply to the current process so the compiler resolves within this step.
+      foreach ($name in $after.Keys) {
+        [System.Environment]::SetEnvironmentVariable($name, $after[$name], 'Process')
+      }
+      if ($clangDir) { $env:PATH = "$clangDir;$env:PATH" }
+
+      # Persist non-PATH changes to GITHUB_ENV and PATH additions to GITHUB_PATH.
+      foreach ($name in $after.Keys) {
+        if ($name -ieq 'Path') { continue }
+        if ($before[$name] -ne $after[$name]) {
+          "$name=$($after[$name])" >> $env:GITHUB_ENV
+        }
+      }
+      $beforePath = @($before['Path'] -split ';')
+      $newEntries = @($after['Path'] -split ';') | Where-Object { $_ -and ($beforePath -notcontains $_) }
+      if ($clangDir) { $clangDir >> $env:GITHUB_PATH }
+      foreach ($p in $newEntries) { $p >> $env:GITHUB_PATH }
+
+      # Resolve the compiler and a stable toolset version for cache keys.
+      if ('${{ inputs.compiler }}' -eq 'clang-cl') {
+        $cxx = (Get-Command clang-cl.exe -ErrorAction Stop).Source
+      } else {
+        $cxx = (Get-Command cl.exe -ErrorAction Stop).Source
+      }
+      Write-Host "C++ compiler: $cxx"
+      if ('${{ inputs.compiler }}' -eq 'clang-cl') { & $cxx --version 2>&1 | Write-Host }
+
+      $toolsetFile = "$vsPath\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+      $toolset = (Get-Content $toolsetFile -ErrorAction Stop | Select-Object -First 1).Trim()
+      Write-Host "MSVC toolset: $toolset"
+
+      "toolset=$toolset" >> $env:GITHUB_OUTPUT
+      "cxx-path=$cxx" >> $env:GITHUB_OUTPUT
