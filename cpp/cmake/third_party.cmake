@@ -86,6 +86,13 @@ if(MSVC AND TARGET eritest-libint2)
   endif()
 endif()
 
+# MSVC's /O2 optimizer is pathologically slow on libint2's large CMake Unity
+# translation units (hours vs minutes for clang-cl). Disable Unity for libint2 on
+# MSVC so the small generated TUs compile quickly and parallelize; clang-cl keeps it.
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TARGET libint2_obj)
+  set_target_properties(libint2_obj PROPERTIES UNITY_BUILD OFF)
+endif()
+
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
 set(LIBECPINT_USE_PUGIXML OFF CACHE BOOL "Use pugixml for ECPINT" FORCE)
