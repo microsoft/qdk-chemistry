@@ -3,7 +3,11 @@ name: Build and Test (Windows)
 on:
   push:
     branches:
-    - session/win_ci_cd
+    - main
+  pull_request:
+    branches:
+    - '**'
+  merge_group:
   workflow_dispatch:
     inputs:
       run_slow_tests:
