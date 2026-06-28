@@ -202,6 +202,18 @@ jobs:
       with:
         python-version: '3.13'
 
+    - name: Set memory-aware build parallelism
+      shell: pwsh
+      run: |
+        # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
+        # cap concurrency by available RAM (~4 GB/job) to avoid C1060 (compiler out
+        # of heap space). Scales up automatically on a larger runner.
+        $cpu = [int]$env:NUMBER_OF_PROCESSORS
+        $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 4)))
+        Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+        "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
+
     - name: Restore dependency cache
       id: cache
       uses: actions/cache/restore@v5
@@ -234,7 +246,7 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
-        # Let Ninja use all cores (dependency objects are already cached).
+        # Honors CMAKE_BUILD_PARALLEL_LEVEL set above (memory-aware).
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
