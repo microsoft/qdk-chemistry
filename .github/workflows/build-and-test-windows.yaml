@@ -22,7 +22,6 @@ permissions:
 env:
   VCPKG_TRIPLET: x64-windows-static-md
   QDK_UARCH: x86-64-v3
-  CMAKE_BUILD_PARALLEL_LEVEL: '4'
   # Bump to force a rebuild of the cached dependencies.
   DEPS_CACHE_VERSION: v1
 
@@ -30,16 +29,20 @@ jobs:
   # ----------------------------------------------------------------------------
   # Job 1: build and cache the (slow) external C++ dependencies.
   #
-  # GitHub-hosted windows runners have a hard 6h per-job limit. With MSVC a full
-  # build (deps + qdk + tests) exceeds it, so this job builds ONLY the slow
-  # FetchContent dependency targets (libint2/gauxc/ecpint/blaspp/lapackpp) to warm
-  # the cache. qdk, macis, and the tests are built in the build-test job below,
-  # which restores the warmed cache.
+  # Builds ONLY the slow FetchContent dependency targets
+  # (libint2/gauxc/ecpint/blaspp/lapackpp). With MSVC this can exceed the 6h
+  # GitHub-hosted job cap, so the build is RESUMABLE: the build dir is cached
+  # after every run (complete -> stable key; partial -> per-run key), and the
+  # next run restores the furthest progress and lets Ninja continue. Once a
+  # complete cache exists the build is skipped entirely.
   # ----------------------------------------------------------------------------
   deps:
-    name: ${{ matrix.compiler }} - Build & cache dependencies
+    name: ${{ matrix.compiler }} - Dependencies
     runs-on: windows-latest
     timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: write  # prune stale dependency caches
     strategy:
       fail-fast: false
       matrix:
@@ -56,20 +59,28 @@ jobs:
       with:
         compiler: ${{ matrix.compiler }}
 
-    - name: Cache vcpkg + dependency build
+    - name: Restore dependency cache
       id: cache
-      uses: actions/cache@v5
+      uses: actions/cache/restore@v5
       with:
         path: |
           vcpkg_installed
           cpp/build-${{ matrix.compiler }}
+        # Exact key = a completed build. restore-keys prefix = the furthest
+        # partial build from a previous (timed-out) run, for resuming.
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+        restore-keys: |
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-partial-
 
     - name: Install vcpkg dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
+        if (Test-Path "vcpkg_installed/${{ env.VCPKG_TRIPLET }}/lib") {
+          Write-Host "vcpkg dependencies already present (restored from cache); skipping install."
+          exit 0
+        }
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         & "$vcpkg\vcpkg.exe" install `
@@ -79,7 +90,7 @@ jobs:
           --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
         if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
-    - name: Configure & build dependency targets
+    - name: Configure CMake
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
@@ -102,12 +113,68 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
+
+    - name: Build dependency targets (resumable, time-boxed)
+      id: build
+      if: steps.cache.outputs.cache-hit != 'true'
+      # Kept under the 6h job cap (accounting for ~85 min of cold vcpkg + download
+      # overhead) so the resumable partial cache is saved before the job is
+      # force-cancelled. The next run restores this progress and continues.
+      timeout-minutes: 255
+      shell: pwsh
+      run: |
+        # No --parallel / CMAKE_BUILD_PARALLEL_LEVEL: let Ninja use all cores.
         cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2 ecpint gauxc blaspp lapackpp
-        if ($LASTEXITCODE -ne 0) { throw "CMake dependency build failed ($LASTEXITCODE)" }
+        if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
+
+    - name: Save dependency cache (complete)
+      if: steps.build.outcome == 'success'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          vcpkg_installed
+          cpp/build-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+
+    - name: Save dependency cache (partial, for resume)
+      if: steps.build.outcome == 'failure'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          vcpkg_installed
+          cpp/build-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-partial-${{ github.run_id }}-${{ github.run_attempt }}
+
+    - name: Prune stale dependency caches
+      if: always()
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Best-effort: keep the newest partial (for resume) and drop older ones;
+        # once a complete build succeeds, drop all partials for this base key.
+        $base = "windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-"
+        $keepNewestPartial = '${{ steps.build.outcome }}' -eq 'failure'
+        try {
+          $caches = gh cache list --limit 100 --json id,key,createdAt | ConvertFrom-Json
+          $partials = $caches |
+            Where-Object { $_.key.StartsWith($base) -and $_.key.Contains('-partial-') } |
+            Sort-Object createdAt -Descending
+          $skip = if ($keepNewestPartial) { 1 } else { 0 }
+          $partials | Select-Object -Skip $skip | ForEach-Object {
+            Write-Host "Deleting stale cache: $($_.key)"
+            gh cache delete $_.id 2>$null
+          }
+        } catch {
+          Write-Host "Cache prune skipped: $_"
+        }
 
   # ----------------------------------------------------------------------------
   # Job 2: rebuild qdk against the cached dependencies, then run the C++ and
-  # Python test suites.
+  # Python test suites. qdk/macis/test sources are re-checked-out here, so this
+  # job always rebuilds them; the cached dependency .libs are reused as-is.
   # ----------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.compiler }} - Build & test
@@ -135,7 +202,7 @@ jobs:
       with:
         python-version: '3.13'
 
-    - name: Restore vcpkg + dependency build
+    - name: Restore dependency cache
       id: cache
       uses: actions/cache/restore@v5
       with:
@@ -144,19 +211,6 @@ jobs:
           cpp/build-${{ matrix.compiler }}
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
-
-    - name: Install vcpkg dependencies (cache-miss fallback)
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
-        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
-        & "$vcpkg\vcpkg.exe" install `
-          --triplet ${{ env.VCPKG_TRIPLET }} `
-          --x-manifest-root="${{ github.workspace }}" `
-          --x-install-root="${{ github.workspace }}\vcpkg_installed" `
-          --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
-        if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
     - name: Configure & build C++ library
       shell: pwsh
@@ -180,6 +234,7 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
+        # Let Ninja use all cores (dependency objects are already cached).
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
