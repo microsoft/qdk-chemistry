@@ -128,7 +128,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
     - name: Save dependency cache (complete)
-      if: steps.build.outcome == 'success'
+      if: ${{ always() && steps.build.outcome == 'success' }}
       uses: actions/cache/save@v5
       with:
         path: |
@@ -138,7 +138,7 @@ jobs:
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Save dependency cache (partial, for resume)
-      if: steps.build.outcome == 'failure'
+      if: ${{ always() && steps.build.outcome == 'failure' }}
       uses: actions/cache/save@v5
       with:
         path: |
