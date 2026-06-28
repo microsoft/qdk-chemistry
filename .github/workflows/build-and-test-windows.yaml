@@ -256,9 +256,13 @@ jobs:
         OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
+        # Exclude MACIS_SERIAL_TEST (as on Linux) and libint2's own unit tests:
+        # libint2/unit/build is a compile-at-test-time meta-test of the vendored
+        # libint2 dependency that exceeds the ctest timeout under MSVC. qdk's own
+        # tests still run.
         ctest --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
-          -E "MACIS_SERIAL_TEST"
+          -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "ctest failed ($code)" }
