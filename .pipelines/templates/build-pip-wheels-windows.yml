@@ -22,7 +22,7 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-- powershell: |
+- pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
       --version-file "$(System.DefaultWorkingDirectory)\VERSION" `
       --dev-tag ${{ parameters.devTag }}
@@ -33,7 +33,7 @@ steps:
 # Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
 # Also resolves the MSVC toolset version for the dependency cache key.
-- powershell: |
+- pwsh: |
     $ErrorActionPreference = 'Stop'
 
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -62,7 +62,9 @@ steps:
     }
 
     # Locate cl.exe — vcvarsall x64 puts it on PATH.
-    $cl = (Get-Command cl.exe -ErrorAction SilentlyContinue)?.Source
+    # PS5-compatible null check (no ?. operator available in powershell.exe 5.1).
+    $clCmd = Get-Command cl.exe -ErrorAction SilentlyContinue
+    $cl = if ($clCmd) { $clCmd.Source } else { $null }
     if (-not $cl) { throw "cl.exe not found on PATH after vcvarsall x64" }
     Write-Host "cl.exe: $cl"
     & $cl 2>&1 | Select-Object -First 2 | Write-Host
@@ -105,7 +107,7 @@ steps:
 # Hash all files that influence how the C++ dependencies are built.
 # The result is used in the Cache@2 key so the cache is invalidated on any
 # dep-affecting change without listing every file individually in the key.
-- powershell: |
+- pwsh: |
     $root = "$(System.DefaultWorkingDirectory)"
     $files = @(
         "$root\vcpkg.json",
@@ -149,7 +151,7 @@ steps:
 
 # Build vcpkg packages, configure CMake, and build the slow FetchContent targets
 # (libint2, ecpint, gauxc, blaspp, lapackpp). Skipped entirely on cache hit.
-- powershell: |
+- pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows-deps.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -March     "${{ parameters.march }}" `
@@ -160,7 +162,7 @@ steps:
 
 # Full qdk build, C++ tests, conda environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
-- powershell: |
+- pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
         -SrcDir        "$(System.DefaultWorkingDirectory)" `
         -March         "${{ parameters.march }}" `

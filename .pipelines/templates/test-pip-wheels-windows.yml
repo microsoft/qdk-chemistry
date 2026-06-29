@@ -17,7 +17,7 @@ steps:
 # approach used for Linux/macOS via bootstrap-conda.sh.
 # SYSTEM_ACCESSTOKEN (mapped via env: below) authenticates the conda install
 # against the Azure Artifacts feed (public channels blocked in 1ES CFSClean).
-- powershell: |
+- pwsh: |
     $ErrorActionPreference = 'Stop'
     $scriptPath = "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\bootstrap-conda.ps1"
     $condaExe = & $scriptPath -EnvName testenv -PythonVersion '${{ parameters.pythonVersion }}'
@@ -30,7 +30,7 @@ steps:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 # Install the wheel together with its test extra dependencies.
-- powershell: |
+- pwsh: |
     $ErrorActionPreference = 'Stop'
     $wheels = Get-ChildItem "$(System.DefaultWorkingDirectory)\python\repaired_wheelhouse\qdk_chemistry*.whl"
     if ($wheels.Count -ne 1) {
@@ -47,7 +47,7 @@ steps:
 
 # Snapshot the testenv and generate a pip install --report for Component
 # Governance's PipReportDetector (mirrors test-pip-wheels.sh lines 95-102).
-- powershell: |
+- pwsh: |
     $manifestDir = "$(System.DefaultWorkingDirectory)\python\build\test-manifest"
     New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
     $reqs = & "$(CONDA_EXE)" run -n testenv python -m pip list --format=freeze --exclude qdk_chemistry
@@ -62,7 +62,7 @@ steps:
   condition: ${{ parameters.condition }}
   continueOnError: true
 
-- powershell: |
+- pwsh: |
     $ErrorActionPreference = 'Stop'
     Push-Location "$(System.DefaultWorkingDirectory)\python"
     & "$(CONDA_EXE)" run -n testenv `
