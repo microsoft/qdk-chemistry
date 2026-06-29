@@ -62,10 +62,11 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
       std::shared_ptr<IterativeOrbitalLocalizationScheme> inner_localizer)
       : IterativeOrbitalLocalizationScheme(settings),
         basis_set_(basis_set),
-        overlap_ori_(ao_overlap),
         minimal_basis_name_(minimal_basis_name),
-        basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
-        inner_localizer_(inner_localizer) {
+        inner_localizer_(inner_localizer),
+        overlap_ori_(ao_overlap),
+        basis_ori_fp_(
+            utils::microsoft::convert_basis_set_from_qdk(*basis_set)) {
     QDK_LOG_TRACE_ENTERING();
 
     // Initialize all data structures and pre-compute integrals
@@ -797,7 +798,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // First collect all atomic orbitals on atom A for both basis sets
     std::vector<int> bf_list_ori;
     std::vector<int> bf_list_min;
-    for (auto l = 0; l <= max_l_ori; ++l) {
+    for (auto l = 0; l <= static_cast<int>(max_l_ori); ++l) {
       auto& bf_l_ori = al_to_bf_ori[atom_a][l];
       auto& bf_l_min = al_to_bf_min[atom_a][l];
       bf_list_ori.insert(bf_list_ori.end(), bf_l_ori.begin(), bf_l_ori.end());
@@ -835,7 +836,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
         Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_a);
     int proto_hv_idx = 0;
 
-    for (auto l = 0; l <= max_l_ori; ++l) {
+    for (auto l = 0; l <= static_cast<int>(max_l_ori); ++l) {
       auto& bf_al_ori = al_to_bf_ori[atom_a][l];
       if (bf_al_ori.size() == 0)
         continue;  // no atomic orbitals with this angular momentum on this atom

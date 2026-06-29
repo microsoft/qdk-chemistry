@@ -93,6 +93,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
+  } else {
+    throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
 
   // Extract geometry from structure object

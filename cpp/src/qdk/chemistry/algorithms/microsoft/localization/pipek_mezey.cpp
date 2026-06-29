@@ -209,7 +209,7 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   const auto tol = this->settings_.get<double>("tolerance");
   const auto AB_tol = this->settings_.get<double>("small_rotation_tolerance");
   size_t i_sweep;
-  for (i_sweep = 0; i_sweep < max_sweeps; ++i_sweep) {
+  for (i_sweep = 0; i_sweep < static_cast<size_t>(max_sweeps); ++i_sweep) {
     // Compute Xi
     Xi.setZero();
     for (auto p = 0; p < num_orbitals; ++p)

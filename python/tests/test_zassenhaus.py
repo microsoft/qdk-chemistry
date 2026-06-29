@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 from collections.abc import Hashable
 from fractions import Fraction
 
@@ -30,7 +31,6 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.phase import resolve_energy_aliases
 from qdk_chemistry.utils.zassenhaus_generation import (
     CommutatorPlan,
     PlanExpr,
@@ -42,12 +42,15 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
 
 class TestZassenhausGeneration:
     """Tests for symbolic Zassenhaus generation utilities."""
 
     @staticmethod
     def _expand_plan_term(ref: PlanTerm, plan: CommutatorPlan) -> Hashable | tuple:
+        """Recursively expand a plan term into its nested commutator tuple representation."""
         if ref not in plan:
             return ref
         left, right = plan[ref]
@@ -58,10 +61,12 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _expand_plan_expr(expr: PlanExpr, plan: CommutatorPlan) -> dict:
+        """Expand all terms in a plan expression to their nested commutator tuple representations."""
         return {TestZassenhausGeneration._expand_plan_term(ref, plan): coeff for ref, coeff in expr.items()}
 
     @staticmethod
     def _assert_plan_is_dependency_ordered(plan: CommutatorPlan, leaves: tuple[Hashable, ...]) -> None:
+        """Assert that every node in the plan only depends on previously computed nodes."""
         available: set[PlanTerm] = set(leaves)
         for node, (left, right) in plan.items():
             assert left in available
@@ -70,10 +75,12 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _commutator(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        """Return the matrix commutator [left, right] = left @ right - right @ left."""
         return left @ right - right @ left
 
     @staticmethod
     def _evaluate_matrix_plan_term(ref: PlanTerm, plan: CommutatorPlan, leaves: tuple[np.ndarray, ...]) -> np.ndarray:
+        """Recursively evaluate a plan term as nested matrix commutators over the given leaf matrices."""
         if ref not in plan:
             return leaves[ref]
         left, right = plan[ref]
@@ -84,6 +91,7 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _zassenhaus_matrix_product(leaves: tuple[np.ndarray, ...], *, order: int, time: float) -> np.ndarray:
+        """Compute the Zassenhaus product formula matrix for the given leaf generators up to the specified order."""
         planned_exponents, plan = zassenhaus_commutator_plan(tuple(range(len(leaves))), max_order=order)
         product = np.eye(leaves[0].shape[0], dtype=complex)
         for leaf in leaves:
@@ -149,6 +157,7 @@ class TestZassenhausStepEstimation:
 
     @staticmethod
     def _first_order_product_formula_error(hamiltonian: QubitHamiltonian, *, time: float, steps: int) -> float:
+        """Return the operator-norm error of the first-order Lie-Trotter product formula."""
         step_unitary = np.eye(2**hamiltonian.num_qubits, dtype=complex)
         for label, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
             p_matrix = pauli_to_dense_matrix([label], np.asarray([complex(coeff).real], dtype=complex))
@@ -200,10 +209,12 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _pauli_label_from_map(pauli_term: dict[int, str], num_qubits: int) -> str:
+        """Convert a qubit-index-to-Pauli dict to a full Pauli string in big-endian order."""
         return "".join(pauli_term.get(i, "I") for i in reversed(range(num_qubits)))
 
     @staticmethod
     def _pauli_label_from_qubit_ops(num_qubits: int, qubit_ops: dict[int, str]) -> str:
+        """Build a Pauli string of length num_qubits from a mapping of qubit index to Pauli operator."""
         chars = ["I"] * num_qubits
         for qubit, pauli in qubit_ops.items():
             chars[num_qubits - qubit - 1] = pauli
@@ -211,6 +222,7 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _zassenhaus_unitary_matrix(hamiltonian: QubitHamiltonian, *, order: int, time: float) -> np.ndarray:
+        """Build the Zassenhaus approximate unitary matrix for the given Hamiltonian, order, and time."""
         builder = Zassenhaus(num_divisions=1, order=order, time=time)
         container = builder.run(hamiltonian).get_container()
 
@@ -226,6 +238,7 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _fit_zassenhaus_error_slope(hamiltonian: QubitHamiltonian, *, order: int) -> float:
+        """Fit the log-log slope of the Zassenhaus operator-norm error as a function of time."""
         times = np.logspace(-3, -1, 5)
         ham_mat = hamiltonian.to_matrix()
         errors = np.array(
@@ -244,6 +257,7 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _open_heisenberg_chain_4_site() -> QubitHamiltonian:
+        """Return the open-boundary Heisenberg XXX chain Hamiltonian on 4 sites."""
         labels = [
             TestZassenhausTimeEvolution._pauli_label_from_qubit_ops(4, {site: pauli, site + 1: pauli})
             for site in range(3)
@@ -253,6 +267,7 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _h2_sto3g_jordan_wigner_hamiltonian() -> QubitHamiltonian:
+        """Return the H2/STO-3G active-space Hamiltonian mapped via Jordan-Wigner."""
         structure = Structure(
             np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float),
             ["H", "H"],
@@ -438,6 +453,7 @@ class TestZassenhausTimeEvolution:
         assert len(container_opt.step_terms) < len(raw_terms)
 
         def terms_to_unitary(step_terms):
+            """Convert a sequence of ExponentiatedPauliTerms to a unitary matrix."""
             u = np.eye(2**hamiltonian.num_qubits, dtype=complex)
             for t in step_terms:
                 pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
@@ -453,6 +469,10 @@ class TestZassenhausTimeEvolution:
         assert np.allclose(u_opt, u_raw, atol=1e-12)
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_zassenhaus_operator_norm_error_scaling(self):
         """Check empirical operator-norm error scaling slopes match order + 1 to within 0.1."""
         cases = [
@@ -472,6 +492,10 @@ class TestZassenhausPhaseEstimation:
     """End-to-end H2/STO-3G IQPE tests using Zassenhaus evolution."""
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_zassenhaus_h2_ground_state(self) -> None:
         """Estimate the H2/STO-3G ground-state energy with QDK IQPE and Zassenhaus evolution."""
         Logger.set_global_level("error")
@@ -502,7 +526,6 @@ class TestZassenhausPhaseEstimation:
 
         mc_calculator = create("multi_configuration_calculator")
         casci_total_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, 1, 1)
-        reference_electronic_energy = casci_total_energy - active_hamiltonian.get_core_energy()
 
         n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
         qubit_hamiltonian = create("qubit_mapper", "qdk").run(
@@ -543,15 +566,7 @@ class TestZassenhausPhaseEstimation:
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
         )
-
-        # Resolve 2pi phase periodic alias candidates to find the physical energy
-        estimated_electronic_energy = resolve_energy_aliases(
-            result.raw_energy,
-            evolution_time=evolution_time,
-            reference_energy=reference_electronic_energy,
-            shift_range=range(-3, 4),
-        )
-        estimated_total_energy = estimated_electronic_energy + active_hamiltonian.get_core_energy()
+        estimated_total_energy = result.raw_energy + active_hamiltonian.get_core_energy()
 
         # Assert that total energy is within chemical accuracy of CASCI energy
         assert np.isclose(

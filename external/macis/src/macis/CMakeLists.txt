@@ -68,6 +68,21 @@ target_link_libraries(macis PUBLIC spdlog::spdlog)
 include(macis-mdspan)
 target_link_libraries(macis PUBLIC mdspan)
 
+# IPS4O parallel sorting (used by residue arrays and dynamic bit masking
+# headers via __has_include).  Only used by the parallel-sort code paths,
+# which are gated behind defined(_OPENMP); the headers fall back to
+# std::sort otherwise.  Skip the fetch entirely when OpenMP is disabled.
+if(MACIS_ENABLE_OPENMP)
+  include(macis-ips4o)
+  target_include_directories(macis SYSTEM PUBLIC
+    $<BUILD_INTERFACE:${ips4o_SOURCE_DIR}>)
+  # libatomic is a GCC/Clang runtime; it does not exist on Windows (MSVC and
+  # clang-cl provide atomics intrinsically) or on Apple.
+  if(NOT APPLE AND NOT WIN32)
+    target_link_libraries(macis PUBLIC atomic)
+  endif()
+endif()
+
 
 # Installation
 include( GNUInstallDirs )

@@ -474,10 +474,10 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     Eigen::MatrixXd tmp_one_rdm_aa = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
     Eigen::MatrixXd tmp_one_rdm_bb = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
 
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm_aa(i, i) = 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm_bb(i, i) = 1.0;
     }
 
@@ -591,10 +591,10 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
     }
     size_t n_orbs = alpha_occupations.size();
     Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
     _one_rdm_spin_traced =
@@ -709,7 +709,7 @@ StateVectorContainer::_active_occupations_pair() const {
       Eigen::VectorXd alpha_occ = Eigen::VectorXd::Zero(num_orbitals);
       Eigen::VectorXd beta_occ = Eigen::VectorXd::Zero(num_orbitals);
       const auto& det = determinants[0];
-      for (size_t i = 0; i < num_orbitals && i < det.num_modes(); ++i) {
+      for (size_t i = 0; i < num_orbitals && i < det.capacity(); ++i) {
         if (det.bits_per_mode() == 2) {
           if (det.has_alpha_electron(i)) alpha_occ(i) = 1.0;
           if (det.has_beta_electron(i)) beta_occ(i) = 1.0;
@@ -734,7 +734,7 @@ StateVectorContainer::_active_occupations_pair() const {
     const auto& det = determinants[0];
     if (det.bits_per_mode() == 2) {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         if (det.has_alpha_electron(active_idx))
           alpha_occupations(active_idx) = 1.0;
@@ -743,7 +743,7 @@ StateVectorContainer::_active_occupations_pair() const {
       }
     } else {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         alpha_occupations(active_idx) =
             det.get_mode_state(active_idx) ? 1.0 : 0.0;
@@ -857,16 +857,18 @@ StateVectorContainer::_total_occupations_pair() const {
   auto [alpha_active_indices, beta_active_indices] =
       get_orbitals()->get_active_space_indices();
 
-  for (size_t active_idx = 0; active_idx < alpha_active_indices.size() &&
-                              active_idx < alpha_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < alpha_active_indices.size() &&
+       active_idx < static_cast<size_t>(alpha_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = alpha_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(orbital_idx) = alpha_active_occs(active_idx);
     }
   }
-  for (size_t active_idx = 0; active_idx < beta_active_indices.size() &&
-                              active_idx < beta_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < beta_active_indices.size() &&
+       active_idx < static_cast<size_t>(beta_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = beta_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {

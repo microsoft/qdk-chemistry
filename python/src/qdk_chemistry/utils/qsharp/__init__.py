@@ -20,6 +20,8 @@ _QS_FILES = [
     Path(__file__).parent / "HadamardTest.qs",
     Path(__file__).parent / "PauliExp.qs",
     Path(__file__).parent / "MeasurementBasis.qs",
+    Path(__file__).parent / "PrepSelPrep.qs",
+    Path(__file__).parent / "Select.qs",
 ]
 
 
@@ -28,7 +30,7 @@ def get_qsharp_utils():
     try:
         return qdk.code.QDKChemistry.Utils
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _QS_FILES)
+        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
         qsharp.eval(code)
         return qdk.code.QDKChemistry.Utils
 
