@@ -104,6 +104,13 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
+        # Skip reconfigure if a partial build dir already exists: re-running
+        # cmake touches build system files which causes Ninja to treat compiled
+        # objects as stale and rebuild from scratch instead of resuming.
+        if (Test-Path "cpp/build-${{ matrix.compiler }}/CMakeCache.txt") {
+          Write-Host "Build dir already configured (restored from partial cache); skipping reconfigure."
+          exit 0
+        }
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
