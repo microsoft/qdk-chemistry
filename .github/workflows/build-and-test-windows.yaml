@@ -42,7 +42,7 @@ jobs:
   # ----------------------------------------------------------------------------
   deps:
     name: ${{ matrix.compiler }} - Dependencies
-    runs-on: windows-2025-16core
+    runs-on: windows-2025-32core
     timeout-minutes: 720
     permissions:
       contents: read
@@ -182,7 +182,7 @@ jobs:
   # ----------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.compiler }} - Build & test
-    runs-on: windows-2025-16core
+    runs-on: windows-2025-32core
     timeout-minutes: 360
     needs: deps
     strategy:
