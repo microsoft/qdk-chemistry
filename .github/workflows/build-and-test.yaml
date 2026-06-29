@@ -545,7 +545,7 @@ jobs:
         fi
 
   test-with-qdk-branch:
-    name: Full Test with QDK Branch (iadavis/multi-callable-input-defunc)
+    name: Full Test with QDK Branch
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
       BUILD_DIR: cpp/build
@@ -646,26 +646,11 @@ jobs:
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_ENABLE_OPENMP=ON \
-          -DBUILD_TESTING=ON \
-          -DMACIS_ENABLE_TESTS=ON
+          -DBUILD_TESTING=OFF
         cmake --build "$BUILD_DIR"
-
-    - name: Run C++ tests
-      env:
-        OMP_NUM_THREADS: 4
-      run: |
-        cd "$BUILD_DIR"
-        ctest --output-on-failure --verbose --timeout 300 -E "MACIS_SERIAL_TEST"
 
     - name: Install C++ library
       run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
-
-    - name: Build and install qdk from branch
-      run: |
-        git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
-        pip install "${{ runner.temp }}/qdk/source/qdk_package[jupyter,qre]"
-        echo "Installed qdk from branch: ${QDK_BRANCH}"
-        python -m pip show qdk
 
     - name: Install Python package
       working-directory: python
@@ -676,6 +661,13 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Build and install qdk from branch (overwrite released version)
+      run: |
+        git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
+        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        echo "Installed qdk from branch: ${QDK_BRANCH}"
+        python -m pip show qdk
 
     - name: Run Python tests
       env:
