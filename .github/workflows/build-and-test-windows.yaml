@@ -42,7 +42,7 @@ jobs:
   # ----------------------------------------------------------------------------
   deps:
     name: ${{ matrix.compiler }} - Dependencies
-    runs-on: windows-2025-32core
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=win2025-tl-vanilla, 'JobId=qdk_chemistry-win-deps-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     timeout-minutes: 720
     permissions:
       contents: read
@@ -182,7 +182,7 @@ jobs:
   # ----------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.compiler }} - Build & test
-    runs-on: windows-2025-32core
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=win2025-tl-vanilla, 'JobId=qdk_chemistry-win-build-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     timeout-minutes: 360
     needs: deps
     strategy:
