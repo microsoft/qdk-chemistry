@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "../scf/scf_impl.h"
+#include "../util/similarity_transform.h"
 #include "line_search.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
@@ -994,11 +995,10 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
       F.data() + num_atomic_orbitals * num_atomic_orbitals * spin_index;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
-  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
-                       num_atomic_orbitals, 1.0, C_block_ptr,
-                       num_molecular_orbitals, F_block_ptr, num_atomic_orbitals,
-                       0.0, F_MO.data(), num_molecular_orbitals,
-                       &atba_workspace);
+  similarity_transform(
+      blas::Layout::RowMajor, num_molecular_orbitals, num_atomic_orbitals, 1.0,
+      C_block_ptr, num_molecular_orbitals, F_block_ptr, num_atomic_orbitals,
+      0.0, F_MO.data(), num_molecular_orbitals, &atba_workspace);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
@@ -1101,16 +1101,14 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
 
-  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
-                       num_atomic_orbitals, 1.0, C_block_ptr,
-                       num_molecular_orbitals, F_up_block_ptr,
-                       num_atomic_orbitals, 0.0, F_up_mo.data(),
-                       num_molecular_orbitals, &atba_workspace);
-  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
-                       num_atomic_orbitals, 1.0, C_block_ptr,
-                       num_molecular_orbitals, F_dn_block_ptr,
-                       num_atomic_orbitals, 0.0, F_dn_mo.data(),
-                       num_molecular_orbitals, &atba_workspace);
+  similarity_transform(
+      blas::Layout::RowMajor, num_molecular_orbitals, num_atomic_orbitals, 1.0,
+      C_block_ptr, num_molecular_orbitals, F_up_block_ptr, num_atomic_orbitals,
+      0.0, F_up_mo.data(), num_molecular_orbitals, &atba_workspace);
+  similarity_transform(
+      blas::Layout::RowMajor, num_molecular_orbitals, num_atomic_orbitals, 1.0,
+      C_block_ptr, num_molecular_orbitals, F_dn_block_ptr, num_atomic_orbitals,
+      0.0, F_dn_mo.data(), num_molecular_orbitals, &atba_workspace);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
