@@ -11,6 +11,7 @@
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
+#include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -246,6 +247,50 @@ See Also:
 Default constructor.
 
 Initializes a Cholesky Hamiltonian constructor with default settings.
+
+)");
+
+  // Bind concrete microsoft::ScalarRelativisticHamiltonianConstructor
+  py::class_<microsoft::ScalarRelativisticHamiltonianConstructor,
+             HamiltonianConstructor, py::smart_holder>(
+      m, "QdkScalarRelativisticHamiltonianConstructor", R"(
+QDK implementation of the scalar-relativistic (X2C) Hamiltonian constructor.
+
+This class constructs a molecular Hamiltonian using the exact two-component
+(X2C) method for the one-electron integrals, which captures scalar
+relativistic effects (mass-velocity, Darwin terms) while keeping the
+two-electron integrals unchanged (the X2C-1e approximation).
+
+This is particularly important for molecules containing heavy elements
+(4th row and beyond) where relativistic effects significantly influence
+the electronic structure.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Assuming you have orbitals from an SCF calculation
+    constructor = alg.QdkScalarRelativisticHamiltonianConstructor()
+
+    # Configure settings if needed
+    constructor.settings().set("eri_method", "direct")
+
+    # Construct Hamiltonian with scalar relativistic corrections
+    hamiltonian = constructor.run(orbitals)
+
+See Also:
+    :class:`HamiltonianConstructor`
+    :class:`QdkHamiltonianConstructor`
+    :class:`qdk_chemistry.data.Orbitals`
+    :class:`qdk_chemistry.data.Hamiltonian`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a scalar-relativistic (X2C) Hamiltonian constructor with default settings.
 
 )");
 }

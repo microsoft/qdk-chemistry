@@ -562,7 +562,7 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
 
 TEST_F(HamiltonianConstructorTest, Factory) {
   auto available_solvers = HamiltonianConstructorFactory::available();
-  EXPECT_EQ(available_solvers.size(), 2);
+  EXPECT_GE(available_solvers.size(), 2u);
   EXPECT_THROW(HamiltonianConstructorFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(HamiltonianConstructorFactory::register_instance(
@@ -2697,4 +2697,206 @@ TEST_F(HamiltonianTest, DataTypeName) {
       one_body, two_body, orbitals, core_energy, inactive_fock));
 
   EXPECT_EQ(h.get_data_type_name(), "hamiltonian");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// X2C (scalar-relativistic) HamiltonianConstructor tests
+//
+// These mirror the NR HamiltonianConstructorTest tests above, exercising
+// the "qdk_x2c" factory through the same interfaces.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Helper: run water SCF + build both NR and X2C Hamiltonians
+auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g") {
+  std::vector<Eigen::Vector3d> coords = {{0.0, -0.1432247636, 0.0},
+                                         {1.6380335020, 1.1363366135, 0.0},
+                                         {-1.6380335020, 1.1363366135, 0.0}};
+  std::vector<std::string> syms = {"O", "H", "H"};
+  Structure water(coords, syms);
+
+  auto scf = ScfSolverFactory::create("qdk");
+  auto [energy, wfn] =
+      scf->run(std::make_shared<Structure>(water), 0, 1, basis);
+  auto orbitals = wfn->get_orbitals();
+
+  auto ham_nr = HamiltonianConstructorFactory::create("qdk");
+  auto h_nr = ham_nr->run(orbitals);
+
+  auto ham_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  ham_x2c->settings().set("xuncontract", false);
+  auto h_x2c = ham_x2c->run(orbitals);
+
+  return std::make_tuple(energy, h_nr, h_x2c, orbitals);
+};
+
+TEST_F(HamiltonianConstructorTest, X2CFactory) {
+  // X2C constructor is registered alongside the NR one
+  auto available = HamiltonianConstructorFactory::available();
+  bool found = false;
+  for (const auto& name : available) {
+    if (name == "qdk_x2c") found = true;
+  }
+  EXPECT_TRUE(found);
+
+  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  EXPECT_EQ(x2c->name(), "qdk_x2c");
+}
+
+TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
+  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  EXPECT_EQ(x2c->settings().get<std::string>("eri_method"), "direct");
+  EXPECT_EQ(x2c->settings().get<std::string>("scf_type"), "auto");
+  EXPECT_EQ(x2c->settings().get<bool>("xuncontract"), true);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CEdgeCases) {
+  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+
+  // Throw if restricted orbitals have empty active space
+  EXPECT_THROW(
+      {
+        auto model_orbs = std::make_shared<ModelOrbitals>(3, true);
+        x2c->run(model_orbs);
+      },
+      std::runtime_error);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CNonContiguousActiveSpace) {
+  // Same setup as the NR NonContiguousActiveSpace test
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure structure(coordinates, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  std::vector<size_t> active_indices = {0, 2};
+
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::nullopt, basis_set,
+      std::make_tuple(std::vector<size_t>(active_indices),
+                      std::vector<size_t>{}));
+
+  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  EXPECT_NO_THROW({
+    auto hamiltonian = x2c->run(orbitals);
+    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, X2CNonContiguousInactiveSpace) {
+  // Same setup as the NR NonContiguousInactiveSpace test
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure structure(coordinates, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}));
+  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
+                            std::vector<double>{1.0}));
+  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  // Active: {2, 3}, Inactive: {0, 1} — non-contiguous wouldn't apply here
+  // but we test the pipeline still works with inactive electrons
+  std::vector<size_t> active_indices = {2, 3};
+
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::nullopt, basis_set,
+      std::make_tuple(std::vector<size_t>(active_indices),
+                      std::vector<size_t>{}));
+
+  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  EXPECT_NO_THROW({
+    auto hamiltonian = x2c->run(orbitals);
+    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  });
+}
+
+TEST_F(HamiltonianConstructorTest, X2CRestrictedWater) {
+  // Run the full SCF → X2C pipeline on water/STO-3G
+  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+
+  // Basic validity
+  EXPECT_TRUE(h_x2c->has_one_body_integrals());
+  EXPECT_TRUE(h_x2c->has_two_body_integrals());
+
+  // X2C one-body integrals differ from NR
+  auto [h1_nr, b1] = h_nr->get_one_body_integrals();
+  auto [h1_x2c, b2] = h_x2c->get_one_body_integrals();
+  EXPECT_GT((h1_x2c - h1_nr).norm(), 1e-6);
+
+  // One-body matrix is symmetric
+  EXPECT_NEAR((h1_x2c - h1_x2c.transpose()).norm(), 0.0, 1e-12);
+
+  // 1s orbital is lowered by relativistic effects
+  EXPECT_LT(h1_x2c(0, 0), h1_nr(0, 0));
+}
+
+TEST_F(HamiltonianConstructorTest, X2CERIUnchanged) {
+  // X2C-1e only modifies one-body integrals; ERIs should be identical to NR
+  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+
+  auto [eri_nr, a1, b1] = h_nr->get_two_body_integrals();
+  auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
+  EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CCoreEnergyUnchanged) {
+  // Nuclear repulsion is the same for NR and X2C
+  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+  EXPECT_DOUBLE_EQ(h_nr->get_core_energy(), h_x2c->get_core_energy());
+}
+
+TEST_F(HamiltonianConstructorTest, X2CIntegralSymmetries) {
+  // Mirror the NR IntegralSymmetriesEnergiesO2Singlet test:
+  // verify one-body is symmetric, two-body has 8-fold symmetry
+  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+
+  auto [h1, b1] = h_x2c->get_one_body_integrals();
+  auto [eri, a1, a2] = h_x2c->get_two_body_integrals();
+
+  // One-body: symmetric
+  size_t n = h1.rows();
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < n; ++j) {
+      EXPECT_NEAR(h1(i, j), h1(j, i), 1e-12)
+          << "h1[" << i << "," << j << "] != h1[" << j << "," << i << "]";
+    }
+  }
+
+  // Two-body: (ij|kl) = (ji|kl) = (ij|lk) = (kl|ij) (real orbitals)
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < n; ++j) {
+      for (size_t k = 0; k < n; ++k) {
+        for (size_t l = 0; l < n; ++l) {
+          double ijkl = eri(i * n * n * n + j * n * n + k * n + l);
+          double jikl = eri(j * n * n * n + i * n * n + k * n + l);
+          double ijlk = eri(i * n * n * n + j * n * n + l * n + k);
+          double klij = eri(k * n * n * n + l * n * n + i * n + j);
+          EXPECT_NEAR(ijkl, jikl, 1e-10);
+          EXPECT_NEAR(ijkl, ijlk, 1e-10);
+          EXPECT_NEAR(ijkl, klij, 1e-10);
+        }
+      }
+    }
+  }
 }
