@@ -125,10 +125,10 @@ def generate_cube_data_with_correlation_info(
             "Ensure the calculator was run with calculate_one_rdm=True and calculate_two_rdm=True."
         ) from exc
 
-    if indices is None and not orbitals.has_active_space():
+    if not orbitals.has_active_space():
         raise ValueError(
             "No active space is defined on the wavefunction's orbitals. "
-            "Set an active space on the Orbitals, or pass indices explicitly."
+            "Set an active space on the Orbitals before requesting occupation/entropy overlays."
         )
 
     if indices is None:
@@ -144,7 +144,12 @@ def generate_cube_data_with_correlation_info(
             f"indices {invalid} are not in the active space {list(active_indices)}. "
             "Occupations and entropies are only available for active-space orbitals."
         )
-    occ_alpha, occ_beta = wavefunction.get_active_orbital_occupations()
+    try:
+        occ_alpha, occ_beta = wavefunction.get_active_orbital_occupations()
+    except RuntimeError as exc:
+        raise ValueError(
+            "Wavefunction does not have active-orbital occupations available for overlay."
+        ) from exc
     mo_to_pos = {mo_idx: pos for pos, mo_idx in enumerate(active_indices)}
 
     cube_data_raw = generate_cubefiles_from_orbitals(
