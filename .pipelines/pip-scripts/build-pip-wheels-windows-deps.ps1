@@ -42,6 +42,12 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
 }
 
 # ─── vcpkg install ────────────────────────────────────────────────────────────
+# Route all vcpkg source downloads through the Terrapin internal mirror to
+# avoid hitting external hosts (gitlab.com, github.com, etc.) that are blocked
+# by the 1ES CFSClean network isolation policy.
+# See: https://eng.ms/docs/.../vcpkg  (Step 4: Use Terrapin for Asset Caching)
+$env:X_VCPKG_ASSET_SOURCES = "x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/;x-block-origin"
+
 Write-Host "=== vcpkg install ==="
 & "$VcpkgRoot\vcpkg.exe" install `
     --triplet x64-windows-static-md `
