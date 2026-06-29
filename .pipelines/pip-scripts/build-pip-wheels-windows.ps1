@@ -124,8 +124,10 @@ if ($LASTEXITCODE -ne 0) { throw "pip install requirements failed" }
 # Governance's PipReportDetector sees every package.
 $manifestDir = "$SrcDir\python\build\build-manifest"
 New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
-& $condaExe run -n buildenv python -m pip list --format=freeze |
-    Tee-Object "$manifestDir\requirements.txt"
+$reqs = & $condaExe run -n buildenv python -m pip list --format=freeze
+if ($LASTEXITCODE -ne 0) { throw "pip list failed ($LASTEXITCODE)" }
+$reqs | Set-Content -Encoding utf8 "$manifestDir\requirements.txt"
+$reqs | ForEach-Object { Write-Host $_ }
 & $condaExe run -n buildenv python -m pip install `
     --dry-run --ignore-installed --quiet `
     --report "$manifestDir\component-detection-pip-report.json" `
@@ -138,7 +140,7 @@ Write-Host "=== Prepare README ==="
 try {
     $ghBlob = 'https://github.com/microsoft/qdk-chemistry/blob/main'
     $ghTree = 'https://github.com/microsoft/qdk-chemistry/tree/main'
-    $lines  = Get-Content "$SrcDir\README.md"
+    $lines  = Get-Content -Encoding utf8 "$SrcDir\README.md"
 
     # Apply substitutions line by line (sed -E equivalent).
     $out      = [System.Collections.Generic.List[string]]::new()
@@ -156,7 +158,7 @@ try {
         $line = $line -replace '`cpp/include/`',               "[``cpp/include/``]($ghTree/cpp/include)"
         $out.Add($line)
     }
-    $out | Set-Content "$SrcDir\python\README.md"
+    $out | Set-Content -Encoding utf8 "$SrcDir\python\README.md"
     Write-Host "README prepared."
 } catch {
     Write-Warning "prepare-readme failed: $_  (continuing)"

@@ -50,8 +50,10 @@ steps:
 - powershell: |
     $manifestDir = "$(System.DefaultWorkingDirectory)\python\build\test-manifest"
     New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
-    & "$(CONDA_EXE)" run -n testenv python -m pip list --format=freeze `
-        --exclude qdk_chemistry | Tee-Object "$manifestDir\requirements.txt"
+    $reqs = & "$(CONDA_EXE)" run -n testenv python -m pip list --format=freeze --exclude qdk_chemistry
+    if ($LASTEXITCODE -ne 0) { throw "pip list failed ($LASTEXITCODE)" }
+    $reqs | Set-Content -Encoding utf8 "$manifestDir\requirements.txt"
+    $reqs | ForEach-Object { Write-Host $_ }
     & "$(CONDA_EXE)" run -n testenv python -m pip install `
         --dry-run --ignore-installed --quiet `
         --report "$manifestDir\component-detection-pip-report.json" `
