@@ -54,14 +54,14 @@ function _Bootstrap {
     if ($LASTEXITCODE -ne 0) { throw "Bootstrap venv creation failed ($LASTEXITCODE)" }
     $venvPy = Join-Path $bootstrapVenv 'Scripts\python.exe'
 
-    & $venvPy -m pip install --quiet $ENSURECONDA_PKG
+    & $venvPy -m pip install --quiet $ENSURECONDA_PKG 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "ms-ensureconda install failed ($LASTEXITCODE)" }
 
     # ms-ensureconda --envfile writes a shell-sourceable KEY=VALUE file with
     # CONDA_EXE, CONDA_BASH_HOOK, etc. We parse CONDA_EXE from it.
     $condaEnvFile = Join-Path $env:TEMP "qdk-ensureconda-$EnvName.env"
     $env:ARTIFACTS_CONDA_TOKEN = $env:SYSTEM_ACCESSTOKEN
-    & $venvPy -m ensureconda --envfile $condaEnvFile
+    & $venvPy -m ensureconda --envfile $condaEnvFile 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "ensureconda failed ($LASTEXITCODE)" }
 
     $condaExe = Get-Content $condaEnvFile |
@@ -85,7 +85,7 @@ function _Bootstrap {
     & $condaExe create --override-channels `
         --channel "$CONDA_FEED_ROOT/main" `
         --channel "$CONDA_FEED_ROOT/conda-forge" `
-        --yes --quiet --name $EnvName "python=$PythonVersion" pip
+        --yes --quiet --name $EnvName "python=$PythonVersion" pip 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "conda create '$EnvName' failed ($LASTEXITCODE)" }
     Write-Host "Conda env '$EnvName' created with Python $PythonVersion."
 
