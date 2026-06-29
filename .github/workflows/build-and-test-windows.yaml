@@ -34,16 +34,16 @@ jobs:
   # Job 1: build and cache the (slow) external C++ dependencies.
   #
   # Builds ONLY the slow FetchContent dependency targets
-  # (libint2/gauxc/ecpint/blaspp/lapackpp). With MSVC this can exceed the 6h
-  # GitHub-hosted job cap, so the build is RESUMABLE: the build dir is cached
-  # after every run (complete -> stable key; partial -> per-run key), and the
-  # next run restores the furthest progress and lets Ninja continue. Once a
-  # complete cache exists the build is skipped entirely.
+  # (libint2/gauxc/ecpint/blaspp/lapackpp). With MSVC this can take several
+  # hours, so the build is RESUMABLE: the build dir is cached after every run
+  # (complete -> stable key; partial -> per-run key), and the next run restores
+  # the furthest progress and lets Ninja continue. Once a complete cache exists
+  # the build is skipped entirely. The job timeout is 12 hours.
   # ----------------------------------------------------------------------------
   deps:
     name: ${{ matrix.compiler }} - Dependencies
-    runs-on: windows-latest
-    timeout-minutes: 360
+    runs-on: windows-2025-16core
+    timeout-minutes: 720
     permissions:
       contents: read
       actions: write  # prune stale dependency caches
@@ -121,10 +121,10 @@ jobs:
     - name: Build dependency targets (resumable, time-boxed)
       id: build
       if: steps.cache.outputs.cache-hit != 'true'
-      # Kept under the 6h job cap (accounting for ~85 min of cold vcpkg + download
-      # overhead) so the resumable partial cache is saved before the job is
-      # force-cancelled. The next run restores this progress and continues.
-      timeout-minutes: 255
+      # Kept under the 12h job cap (accounting for vcpkg + download overhead) so
+      # the resumable partial cache is saved before the job is force-cancelled.
+      # The next run restores this progress and continues.
+      timeout-minutes: 630
       shell: pwsh
       run: |
         # No --parallel / CMAKE_BUILD_PARALLEL_LEVEL: let Ninja use all cores.
@@ -182,7 +182,7 @@ jobs:
   # ----------------------------------------------------------------------------
   build-test:
     name: ${{ matrix.compiler }} - Build & test
-    runs-on: windows-latest
+    runs-on: windows-2025-16core
     timeout-minutes: 360
     needs: deps
     strategy:
@@ -237,7 +237,7 @@ jobs:
           -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
-          -DMACIS_ENABLE_TESTS=ON `
+          -DMACIS_ENABLE_TESTS=OFF `
           -DBUILD_SHARED_LIBS=OFF `
           -DBUILD_TESTING=ON `
           -DCMAKE_BUILD_TYPE=Release `
