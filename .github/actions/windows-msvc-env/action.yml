@@ -92,3 +92,15 @@ runs:
 
       "toolset=$toolset" >> $env:GITHUB_OUTPUT
       "cxx-path=$cxx" >> $env:GITHUB_OUTPUT
+
+      # Bootstrap vcpkg if not pre-installed.
+      $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
+      if (Test-Path "$vcpkgRoot\vcpkg.exe") {
+        Write-Host "vcpkg already available at $vcpkgRoot"
+      } else {
+        Write-Host "vcpkg not found — bootstrapping into $vcpkgRoot"
+        git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot --depth 1
+        & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
+        "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+      }

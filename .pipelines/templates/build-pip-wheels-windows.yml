@@ -94,6 +94,18 @@ steps:
     Write-Host "MSVC toolset: $toolset"
     Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
     Write-Host "##vso[task.setvariable variable=CLANGCL_PATH]$clangCl"
+
+    # Bootstrap vcpkg if not pre-installed.
+    $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
+    if (Test-Path "$vcpkgRoot\vcpkg.exe") {
+        Write-Host "vcpkg already available at $vcpkgRoot"
+    } else {
+        Write-Host "vcpkg not found — bootstrapping into $vcpkgRoot"
+        git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot --depth 1
+        & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
+        Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot"
+    }
   displayName: Set up clang-cl / MSVC environment
 
 # Hash all files that influence how the C++ dependencies are built.
