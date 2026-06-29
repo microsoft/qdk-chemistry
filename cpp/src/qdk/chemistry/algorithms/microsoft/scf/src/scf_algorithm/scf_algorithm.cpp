@@ -36,38 +36,53 @@
 
 namespace qdk::chemistry::scf {
 
-void compute_atba_gemm(const double* A, const double* B, double* C, int m,
-                       int n, std::vector<double>& workspace,
-                       blas::Layout layout) {
+void similarity_transform(blas::Layout layout, int64_t N, int64_t K,
+                          double ALPHA, const double* A, int64_t LDA,
+                          const double* B, int64_t LDB, double BETA,
+                          double* C, int64_t LDC,
+                          std::vector<double>* workspace) {
   if (A == nullptr || B == nullptr || C == nullptr) {
-    throw std::invalid_argument("compute_atba_gemm: null matrix pointer.");
+    throw std::invalid_argument("similarity_transform: null matrix pointer.");
   }
-  if (m < 0 || n < 0) {
-    throw std::invalid_argument("compute_atba_gemm: negative dimensions.");
+  if (N < 0 || K < 0) {
+    throw std::invalid_argument("similarity_transform: negative dimensions.");
   }
-  if (m == 0 || n == 0) {
+  if (N == 0) {
+    return;
+  }
+  if (K == 0) {
+    // A**H * B * A vanishes; reduce to C = BETA * C
+    for (int64_t i = 0; i < N; ++i) {
+      for (int64_t j = 0; j < N; ++j) {
+        C[i * LDC + j] *= BETA;
+      }
+    }
     return;
   }
 
-  const size_t required_workspace_size = static_cast<size_t>(m) * n;
-  if (workspace.size() < required_workspace_size) {
-    throw std::invalid_argument(
-        "compute_atba_gemm: workspace is smaller than m * n.");
+  const size_t required_workspace_size = static_cast<size_t>(K) * N;
+  std::vector<double> internal_workspace;
+  double* temp_ptr;
+  if (workspace == nullptr) {
+    internal_workspace.resize(required_workspace_size);
+    temp_ptr = internal_workspace.data();
+  } else {
+    if (workspace->size() < required_workspace_size) {
+      workspace->resize(required_workspace_size);
+    }
+    temp_ptr = workspace->data();
   }
 
-  const int lda = (layout == blas::Layout::RowMajor) ? n : m;
-  const int ldb = m;
-  const int ldc = n;
+  // LD for the K x N temporary buffer
+  const int64_t ld_temp = (layout == blas::Layout::RowMajor) ? N : K;
 
-  const int ld_workspace = (layout == blas::Layout::RowMajor) ? n : m;
+  // temp = B * A  (K x K * K x N -> K x N)
+  blas::gemm(layout, blas::Op::NoTrans, blas::Op::NoTrans, K, N, K, 1.0, B,
+             LDB, A, LDA, 0.0, temp_ptr, ld_temp);
 
-  // workspace = B * A
-  blas::gemm(layout, blas::Op::NoTrans, blas::Op::NoTrans, m, n, m, 1.0, B, ldb,
-             A, lda, 0.0, workspace.data(), ld_workspace);
-
-  // C = A^T * workspace
-  blas::gemm(layout, blas::Op::Trans, blas::Op::NoTrans, n, n, m, 1.0, A, lda,
-             workspace.data(), ld_workspace, 0.0, C, ldc);
+  // C = ALPHA * A**H * temp + BETA * C  (N x K * K x N -> N x N)
+  blas::gemm(layout, blas::Op::Trans, blas::Op::NoTrans, N, N, K, ALPHA, A,
+             LDA, temp_ptr, ld_temp, BETA, C, LDC);
 }
 
 SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
@@ -322,12 +337,16 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
       F.data() + num_atomic_orbitals * num_atomic_orbitals;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
-  compute_atba_gemm(C_block_ptr, F_up_block_ptr, F_up_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals, atba_workspace,
-                    blas::Layout::RowMajor);
-  compute_atba_gemm(C_block_ptr, F_dn_block_ptr, F_dn_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals, atba_workspace,
-                    blas::Layout::RowMajor);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_block_ptr,
+                       num_molecular_orbitals, F_up_block_ptr,
+                       num_atomic_orbitals, 0.0, F_up_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_block_ptr,
+                       num_molecular_orbitals, F_dn_block_ptr,
+                       num_atomic_orbitals, 0.0, F_dn_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
                            int row, int col, int rows, int cols) {

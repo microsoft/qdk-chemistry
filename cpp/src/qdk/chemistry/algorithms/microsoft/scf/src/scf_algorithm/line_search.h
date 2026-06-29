@@ -9,9 +9,7 @@
 #include <cstddef>
 #include <stdexcept>
 
-namespace qdk::chemistry::scf {
-
-namespace impl {
+namespace qdk::chemistry::scf::impl {
 
 /**
  * @brief Nocedal-Wright line search with strong Wolfe conditions.
@@ -156,6 +154,4 @@ void nocedal_wright_line_search(Functor& op,
   if (!converged) throw std::runtime_error("Line Search Failed");
 }
 
-}  // namespace impl
-
-}  // namespace qdk::chemistry::scf
+}  // namespace qdk::chemistry::scf::impl

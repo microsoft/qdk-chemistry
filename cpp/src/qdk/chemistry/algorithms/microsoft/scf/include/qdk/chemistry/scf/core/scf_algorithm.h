@@ -15,33 +15,43 @@
 namespace qdk::chemistry::scf {
 
 /**
- * @brief Compute C = A^T * B * A using BLAS GEMM only
+ * @brief Compute C = ALPHA * A**H * B * A + BETA * C using BLAS GEMM
+ *
+ * Performs a similarity (congruence) transformation of B by A, with optional
+ * scaling and accumulation into C.
  *
  * Matrix shapes:
- * A: m x n
- * B: m x m
- * C: n x n
+ * A: K x N
+ * B: K x K  (square)
+ * C: N x N  (square)
  *
- * @param[in] m Row count of A and dimension of square B block.
- * @param[in] n Column count of A and dimension of square C block.
+ * If workspace is nullptr the function allocates its own internal buffer;
+ * otherwise the caller-supplied buffer is used (and resized if too small).
+ * Passing a pre-allocated workspace avoids repeated heap allocations across
+ * consecutive calls.
  *
- * Assumed leading dimensions for contiguous storage:
- * RowMajor: lda = n, ldb = m, ldc = n
- * ColMajor: lda = m, ldb = m, ldc = n
- *
- * Pointers may reference sub-block starts (not necessarily matrix origin).
- * The intermediate workspace is provided by caller to avoid repeated
- * allocations across consecutive calls.
- *
- * @param[in] A Pointer to the A matrix block.
- * @param[in] B Pointer to the B matrix block.
- * @param[out] C Pointer to output C matrix block.
- * @param[in,out] workspace Temporary buffer of at least m*n doubles.
- * @param[in] layout BLAS matrix layout (RowMajor by default).
+ * @param[in]     layout    BLAS matrix storage layout (RowMajor or ColMajor).
+ * @param[in]     N         Column count of A and dimension of square C.
+ * @param[in]     K         Row count of A and dimension of square B.
+ * @param[in]     ALPHA     Scalar multiplier for A**H * B * A.
+ * @param[in]     A         Pointer to the A matrix (K x N).
+ * @param[in]     LDA       Leading dimension of A.
+ * @param[in]     B         Pointer to the B matrix (K x K).
+ * @param[in]     LDB       Leading dimension of B.
+ * @param[in]     BETA      Scalar multiplier for the input C matrix.
+ * @param[in,out] C         Pointer to the C matrix (N x N); overwritten on
+ *                          output.
+ * @param[in]     LDC       Leading dimension of C.
+ * @param[in,out] workspace Optional temporary buffer of at least K*N doubles.
+ *                          Resized automatically if smaller than required.
+ *                          Pass nullptr to let the function allocate
+ *                          internally.
  */
-void compute_atba_gemm(const double* A, const double* B, double* C, int m,
-                       int n, std::vector<double>& workspace,
-                       blas::Layout layout = blas::Layout::RowMajor);
+void similarity_transform(blas::Layout layout, int64_t N, int64_t K,
+                          double ALPHA, const double* A, int64_t LDA,
+                          const double* B, int64_t LDB, double BETA,
+                          double* C, int64_t LDC,
+                          std::vector<double>* workspace = nullptr);
 
 // Forward declaration
 class SCFImpl;

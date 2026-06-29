@@ -207,9 +207,11 @@ static void compute_restricted_unrestricted_gradient(
         num_atomic_orbitals * num_atomic_orbitals * spin_index;
     const double* C_block_ptr = C.data() + C_block_offset;
     const double* F_block_ptr = F.data() + F_block_offset;
-    compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
-                      num_atomic_orbitals, num_molecular_orbitals,
-                      atba_workspace);
+    similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                         num_atomic_orbitals, 1.0, C_block_ptr,
+                         num_molecular_orbitals, F_block_ptr,
+                         num_atomic_orbitals, 0.0, F_MO.data(),
+                         num_molecular_orbitals, &atba_workspace);
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
@@ -293,33 +295,43 @@ static void compute_restricted_open_shell_gradient(
   // Calculate Generalized Fock matrix in MO basis
   RowMajorMatrix H_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, H_ao_full.data(), H_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_ao_mo_ptr,
+                       num_molecular_orbitals, H_ao_full.data(),
+                       num_atomic_orbitals, 0.0, H_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   RowMajorMatrix J_alpha_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, J_alpha_ao.data(), J_alpha_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_ao_mo_ptr,
+                       num_molecular_orbitals, J_alpha_ao.data(),
+                       num_atomic_orbitals, 0.0, J_alpha_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   RowMajorMatrix J_beta_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, J_beta_ao.data(), J_beta_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_ao_mo_ptr,
+                       num_molecular_orbitals, J_beta_ao.data(),
+                       num_atomic_orbitals, 0.0, J_beta_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   RowMajorMatrix K_alpha_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, K_alpha_ao.data(), K_alpha_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_ao_mo_ptr,
+                       num_molecular_orbitals, K_alpha_ao.data(),
+                       num_atomic_orbitals, 0.0, K_alpha_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   RowMajorMatrix K_beta_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, K_beta_ao.data(), K_beta_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_ao_mo_ptr,
+                       num_molecular_orbitals, K_beta_ao.data(),
+                       num_atomic_orbitals, 0.0, K_beta_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   RowMajorMatrix F_I = H_mo + 2.0 * J_beta_mo - K_beta_mo;
   RowMajorMatrix F_A = J_alpha_mo - J_beta_mo - 0.5 * (K_alpha_mo - K_beta_mo);
@@ -982,8 +994,11 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
       F.data() + num_atomic_orbitals * num_atomic_orbitals * spin_index;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
-  compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(), num_atomic_orbitals,
-                    num_molecular_orbitals, atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_block_ptr,
+                       num_molecular_orbitals, F_block_ptr, num_atomic_orbitals,
+                       0.0, F_MO.data(), num_molecular_orbitals,
+                       &atba_workspace);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
@@ -1086,12 +1101,16 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
 
-  compute_atba_gemm(C_block_ptr, F_up_block_ptr, F_up_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
-  compute_atba_gemm(C_block_ptr, F_dn_block_ptr, F_dn_mo.data(),
-                    num_atomic_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_block_ptr,
+                       num_molecular_orbitals, F_up_block_ptr,
+                       num_atomic_orbitals, 0.0, F_up_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
+  similarity_transform(blas::Layout::RowMajor, num_molecular_orbitals,
+                       num_atomic_orbitals, 1.0, C_block_ptr,
+                       num_molecular_orbitals, F_dn_block_ptr,
+                       num_atomic_orbitals, 0.0, F_dn_mo.data(),
+                       num_molecular_orbitals, &atba_workspace);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
