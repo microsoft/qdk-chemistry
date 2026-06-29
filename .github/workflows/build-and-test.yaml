@@ -660,9 +660,12 @@ jobs:
     - name: Install C++ library
       run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
 
-    - name: Install qdk from branch
+    - name: Build and install qdk from branch
       run: |
-        python -m pip install "qdk[jupyter,qre] @ git+https://github.com/microsoft/qdk.git@${QDK_BRANCH}"
+        git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
+        cd "${{ runner.temp }}/qdk"
+        python ./prereqs.py --install
+        python ./build.py --widgets --qdk --pip --no-test
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 
