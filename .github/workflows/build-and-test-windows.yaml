@@ -127,9 +127,9 @@ jobs:
       timeout-minutes: 630
       shell: pwsh
       run: |
-        # Alias targets (Libint2::cxx, ECPINT::ecpint, gauxc::gauxc) are CMake-level
-        # constructs and don't get Ninja phony targets; use the internal library names.
-        cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2_cxx ecpint gauxc blaspp lapackpp
+        # libint2_cxx is a CMake INTERFACE target (no Ninja phony); libint2_obj is
+        # the actual OBJECT library that compiles all libint2 sources.
+        cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2_obj ecpint gauxc blaspp lapackpp
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
     - name: Save dependency cache (complete)
