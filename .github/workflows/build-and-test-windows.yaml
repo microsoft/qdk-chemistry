@@ -127,8 +127,9 @@ jobs:
       timeout-minutes: 630
       shell: pwsh
       run: |
-        # No --parallel / CMAKE_BUILD_PARALLEL_LEVEL: let Ninja use all cores.
-        cmake --build "cpp/build-${{ matrix.compiler }}" --target Libint2::cxx ECPINT::ecpint gauxc::gauxc blaspp lapackpp
+        # Alias targets (Libint2::cxx, ECPINT::ecpint, gauxc::gauxc) are CMake-level
+        # constructs and don't get Ninja phony targets; use the internal library names.
+        cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2_cxx ecpint gauxc blaspp lapackpp
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
     - name: Save dependency cache (complete)
@@ -159,7 +160,7 @@ jobs:
       run: |
         # Best-effort: keep the newest partial (for resume) and drop older ones;
         # once a complete build succeeds, drop all partials for this base key.
-        $base = "windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-
+        $base = "windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-"
         $keepNewestPartial = @('failure','cancelled') -contains '${{ steps.build.outcome }}'
         try {
           $caches = gh cache list --limit 100 --json id,key,createdAt | ConvertFrom-Json
