@@ -663,9 +663,7 @@ jobs:
     - name: Build and install qdk from branch
       run: |
         git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
-        cd "${{ runner.temp }}/qdk"
-        python ./prereqs.py --install
-        python ./build.py --widgets --qdk --pip --no-test
+        pip install "${{ runner.temp }}/qdk/source/qdk_package[jupyter,qre]"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 
