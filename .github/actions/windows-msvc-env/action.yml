@@ -104,3 +104,6 @@ runs:
         if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
         "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
       }
+      # vcvarsall sets VCPKG_ROOT to VS's bundled copy; override it to match our
+      # standalone installation so vcpkg.exe doesn't warn about the mismatch.
+      "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV

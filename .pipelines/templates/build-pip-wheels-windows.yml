@@ -106,6 +106,9 @@ steps:
         if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
         Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot"
     }
+    # vcvarsall sets VCPKG_ROOT to VS's bundled copy; override it to match our
+    # standalone installation so vcpkg.exe doesn't warn about the mismatch.
+    Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot"
   displayName: Set up clang-cl / MSVC environment
 
 # Hash all files that influence how the C++ dependencies are built.
