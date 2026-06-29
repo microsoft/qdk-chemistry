@@ -34,6 +34,13 @@ try:
 except ImportError:
     _HAS_NOTEBOOK_DEPS = False
 
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
+
 _requires_notebook_deps = pytest.mark.xfail(
     not _HAS_NOTEBOOK_DEPS,
     reason="nbclient and nbformat are optional dependencies",
@@ -289,6 +296,10 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
 )
 @pytest.mark.skipif(
     not PYSCF_AVAILABLE,
