@@ -9,7 +9,7 @@
       1. Rebuilds the full qdk + macis library on top of the cached dep tree.
       2. Runs the C++ test suite (ctest); results are written to an XML file
          that the calling YAML template publishes with PublishTestResults@2.
-      3. Installs the C++ library under install-clang-cl/.
+      3. Installs the C++ library under install-msvc/.
       4. Bootstraps a conda environment via ms-ensureconda (the Microsoft-approved
          conda bootstrapper). Public channels are blocked in 1ES CFSClean; all
          packages are fetched from the Azure Artifacts Conda/PyPI feed.
@@ -22,7 +22,7 @@
       8. Copies the wheel to python/repaired_wheelhouse/.
 
     Prerequisites (set by the YAML template before this script runs):
-      - INCLUDE, LIB, PATH already contain MSVC / clang-cl entries.
+      - INCLUDE, LIB, PATH already contain MSVC entries.
       - CMAKE_BUILD_PARALLEL_LEVEL is set (or computed here).
       - SYSTEM_ACCESSTOKEN is in the environment (mapped by the YAML step via
         env: SYSTEM_ACCESSTOKEN: $(System.AccessToken)).
@@ -30,7 +30,7 @@
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
-    [Parameter(Mandatory)] [string]$ClangClPath,
+    [Parameter(Mandatory)] [string]$ClPath,
     [string]$March         = 'x86-64-v3',
     [string]$BuildType     = 'Release',
     [string]$PythonVersion = '3.11',
@@ -43,8 +43,8 @@ if (-not $VcpkgRoot) {
     $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
 }
 
-$buildDir  = "$SrcDir\cpp\build-clang-cl"
-$installDir = "$SrcDir\install-clang-cl"
+$buildDir  = "$SrcDir\cpp\build-msvc"
+$installDir = "$SrcDir\install-msvc"
 
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
@@ -70,8 +70,8 @@ $cmakeArgs = @(
     '-DBUILD_SHARED_LIBS=OFF',
     '-DBUILD_TESTING=ON',
     "-DCMAKE_BUILD_TYPE=$BuildType",
-    "-DCMAKE_C_COMPILER=$ClangClPath",
-    "-DCMAKE_CXX_COMPILER=$ClangClPath",
+    "-DCMAKE_C_COMPILER=$ClPath",
+    "-DCMAKE_CXX_COMPILER=$ClPath",
     "-DCMAKE_INSTALL_PREFIX=$installDir",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
@@ -88,7 +88,7 @@ if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
 # ─── C++ tests ───────────────────────────────────────────────────────────────
 # Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time meta-test)
-# which exceed the ctest timeout under clang-cl.
+# which can exceed the ctest timeout under MSVC.
 # Save the ctest exit code; throw AFTER the wheel has been built so the
 # PublishTestResults@2 task in the YAML always has something to publish.
 Write-Host "=== ctest ==="
@@ -180,9 +180,9 @@ $buildArgs = @(
     '-C=cmake.define.QDK_ENABLE_OPENMP=OFF',
     '-C=cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
     '-C=cmake.define.BUILD_TESTING=OFF',
-    '-C=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF',
-    "-C=cmake.define.CMAKE_C_COMPILER=$ClangClPath",
-    "-C=cmake.define.CMAKE_CXX_COMPILER=$ClangClPath",
+    "-C=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF",
+    "-C=cmake.define.CMAKE_C_COMPILER=$ClPath",
+    "-C=cmake.define.CMAKE_CXX_COMPILER=$ClPath",
     "-C=cmake.define.CMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-C=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-C=cmake.define.VCPKG_TARGET_TRIPLET=x64-windows-static-md',

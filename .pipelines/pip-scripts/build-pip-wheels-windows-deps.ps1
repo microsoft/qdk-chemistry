@@ -9,14 +9,14 @@
     pipeline job; the full qdk build then starts from a warm build tree.
 
     Prerequisites (set by the YAML template before this script runs):
-      - INCLUDE, LIB, PATH already contain MSVC / clang-cl entries
+      - INCLUDE, LIB, PATH already contain MSVC entries
         (applied via ##vso[task.setvariable] / ##vso[task.prependpath]).
       - CMAKE_BUILD_PARALLEL_LEVEL is set if caller wants a specific level
         (otherwise computed here from CPU count and available RAM).
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
-    [Parameter(Mandatory)] [string]$ClangClPath,
+    [Parameter(Mandatory)] [string]$ClPath,
     [string]$March     = 'x86-64-v3',
     [string]$BuildType = 'Release',
     [string]$VcpkgRoot
@@ -29,9 +29,9 @@ if (-not $VcpkgRoot) {
 }
 if (-not (Test-Path "$VcpkgRoot\vcpkg.exe")) { throw "vcpkg.exe not found under '$VcpkgRoot'" }
 
-$buildDir = "$SrcDir\cpp\build-clang-cl"
+$buildDir = "$SrcDir\cpp\build-msvc"
 
-# Cap Ninja parallelism by available RAM (~4 GB/job for clang-cl TUs pulling in
+# Cap Ninja parallelism by available RAM (~4 GB/job for MSVC TUs pulling in
 # libint2 headers). On the HB120 runner this typically allows all 120 cores.
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
@@ -63,9 +63,9 @@ $cmakeArgs = @(
     '-DBUILD_SHARED_LIBS=OFF',
     '-DBUILD_TESTING=ON',
     "-DCMAKE_BUILD_TYPE=$BuildType",
-    "-DCMAKE_C_COMPILER=$ClangClPath",
-    "-DCMAKE_CXX_COMPILER=$ClangClPath",
-    "-DCMAKE_INSTALL_PREFIX=$SrcDir\install-clang-cl",
+    "-DCMAKE_C_COMPILER=$ClPath",
+    "-DCMAKE_CXX_COMPILER=$ClPath",
+    "-DCMAKE_INSTALL_PREFIX=$SrcDir\install-msvc",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',

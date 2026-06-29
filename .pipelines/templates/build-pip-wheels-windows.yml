@@ -31,7 +31,7 @@ steps:
   condition: ne('${{ parameters.devTag }}', 'None')
 
 # Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
-# clang-cl and the MSVC linker are available to all subsequent steps.
+# cl.exe and the MSVC linker are available to all subsequent steps.
 # Also resolves the MSVC toolset version for the dependency cache key.
 - powershell: |
     $ErrorActionPreference = 'Stop'
@@ -56,25 +56,16 @@ steps:
     }
     Remove-Item $tmp
 
-    # Locate clang-cl from the VS LLVM component; fall back to PATH.
-    $clangCl = $null
-    foreach ($c in @("$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
-                     "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe")) {
-        if (Test-Path $c) { $clangCl = $c; break }
-    }
-    if (-not $clangCl) {
-        $clangCl = (Get-Command clang-cl.exe -ErrorAction SilentlyContinue)?.Source
-    }
-    if (-not $clangCl) { throw "clang-cl.exe not found under $vsPath or on PATH" }
-    $clangDir = Split-Path $clangCl
-    Write-Host "clang-cl: $clangCl"
-    & $clangCl --version 2>&1 | Write-Host
-
-    # Apply to current process.
+    # Apply to current process so Get-Command can resolve cl.exe.
     foreach ($name in $after.Keys) {
         [System.Environment]::SetEnvironmentVariable($name, $after[$name], 'Process')
     }
-    $env:PATH = "$clangDir;$env:PATH"
+
+    # Locate cl.exe — vcvarsall x64 puts it on PATH.
+    $cl = (Get-Command cl.exe -ErrorAction SilentlyContinue)?.Source
+    if (-not $cl) { throw "cl.exe not found on PATH after vcvarsall x64" }
+    Write-Host "cl.exe: $cl"
+    & $cl 2>&1 | Select-Object -First 2 | Write-Host
 
     # Export non-PATH changes to subsequent ADO steps.
     foreach ($name in $after.Keys) {
@@ -83,17 +74,17 @@ steps:
             Write-Host "##vso[task.setvariable variable=$name]$($after[$name])"
         }
     }
-    # Prepend new PATH entries + clang-cl directory.
+    # Prepend new PATH entries from vcvarsall.
     $beforePath = @($before['Path'] -split ';')
     $newEntries = @($after['Path'] -split ';') | Where-Object { $_ -and ($beforePath -notcontains $_) }
-    (@($clangDir) + $newEntries) | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
+    $newEntries | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
 
     # MSVC toolset version: stable identifier for cache key.
     $toolsetFile = "$vsPath\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
     $toolset = (Get-Content $toolsetFile -ErrorAction Stop | Select-Object -First 1).Trim()
     Write-Host "MSVC toolset: $toolset"
     Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
-    Write-Host "##vso[task.setvariable variable=CLANGCL_PATH]$clangCl"
+    Write-Host "##vso[task.setvariable variable=CL_PATH]$cl"
 
     # Bootstrap vcpkg if not pre-installed.
     $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
@@ -109,7 +100,7 @@ steps:
     # vcvarsall sets VCPKG_ROOT to VS's bundled copy; override it to match our
     # standalone installation so vcpkg.exe doesn't warn about the mismatch.
     Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot"
-  displayName: Set up clang-cl / MSVC environment
+  displayName: Set up MSVC environment
 
 # Hash all files that influence how the C++ dependencies are built.
 # The result is used in the Cache@2 key so the cache is invalidated on any
@@ -150,10 +141,10 @@ steps:
 - task: Cache@2
   displayName: Restore / save C++ dependency cache
   inputs:
-    key: '"windows-deps-clang-cl-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
+    key: '"windows-deps-msvc-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
     path: |
       $(System.DefaultWorkingDirectory)/vcpkg_installed
-      $(System.DefaultWorkingDirectory)/cpp/build-clang-cl
+      $(System.DefaultWorkingDirectory)/cpp/build-msvc
     cacheHitVar: DEPS_CACHE_RESTORED
 
 # Build vcpkg packages, configure CMake, and build the slow FetchContent targets
@@ -163,7 +154,7 @@ steps:
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -March     "${{ parameters.march }}" `
         -BuildType "${{ parameters.buildType }}" `
-        -ClangClPath "$(CLANGCL_PATH)"
+        -ClPath    "$(CL_PATH)"
   displayName: Build C++ dependencies (libint2 / gauxc / ecpint / blaspp / lapackpp)
   condition: ne(variables['DEPS_CACHE_RESTORED'], 'true')
 
@@ -174,7 +165,7 @@ steps:
         -SrcDir        "$(System.DefaultWorkingDirectory)" `
         -March         "${{ parameters.march }}" `
         -BuildType     "${{ parameters.buildType }}" `
-        -ClangClPath   "$(CLANGCL_PATH)" `
+        -ClPath        "$(CL_PATH)" `
         -PythonVersion "${{ parameters.pythonVersion }}" `
         -DevTag        "${{ parameters.devTag }}"
   displayName: Build C++ library, run tests, and build Python wheel
@@ -186,6 +177,6 @@ steps:
   displayName: Publish C++ test results
   inputs:
     testResultsFormat: JUnit
-    testResultsFiles: '$(System.DefaultWorkingDirectory)/cpp/build-clang-cl/ctest_results.xml'
+    testResultsFiles: '$(System.DefaultWorkingDirectory)/cpp/build-msvc/ctest_results.xml'
     testRunTitle: 'C++ tests - Windows x86_64 Python ${{ parameters.pythonVersion }}'
   condition: always()
