@@ -1,0 +1,176 @@
+parameters:
+- name: march
+  type: string
+  default: x86-64-v3
+- name: buildType
+  type: string
+  default: Release
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: pythonVersion
+  type: string
+  default: '3.11'
+- name: devTag
+  type: string
+  default: 'None'
+
+steps:
+- checkout: self
+  persistCredentials: true
+  path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
+
+- powershell: |
+    python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
+      --version-file "$(System.DefaultWorkingDirectory)\VERSION" `
+      --dev-tag ${{ parameters.devTag }}
+    Get-Content "$(System.DefaultWorkingDirectory)\VERSION"
+  displayName: Validate/Set Development Version for Wheels
+  condition: ne('${{ parameters.devTag }}', 'None')
+
+# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# clang-cl and the MSVC linker are available to all subsequent steps.
+# Also resolves the MSVC toolset version for the dependency cache key.
+- powershell: |
+    $ErrorActionPreference = 'Stop'
+
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    $vsPath = & $vswhere -latest -products * -property installationPath
+    if (-not $vsPath) { throw "No Visual Studio installation found" }
+    Write-Host "Visual Studio: $vsPath"
+
+    $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
+    if (-not (Test-Path $vcvarsall)) { throw "vcvarsall.bat not found at $vcvarsall" }
+
+    # Snapshot env, run vcvarsall x64, diff to capture changes.
+    $before = @{}
+    Get-ChildItem env: | ForEach-Object { $before[$_.Name] = $_.Value }
+    $tmp = [System.IO.Path]::GetTempFileName()
+    cmd /c "`"$vcvarsall`" x64 && set > `"$tmp`""
+    if ($LASTEXITCODE -ne 0) { throw "vcvarsall.bat failed ($LASTEXITCODE)" }
+    $after = @{}
+    Get-Content $tmp | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') { $after[$matches[1]] = $matches[2] }
+    }
+    Remove-Item $tmp
+
+    # Locate clang-cl from the VS LLVM component; fall back to PATH.
+    $clangCl = $null
+    foreach ($c in @("$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+                     "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe")) {
+        if (Test-Path $c) { $clangCl = $c; break }
+    }
+    if (-not $clangCl) {
+        $clangCl = (Get-Command clang-cl.exe -ErrorAction SilentlyContinue)?.Source
+    }
+    if (-not $clangCl) { throw "clang-cl.exe not found under $vsPath or on PATH" }
+    $clangDir = Split-Path $clangCl
+    Write-Host "clang-cl: $clangCl"
+    & $clangCl --version 2>&1 | Write-Host
+
+    # Apply to current process.
+    foreach ($name in $after.Keys) {
+        [System.Environment]::SetEnvironmentVariable($name, $after[$name], 'Process')
+    }
+    $env:PATH = "$clangDir;$env:PATH"
+
+    # Export non-PATH changes to subsequent ADO steps.
+    foreach ($name in $after.Keys) {
+        if ($name -ieq 'Path') { continue }
+        if ($before[$name] -ne $after[$name]) {
+            Write-Host "##vso[task.setvariable variable=$name]$($after[$name])"
+        }
+    }
+    # Prepend new PATH entries + clang-cl directory.
+    $beforePath = @($before['Path'] -split ';')
+    $newEntries = @($after['Path'] -split ';') | Where-Object { $_ -and ($beforePath -notcontains $_) }
+    (@($clangDir) + $newEntries) | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
+
+    # MSVC toolset version: stable identifier for cache key.
+    $toolsetFile = "$vsPath\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+    $toolset = (Get-Content $toolsetFile -ErrorAction Stop | Select-Object -First 1).Trim()
+    Write-Host "MSVC toolset: $toolset"
+    Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
+    Write-Host "##vso[task.setvariable variable=CLANGCL_PATH]$clangCl"
+  displayName: Set up clang-cl / MSVC environment
+
+# Hash all files that influence how the C++ dependencies are built.
+# The result is used in the Cache@2 key so the cache is invalidated on any
+# dep-affecting change without listing every file individually in the key.
+- powershell: |
+    $root = "$(System.DefaultWorkingDirectory)"
+    $files = @(
+        "$root\vcpkg.json",
+        "$root\vcpkg-configuration.json",
+        "$root\cpp\manifest\qdk-chemistry\cgmanifest.json",
+        "$root\external\macis\manifest\cgmanifest.json",
+        "$root\cpp\cmake\third_party.cmake",
+        "$root\cpp\cmake\modules\DependencyManager.cmake",
+        "$root\external\macis\src\lobpcgxx\CMakeLists.txt",
+        "$root\.pipelines\toolchains\windows.cmake"
+    )
+    if (Test-Path "$root\vcpkg-overlay") {
+        $files += Get-ChildItem "$root\vcpkg-overlay" -Recurse -File |
+                  Select-Object -ExpandProperty FullName
+    }
+    if (Test-Path "$root\cpp\cmake\patches") {
+        $files += Get-ChildItem "$root\cpp\cmake\patches" -Recurse -File |
+                  Select-Object -ExpandProperty FullName
+    }
+    $hashes = $files | Where-Object { Test-Path $_ } | Sort-Object |
+              ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+    $combined  = $hashes -join ","
+    $hashBytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash(
+                     [System.Text.Encoding]::UTF8.GetBytes($combined))
+    $hashStr   = ($hashBytes | ForEach-Object { $_.ToString("x2") }) -join ""
+    Write-Host "Dependency files hash: $hashStr"
+    Write-Host "##vso[task.setvariable variable=DEPS_FILES_HASH]$hashStr"
+  displayName: Compute dependency cache key
+
+# Restore the dependency build dir (vcpkg + FetchContent .libs). If a matching
+# cache exists the deps script is skipped entirely. ADO Cache@2 saves automatically
+# at job end.
+- task: Cache@2
+  displayName: Restore / save C++ dependency cache
+  inputs:
+    key: '"windows-deps-clang-cl-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
+    path: |
+      $(System.DefaultWorkingDirectory)/vcpkg_installed
+      $(System.DefaultWorkingDirectory)/cpp/build-clang-cl
+    cacheHitVar: DEPS_CACHE_RESTORED
+
+# Build vcpkg packages, configure CMake, and build the slow FetchContent targets
+# (libint2, ecpint, gauxc, blaspp, lapackpp). Skipped entirely on cache hit.
+- powershell: |
+    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows-deps.ps1" `
+        -SrcDir    "$(System.DefaultWorkingDirectory)" `
+        -March     "${{ parameters.march }}" `
+        -BuildType "${{ parameters.buildType }}" `
+        -ClangClPath "$(CLANGCL_PATH)"
+  displayName: Build C++ dependencies (libint2 / gauxc / ecpint / blaspp / lapackpp)
+  condition: ne(variables['DEPS_CACHE_RESTORED'], 'true')
+
+# Full qdk build, C++ tests, conda environment setup, and Python wheel build.
+# SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
+- powershell: |
+    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
+        -SrcDir        "$(System.DefaultWorkingDirectory)" `
+        -March         "${{ parameters.march }}" `
+        -BuildType     "${{ parameters.buildType }}" `
+        -ClangClPath   "$(CLANGCL_PATH)" `
+        -PythonVersion "${{ parameters.pythonVersion }}" `
+        -DevTag        "${{ parameters.devTag }}"
+  displayName: Build C++ library, run tests, and build Python wheel
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    OMP_NUM_THREADS: '2'
+
+- task: PublishTestResults@2
+  displayName: Publish C++ test results
+  inputs:
+    testResultsFormat: JUnit
+    testResultsFiles: '$(System.DefaultWorkingDirectory)/cpp/build-clang-cl/ctest_results.xml'
+    testRunTitle: 'C++ tests - Windows x86_64 Python ${{ parameters.pythonVersion }}'
+  condition: always()

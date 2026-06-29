@@ -1,0 +1,83 @@
+<#
+.SYNOPSIS
+    Build C++ dependencies (vcpkg + FetchContent targets) for the Windows wheel pipeline.
+
+.DESCRIPTION
+    Invoked only on a dependency cache miss. Installs vcpkg packages, runs the CMake
+    configure pass, and builds the slow FetchContent targets (libint2, ecpint, gauxc,
+    blaspp, lapackpp). The build directory is subsequently cached by the calling
+    pipeline job; the full qdk build then starts from a warm build tree.
+
+    Prerequisites (set by the YAML template before this script runs):
+      - INCLUDE, LIB, PATH already contain MSVC / clang-cl entries
+        (applied via ##vso[task.setvariable] / ##vso[task.prependpath]).
+      - CMAKE_BUILD_PARALLEL_LEVEL is set if caller wants a specific level
+        (otherwise computed here from CPU count and available RAM).
+#>
+param(
+    [Parameter(Mandatory)] [string]$SrcDir,
+    [Parameter(Mandatory)] [string]$ClangClPath,
+    [string]$March     = 'x86-64-v3',
+    [string]$BuildType = 'Release',
+    [string]$VcpkgRoot
+)
+$ErrorActionPreference = 'Stop'
+
+# Fall back to well-known vcpkg location on MMS images.
+if (-not $VcpkgRoot) {
+    $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
+}
+if (-not (Test-Path "$VcpkgRoot\vcpkg.exe")) { throw "vcpkg.exe not found under '$VcpkgRoot'" }
+
+$buildDir = "$SrcDir\cpp\build-clang-cl"
+
+# Cap Ninja parallelism by available RAM (~4 GB/job for clang-cl TUs pulling in
+# libint2 headers). On the HB120 runner this typically allows all 120 cores.
+if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
+    $cpu   = [int]$env:NUMBER_OF_PROCESSORS
+    $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 4)))
+    Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
+}
+
+# ─── vcpkg install ────────────────────────────────────────────────────────────
+Write-Host "=== vcpkg install ==="
+& "$VcpkgRoot\vcpkg.exe" install `
+    --triplet x64-windows-static-md `
+    --x-manifest-root="$SrcDir" `
+    --x-install-root="$SrcDir\vcpkg_installed" `
+    --overlay-ports="$SrcDir\vcpkg-overlay\ports"
+if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
+
+# ─── CMake configure (deps pass) ─────────────────────────────────────────────
+Write-Host "=== CMake configure ==="
+$cmakeArgs = @(
+    '-S', "$SrcDir\cpp",
+    '-B', $buildDir,
+    '-GNinja',
+    "-DQDK_UARCH=$March",
+    '-DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
+    '-DQDK_CHEMISTRY_ENABLE_MPI=OFF',
+    '-DMACIS_ENABLE_TESTS=ON',
+    '-DBUILD_SHARED_LIBS=OFF',
+    '-DBUILD_TESTING=ON',
+    "-DCMAKE_BUILD_TYPE=$BuildType",
+    "-DCMAKE_C_COMPILER=$ClangClPath",
+    "-DCMAKE_CXX_COMPILER=$ClangClPath",
+    "-DCMAKE_INSTALL_PREFIX=$SrcDir\install-clang-cl",
+    "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
+    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
+    '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
+    "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
+    '-DFETCHCONTENT_QUIET=OFF'
+)
+cmake @cmakeArgs
+if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
+
+# ─── Build slow FetchContent dependency targets ───────────────────────────────
+# Ninja reuses any previously-built artefacts from a restored partial cache, so
+# this step is incremental when a stale cache is present.
+Write-Host "=== Building C++ dependencies ==="
+cmake --build $buildDir --target libint2 ecpint gauxc blaspp lapackpp
+if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }

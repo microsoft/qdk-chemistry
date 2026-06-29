@@ -1,0 +1,75 @@
+parameters:
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: pythonVersion
+  type: string
+  default: '3.11'
+- name: runSlowTests
+  type: boolean
+  default: true
+- name: condition
+  type: string
+  default: succeeded()
+
+steps:
+# Bootstrap conda and create an isolated test environment, matching the
+# approach used for Linux/macOS via bootstrap-conda.sh.
+# SYSTEM_ACCESSTOKEN (mapped via env: below) authenticates the conda install
+# against the Azure Artifacts feed (public channels blocked in 1ES CFSClean).
+- powershell: |
+    $ErrorActionPreference = 'Stop'
+    $scriptPath = "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\bootstrap-conda.ps1"
+    $condaExe = & $scriptPath -EnvName testenv -PythonVersion '${{ parameters.pythonVersion }}'
+    if ($LASTEXITCODE -ne 0) { throw "Conda bootstrap failed ($LASTEXITCODE)" }
+    # Export conda exe path for subsequent steps.
+    Write-Host "##vso[task.setvariable variable=CONDA_EXE]$condaExe"
+  displayName: Set up conda test environment (Python ${{ parameters.pythonVersion }})
+  condition: ${{ parameters.condition }}
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+# Install the wheel together with its test extra dependencies.
+- powershell: |
+    $ErrorActionPreference = 'Stop'
+    $wheels = Get-ChildItem "$(System.DefaultWorkingDirectory)\python\repaired_wheelhouse\qdk_chemistry*.whl"
+    if ($wheels.Count -ne 1) {
+        throw "Expected exactly 1 wheel, found $($wheels.Count): $($wheels.Name -join ', ')"
+    }
+    $wheel = $wheels[0].FullName
+    Write-Host "Installing: $wheel"
+    & "$(CONDA_EXE)" run -n testenv python -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
+    & "$(CONDA_EXE)" run -n testenv python -m pip install "$wheel[test]"
+    if ($LASTEXITCODE -ne 0) { throw "pip install wheel[test] failed ($LASTEXITCODE)" }
+  displayName: Install wheel with test dependencies
+  condition: ${{ parameters.condition }}
+
+# Snapshot the testenv and generate a pip install --report for Component
+# Governance's PipReportDetector (mirrors test-pip-wheels.sh lines 95-102).
+- powershell: |
+    $manifestDir = "$(System.DefaultWorkingDirectory)\python\build\test-manifest"
+    New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
+    & "$(CONDA_EXE)" run -n testenv python -m pip list --format=freeze `
+        --exclude qdk_chemistry | Tee-Object "$manifestDir\requirements.txt"
+    & "$(CONDA_EXE)" run -n testenv python -m pip install `
+        --dry-run --ignore-installed --quiet `
+        --report "$manifestDir\component-detection-pip-report.json" `
+        -r "$manifestDir\requirements.txt"
+  displayName: Generate Component Governance PipReport
+  condition: ${{ parameters.condition }}
+  continueOnError: true
+
+- powershell: |
+    $ErrorActionPreference = 'Stop'
+    Push-Location "$(System.DefaultWorkingDirectory)\python"
+    & "$(CONDA_EXE)" run -n testenv `
+        --env QSHARP_PYTHON_TELEMETRY=false `
+        --env "QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}" `
+        --env OMP_NUM_THREADS=2 `
+        python -m pytest -v tests/
+    $code = $LASTEXITCODE
+    Pop-Location
+    if ($code -ne 0) { throw "pytest failed ($code)" }
+  displayName: Run Python tests
+  condition: ${{ parameters.condition }}
