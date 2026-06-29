@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      rebuild_dep_cache:
+        description: Rebuild dependency cache from scratch (ignore existing cache)
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,6 +70,7 @@ jobs:
 
     - name: Restore dependency cache
       id: cache
+      if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: |

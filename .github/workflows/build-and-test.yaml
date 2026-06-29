@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      rebuild_dep_cache:
+        description: Rebuild dependency cache from scratch (ignore existing cache)
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -219,7 +224,8 @@ jobs:
 
     - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
       id: cache-cpp-deps
-      uses: actions/cache@v5
+      if: ${{ !inputs.rebuild_dep_cache }}
+      uses: actions/cache/restore@v5
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -243,6 +249,16 @@ jobs:
         bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
+
+    - name: Save C++ dependency cache
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ${{ env.CPP_DEPS_PREFIX }}
+        key: >-
+          cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
