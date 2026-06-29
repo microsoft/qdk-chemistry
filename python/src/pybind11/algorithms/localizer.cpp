@@ -299,6 +299,7 @@ reduced density matrix (1-RDM). Natural orbitals are eigenfunctions of the
 
 .. note::
     Requires ``loc_indices_a == loc_indices_b`` (natural orbitals are a single set).
+    Requires ``loc_indices_a``/``loc_indices_b`` to match the orbitals' active-space indices exactly.
     Requires a spin-traced 1-RDM and an active space in the wavefunction.
     For unrestricted Slaterdeterminant, the 1-RDM is expressed in the
     alpha MO basis and the output is always a restricted set of natural orbitals.
