@@ -61,34 +61,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
-          build-parallel: 32
-          uarch: x86-64-v3
-          python-version: '3.10'
-          cpp-test-threads: 2
-          python-test-threads: 2
+        # Python 3.10 temporarily disabled: stable qdk[qre] requires cirq-core>=1.6.1,
+        # which needs Python >= 3.11, so the qre extra cannot resolve on 3.10.
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-test-threads: 4
+          python-test-threads: 4
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.14'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-test-threads: 4
+          python-test-threads: 4
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
           python-version: '3.13'
-          cpp-test-threads: 16
-          python-test-threads: 16
+          cpp-test-threads: 4
+          python-test-threads: 4
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
@@ -262,7 +257,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
+          -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
@@ -358,7 +353,7 @@ jobs:
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
-        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ inputs.run_slow_tests && '1' || '0' }}
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
