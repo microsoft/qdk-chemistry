@@ -711,11 +711,6 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
           -DQDK_ENABLE_OPENMP=OFF `
-          # Prevent blaspp (fetched by macis/lobpcgxx) from finding OpenMP.
-          # clang-cl finds libomp.lib; blaspp links it PUBLIC, propagating
-          # -Xclang -fopenmp to chemistry where structured bindings inside
-          # OpenMP regions cause a clang compile error.
-          -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=TRUE `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 

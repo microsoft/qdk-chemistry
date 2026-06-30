@@ -54,6 +54,10 @@ if(NOT lapackpp_FOUND )
     ${_lapackpp_patch}
   )
 
+  # Propagate the OpenMP intent to blaspp as a cache variable.
+  # blaspp uses option(use_openmp ...) which checks the cache; without
+  # this the local variable set above is invisible to blaspp's configure.
+  set(use_openmp ${use_openmp} CACHE BOOL "blaspp: enable OpenMP" FORCE)
   FetchContent_MakeAvailable( blaspp )
   FetchContent_MakeAvailable( lapackpp )
 
