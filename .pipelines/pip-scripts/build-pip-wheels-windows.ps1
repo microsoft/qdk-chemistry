@@ -60,6 +60,21 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
 # Re-configure the same build dir to refresh any source-path references, then
 # build all qdk + macis targets. Dep .libs from the cache (or the deps step)
 # are already present — Ninja skips them.
+# Guard: if the cached build dir was written on a different drive/path, remove
+# only CMake metadata (NOT compiled artefacts) so configure succeeds.
+if (Test-Path "$buildDir\CMakeCache.txt") {
+    $cacheText = Get-Content "$buildDir\CMakeCache.txt" -Raw -ErrorAction SilentlyContinue
+    $srcNorm   = $SrcDir.Replace('\', '/').ToLower()
+    if ($cacheText -and $cacheText.Replace('\', '/').ToLower() -notmatch [regex]::Escape($srcNorm)) {
+        Write-Host "CMakeCache.txt path mismatch — removing CMake metadata (compiled artifacts preserved)"
+        Remove-Item "$buildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue
+        if (Test-Path "$buildDir\CMakeFiles") {
+            Get-ChildItem "$buildDir\CMakeFiles" -File -ErrorAction SilentlyContinue |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Write-Host "=== CMake configure (full build) ==="
 $cmakeArgs = @(
     '-S', "$SrcDir\cpp",

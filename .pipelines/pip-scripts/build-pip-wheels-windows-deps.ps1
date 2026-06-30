@@ -62,6 +62,26 @@ Write-Host "=== vcpkg install ==="
 if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
 # ─── CMake configure (deps pass) ─────────────────────────────────────────────
+# If the build dir was cached on a runner with a different workspace root
+# (e.g. N:/ vs D:/) CMake will error: "source directory mismatch". Fix by
+# removing only CMakeCache.txt and the top-level CMakeFiles metadata (NOT the
+# compiled artefacts in _deps/ and CMakeFiles/<target>.dir/). CMake then
+# reconfigures with the current paths and Ninja reuses the existing .lib files.
+if (Test-Path "$buildDir\CMakeCache.txt") {
+    $cacheText = Get-Content "$buildDir\CMakeCache.txt" -Raw -ErrorAction SilentlyContinue
+    $srcNorm   = $SrcDir.Replace('\', '/').ToLower()
+    if ($cacheText -and $cacheText.Replace('\', '/').ToLower() -notmatch [regex]::Escape($srcNorm)) {
+        Write-Host "CMakeCache.txt path mismatch — removing CMake metadata (compiled artifacts preserved)"
+        Remove-Item "$buildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue
+        if (Test-Path "$buildDir\CMakeFiles") {
+            # Remove only the top-level cmake infrastructure files; object file
+            # subdirectories (CMakeFiles/<target>.dir/ etc.) are intentionally kept.
+            Get-ChildItem "$buildDir\CMakeFiles" -File -ErrorAction SilentlyContinue |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Write-Host "=== CMake configure ==="
 $cmakeArgs = @(
     '-S', "$SrcDir\cpp",
