@@ -96,10 +96,6 @@ extends:
           enabled: true
         sourceLanguages: python
         binaryLanguages: cpp
-      psscriptanalyzer:
-        enabled: false
-        justificationForDisabling: PSScriptAnalyzer not yet configured for the new Windows pip-scripts.
-        break: false
       armory:
         enabled: false
         justificationForDisabling: ARM templates are not used in this repository.
