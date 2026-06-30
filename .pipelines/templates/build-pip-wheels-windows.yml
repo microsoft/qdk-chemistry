@@ -137,16 +137,21 @@ steps:
     Write-Host "##vso[task.setvariable variable=DEPS_FILES_HASH]$hashStr"
   displayName: Compute dependency cache key
 
-# Restore the dependency build dir (vcpkg + FetchContent .libs). If a matching
-# cache exists the deps script is skipped entirely. ADO Cache@2 saves automatically
-# at job end.
+# Restore the dependency build dirs separately to avoid a known Windows issue
+# with Cache@2 multi-line `path`: the task passes both lines as a single tar
+# argument, causing "could not chdir" at save time. Two tasks work reliably.
 - task: Cache@2
-  displayName: Restore / save C++ dependency cache
+  displayName: Restore / save vcpkg dependency cache
+  inputs:
+    key: '"windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
+    path: $(System.DefaultWorkingDirectory)/vcpkg_installed
+    cacheHitVar: VCPKG_CACHE_RESTORED
+
+- task: Cache@2
+  displayName: Restore / save C++ build cache
   inputs:
     key: '"windows-deps-msvc-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
-    path: |
-      $(System.DefaultWorkingDirectory)/vcpkg_installed
-      $(System.DefaultWorkingDirectory)/cpp/build-msvc
+    path: $(System.DefaultWorkingDirectory)/cpp/build-msvc
     cacheHitVar: DEPS_CACHE_RESTORED
 
 # Build vcpkg packages, configure CMake, and build the slow FetchContent targets
@@ -158,7 +163,7 @@ steps:
         -BuildType "${{ parameters.buildType }}" `
         -ClPath    "$(CL_PATH)"
   displayName: Build C++ dependencies (libint2 / gauxc / ecpint / blaspp / lapackpp)
-  condition: ne(variables['DEPS_CACHE_RESTORED'], 'true')
+  condition: or(ne(variables['DEPS_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
 
 # Full qdk build, C++ tests, conda environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
