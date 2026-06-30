@@ -460,7 +460,8 @@ class TestCircuitEstimate:
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
-        qir = openqasm_compile("""
+        qir = openqasm_compile(
+            """
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
@@ -469,8 +470,8 @@ class TestCircuitEstimate:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """,
-        target_profile=TargetProfile.Base
+            """,
+            target_profile=TargetProfile.Base
         )
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
@@ -520,7 +521,8 @@ class TestGetQreApplication:
         """Test that get_qre_application works with QIR-only circuit."""
         from qdk.qre.application import QIRApplication  # noqa: PLC0415
 
-        qir = openqasm_compile("""
+        qir = openqasm_compile(
+            """
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
@@ -529,8 +531,8 @@ class TestGetQreApplication:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """,
-        target_profile=TargetProfile.Base
+            """,
+            target_profile=TargetProfile.Base
         )
         circuit = Circuit(qir=qir)
         app = circuit.get_qre_application()

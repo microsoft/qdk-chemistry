@@ -165,7 +165,9 @@ class Circuit(DataClass):
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base)
+            return openqasm_compile(
+                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
+            )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
