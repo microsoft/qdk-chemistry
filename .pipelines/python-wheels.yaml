@@ -116,6 +116,22 @@ extends:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
       jobs:
+      # Windows C++ dependency build (vcpkg + FetchContent targets).
+      # Runs once so the 5 parallel Python-version wheel jobs share a single
+      # warm cache entry instead of each rebuilding deps independently.
+      - job: Build_windows_x86_64_deps
+        pool:
+          name: $(CPU_POOL_X86)
+          demands:
+          - ImageOverride -equals windows-2025-1espt
+          os: windows
+        timeoutInMinutes: 480
+        displayName: Build Windows x86_64 C++ dependencies
+        steps:
+        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+          parameters:
+            march: x86-64-v3
+
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
           ${{ if eq(target.os, 'macOS') }}:
@@ -133,6 +149,7 @@ extends:
               os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ elseif eq(target.os, 'windows') }}:
+            dependsOn: Build_windows_x86_64_deps
             pool:
               name: $(CPU_POOL_X86)
               demands:
