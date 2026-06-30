@@ -12,6 +12,7 @@ from pathlib import Path
 
 import h5py
 import pytest
+from qdk import TargetProfile
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 
@@ -50,7 +51,7 @@ def simple_qasm() -> str:
 @pytest.fixture
 def simple_qir(simple_qasm) -> str:
     """The QIR representation of the simple QASM string."""
-    return str(openqasm_compile(simple_qasm))
+    return str(openqasm_compile(simple_qasm, target_profile=TargetProfile.Base))
 
 
 class TestCircuitConstruction:
@@ -68,7 +69,7 @@ class TestCircuitConstruction:
         c[0] = measure q[0];
         c[1] = measure q[1];
         """
-        qir = openqasm_compile(qasm)
+        qir = openqasm_compile(qasm, target_profile=TargetProfile.Base)
         qsharp_circuit = openqasm_circuit(qasm)
         circuit = Circuit(qasm=qasm, qir=qir, qsharp=qsharp_circuit)
         assert circuit.qasm is not None
@@ -468,7 +469,9 @@ class TestCircuitEstimate:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """)
+        """,
+        target_profile=TargetProfile.Base
+        )
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
             circuit.estimate()
@@ -526,7 +529,9 @@ class TestGetQreApplication:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """)
+        """,
+        target_profile=TargetProfile.Base
+        )
         circuit = Circuit(qir=qir)
         app = circuit.get_qre_application()
         assert isinstance(app, QIRApplication)
