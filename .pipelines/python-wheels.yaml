@@ -78,10 +78,6 @@ parameters:
   type: boolean
   default: true
   displayName: Run slow tests
-- name: windowsOnly
-  type: boolean
-  default: false
-  displayName: Windows only (skip Linux/macOS — for iterating on the Windows pipeline)
 
 variables:
 - group: QdkChemistry
@@ -122,7 +118,6 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          condition: ${{ or(eq(target.os, 'windows'), not(parameters.windowsOnly)) }}
           ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
