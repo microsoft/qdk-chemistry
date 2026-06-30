@@ -272,7 +272,6 @@ extends:
           - ${{ if eq(target.os, 'windows') }}:
             - template: .pipelines/templates/test-pip-wheels-windows.yml@self
               parameters:
-                agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
                 # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
