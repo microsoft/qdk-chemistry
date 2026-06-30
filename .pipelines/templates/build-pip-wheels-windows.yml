@@ -5,6 +5,12 @@ parameters:
 - name: buildType
   type: string
   default: Release
+- name: buildTesting
+  type: string
+  default: 'OFF'
+- name: enableCoverage
+  type: string
+  default: 'OFF'
 - name: agentBuildDirectory
   type: string
   default: $(Agent.BuildDirectory)
@@ -89,12 +95,14 @@ steps:
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
 - pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
-        -SrcDir        "$(System.DefaultWorkingDirectory)" `
-        -March         "${{ parameters.march }}" `
-        -BuildType     "${{ parameters.buildType }}" `
-        -ClPath        "$(CL_PATH)" `
-        -PythonVersion "${{ parameters.pythonVersion }}" `
-        -DevTag        "${{ parameters.devTag }}"
+        -SrcDir         "$(System.DefaultWorkingDirectory)" `
+        -March          "${{ parameters.march }}" `
+        -BuildType      "${{ parameters.buildType }}" `
+        -BuildTesting   "${{ parameters.buildTesting }}" `
+        -EnableCoverage "${{ parameters.enableCoverage }}" `
+        -ClPath         "$(CL_PATH)" `
+        -PythonVersion  "${{ parameters.pythonVersion }}" `
+        -DevTag         "${{ parameters.devTag }}"
   displayName: Build C++ library, run tests, and build Python wheel
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -106,4 +114,4 @@ steps:
     testResultsFormat: JUnit
     testResultsFiles: '$(System.DefaultWorkingDirectory)/cpp/build-msvc/ctest_results.xml'
     testRunTitle: 'C++ tests - Windows x86_64 Python ${{ parameters.pythonVersion }}'
-  condition: always()
+  condition: and(always(), ne('${{ parameters.buildTesting }}', 'OFF'))

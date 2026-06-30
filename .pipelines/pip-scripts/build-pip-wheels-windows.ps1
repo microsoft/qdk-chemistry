@@ -31,10 +31,12 @@
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
     [Parameter(Mandatory)] [string]$ClPath,
-    [string]$March         = 'x86-64-v3',
-    [string]$BuildType     = 'Release',
-    [string]$PythonVersion = '3.11',
-    [string]$DevTag        = 'None',
+    [string]$March          = 'x86-64-v3',
+    [string]$BuildType      = 'Release',
+    [string]$BuildTesting   = 'OFF',
+    [string]$EnableCoverage = 'OFF',
+    [string]$PythonVersion  = '3.11',
+    [string]$DevTag         = 'None',
     [string]$VcpkgRoot
 )
 $ErrorActionPreference = 'Stop'
@@ -64,11 +66,11 @@ $cmakeArgs = @(
     '-B', $buildDir,
     '-GNinja',
     "-DQDK_UARCH=$March",
-    '-DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
+    "-DQDK_CHEMISTRY_ENABLE_COVERAGE=$EnableCoverage",
     '-DQDK_CHEMISTRY_ENABLE_MPI=OFF',
-    '-DMACIS_ENABLE_TESTS=ON',
+    "-DMACIS_ENABLE_TESTS=$BuildTesting",
     '-DBUILD_SHARED_LIBS=OFF',
-    '-DBUILD_TESTING=ON',
+    "-DBUILD_TESTING=$BuildTesting",
     '-DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST',
     '-DVCPKG_APPLOCAL_DEPS=OFF',
     "-DCMAKE_BUILD_TYPE=$BuildType",
@@ -89,19 +91,22 @@ cmake --build $buildDir
 if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
 # ─── C++ tests ───────────────────────────────────────────────────────────────
-# Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time meta-test)
-# which can exceed the ctest timeout under MSVC.
-# Save the ctest exit code; throw AFTER the wheel has been built so the
-# PublishTestResults@2 task in the YAML always has something to publish.
-Write-Host "=== ctest ==="
-Push-Location $buildDir
-ctest --output-on-failure --verbose --timeout 400 `
-      --output-junit ctest_results.xml `
-      -E "MACIS_SERIAL_TEST|libint2/unit"
-$ctestCode = $LASTEXITCODE
-Pop-Location
-if ($ctestCode -ne 0) {
-    Write-Warning "ctest returned $ctestCode — continuing to build wheel, then will throw."
+$ctestCode = 0
+if ($BuildTesting -ne 'OFF') {
+    # Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time meta-test)
+    # which can exceed the ctest timeout under MSVC.
+    # Save the ctest exit code; throw AFTER the wheel has been built so the
+    # PublishTestResults@2 task in the YAML always has something to publish.
+    Write-Host "=== ctest ==="
+    Push-Location $buildDir
+    ctest --output-on-failure --verbose --timeout 400 `
+          --output-junit ctest_results.xml `
+          -E "MACIS_SERIAL_TEST|libint2/unit"
+    $ctestCode = $LASTEXITCODE
+    Pop-Location
+    if ($ctestCode -ne 0) {
+        Write-Warning "ctest returned $ctestCode — continuing to build wheel, then will throw."
+    }
 }
 
 # ─── Install C++ library ─────────────────────────────────────────────────────

@@ -17,8 +17,10 @@
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
     [Parameter(Mandatory)] [string]$ClPath,
-    [string]$March     = 'x86-64-v3',
-    [string]$BuildType = 'Release',
+    [string]$March          = 'x86-64-v3',
+    [string]$BuildType      = 'Release',
+    [string]$BuildTesting   = 'OFF',
+    [string]$EnableCoverage = 'OFF',
     [string]$VcpkgRoot
 )
 $ErrorActionPreference = 'Stop'
@@ -68,9 +70,9 @@ $cmakeArgs = @(
     "-DQDK_UARCH=$March",
     '-DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
     '-DQDK_CHEMISTRY_ENABLE_MPI=OFF',
-    '-DMACIS_ENABLE_TESTS=ON',
+    "-DMACIS_ENABLE_TESTS=$BuildTesting",
     '-DBUILD_SHARED_LIBS=OFF',
-    '-DBUILD_TESTING=ON',
+    "-DBUILD_TESTING=$BuildTesting",
     "-DCMAKE_BUILD_TYPE=$BuildType",
     "-DCMAKE_C_COMPILER=$ClPath",
     "-DCMAKE_CXX_COMPILER=$ClPath",
