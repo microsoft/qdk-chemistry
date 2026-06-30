@@ -23,8 +23,12 @@ void similarity_transform(blas::Layout layout, int64_t N, int64_t K,
   }
   if (K == 0) {
     // A**H * B * A vanishes; reduce to C = BETA * C
-    for (int64_t i = 0; i < N * N; ++i) {
-      C[i] *= BETA;
+    if (layout == blas::Layout::RowMajor) {
+      for (int64_t row = 0; row < N; ++row)
+        for (int64_t col = 0; col < N; ++col) C[row * LDC + col] *= BETA;
+    } else {
+      for (int64_t col = 0; col < N; ++col)
+        for (int64_t row = 0; row < N; ++row) C[col * LDC + row] *= BETA;
     }
     return;
   }
