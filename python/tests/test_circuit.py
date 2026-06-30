@@ -471,7 +471,7 @@ class TestCircuitEstimate:
             c[0] = measure q[0];
             c[1] = measure q[1];
             """,
-            target_profile=TargetProfile.Base
+            target_profile=TargetProfile.Base,
         )
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
@@ -532,7 +532,7 @@ class TestGetQreApplication:
             c[0] = measure q[0];
             c[1] = measure q[1];
             """,
-            target_profile=TargetProfile.Base
+            target_profile=TargetProfile.Base,
         )
         circuit = Circuit(qir=qir)
         app = circuit.get_qre_application()
