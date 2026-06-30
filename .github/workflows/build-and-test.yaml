@@ -648,6 +648,7 @@ jobs:
           -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
           -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
+          -DQDK_ENABLE_OPENMP=OFF `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure (deps) failed ($LASTEXITCODE)" }
 
@@ -709,6 +710,7 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
+          -DQDK_ENABLE_OPENMP=OFF `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 

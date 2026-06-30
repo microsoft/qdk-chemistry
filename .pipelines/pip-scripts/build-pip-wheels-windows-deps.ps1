@@ -99,6 +99,7 @@ $cmakeArgs = @(
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
     "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
+    '-DQDK_ENABLE_OPENMP=OFF',
     '-DFETCHCONTENT_QUIET=OFF'
 )
 cmake @cmakeArgs
