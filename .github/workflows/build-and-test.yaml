@@ -574,7 +574,7 @@ jobs:
       VCPKG_TRIPLET: x64-windows-static-md
       QDK_UARCH: x86-64-v3
       # Bump to force a rebuild of the cached dependencies.
-      DEPS_CACHE_VERSION: v1
+      DEPS_CACHE_VERSION: v2
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -604,15 +604,6 @@ jobs:
         $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
-        # Include a short hash of the workspace path in the cache key so that
-        # runners with different workspace base directories (e.g. D:\a\ vs
-        # D:\a\_work\) each get their own cache entry and never hit a
-        # CMakeCache.txt path mismatch on restore.
-        $wsPath = "${{ github.workspace }}".ToLower().Replace('\', '/')
-        $wsBytes = [System.Text.Encoding]::UTF8.GetBytes($wsPath)
-        $wsHash = ([System.Security.Cryptography.SHA256]::Create().ComputeHash($wsBytes) |
-                    ForEach-Object { $_.ToString('x2') }) -join ''
-        "wshash=$($wsHash.Substring(0, 12))" >> $env:GITHUB_OUTPUT
 
     - name: Restore dependency cache
       id: cache
@@ -620,49 +611,12 @@ jobs:
       with:
         path: |
           vcpkg_installed
-          cpp/build-${{ matrix.compiler }}
+          deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-ws${{ steps.env2.outputs.wshash }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
-
-    - name: Validate cached build directory
-      id: cache-validate
-      if: steps.cache.outputs.cache-hit == 'true'
-      shell: pwsh
-      run: |
-        # If the cached CMakeCache.txt was written on a runner with a different
-        # workspace base path (e.g. D:\a\ vs D:\a\_work\) cmake configure will
-        # error: "source directory mismatch". Fix by removing only CMakeCache.txt
-        # and the top-level CMakeFiles/*.cmake infrastructure files — NOT the
-        # compiled artefacts in CMakeFiles/<target>.dir/ or _deps/.
-        # cmake reconfigures with the new paths; Ninja reuses the existing
-        # .lib/.obj outputs and skips recompilation entirely.
-        $buildDir = "cpp/build-${{ matrix.compiler }}"
-        $cacheFile = "$buildDir/CMakeCache.txt"
-        if (-not (Test-Path $cacheFile)) {
-          Write-Host "No CMakeCache.txt in restored cache — treating as cache miss"
-          "cache-valid=false" >> $env:GITHUB_OUTPUT
-          exit 0
-        }
-        $ws = "${{ github.workspace }}".Replace('\', '/').ToLower()
-        $content = (Get-Content $cacheFile -Raw).ToLower().Replace('\', '/')
-        if ($content -notmatch [regex]::Escape($ws)) {
-          Write-Host "Workspace path mismatch in cached CMakeCache.txt (expected: $ws)"
-          Write-Host "Removing CMake metadata only — compiled artifacts preserved"
-          Remove-Item "$buildDir/CMakeCache.txt" -Force -ErrorAction SilentlyContinue
-          if (Test-Path "$buildDir/CMakeFiles") {
-            # Remove only top-level infrastructure files; object subdirectories
-            # (CMakeFiles/<target>.dir/, _deps/, etc.) are intentionally kept.
-            Get-ChildItem "$buildDir/CMakeFiles" -File -ErrorAction SilentlyContinue |
-              Remove-Item -Force -ErrorAction SilentlyContinue
-          }
-          "cache-valid=false" >> $env:GITHUB_OUTPUT
-        } else {
-          Write-Host "Cached build directory paths match current workspace"
-          "cache-valid=true" >> $env:GITHUB_OUTPUT
-        }
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Install vcpkg dependencies
-      if: steps.cache.outputs.cache-hit != 'true' || steps.cache-validate.outputs.cache-valid == 'false'
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
@@ -674,12 +628,69 @@ jobs:
           --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
         if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
-    - name: Configure CMake
-      if: steps.cache.outputs.cache-hit != 'true' || steps.cache-validate.outputs.cache-valid == 'false'
+    - name: Configure CMake (deps only)
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
+        # Standalone project at .pipelines/cmake/deps-install — includes
+        # third_party.cmake from the main project. No changes to cpp/CMakeLists.txt.
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        cmake -S ".pipelines/cmake/deps-install" -B "deps-build-${{ matrix.compiler }}" -GNinja `
+          -DQDK_UARCH=${{ env.QDK_UARCH }} `
+          -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
+          -DBUILD_SHARED_LIBS=OFF `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\deps-install-${{ matrix.compiler }}" `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
+          -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
+          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
+          -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
+          -DFETCHCONTENT_QUIET=OFF
+        if ($LASTEXITCODE -ne 0) { throw "CMake configure (deps) failed ($LASTEXITCODE)" }
+
+    - name: Build C++ dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        # libint2_cxx is a CMake INTERFACE target (no Ninja phony); libint2_obj is
+        # the actual OBJECT library that compiles all libint2 sources.
+        # macis is internal code — it is intentionally excluded from the cached
+        # install prefix and is always built from external/macis in the main build.
+        cmake --build "deps-build-${{ matrix.compiler }}" --target libint2_obj ecpint gauxc
+        if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
+
+    - name: Install C++ dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        # cmake --install fires all FetchContent sub-project install() rules registered
+        # in this build tree. Generated config files use ${_IMPORT_PREFIX} (relative to
+        # the config file) — no hardcoded paths; path-independent across runners.
+        cmake --install "deps-build-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "CMake install (deps) failed ($LASTEXITCODE)" }
+
+    - name: Save dependency cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          vcpkg_installed
+          deps-install-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+
+    - name: Configure CMake
+      shell: pwsh
+      run: |
+        # Always configure fresh. Pre-installed deps are found via CMAKE_PREFIX_PATH;
+        # FetchContent is disabled to enforce use of the installed copies.
+        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
           -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
@@ -693,38 +704,18 @@ jobs:
           -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install-${{ matrix.compiler }}" `
+          "-DCMAKE_PREFIX_PATH=$depsInstall;$vcpkgInstalled" `
           -DCMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
           -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
           -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
+          -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
-
-    - name: Build C++ dependencies
-      if: steps.cache.outputs.cache-hit != 'true' || steps.cache-validate.outputs.cache-valid == 'false'
-      shell: pwsh
-      run: |
-        # libint2_cxx is a CMake INTERFACE target (no Ninja phony); libint2_obj is
-        # the actual OBJECT library that compiles all libint2 sources.
-        cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2_obj ecpint gauxc blaspp lapackpp
-        if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
-
-    - name: Save dependency cache
-      if: steps.cache.outputs.cache-hit != 'true' || steps.cache-validate.outputs.cache-valid == 'false'
-      uses: actions/cache/save@v5
-      with:
-        path: |
-          vcpkg_installed
-          cpp/build-${{ matrix.compiler }}
-        key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-ws${{ steps.env2.outputs.wshash }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Build C++ library
       shell: pwsh
       run: |
-        # Dep targets are already up-to-date (either just built or restored from
-        # cache); Ninja skips them and only compiles qdk + test sources.
-        # Honors CMAKE_BUILD_PARALLEL_LEVEL set above (memory-aware).
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
@@ -756,7 +747,7 @@ jobs:
       run: |
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
-        $prefix = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }};${{ github.workspace }}\install-${{ matrix.compiler }}"
+        $prefix = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }};${{ github.workspace }}\install-${{ matrix.compiler }};${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         Push-Location python
         # plugins (pyscf) do not build on Windows; install the test extra only.
         # QDK_ALLOW_DEPENDENCY_FETCH=OFF: fail fast if the installed qdk is not

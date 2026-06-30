@@ -6,7 +6,9 @@
 .DESCRIPTION
     This script is always invoked (unlike the deps script which is skipped on
     cache hit). It:
-      1. Rebuilds the full qdk + macis library on top of the cached dep tree.
+      1. Configures and builds the full qdk library using pre-installed deps
+         from $DepsInstallDir (the cached install prefix populated by the deps
+         script). FetchContent is disabled (QDK_ALLOW_DEPENDENCY_FETCH=OFF).
       2. Runs the C++ test suite (ctest); results are written to an XML file
          that the calling YAML template publishes with PublishTestResults@2.
       3. Installs the C++ library under install-msvc/.
@@ -27,6 +29,8 @@
       - SYSTEM_ACCESSTOKEN is in the environment (mapped by the YAML step via
         env: SYSTEM_ACCESSTOKEN: $(System.AccessToken)).
       - PIP_INDEX_URL is set by PipAuthenticate@1 at job level.
+      - The C++ deps install prefix ($DepsInstallDir) has been restored from
+        cache (or built by build-pip-wheels-windows-deps.ps1).
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
@@ -37,13 +41,15 @@ param(
     [string]$EnableCoverage = 'OFF',
     [string]$PythonVersion  = '3.11',
     [string]$DevTag         = 'None',
-    [string]$VcpkgRoot
+    [string]$VcpkgRoot,
+    [string]$DepsInstallDir
 )
 $ErrorActionPreference = 'Stop'
 
 if (-not $VcpkgRoot) {
     $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
 }
+if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
 
 $buildDir  = "$SrcDir\cpp\build-msvc"
 $installDir = "$SrcDir\install-msvc"
@@ -56,26 +62,12 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
 
-# ─── CMake reconfigure + full build ──────────────────────────────────────────
-# Re-configure the same build dir to refresh any source-path references, then
-# build all qdk + macis targets. Dep .libs from the cache (or the deps step)
-# are already present — Ninja skips them.
-# Guard: if the cached build dir was written on a different drive/path, remove
-# only CMake metadata (NOT compiled artefacts) so configure succeeds.
-if (Test-Path "$buildDir\CMakeCache.txt") {
-    $cacheText = Get-Content "$buildDir\CMakeCache.txt" -Raw -ErrorAction SilentlyContinue
-    $srcNorm   = $SrcDir.Replace('\', '/').ToLower()
-    if ($cacheText -and $cacheText.Replace('\', '/').ToLower() -notmatch [regex]::Escape($srcNorm)) {
-        Write-Host "CMakeCache.txt path mismatch — removing CMake metadata (compiled artifacts preserved)"
-        Remove-Item "$buildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue
-        if (Test-Path "$buildDir\CMakeFiles") {
-            Get-ChildItem "$buildDir\CMakeFiles" -File -ErrorAction SilentlyContinue |
-                Remove-Item -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
+# ─── CMake configure + full build ────────────────────────────────────────────
+# Always configure fresh (no cached build dir). Pre-installed deps are found via
+# CMAKE_PREFIX_PATH; FetchContent is disabled to enforce use of installed copies.
+# This build dir is for qdk only and is NOT cached between pipeline runs.
 Write-Host "=== CMake configure (full build) ==="
+$vcpkgInstalled = "$SrcDir\vcpkg_installed\x64-windows-static-md"
 $cmakeArgs = @(
     '-S', "$SrcDir\cpp",
     '-B', $buildDir,
@@ -92,10 +84,12 @@ $cmakeArgs = @(
     "-DCMAKE_C_COMPILER=$ClPath",
     "-DCMAKE_CXX_COMPILER=$ClPath",
     "-DCMAKE_INSTALL_PREFIX=$installDir",
+    "-DCMAKE_PREFIX_PATH=$DepsInstallDir;$vcpkgInstalled",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
     "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
+    '-DQDK_ALLOW_DEPENDENCY_FETCH=OFF',
     '-DFETCHCONTENT_QUIET=OFF'
 )
 cmake @cmakeArgs
@@ -190,7 +184,7 @@ try {
 # scikit-build-core picks up the pre-built C++ library via CMAKE_PREFIX_PATH so
 # FetchContent is never triggered. QDK_ALLOW_DEPENDENCY_FETCH=OFF enforces this.
 Write-Host "=== python -m build --wheel ==="
-$prefix   = "$SrcDir\vcpkg_installed\x64-windows-static-md;$installDir"
+$prefix   = "$SrcDir\vcpkg_installed\x64-windows-static-md;$installDir;$DepsInstallDir"
 $buildArgs = @(
     'run', '-n', 'buildenv',
     'python', '-m', 'build', '--wheel',

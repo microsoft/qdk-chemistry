@@ -1,12 +1,28 @@
 <#
 .SYNOPSIS
-    Build C++ dependencies (vcpkg + FetchContent targets) for the Windows wheel pipeline.
+    Build C++ dependencies (vcpkg + external FetchContent targets) for the Windows wheel pipeline
+    and install them to a path-independent prefix for caching.
 
 .DESCRIPTION
     Invoked only on a dependency cache miss. Installs vcpkg packages, runs the CMake
-    configure pass, and builds the slow FetchContent targets (libint2, ecpint, gauxc,
-    blaspp, lapackpp). The build directory is subsequently cached by the calling
-    pipeline job; the full qdk build then starts from a warm build tree.
+    configure pass, builds the slow external FetchContent targets (libint2, ecpint,
+    gauxc), then installs to $DepsInstallDir via cmake --install.
+
+    macis is intentionally excluded: it is internal code and is always built fresh
+    from the local external/macis source directory in the main qdk build step.
+    Its transitive deps (blaspp, lapackpp, lobpcgxx, etc.) are built as part of
+    the main build along with macis.
+
+    Only the installed prefix ($DepsInstallDir) and vcpkg_installed/ are cached, NOT
+    the build directory. Installed CMake package config files use ${_IMPORT_PREFIX}
+    (computed at find_package time), so they are path-independent and can be restored
+    on a runner with a different workspace drive or path without any CMakeCache mismatch.
+
+    The subsequent full qdk build uses:
+      -DCMAKE_PREFIX_PATH="<DepsInstallDir>;<vcpkg_installed/triplet>"
+      -DQDK_ALLOW_DEPENDENCY_FETCH=OFF
+    so that find_package() finds all deps from the install prefix and FetchContent is
+    never triggered.
 
     Prerequisites (set by the YAML template before this script runs):
       - INCLUDE, LIB, PATH already contain MSVC entries
@@ -21,7 +37,8 @@ param(
     [string]$BuildType      = 'Release',
     [string]$BuildTesting   = 'OFF',
     [string]$EnableCoverage = 'OFF',
-    [string]$VcpkgRoot
+    [string]$VcpkgRoot,
+    [string]$DepsInstallDir
 )
 $ErrorActionPreference = 'Stop'
 
@@ -31,7 +48,12 @@ if (-not $VcpkgRoot) {
 }
 if (-not (Test-Path "$VcpkgRoot\vcpkg.exe")) { throw "vcpkg.exe not found under '$VcpkgRoot'" }
 
-$buildDir = "$SrcDir\cpp\build-msvc"
+if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
+
+# Standalone cmake project for external deps only (no macis, no chemistry).
+$depsProjectDir = "$SrcDir\.pipelines\cmake\deps-install"
+# Ephemeral build dir — only the install prefix is cached.
+$buildDir = "$SrcDir\deps-build-msvc"
 
 # Cap Ninja parallelism by available RAM (~4 GB/job for MSVC TUs pulling in
 # libint2 headers). On the HB120 runner this typically allows all 120 cores.
@@ -47,10 +69,6 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
 # Route all vcpkg source downloads through the Terrapin internal mirror to
 # avoid hitting external hosts (gitlab.com etc.) that are blocked by the
 # 1ES CFSClean network isolation policy.
-# See: https://eng.ms/docs/.../vcpkg  (Step 4: Use Terrapin for Asset Caching)
-# Do NOT set x-block-origin: github.com is accessible from the runner, but
-# gitlab.com (used by eigen3) is blocked; Terrapin is the preferred source and
-# falls back to the authoritative URL only on a miss.
 $env:X_VCPKG_ASSET_SOURCES = "x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/"
 
 Write-Host "=== vcpkg install ==="
@@ -61,42 +79,22 @@ Write-Host "=== vcpkg install ==="
     --overlay-ports="$SrcDir\vcpkg-overlay\ports"
 if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
-# ─── CMake configure (deps pass) ─────────────────────────────────────────────
-# If the build dir was cached on a runner with a different workspace root
-# (e.g. N:/ vs D:/) CMake will error: "source directory mismatch". Fix by
-# removing only CMakeCache.txt and the top-level CMakeFiles metadata (NOT the
-# compiled artefacts in _deps/ and CMakeFiles/<target>.dir/). CMake then
-# reconfigures with the current paths and Ninja reuses the existing .lib files.
-if (Test-Path "$buildDir\CMakeCache.txt") {
-    $cacheText = Get-Content "$buildDir\CMakeCache.txt" -Raw -ErrorAction SilentlyContinue
-    $srcNorm   = $SrcDir.Replace('\', '/').ToLower()
-    if ($cacheText -and $cacheText.Replace('\', '/').ToLower() -notmatch [regex]::Escape($srcNorm)) {
-        Write-Host "CMakeCache.txt path mismatch — removing CMake metadata (compiled artifacts preserved)"
-        Remove-Item "$buildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue
-        if (Test-Path "$buildDir\CMakeFiles") {
-            # Remove only the top-level cmake infrastructure files; object file
-            # subdirectories (CMakeFiles/<target>.dir/ etc.) are intentionally kept.
-            Get-ChildItem "$buildDir\CMakeFiles" -File -ErrorAction SilentlyContinue |
-                Remove-Item -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
-Write-Host "=== CMake configure ==="
+# ─── CMake configure (standalone deps project) ───────────────────────────────
+# Configures .pipelines/cmake/deps-install/CMakeLists.txt which includes
+# third_party.cmake directly from the main project — same versions, same flags.
+# No changes to cpp/CMakeLists.txt required.
+Write-Host "=== CMake configure (deps standalone project) ==="
 $cmakeArgs = @(
-    '-S', "$SrcDir\cpp",
+    '-S', $depsProjectDir,
     '-B', $buildDir,
     '-GNinja',
     "-DQDK_UARCH=$March",
-    '-DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
     '-DQDK_CHEMISTRY_ENABLE_MPI=OFF',
-    "-DMACIS_ENABLE_TESTS=$BuildTesting",
     '-DBUILD_SHARED_LIBS=OFF',
-    "-DBUILD_TESTING=$BuildTesting",
     "-DCMAKE_BUILD_TYPE=$BuildType",
     "-DCMAKE_C_COMPILER=$ClPath",
     "-DCMAKE_CXX_COMPILER=$ClPath",
-    "-DCMAKE_INSTALL_PREFIX=$SrcDir\install-msvc",
+    "-DCMAKE_INSTALL_PREFIX=$DepsInstallDir",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
@@ -107,8 +105,17 @@ cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 
 # ─── Build slow FetchContent dependency targets ───────────────────────────────
-# Ninja reuses any previously-built artefacts from a restored partial cache, so
-# this step is incremental when a stale cache is present.
+# libint2_obj: the OBJECT library that compiles all libint2 sources.
+# ecpint, gauxc: other external third-party deps.
+# macis is internal code — intentionally excluded from the cached install prefix.
 Write-Host "=== Building C++ dependencies ==="
-cmake --build $buildDir --target libint2 ecpint gauxc blaspp lapackpp
+cmake --build $buildDir --target libint2_obj ecpint gauxc
 if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
+
+# ─── Install deps to path-independent prefix ─────────────────────────────────
+# All FetchContent sub-project install() rules are registered in this build tree
+# and fire here. Generated cmake config files use ${_IMPORT_PREFIX} (computed
+# relative to the config file at find_package time) — fully path-independent.
+Write-Host "=== cmake --install (deps prefix: $DepsInstallDir) ==="
+cmake --install $buildDir
+if ($LASTEXITCODE -ne 0) { throw "CMake install (deps) failed ($LASTEXITCODE)" }

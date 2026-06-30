@@ -54,11 +54,11 @@ steps:
     cacheHitVar: VCPKG_CACHE_RESTORED
 
 - task: Cache@2
-  displayName: Restore / save C++ build cache
+  displayName: Restore C++ deps install cache
   inputs:
-    key: '"windows-deps-msvc-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
-    path: $(System.DefaultWorkingDirectory)/cpp/build-msvc
-    cacheHitVar: DEPS_CACHE_RESTORED
+    key: '"windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
+    path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+    cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
 # Full qdk build, C++ tests, conda environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
