@@ -434,6 +434,10 @@ class TestVerstraeteCiracSpectral:
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_spectral_validation_3x2_huckel(self) -> None:
         """Compare eigenvalues of 3x2 Hückel model under VC and JW mappings.
 
