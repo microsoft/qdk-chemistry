@@ -71,7 +71,7 @@ steps:
     $env:QDK_CHEMISTRY_RUN_SLOW_TESTS = '${{ parameters.runSlowTests }}'
     $env:OMP_NUM_THREADS              = '2'
     Push-Location "$(System.DefaultWorkingDirectory)\python"
-    & "$(CONDA_EXE)" run -n testenv python -m pytest -v tests/
+    & "$(CONDA_EXE)" run -n testenv --no-capture-output python -m pytest -v tests/
     $code = $LASTEXITCODE
     Pop-Location
     if ($code -ne 0) { throw "pytest failed ($code)" }
