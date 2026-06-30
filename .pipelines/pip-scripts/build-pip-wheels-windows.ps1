@@ -154,28 +154,7 @@ $LASTEXITCODE = 0
 # ─── Prepare README (equivalent to prepare-readme.sh) ────────────────────────
 Write-Host "=== Prepare README ==="
 try {
-    $ghBlob = 'https://github.com/microsoft/qdk-chemistry/blob/main'
-    $ghTree = 'https://github.com/microsoft/qdk-chemistry/tree/main'
-    $lines  = Get-Content -Encoding utf8 "$SrcDir\README.md"
-
-    # Apply substitutions line by line (sed -E equivalent).
-    $out      = [System.Collections.Generic.List[string]]::new()
-    $deleting = $false
-    foreach ($line in $lines) {
-        # Range delete: ## Project Structure ... closing ```
-        if ($line -match '^## Project Structure$') { $deleting = $true;  continue }
-        if ($deleting) {
-            if ($line -match '^```$') { $deleting = $false }
-            continue
-        }
-        $line = $line -replace '\]\(\./([^)]+)\)',              "]($ghBlob/`$1)"
-        $line = $line -replace '\]\(([A-Z][A-Z_]*\.(md|txt))\)', "]($ghBlob/`$1)"
-        $line = $line -replace '`examples/`',                  "[``examples/``]($ghTree/examples)"
-        $line = $line -replace '`cpp/include/`',               "[``cpp/include/``]($ghTree/cpp/include)"
-        $out.Add($line)
-    }
-    $out | Set-Content -Encoding utf8 "$SrcDir\python\README.md"
-    Write-Host "README prepared."
+    & "$PSScriptRoot\prepare-readme.ps1" -SrcDir $SrcDir
 } catch {
     Write-Warning "prepare-readme failed: $_  (continuing)"
 }
