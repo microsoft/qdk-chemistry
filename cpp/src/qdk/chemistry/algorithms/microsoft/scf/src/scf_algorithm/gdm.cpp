@@ -1283,6 +1283,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
     return;
   }
 
+  // J and K matrices for each spin block are needed for ROHF gradient
+  // computation, which cannot be restored from the Fock matrix. For other
+  // orbital types, the gradient can be computed directly from the Fock matrix.
   if (cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
     const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
     RowMajorMatrix J_ao =
