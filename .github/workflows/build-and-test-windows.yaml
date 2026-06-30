@@ -67,6 +67,7 @@ jobs:
 
     - name: Set memory-aware build parallelism
       shell: pwsh
+      id: env2
       run: |
         # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
         # cap concurrency by available RAM (~4 GB/job) to avoid C1060 (compiler out
@@ -76,6 +77,15 @@ jobs:
         $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
+        # Include a short hash of the workspace path in the cache key so that
+        # runners with different workspace base directories (e.g. D:\a\ vs
+        # D:\a\_work\) each get their own cache entry and never hit a
+        # CMakeCache.txt path mismatch on restore.
+        $wsPath = "${{ github.workspace }}".ToLower().Replace('\', '/')
+        $wsBytes = [System.Text.Encoding]::UTF8.GetBytes($wsPath)
+        $wsHash = ([System.Security.Cryptography.SHA256]::Create().ComputeHash($wsBytes) |
+                    ForEach-Object { $_.ToString('x2') }) -join ''
+        "wshash=$($wsHash.Substring(0, 12))" >> $env:GITHUB_OUTPUT
 
     - name: Restore dependency cache
       id: cache
@@ -85,7 +95,7 @@ jobs:
           vcpkg_installed
           cpp/build-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-ws${{ steps.env2.outputs.wshash }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Validate cached build directory
       id: cache-validate
@@ -172,7 +182,7 @@ jobs:
           vcpkg_installed
           cpp/build-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-ws${{ steps.env2.outputs.wshash }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Build C++ library
       shell: pwsh
