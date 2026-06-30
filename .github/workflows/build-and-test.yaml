@@ -655,11 +655,10 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        # libint2_cxx is a CMake INTERFACE target (no Ninja phony); libint2_obj is
-        # the actual OBJECT library that compiles all libint2 sources.
-        # macis is internal code — it is intentionally excluded from the cached
-        # install prefix and is always built from external/macis in the main build.
-        cmake --build "deps-build-${{ matrix.compiler }}" --target libint2_obj ecpint gauxc
+        # Build everything in the standalone deps project: this produces int2.lib
+        # (the STATIC library that archives libint2_obj) so that cmake --install
+        # succeeds. macis is internal code, excluded from the standalone project.
+        cmake --build "deps-build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
     - name: Install C++ dependencies

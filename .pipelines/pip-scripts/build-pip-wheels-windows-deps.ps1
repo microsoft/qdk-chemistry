@@ -104,12 +104,12 @@ $cmakeArgs = @(
 cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 
-# ─── Build slow FetchContent dependency targets ───────────────────────────────
-# libint2_obj: the OBJECT library that compiles all libint2 sources.
-# ecpint, gauxc: other external third-party deps.
-# macis is internal code — intentionally excluded from the cached install prefix.
+# ─── Build all targets in the standalone deps project ────────────────────────
+# Build everything: this produces int2.lib (STATIC library that archives
+# libint2_obj), ecpint.lib, gauxc.lib, etc. so that cmake --install succeeds.
+# macis is internal code — intentionally excluded from the standalone project.
 Write-Host "=== Building C++ dependencies ==="
-cmake --build $buildDir --target libint2_obj ecpint gauxc
+cmake --build $buildDir
 if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
 # ─── Install deps to path-independent prefix ─────────────────────────────────
