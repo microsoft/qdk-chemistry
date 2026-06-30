@@ -143,6 +143,7 @@ jobs:
           -DBUILD_SHARED_LIBS=OFF `
           -DBUILD_TESTING=ON `
           -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST `
+          -DVCPKG_APPLOCAL_DEPS=OFF `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
