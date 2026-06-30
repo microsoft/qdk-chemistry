@@ -6,25 +6,21 @@
 # --------------------------------------------------------------------------------------------
 
 ################################################################################
-# docs:xyz ../data/h2.structure.xyz
 # start-cell-json
 import os
+from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.data import (
-    Structure,
-    Hamiltonian,
     CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
     ModelOrbitals,
+    Structure,
 )
 
-# Load structure from inline XYZ file (the data uses Angstrom, which is converted to Bohr internally)
-structure = Structure.from_xyz("""\
-2
-H2 molecule
-H    0.000000    0.000000    0.000000
-H    0.000000    0.000000    0.740848
-""")
+# Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
+# Substitute the path with your own, if needed.
+structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # For demonstration: create a structure with custom masses and charges
 # (requires explicit coordinates, here in Bohr)
