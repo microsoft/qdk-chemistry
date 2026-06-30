@@ -90,6 +90,12 @@ $cmakeArgs = @(
     '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
     "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
     '-DQDK_ALLOW_DEPENDENCY_FETCH=OFF',
+    '-DQDK_ENABLE_OPENMP=OFF',
+    # Prevent blaspp (fetched by macis/lobpcgxx) from finding OpenMP: clang-cl
+    # finds libomp.lib, which blaspp links PUBLIC, propagating -Xclang -fopenmp
+    # to chemistry. This is a clang-cl-specific issue with structured bindings
+    # inside OpenMP regions that clang does not yet support.
+    '-DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=TRUE',
     '-DFETCHCONTENT_QUIET=OFF'
 )
 cmake @cmakeArgs
