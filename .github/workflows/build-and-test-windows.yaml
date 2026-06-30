@@ -247,14 +247,19 @@ jobs:
       run: |
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
-        # The cached CMakeCache.txt files were written on the deps-job runner
-        # whose workspace path may differ (e.g. different _work subdirectory).
-        # CMake rejects the path mismatch. Delete ALL CMakeCache.txt files
-        # (top-level + every _deps/*/subbuild/) so CMake reconfigures with the
-        # current paths while keeping compiled .obj/.lib files for Ninja.
-        Get-ChildItem -Recurse -Filter CMakeCache.txt `
-          -Path "cpp/build-${{ matrix.compiler }}" -ErrorAction SilentlyContinue |
-          Remove-Item -Force -ErrorAction SilentlyContinue
+        # Delete only the top-level CMakeCache.txt so cmake reconfigures with the
+        # current workspace path. Subbuild CMakeCache.txt files (libint2, gauxc,
+        # etc.) are deliberately kept: deleting them forces cmake to regenerate
+        # the subbuild build.ninja with fresh absolute paths, which causes Ninja
+        # to invalidate all ~12,000 compiled dep objects and rebuild everything.
+        # The GHA workspace path is stable per repository name so subbuild paths
+        # are always consistent between the deps-job (cache save) and the
+        # build-test job (cache restore).
+        $topCache = "cpp/build-${{ matrix.compiler }}/CMakeCache.txt"
+        if (Test-Path $topCache) {
+          Write-Host "Removing top-level CMakeCache.txt"
+          Remove-Item $topCache -Force
+        }
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
           -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
