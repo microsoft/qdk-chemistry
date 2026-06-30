@@ -57,7 +57,7 @@ $installDir = "$SrcDir\install-msvc"
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 4)))
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
     Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
