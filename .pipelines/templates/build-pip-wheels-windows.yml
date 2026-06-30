@@ -41,38 +41,7 @@ steps:
 # Also resolves the MSVC toolset version for the dependency cache key.
 - template: steps/setup-msvc-env.yml@self
 
-# Hash all files that influence how the C++ dependencies are built.
-# The result is used in the Cache@2 key so the cache is invalidated on any
-# dep-affecting change without listing every file individually in the key.
-- pwsh: |
-    $root = "$(System.DefaultWorkingDirectory)"
-    $files = @(
-        "$root\vcpkg.json",
-        "$root\vcpkg-configuration.json",
-        "$root\cpp\manifest\qdk-chemistry\cgmanifest.json",
-        "$root\external\macis\manifest\cgmanifest.json",
-        "$root\cpp\cmake\third_party.cmake",
-        "$root\cpp\cmake\modules\DependencyManager.cmake",
-        "$root\external\macis\src\lobpcgxx\CMakeLists.txt",
-        "$root\.pipelines\toolchains\windows.cmake"
-    )
-    if (Test-Path "$root\vcpkg-overlay") {
-        $files += Get-ChildItem "$root\vcpkg-overlay" -Recurse -File |
-                  Select-Object -ExpandProperty FullName
-    }
-    if (Test-Path "$root\cpp\cmake\patches") {
-        $files += Get-ChildItem "$root\cpp\cmake\patches" -Recurse -File |
-                  Select-Object -ExpandProperty FullName
-    }
-    $hashes = $files | Where-Object { Test-Path $_ } | Sort-Object |
-              ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
-    $combined  = $hashes -join ","
-    $hashBytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash(
-                     [System.Text.Encoding]::UTF8.GetBytes($combined))
-    $hashStr   = ($hashBytes | ForEach-Object { $_.ToString("x2") }) -join ""
-    Write-Host "Dependency files hash: $hashStr"
-    Write-Host "##vso[task.setvariable variable=DEPS_FILES_HASH]$hashStr"
-  displayName: Compute dependency cache key
+- template: steps/compute-deps-cache-key.yml@self
 
 # Restore the dependency build dirs separately to avoid a known Windows issue
 # with Cache@2 multi-line `path`: the task passes both lines as a single tar
