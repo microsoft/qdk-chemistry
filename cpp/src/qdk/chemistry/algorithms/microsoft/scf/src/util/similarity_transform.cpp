@@ -23,10 +23,8 @@ void similarity_transform(blas::Layout layout, int64_t N, int64_t K,
   }
   if (K == 0) {
     // A**H * B * A vanishes; reduce to C = BETA * C
-    for (int64_t i = 0; i < N; ++i) {
-      for (int64_t j = 0; j < N; ++j) {
-        C[i * LDC + j] *= BETA;
-      }
+    for (int64_t i = 0; i < N * N; ++i) {
+      C[i] *= BETA;
     }
     return;
   }

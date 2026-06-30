@@ -9,6 +9,7 @@
 
 #include <limits>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::scf {
