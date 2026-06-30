@@ -30,6 +30,11 @@ cmake_minimum_required(VERSION 3.21)
 
 project(qdk-chemistry-deps LANGUAGES C CXX)
 
+# Mirror the main project: C++20 globally ensures MSVC passes /std:c++20 which
+# implies /permissive- (required for C++ alternative tokens used by GauXC).
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # ─── Options (mirror the relevant subset from the main project) ───────────────
 
 set(QDK_UARCH "" CACHE STRING "Target microarchitecture (e.g. x86-64-v3)")
