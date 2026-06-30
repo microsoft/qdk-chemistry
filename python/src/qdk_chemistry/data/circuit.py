@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-from qdk import qsharp, TargetProfile
+from qdk import TargetProfile, qsharp
 from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
 from qdk.openqasm import circuit as openqasm_circuit
