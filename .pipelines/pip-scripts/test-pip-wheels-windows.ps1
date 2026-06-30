@@ -1,30 +1,10 @@
 <#
 .SYNOPSIS
-    Install the built Windows wheel into a conda test environment and run pytest.
+    Install the built Windows wheel and run pytest.
 
 .DESCRIPTION
-    Windows equivalent of test-pip-wheels.sh. Mirrors the structure of that
-    script so that test-pip-wheels-windows.yml can call this script in a single
-    step the same way test-pip-wheels.yml calls test-pip-wheels.sh.
-
-    Steps performed:
-      1. Bootstrap a conda test environment via bootstrap-conda.ps1.
-      2. Install the built wheel together with its [test] extra dependencies.
-      3. Snapshot the environment and generate a pip install --report for
-         Component Governance's PipReportDetector (non-fatal on failure).
-      4. Run the pytest suite with -v.
-
-.PARAMETER SrcDir
-    Root of the qdk-chemistry repository checkout
-    (System.DefaultWorkingDirectory in ADO).
-    Defaults to two levels above this script's directory.
-
-.PARAMETER PythonVersion
-    Python version for the conda test environment (e.g. '3.12').
-
-.PARAMETER RunSlowTests
-    Whether to run slow tests. Passed as QDK_CHEMISTRY_RUN_SLOW_TESTS env var.
-    Accepts 'true'/'false' or 'True'/'False' (as expanded by YAML templates).
+    Bootstraps a conda test environment, installs the wheel with its [test]
+    extras, generates a Component Governance PipReport (non-fatal), and runs pytest.
 #>
 param(
     [string]$SrcDir        = (Resolve-Path "$PSScriptRoot\..\.." -ErrorAction Stop),
@@ -55,7 +35,6 @@ if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "pip install wheel[test] failed ($LASTEXITCODE)" }
 
 # ─── 3. Component Governance PipReport (non-fatal) ───────────────────────────
-# Mirrors test-pip-wheels.sh lines 95-102.
 Write-Host "=== Generate Component Governance PipReport ==="
 try {
     $manifestDir = "$pythonDir\build\test-manifest"

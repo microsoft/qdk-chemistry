@@ -1,36 +1,13 @@
 <#
 .SYNOPSIS
-    Build the full qdk C++ library, run C++ tests, and produce a Python wheel
-    using a conda-isolated build environment.
+    Build the C++ library, run tests, and produce a Python wheel.
 
 .DESCRIPTION
-    This script is always invoked (unlike the deps script which is skipped on
-    cache hit). It:
-      1. Configures and builds the full qdk library using pre-installed deps
-         from $DepsInstallDir (the cached install prefix populated by the deps
-         script). FetchContent is disabled (QDK_ALLOW_DEPENDENCY_FETCH=OFF).
-      2. Runs the C++ test suite (ctest); results are written to an XML file
-         that the calling YAML template publishes with PublishTestResults@2.
-      3. Installs the C++ library under install-msvc/.
-      4. Bootstraps a conda environment via ms-ensureconda (the Microsoft-approved
-         conda bootstrapper). Public channels are blocked in 1ES CFSClean; all
-         packages are fetched from the Azure Artifacts Conda/PyPI feed.
-      5. Installs build tooling (pip, build, scikit-build-core, etc.) and
-         generates a Component Governance PipReport.
-      6. Rewrites relative README links to absolute GitHub URLs (equivalent to
-         prepare-readme.sh).
-      7. Builds the distribution wheel with scikit-build-core. No wheel repair
-         is needed: x64-windows-static-md statically links all vcpkg deps.
-      8. Copies the wheel to python/repaired_wheelhouse/.
-
-    Prerequisites (set by the YAML template before this script runs):
-      - INCLUDE, LIB, PATH already contain MSVC entries.
-      - CMAKE_BUILD_PARALLEL_LEVEL is set (or computed here).
-      - SYSTEM_ACCESSTOKEN is in the environment (mapped by the YAML step via
-        env: SYSTEM_ACCESSTOKEN: $(System.AccessToken)).
-      - PIP_INDEX_URL is set by PipAuthenticate@1 at job level.
-      - The C++ deps install prefix ($DepsInstallDir) has been restored from
-        cache (or built by build-pip-wheels-windows-deps.ps1).
+    Always invoked (unlike the deps script which skips on cache hit). Configures
+    and builds qdk against pre-installed deps from $DepsInstallDir, runs ctest,
+    installs the C++ library, bootstraps a conda environment, and builds the wheel
+    with scikit-build-core. No wheel repair needed: x64-windows-static-md statically
+    links all vcpkg deps.
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
@@ -63,9 +40,6 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
 }
 
 # ─── CMake configure + full build ────────────────────────────────────────────
-# Always configure fresh (no cached build dir). Pre-installed deps are found via
-# CMAKE_PREFIX_PATH; FetchContent is disabled to enforce use of installed copies.
-# This build dir is for qdk only and is NOT cached between pipeline runs.
 Write-Host "=== CMake configure (full build) ==="
 $vcpkgInstalled = "$SrcDir\vcpkg_installed\x64-windows-static-md"
 $cmakeArgs = @(
@@ -103,10 +77,7 @@ if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 # ─── C++ tests ───────────────────────────────────────────────────────────────
 $ctestCode = 0
 if ($BuildTesting -ne 'OFF') {
-    # Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time meta-test)
-    # which can exceed the ctest timeout under MSVC.
-    # Save the ctest exit code; throw AFTER the wheel has been built so the
-    # PublishTestResults@2 task in the YAML always has something to publish.
+    # Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time, exceeds timeout).
     Write-Host "=== ctest ==="
     Push-Location $buildDir
     ctest --output-on-failure --verbose --timeout 400 `
@@ -136,9 +107,7 @@ if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
 & $condaExe run -n buildenv python -m pip install -r "$SrcDir\.pipelines\requirements.txt"
 if ($LASTEXITCODE -ne 0) { throw "pip install requirements failed" }
 
-# ─── Component Governance PipReport ──────────────────────────────────────────
-# Snapshot the buildenv and feed it to pip install --report so Component
-# Governance's PipReportDetector sees every package.
+# ─── Component Governance PipReport (non-fatal) ──────────────────────────────
 $manifestDir = "$SrcDir\python\build\build-manifest"
 New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
 $reqs = & $condaExe run -n buildenv python -m pip list --format=freeze
@@ -161,8 +130,6 @@ try {
 }
 
 # ─── Build Python wheel ───────────────────────────────────────────────────────
-# scikit-build-core picks up the pre-built C++ library via CMAKE_PREFIX_PATH so
-# FetchContent is never triggered. QDK_ALLOW_DEPENDENCY_FETCH=OFF enforces this.
 Write-Host "=== python -m build --wheel ==="
 $prefix   = "$SrcDir\vcpkg_installed\x64-windows-static-md;$installDir;$DepsInstallDir"
 $buildArgs = @(
@@ -192,9 +159,7 @@ Pop-Location
 if ($wheelCode -ne 0) { throw "python -m build --wheel failed ($wheelCode)" }
 
 # ─── Copy wheel to repaired_wheelhouse ───────────────────────────────────────
-# No wheel repair needed: x64-windows-static-md statically links all vcpkg
-# deps; the only dynamic runtime deps (MSVCP140.dll, VCRUNTIME140.dll, UCRT)
-# are always present on modern Windows.
+# No wheel repair needed: x64-windows-static-md statically links all vcpkg deps.
 $distDir   = "$SrcDir\python\dist"
 $outputDir = "$SrcDir\python\repaired_wheelhouse"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null

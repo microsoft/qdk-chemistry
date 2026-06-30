@@ -3,26 +3,14 @@
     Bootstrap ms-ensureconda and create a named conda environment.
 
 .DESCRIPTION
-    PowerShell equivalent of bootstrap-conda.sh for Windows 1ES builds.
-
-    This script is meant to be *called* (not dot-sourced) from other scripts
-    or YAML powershell steps. It writes all diagnostic output via Write-Host
-    and emits exactly one line to stdout: the resolved path to conda.exe.
-    Callers capture it with:
+    Installs ms-ensureconda into a throwaway venv, uses it to bootstrap conda,
+    then creates the named environment with the requested Python version.
+    Writes all diagnostic output to Write-Host; emits exactly one line to stdout:
+    the resolved path to conda.exe. Callers capture it with:
 
         $condaExe = & "$PSScriptRoot\bootstrap-conda.ps1" -EnvName buildenv -PythonVersion 3.11
 
-    Required env var:
-        SYSTEM_ACCESSTOKEN   Pipeline access token, mapped from $(System.AccessToken).
-                             Used by the azure_artifacts_conda_auth plugin that is
-                             pre-registered in ms-ensureconda's conda distribution.
-
-    Rationale: ms-ensureconda is the Microsoft-approved conda bootstrapper for CI
-    builds. See:
-        https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
-    All network access goes through the Azure Artifacts feed (1ES CFSClean blocks
-    public conda channels). The azure_artifacts_conda_auth plugin reads
-    ARTIFACTS_CONDA_TOKEN; we set it to SYSTEM_ACCESSTOKEN before every conda call.
+    Requires SYSTEM_ACCESSTOKEN to be set (mapped from $(System.AccessToken)).
 #>
 param(
     # Name of the conda environment to create (e.g. "buildenv" or "testenv").
@@ -46,8 +34,7 @@ function _Bootstrap {
 
     Write-Host "Installing $ENSURECONDA_PKG and bootstrapping conda..."
 
-    # Use a throwaway venv so we don't fight PEP 668 (externally-managed Python).
-    # Clean any stale venv first (idempotent on retries / self-hosted agents).
+    # Throwaway venv avoids PEP 668 issues; cleaned on retries.
     $bootstrapVenv = Join-Path $env:TEMP "qdk-bootstrap-venv-$EnvName"
     Remove-Item -Recurse -Force $bootstrapVenv -ErrorAction SilentlyContinue
     python -m venv $bootstrapVenv
@@ -57,8 +44,7 @@ function _Bootstrap {
     & $venvPy -m pip install --quiet $ENSURECONDA_PKG 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "ms-ensureconda install failed ($LASTEXITCODE)" }
 
-    # ms-ensureconda --envfile writes a shell-sourceable KEY=VALUE file with
-    # CONDA_EXE, CONDA_BASH_HOOK, etc. We parse CONDA_EXE from it.
+    # Parse CONDA_EXE from the KEY=VALUE envfile written by ms-ensureconda.
     $condaEnvFile = Join-Path $env:TEMP "qdk-ensureconda-$EnvName.env"
     $env:ARTIFACTS_CONDA_TOKEN = $env:SYSTEM_ACCESSTOKEN
     & $venvPy -m ensureconda --envfile $condaEnvFile 2>&1 | Out-Host
@@ -73,14 +59,11 @@ function _Bootstrap {
     }
     Write-Host "conda: $condaExe  ($( & $condaExe --version 2>&1 ))"
 
-    # Remove any pre-existing env (idempotent on self-hosted agents and retries).
+    # Remove any pre-existing env (idempotent).
     & $condaExe env remove -y -n $EnvName 2>&1 | Out-Null
     $LASTEXITCODE = 0  # env remove exits 1 when env doesn't exist; ignore
 
-    # Public channels (conda.anaconda.org, repo.anaconda.com) are blocked under
-    # 1ES network isolation (CFSClean). Force all installs through the Azure
-    # Artifacts feed, which proxies `main` and `conda-forge` as named subpaths.
-    # The `main` channel carries python + pip; `conda-forge` is a fallback.
+    # Route all installs through the Azure Artifacts feed (proxies conda main + conda-forge).
     $env:ARTIFACTS_CONDA_TOKEN = $env:SYSTEM_ACCESSTOKEN
     & $condaExe create --override-channels `
         --channel "$CONDA_FEED_ROOT/main" `
@@ -89,7 +72,6 @@ function _Bootstrap {
     if ($LASTEXITCODE -ne 0) { throw "conda create '$EnvName' failed ($LASTEXITCODE)" }
     Write-Host "Conda env '$EnvName' created with Python $PythonVersion."
 
-    # Return the resolved conda exe path (captured by caller).
     return $condaExe
 }
 
@@ -109,5 +91,4 @@ while ($true) {
     }
 }
 
-# Emit only the conda exe path to stdout; callers capture this line.
 Write-Output $condaExe

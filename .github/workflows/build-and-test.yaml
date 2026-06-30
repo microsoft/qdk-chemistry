@@ -632,8 +632,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        # Standalone project at .pipelines/cmake/deps-install — includes
-        # third_party.cmake from the main project. No changes to cpp/CMakeLists.txt.
+        # Standalone project at .pipelines/cmake/deps-install; no changes to cpp/CMakeLists.txt.
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         cmake -S ".pipelines/cmake/deps-install" -B "deps-build-${{ matrix.compiler }}" -GNinja `
@@ -656,9 +655,6 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        # Build everything in the standalone deps project: this produces int2.lib
-        # (the STATIC library that archives libint2_obj) so that cmake --install
-        # succeeds. macis is internal code, excluded from the standalone project.
         cmake --build "deps-build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
@@ -666,9 +662,6 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        # cmake --install fires all FetchContent sub-project install() rules registered
-        # in this build tree. Generated config files use ${_IMPORT_PREFIX} (relative to
-        # the config file) — no hardcoded paths; path-independent across runners.
         cmake --install "deps-build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake install (deps) failed ($LASTEXITCODE)" }
 
@@ -685,8 +678,7 @@ jobs:
     - name: Configure CMake
       shell: pwsh
       run: |
-        # Always configure fresh. Pre-installed deps are found via CMAKE_PREFIX_PATH;
-        # FetchContent is disabled to enforce use of the installed copies.
+        # Pre-installed deps are found via CMAKE_PREFIX_PATH; FetchContent is disabled.
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
@@ -751,8 +743,6 @@ jobs:
         $prefix = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }};${{ github.workspace }}\install-${{ matrix.compiler }};${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         Push-Location python
         # plugins (pyscf) do not build on Windows; install the test extra only.
-        # QDK_ALLOW_DEPENDENCY_FETCH=OFF: fail fast if the installed qdk is not
-        # reused (avoids a silent multi-hour rebuild of the C++ stack from source).
         python -m pip install -v ".[test]" `
           --config-settings=cmake.args="-GNinja" `
           --config-settings=cmake.define.CMAKE_PREFIX_PATH="$prefix" `

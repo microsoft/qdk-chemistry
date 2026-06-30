@@ -1,15 +1,11 @@
 # Step template: Set up MSVC x64 developer environment.
-#
-# Imports vcvarsall x64, exports all changed env vars to subsequent ADO steps,
+# Imports vcvarsall x64, exports changed env vars to subsequent ADO steps,
 # resolves the MSVC toolset version (MSVC_TOOLSET), and locates cl.exe (CL_PATH).
-# Also ensures vcpkg is available and overrides VCPKG_ROOT to the standalone copy.
 #
-# Outputs (set as ADO pipeline variables for subsequent steps):
+# Outputs:
 #   MSVC_TOOLSET  — e.g. "14.51.36231"  (used in dep cache keys)
 #   CL_PATH       — absolute path to cl.exe
-#   VCPKG_ROOT    — path to the standalone vcpkg installation
-#
-# No parameters — always targets x64.
+#   VCPKG_ROOT    — path to the vcpkg installation
 
 steps:
 - pwsh: |
@@ -78,7 +74,7 @@ steps:
         if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
         Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot"
     }
-    # vcvarsall sets VCPKG_ROOT to VS's bundled copy; override it to the standalone
-    # installation so vcpkg.exe doesn't warn about the mismatch.
+    # Override VCPKG_ROOT: vcvarsall sets it to VS's bundled copy, which may
+    # differ from our standalone installation.
     Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot"
   displayName: Set up MSVC environment
