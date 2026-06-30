@@ -1,4 +1,4 @@
-parameters:
+﻿parameters:
 - name: march
   type: string
   default: x86-64-v3
@@ -47,14 +47,14 @@ steps:
 # with Cache@2 multi-line `path`: the task passes both lines as a single tar
 # argument, causing "could not chdir" at save time. Two tasks work reliably.
 - task: Cache@2
-  displayName: Restore / save vcpkg dependency cache
+  displayName: Restore/save vcpkg dependency cache
   inputs:
     key: '"windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
 - task: Cache@2
-  displayName: Restore C++ deps install cache
+  displayName: Restore/save C++ deps install cache
   inputs:
     key: '"windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" | "$(DEPS_FILES_HASH)"'
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
@@ -72,7 +72,7 @@ steps:
         -ClPath         "$(CL_PATH)" `
         -PythonVersion  "${{ parameters.pythonVersion }}" `
         -DevTag         "${{ parameters.devTag }}"
-  displayName: Build C++ library, run tests, and build Python wheel
+  displayName: Build C++ library, run tests, build Python wheel
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     OMP_NUM_THREADS: '2'
