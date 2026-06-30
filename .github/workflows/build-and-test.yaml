@@ -630,11 +630,12 @@ jobs:
       shell: pwsh
       run: |
         # If the cached CMakeCache.txt was written on a runner with a different
-        # workspace base path (e.g. D:\a\ vs D:\a\_work\) the cached build.ninja
-        # files will reference stale absolute paths and cmake/ninja will fail.
-        # Detect this by checking whether the current workspace path appears in
-        # CMakeCache.txt (case-insensitive, forward-slash-normalised) and, if not,
-        # wipe the build directory so the configure + build steps run from scratch.
+        # workspace base path (e.g. D:\a\ vs D:\a\_work\) cmake configure will
+        # error: "source directory mismatch". Fix by removing only CMakeCache.txt
+        # and the top-level CMakeFiles/*.cmake infrastructure files — NOT the
+        # compiled artefacts in CMakeFiles/<target>.dir/ or _deps/.
+        # cmake reconfigures with the new paths; Ninja reuses the existing
+        # .lib/.obj outputs and skips recompilation entirely.
         $buildDir = "cpp/build-${{ matrix.compiler }}"
         $cacheFile = "$buildDir/CMakeCache.txt"
         if (-not (Test-Path $cacheFile)) {
@@ -646,7 +647,14 @@ jobs:
         $content = (Get-Content $cacheFile -Raw).ToLower().Replace('\', '/')
         if ($content -notmatch [regex]::Escape($ws)) {
           Write-Host "Workspace path mismatch in cached CMakeCache.txt (expected: $ws)"
-          Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
+          Write-Host "Removing CMake metadata only — compiled artifacts preserved"
+          Remove-Item "$buildDir/CMakeCache.txt" -Force -ErrorAction SilentlyContinue
+          if (Test-Path "$buildDir/CMakeFiles") {
+            # Remove only top-level infrastructure files; object subdirectories
+            # (CMakeFiles/<target>.dir/, _deps/, etc.) are intentionally kept.
+            Get-ChildItem "$buildDir/CMakeFiles" -File -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+          }
           "cache-valid=false" >> $env:GITHUB_OUTPUT
         } else {
           Write-Host "Cached build directory paths match current workspace"
