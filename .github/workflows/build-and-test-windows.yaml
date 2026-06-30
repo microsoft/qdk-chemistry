@@ -15,11 +15,6 @@ on:
         required: false
         default: false
         type: boolean
-      rebuild_dep_cache:
-        description: Rebuild dependency cache from scratch (ignore existing cache)
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,22 +31,19 @@ env:
 
 jobs:
   # ----------------------------------------------------------------------------
-  # Job 1: build and cache the (slow) external C++ dependencies.
+  # Job 1: build and cache the slow external C++ dependencies.
   #
-  # Builds ONLY the slow FetchContent dependency targets
-  # (libint2/gauxc/ecpint/blaspp/lapackpp). With MSVC this can take several
-  # hours, so the build is RESUMABLE: the build dir is cached after every run
-  # (complete -> stable key; partial -> per-run key), and the next run restores
-  # the furthest progress and lets Ninja continue. Once a complete cache exists
-  # the build is skipped entirely. The job timeout is 12 hours.
+  # Builds ONLY the slow FetchContent targets (libint2/gauxc/ecpint/blaspp/
+  # lapackpp) plus vcpkg packages. The complete build is cached under an exact
+  # content-hash key. Subsequent runs skip this job entirely on a cache hit.
+  # To force a full rebuild, bump DEPS_CACHE_VERSION in the env block above.
   # ----------------------------------------------------------------------------
   deps:
     name: ${{ matrix.compiler }} - Dependencies
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=windows-2025-1espt, 'JobId=qdk_chemistry-win-deps-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
-    timeout-minutes: 720
+    timeout-minutes: 360
     permissions:
       contents: read
-      actions: write  # prune stale dependency caches
     strategy:
       fail-fast: false
       matrix:
@@ -70,27 +62,18 @@ jobs:
 
     - name: Restore dependency cache
       id: cache
-      if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: |
           vcpkg_installed
           cpp/build-${{ matrix.compiler }}
-        # Exact key = a completed build. restore-keys prefix = the furthest
-        # partial build from a previous (timed-out) run, for resuming.
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
-        restore-keys: |
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-partial-
 
     - name: Install vcpkg dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        if (Test-Path "vcpkg_installed/${{ env.VCPKG_TRIPLET }}/lib") {
-          Write-Host "vcpkg dependencies already present (restored from cache); skipping install."
-          exit 0
-        }
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         & "$vcpkg\vcpkg.exe" install `
@@ -104,13 +87,6 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        # Skip reconfigure if a partial build dir already exists: re-running
-        # cmake touches build system files which causes Ninja to treat compiled
-        # objects as stale and rebuild from scratch instead of resuming.
-        if (Test-Path "cpp/build-${{ matrix.compiler }}/CMakeCache.txt") {
-          Write-Host "Build dir already configured (restored from partial cache); skipping reconfigure."
-          exit 0
-        }
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
@@ -131,13 +107,8 @@ jobs:
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 
-    - name: Build dependency targets (resumable, time-boxed)
-      id: build
+    - name: Build dependency targets
       if: steps.cache.outputs.cache-hit != 'true'
-      # Kept under the 12h job cap (accounting for vcpkg + download overhead) so
-      # the resumable partial cache is saved before the job is force-cancelled.
-      # The next run restores this progress and continues.
-      timeout-minutes: 630
       shell: pwsh
       run: |
         # libint2_cxx is a CMake INTERFACE target (no Ninja phony); libint2_obj is
@@ -145,8 +116,8 @@ jobs:
         cmake --build "cpp/build-${{ matrix.compiler }}" --target libint2_obj ecpint gauxc blaspp lapackpp
         if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
 
-    - name: Save dependency cache (complete)
-      if: ${{ always() && steps.build.outcome == 'success' }}
+    - name: Save dependency cache
+      if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: |
@@ -154,40 +125,6 @@ jobs:
           cpp/build-${{ matrix.compiler }}
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
-
-    - name: Save dependency cache (partial, for resume)
-      if: ${{ always() && (steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
-      uses: actions/cache/save@v5
-      with:
-        path: |
-          vcpkg_installed
-          cpp/build-${{ matrix.compiler }}
-        key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-partial-${{ github.run_id }}-${{ github.run_attempt }}
-
-    - name: Prune stale dependency caches
-      if: always()
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Best-effort: keep the newest partial (for resume) and drop older ones;
-        # once a complete build succeeds, drop all partials for this base key.
-        $base = "windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}-"
-        $keepNewestPartial = @('failure','cancelled') -contains '${{ steps.build.outcome }}'
-        try {
-          $caches = gh cache list --limit 100 --json id,key,createdAt | ConvertFrom-Json
-          $partials = $caches |
-            Where-Object { $_.key.StartsWith($base) -and $_.key.Contains('-partial-') } |
-            Sort-Object createdAt -Descending
-          $skip = if ($keepNewestPartial) { 1 } else { 0 }
-          $partials | Select-Object -Skip $skip | ForEach-Object {
-            Write-Host "Deleting stale cache: $($_.key)"
-            gh cache delete $_.id 2>$null
-          }
-        } catch {
-          Write-Host "Cache prune skipped: $_"
-        }
 
   # ----------------------------------------------------------------------------
   # Job 2: rebuild qdk against the cached dependencies, then run the C++ and
