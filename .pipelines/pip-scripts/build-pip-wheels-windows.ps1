@@ -141,7 +141,7 @@ $buildArgs = @(
     '-C=cmake.define.BUILD_SHARED_LIBS=OFF',
     '-C=cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF',
     '-C=cmake.define.QDK_ENABLE_OPENMP=OFF',
-    '-C=cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF',
+    "-C=cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=$EnableCoverage",
     '-C=cmake.define.BUILD_TESTING=OFF',
     "-C=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF",
     "-C=cmake.define.CMAKE_C_COMPILER=$ClPath",
@@ -171,5 +171,7 @@ Copy-Item $wheels[0].FullName $outputDir
 Write-Host "Wheel : $($wheels[0].Name)"
 Write-Host "Output: $outputDir"
 
-# Deferred ctest failure: publish results step has already run by this point.
+# Defer the ctest failure until after PublishTestResults@2 has had a chance to
+# upload the XML — that step runs with condition: always(), so it fires even
+# when this script throws. Re-raise here so the task still fails.
 if ($ctestCode -ne 0) { throw "ctest failed ($ctestCode)" }

@@ -1,4 +1,4 @@
-﻿parameters:
+parameters:
 - name: march
   type: string
   default: x86-64-v3
@@ -11,9 +11,6 @@
 - name: enableCoverage
   type: string
   default: 'OFF'
-- name: agentBuildDirectory
-  type: string
-  default: $(Agent.BuildDirectory)
 - name: pythonVersion
   type: string
   default: '3.11'
@@ -24,7 +21,6 @@
 steps:
 - checkout: self
   persistCredentials: true
-  path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
