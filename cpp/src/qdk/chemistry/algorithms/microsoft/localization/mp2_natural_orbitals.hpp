@@ -11,7 +11,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 #define QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE              \
   "MP2NaturalOrbitalLocalizer is deprecated; use NaturalOrbitalLocalizer " \
   "(qdk_natural_orbitals) with a wavefunction that already contains the "  \
-  "active-space 1-RDM."
+  "MP2 active-space 1-RDM."
 
 /**
  * @class MP2NaturalOrbitalLocalizer
@@ -19,7 +19,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  * orbitals
  *
  * @deprecated Use NaturalOrbitalLocalizer (qdk_natural_orbitals) with a
- * wavefunction that already contains the active-space one-particle reduced
+ * wavefunction that already contains the active-space MP2 one-particle reduced
  * density matrix (1-RDM).
  *
  * This class provides a concrete implementation of the Localizer interface
