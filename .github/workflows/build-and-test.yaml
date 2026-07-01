@@ -639,7 +639,7 @@ jobs:
           -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
           -DBUILD_SHARED_LIBS=OFF `
-          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo `
           -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\deps-install-${{ matrix.compiler }}" `
@@ -692,7 +692,7 @@ jobs:
           -DBUILD_TESTING=ON `
           -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST `
           -DVCPKG_APPLOCAL_DEPS=OFF `
-          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo `
           -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install-${{ matrix.compiler }}" `
