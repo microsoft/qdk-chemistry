@@ -17,43 +17,43 @@ namespace qdk::chemistry::algorithms {
 
 namespace detail {
 /**
- * @brief Check whether a wavefunction is exactly the mean-field determinant.
+ * @brief Check whether a wavefunction is exactly the Aufbau determinant.
  *
- * A mean-field wavefunction is represented as a single determinant with unit CI
- * coefficient.
+ * An Aufbau determinant wavefunction contains a single determinant with the
+ * canonical Aufbau occupation implied by its electron counts.
  *
  * @param wavefunction The wavefunction to check.
- * @return True if the wavefunction is exactly the mean-field determinant.
+ * @return True if the wavefunction is exactly the Aufbau determinant.
  */
-bool is_mean_field_wavefunction(
+bool is_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction);
 
 /**
- * @brief Log a warning when a localizer receives a non-mean-field wavefunction.
+ * @brief Log a warning when a localizer receives a non-Aufbau wavefunction.
  *
- * Localizers transform orbitals and return a single-reference wavefunction;
+ * Localizers transform orbitals and return an Aufbau determinant wavefunction;
  * correlated-state coefficients from a multi-determinant input are not carried
  * through the transformation.
  *
  * @param wavefunction The wavefunction to check.
  * @param localizer_name Name of the localizer issuing the warning.
  */
-void warn_if_not_mean_field_wavefunction(
+void warn_if_not_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::string& localizer_name);
 
 /**
- * @brief Create a mean-field determinant wavefunction with updated orbitals.
+ * @brief Create an Aufbau determinant wavefunction with updated orbitals.
  *
- * The returned wavefunction contains a single canonical Aufbau determinant with
- * a new set of orbitals.
+ * The returned wavefunction contains the canonical Aufbau determinant with a
+ * new set of orbitals.
  *
  * @param wavefunction The original wavefunction providing electron counts.
  * @param new_orbitals The orbitals to attach to the output wavefunction.
  * @param one_rdm_spin_traced Optional spin-traced active-space 1-RDM payload.
- * @return A mean-field determinant wavefunction with the updated orbitals.
+ * @return An Aufbau determinant wavefunction with the updated orbitals.
  */
-std::shared_ptr<data::Wavefunction> new_mean_field_wavefunction(
+std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
     std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced =
@@ -128,7 +128,7 @@ class Localizer
    * @note The specific requirements for the inputs and settings affecting
    * this method may vary by implementation. See the documentation for
    * the specific localizer being used (docstring).
-   * @note Localizers return a single mean-field determinant wavefunction with
+   * @note Localizers return a single Aufbau determinant wavefunction with
    * updated orbitals. Localizers may attach derived RDM payloads when their
    * algorithm naturally produces them.
    * @note The number of electrons is an input for the

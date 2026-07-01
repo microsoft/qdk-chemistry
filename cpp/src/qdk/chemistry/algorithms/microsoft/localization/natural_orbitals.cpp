@@ -20,7 +20,7 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   auto orbitals = wavefunction->get_orbitals();
 
   if (loc_indices_a.empty() && loc_indices_b.empty()) {
-    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   // Natural orbitals are a single spatial orbital set.
@@ -194,7 +194,7 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   }
 
   Eigen::MatrixXd diagonal_one_rdm = occupations.asDiagonal();
-  return detail::new_mean_field_wavefunction(
+  return detail::new_aufbau_determinant_wavefunction(
       wavefunction, new_orbitals,
       data::ContainerTypes::MatrixVariant(diagonal_one_rdm));
 }

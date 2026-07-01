@@ -30,7 +30,7 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
-from qdk_chemistry.algorithms.orbital_localizer import new_mean_field_wavefunction
+from qdk_chemistry.algorithms.orbital_localizer import new_aufbau_determinant_wavefunction
 from qdk_chemistry.data import Orbitals, Settings, Wavefunction
 from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
@@ -156,19 +156,19 @@ class PyscfLocalizer(OrbitalLocalizer):
             raise ValueError("loc_indices_b must be sorted")
 
         # Localization rotates the (active) orbital basis. Correlated-state coefficients
-        # are not re-expressed in the localized basis; the returned wavefunction is a
-        # single reference built from the transformed orbitals.
+        # are not re-expressed in the localized basis; the returned wavefunction is an
+        # Aufbau determinant built from the transformed orbitals.
         if len(wavefunction.get_active_determinants()) > 1:
             Logger.warn(
                 "PyscfLocalizer received a multi-determinant wavefunction. The returned wavefunction will contain "
-                "a single reference built from the transformed orbitals; correlated-state coefficients are not "
+                "an Aufbau determinant built from the transformed orbitals; correlated-state coefficients are not "
                 "preserved."
             )
 
-        # If both index vectors are empty, return a single-reference wavefunction
+        # If both index vectors are empty, return an Aufbau determinant wavefunction
         # with the original orbital coefficients unchanged.
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
-            return new_mean_field_wavefunction(wavefunction, wavefunction.get_orbitals())
+            return new_aufbau_determinant_wavefunction(wavefunction, wavefunction.get_orbitals())
 
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
@@ -255,8 +255,8 @@ class PyscfLocalizer(OrbitalLocalizer):
                 if active_alpha is not None
                 else None,
             )
-        # Return a single-reference wavefunction in the transformed orbital basis.
-        return new_mean_field_wavefunction(wavefunction, loc_orbitals)
+        # Return an Aufbau determinant wavefunction in the transformed orbital basis.
+        return new_aufbau_determinant_wavefunction(wavefunction, loc_orbitals)
 
     def name(self) -> str:
         """Return the settings for the localizer."""

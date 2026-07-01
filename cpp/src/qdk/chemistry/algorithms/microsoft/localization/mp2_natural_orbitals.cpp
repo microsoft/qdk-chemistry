@@ -22,7 +22,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
 
   // Get electron counts from settings
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();
@@ -43,7 +43,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
 
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   if (nalpha == 0 && nbeta == 0) {
@@ -165,7 +165,8 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
       orbitals->active_indices(), orbitals->inactive_indices());
-  return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
+  return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                     new_orbitals);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

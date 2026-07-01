@@ -58,14 +58,14 @@ data::Configuration _active_configuration_for_orbitals(
 }
 
 /**
- * @brief Build the canonical mean-field determinant for an orbital basis.
+ * @brief Build the canonical Aufbau determinant for an orbital basis.
  *
  * @param wavefunction Wavefunction providing total electron counts.
  * @param orbitals Orbital basis providing the number of molecular orbitals.
- * @return Canonical Hartree-Fock configuration over the full orbital space.
+ * @return Canonical Aufbau configuration over the full orbital space.
  * @throws std::invalid_argument If @p wavefunction or @p orbitals is null.
  */
-data::Configuration _mean_field_configuration(
+data::Configuration _aufbau_determinant_configuration(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -82,7 +82,7 @@ data::Configuration _mean_field_configuration(
                                                          num_orbitals);
 }
 
-bool is_mean_field_wavefunction(
+bool is_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction) {
   QDK_LOG_TRACE_ENTERING();
   if (!wavefunction) {
@@ -94,8 +94,8 @@ bool is_mean_field_wavefunction(
       return false;
     }
 
-    const auto expected_det =
-        _mean_field_configuration(wavefunction, wavefunction->get_orbitals());
+    const auto expected_det = _aufbau_determinant_configuration(
+        wavefunction, wavefunction->get_orbitals());
     const auto total_determinants = wavefunction->get_total_determinants();
     if (total_determinants.size() != 1) {
       return false;
@@ -107,21 +107,21 @@ bool is_mean_field_wavefunction(
   }
 }
 
-void warn_if_not_mean_field_wavefunction(
+void warn_if_not_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::string& localizer_name) {
   QDK_LOG_TRACE_ENTERING();
-  if (!is_mean_field_wavefunction(wavefunction)) {
+  if (!is_aufbau_determinant_wavefunction(wavefunction)) {
     QDK_LOGGER().warn(
-        "{} received a wavefunction that is not the single mean-field "
+        "{} received a wavefunction that is not the single Aufbau "
         "determinant. The returned wavefunction will contain a single "
-        "reference built from the transformed orbitals; correlated-state "
-        "coefficients are not preserved.",
+        "Aufbau determinant built from the transformed orbitals; "
+        "correlated-state coefficients are not preserved.",
         localizer_name);
   }
 }
 
-std::shared_ptr<data::Wavefunction> new_mean_field_wavefunction(
+std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
     std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced) {
@@ -133,11 +133,12 @@ std::shared_ptr<data::Wavefunction> new_mean_field_wavefunction(
     throw std::invalid_argument("New orbitals pointer cannot be nullptr");
   }
 
-  auto mean_field_det = _active_configuration_for_orbitals(
-      _mean_field_configuration(wavefunction, new_orbitals), new_orbitals);
+  auto aufbau_det = _active_configuration_for_orbitals(
+      _aufbau_determinant_configuration(wavefunction, new_orbitals),
+      new_orbitals);
   if (one_rdm_spin_traced) {
     Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(1);
-    data::ContainerTypes::DeterminantVector determinants{mean_field_det};
+    data::ContainerTypes::DeterminantVector determinants{aufbau_det};
     auto new_container = std::make_unique<data::StateVectorContainer>(
         data::ContainerTypes::VectorVariant(coeffs), determinants, new_orbitals,
         one_rdm_spin_traced, std::nullopt, "electrons",
@@ -146,7 +147,7 @@ std::shared_ptr<data::Wavefunction> new_mean_field_wavefunction(
   }
 
   auto new_container = std::make_unique<data::StateVectorContainer>(
-      mean_field_det, new_orbitals, "electrons", wavefunction->get_type());
+      aufbau_det, new_orbitals, "electrons", wavefunction->get_type());
   return std::make_shared<data::Wavefunction>(std::move(new_container));
 }
 }  // namespace detail

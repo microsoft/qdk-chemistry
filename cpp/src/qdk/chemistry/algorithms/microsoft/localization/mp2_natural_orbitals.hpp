@@ -42,9 +42,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  * 2. Compute the MP2 natural orbitals using the Hamiltonian integrals
  * 3. Transform the original orbital coefficients to the natural orbital basis
  * 4. Construct the transformed orbitals with updated coefficients
- * 5. Return a new wavefunction containing the MP2 natural orbitals with these
- *    single configuration of the input wavefunction or a single aufbau
- *    configuration if the input wavefunction has multiple configurations.
+ * 5. Return a new Aufbau determinant wavefunction containing the MP2 natural
+ *    orbitals.
  */
 class [[deprecated(QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE)]]
 MP2NaturalOrbitalLocalizer : public Localizer {

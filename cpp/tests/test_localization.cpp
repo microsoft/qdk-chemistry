@@ -101,8 +101,9 @@ TEST_F(LocalizationTest,
 
     ASSERT_NE(localized_wfn, nullptr) << localizer_name;
     EXPECT_NE(localized_wfn.get(), wfn.get()) << localizer_name;
-    EXPECT_TRUE(qdk::chemistry::algorithms::detail::is_mean_field_wavefunction(
-        localized_wfn))
+    EXPECT_TRUE(
+        qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+            localized_wfn))
         << localizer_name;
 
     const auto& [localized_alpha, localized_beta] =
@@ -1241,9 +1242,10 @@ TEST_F(LocalizationTest, NaturalOrbitals) {
     no_wfn_ptr = localizer->run(wfn_cas, active_indices, active_indices);
   });
   ASSERT_NE(no_wfn_ptr, nullptr);
-  // Check that the returned wavefunction is a mean-field determinant carrier.
-  ASSERT_TRUE(qdk::chemistry::algorithms::detail::is_mean_field_wavefunction(
-      no_wfn_ptr));
+  // Check that the returned wavefunction is an Aufbau determinant carrier.
+  ASSERT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          no_wfn_ptr));
   auto& no_orbitals = *no_wfn_ptr->get_orbitals();
 
   const auto& Ca_can = active_orbitals->get_coefficients().first;

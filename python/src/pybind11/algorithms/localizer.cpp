@@ -48,25 +48,26 @@ class LocalizerBase : public Localizer,
 
 void bind_localizer(py::module &m) {
   m.def(
-      "new_mean_field_wavefunction",
+      "new_aufbau_determinant_wavefunction",
       [](std::shared_ptr<Wavefunction> wavefunction,
          std::shared_ptr<Orbitals> orbitals) {
-        return qdk::chemistry::algorithms::detail::new_mean_field_wavefunction(
-            std::move(wavefunction), std::move(orbitals));
+        return qdk::chemistry::algorithms::detail::
+            new_aufbau_determinant_wavefunction(std::move(wavefunction),
+                                                std::move(orbitals));
       },
       py::arg("wavefunction"), py::arg("orbitals"), R"(
-Create a single-reference mean-field wavefunction for an orbital basis.
+Create an Aufbau determinant wavefunction for an orbital basis.
 
-The determinant is the canonical Aufbau mean-field determinant implied by the
-input wavefunction's electron counts and the supplied orbitals. If the orbitals
-define an active space, the determinant is projected into that active space.
+The determinant is the canonical Aufbau determinant implied by the input
+wavefunction's electron counts and the supplied orbitals. If the orbitals define
+an active space, the determinant is projected into that active space.
 
 Args:
     wavefunction (qdk_chemistry.data.Wavefunction): Wavefunction providing electron counts
     orbitals (qdk_chemistry.data.Orbitals): Orbital basis for the returned wavefunction
 
 Returns:
-    qdk_chemistry.data.Wavefunction: Single-reference wavefunction with the supplied orbitals
+    qdk_chemistry.data.Wavefunction: Aufbau determinant wavefunction with the supplied orbitals
 )");
 
   // Localizer abstract base class

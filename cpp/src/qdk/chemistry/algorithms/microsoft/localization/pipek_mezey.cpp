@@ -20,11 +20,11 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
 
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   // Early validation: Check that indices are sorted
@@ -114,7 +114,8 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   } else {
     // Localize selected orbitals
     Eigen::MatrixXd C_lmo = do_loc(coeffs_alpha, loc_indices_a);
@@ -125,7 +126,8 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   }
 }
 

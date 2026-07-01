@@ -1231,10 +1231,10 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  detail::warn_if_not_mean_field_wavefunction(wavefunction, name());
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
 
   if (loc_indices_a.empty() && loc_indices_b.empty()) {
-    return detail::new_mean_field_wavefunction(wavefunction, orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   // Get electron counts from settings
@@ -1359,7 +1359,8 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   } else {
     // Unrestricted case: UHF - only handle virtual orbitals
     const size_t num_alpha_virtual_orbitals =
@@ -1397,7 +1398,8 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_mean_field_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   }
 }
 
