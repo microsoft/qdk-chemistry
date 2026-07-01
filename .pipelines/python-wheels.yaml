@@ -264,7 +264,6 @@ extends:
                 march: ${{ target.march }}
                 buildTesting: OFF
                 enableCoverage: OFF
-                agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
 
