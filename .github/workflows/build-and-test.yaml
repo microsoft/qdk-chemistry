@@ -583,9 +583,12 @@ jobs:
 
     - name: Set up ${{ matrix.compiler }} environment
       id: env
-      uses: ./.github/actions/windows-msvc-env
-      with:
-        compiler: ${{ matrix.compiler }}
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.pipelines\install-scripts\setup-msvc-env.ps1" -Compiler "${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "setup-msvc-env.ps1 failed ($LASTEXITCODE)" }
+        "toolset=$env:MSVC_TOOLSET" >> $env:GITHUB_OUTPUT
+        "cxx-path=$env:CXX_PATH"   >> $env:GITHUB_OUTPUT
 
     - name: Set up Python
       uses: actions/setup-python@v6

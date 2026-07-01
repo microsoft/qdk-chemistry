@@ -1,6 +1,19 @@
-# Sets up the MSVC x64 developer environment for a pipeline step.
-# Imports vcvarsall x64, exports changed env vars to subsequent ADO steps via
-# ##vso logging commands, and resolves MSVC_TOOLSET, CL_PATH, and VCPKG_ROOT.
+<#
+.SYNOPSIS
+    Set up the MSVC x64 developer environment for Windows CI pipelines.
+
+.DESCRIPTION
+    Runs vcvarsall x64, discovers the C++ compiler, and exports all changed
+    environment variables to the CI system. Auto-detects GitHub Actions
+    (GITHUB_ENV set) vs Azure Pipelines (##vso commands). Sets $env:MSVC_TOOLSET
+    and $env:CXX_PATH in the current process for the calling step to read.
+
+.PARAMETER Compiler
+    'msvc' (default) to use cl.exe, or 'clang-cl' to use clang-cl.exe.
+#>
+param(
+    [string]$Compiler = 'msvc'
+)
 $ErrorActionPreference = 'Stop'
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -23,36 +36,68 @@ Get-Content $tmp | ForEach-Object {
 }
 Remove-Item $tmp
 
-# Apply to current process so Get-Command can resolve cl.exe.
+# Locate clang-cl if requested (not added by vcvarsall).
+$clangDir = $null
+if ($Compiler -eq 'clang-cl') {
+    $candidates = @(
+        "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+        "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { $clangDir = Split-Path $c; break } }
+    if (-not $clangDir) { throw "clang-cl.exe not found under $vsPath\VC\Tools\Llvm" }
+}
+
+# Apply vcvarsall changes to the current process.
 foreach ($name in $after.Keys) {
     [System.Environment]::SetEnvironmentVariable($name, $after[$name], 'Process')
 }
+if ($clangDir) { $env:PATH = "$clangDir;$env:PATH" }
 
-# Locate cl.exe — vcvarsall x64 puts it on PATH.
-$clCmd = Get-Command cl.exe -ErrorAction SilentlyContinue
-$cl = if ($clCmd) { $clCmd.Source } else { $null }
-if (-not $cl) { throw "cl.exe not found on PATH after vcvarsall x64" }
-Write-Host "cl.exe: $cl"
-& $cl 2>&1 | Select-Object -First 2 | Write-Host
-
-# Export non-PATH changes to subsequent ADO steps.
-foreach ($name in $after.Keys) {
-    if ($name -ieq 'Path') { continue }
-    if ($before[$name] -ne $after[$name]) {
-        Write-Host "##vso[task.setvariable variable=$name]$($after[$name])"
-    }
+# Resolve the compiler path.
+$cxx = if ($Compiler -eq 'clang-cl') {
+    (Get-Command clang-cl.exe -ErrorAction Stop).Source
+} else {
+    (Get-Command cl.exe -ErrorAction Stop).Source
 }
-# Prepend new PATH entries from vcvarsall.
-$beforePath = @($before['Path'] -split ';')
-$newEntries = @($after['Path'] -split ';') | Where-Object { $_ -and ($beforePath -notcontains $_) }
-$newEntries | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
+Write-Host "C++ compiler: $cxx"
+if ($Compiler -eq 'clang-cl') { & $cxx --version 2>&1 | Write-Host }
 
-# MSVC toolset version: stable identifier for dep cache keys.
+# Stable MSVC toolset version for cache keys.
 $toolsetFile = "$vsPath\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
 $toolset = (Get-Content $toolsetFile -ErrorAction Stop | Select-Object -First 1).Trim()
 Write-Host "MSVC toolset: $toolset"
-Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
-Write-Host "##vso[task.setvariable variable=CL_PATH]$cl"
+
+# Expose in current process so the calling step can read them immediately.
+$env:MSVC_TOOLSET = $toolset
+$env:CXX_PATH     = $cxx
+
+# Propagate vcvarsall env changes and CI-specific outputs.
+$beforePath    = @($before['Path'] -split ';')
+$newPathEntries = @($after['Path'] -split ';') | Where-Object { $_ -and ($beforePath -notcontains $_) }
+
+if ($env:GITHUB_ENV) {
+    # GitHub Actions: write to GITHUB_ENV / GITHUB_PATH.
+    foreach ($name in $after.Keys) {
+        if ($name -ieq 'Path') { continue }
+        if ($before[$name] -ne $after[$name]) { "$name=$($after[$name])" >> $env:GITHUB_ENV }
+    }
+    if ($clangDir) { $clangDir >> $env:GITHUB_PATH }
+    $newPathEntries | ForEach-Object { $_ >> $env:GITHUB_PATH }
+    "MSVC_TOOLSET=$toolset" >> $env:GITHUB_ENV
+    "CXX_PATH=$cxx"         >> $env:GITHUB_ENV
+} else {
+    # Azure Pipelines: use ##vso logging commands.
+    foreach ($name in $after.Keys) {
+        if ($name -ieq 'Path') { continue }
+        if ($before[$name] -ne $after[$name]) {
+            Write-Host "##vso[task.setvariable variable=$name]$($after[$name])"
+        }
+    }
+    if ($clangDir) { Write-Host "##vso[task.prependpath]$clangDir" }
+    $newPathEntries | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
+    Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
+    Write-Host "##vso[task.setvariable variable=CL_PATH]$cxx"
+}
 
 # Bootstrap vcpkg if not pre-installed.
 $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
@@ -63,8 +108,9 @@ if (Test-Path "$vcpkgRoot\vcpkg.exe") {
     git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot --depth 1
     & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
     if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
-    Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot"
+    if ($env:GITHUB_ENV) { "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
+    else                  { Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot" }
 }
-# Override VCPKG_ROOT: vcvarsall sets it to VS's bundled copy, which may
-# differ from our standalone installation.
-Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot"
+# Override VCPKG_ROOT: vcvarsall may set it to VS's bundled copy.
+if ($env:GITHUB_ENV) { "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
+else                  { Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot" }
