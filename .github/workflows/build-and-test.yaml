@@ -613,57 +613,18 @@ jobs:
           vcpkg_installed
           deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
-
-    - name: Install vcpkg dependencies
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
-        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
-        & "$vcpkg\vcpkg.exe" install `
-          --triplet ${{ env.VCPKG_TRIPLET }} `
-          --x-manifest-root="${{ github.workspace }}" `
-          --x-install-root="${{ github.workspace }}\vcpkg_installed" `
-          --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
-        if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
-
-    - name: Configure CMake (deps only)
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-        # Standalone project at .pipelines/cmake/deps-install; no changes to cpp/CMakeLists.txt.
-        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
-        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
-        cmake -S ".pipelines/cmake/deps-install" -B "deps-build-${{ matrix.compiler }}" -GNinja `
-          -DQDK_UARCH=${{ env.QDK_UARCH }} `
-          -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
-          -DBUILD_SHARED_LIBS=OFF `
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo `
-          -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
-          -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
-          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\deps-install-${{ matrix.compiler }}" `
-          -DCMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
-          -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
-          -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
-          -DQDK_ENABLE_OPENMP=OFF `
-          -DFETCHCONTENT_QUIET=OFF
-        if ($LASTEXITCODE -ne 0) { throw "CMake configure (deps) failed ($LASTEXITCODE)" }
-
-    - name: Build C++ dependencies
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-        cmake --build "deps-build-${{ matrix.compiler }}"
-        if ($LASTEXITCODE -ne 0) { throw "Dependency build failed ($LASTEXITCODE)" }
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/pip-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Install C++ dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        cmake --install "deps-build-${{ matrix.compiler }}"
-        if ($LASTEXITCODE -ne 0) { throw "CMake install (deps) failed ($LASTEXITCODE)" }
+        & "${{ github.workspace }}\.pipelines\pip-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir        "${{ github.workspace }}" `
+            -ClPath        "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType     RelWithDebInfo `
+            -DepsInstallDir "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "Dependency install failed ($LASTEXITCODE)" }
 
     - name: Save dependency cache
       if: steps.cache.outputs.cache-hit != 'true'
@@ -673,7 +634,7 @@ jobs:
           vcpkg_installed
           deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/third_party.cmake', 'cpp/cmake/patches/**', 'cpp/cmake/modules/DependencyManager.cmake', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/pip-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Configure CMake
       shell: pwsh
