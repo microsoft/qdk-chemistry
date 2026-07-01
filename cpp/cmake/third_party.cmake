@@ -60,21 +60,22 @@ handle_dependency(libint2
   ${_libint2_patch_args}
   REQUIRED
 )
-if(MSVC AND TARGET libint2_cxx)
-  # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor
-  # (Boost.Preprocessor). Apply to both FetchContent and imported targets.
-  # clang-cl rejects /Zc:preprocessor; omit it there.
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
-  else()
-    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+foreach(_libint2_cxx_target libint2_cxx Libint2::libint2_cxx)
+  if(MSVC AND TARGET ${_libint2_cxx_target})
+    # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor
+    # (Boost.Preprocessor). Apply to both the FetchContent target (libint2_cxx)
+    # and the installed imported target (Libint2::libint2_cxx).
+    # clang-cl rejects /Zc:preprocessor; omit it there.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus)
+    else()
+      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+    endif()
   endif()
-endif()
+endforeach()
 # eritest-libint2 links only to libint2-static (C library), so it misses the
 # INTERFACE flags from libint2_cxx but still needs C++11 detection.
 if(MSVC AND TARGET eritest-libint2)
-  # eritest-libint2 links only to libint2-static (C library), so it misses the
-  # INTERFACE flags from libint2_cxx but still needs C++11 detection.
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
   else()
