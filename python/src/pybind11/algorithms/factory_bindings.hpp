@@ -9,6 +9,7 @@
 #include <pybind11/stl.h>
 
 #include <memory>
+#include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <string>
 
 namespace py = pybind11;
@@ -18,7 +19,9 @@ namespace qdk::chemistry::python {
 template <typename AlgorithmType>
 void warn_if_deprecated_algorithm(const AlgorithmType& algorithm,
                                   Py_ssize_t stack_level = 2) {
-  if (const auto message = algorithm.deprecation_message()) {
+  if (const auto message =
+          qdk::chemistry::algorithms::detail::DeprecationAccess::message(
+              algorithm)) {
     if (PyErr_WarnEx(PyExc_DeprecationWarning, message->c_str(), stack_level) <
         0) {
       throw py::error_already_set();

@@ -65,11 +65,11 @@ MP2NaturalOrbitalLocalizer : public Localizer {
    */
   virtual std::string name() const final { return "qdk_mp2_natural_orbitals"; };
 
-  std::optional<std::string> deprecation_message() const final {
+ protected:
+  std::optional<std::string> _deprecation_message() const final {
     return QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE;
   }
 
- protected:
   /**
    * @brief Transform canonical orbitals into MP2 natural orbitals
    *
