@@ -119,7 +119,9 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
     cmake --install $depBuild
     if ($LASTEXITCODE -ne 0) { throw "cmake install failed for $Name ($LASTEXITCODE)" }
 
-    Remove-Item $depBuild -Recurse -Force -ErrorAction SilentlyContinue
+    if (-not $KeepBuildDir) {
+        Remove-Item $depBuild -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # ─── vcpkg install ────────────────────────────────────────────────────────────
