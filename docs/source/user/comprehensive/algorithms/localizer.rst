@@ -37,6 +37,7 @@ The ``run`` method takes a :class:`~qdk_chemistry.data.Wavefunction` instance an
 .. note::
    The returned wavefunction is a single-reference container built from the transformed orbitals.
    Localizers do not preserve a multi-configuration expansion, coupled-cluster amplitudes, or other correlated-state coefficients from the input wavefunction.
+   To obtain a correlated wavefunction in the transformed orbital basis, construct a new Hamiltonian from the returned orbitals with :doc:`HamiltonianConstructor <hamiltonian_constructor>` and run the appropriate correlated solver, such as :doc:`MultiConfigurationCalculator <mc_calculator>`.
    Some localizers may attach derived density-matrix data, such as natural-orbital occupation numbers, when those data are part of the transformation.
 
 Input requirements
