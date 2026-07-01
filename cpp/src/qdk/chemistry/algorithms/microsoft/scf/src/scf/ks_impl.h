@@ -86,13 +86,16 @@ class KSImpl : public SCFImpl {
    * must be fully initialized before calling it.
    *
    * @param P_matrix Trial density matrix
+   * @param J_out Output Coulomb matrix J
+   * @param K_out Output exchange matrix K
    * @param loc Source location of the caller (automatically captured)
    * @return std::pair containing:
    *   - first: total energy including XC in Hartree
    *   - second: Fock matrix in AO basis
    */
   std::pair<double, RowMajorMatrix> evaluate_trial_density_energy_and_fock(
-      const RowMajorMatrix& P_matrix,
+      const RowMajorMatrix& P_matrix, RowMajorMatrix& J_out,
+      RowMajorMatrix& K_out,
       const std::source_location& loc =
           std::source_location::current()) const override;
 
