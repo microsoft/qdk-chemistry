@@ -178,6 +178,7 @@ Remove-Item $libintExtract -Recurse -Force
 Write-Host "=== Installing ecpint ==="
 $ecpintSrc = "$buildDir\ecpint-src"
 git clone https://github.com/robashaw/libecpint $ecpintSrc
+git -C $ecpintSrc checkout $ecpintCommit
 
 if (-not $isClangCl) {
     Write-Host "Applying ecpint MSVC patches..."
