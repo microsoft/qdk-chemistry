@@ -39,9 +39,9 @@ std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
   return {n_alpha, n_beta};
 }
 
-std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
+ScfCalculationResult ScfSolver::_run_with_options(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    BasisOrGuessType basis_or_guess) const {
+    BasisOrGuessType basis_or_guess, bool require_gradient) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
@@ -184,7 +184,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create SCFConfig
   auto ms_scf_config = std::make_unique<qcs::SCFConfig>();
   ms_scf_config->mpi = qcs::mpi_default_input();
-  ms_scf_config->require_gradient = false;
+  ms_scf_config->require_gradient = require_gradient;
   ms_scf_config->require_polarizability = false;
   ms_scf_config->exc.xc_name = method;
   std::transform(ms_scf_config->exc.xc_name.begin(),
@@ -497,7 +497,38 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Return total energy
   double total_energy = context.result.scf_total_energy;
 
-  return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
-                                          std::move(wavefunction)));
+  std::optional<Eigen::VectorXd> gradient;
+  if (require_gradient && ms_scf_config->mpi.world_rank == 0) {
+    const auto& raw_gradient = context.result.scf_total_gradient;
+    const auto expected_size = 3 * structure->get_num_atoms();
+    if (raw_gradient.size() != expected_size) {
+      throw std::runtime_error(
+          "Internal SCF did not return the requested analytic nuclear "
+          "gradient");
+    }
+    gradient = Eigen::Map<const Eigen::VectorXd>(
+        raw_gradient.data(), static_cast<Eigen::Index>(raw_gradient.size()));
+  }
+
+  auto wavefunction_ptr =
+      std::make_shared<data::Wavefunction>(std::move(wavefunction));
+
+  return {total_energy, wavefunction_ptr, gradient};
+}
+
+ScfCalculationResult ScfSolver::run_with_analytic_gradient(
+    std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
+    BasisOrGuessType basis_or_guess) const {
+  this->lock_settings();
+  return _run_with_options(structure, charge, multiplicity, basis_or_guess,
+                           true);
+}
+
+std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
+    std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
+    BasisOrGuessType basis_or_guess) const {
+  auto result =
+      _run_with_options(structure, charge, multiplicity, basis_or_guess, false);
+  return {result.energy, result.wavefunction};
 }
 }  // namespace qdk::chemistry::algorithms::microsoft
