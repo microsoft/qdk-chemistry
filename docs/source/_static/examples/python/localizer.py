@@ -60,7 +60,9 @@ print(localized_orbitals.get_summary())
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("orbital_localizer"))
-# ['pyscf_multi', 'qdk_vvhv', 'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']
+# Example output:
+# ['pyscf_multi', 'qdk_vvhv', 'qdk_natural_orbitals',
+#  'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']
 # end-cell-list-implementations
 ################################################################################
 
