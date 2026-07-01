@@ -737,6 +737,8 @@ jobs:
 
     - name: Build & install Python package
       shell: pwsh
+      env:
+        CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
         $vcpkg = $env:VCPKG_INSTALLATION_ROOT
         if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }

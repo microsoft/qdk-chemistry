@@ -16,9 +16,13 @@ steps:
 # Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
 # Also resolves the MSVC toolset version for the dependency cache key.
-- template: steps/setup-msvc-env.yml@self
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\setup-msvc-env.ps1
+  displayName: Set up MSVC environment
 
-- template: steps/compute-deps-cache-key.yml@self
+- pwsh: |
+    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\compute-deps-cache-key.ps1" `
+        -SrcDir "$(System.DefaultWorkingDirectory)"
+  displayName: Compute dependency cache key
 
 - task: Cache@2
   displayName: Restore/save vcpkg dependency cache
