@@ -108,6 +108,16 @@
                 }
             },
             "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/SaschaWitt/ips4o.git",
+                    "commitHash": "8d5a97bb4c4048a1eef18b537f191a31462b051a"
+                }
+            },
+            "developmentDependency": false
         }
     ]
 }
