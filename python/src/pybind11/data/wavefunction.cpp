@@ -266,7 +266,10 @@ It uses variant types to support both real and complex arithmetic.
            "Check if mutual information is available")
       .def("get_mutual_information",
            &WavefunctionContainer::get_mutual_information,
-           "Get mutual information matrix for active orbitals");
+           "Get mutual information matrix for active orbitals")
+      .def("compute_s_squared", &WavefunctionContainer::compute_s_squared,
+           "Compute the expectation value of the total spin-squared operator "
+           "<S^2> from spin-dependent RDMs");
 
   // Wavefunction class
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
@@ -907,6 +910,32 @@ Raises:
 
 Examples:
     >>> s2 = wf.get_two_orbital_entropies()
+)");
+
+  wavefunction.def("compute_s_squared", &Wavefunction::compute_s_squared,
+                   R"(
+Compute the expectation value of the total spin-squared operator <S^2>.
+
+Uses the spin-dependent one- and two-particle reduced density matrices (RDMs):
+
+    <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+            - sum_{ij} Gamma^{ab}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{aa}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{bb}(i,j,j,i)
+            - 1/2 * sum_{ij} Gamma^{ab}(i,i,j,j)
+
+For a pure spin eigenstate, <S^2> = S(S+1).
+
+Returns:
+    float: The expectation value <S^2> (real-valued wavefunctions only)
+
+Raises:
+    RuntimeError: If the required spin-resolved active-space RDMs are
+                  unavailable (in particular if the orbitals do not define an MO
+                  spin axis), or if the RDMs are complex-valued (not yet
+                  supported)
+Examples:
+    >>> s_squared = wf.compute_s_squared()
 )");
 
   // RDM availability check methods
