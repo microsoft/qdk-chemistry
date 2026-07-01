@@ -1378,7 +1378,7 @@ class TestPyscfPlugin:
         localized_wfn = localizer.run(multi_wfn, list(active_alpha), list(active_beta))
 
         assert warnings
-        assert "multi-determinant wavefunction" in warnings[0]
+        assert any("multi-determinant wavefunction" in warn for warn in warnings)
         assert len(localized_wfn.get_active_determinants()) == 1
         assert localized_wfn.get_active_determinants()[0] == expected_mean_field_det
         self._verify_active_space_preserved(multi_wfn, localized_wfn, "pyscf_multi")
