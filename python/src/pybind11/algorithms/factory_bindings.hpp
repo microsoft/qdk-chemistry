@@ -112,6 +112,9 @@ See Also:
       "create",
       [](const std::string& name) -> std::unique_ptr<AlgorithmType> {
         auto instance = FactoryType::create(name);
+        if (!instance) {
+          throw std::runtime_error("Factory returned nullptr");
+        }
         warn_if_deprecated_algorithm(*instance);
         return instance;
       },

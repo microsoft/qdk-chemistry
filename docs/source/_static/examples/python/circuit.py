@@ -143,6 +143,6 @@ circuit.to_hdf5_file("example_circuit.circuit.h5")
 # Load from HDF5
 loaded_h5 = Circuit.from_hdf5_file("example_circuit.circuit.h5")
 # end-cell-serialization
-Path("example_circuit.circuit.json").unlink()
-Path("example_circuit.circuit.h5").unlink()
+Path("example_circuit.circuit.json").unlink(missing_ok=True)
+Path("example_circuit.circuit.h5").unlink(missing_ok=True)
 ################################################################################
