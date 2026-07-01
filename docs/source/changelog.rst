@@ -9,6 +9,15 @@ Version 2.0.0
 
 Work in progress
 
+Bug fixes
+---------
+
+- Fixed ROHF crash when the AO basis is linearly dependent (``n_MO < n_AO``).
+  The solver now uses the overlap-mediated projection
+  ``F_eff_AO = S C F_MO_eff C^T S`` for the rectangular MO coefficient matrix,
+  matching the RHF/UHF treatment in the reduced MO space (`#543
+  <https://github.com/microsoft/qdk-chemistry/issues/543>`_).
+
 Breaking changes
 -----------------
 
