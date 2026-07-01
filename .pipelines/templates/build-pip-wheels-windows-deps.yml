@@ -9,7 +9,6 @@ parameters:
 steps:
 - checkout: self
   persistCredentials: true
-  path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 

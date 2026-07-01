@@ -105,7 +105,7 @@ if (Test-Path "$vcpkgRoot\vcpkg.exe") {
     Write-Host "vcpkg already available at $vcpkgRoot"
 } else {
     Write-Host "vcpkg not found — bootstrapping into $vcpkgRoot"
-    git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot --depth 1
+    git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
     & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
     if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
     if ($env:GITHUB_ENV) { "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
