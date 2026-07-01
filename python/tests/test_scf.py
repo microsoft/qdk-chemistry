@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 import re
 
 import numpy as np
@@ -68,6 +69,30 @@ def create_oxygen_structure():
     symbols = ["O"]
     coords = np.array([[0.00000000000, 0.00000000000, 0.00000000000]])
     return Structure(symbols, coords)
+
+
+_OBENZOSEMIQUINONE_XYZ = """\
+13
+o-benzosemiquinone
+O    3.7321    1.3450    0.0000
+O    2.0000    0.3450    0.0000
+C    3.7321    0.3450    0.0000
+C    2.8660   -0.1550    0.0000
+C    4.5981   -0.1550    0.0000
+C    2.8660   -1.1550    0.0000
+C    4.5981   -1.1550    0.0000
+C    3.7321   -1.6550    0.0000
+H    5.1350    0.1550    0.0000
+H    2.3291   -1.4650    0.0000
+H    5.1350   -1.4650    0.0000
+H    3.7321   -2.2750    0.0000
+H    4.2690    1.6550    0.0000
+"""
+
+
+def create_obenzosemiquinone_structure():
+    """Create o-benzosemiquinone radical (from issue #543)."""
+    return Structure.from_xyz(_OBENZOSEMIQUINONE_XYZ)
 
 
 class TestScfSolver:
@@ -460,3 +485,19 @@ class TestScfSolver:
         # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
+
+    def test_rohf_linearly_dependent_basis_issue_543(self):
+        """ROHF must not raise when n_MO < n_AO (regression for issue #543)."""
+        structure = create_obenzosemiquinone_structure()
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("enable_gdm", False)
+
+        energy, wavefunction = scf_solver.run(structure, 0, 2, "def2-tzvp")
+        orbitals = wavefunction.get_orbitals()
+
+        assert isinstance(energy, float)
+        assert math.isfinite(energy)
+        assert orbitals.is_restricted()
+
