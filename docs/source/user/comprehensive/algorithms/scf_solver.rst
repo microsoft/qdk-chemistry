@@ -52,13 +52,6 @@ Basis set or initial guess
 
 .. rubric:: Creating a :term:`SCF` solver
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/scf_solver.py
@@ -66,17 +59,17 @@ Basis set or initial guess
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-.. rubric:: Configuring settings
-
-Settings can be modified using the ``settings()`` object.
-See `Available settings`_ below for a complete list of options.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+.. rubric:: Configuring settings
+
+Settings can be modified using the ``settings()`` object.
+See `Available settings`_ below for a complete list of options.
 
 .. tab:: Python API
 
@@ -85,14 +78,14 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-.. rubric:: Running the calculation
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-run
-      :end-before: // end-cell-run
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -101,16 +94,16 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-.. rubric:: Alternative run options
-
-The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-alternative-run
-      :end-before: // end-cell-alternative-run
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
+
+.. rubric:: Alternative run options
+
+The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
 
 .. tab:: Python API
 
@@ -118,6 +111,13 @@ The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an 
       :language: python
       :start-after: # start-cell-alternative-run
       :end-before: # end-cell-alternative-run
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-alternative-run
+      :end-before: // end-cell-alternative-run
 
 
 Available settings
@@ -155,19 +155,19 @@ Available implementations
 QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ScfSolver` provides a unified interface to :term:`SCF` calculations across various quantum chemistry packages.
 You can discover available implementations programmatically:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. _qdk-scf-native:
 

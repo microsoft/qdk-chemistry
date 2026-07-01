@@ -18,6 +18,13 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
 
 def create_water_structure():
     """Create a water molecule structure.
@@ -86,6 +93,7 @@ class TestMCCalculator:
         )
         assert wfn_fci.size() == 441
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_mc_cas_entropies_doublet(self):
         """Test MACIS CAS entropy evaluation on NO doublet with full active space."""
         # Create NO molecule
@@ -166,7 +174,7 @@ class TestMCCalculator:
         """Test MACIS CAS entropy evaluation on H2O singlet with full active space."""
         h2o = create_water_structure()
 
-        # use pyscf for ROHF
+        # use default SCF solver for RHF
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("scf_type", "restricted")
         mc_calculator = algorithms.create("multi_configuration_calculator", "macis_cas")

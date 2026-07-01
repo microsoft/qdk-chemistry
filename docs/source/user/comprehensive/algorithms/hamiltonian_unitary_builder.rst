@@ -10,9 +10,9 @@ Overview
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
-QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
-These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
+QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
+
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -143,6 +143,64 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
 
+.. _zassenhaus-builder:
+
+Zassenhaus product formulas
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"zassenhaus"``
+
+The Zassenhaus decomposition approximates the time-evolution operator by recursively generating commutator correction terms.
+For a Hamiltonian :math:`H = \sum_j \alpha_j P_j`, the first-order approximation is the Trotter product, and higher-order approximations introduce explicit product-formula factors for lower-order commutator corrections:
+
+**First-order Zassenhaus** (:math:`p = 1`):
+Matches the first-order Trotter product formula.
+
+**Second-order Zassenhaus** (:math:`p = 2`):
+
+.. math::
+
+   e^{-iHt} \approx \left[ \prod_{j > k} e^{-\frac{1}{2} [H_j, H_k] t^2} \cdot \prod_j e^{-i H_j t} \right]^N
+
+**Higher orders** (up to :math:`p = 4`) recursively construct explicit nested-commutator terms. Unlike Trotter-Suzuki formulas where step count is used to reduce commutator errors, the Zassenhaus builder computes low-order corrections explicitly.
+
+The number of divisions can be specified directly (``num_divisions``) or computed automatically from a ``target_accuracy`` using one of two bounds:
+
+Commutator bound (default)
+   A tighter bound based on nested commutators of the first omitted exponent:
+   :math:`N = \lceil \frac{\|C_{p+1}(-iH_1, \dots, -iH_m)\|^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil`
+
+Naive bound
+   A looser bound using the absolute coefficient sum of the first omitted exponent and the 1-norm of the Hamiltonian:
+   :math:`N = \lceil \frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil`
+
+When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 3, and 4 to select the order that minimizes the total gate count (product of step reps and step terms) for the target accuracy.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Zassenhaus order (0 for auto, or 1 to 4). Default is 0.
+   * - ``target_accuracy``
+     - float
+     - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
+   * - ``num_divisions``
+     - int
+     - Explicit number of Zassenhaus steps :math:`N`. When set to 0 (default), determined from ``target_accuracy``.
+   * - ``error_bound``
+     - str
+     - Error bound strategy: ``"commutator"`` (default, tighter) or ``"naive"`` (simpler).
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+
+
 Consuming term partitions
 -------------------------
 
@@ -209,12 +267,103 @@ Example::
     #   exp(-i * +0.2500 * XIII)
 
 
+.. _block-encoding-builder:
+
+Block encoding
+~~~~~~~~~~~~~~
+
+Block encoding is a technique for embedding a non-unitary operator (such as :math:`H / \lambda`) into a larger unitary circuit.
+Given an :math:`n`-qubit Hamiltonian :math:`H`, a block encoding uses :math:`a` ancilla qubits to construct a unitary :math:`U` such that:
+
+.. math::
+
+   (\langle 0|^{\otimes a} \otimes I)\, U\, (|0\rangle^{\otimes a} \otimes I) = \frac{H}{\lambda}
+
+where :math:`\lambda \geq \|H\|` is a normalization factor (typically the L1 norm of the coefficients).
+The Hamiltonian is encoded in the top-left block of the larger unitary — hence the name "block encoding."
+
+Block encodings are the foundation for quantum algorithms such as qubitization, QSVT, and quantum linear system solvers.
+QDK/Chemistry currently provides the **LCU** (Linear Combination of Unitaries) method for constructing block encodings.
+
+.. _lcu-builder:
+
+LCU (Linear Combination of Unitaries)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. rubric:: Factory name: ``"lcu"``
+
+The LCU builder constructs a block encoding of :math:`H / \lambda` using the PREPARE–SELECT pattern :cite:`Childs2012`.
+For a Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` with :math:`\lambda = \sum_j |\alpha_j|`:
+
+**PREPARE oracle**
+
+Prepares an ancilla register in the state :math:`|\psi\rangle = \sum_j \sqrt{|\alpha_j| / \lambda}\, |j\rangle` using :math:`\lceil \log_2 L \rceil` qubits.
+
+**SELECT oracle**
+
+Applies the corresponding Pauli string controlled on the ancilla index:
+
+.. math::
+
+   \text{SELECT} = \sum_{j=0}^{L-1} |j\rangle\langle j| \otimes P_j
+
+with sign corrections absorbed into a phase vector.
+
+**Block encoding circuit**
+
+The composite circuit :math:`\text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}` realizes the block encoding:
+
+.. math::
+
+   (\langle 0| \otimes I)\, \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}\, (|0\rangle \otimes I) = \frac{H}{\lambda}
+
+**Quantum walk operator**
+
+When ``quantum_walk=True``, the builder wraps the block encoding with a reflection to form the qubitization walk operator:
+
+.. math::
+
+   W = (2|0\rangle\langle 0| - I) \cdot \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}
+
+The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :math:`E_k` are the eigenvalues of :math:`H`.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``power``
+     - int
+     - The power to which the walk operator is raised. Default is 1.
+   * - ``quantum_walk``
+     - bool
+     - If ``True``, wrap the block encoding with a reflection to form the qubitization walk operator. If ``False``, produce the plain block encoding. Default is ``False``.
+   * - ``tolerance``
+     - float
+     - Minimum L1 norm below which the decomposition is considered ill-defined. Default is 1e-12.
+
+.. rubric:: Example
+
+::
+
+    from qdk_chemistry.algorithms import registry
+
+    lcu = registry.create("hamiltonian_unitary_builder", "lcu")
+    lcu.settings().update({"quantum_walk": True})
+    unitary = lcu.run(qubit_hamiltonian)
+
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
+
+
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or linear combinations of unitaries
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
-- :doc:`PhaseEstimation <phase_estimation>`: One consumer of time-evolution unitaries
+- :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading
 ---------------

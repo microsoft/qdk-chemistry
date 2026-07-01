@@ -12,6 +12,7 @@ helps ensure documentation correctness and trustworthiness.
 # --------------------------------------------------------------------------------------------
 
 import importlib.util
+import os
 import re as _re
 import subprocess
 import sys
@@ -79,25 +80,34 @@ def run_snippet(code: str, snippet_index: int, readme_path: Path, log_dir: Path 
     """
     with tempfile.TemporaryDirectory() as td:
         fn = Path(td) / f"snippet_{snippet_index}.py"
+        out_path: Path | None = None
+        err_path: Path | None = None
         fn.write_text(code, encoding="utf-8")
         if log_dir:
             log_dir.mkdir(parents=True, exist_ok=True)
             out_path = log_dir / f"snippet_{snippet_index}.stdout.txt"
             err_path = log_dir / f"snippet_{snippet_index}.stderr.txt"
             meta_path = log_dir / f"snippet_{snippet_index}.meta.txt"
-            meta_path.write_text(f"readme: {readme_path}\nsnippet_index: {snippet_index}\n")
+            meta_path.write_text(f"readme: {readme_path}\nsnippet_index: {snippet_index}\n", encoding="utf-8")
         try:
             proc = subprocess.run(
-                [sys.executable, "-B", str(fn)], cwd=td, capture_output=True, text=True, check=True, timeout=60
+                [sys.executable, "-B", str(fn)],
+                cwd=td,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+                timeout=60,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
         except (subprocess.CalledProcessError, OSError) as exc:
-            if log_dir:
-                out_path.write_text(getattr(exc, "stdout", "") or "")
-                err_path.write_text(getattr(exc, "stderr", "") or "")
+            if out_path is not None and err_path is not None:
+                out_path.write_text(getattr(exc, "stdout", "") or "", encoding="utf-8")
+                err_path.write_text(getattr(exc, "stderr", "") or "", encoding="utf-8")
             return False
-        if log_dir:
-            out_path.write_text(proc.stdout or "")
-            err_path.write_text(proc.stderr or "")
+        if out_path is not None and err_path is not None:
+            out_path.write_text(proc.stdout or "", encoding="utf-8")
+            err_path.write_text(proc.stderr or "", encoding="utf-8")
         return True
 
 
