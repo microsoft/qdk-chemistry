@@ -543,3 +543,148 @@ jobs:
           done
           exit $MAKE_EXIT_CODE
         fi
+
+  test-with-qdk-branch:
+    name: Full Test with QDK Branch
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
+    env:
+      BUILD_DIR: cpp/build
+      QSHARP_PYTHON_TELEMETRY: 'false'
+      CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
+      CTEST_OUTPUT_ON_FAILURE: 1
+      CMAKE_BUILD_PARALLEL_LEVEL: 32
+      QDK_UARCH: x86-64-v3
+      QDK_BRANCH: iadavis/multi-callable-input-defunc
+    steps:
+    - name: Free up disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /usr/local/lib/android || true
+        sudo rm -rf /opt/ghc || true
+        sudo rm -rf /opt/hostedtoolcache/go || true
+        sudo rm -rf /opt/hostedtoolcache/Ruby || true
+        sudo apt-get clean || true
+
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Set up environment paths
+      run: |
+        echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+        cache: pip
+
+    - name: Install Linux system packages
+      run: |
+        MAX_WAIT_SECONDS=300
+        WAIT_INTERVAL_SECONDS=5
+        ELAPSED_SECONDS=0
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock (elapsed: ${ELAPSED_SECONDS}s)..."
+          sleep "${WAIT_INTERVAL_SECONDS}"
+          ELAPSED_SECONDS=$((ELAPSED_SECONDS + WAIT_INTERVAL_SECONDS))
+          if [ "${ELAPSED_SECONDS}" -ge "${MAX_WAIT_SECONDS}" ]; then
+            echo "Error: dpkg lock not released after ${MAX_WAIT_SECONDS}s."
+            exit 1
+          fi
+        done
+
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          ninja-build \
+          cmake \
+          libeigen3-dev \
+          libboost-all-dev \
+          libhdf5-dev \
+          libopenblas-dev \
+          libgfortran5 \
+          pkg-config
+
+    - name: Cache C++ dependency install
+      id: cache-cpp-deps
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ env.CPP_DEPS_PREFIX }}
+        key: >-
+          cpp-deps-Linux-x86-64-v3-
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+
+    - name: Add C++ deps prefix to CMake search path
+      run: |
+        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
+
+    - name: Install C++ dependencies
+      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
+      env:
+        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
+        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        KEEP_BUILD_DIR: 1
+      run: |
+        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
+          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
+
+    - name: Configure and build C++
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DQDK_ENABLE_OPENMP=ON \
+          -DBUILD_TESTING=OFF
+        cmake --build "$BUILD_DIR"
+
+    - name: Install C++ library
+      run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
+
+    - name: Install Python package
+      working-directory: python
+      env:
+        CMAKE_BUILD_TYPE: Release
+      run: |
+        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+        python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Build and install qdk from branch (overwrite released version)
+      run: |
+        git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
+        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        echo "Installed qdk from branch: ${QDK_BRANCH}"
+        python -m pip show qdk
+
+    - name: Run Python tests
+      env:
+        OMP_NUM_THREADS: 4
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
+      working-directory: python
+      run: |
+        set -e
+        mkdir -p ../test-results
+        pytest \
+          --junitxml=../test-results/pytest_report.xml \
+          -v \
+          --tb=short
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: qdk-branch-test-results
+        path: test-results/
