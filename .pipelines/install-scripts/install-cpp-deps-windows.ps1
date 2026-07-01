@@ -48,15 +48,13 @@ New-Item -ItemType Directory -Force -Path $DepsInstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $buildDir       | Out-Null
 
 # ─── Memory-aware build parallelism ──────────────────────────────────────────
-if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
-    $cpu   = [int]$env:NUMBER_OF_PROCESSORS
-    $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
-    Write-Host "CPUs=$cpu  RAM=${ramGB}GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
-}
-# libint2 TUs under MSVC peak at several GB; cap separately to avoid OOM.
-$libintJobs = [math]::Min(4, [int]$env:CMAKE_BUILD_PARALLEL_LEVEL)
+# Cap by RAM (~3.5 GB/job) to avoid OOM on machines with many cores but limited
+# memory. On typical CI runners this equals NUMBER_OF_PROCESSORS.
+$cpu   = [int]$env:NUMBER_OF_PROCESSORS
+$ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+$jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
+Write-Host "CPUs=$cpu  RAM=${ramGB}GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+$env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 
 $isClangCl = $ClPath -imatch 'clang'
 
@@ -107,19 +105,15 @@ $commonArgs = @(
     '-DFETCHCONTENT_QUIET=OFF'
 )
 
-function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs, [int]$Jobs = 0) {
+function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) {
     $depBuild = "$buildDir\$Name-build"
     Write-Host "--- cmake configure: $Name ---"
     cmake -S $SrcPath -B $depBuild @commonArgs @ExtraArgs
     if ($LASTEXITCODE -ne 0) { throw "cmake configure failed for $Name ($LASTEXITCODE)" }
 
-    $savedJobs = $env:CMAKE_BUILD_PARALLEL_LEVEL
-    if ($Jobs -gt 0) { $env:CMAKE_BUILD_PARALLEL_LEVEL = $Jobs }
-    Write-Host "--- cmake build: $Name (jobs=$($env:CMAKE_BUILD_PARALLEL_LEVEL)) ---"
+    Write-Host "--- cmake build: $Name (jobs=$env:CMAKE_BUILD_PARALLEL_LEVEL) ---"
     cmake --build $depBuild
-    $buildCode = $LASTEXITCODE
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = $savedJobs
-    if ($buildCode -ne 0) { throw "cmake build failed for $Name ($buildCode)" }
+    if ($LASTEXITCODE -ne 0) { throw "cmake build failed for $Name ($LASTEXITCODE)" }
 
     Write-Host "--- cmake install: $Name ---"
     cmake --install $depBuild
@@ -177,7 +171,7 @@ if (-not $isClangCl) {
     finally { Pop-Location }
 }
 
-Invoke-CMakeDep 'libint2' $libintSrc @('-DBUILD_TESTING=OFF') $libintJobs
+Invoke-CMakeDep 'libint2' $libintSrc @('-DBUILD_TESTING=OFF')
 Remove-Item $libintExtract -Recurse -Force
 
 # ─── ecpint ──────────────────────────────────────────────────────────────────
