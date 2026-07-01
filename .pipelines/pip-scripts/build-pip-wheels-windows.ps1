@@ -1,13 +1,11 @@
 <#
 .SYNOPSIS
-    Build the C++ library, run tests, and produce a Python wheel.
+    Build a Python wheel for qdk-chemistry on Windows.
 
 .DESCRIPTION
-    Always invoked (unlike the deps script which skips on cache hit). Configures
-    and builds qdk against pre-installed deps from $DepsInstallDir, runs ctest,
-    installs the C++ library, bootstraps a conda environment, and builds the wheel
-    with scikit-build-core. No wheel repair needed: x64-windows-static-md statically
-    links all vcpkg deps.
+    Bootstraps a conda environment, installs build tooling, then builds the
+    wheel with scikit-build-core. C++ deps are pre-installed by the deps job
+    and found via CMAKE_PREFIX_PATH. Mirrors the approach of build-pip-wheels.sh.
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
@@ -28,9 +26,6 @@ if (-not $VcpkgRoot) {
 }
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
 
-$buildDir  = "$SrcDir\cpp\build-msvc"
-$installDir = "$SrcDir\install-msvc"
-
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
@@ -38,62 +33,6 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
-
-# ─── CMake configure + full build ────────────────────────────────────────────
-Write-Host "=== CMake configure (full build) ==="
-$vcpkgInstalled = "$SrcDir\vcpkg_installed\x64-windows-static-md"
-$cmakeArgs = @(
-    '-S', "$SrcDir\cpp",
-    '-B', $buildDir,
-    '-GNinja',
-    "-DQDK_UARCH=$March",
-    "-DQDK_CHEMISTRY_ENABLE_COVERAGE=$EnableCoverage",
-    '-DQDK_CHEMISTRY_ENABLE_MPI=OFF',
-    "-DMACIS_ENABLE_TESTS=$BuildTesting",
-    '-DBUILD_SHARED_LIBS=OFF',
-    "-DBUILD_TESTING=$BuildTesting",
-    '-DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST',
-    '-DVCPKG_APPLOCAL_DEPS=OFF',
-    "-DCMAKE_BUILD_TYPE=$BuildType",
-    "-DCMAKE_C_COMPILER=$ClPath",
-    "-DCMAKE_CXX_COMPILER=$ClPath",
-    "-DCMAKE_INSTALL_PREFIX=$installDir",
-    "-DCMAKE_PREFIX_PATH=$DepsInstallDir;$vcpkgInstalled",
-    "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
-    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
-    '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
-    "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
-    '-DQDK_ALLOW_DEPENDENCY_FETCH=OFF',
-    '-DQDK_ENABLE_OPENMP=OFF',
-    '-DFETCHCONTENT_QUIET=OFF'
-)
-cmake @cmakeArgs
-if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
-
-Write-Host "=== CMake build ==="
-cmake --build $buildDir
-if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
-
-# ─── C++ tests ───────────────────────────────────────────────────────────────
-$ctestCode = 0
-if ($BuildTesting -ne 'OFF') {
-    # Exclude MACIS_SERIAL_TEST and libint2/unit (compile-at-test-time, exceeds timeout).
-    Write-Host "=== ctest ==="
-    Push-Location $buildDir
-    ctest --output-on-failure --verbose --timeout 400 `
-          --output-junit ctest_results.xml `
-          -E "MACIS_SERIAL_TEST|libint2/unit"
-    $ctestCode = $LASTEXITCODE
-    Pop-Location
-    if ($ctestCode -ne 0) {
-        Write-Warning "ctest returned $ctestCode — continuing to build wheel, then will throw."
-    }
-}
-
-# ─── Install C++ library ─────────────────────────────────────────────────────
-Write-Host "=== cmake --install ==="
-cmake --install $buildDir
-if ($LASTEXITCODE -ne 0) { throw "CMake install failed ($LASTEXITCODE)" }
 
 # ─── Conda bootstrap ─────────────────────────────────────────────────────────
 Write-Host "=== Conda bootstrap ==="
@@ -121,7 +60,7 @@ $reqs | ForEach-Object { Write-Host $_ }
 # PipReport failures are non-fatal (Component Governance is best-effort).
 $LASTEXITCODE = 0
 
-# ─── Prepare README (equivalent to prepare-readme.sh) ────────────────────────
+# ─── Prepare README ──────────────────────────────────────────────────────────
 Write-Host "=== Prepare README ==="
 try {
     & "$PSScriptRoot\prepare-readme.ps1" -SrcDir $SrcDir
@@ -130,8 +69,10 @@ try {
 }
 
 # ─── Build Python wheel ───────────────────────────────────────────────────────
+# scikit-build-core builds the full C++ library; pre-installed deps (vcpkg
+# packages + libint2/ecpint/gauxc) are found via CMAKE_PREFIX_PATH.
 Write-Host "=== python -m build --wheel ==="
-$prefix   = "$SrcDir\vcpkg_installed\x64-windows-static-md;$installDir;$DepsInstallDir"
+$prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\x64-windows-static-md"
 $buildArgs = @(
     'run', '-n', 'buildenv',
     'python', '-m', 'build', '--wheel',
@@ -142,15 +83,20 @@ $buildArgs = @(
     '-C=cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF',
     '-C=cmake.define.QDK_ENABLE_OPENMP=OFF',
     "-C=cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=$EnableCoverage",
-    '-C=cmake.define.BUILD_TESTING=OFF',
+    "-C=cmake.define.BUILD_TESTING=$BuildTesting",
+    "-C=cmake.define.MACIS_ENABLE_TESTS=$BuildTesting",
+    '-C=cmake.define.CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST',
     "-C=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF",
+    '-C=cmake.define.VCPKG_APPLOCAL_DEPS=OFF',
+    "-C=cmake.define.CMAKE_BUILD_TYPE=$BuildType",
     "-C=cmake.define.CMAKE_C_COMPILER=$ClPath",
     "-C=cmake.define.CMAKE_CXX_COMPILER=$ClPath",
     "-C=cmake.define.CMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-C=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
     '-C=cmake.define.VCPKG_TARGET_TRIPLET=x64-windows-static-md',
     "-C=cmake.define.VCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
-    "-C=cmake.define.CMAKE_PREFIX_PATH=$prefix"
+    "-C=cmake.define.CMAKE_PREFIX_PATH=$prefix",
+    '-C=cmake.define.FETCHCONTENT_QUIET=OFF'
 )
 Push-Location "$SrcDir\python"
 & $condaExe @buildArgs
@@ -170,8 +116,3 @@ if ($wheels.Count -ne 1) {
 Copy-Item $wheels[0].FullName $outputDir
 Write-Host "Wheel : $($wheels[0].Name)"
 Write-Host "Output: $outputDir"
-
-# Defer the ctest failure until after PublishTestResults@2 has had a chance to
-# upload the XML — that step runs with condition: always(), so it fires even
-# when this script throws. Re-raise here so the task still fails.
-if ($ctestCode -ne 0) { throw "ctest failed ($ctestCode)" }

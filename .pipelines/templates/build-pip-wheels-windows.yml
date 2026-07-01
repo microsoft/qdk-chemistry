@@ -83,11 +83,3 @@ steps:
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     OMP_NUM_THREADS: '2'
-
-- task: PublishTestResults@2
-  displayName: Publish C++ test results
-  inputs:
-    testResultsFormat: JUnit
-    testResultsFiles: '$(System.DefaultWorkingDirectory)/cpp/build-msvc/ctest_results.xml'
-    testRunTitle: 'C++ tests - Windows x86_64 Python ${{ parameters.pythonVersion }}'
-  condition: and(always(), ne('${{ parameters.buildTesting }}', 'OFF'))

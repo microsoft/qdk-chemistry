@@ -61,28 +61,24 @@ handle_dependency(libint2
   REQUIRED
 )
 if(MSVC AND TARGET libint2_cxx)
-  # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor (Boost.Preprocessor).
-  # Skip IMPORTED targets (target_compile_options rejects them).
-  get_target_property(_libint2_cxx_imported libint2_cxx IMPORTED)
-  if(NOT _libint2_cxx_imported)
-    # clang-cl rejects /Zc:preprocessor; omit it to avoid -Wunused-command-line-argument.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
-    else()
-      target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
-    endif()
+  # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor
+  # (Boost.Preprocessor). Apply to both FetchContent and imported targets.
+  # clang-cl rejects /Zc:preprocessor; omit it there.
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus)
+  else()
+    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
   endif()
 endif()
 # eritest-libint2 links only to libint2-static (C library), so it misses the
 # INTERFACE flags from libint2_cxx but still needs C++11 detection.
 if(MSVC AND TARGET eritest-libint2)
-  get_target_property(_eritest_imported eritest-libint2 IMPORTED)
-  if(NOT _eritest_imported)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
-    else()
-      target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
-    endif()
+  # eritest-libint2 links only to libint2-static (C library), so it misses the
+  # INTERFACE flags from libint2_cxx but still needs C++11 detection.
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
+  else()
+    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
   endif()
 endif()
 
