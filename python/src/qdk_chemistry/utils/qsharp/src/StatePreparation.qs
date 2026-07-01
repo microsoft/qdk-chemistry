@@ -44,9 +44,9 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
-    function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit {
-        StatePreparation(params, _)
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
+    function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit is Adj + Ctl {
+        ApplyDensePreparation(params.rowMap, params.stateVector, _)
     }
 
 

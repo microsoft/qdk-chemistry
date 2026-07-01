@@ -190,6 +190,59 @@ class TestSparseIsometryBinaryEncoding:
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     @pytest.mark.parametrize(
+        ("n_electrons", "n_orbitals", "n_dets", "seed", "binary_encoding", "include_negative_controls"),
+        [
+            (6, 6, 20, 42, True, True),
+            (6, 6, 20, 42, True, False),
+            (6, 6, 20, 42, False, True),
+            (6, 6, 30, 7, True, True),
+            (6, 6, 30, 7, False, True),
+        ],
+        ids=[
+            "6e6o_20det_binenc_negctrl",
+            "6e6o_20det_binenc_no_negctrl",
+            "6e6o_20det_no_binenc",
+            "6e6o_30det_binenc_negctrl",
+            "6e6o_30det_no_binenc",
+        ],
+    )
+    def test_qiskit_isometry_dense_prep_statevector(
+        self, n_electrons, n_orbitals, n_dets, seed, binary_encoding, include_negative_controls
+    ):
+        """Sparse isometry with qiskit_regular_isometry as dense prep, with/without binary encoding."""
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+        wf = create_random_wavefunction(
+            n_electrons=n_electrons,
+            n_orbitals=n_orbitals,
+            n_dets=n_dets,
+            seed=seed,
+        )
+        prep = create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "qiskit_regular_isometry"),
+            binary_encoding=binary_encoding,
+            include_negative_controls=include_negative_controls,
+        )
+        circuit = prep.run(wf)
+        assert isinstance(circuit, Circuit)
+
+        expected_sv = create_statevector_from_wavefunction(wf, normalize=True)
+        n_system = 2 * n_orbitals
+
+        qc = circuit.get_qiskit_circuit()
+        sim_data = np.array(Statevector.from_instruction(qc))
+        system_sv = sim_data[: 2**n_system]
+        overlap = np.abs(np.vdot(expected_sv, system_sv))
+        assert np.isclose(
+            overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize(
         ("n_electrons", "n_orbitals", "n_dets", "seed"),
         [
             (6, 6, 20, 42),

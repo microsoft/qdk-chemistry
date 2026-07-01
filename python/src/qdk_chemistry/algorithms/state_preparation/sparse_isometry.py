@@ -161,7 +161,9 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         # Build expansion ops and compose with dense circuit
         expansion_ops = self._build_expansion_ops(gf2x_operation_results)
-        return self._compose_with_expansion(dense_circuit, expansion_ops, gf2x_operation_results.row_map, n_qubits)
+        return self._compose_with_expansion(
+            dense_circuit, expansion_ops, gf2x_operation_results.row_map, n_qubits, dense_algo
+        )
 
     def _run_binary_encoding(self, state_vector: list[list[int]], coeffs: np.ndarray, n_qubits: int) -> Circuit | None:
         """Prepare a quantum circuit using binary encoding.
@@ -204,6 +206,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             synthesis["gaussian_elimination_ops"],
             synthesis["ancilla_pool"],
             n_qubits,
+            dense_algo,
         )
 
     def _synthesize_binary_encoding(
@@ -326,6 +329,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         expansion_ops: list[MatrixCompressionOp],
         embedding_map: list[int],
         n_qubits: int,
+        dense_algo: "StatePreparation",
     ) -> Circuit:
         """Compose a dense preparation circuit with expansion operations.
 
@@ -337,6 +341,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             expansion_ops: GF2 Gaussian elimination expansion operations for the full register.
             embedding_map: Maps reduced qubit indices to full register positions.
             n_qubits: Total number of qubits in the full register.
+            dense_algo: The nested dense state prep algorithm instance (for transpile settings).
 
         Returns:
             Composed Circuit operating on the full qubit register.
@@ -344,7 +349,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         """
         if dense_circuit._qsharp_op is not None:  # noqa: SLF001
             return self._compose_qsharp(dense_circuit, expansion_ops, embedding_map, n_qubits)
-        return self._compose_qiskit(dense_circuit, expansion_ops, embedding_map, n_qubits)
+        return self._compose_qiskit(dense_circuit, expansion_ops, embedding_map, n_qubits, dense_algo)
 
     def _compose_qsharp(
         self,
@@ -377,9 +382,11 @@ class SparseIsometryStatePreparation(StatePreparation):
         expansion_ops: list[MatrixCompressionOp],
         embedding_map: list[int],
         n_qubits: int,
+        dense_algo: "StatePreparation",
     ) -> Circuit:
         """Compose via Qiskit — embed dense circuit on subregister, then apply expansion gates."""
         from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
+        from qiskit.compiler import transpile  # noqa: PLC0415
 
         from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
 
@@ -387,6 +394,12 @@ class SparseIsometryStatePreparation(StatePreparation):
         full_qc = QuantumCircuit(n_qubits)
         full_qc.compose(dense_qc, qubits=embedding_map, inplace=True)
         apply_matrix_compression_ops(full_qc, expansion_ops)
+
+        # Transpile using the dense prep algorithm's settings to decompose
+        if dense_algo.settings().get("transpile"):
+            basis_gates = dense_algo.settings().get("basis_gates")
+            opt_level = dense_algo.settings().get("transpile_optimization_level")
+            full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
         return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
 
@@ -398,6 +411,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         gaussian_elimination_ops: list[MatrixCompressionOp],
         ancilla_pool: list[int],
         n_qubits: int,
+        dense_algo: "StatePreparation",
     ) -> Circuit:
         """Compose a dense circuit with binary-encoding and GF2 Gaussian elimination expansion operations.
 
@@ -408,6 +422,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             gaussian_elimination_ops: GF2 Gaussian elimination expansion operations.
             ancilla_pool: Idle qubit indices available as ancillas.
             n_qubits: Total number of qubits in the full register.
+            dense_algo: The nested dense state prep algorithm instance (for transpile settings).
 
         Returns:
             Composed Circuit operating on the full qubit register.
@@ -438,6 +453,7 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         # Qiskit path
         from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
+        from qiskit.compiler import transpile  # noqa: PLC0415
 
         from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
 
@@ -446,6 +462,13 @@ class SparseIsometryStatePreparation(StatePreparation):
         full_qc.compose(dense_qc, qubits=dense_row_map, inplace=True)
         apply_matrix_compression_ops(full_qc, binary_encoding_ops)
         apply_matrix_compression_ops(full_qc, gaussian_elimination_ops)
+
+        # Transpile using the dense prep algorithm's settings to decompose
+        # multi-controlled gates (e.g. MCX) whose QASM3 export has a Qiskit bug.
+        if dense_algo.settings().get("transpile"):
+            basis_gates = dense_algo.settings().get("basis_gates")
+            opt_level = dense_algo.settings().get("transpile_optimization_level")
+            full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
         return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
 
