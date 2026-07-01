@@ -176,7 +176,7 @@ jobs:
       if: matrix.os-name == 'macOS'
       run: |
         brew update
-        brew upgrade
+        brew upgrade || true
         arch -arm64 brew install \
           cmake \
           ninja \
