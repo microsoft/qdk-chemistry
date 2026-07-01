@@ -41,6 +41,7 @@ from qdk_chemistry.algorithms.multi_configuration_scf import MultiConfigurationS
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
+    QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
@@ -81,6 +82,7 @@ __all__ = [
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
+    "QdkNaturalOrbitalLocalizer",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",
