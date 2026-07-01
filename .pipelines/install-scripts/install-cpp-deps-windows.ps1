@@ -177,8 +177,7 @@ Remove-Item $libintExtract -Recurse -Force
 # ─── ecpint ──────────────────────────────────────────────────────────────────
 Write-Host "=== Installing ecpint ==="
 $ecpintSrc = "$buildDir\ecpint-src"
-git clone https://github.com/robashaw/libecpint $ecpintSrc --no-local
-git -C $ecpintSrc checkout $ecpintCommit
+git clone https://github.com/robashaw/libecpint $ecpintSrc
 
 if (-not $isClangCl) {
     Write-Host "Applying ecpint MSVC patches..."
@@ -198,7 +197,7 @@ Remove-Item $ecpintSrc -Recurse -Force
 # linalg-cmake-modules) via FetchContent — all pinned in gauxc's cmake.
 Write-Host "=== Installing gauxc ==="
 $gauxcSrc = "$buildDir\gauxc-src"
-git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc --no-local
+git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
 git -C $gauxcSrc checkout $gauxcCommit
 
 Invoke-CMakeDep 'gauxc' $gauxcSrc @(
