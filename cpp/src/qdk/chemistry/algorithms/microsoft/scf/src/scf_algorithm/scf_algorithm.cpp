@@ -358,7 +358,9 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   } else {
     // Rectangular case (nMO < nAO): overlap-mediated projection
     //   F_eff_AO = S * C * F_MO_eff * C^T * S
-    // Proof: C^T(SCF_MOC^TS)C = (C^TSC)F_MO(C^TSC) = F_MO  since C^TSC=I
+    // Proof: C^T F_eff_AO C = (C^T S C) F_MO_eff (C^T S C) = F_MO_eff
+    // when C^T S C = I. This mirrors the RHF/UHF treatment in the
+    // reduced MO space.
     RowMajorMatrix SC(num_atomic_orbitals, num_molecular_orbitals);
     SC.noalias() = S * C;
     effective_fock.noalias() = SC * effective_F_mo * SC.transpose();
