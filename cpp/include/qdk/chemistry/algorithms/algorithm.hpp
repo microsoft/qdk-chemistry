@@ -283,6 +283,11 @@ class AlgorithmFactory {
     }
 
     auto instance = it->second();
+    if (!instance) {
+      throw std::runtime_error(
+          "Algorithm factory for " + Derived::algorithm_type_name() +
+          ": Algorithm with name '" + key + "' returned nullptr");
+    }
     if (const auto message = detail::DeprecationAccess::message(*instance)) {
       QDK_LOGGER().warn(*message);
     }
