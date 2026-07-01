@@ -613,13 +613,13 @@ jobs:
           vcpkg_installed
           deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/pip-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Install C++ dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        & "${{ github.workspace }}\.pipelines\pip-scripts\install-cpp-deps-windows.ps1" `
+        & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
             -SrcDir        "${{ github.workspace }}" `
             -ClPath        "${{ steps.env.outputs.cxx-path }}" `
             -BuildType     RelWithDebInfo `
@@ -634,7 +634,7 @@ jobs:
           vcpkg_installed
           deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/pip-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', 'cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Configure CMake
       shell: pwsh

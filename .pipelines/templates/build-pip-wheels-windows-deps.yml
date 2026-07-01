@@ -16,11 +16,11 @@ steps:
 # Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
 # Also resolves the MSVC toolset version for the dependency cache key.
-- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\setup-msvc-env.ps1
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
   displayName: Set up MSVC environment
 
 - pwsh: |
-    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\compute-deps-cache-key.ps1" `
+    & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\compute-deps-cache-key.ps1" `
         -SrcDir "$(System.DefaultWorkingDirectory)"
   displayName: Compute dependency cache key
 
@@ -39,9 +39,8 @@ steps:
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
 - pwsh: |
-    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows-deps.ps1" `
+    & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
-        -March     "${{ parameters.march }}" `
         -BuildType "${{ parameters.buildType }}" `
         -ClPath    "$(CL_PATH)"
   displayName: Build and install C++ dependencies
