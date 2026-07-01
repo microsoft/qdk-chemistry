@@ -80,7 +80,7 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     mapping = MajoranaMapping.jordan_wigner(2 * num_active_orbitals)
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
-    state_prep_builder = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+    state_prep_builder = create("state_prep", algorithm_name="sparse_isometry")
     state_preparation = state_prep_builder.run(active_wfn)
 
     evolution_builder = create("hamiltonian_unitary_builder", "trotter", time=_EVOLUTION_TIME, power=_OBSERVABLE_POWER)
