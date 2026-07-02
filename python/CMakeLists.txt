@@ -114,7 +114,7 @@ else()
             COMPONENT qdk_chemistry_resources
         )
     else()
-        message(WARNING "QDK resources not found at '${_qdk_resources}' — wheel will be missing share/qdk/chemistry/scf/resources")
+        message(FATAL_ERROR "QDK resources not found at '${_qdk_resources}' — wheel will be missing share/qdk/chemistry/scf/resources")
     endif()
 endif()
 
