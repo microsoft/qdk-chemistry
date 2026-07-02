@@ -182,16 +182,35 @@ class RobustPhaseEstimation(PhaseEstimation):
 
         theta = 0.0
         final_samples = 1
+        randomized = category in ("qdrift", "partial_randomized")
         for m in range(total + 1):
             shots, samples = qdrift_schedule(total, m)
             evolution_time = (2**m) * base_time
             final_samples = samples
 
-            unitary = self._build_unitary(
-                qubit_hamiltonian, evolution_time, samples, seed, m, category, epsilon_unitary
-            )
-            real_part = self._sample_signal(state_preparation, unitary, shots, "X")
-            imag_part = self._sample_signal(state_preparation, unitary, shots, "Y")
+            if randomized:
+                # Faithful estimator: each Hadamard repetition uses a freshly
+                # drawn circuit, so the shot-average estimates the expected
+                # signal <psi|E_C[U_C]|psi> rather than a single frozen draw.
+                real_part, imag_part = self._sample_signal_randomized(
+                    state_preparation,
+                    qubit_hamiltonian,
+                    evolution_time,
+                    samples,
+                    shots,
+                    seed,
+                    m,
+                    category,
+                    epsilon_unitary,
+                )
+            else:
+                # Deterministic builder: the circuit is fixed, so one build
+                # measured `shots` times only samples measurement noise.
+                unitary = self._build_unitary(
+                    qubit_hamiltonian, evolution_time, samples, seed, m, category, epsilon_unitary
+                )
+                real_part = self._sample_signal(state_preparation, unitary, shots, "X")
+                imag_part = self._sample_signal(state_preparation, unitary, shots, "Y")
 
             measured_phase = float(np.angle(complex(real_part, imag_part)))
             theta = rpe_angle_update(theta, measured_phase, m)
@@ -252,6 +271,8 @@ class RobustPhaseEstimation(PhaseEstimation):
         round_index: int,
         category: str,
         epsilon_unitary: float,
+        *,
+        explicit_seed: bool = False,
     ):
         """Create and size the time-evolution unitary for one round.
 
@@ -259,6 +280,10 @@ class RobustPhaseEstimation(PhaseEstimation):
         tangent energy map). Accuracy-aware builders (partially randomized or
         deterministic) instead receive the per-round unitary accuracy budget
         ``epsilon_unitary`` and self-size their internal resolution.
+
+        When ``explicit_seed`` is set the caller has already derived a per-draw
+        seed and ``seed`` is used verbatim; otherwise it is offset by
+        ``round_index`` so successive rounds draw independently.
         """
         builder = self._create_nested("unitary_builder")
         settings = builder.settings()
@@ -269,8 +294,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         elif settings.has("target_accuracy"):
             settings.set("target_accuracy", float(epsilon_unitary))
         if seed >= 0 and settings.has("seed"):
-            # Offset per round so successive rounds draw independent samples.
-            settings.set("seed", int(seed) + round_index)
+            settings.set("seed", int(seed) if explicit_seed else int(seed) + round_index)
         return builder.run(qubit_hamiltonian)
 
     def _sample_signal(self, state_preparation: Circuit, unitary, shots: int, test_basis: str) -> float:
@@ -279,6 +303,60 @@ class RobustPhaseEstimation(PhaseEstimation):
         hadamard_test.settings().set("test_basis", test_basis)
         executor_data = hadamard_test.run(state_preparation, unitary, shots)
         return expectation_from_counts(executor_data.bitstring_counts)
+
+    def _sample_signal_randomized(
+        self,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitHamiltonian,
+        evolution_time: float,
+        samples: int,
+        shots: int,
+        seed: int,
+        round_index: int,
+        category: str,
+        epsilon_unitary: float,
+    ) -> tuple[float, float]:
+        r"""Estimate the round signal by averaging over independent fresh draws.
+
+        For randomized builders (qDRIFT / partially randomized) the faithful
+        quantity is the expected signal
+        :math:`\langle\psi|\mathbb{E}_C[U_C(t)]|\psi\rangle`, not any single
+        realization. Each of the ``shots`` Hadamard repetitions therefore uses a
+        freshly sampled circuit; the same draw supplies the X (real) and Y
+        (imaginary) sample so the complex signal stays consistent, and the
+        per-draw expectations are averaged. This is the qDRIFT sampling contract
+        of Günther et al. (2025), App. B.2 (``shots`` independent draws of depth
+        ``samples``).
+        """
+        real_accumulator = 0.0
+        imag_accumulator = 0.0
+        for draw_index in range(shots):
+            draw_seed = self._derive_seed(seed, round_index, draw_index) if seed >= 0 else -1
+            unitary = self._build_unitary(
+                qubit_hamiltonian,
+                evolution_time,
+                samples,
+                draw_seed,
+                round_index,
+                category,
+                epsilon_unitary,
+                explicit_seed=True,
+            )
+            real_accumulator += self._sample_signal(state_preparation, unitary, 1, "X")
+            imag_accumulator += self._sample_signal(state_preparation, unitary, 1, "Y")
+        inverse_shots = 1.0 / float(shots)
+        return real_accumulator * inverse_shots, imag_accumulator * inverse_shots
+
+    @staticmethod
+    def _derive_seed(seed: int, round_index: int, draw_index: int) -> int:
+        """Derive an independent, reproducible builder seed for one draw.
+
+        Mixes ``(seed, round_index, draw_index)`` through ``SeedSequence`` so that
+        every draw in every round is statistically independent yet fully
+        reproducible for a fixed top-level ``seed``.
+        """
+        sequence = np.random.SeedSequence([int(seed), int(round_index), int(draw_index)])
+        return int(sequence.generate_state(1)[0])
 
     @staticmethod
     def _resolve_energy(

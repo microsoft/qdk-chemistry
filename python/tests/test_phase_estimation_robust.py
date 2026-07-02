@@ -25,7 +25,7 @@ import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import RobustPhaseEstimation
 from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.utils.rpe import num_rounds
+from qdk_chemistry.utils.rpe import num_rounds, qdrift_schedule
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -246,11 +246,183 @@ def test_partial_builder_receives_unitary_budget(monkeypatch: pytest.MonkeyPatch
     assert records, "unitary builder was never run"
     eps_unitary = 0.5e-2
     tau = float(np.pi / (2 * 1.0))
-    for round_index, record in enumerate(records):
+    total = num_rounds(1.0, eps_unitary)  # eps_rpe == eps_unitary here (fraction 0.5, target 1e-2)
+    # Every build carries the per-round unitary budget and never the qDRIFT knob.
+    for record in records:
         assert record["target_accuracy"] == pytest.approx(eps_unitary)
-        assert record["time"] == pytest.approx((2**round_index) * tau)
         assert "num_samples" not in record  # partial path must not use the qDRIFT sample knob
-        assert record["seed"] == 5 + round_index
+    # Fresh-draw-per-shot: each round issues `shots` independent builds at that
+    # round's evolution time, every one seeded independently.
+    builds_by_time: dict[float, list[dict[str, object]]] = {}
+    for record in records:
+        builds_by_time.setdefault(float(record["time"]), []).append(record)
+    for round_index in range(total + 1):
+        round_time = (2**round_index) * tau
+        round_builds = builds_by_time.get(round_time)
+        assert round_builds is not None, f"round {round_index} issued no builds"
+        expected_shots, _ = qdrift_schedule(total, round_index)
+        assert len(round_builds) == expected_shots  # one fresh draw per shot
+        seeds = [record["seed"] for record in round_builds]
+        assert len(set(seeds)) == expected_shots  # every draw seeded independently
+
+
+def test_sample_signal_randomized_averages_independent_draws(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Randomized rounds draw a fresh circuit per shot and average the per-draw signals."""
+    driver = RobustPhaseEstimation(seed=7)
+    build_seeds: list[int] = []
+
+    def fake_build(qh, t, samples, seed, m, category, eps, *, explicit_seed=False):  # noqa: ARG001
+        assert explicit_seed is True  # per-draw seed used verbatim
+        build_seeds.append(seed)
+        return ("unitary", seed)
+
+    def fake_sample(state, unitary, shots, basis):  # noqa: ARG001
+        assert shots == 1  # one measurement per fresh draw
+        value = (unitary[1] % 100) / 100.0
+        return value if basis == "X" else -value
+
+    monkeypatch.setattr(driver, "_build_unitary", fake_build)
+    monkeypatch.setattr(driver, "_sample_signal", fake_sample)
+
+    shots = 6
+    real_part, imag_part = driver._sample_signal_randomized(object(), object(), 1.5, 8, shots, 7, 3, "qdrift", 0.0)
+
+    assert len(build_seeds) == shots  # one fresh draw per shot
+    assert len(set(build_seeds)) == shots  # every draw is independent
+    expected_real = float(np.mean([(s % 100) / 100.0 for s in build_seeds]))
+    assert real_part == pytest.approx(expected_real)  # averaged, not a single draw
+    assert imag_part == pytest.approx(-expected_real)  # X and Y share each draw
+
+
+def test_sample_signal_randomized_nondeterministic_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With seed < 0 the round still issues one fresh (RNG-seeded) draw per shot."""
+    driver = RobustPhaseEstimation(seed=-1)
+    build_seeds: list[int] = []
+
+    def fake_build(qh, t, samples, seed, m, category, eps, *, explicit_seed=False):  # noqa: ARG001
+        build_seeds.append(seed)
+        return ("unitary", 0)
+
+    def fake_sample(state, unitary, shots, basis):  # noqa: ARG001
+        return 0.0
+
+    monkeypatch.setattr(driver, "_build_unitary", fake_build)
+    monkeypatch.setattr(driver, "_sample_signal", fake_sample)
+
+    driver._sample_signal_randomized(object(), object(), 1.0, 8, 4, -1, 0, "qdrift", 0.0)
+
+    assert len(build_seeds) == 4  # still draws once per shot
+    assert all(seed == -1 for seed in build_seeds)  # non-deterministic RNG per build
+
+
+# =============================================================================
+# Layer 1b: precision contract via a noiseless classical signal (no Q#)
+# =============================================================================
+_NONCOMMUTING_PAULIS = ["ZI", "XI", "IZ", "ZZ"]
+_NONCOMMUTING_COEFFS = [1.0, 0.8, 0.5, 0.3]
+
+
+def _noncommuting_ground_state_problem() -> tuple[QubitHamiltonian, np.ndarray, float]:
+    """Return (H, ground eigenvector, ground energy) for a non-commuting 2-qubit H.
+
+    ``ZI`` and ``XI`` anti-commute, so the deterministic Trotter part has genuine
+    error to resolve; with ``weight_threshold=0.5`` the partially randomized split
+    is ``H_D = {ZI, XI, IZ}`` and ``H_R = {ZZ}`` (lambda_R = 0.3 << lambda = 2.6).
+    """
+    hamiltonian = QubitHamiltonian(pauli_strings=_NONCOMMUTING_PAULIS, coefficients=_NONCOMMUTING_COEFFS)
+    dense = _dense_from_pauli(_NONCOMMUTING_PAULIS, _NONCOMMUTING_COEFFS)
+    eigenvalues, eigenvectors = np.linalg.eigh(dense)
+    return hamiltonian, eigenvectors[:, 0], float(eigenvalues[0])
+
+
+def _materialize_container(container) -> np.ndarray:
+    """Materialize a ``PauliProductFormulaContainer`` as a dense unitary matrix.
+
+    Applies the product of exponentiated Pauli terms once and raises it to the
+    container's ``step_reps`` power. Each ``e^{-i*angle*P}`` uses the closed form
+    ``cos(angle) I - i sin(angle) P`` (valid because every Pauli string squares to
+    the identity), so no matrix exponential is required.
+    """
+    num_qubits = container.num_qubits
+    dim = 2**num_qubits
+    identity = np.eye(dim, dtype=complex)
+    step = identity.copy()
+    for term in container.step_terms:
+        labels = ["I"] * num_qubits
+        for qubit, op in term.pauli_term.items():
+            labels[num_qubits - 1 - qubit] = op  # little-endian: qubit 0 is rightmost
+        pauli = _dense_from_pauli(["".join(labels)], [1.0])
+        angle = term.angle
+        step = (np.cos(angle) * identity - 1j * np.sin(angle) * pauli) @ step
+    return np.linalg.matrix_power(step, container.step_reps)
+
+
+def _classical_signal_sampler(ground_vector: np.ndarray):
+    """Return a noiseless replacement for ``RobustPhaseEstimation._sample_signal``.
+
+    It materializes the real per-round unitary and returns the exact Hadamard-test
+    expectation (X basis -> ``Re<psi|U|psi>``, Y basis -> ``Im<psi|U|psi>``),
+    removing shot noise so the test isolates the algorithm's systematic and
+    single-draw error rather than statistical fluctuation.
+    """
+
+    def _sample(state_preparation: object, unitary, shots: int, test_basis: str) -> float:  # noqa: ARG001
+        dense_unitary = _materialize_container(unitary.get_container())
+        signal = complex(ground_vector.conj() @ (dense_unitary @ ground_vector))
+        return float(signal.real) if test_basis == "X" else float(signal.imag)
+
+    return _sample
+
+
+@pytest.mark.parametrize(
+    ("builder_name", "builder_kwargs", "expected_category", "expected_correction"),
+    [
+        ("trotter", {"order": 2}, "deterministic_or_exact", "linear"),
+        ("qdrift", {}, "qdrift", "qdrift_tangent"),
+        ("partially_randomized", {"weight_threshold": 0.5, "trotter_order": 2}, "partial_randomized", "linear"),
+    ],
+)
+def test_robust_qpe_within_target_accuracy_classical_signal(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_name: str,
+    builder_kwargs: dict[str, object],
+    expected_category: str,
+    expected_correction: str,
+) -> None:
+    """All three builders recover the GSE within ``target_accuracy`` (the public contract).
+
+    A noiseless classical Hadamard signal (each per-round unitary materialized
+    densely) replaces the Q# simulator, so the test runs without Q# and isolates the
+    algorithm's error from shot noise. For the randomized builders every one of a
+    round's shots draws a fresh circuit, so the classical signal is averaged over
+    independent draws (the faithful expected signal), exactly as on hardware. The
+    seed is fixed; because qDRIFT and partially randomized are stochastic, the
+    assertion is the public contract ``abs <= epsilon`` rather than a tighter
+    per-seed value.
+
+    Measured errors at this seed (epsilon=0.1): trotter ~3.7e-4, qDRIFT ~7e-3,
+    partial ~2e-4. Averaging a fresh draw per shot makes the qDRIFT error the
+    shot-averaged (expected-signal) error; the earlier frozen single-draw path was
+    both larger (~1.2e-2 typical) and prone to rare catastrophic phase-wrap
+    failures on high-significance rounds (max ~5 over 15 seeds).
+    """
+    from qdk_chemistry.data import AlgorithmRef  # noqa: PLC0415
+
+    epsilon = 0.1
+    hamiltonian, ground_vector, ground_energy = _noncommuting_ground_state_problem()
+    driver = RobustPhaseEstimation(
+        target_accuracy=epsilon, unitary_accuracy_fraction=0.5, energy_correction="auto", seed=7
+    )
+    driver.settings().set(
+        "unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", builder_name, **builder_kwargs)
+    )
+    monkeypatch.setattr(driver, "_sample_signal", _classical_signal_sampler(ground_vector))
+
+    result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
+
+    assert result.resolved_energy == pytest.approx(ground_energy, abs=epsilon)
+    assert result.metadata["unitary_builder"] == expected_category
+    assert result.metadata["energy_correction"] == expected_correction
 
 
 # =============================================================================
