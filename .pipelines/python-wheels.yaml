@@ -410,7 +410,7 @@ extends:
 
         # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
         # publishing anything, according to the ESRP docs. When debugging, set contenttype: NPM to prevent publishing to PyPI.
-        - task: EsrpRelease@9
+        - task: EsrpRelease@12
           condition: succeeded()
           displayName: Publish Python Packages
           inputs:
@@ -419,10 +419,13 @@ extends:
             keyvaultname: quantum-esrp-kv
             signcertname: ESRPCert
             clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-            contenttype: PyPI
-            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
+            intent: PackageDistribution
+            contenttype: PyPi
+            contentsource: Folder
             folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
             waitforreleasecompletion: true
             owners: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
             approvers: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            serviceendpointurl: https://api.esrp.microsoft.com
             mainpublisher: ESRPRELPACMAN
+            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
