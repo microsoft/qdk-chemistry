@@ -61,7 +61,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/catchorg/Catch2.git",
-                    "commitHash": "20192da44883d602e0365c14b778f47b2deb15aa",
+                    "commitHash": "3f0283de7a9c43200033da996ff9093be3ac84dc",
                     "tag": "v3.3.2"
                 }
             },
@@ -82,7 +82,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/blaspp.git",
-                    "commitHash": "c544fa5ad8e78997e9406eb723d9435e6153cd91",
+                    "commitHash": "37b744ed72997d190a9cff651c464a71330aeec0",
                     "tag": "v2025.05.28"
                 }
             },
@@ -104,7 +104,17 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/kokkos/mdspan.git",
-                    "commitHash": "80fc772eb812b45097c28fc0a46d8ff006138d69"
+                    "commitHash": "3fdf85b01e10629ddb18a0a3ffd468d7f9cfa185"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/SaschaWitt/ips4o.git",
+                    "commitHash": "8d5a97bb4c4048a1eef18b537f191a31462b051a"
                 }
             },
             "developmentDependency": false
