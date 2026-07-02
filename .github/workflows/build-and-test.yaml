@@ -611,6 +611,7 @@ jobs:
 
     - name: Restore vcpkg cache
       id: cache-vcpkg
+      if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: vcpkg_installed
@@ -618,6 +619,7 @@ jobs:
 
     - name: Restore deps-install cache
       id: cache-deps
+      if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: deps-install-${{ matrix.compiler }}
