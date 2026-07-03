@@ -8,3 +8,6 @@ pipelines:
           lastModifiedDate: 2026-01-24
         spotbugs:
           lastModifiedDate: 2026-01-24
+      source:
+        psscriptanalyzer:
+          lastModifiedDate: 2026-07-03
