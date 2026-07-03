@@ -81,7 +81,8 @@ class RobustPhaseEstimationSettings(Settings):
             0.5,
             "Fraction f of the total target_accuracy budget assigned to the unitary builder: "
             "epsilon_unitary = f * target_accuracy and epsilon_rpe = (1 - f) * target_accuracy. "
-            "Use a value in [0, 1); 0.5 splits the budget evenly.",
+            "Use a value in [0, 1); 0.5 splits the budget evenly. Ignored for pure qDRIFT, "
+            "which auto-sets f = 0 so the whole budget sizes the RPE ladder.",
         )
         self._set_default(
             "energy_correction",
@@ -120,6 +121,9 @@ class RobustPhaseEstimation(PhaseEstimation):
             unitary_accuracy_fraction: Fraction ``f`` of ``target_accuracy`` given
                 to the unitary builder (``epsilon_unitary = f * target_accuracy``,
                 ``epsilon_rpe = (1 - f) * target_accuracy``). Use a value in ``[0, 1)``.
+                Ignored for pure qDRIFT, which auto-sets ``f = 0`` (the qDRIFT
+                builder is sized by its sample schedule and de-biased by the
+                tangent map, so the whole budget sizes the RPE ladder).
             energy_correction: Phase-to-energy map: ``"auto"`` (qDRIFT -> tangent,
                 otherwise linear), ``"linear"``, or ``"qdrift_tangent"``.
             seed: Random seed for the evolution builder (``-1`` for non-deterministic).
@@ -159,7 +163,17 @@ class RobustPhaseEstimation(PhaseEstimation):
         epsilon_total = self._settings.get("target_accuracy")
         seed = self._settings.get("seed")
 
+        category = self._classify_builder()
+        correction = self._select_correction(category)
+
         fraction = min(max(float(self._settings.get("unitary_accuracy_fraction")), 0.0), 1.0)
+        if category == "qdrift":
+            # Pure qDRIFT ignores the unitary-accuracy budget: its depth comes
+            # from the per-round num_samples schedule and its systematic bias is
+            # removed by the tangent de-biasing map, not by an accuracy target.
+            # Route the whole budget to the RPE ladder instead of stranding a
+            # share of it on a builder that will not spend it.
+            fraction = 0.0
         epsilon_unitary = fraction * epsilon_total
         epsilon_rpe = (1.0 - fraction) * epsilon_total
         if epsilon_rpe <= 0.0:
@@ -171,8 +185,6 @@ class RobustPhaseEstimation(PhaseEstimation):
         if base_time <= 0.0:
             base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
 
-        category = self._classify_builder()
-        correction = self._select_correction(category)
         total = num_rounds(lambda_norm, epsilon_rpe)
         Logger.info(
             f"RobustPhaseEstimation: lambda={lambda_norm:.6g}, base_time={base_time:.6g}, "
