@@ -14,7 +14,7 @@ import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, MakeMPSSequentialOp, ApplyMPSSequential, MPSSequentialParams, MakeMPSSequentialOpGrouped, ApplyMPSSequentialGrouped, MPSSequentialGroupedParams, SiteUnitary;
+export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, MakeMPSSequentialOp, ApplyMPSSequential, MPSSequentialParams, MakeMPSSequentialOpGrouped, ApplyMPSSequentialGrouped, MPSSequentialGroupedParams, SiteUnitary, SiteUnitaryFast, MakeMPSSequentialOpGroupedFast, ApplyMPSSequentialGroupedFast, MPSSequentialGroupedFastParams;
 
 // =============================================================================
 // CSD decomposition (Givens + QROAM + phase gradient)
@@ -570,4 +570,272 @@ operation ApplyMPSSequentialGrouped(
 /// Returns a Qubit[] => Unit callable for grouped MPS sequential state preparation.
 function MakeMPSSequentialOpGrouped(params : MPSSequentialGroupedParams) : Qubit[] => Unit {
     ApplyMPSSequentialGrouped(params, _)
+}
+
+// =============================================================================
+// Fast resource estimation path using RepeatEstimates
+// =============================================================================
+
+/// # Summary
+/// Fast site unitary for resource estimation — uses RepeatEstimates.
+///
+/// # Description
+/// Instead of passing all `dim` Givens layers (O(dim^2) data), this accepts
+/// only 2 representative layers per matrix (one non-shifted, one shifted) plus
+/// the layer count. The `*Fast` Givens functions use RepeatEstimates internally
+/// to correctly account for the total cost without iterating over all layers.
+///
+/// # Input
+/// ## vRepLayerAngles
+/// Double[2][numAngles]: representative V layers (index 0=non-shifted, 1=shifted).
+/// ## vNumLayers
+/// Total number of V Givens layers.
+/// ## vPhases
+/// Bool[dim]: V phase correction.
+/// ## rot0Angles, rot1Angles, rot2Angles
+/// UCR Ry angles (same as SiteUnitary).
+/// ## w0RepLayerAngles, w0NumLayers, w0Phases
+/// Representative W₀ layers, count, and phases.
+/// ## w1RepLayerAngles, w1NumLayers, w1Phases
+/// Representative W₁ layers, count, and phases.
+/// ## uRepLayerAngles, uNumLayers, uPhases
+/// Representative U layers, count, and phases.
+operation SiteUnitaryFast(
+    vRepLayerAngles : Double[][],
+    vNumLayers : Int,
+    vPhases : Bool[],
+    rot0Angles : Double[],
+    rot1Angles : Double[],
+    rot2Angles : Double[],
+    w0RepLayerAngles : Double[][],
+    w0NumLayers : Int,
+    w0Phases : Bool[],
+    w1RepLayerAngles : Double[][],
+    w1NumLayers : Int,
+    w1Phases : Bool[],
+    uRepLayerAngles : Double[][],
+    uNumLayers : Int,
+    uPhases : Bool[],
+    newSite : Qubit[],
+    ancilla : Qubit[],
+    phaseGradient : Qubit[],
+    angleReg : Qubit[]
+) : Unit {
+    let q0 = newSite[0];
+    let q1 = newSite[1];
+    let rotationBits = Length(phaseGradient);
+    let ancillaDim = 1 <<< Length(ancilla);
+    let numAddresses = ancillaDim / 2;
+
+    // Phase data (small — quantized eagerly)
+    let vPhaseData = PhaseFlipsAsSelectData(vPhases);
+    let rot0Data = QuantizeRyAngles(rot0Angles, rotationBits);
+    let rot1Data = QuantizeRyAngles(rot1Angles, rotationBits);
+    let rot2Data = QuantizeRyAngles(rot2Angles, rotationBits);
+    let w0PhaseData = PhaseFlipsAsSelectData(w0Phases);
+    let w1PhaseData = PhaseFlipsAsSelectData(w1Phases);
+    let uNumAddresses = 2 * ancillaDim;
+    let uPhaseData = PhaseFlipsAsSelectData(uPhases);
+
+    // Step 1: V on ancilla (fast Givens with RepeatEstimates)
+    if vNumLayers > 0 {
+        ApplyRealUnitaryViaGivensFast(vRepLayerAngles, vNumLayers, vPhaseData, numAddresses, rotationBits, 0, Reversed(ancilla), phaseGradient, angleReg);
+    }
+
+    // Step 2: UCR Ry on q0, addressed by ancilla
+    QroamCleanRotation(rot0Data, ancilla, q0, phaseGradient);
+
+    // Step 3: CNOT(q1, q0)
+    CNOT(q1, q0);
+
+    // Step 4: W₀ on ancilla, controlled by q0 (fast)
+    if w0NumLayers > 0 {
+        ApplyControlledRealUnitaryViaGivensFast(w0RepLayerAngles, w0NumLayers, w0PhaseData, numAddresses, rotationBits, 1, Reversed(ancilla), phaseGradient, q0, angleReg);
+    }
+
+    // Step 5: Controlled UCR on q1, ctrl by q0
+    ControlledQroamCleanRotation(rot1Data, ancilla, q0, q1, phaseGradient);
+
+    // Step 6: CNOT(q1, q0)
+    CNOT(q1, q0);
+
+    // Step 7: W₁ on ancilla, controlled by q1 (fast)
+    if w1NumLayers > 0 {
+        ApplyControlledRealUnitaryViaGivensFast(w1RepLayerAngles, w1NumLayers, w1PhaseData, numAddresses, rotationBits, 2, Reversed(ancilla), phaseGradient, q1, angleReg);
+    }
+
+    // Step 8: Controlled UCR on q0, ctrl by q1
+    ControlledQroamCleanRotation(rot2Data, ancilla, q1, q0, phaseGradient);
+
+    // Step 9: Multiplexed U on ancilla+site (fast)
+    if uNumLayers > 0 {
+        ApplyBlockDiagUnitaryViaGivensFast(uRepLayerAngles, uNumLayers, uPhaseData, uNumAddresses, rotationBits, 3, Reversed(ancilla), [q1, q0], phaseGradient, angleReg);
+    }
+}
+
+/// # Summary
+/// Fast grouped circuit wrapper for resource estimation.
+///
+/// # Description
+/// Groups sites by effective ancilla dimension (shape) and uses SiteUnitaryFast.
+/// Accepts only 2 representative layers per Givens matrix (+ layer counts),
+/// reducing data transfer from O(dim^2) to O(dim) and eliminating loop overhead.
+operation MakeMPSSequentialCircuitGroupedFast(
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteShapeIndices : Int[],
+    shapeEffectiveBits : Int[],
+    shapeVRepLayerAngles : Double[][][],
+    shapeVNumLayers : Int[],
+    shapeVPhases : Bool[][],
+    shapeRot0Angles : Double[][],
+    shapeRot1Angles : Double[][],
+    shapeRot2Angles : Double[][],
+    shapeW0RepLayerAngles : Double[][][],
+    shapeW0NumLayers : Int[],
+    shapeW0Phases : Bool[][],
+    shapeW1RepLayerAngles : Double[][][],
+    shapeW1NumLayers : Int[],
+    shapeW1Phases : Bool[][],
+    shapeURepLayerAngles : Double[][][],
+    shapeUNumLayers : Int[],
+    shapeUPhases : Bool[][]
+) : Unit {
+    use state = Qubit[2 * numSites];
+    use ancilla = Qubit[numAncillaQubits];
+
+    // Initialize phase gradient register
+    use phaseGradient = Qubit[rotationBits];
+    PreparePhaseGradientState(phaseGradient);
+
+    // Single shared angle register
+    use angleReg = Qubit[rotationBits];
+
+    // Prepare initial state
+    let initReg = ancilla + state[0..1];
+    QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
+
+    // Apply site unitaries with per-shape caching
+    for siteIdx in 0..numSites - 2 {
+        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let shapeIdx = siteShapeIndices[siteIdx];
+        let effectiveBits = shapeEffectiveBits[shapeIdx];
+        if BeginEstimateCaching("SiteUnitary", shapeIdx) {
+            SiteUnitaryFast(
+                shapeVRepLayerAngles[shapeIdx],
+                shapeVNumLayers[shapeIdx],
+                shapeVPhases[shapeIdx],
+                shapeRot0Angles[shapeIdx],
+                shapeRot1Angles[shapeIdx],
+                shapeRot2Angles[shapeIdx],
+                shapeW0RepLayerAngles[shapeIdx],
+                shapeW0NumLayers[shapeIdx],
+                shapeW0Phases[shapeIdx],
+                shapeW1RepLayerAngles[shapeIdx],
+                shapeW1NumLayers[shapeIdx],
+                shapeW1Phases[shapeIdx],
+                shapeURepLayerAngles[shapeIdx],
+                shapeUNumLayers[shapeIdx],
+                shapeUPhases[shapeIdx],
+                newSite,
+                ancilla[0..effectiveBits - 1],
+                phaseGradient,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
+    }
+
+    // Undo phase gradient state
+    Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+// =============================================================================
+// Composable Op wrapper for fast grouped MPS (QPE composition)
+// =============================================================================
+
+/// Parameters struct for fast grouped MPS sequential state preparation.
+struct MPSSequentialGroupedFastParams {
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteShapeIndices : Int[],
+    shapeEffectiveBits : Int[],
+    shapeVRepLayerAngles : Double[][][],
+    shapeVNumLayers : Int[],
+    shapeVPhases : Bool[][],
+    shapeRot0Angles : Double[][],
+    shapeRot1Angles : Double[][],
+    shapeRot2Angles : Double[][],
+    shapeW0RepLayerAngles : Double[][][],
+    shapeW0NumLayers : Int[],
+    shapeW0Phases : Bool[][],
+    shapeW1RepLayerAngles : Double[][][],
+    shapeW1NumLayers : Int[],
+    shapeW1Phases : Bool[][],
+    shapeURepLayerAngles : Double[][][],
+    shapeUNumLayers : Int[],
+    shapeUPhases : Bool[][],
+}
+
+/// Applies fast grouped MPS sequential state preparation on the system qubit array.
+/// Ancilla qubits are allocated internally (they start and end in |0⟩).
+operation ApplyMPSSequentialGroupedFast(
+    params : MPSSequentialGroupedFastParams,
+    qubits : Qubit[]
+) : Unit {
+    use ancilla = Qubit[params.numAncillaQubits];
+
+    // Initialize phase gradient register
+    use phaseGradient = Qubit[params.rotationBits];
+    PreparePhaseGradientState(phaseGradient);
+
+    // Single shared angle register
+    use angleReg = Qubit[params.rotationBits];
+
+    // Prepare initial state
+    let initReg = ancilla + qubits[0..1];
+    QroamStatePrep(params.initialStateVec, Reversed(initReg), phaseGradient, angleReg);
+
+    // Apply site unitaries with per-shape caching
+    for siteIdx in 0..params.numSites - 2 {
+        let newSite = qubits[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let shapeIdx = params.siteShapeIndices[siteIdx];
+        let effectiveBits = params.shapeEffectiveBits[shapeIdx];
+        if BeginEstimateCaching("SiteUnitary", shapeIdx) {
+            SiteUnitaryFast(
+                params.shapeVRepLayerAngles[shapeIdx],
+                params.shapeVNumLayers[shapeIdx],
+                params.shapeVPhases[shapeIdx],
+                params.shapeRot0Angles[shapeIdx],
+                params.shapeRot1Angles[shapeIdx],
+                params.shapeRot2Angles[shapeIdx],
+                params.shapeW0RepLayerAngles[shapeIdx],
+                params.shapeW0NumLayers[shapeIdx],
+                params.shapeW0Phases[shapeIdx],
+                params.shapeW1RepLayerAngles[shapeIdx],
+                params.shapeW1NumLayers[shapeIdx],
+                params.shapeW1Phases[shapeIdx],
+                params.shapeURepLayerAngles[shapeIdx],
+                params.shapeUNumLayers[shapeIdx],
+                params.shapeUPhases[shapeIdx],
+                newSite,
+                ancilla[0..effectiveBits - 1],
+                phaseGradient,
+                angleReg
+            );
+            EndEstimateCaching();
+        }
+    }
+
+    // Undo phase gradient state
+    Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+/// Returns a Qubit[] => Unit callable for fast grouped MPS sequential state preparation.
+function MakeMPSSequentialOpGroupedFast(params : MPSSequentialGroupedFastParams) : Qubit[] => Unit {
+    ApplyMPSSequentialGroupedFast(params, _)
 }

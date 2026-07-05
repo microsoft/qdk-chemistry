@@ -12,7 +12,7 @@ import QDKChemistry.Utils.SelectSwap.ControlledQroamCleanRotation;
 import QDKChemistry.Utils.SelectSwap.QroamCleanRotation;
 import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
 
-export ApplyGivensLayer, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, ApplyBlockDiagUnitaryViaGivens, IncrementByOne, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial;
+export ApplyGivensLayer, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, ApplyBlockDiagUnitaryViaGivens, IncrementByOne, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial, ApplyRealUnitaryViaGivensFast, ApplyControlledRealUnitaryViaGivensFast, ApplyBlockDiagUnitaryViaGivensFast;
 
 /// # Summary
 /// Increments a little-endian register by 1 (mod 2^n).
@@ -586,6 +586,152 @@ operation ApplyBlockDiagUnitaryViaGivens(
     }
 
     // Phase correction on the joint register via Reed-Muller polynomial
+    if Length(phaseFlipData) > 0 {
+        mutable hasFlips = false;
+        for row in phaseFlipData {
+            if Length(row) > 0 and row[0] {
+                set hasFlips = true;
+            }
+        }
+        if hasFlips {
+            mutable phases : Bool[] = [];
+            for row in phaseFlipData {
+                set phases += [Length(row) > 0 and row[0]];
+            }
+            ApplyPhasePolynomial(phases, Reversed(jointReg));
+        }
+    }
+}
+
+// =============================================================================
+// Fast resource estimation variants using RepeatEstimates
+// =============================================================================
+// These accept only 2 representative layers (one non-shifted, one shifted) plus
+// the total layer count. They call BeginEstimateCaching only twice and use
+// RepeatEstimates to inform the resource estimator of the total repetitions.
+// This eliminates both the O(dim^2) data serialization and the O(dim) loop overhead.
+
+/// # Summary
+/// Fast resource estimation variant of ApplyRealUnitaryViaGivens.
+///
+/// # Description
+/// Accepts exactly 2 representative layer angle arrays (index 0 = non-shifted,
+/// index 1 = shifted) and the total number of layers. Uses RepeatEstimates to
+/// multiply the single-layer cost by the appropriate count.
+operation ApplyRealUnitaryViaGivensFast(
+    repLayerAngles : Double[][],
+    numLayers : Int,
+    phaseFlipData : Bool[][],
+    numAddresses : Int,
+    rotationBits : Int,
+    cacheId : Int,
+    target : Qubit[],
+    phaseGradient : Qubit[],
+    angleReg : Qubit[]
+) : Unit {
+    // Iterate over all layers using cache hits.
+    // Only 2 representative layers are provided; the cache ensures that
+    // each variant (shifted/non-shifted) is traced once and reused.
+    for i in 0..numLayers - 1 {
+        let shifted = i % 2 == 1;
+        let variant = Length(target) * 2 + (if shifted { 1 } else { 0 });
+        if BeginEstimateCaching($"GivensLayer_{cacheId}", variant) {
+            let layerIdx = if shifted { 1 } else { 0 };
+            let quantized = QuantizeGivensAngles(repLayerAngles[layerIdx], numAddresses, rotationBits);
+            ApplyGivensLayer(quantized, shifted, target, phaseGradient, angleReg);
+            EndEstimateCaching();
+        }
+    }
+
+    // Phase correction
+    if Length(phaseFlipData) > 0 {
+        mutable hasFlips = false;
+        for row in phaseFlipData {
+            if Length(row) > 0 and row[0] {
+                set hasFlips = true;
+            }
+        }
+        if hasFlips {
+            mutable phases : Bool[] = [];
+            for row in phaseFlipData {
+                set phases += [Length(row) > 0 and row[0]];
+            }
+            ApplyPhasePolynomial(phases, Reversed(target));
+        }
+    }
+}
+
+/// # Summary
+/// Fast resource estimation variant of ApplyControlledRealUnitaryViaGivens.
+operation ApplyControlledRealUnitaryViaGivensFast(
+    repLayerAngles : Double[][],
+    numLayers : Int,
+    phaseFlipData : Bool[][],
+    numAddresses : Int,
+    rotationBits : Int,
+    cacheId : Int,
+    target : Qubit[],
+    phaseGradient : Qubit[],
+    control : Qubit,
+    angleReg : Qubit[]
+) : Unit {
+    for i in 0..numLayers - 1 {
+        let shifted = i % 2 == 1;
+        let variant = Length(target) * 2 + (if shifted { 1 } else { 0 });
+        if BeginEstimateCaching($"ControlledGivensLayer_{cacheId}", variant) {
+            let layerIdx = if shifted { 1 } else { 0 };
+            let quantized = QuantizeGivensAngles(repLayerAngles[layerIdx], numAddresses, rotationBits);
+            ApplyControlledGivensLayer(quantized, shifted, target, phaseGradient, control, angleReg);
+            EndEstimateCaching();
+        }
+    }
+
+    // Controlled phase correction
+    if Length(phaseFlipData) > 0 {
+        mutable hasFlips = false;
+        for row in phaseFlipData {
+            if Length(row) > 0 and row[0] {
+                set hasFlips = true;
+            }
+        }
+        if hasFlips {
+            let dim = Length(phaseFlipData);
+            mutable extendedPhases : Bool[] = Repeated(false, dim);
+            for row in phaseFlipData {
+                set extendedPhases += [Length(row) > 0 and row[0]];
+            }
+            ApplyPhasePolynomial(extendedPhases, Reversed(target) + [control]);
+        }
+    }
+}
+
+/// # Summary
+/// Fast resource estimation variant of ApplyBlockDiagUnitaryViaGivens.
+operation ApplyBlockDiagUnitaryViaGivensFast(
+    repLayerAngles : Double[][],
+    numLayers : Int,
+    phaseFlipData : Bool[][],
+    numAddresses : Int,
+    rotationBits : Int,
+    cacheId : Int,
+    target : Qubit[],
+    subspace : Qubit[],
+    phaseGradient : Qubit[],
+    angleReg : Qubit[]
+) : Unit {
+    let jointReg = subspace + target;
+    for i in 0..numLayers - 1 {
+        let shifted = i % 2 == 1;
+        let variant = Length(jointReg) * 2 + (if shifted { 1 } else { 0 });
+        if BeginEstimateCaching($"BlockDiagGivensLayer_{cacheId}", variant) {
+            let layerIdx = if shifted { 1 } else { 0 };
+            let quantized = QuantizeGivensAngles(repLayerAngles[layerIdx], numAddresses, rotationBits);
+            ApplyGivensLayer(quantized, shifted, jointReg, phaseGradient, angleReg);
+            EndEstimateCaching();
+        }
+    }
+
+    // Phase correction on joint register
     if Length(phaseFlipData) > 0 {
         mutable hasFlips = false;
         for row in phaseFlipData {

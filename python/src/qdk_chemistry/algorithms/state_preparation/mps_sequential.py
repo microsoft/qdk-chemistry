@@ -64,8 +64,16 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
             "fast_resource_estimation",
             "bool",
             False,
-            "Only synthesize one site unitary to reduce classical preprocessing overhead. "
-            "Valid for resource estimation (with BeginEstimateCaching) but not simulation.",
+            "Synthesize one representative per shape group and use BeginEstimateCaching to "
+            "replicate cost. Valid for resource estimation only — not simulation.",
+        )
+        self._set_default(
+            "fast_grouped_resource_estimation",
+            "bool",
+            False,
+            "Like fast_resource_estimation but with O(dim) serialization instead of O(dim^2). "
+            "Sends only 2 representative Givens layers per matrix plus the layer count. "
+            "Faster for large bond dimensions (chi >= 2000).",
         )
 
 
@@ -116,14 +124,18 @@ class MPSSequentialStatePreparation(StatePreparation):
             raise TypeError(f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
 
         fast_re = self._settings.get("fast_resource_estimation")
+        fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")
 
-        data = generate_mps_preparation_data(wavefunction.tensors, fast_resource_estimation=fast_re)
+        data = generate_mps_preparation_data(wavefunction.tensors, fast_resource_estimation=fast_re or fast_grouped_re)
 
         rotation_bits = self._settings.get("rotation_bits")
 
         if fast_re:
             params = data.to_qsharp_params_grouped(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
+        elif fast_grouped_re:
+            params = data.to_qsharp_params_grouped_fast(rotation_bits)
+            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGroupedFast
         else:
             params = data.to_qsharp_params(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
@@ -137,6 +149,9 @@ class MPSSequentialStatePreparation(StatePreparation):
         if fast_re:
             op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedParams(**params)
             qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGrouped(op_params)
+        elif fast_grouped_re:
+            op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedFastParams(**params)
+            qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGroupedFast(op_params)
         else:
             op_params = QSHARP_UTILS.MPSSequential.MPSSequentialParams(**params)
             qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOp(op_params)
@@ -294,6 +309,49 @@ class MPSPreparationData:
         }
         return params
 
+    def to_qsharp_params_grouped_fast(self, rotation_bits: int) -> dict:
+        """Flatten into the dict expected by MakeMPSSequentialCircuitGroupedFast.
+
+        Passes only 2 representative layers per Givens matrix (one non-shifted,
+        one shifted) plus the total layer count. This reduces serialization from
+        O(dim^2) to O(dim) and enables RepeatEstimates on the Q# side.
+        """
+        assert self.site_shape_indices is not None, "Grouped mode requires site_shape_indices"
+        assert self.shape_effective_bits is not None, "Grouped mode requires shape_effective_bits"
+
+        def _rep_layers(givens: GivensLayerData) -> list[list[float]]:
+            """Extract at most 2 representative layers (non-shifted, shifted)."""
+            if len(givens.layer_angles) == 0:
+                return []
+            if len(givens.layer_angles) == 1:
+                return [givens.layer_angles[0]]
+            return [givens.layer_angles[0], givens.layer_angles[1]]
+
+        params: dict = {
+            "initialStateVec": self.initial_state_vec,
+            "numSites": self.num_sites,
+            "rotationBits": rotation_bits,
+            "numAncillaQubits": self.ancilla_bits,
+            "siteShapeIndices": self.site_shape_indices,
+            "shapeEffectiveBits": self.shape_effective_bits,
+            "shapeVRepLayerAngles": [_rep_layers(s.v) for s in self.sites],
+            "shapeVNumLayers": [len(s.v.layer_angles) for s in self.sites],
+            "shapeVPhases": [s.v.phases for s in self.sites],
+            "shapeRot0Angles": [s.rot_angles[0] for s in self.sites],
+            "shapeRot1Angles": [s.rot_angles[1] for s in self.sites],
+            "shapeRot2Angles": [s.rot_angles[2] for s in self.sites],
+            "shapeW0RepLayerAngles": [_rep_layers(s.w0) for s in self.sites],
+            "shapeW0NumLayers": [len(s.w0.layer_angles) for s in self.sites],
+            "shapeW0Phases": [s.w0.phases for s in self.sites],
+            "shapeW1RepLayerAngles": [_rep_layers(s.w1) for s in self.sites],
+            "shapeW1NumLayers": [len(s.w1.layer_angles) for s in self.sites],
+            "shapeW1Phases": [s.w1.phases for s in self.sites],
+            "shapeURepLayerAngles": [_rep_layers(s.u) for s in self.sites],
+            "shapeUNumLayers": [len(s.u.layer_angles) for s in self.sites],
+            "shapeUPhases": [s.u.phases for s in self.sites],
+        }
+        return params
+
 
 # ---------------------------------------------------------------------------
 # Unitary synthesis helpers
@@ -427,21 +485,21 @@ def _make_dummy_site_data(effective_dim: int) -> SiteUnitaryData:
     # V is always empty (absorbed into previous site)
     v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
 
-    # W0, W1: Clements decomposition of dim×dim unitary produces exactly `dim` layers
+    # W0, W1: Clements decomposition of dim*dim unitary produces exactly `dim` layers
     w0_givens = _make_dummy_givens_layers(dim)
     w1_givens = _make_dummy_givens_layers(dim)
 
     # UCR rotation angles: array length = dim (resource cost depends on length)
     rot_angles = [[0.1] * dim for _ in range(3)]
 
-    # U: block-diagonal of 4 dim×dim blocks, merged into global layers
+    # U: block-diagonal of 4 dim*dim blocks, merged into global layers
     u_givens = _make_dummy_block_diagonal_layers(dim, num_blocks=4)
 
     return SiteUnitaryData(v=v_givens, rot_angles=rot_angles, w0=w0_givens, w1=w1_givens, u=u_givens)
 
 
 def _make_dummy_givens_layers(dim: int) -> GivensLayerData:
-    """Create dummy Givens layer structure for a dim×dim Clements decomposition.
+    """Create dummy Givens layer structure for a dim*dim Clements decomposition.
 
     The Clements decomposition always produces exactly `dim` layers with
     alternating even/odd pair structure. This runs in O(dim) time.
@@ -466,8 +524,8 @@ def _make_dummy_givens_layers(dim: int) -> GivensLayerData:
 def _make_dummy_block_diagonal_layers(dim: int, num_blocks: int = 4) -> GivensLayerData:
     """Create dummy merged Givens layers for a block-diagonal unitary.
 
-    Simulates the merge of `num_blocks` Clements decompositions (each dim×dim)
-    into global layers of the full (num_blocks*dim)×(num_blocks*dim) register.
+    Simulates the merge of `num_blocks` Clements decompositions (each dim*dim)
+    into global layers of the full (num_blocks*dim)*(num_blocks*dim) register.
     Runs in O(num_blocks * dim) time instead of O(dim³).
     """
     total_dim = num_blocks * dim

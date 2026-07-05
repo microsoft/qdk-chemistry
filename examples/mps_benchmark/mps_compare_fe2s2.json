@@ -1,0 +1,220 @@
+{
+  "parameters": {
+    "phase_bits": 10,
+    "architecture": "Majorana(error_rate=1e-5)",
+    "isa": "ThreeAux + RoundBasedFactory",
+    "max_error": 0.01
+  },
+  "datasets": {
+    "fe2s2": {
+      "label": "Fe2S2-2_small (20 sites)",
+      "num_sites": 20,
+      "num_qubits": 40,
+      "bond_dims": [
+        1,
+        4,
+        16,
+        64,
+        249,
+        742,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        871,
+        255,
+        64,
+        16,
+        4,
+        1
+      ],
+      "max_bond_dim": 1000,
+      "sequential": {
+        "logical_toffoli": 12473297,
+        "logical_qubits": 245,
+        "build_time_s": 2.52,
+        "physical_qubits": 182551,
+        "runtime_ns": 22261073625000,
+        "compute_distance": 9,
+        "compute_qubits": 172056,
+        "num_ts_per_rotation": 13,
+        "factories": [
+          {
+            "copies": 1,
+            "runs": 50364419,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 49896050
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "qre_time_s": 30.35,
+        "pareto_front": [
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 182551,
+            "runtime": 22261.073625,
+            "error": 0.006212756036416283,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 188800,
+            "runtime": 14134.015,
+            "error": 0.0059354876482200156,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 193046,
+            "runtime": 12114.87,
+            "error": 0.005924685189065587,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 197172,
+            "runtime": 9893.8105,
+            "error": 0.006016708479595579,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 203541,
+            "runtime": 7420.357875,
+            "error": 0.005977498968231439,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 213916,
+            "runtime": 6057.435,
+            "error": 0.005892277811602302,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 222288,
+            "runtime": 4946.90525,
+            "error": 0.005938289456867299,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 230660,
+            "runtime": 4038.29,
+            "error": 0.0058814753524478736,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sequential",
+            "qubits": 237400,
+            "runtime": 1615.317984,
+            "error": 0.009238327015962186,
+            "factories": "16\u00d7T"
+          }
+        ]
+      },
+      "sparse": {
+        "logical_toffoli": 345654,
+        "logical_qubits": 296,
+        "build_time_s": 61.06,
+        "physical_qubits": 127750,
+        "runtime_ns": 401260392000,
+        "compute_distance": 7,
+        "compute_qubits": 123906,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 1,
+            "runs": 1393265,
+            "error_rate": 1.471563351790282e-09,
+            "states": 1385694
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "qre_time_s": 5.69,
+        "pareto_front": [
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 127750,
+            "runtime": 401.260392,
+            "error": 0.008311297117243668,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 128434,
+            "runtime": 256.06112,
+            "error": 0.00853399142531693,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 130568,
+            "runtime": 219.48096,
+            "error": 0.008340605477812839,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 130698,
+            "runtime": 178.32828,
+            "error": 0.009349891139444507,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 132962,
+            "runtime": 133.74621,
+            "error": 0.008807490802780453,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 135226,
+            "runtime": 109.74048,
+            "error": 0.007760447635300563,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 137490,
+            "runtime": 89.16414,
+            "error": 0.008265090466116396,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 139754,
+            "runtime": 73.16032,
+            "error": 0.007567061687796472,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 151074,
+            "runtime": 44.58207,
+            "error": 0.007722690129452342,
+            "factories": "12\u00d7T"
+          },
+          {
+            "name": "Fe2S2-2_small (20 sites) Sparse",
+            "qubits": 155602,
+            "runtime": 36.58016,
+            "error": 0.007373675740292379,
+            "factories": "14\u00d7T"
+          }
+        ]
+      },
+      "comparison": {
+        "toffoli_ratio_seq_over_sparse": 36.0861,
+        "qubit_ratio_seq_over_sparse": 0.8277
+      }
+    }
+  }
+}

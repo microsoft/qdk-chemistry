@@ -1,0 +1,263 @@
+{
+  "parameters": {
+    "molecules": [
+      "Fe2S2-20"
+    ],
+    "site_dim": 4,
+    "phase_bits_mps": 10,
+    "bond_dims": [
+      100,
+      1000,
+      5000,
+      10000
+    ],
+    "sigma_E": 0.001,
+    "architecture": "Majorana(error_rate=1e-5)",
+    "isa": "ThreeAux + RoundBasedFactory",
+    "max_error": 0.01
+  },
+  "Fe2S2-20": {
+    "params": {
+      "N": 20,
+      "R": 14,
+      "B": 15,
+      "C": 5,
+      "b_rot": 15,
+      "b_coeff": 11,
+      "lambda_eff": 6.469
+    },
+    "mps_only": [
+      {
+        "label": "real(DMRG)",
+        "bond_dim": 1000,
+        "logical_toffoli": 12473297,
+        "logical_qubits": 245,
+        "physical_qubits": 237400,
+        "runtime_ns": 1615317984000,
+        "compute_distance": 7,
+        "compute_qubits": 103448,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 16,
+            "runs": 3192328,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 49896266
+          }
+        ],
+        "factory_summary": "16\u00d7T"
+      },
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "logical_toffoli": 594089,
+        "logical_qubits": 117,
+        "physical_qubits": 71714,
+        "runtime_ns": 95590677000,
+        "compute_distance": 7,
+        "compute_qubits": 51338,
+        "num_ts_per_rotation": 13,
+        "factories": [
+          {
+            "copies": 9,
+            "runs": 267761,
+            "error_rate": 1.471563351790282e-09,
+            "states": 2379218
+          }
+        ],
+        "factory_summary": "9\u00d7T"
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "logical_toffoli": 12473297,
+        "logical_qubits": 245,
+        "physical_qubits": 237400,
+        "runtime_ns": 1615317984000,
+        "compute_distance": 7,
+        "compute_qubits": 103448,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 16,
+            "runs": 3192328,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 49896266
+          }
+        ],
+        "factory_summary": "16\u00d7T"
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "logical_toffoli": 280734629,
+        "logical_qubits": 441,
+        "physical_qubits": 561535,
+        "runtime_ns": 55252877407000,
+        "compute_distance": 9,
+        "compute_qubits": 302703,
+        "num_ts_per_rotation": 13,
+        "factories": [
+          {
+            "copies": 14,
+            "runs": 82590250,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 1122941378
+          }
+        ],
+        "factory_summary": "14\u00d7T"
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "logical_toffoli": 761612785,
+        "logical_qubits": 751,
+        "physical_qubits": 821797,
+        "runtime_ns": 122231675160000,
+        "compute_distance": 9,
+        "compute_qubits": 507501,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 182708034,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 3046454218
+          }
+        ],
+        "factory_summary": "17\u00d7T"
+      }
+    ],
+    "qpe_hf": {
+      "label": "QPE(HF)",
+      "logical_toffoli": 52327302,
+      "logical_qubits": 450,
+      "physical_qubits": 400573,
+      "runtime_ns": 10219320636000,
+      "compute_distance": 9,
+      "compute_qubits": 308481,
+      "num_ts_per_rotation": 14,
+      "factories": [
+        {
+          "copies": 11,
+          "runs": 20196285,
+          "error_rate": 1.4397919091038791e-11,
+          "states": 209316387
+        }
+      ],
+      "factory_summary": "11\u00d7T"
+    },
+    "mps_plus_qpe": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "mps_toffoli": 594089,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 52921391,
+        "logical_qubits": 450,
+        "physical_qubits": 400573,
+        "runtime_ns": 10339403515000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 11,
+            "runs": 20433603,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 211695821
+          }
+        ],
+        "factory_summary": "11\u00d7T"
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "mps_toffoli": 12473297,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 64800599,
+        "logical_qubits": 450,
+        "physical_qubits": 400573,
+        "runtime_ns": 12692755033000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 11,
+            "runs": 25084496,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 259212653
+          }
+        ],
+        "factory_summary": "11\u00d7T"
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "mps_toffoli": 280734629,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 333061931,
+        "logical_qubits": 548,
+        "physical_qubits": 632476,
+        "runtime_ns": 65472179815000,
+        "compute_distance": 9,
+        "compute_qubits": 373644,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 14,
+            "runs": 97865739,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 1332257981
+          }
+        ],
+        "factory_summary": "14\u00d7T"
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "mps_toffoli": 761612785,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 813940087,
+        "logical_qubits": 858,
+        "physical_qubits": 892096,
+        "runtime_ns": 130573965520000,
+        "compute_distance": 9,
+        "compute_qubits": 577800,
+        "num_ts_per_rotation": 15,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 195177825,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 3255771328
+          }
+        ],
+        "factory_summary": "17\u00d7T"
+      },
+      {
+        "label": "real(DMRG)",
+        "bond_dim": 1000,
+        "mps_toffoli": 12473297,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 64800599,
+        "logical_qubits": 450,
+        "physical_qubits": 400573,
+        "runtime_ns": 12692755033000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 11,
+            "runs": 25084496,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 259212653
+          }
+        ],
+        "factory_summary": "11\u00d7T"
+      }
+    ]
+  }
+}
