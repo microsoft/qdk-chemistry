@@ -191,22 +191,19 @@ operation MPSSparse(
     // Apply sparse site unitaries
     for siteIdx in 0..numSites - 2 {
         let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
-        if BeginEstimateCaching("SparseSiteUnitary", SingleVariant()) {
-            SparseSiteUnitary(
-                siteColPermTargets[siteIdx],
-                siteColInvPermTargets[siteIdx],
-                siteRowPermTargets[siteIdx],
-                siteRowInvPermTargets[siteIdx],
-                siteBlockLayerAngles[siteIdx],
-                siteBlockLayerShifted[siteIdx],
-                siteBlockPhases[siteIdx],
-                newSite,
-                ancilla,
-                phaseGradient,
-                angleReg
-            );
-            EndEstimateCaching();
-        }
+        SparseSiteUnitary(
+            siteColPermTargets[siteIdx],
+            siteColInvPermTargets[siteIdx],
+            siteRowPermTargets[siteIdx],
+            siteRowInvPermTargets[siteIdx],
+            siteBlockLayerAngles[siteIdx],
+            siteBlockLayerShifted[siteIdx],
+            siteBlockPhases[siteIdx],
+            newSite,
+            ancilla,
+            phaseGradient,
+            angleReg
+        );
     }
 
     // Undo phase gradient state

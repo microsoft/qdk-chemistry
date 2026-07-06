@@ -494,7 +494,7 @@ class TestMPSSparseResourceEstimate:
         result = circuit.estimate()
         counts = result.logical_counts
 
-        assert counts["cczCount"] > 0
+        assert counts["cczCount"] >= QUALTRAN_COST_SPARSE["toffoli"]
         # Allow up to 5x Qualtran (different decomposition choices)
         assert counts["cczCount"] <= QUALTRAN_COST_SPARSE["toffoli"] * 5
 
