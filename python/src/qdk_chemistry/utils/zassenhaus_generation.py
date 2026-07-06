@@ -298,4 +298,9 @@ def zassenhaus_commutator_plan(
     valid evaluation order.
     """
     leaf_tuple = _normalize_leaves(leaves)
-    return _cached_zassenhaus_commutator_plan(leaf_tuple, max_order)
+    cached_exponents, cached_plan = _cached_zassenhaus_commutator_plan(leaf_tuple, max_order)
+
+    # Return fresh copies to prevent caller mutation from corrupting the cached objects
+    exponents_copy = {k: dict(v) for k, v in cached_exponents.items()}
+    plan_copy = dict(cached_plan)
+    return exponents_copy, plan_copy
