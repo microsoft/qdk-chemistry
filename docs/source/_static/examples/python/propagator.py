@@ -36,7 +36,7 @@ td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=lambda t: np.sin(2 * np.pi
 propagator = registry.create("propagator", "magnus")
 h_eff = propagator.run(td_hamiltonian, t_start=0.0, t_end=0.1)
 
-print(f"Effective Hamiltonian has {h_eff.num_terms} Pauli terms")
+print(f"Effective Hamiltonian has {len(h_eff.pauli_strings)} Pauli terms")
 # end-cell-run
 ################################################################################
 

@@ -68,7 +68,7 @@ observables = [h0]  # Measure ZZ energy after evolution
 results = sim.run(td_hamiltonian, observables, state_prep, shots=1000)
 
 for energy_result, measurement_data in results:
-    print(f"Energy: {energy_result.energy:.4f}")
+    print(f"Energy: {energy_result.energy_expectation_value:.4f}")
 # end-cell-run
 ################################################################################
 
