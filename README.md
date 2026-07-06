@@ -66,7 +66,7 @@ This deploys:
 |--------|----------------|--------|
 | `vscode` | `.github/copilot-instructions.md` | Baseline instructions: use skills first, agents for complex workflows |
 | | `.github/agents/` | Multi-agent orchestration (quantum-agent, chemist, researcher, reviewer, reporter) |
-| | `.github/skills/` | Domain knowledge (overview, MCP tools, Python SDK) |
+| | `.github/skills/` | Domain knowledge (overview, MCP tools, Python SDK, remote execution) |
 | | `.vscode/mcp.json` (generated) | MCP server config auto-detected from current environment |
 | `copilot` | `copilot-instructions.md` | Full MCP tool reference for Copilot CLI |
 | `claude` | `CLAUDE.md` | Full MCP tool reference for Claude Code |

@@ -15,6 +15,7 @@
 import functools
 import inspect
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,11 +24,20 @@ from mcp.server.fastmcp import FastMCP
 
 from qdk_chemistry import algorithms, constants, data
 from qdk_chemistry.data import AlgorithmRef
-from qdk_chemistry.remote.cache import available_caches, resolve_cache
-from qdk_chemistry.remote.cache.folder import FolderCache
+
+# Remote execution support — optional; the MCP server works without it.
+try:
+    from qdk_chemistry.remote.backends.base import available_backends
+    from qdk_chemistry.remote.cache import available_caches, resolve_cache
+    from qdk_chemistry.remote.cache.folder import FolderCache
+
+    _REMOTE_AVAILABLE = True
+except Exception:  # noqa: BLE001  # ImportError, ModuleNotFoundError, or build issues
+    _REMOTE_AVAILABLE = False
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.remote.job import Job
 from qdk_chemistry.utils import (
     compute_valence_space_parameters,
 )
@@ -82,6 +92,19 @@ def _is_success_string(s: str) -> bool:
     return bool(" " not in s and len(s) < 100)
 
 
+class _JobSubmittedError(Exception):
+    """Raised by ``_run_algorithm`` when a remote job is still running.
+
+    Caught by ``_structured`` to produce a ``{"status": "submitted", ...}``
+    envelope instead of letting the tool body crash on tuple unpacking.
+
+    """
+
+    def __init__(self, job: Job):
+        self.job = job
+        super().__init__(f"Job {job.job_id} submitted but not yet complete.")
+
+
 def _wrap_result(result):
     """Convert a raw tool result into a structured ``{status, result/message}`` envelope."""
     if isinstance(result, Path):
@@ -114,6 +137,20 @@ def _structured(func):
     def wrapper(*args, **kwargs):
         try:
             result = func(*args, **kwargs)
+        except _JobSubmittedError as sig:
+            job = sig.job
+            return {
+                "status": "submitted",
+                "message": "Job submitted but not yet complete. Use check_remote_job to monitor.",
+                "job": {
+                    "job_id": job.job_id,
+                    "job_file": str(job.file_path) if job.file_path else None,
+                    "backend": job.backend,
+                    "status": job.status,
+                    "run_hash": job.run_hash,
+                    "submitted_at": job.submitted_at,
+                },
+            }
         except Exception as e:  # noqa: BLE001
             return {"status": "error", "message": str(e), "error_type": type(e).__name__}
         return _wrap_result(result)
@@ -227,7 +264,9 @@ def _apply_settings(algorithm, settings: dict | None) -> None:
         algorithm.settings().set(key, value)
 
 
-def _run_algorithm(algorithm, *args, cache=None, overwrite=False, **kwargs):
+def _run_algorithm(
+    algorithm, *args, cache=None, remote=None, remote_config=None, remote_timeout=120, overwrite=False, **kwargs
+):
     """Execute an algorithm with automatic caching.
 
     Every run is cached by default so that identical computations are
@@ -237,17 +276,85 @@ def _run_algorithm(algorithm, *args, cache=None, overwrite=False, **kwargs):
     backend name, or ``CacheBackend`` instance), it is used instead —
     this includes shared caches, ``TieredCache``, CosmosDB, etc.
     """
-    # Always use a cache so that identical local runs are
+    if not _REMOTE_AVAILABLE and (cache is not None or remote is not None):
+        return "Remote/cache execution is not available. The qdk_chemistry.remote module could not be imported."
+
+    # Always use a cache so that identical local or remote runs are
     # never recomputed.  When the caller supplies an explicit cache it
     # takes precedence; otherwise a default FolderCache under
     # config.cache_dir is used.
     if cache is not None:
         resolved_cache = resolve_cache(cache)
-    else:
+    elif _REMOTE_AVAILABLE:
         resolved_cache = FolderCache(path=config.cache_dir)
+    else:
+        # Remote module unavailable and no explicit cache — run without.
+        return algorithm.run(*args, **kwargs)
 
-    sdk_kwargs: dict[str, Any] = {"cache": resolved_cache, "force_rerun": overwrite}
+    # If remote is a name string and remote_config is provided,
+    # create a pre-configured backend instance so the SDK receives
+    # the full configuration.
+    resolved_remote = remote
+    if isinstance(remote, str) and remote_config:
+        from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+        resolved_remote = get_backend(remote, **remote_config)
+        resolved_remote.connect()
+
+    sdk_kwargs: dict[str, Any] = {
+        "cache": resolved_cache,
+        "remote": resolved_remote,
+        "force_rerun": overwrite,
+    }
+
+    # For remote jobs with a timeout, run in a thread so we can
+    # return early if the job is still running.  The thread continues
+    # in the background — the SDK will complete and write results to
+    # the cache even after we return.
+    if remote is not None and remote_timeout is not None:
+        import concurrent.futures  # noqa: PLC0415
+
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(algorithm.run, *args, **sdk_kwargs, **kwargs)
+        try:
+            result = future.result(timeout=remote_timeout)
+        except concurrent.futures.TimeoutError:
+            # Let the thread keep running — don't wait for it.
+            pool.shutdown(wait=False)
+            # Job is still running — find it in the cache and signal
+            run_hash = _compute_run_hash(algorithm, *args, **kwargs)
+            job = resolved_cache.get_job(run_hash) if run_hash else None
+            if job is not None:
+                raise _JobSubmittedError(job) from None
+            # Could not find job in cache — generic message
+            raise _JobSubmittedError(
+                Job(
+                    job_id="unknown",
+                    backend=remote if isinstance(remote, str) else "remote",
+                    backend_config={},
+                    backend_state={},
+                    status="running",
+                    run_hash=run_hash,
+                )
+            ) from None
+        except Exception:
+            pool.shutdown(wait=False)
+            raise
+        else:
+            pool.shutdown(wait=False)
+            return result
+
+    # No timeout (cache-only, or blocking remote) — call directly
     return algorithm.run(*args, **sdk_kwargs, **kwargs)
+
+
+def _compute_run_hash(algorithm, *args, **kwargs) -> str | None:
+    """Compute the deterministic run hash, or None if not available."""
+    import contextlib  # noqa: PLC0415
+
+    with contextlib.suppress(Exception):
+        return algorithm.hash(*args, **kwargs)
+    return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -265,14 +372,36 @@ def list_cache_backends() -> dict:
     ``run_*`` tool to enable result caching.
 
     Built-in backends include ``"folder"`` (local directory) and
-    ``"tiered"`` (layered caches). Additional backends are available
-    as plugins.
+    ``"tiered"`` (layered local + remote). Additional backends
+    are available as plugins.
 
     Returns:
         Dict with ``backends`` list of registered cache backend names.
 
     """
+    if not _REMOTE_AVAILABLE:
+        return {"backends": [], "note": "Remote/cache module not available."}
     return {"backends": available_caches()}
+
+
+@app.tool()
+@_structured
+def list_remote_backends() -> dict:
+    """List the registered remote execution backend names.
+
+    Returns the names of all remote execution backends that are currently
+    installed and available. Use a name with the ``remote`` parameter of
+    any ``run_*`` tool to execute the algorithm on a remote backend.
+
+    Built-in backends include ``"local"`` and ``"ssh"``.
+
+    Returns:
+        Dict with ``backends`` list of registered remote backend names.
+
+    """
+    if not _REMOTE_AVAILABLE:
+        return {"backends": [], "note": "Remote/cache module not available."}
+    return {"backends": available_backends()}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -575,8 +704,13 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "visualize_circuit",
         "visualize_scatter_plot",
     ],
-    "caching": [
+    "remote_execution": [
+        "check_remote_job",
+        "retrieve_remote_results",
+        "list_remote_jobs",
+        "cancel_remote_job",
         "list_cache_backends",
+        "list_remote_backends",
         "describe_backend",
     ],
 }
@@ -592,7 +726,8 @@ def list_tools(category: str | None = None) -> dict:
 
     Categories: ``project``, ``data_inspection``, ``utility``,
     ``input_construction``, ``classical_calculation``,
-    ``quantum_preparation``, ``qpe``, ``visualization``, ``caching``.
+    ``quantum_preparation``, ``qpe``, ``visualization``,
+    ``remote_execution``.
 
     Args:
         category (str, optional): Filter to a single category.
@@ -734,28 +869,35 @@ def convert_energy(
 @app.tool()
 @_structured
 def describe_backend(backend_type: str, name: str) -> dict | str:
-    """Describe the configuration parameters for a cache backend.
+    """Describe the configuration parameters for a cache or remote backend.
 
     Returns the ``__init__`` parameter names, types, and defaults so an
-    agent can construct a valid ``cache_config`` dict.
+    agent can construct a valid ``remote_config`` or ``cache_config`` dict.
 
     Args:
-        backend_type: Must be ``"cache"``.
-        name: The registered backend name (e.g. ``"folder"``).
+        backend_type: Either ``"cache"`` or ``"remote"``.
+        name: The registered backend name (e.g. ``"folder"``, ``"ssh"``).
 
     Returns:
         Dict with ``name``, ``parameters`` list describing each
         constructor kwarg, and ``docstring``.
 
     """
+    if not _REMOTE_AVAILABLE:
+        return "Remote/cache module not available."
+
     import inspect as _inspect  # noqa: PLC0415
 
     if backend_type == "cache":
         from qdk_chemistry.remote.cache import _CACHES  # noqa: PLC0415
 
         registry = _CACHES
+    elif backend_type == "remote":
+        from qdk_chemistry.remote.backends.base import _BACKENDS  # noqa: PLC0415
+
+        registry = _BACKENDS
     else:
-        return f"backend_type must be 'cache', got '{backend_type}'"
+        return f"backend_type must be 'cache' or 'remote', got '{backend_type}'"
 
     if name not in registry:
         return f"No {backend_type} backend registered with name '{name}'. Available: {', '.join(registry)}"
@@ -1134,6 +1276,9 @@ def run_active_space_selector(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Select active space orbitals from the a serialized wavefunction and save (serialize) a new wavefunction.
@@ -1219,6 +1364,9 @@ def run_active_space_selector(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -1256,6 +1404,9 @@ def run_active_space_selector(
         active_space_selector,
         wavefunction,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
 
@@ -1275,6 +1426,9 @@ def run_dynamical_correlation_calculator(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
     """Run dynamical correlation calculator.
@@ -1322,6 +1476,9 @@ def run_dynamical_correlation_calculator(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -1356,6 +1513,9 @@ def run_dynamical_correlation_calculator(
         dyn_corr_calculator,
         ansatz,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
     # Algorithm returns (energy, correlated_wavefunction[, original_wavefunction])
@@ -1376,6 +1536,9 @@ def run_hamiltonian_constructor(
     orbitals_filename: str,
     out_hamiltonian_filename: str,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Use the Hamiltonian constructor class to create a hamiltonian object and save to file.
@@ -1418,6 +1581,9 @@ def run_hamiltonian_constructor(
             Can come from a full SCF wavefunction (small systems) or an active-space wavefunction (larger systems).
         out_hamiltonian_filename (str): Name of the file where the output hamiltonian will be saved
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -1444,6 +1610,9 @@ def run_hamiltonian_constructor(
         ham_constructor,
         orbitals,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
 
@@ -1805,6 +1974,9 @@ def run_orbital_localization(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Localize the orbitals of an input wavefunction and save to file.
@@ -1850,6 +2022,9 @@ def run_orbital_localization(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -1910,6 +2085,9 @@ def run_stability_checker(
     out_stability_result_filename: str,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[bool, str]:
     """Check the stability of the given wavefunction with respect to orbital rotation.
@@ -1944,6 +2122,9 @@ def run_stability_checker(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -1998,6 +2179,8 @@ def run_qubit_hamiltonian_solver(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
 ) -> str | tuple[float, list]:
     """Solve a qubit Hamiltonian to get the ground state energy and wavefunction.
 
@@ -2033,6 +2216,8 @@ def run_qubit_hamiltonian_solver(
         settings (Dict, optional): A dictionary of key-value pairs specifying which settings keys
             to replace with specific values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
 
     Returns:
         Tuple[float, List]: The ground state energy and corresponding eigenstate (statevector) as a list
@@ -2055,6 +2240,8 @@ def run_qubit_hamiltonian_solver(
         qubit_hamiltonian_solver,
         qubit_hamiltonian,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
     )
 
     return (energy, eigenstate.tolist())
@@ -2074,6 +2261,9 @@ def run_energy_estimator(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[str, str]:
     """Estimate the expectation value and variance of a Hamiltonian from a quantum circuit.
@@ -2120,6 +2310,9 @@ def run_energy_estimator(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2175,6 +2368,9 @@ def run_energy_estimator(
         total_shots,
         noise_model,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
 
@@ -2195,6 +2391,9 @@ def run_qubit_mapper(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Map a fermionic Hamiltonian to a qubit Hamiltonian.
@@ -2254,6 +2453,9 @@ def run_qubit_mapper(
         settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
             with specific values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2285,6 +2487,9 @@ def run_qubit_mapper(
         qubit_mapper,
         hamiltonian,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
 
@@ -2304,6 +2509,9 @@ def run_state_preparation(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Prepare a quantum circuit that encodes the given wavefunction.
@@ -2365,6 +2573,9 @@ def run_state_preparation(
         settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
             with specific values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2394,6 +2605,9 @@ def run_state_preparation(
         state_prep,
         wavefunction,
         cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
         overwrite=overwrite,
     )
 
@@ -2413,6 +2627,9 @@ def run_resource_estimation(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Estimate the quantum resources required to execute a circuit.
@@ -2442,6 +2659,9 @@ def run_resource_estimation(
             uses ``Circuit.estimate`` and does not select an algorithm implementation.
         settings (Dict, optional): Estimator parameters forwarded to ``Circuit.estimate``
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
 
@@ -2466,6 +2686,8 @@ def run_resource_estimation(
 
     if cache is not None:
         return "ERROR: cache is not supported for resource estimation via Circuit.estimate()."
+    if remote is not None or remote_config is not None:
+        return "ERROR: remote execution is not supported for resource estimation via Circuit.estimate()."
 
     resource_estimator_data = _json_safe(circuit.estimate(settings))
     with open(out_resource_estimator_data_filename, "w", encoding="utf-8") as f:
@@ -2485,6 +2707,9 @@ def run_time_evolution_builder(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Build a time evolution unitary U = exp(-iHt) from a qubit Hamiltonian.
@@ -2522,6 +2747,9 @@ def run_time_evolution_builder(
         algorithm_name (str, optional): The name of the time evolution builder algorithm to use
         settings (Dict, optional): Settings overrides for the time evolution builder
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2585,6 +2813,9 @@ def run_controlled_evolution_circuit_mapper(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Map a time evolution unitary to a controlled quantum circuit.
@@ -2629,6 +2860,9 @@ def run_controlled_evolution_circuit_mapper(
         algorithm_name (str, optional): The name of the circuit mapper algorithm to use
         settings (Dict, optional): Settings overrides for the circuit mapper
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2693,6 +2927,9 @@ def run_circuit_executor(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Execute a quantum circuit on a simulator or hardware backend.
@@ -2730,6 +2967,9 @@ def run_circuit_executor(
         algorithm_name (str, optional): The name of the circuit executor algorithm to use
         settings (Dict, optional): Settings overrides for the circuit executor
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2789,6 +3029,9 @@ def run_phase_estimation(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
     """Run Quantum Phase Estimation to estimate eigenvalues of a qubit Hamiltonian.
@@ -2900,6 +3143,9 @@ def run_phase_estimation(
             Sub-algorithm overrides (``evolution_builder``, ``circuit_mapper``, ``circuit_executor``) can be
             specified as nested dicts — see the docstring above for the format.
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -2990,6 +3236,9 @@ def run_scf(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
     """Run a self-consistent field (SCF) calculation.
@@ -3052,6 +3301,9 @@ def run_scf(
             specifying which settings keys to replace with specific
             values (overrides defaults).
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -3114,6 +3366,9 @@ def run_multi_configuration_calculation(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
     """Run multi-configurational calculation.
@@ -3185,6 +3440,9 @@ def run_multi_configuration_calculation(
             specifying which settings keys to replace with specific
             values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -3257,6 +3515,9 @@ def run_multi_configuration_scf(
     mc_calculator_settings: dict | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
     """Run multi-configuration self consistent field (MCSCF) calculation.
@@ -3313,6 +3574,9 @@ def run_multi_configuration_scf(
             specifying which settings keys to replace with specific
             values for MCSCF (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -3397,6 +3661,9 @@ def run_projected_multi_configuration_calculation(
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
     """Run a projected multi-configuration calculation on a specific set of determinants.
@@ -3452,6 +3719,9 @@ def run_projected_multi_configuration_calculation(
         settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys
             to replace with specific values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
+        remote (str, optional): Remote backend identifier for remote execution
+        remote_config (dict, optional): Configuration options for the remote backend
+        remote_timeout (int): Maximum seconds to wait for a remote job
             to complete before returning a job handle. Default ``120``.
         overwrite (bool): If ``True``, overwrite existing output files
             without prompting. Default ``False``.
@@ -3638,3 +3908,266 @@ def get_circuit_stats(
         return stats
     except Exception as e:  # noqa: BLE001
         return f"Failed to analyze circuit {circuit_filename}: {e!s}"
+
+# Remote / async job tools
+# =========================
+
+
+def _require_remote() -> str | None:
+    """Return an error message if the remote module is not available."""
+    if not _REMOTE_AVAILABLE:
+        return (
+            "Remote execution is not available. "
+            "The qdk_chemistry.remote module could not be imported. "
+            "Ensure the package is built with remote support."
+        )
+    return None
+
+
+def _get_default_cache() -> FolderCache:
+    """Return the default FolderCache backed by ``config.jobs_dir``."""
+    return FolderCache(path=config.jobs_dir)
+
+
+def _discover_cached_jobs() -> list[Job]:
+    """Discover all job files in the default cache directory."""
+    jobs_dir = config.jobs_dir
+    if not jobs_dir.exists():
+        return []
+    jobs = []
+    for p in sorted(jobs_dir.glob("*.job.json")):
+        try:
+            jobs.append(Job.load(p))
+        except (json.JSONDecodeError, KeyError, OSError):
+            continue
+    return jobs
+
+
+def _load_remote_job(job_id: str):
+    """Load a Job by its job_id from the default cache directory.
+
+    Scans all cache job files to find the one matching the given job_id.
+
+    Returns:
+        (Job, None) on success, or (None, error_string) on failure.
+
+    """
+    for job in _discover_cached_jobs():
+        if job.job_id == job_id:
+            return job, None
+    return None, f"No remote job found with id '{job_id}' in {config.jobs_dir}."
+
+
+@app.tool()
+@_structured
+@validate_project
+def check_remote_job(
+    project_name: str,
+    job_id: str,
+) -> str | dict:
+    """Check the status of a previously submitted remote job.
+
+    Reads the job file from the jobs directory, queries the backend, and
+    updates the file with the latest status.
+
+    Args:
+        project_name (str): Working project directory.
+        job_id (str): The job ID (from the ``"submitted"`` status response
+            of any ``run_*`` tool with ``remote`` set, or from ``list_remote_jobs``).
+
+    Returns:
+        Dict with ``status``, ``logs``, ``submitted_at``, ``elapsed``.
+
+    """
+    err = _require_remote()
+    if err:
+        return err
+
+    job, load_err = _load_remote_job(job_id)
+    if load_err:
+        return load_err
+
+    try:
+        job_status = job.check()  # also updates & saves the job file
+    except Exception as e:  # noqa: BLE001
+        return f"Failed to query job status: {e}"
+
+    # Calculate elapsed time
+    elapsed = ""
+    if job.submitted_at:
+        try:
+            submitted_dt = datetime.fromisoformat(job.submitted_at)
+            delta = datetime.now(timezone.utc) - submitted_dt
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            elapsed = f"{hours}h {minutes}m {seconds}s"
+        except (ValueError, TypeError):
+            pass
+
+    result: dict[str, Any] = {
+        "job_id": job_id,
+        "status": job_status.status,
+        "elapsed": elapsed,
+        "submitted_at": job.submitted_at,
+        "logs": job_status.logs,
+    }
+    if job_status.error:
+        result["error"] = job_status.error
+    if job.run_hash:
+        result["run_hash"] = job.run_hash
+    if job.input_hashes:
+        result["input_hashes"] = job.input_hashes
+    if job.output_hashes:
+        result["output_hashes"] = job.output_hashes
+    return result
+
+
+@app.tool()
+@_structured
+@validate_project
+def retrieve_remote_results(
+    project_name: str,
+    job_id: str,
+) -> str | dict:
+    """Download results from a completed remote job into the project directory.
+
+    Once downloaded, the output files are available to all other qdk-chemistry
+    tools (visualization, further computation, etc.).
+
+    Args:
+        project_name (str): Working project directory.
+        job_id (str): The job ID (from the ``"submitted"`` status response
+            of any ``run_*`` tool with ``remote`` set, or from ``list_remote_jobs``).
+
+    Returns:
+        Dict with ``downloaded_files`` list and ``status``.
+
+    """
+    err = _require_remote()
+    if err:
+        return err
+
+    job, load_err = _load_remote_job(job_id)
+    if load_err:
+        return load_err
+
+    project_dir = config.projects_dir / project_name
+    try:
+        job.fetch(local_dir=project_dir)  # updates status to "retrieved" & saves
+    except Exception as e:  # noqa: BLE001
+        return f"Failed to retrieve results for job '{job_id}': {e}"
+
+    # Discover downloaded files from the manifest
+    downloaded: list[str] = []
+    primitives: dict[str, Any] = {}
+    manifest_path = project_dir / "manifest.json"
+    if manifest_path.exists():
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+
+        def _collect(entry_data: Any, name: str = "result") -> None:
+            if isinstance(entry_data, dict):
+                entry_type = entry_data.get("type")
+                if entry_data.get("file"):
+                    downloaded.append(entry_data["file"])
+                elif "value" in entry_data and entry_type in ("float", "int", "str", "bool", "none"):
+                    primitives[name] = entry_data["value"]
+                elif entry_type in ("tuple", "list") and "items" in entry_data:
+                    for i, item in enumerate(entry_data["items"]):
+                        _collect(item, f"{name}_{i}")
+                elif entry_type == "dict" and "entries" in entry_data:
+                    for k, v in entry_data["entries"].items():
+                        _collect(v, f"{name}_{k}")
+
+        for i, result_entry in enumerate(manifest.get("results", [])):
+            _collect(result_entry, f"result_{i}")
+
+        manifest_path.unlink(missing_ok=True)
+
+    return {
+        "status": "retrieved",
+        "job_id": job_id,
+        "downloaded_files": downloaded,
+        "values": primitives,
+        "output_hashes": job.output_hashes,
+    }
+
+
+@app.tool()
+@_structured
+@validate_project
+def list_remote_jobs(
+    project_name: str,
+    status_filter: str | None = None,
+) -> str | dict:
+    """List remote jobs, optionally filtered by status.
+
+    Scans the jobs/cache directory for job files.
+
+    Args:
+        project_name (str): Working project directory.
+        status_filter (str, optional): Filter by status (e.g. "submitted",
+            "Succeeded", "Failed", "retrieved").
+
+    Returns:
+        Dict with ``jobs`` list.
+
+    """
+    err = _require_remote()
+    if err:
+        return err
+
+    all_jobs = _discover_cached_jobs()
+
+    jobs = []
+    for j in all_jobs:
+        if status_filter and j.status != status_filter:
+            continue
+        algo_info = j.algorithm_info or {}
+        jobs.append(
+            {
+                "job_id": j.job_id,
+                "algorithm": f"{algo_info.get('type', '?')}/{algo_info.get('name', '?')}",
+                "backend": j.backend,
+                "status": j.status,
+                "submitted_at": j.submitted_at,
+                "run_hash": j.run_hash,
+                "input_hashes": j.input_hashes,
+                "output_hashes": j.output_hashes,
+            }
+        )
+
+    return {"jobs": jobs}
+
+
+@app.tool()
+@_structured
+@validate_project
+def cancel_remote_job(
+    project_name: str,
+    job_id: str,
+) -> str | dict:
+    """Cancel a running remote job.
+
+    Args:
+        project_name (str): Working project directory.
+        job_id (str): The job ID to cancel.
+
+    Returns:
+        Dict confirming cancellation.
+
+    """
+    err = _require_remote()
+    if err:
+        return err
+
+    job, load_err = _load_remote_job(job_id)
+    if load_err:
+        return load_err
+
+    try:
+        job.cancel()  # updates status to "canceled" & saves
+    except Exception as e:  # noqa: BLE001
+        return f"Failed to cancel job: {e}"
+
+    return {"job_id": job_id, "status": "canceled"}

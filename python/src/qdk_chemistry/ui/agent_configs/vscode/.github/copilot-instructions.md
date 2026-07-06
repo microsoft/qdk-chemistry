@@ -14,6 +14,7 @@ Skills are pre-built domain knowledge bundles in `.github/skills/`. **Always loa
 | `qdk-chemistry-overview` | Starting a new task, orienting yourself, understanding what's available |
 | `qdk-chemistry-mcp` | Using any MCP tool — contains the full tool reference, active space guide, QPE guide, compression strategies, and common failure modes |
 | `qdk-chemistry-coding` | Writing or reviewing Python code that uses the `qdk_chemistry` SDK — contains the API reference, factory patterns, and complete worked examples |
+| `remote-execution` | Submitting jobs to remote compute (HPC clusters, SSH backends) |
 
 **Workflow:** Read the skill → follow its guidance → consult its reference docs for specifics. Don't guess parameters or invent procedures when the skill has the answer.
 
@@ -39,6 +40,7 @@ Is this a multi-step quantum chemistry workflow?
 └── NO
     ├── Is this about using MCP tools? → Load qdk-chemistry-mcp skill
     ├── Is this about writing Python code? → Load qdk-chemistry-coding skill
+    ├── Is this about remote execution? → Load remote-execution skill
     ├── Need background on a concept/algorithm? → Load qdk-chemistry-overview skill
     └── General question → Load qdk-chemistry-overview skill
 ```

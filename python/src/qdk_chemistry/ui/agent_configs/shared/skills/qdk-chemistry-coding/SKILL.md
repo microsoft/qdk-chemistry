@@ -207,6 +207,20 @@ else:
 structure.content_hash()  # 16-char hex string
 ```
 
+## Remote Execution
+
+Any algorithm can be transparently offloaded to a remote backend:
+
+```python
+scf = create("scf_solver")
+
+# Run on SSH server
+scf_ssh = scf.on_remote("ssh", host="compute-server.example.com")
+energy, wfn = scf_ssh.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
+```
+
+See the `remote-execution` skill for full details.
+
 ## Parameter Sweep Example
 
 ```python

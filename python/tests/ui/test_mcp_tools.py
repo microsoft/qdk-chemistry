@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -13,20 +14,23 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import data
+from qdk_chemistry.remote.job import Job
 from qdk_chemistry.ui import tools as srv
 from qdk_chemistry.ui.cli import _VERSION_PLACEHOLDER, _copy_with_version
-from qdk_chemistry.ui.config import config
+from qdk_chemistry.ui.config import QDKMCPConfig, config
 
 
 @pytest.fixture
 def _dirs():
-    """Temp projects dir, restored after test."""
+    """Temp projects + jobs dirs, restored after test."""
     with tempfile.TemporaryDirectory() as t:
-        orig_p = config.projects_dir
+        orig_p, orig_j = config.projects_dir, config.jobs_dir
         config.projects_dir = Path(t) / "projects"
+        config.jobs_dir = Path(t) / "jobs"
         config.projects_dir.mkdir()
+        config.jobs_dir.mkdir()
         yield
-        config.projects_dir = orig_p
+        config.projects_dir, config.jobs_dir = orig_p, orig_j
 
 
 @pytest.fixture
@@ -143,14 +147,66 @@ def test_run_algorithm_local():
     m.run.assert_called_once_with("a")
 
 
-def test_run_algorithm_auto_cache():
+def test_run_algorithm_remote_auto_cache():
     m = MagicMock()
     m.run.return_value = "ok"
-    with patch("qdk_chemistry.ui.tools.FolderCache") as mock_fc:
+    with (
+        patch("qdk_chemistry.ui.tools._REMOTE_AVAILABLE", True),
+        patch("qdk_chemistry.ui.tools.FolderCache") as mock_fc,
+    ):
         mock_fc.return_value = MagicMock()
-        srv._run_algorithm(m, cache=None)
-    mock_fc.assert_called_once_with(path=config.cache_dir)
+        srv._run_algorithm(m, cache=None, remote="disc", remote_timeout=None)
+    mock_fc.assert_called_once_with(path=config.jobs_dir)
     assert m.run.call_args[1]["cache"] is mock_fc.return_value
+    assert m.run.call_args[1]["remote"] == "disc"
+
+
+# ── _JobSubmittedError ───────────────────────────────────────────────────
+
+
+def test_structured_catches_job_submitted():
+    job = Job(job_id="x", backend="b", backend_config={}, backend_state={}, status="submitted")
+
+    @srv._structured
+    def boom():
+        raise srv._JobSubmittedError(job)
+
+    r = boom()
+    assert r["status"] == "submitted"
+    assert r["job"]["job_id"] == "x"
+
+
+# ── Job discovery ────────────────────────────────────────────────────────
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_discover_and_load_job():
+    j = Job(job_id="abc", backend="local", backend_config={}, backend_state={}, run_hash="h1")
+    j.save(config.jobs_dir / "h1.job.json")
+
+    found = srv._discover_cached_jobs()
+    assert any(x.job_id == "abc" for x in found)
+
+    loaded, err = srv._load_remote_job("abc")
+    assert err is None
+    assert loaded.job_id == "abc"
+
+    _, err2 = srv._load_remote_job("missing")
+    assert err2 is not None
+
+
+# ── Config ───────────────────────────────────────────────────────────────
+
+
+def test_config_jobs_dir_env():
+    with tempfile.TemporaryDirectory() as t:
+        os.environ["QDK_SCRATCH_DIR"] = t
+        os.environ["QDK_JOBS_DIR"] = t
+        try:
+            assert QDKMCPConfig().jobs_dir == Path(t)
+        finally:
+            del os.environ["QDK_JOBS_DIR"]
+            del os.environ["QDK_SCRATCH_DIR"]
 
 
 # ── Version injection ────────────────────────────────────────────────────

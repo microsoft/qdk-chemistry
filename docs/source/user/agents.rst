@@ -112,9 +112,9 @@ exposes ~40 tools organized into categories that the agent discovers via
 ``list_tools``.
 
 Every tool returns a structured JSON envelope with ``status`` (``"ok"``,
-``"error"``, or ``"exists"``). All ``run_*`` tools accept
-``overwrite=True`` to bypass the ``"exists"`` check, and ``cache`` to
-reuse local cached results.
+``"error"``, ``"exists"``, or ``"submitted"``). All ``run_*`` tools
+accept ``overwrite=True`` to bypass the ``"exists"`` check, and
+``remote``/``cache`` parameters for remote execution.
 
 Start the server manually if needed:
 
@@ -151,6 +151,7 @@ shell-based workflows. It's organized around five concepts:
    Query available algorithms, inspect default settings, generate
    config templates for compound algorithms (MCSCF, QPE).
 
-All algorithm commands accept ``--cache`` to reuse local cached results.
-Use ``qc --dry-run`` to preview parameters without executing, and
-``qc --help`` for the full command list.
+All algorithm commands accept ``--cache``, ``--remote``, and
+``--remote-config`` for remote execution. Use ``qc --dry-run`` to
+preview parameters without executing, and ``qc --help`` for the full
+command list.

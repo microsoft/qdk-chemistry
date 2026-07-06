@@ -1,26 +1,27 @@
 ---
 name: qdk-chemistry-overview
 version: '{{QDK_CHEMISTRY_VERSION}}'
-description: 'Top-level guide for QDK Chemistry usage modes. Use when: deciding how to approach a quantum chemistry task, choosing between Python SDK coding and MCP tools, planning a workflow, or orienting to the QDK Chemistry ecosystem. Covers decision trees for interface selection, workflow patterns, and when to invoke each specialized skill.'
+description: 'Top-level guide for QDK Chemistry usage modes. Use when: deciding how to approach a quantum chemistry task, choosing between Python SDK coding vs MCP tools vs remote execution, planning a workflow, or orienting to the QDK Chemistry ecosystem. Covers decision trees for interface selection, workflow patterns, and when to invoke each specialized skill.'
 ---
 
 # QDK Chemistry Overview
 
 ## When to Use This Skill
 
-- You need to decide **how** to approach a quantum chemistry task (code vs MCP)
+- You need to decide **how** to approach a quantum chemistry task (code vs MCP vs remote)
 - You want to understand the QDK Chemistry ecosystem and available interfaces
 - You are planning a multi-step workflow and need to pick the right mode
 - You are unsure which specialized skill to load next
 
 ## Three Interfaces — One Pipeline
 
-QDK Chemistry provides two ways to run the same quantum chemistry pipeline. Each has distinct strengths:
+QDK Chemistry provides three ways to run the same quantum chemistry pipeline. Each has distinct strengths:
 
 | Interface | Best For | Skill |
 |-----------|----------|-------|
 | **Python SDK** | Custom scripts, notebooks, loops, parameter sweeps, programmatic control, integration with other Python libraries | `qdk-chemistry-coding` |
 | **MCP Tools** | Interactive agent-driven workflows in VS Code/Claude, no-code execution, visualization, step-by-step exploration | `qdk-chemistry-mcp` |
+| **Remote Execution** | Running heavy computations on HPC clusters, SSH servers, or local backends | `remote-execution` |
 
 ## Decision Tree
 
@@ -37,6 +38,10 @@ User wants to do quantum chemistry
 │
 ├─ "Write me a script / notebook" ──────────────► Load qdk-chemistry-coding skill
 │   Python code, parameter sweeps, automation
+│
+├─ "This is too big for my machine" ────────────► Load remote-execution skill
+│   HPC clusters, SSH backends
+│   (Combine with coding or MCP skill for the actual workflow)
 │
 └─ "I need both code and interactivity" ────────► Load qdk-chemistry-coding + qdk-chemistry-mcp
     Write script, then run steps interactively
@@ -87,7 +92,9 @@ Skills can be combined for complex tasks:
 
 | Scenario | Skills to Load |
 |----------|---------------|
+| Write a notebook that runs SCF + CASCI on a cluster | `qdk-chemistry-coding` + `remote-execution` |
 | Interactively explore a molecule, then generate a reproducible script | `qdk-chemistry-mcp` + `qdk-chemistry-coding` |
+| Run a parameter sweep on HPC via MCP agent orchestration | `qdk-chemistry-mcp` + `remote-execution` |
 | Full QPE analysis with report generation | `qdk-chemistry-mcp` (agents handle this end-to-end) |
 
 ## Project Structure

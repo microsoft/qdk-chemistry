@@ -60,6 +60,7 @@ from .tools import (
     get_orbitals_from_input,
     get_top_configurations,
     list_cache_backends,
+    list_remote_backends,
     run_active_space_selector,
     run_circuit_executor,
     run_controlled_evolution_circuit_mapper,
@@ -214,24 +215,49 @@ def _add_config_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_execution_args(parser: argparse.ArgumentParser) -> None:
-    """Add shared execution arguments."""
+    """Add ``--cache``, ``--remote``, and ``--remote-config`` arguments."""
     parser.add_argument(
         "--cache",
         metavar="NAME_OR_PATH",
         help=(
             "Enable result caching. Pass a registered cache backend name "
             "(e.g. 'folder', 'cosmosdb') or a filesystem path for a folder cache. "
-            "Use 'qc config cache-backends' to see available backends."
+            "Use 'list-cache-backends' to see available backends."
+        ),
+    )
+    parser.add_argument(
+        "--remote",
+        metavar="BACKEND",
+        help=(
+            "Execute on a remote backend instead of locally "
+            "(e.g. 'ssh', 'local'). Requires --cache. "
+            "Use 'list-remote-backends' to see available backends."
+        ),
+    )
+    parser.add_argument(
+        "--remote-config",
+        type=parse_json_arg,
+        metavar="JSON",
+        help=(
+            "Backend-specific configuration as JSON "
+            '(e.g. \'{"pool": "gpu-pool", "timeout": 7200}\'). '
+            "Use 'describe-backend' to see parameters for a specific backend."
         ),
     )
 
 
 def _get_execution_kwargs(args: argparse.Namespace) -> dict[str, Any]:
-    """Extract shared execution kwargs from parsed args."""
+    """Extract cache/remote/remote_config kwargs from parsed args."""
     kwargs: dict[str, Any] = {}
     cache = getattr(args, "cache", None)
+    remote = getattr(args, "remote", None)
+    remote_config = getattr(args, "remote_config", None)
     if cache is not None:
         kwargs["cache"] = cache
+    if remote is not None:
+        kwargs["remote"] = remote
+    if remote_config is not None:
+        kwargs["remote_config"] = remote_config
     return kwargs
 
 
@@ -681,8 +707,14 @@ def cmd_list_cache_backends(_args):
     _print_result(result)
 
 
+def cmd_list_remote_backends(_args):
+    """List available remote execution backend names."""
+    result = list_remote_backends()
+    _print_result(result)
+
+
 def cmd_describe_backend(args):
-    """Describe configuration parameters for a cache backend."""
+    """Describe configuration parameters for a cache or remote backend."""
     result = describe_backend(
         backend_type=args.backend_type,
         name=args.name,
@@ -1515,14 +1547,22 @@ def _create_config_parsers(subparsers):
     )
     p.set_defaults(func=cmd_list_cache_backends)
 
+    # remote-backends
+    p = subparsers.add_parser(
+        "remote-backends",
+        help="List available remote execution backend names",
+        description="Show all registered remote backends (local, ssh, etc.).",
+    )
+    p.set_defaults(func=cmd_list_remote_backends)
+
     # describe-backend
     p = subparsers.add_parser(
         "describe-backend",
         help="Describe configuration parameters for a backend",
-        description="Show __init__ parameters for a cache backend.",
+        description="Show __init__ parameters for a cache or remote backend.",
     )
-    p.add_argument("--backend-type", required=True, choices=["cache"], help="Backend category")
-    p.add_argument("--name", required=True, help="Registered backend name (e.g. 'folder')")
+    p.add_argument("--backend-type", required=True, choices=["cache", "remote"], help="Backend category")
+    p.add_argument("--name", required=True, help="Registered backend name (e.g. 'folder', 'ssh')")
     p.set_defaults(func=cmd_describe_backend)
 
 
@@ -2139,6 +2179,8 @@ def cmd_list_commands(_args):
             entry["category"] = "group"
         elif name in ("workflow", "describe", "list-commands"):
             entry["category"] = "meta"
+        elif name == "remote-run":
+            entry["category"] = "internal"
         commands.append(entry)
 
     print(json.dumps({"commands": commands, "total": len(commands)}, indent=2))
@@ -2476,6 +2518,150 @@ def _create_setup_parsers(subparsers):
     p.set_defaults(func=cmd_setup_mcp)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# remote-run — single CLI command executed on remote compute nodes
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def cmd_remote_run(args: argparse.Namespace) -> None:
+    """Execute a serialized algorithm job from an input directory.
+
+    This command is invoked by the remote execution backend on compute
+    nodes.  It replaces the generated Python script with a stable,
+    single-command interface.
+
+    Steps:
+        1. Optionally connect to a remote cache (from the manifest).
+        2. Check the cache for a full result hit → write outputs and exit.
+        3. Deserialize inputs (resolving ``"cached"`` entries from the cache).
+        4. Reconstruct and execute the algorithm.
+        5. Store results in the remote cache (best-effort).
+        6. Serialize outputs to the output directory.
+    """
+    from qdk_chemistry.algorithms import create as create_algorithm  # noqa: PLC0415
+    from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
+        deserialize_inputs,
+        serialize_outputs,
+    )
+
+    input_dir = args.input_dir
+    output_dir = args.output_dir
+
+    # 1) Connect to remote cache if the manifest includes one
+    cache = None
+    run_hash = None
+    try:
+        manifest_path = Path(input_dir) / "manifest.json"
+        if manifest_path.exists():
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+            run_hash = manifest.get("run_hash")
+            cache_info = manifest.get("remote_cache")
+            if cache_info and cache_info.get("name"):
+                from qdk_chemistry.remote.cache import get_cache  # noqa: PLC0415
+
+                name = cache_info["name"]
+                cache_config = {k: v for k, v in cache_info.items() if k != "name"}
+                cache = get_cache(name, **cache_config)
+    except Exception:  # noqa: BLE001
+        pass  # best-effort; proceed without cache
+
+    # 2) Check cache for a full result hit
+    result: Any = None
+    if cache is not None and run_hash is not None:
+        try:
+            job = cache.get_job(run_hash)
+            if job is not None and getattr(job, "output_hashes", None):
+                status = getattr(job, "status", "")
+                if status in ("retrieved", "Succeeded"):
+                    items: list[Any] = []
+                    hit = True
+                    for entry in job.output_hashes:
+                        if "value" in entry:
+                            items.append(entry["value"])
+                        else:
+                            data = cache.get_data(entry["hash"])
+                            if data is None:
+                                hit = False
+                                break
+                            items.append(data)
+                    if hit:
+                        result = items[0] if len(items) == 1 else tuple(items)
+                        print("CACHE HIT: Results loaded from remote cache")
+        except Exception:  # noqa: BLE001
+            pass  # cache miss — compute below
+
+    # 3) Deserialize inputs and run the algorithm
+    if result is None:
+        inputs = deserialize_inputs(input_dir, cache=cache)
+
+        algorithm = create_algorithm(
+            inputs["algorithm_type"],
+            inputs["algorithm_name"],
+        )
+        for key, value in inputs["settings"].items():
+            algorithm.settings().set(key, value)
+
+        result = algorithm.run(*inputs["args"], **inputs["kwargs"])
+
+        # 4) Store in remote cache (best-effort)
+        if cache is not None and run_hash is not None:
+            try:
+                import datetime  # noqa: PLC0415
+
+                from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
+                from qdk_chemistry.remote.job import Job  # noqa: PLC0415
+
+                output_hashes = collect_content_hashes(result)
+                result_items = result if isinstance(result, tuple) else (result,)
+                for entry, item in zip(output_hashes, result_items, strict=False):
+                    if "value" not in entry:
+                        cache.put_data(entry["hash"], item)
+
+                job_obj = Job(
+                    job_id=run_hash[:12],
+                    backend="remote",
+                    backend_config={},
+                    backend_state={},
+                    algorithm_info={
+                        "type": inputs.get("algorithm_type"),
+                        "name": inputs.get("algorithm_name"),
+                        "settings": inputs.get("settings", {}),
+                    },
+                    status="retrieved",
+                    submitted_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    run_hash=run_hash,
+                    output_hashes=output_hashes,
+                )
+                cache.put_job(run_hash, job_obj)
+            except Exception:  # noqa: BLE001
+                pass
+
+    # 5) Serialize outputs
+    serialize_outputs(output_dir, result)
+    print(json.dumps({"success": True, "output_dir": str(output_dir)}))
+
+
+def _create_remote_run_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register the ``remote-run`` subcommand."""
+    p = subparsers.add_parser(
+        "remote-run",
+        help="(internal) Execute a serialized job on a compute node",
+        description=(
+            "Run a pre-serialized algorithm job.  Reads inputs from\n"
+            "--input-dir, executes the algorithm, and writes outputs to\n"
+            "--output-dir.  If the input manifest contains remote_cache\n"
+            "coordinates, the cache is checked first and results are\n"
+            "stored on completion.\n\n"
+            "This command is not intended for direct use — it is invoked\n"
+            "by remote execution backends on compute nodes."
+        ),
+    )
+    p.add_argument("--input-dir", required=True, help="Directory containing serialized inputs and manifest.json")
+    p.add_argument("--output-dir", required=True, help="Directory to write serialized outputs to")
+    p.set_defaults(func=cmd_remote_run)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser with grouped subcommands.
 
@@ -2560,6 +2746,7 @@ def create_parser() -> argparse.ArgumentParser:
     _create_workflow_parser(subparsers)
     _create_describe_parser(subparsers)
     _create_list_commands_parser(subparsers)
+    _create_remote_run_parser(subparsers)
 
     # Populate the module-level registry for use by describe/list-commands
     _SUBPARSER_REGISTRY.clear()

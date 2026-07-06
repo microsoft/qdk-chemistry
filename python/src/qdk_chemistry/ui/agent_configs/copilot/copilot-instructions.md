@@ -44,9 +44,10 @@ Once configured, the MCP tools are available for no-code quantum chemistry workf
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `list_cache_backends` | List available local caching backends | — |
-| `describe_backend` | Get details about a specific cache backend | `backend_type`, `name` |
+| `list_remote_backends` | List available remote execution backends | — |
+| `describe_backend` | Get details about a specific backend | `backend_name` |
 
-Use these tools to discover available resources before configuring caching strategies.
+Use these tools to discover available resources before submitting remote jobs or configuring caching strategies.
 
 #### Structure & Helpers
 
@@ -131,8 +132,9 @@ All tools return a JSON envelope:
 | `"ok"` | Success | `{"status": "ok", "result": <value>}` |
 | `"error"` | Failure | `{"status": "error", "message": "..."}` |
 | `"exists"` | Output file already exists | `{"status": "exists", "message": "..."}` |
+| `"submitted"` | Remote job submitted (async) | `{"status": "submitted", "result": {"job_id": "...", ...}}` |
 
-Always check `result.status` before using `result.result`. When `status` is `"exists"`, the tool is asking whether to overwrite.
+Always check `result.status` before using `result.result`. When `status` is `"exists"`, the tool is asking whether to overwrite. When `status` is `"submitted"`, use `check_remote_job` with the returned `job_id` to monitor progress.
 
 ---
 

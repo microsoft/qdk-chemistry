@@ -39,9 +39,10 @@ Once configured, the MCP server exposes tools for no-code quantum chemistry work
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `list_cache_backends` | List available local caching backends | — |
-| `describe_backend` | Get details about a specific cache backend | `backend_type`, `name` |
+| `list_remote_backends` | List available remote execution backends | — |
+| `describe_backend` | Get details about a specific backend (local or remote) | `backend_name` |
 
-Use these tools to discover available resources before configuring caching strategies.
+Use these tools to discover available resources before submitting remote jobs or configuring caching strategies.
 
 #### Structure & Helpers
 
@@ -134,8 +135,9 @@ All MCP tools return a structured JSON envelope:
 | `"ok"` | Success | `{"status": "ok", "result": <value>}` |
 | `"error"` | Failure | `{"status": "error", "message": "..."}` |
 | `"exists"` | Output file already exists | `{"status": "exists", "message": "..."}` |
+| `"submitted"` | Remote job submitted (async) | `{"status": "submitted", "result": {"job_id": "...", ...}}` |
 
-**Always check `result.status`** before using `result.result`. When `status` is `"exists"`, the tool is asking whether to overwrite — you can re-run to overwrite or use the existing file.
+**Always check `result.status`** before using `result.result`. When `status` is `"exists"`, the tool is asking whether to overwrite — you can re-run to overwrite or use the existing file. When `status` is `"submitted"`, the job is running remotely — use `check_remote_job` with the returned `job_id` to monitor progress.
 
 ### Standard Workflow via MCP
 
