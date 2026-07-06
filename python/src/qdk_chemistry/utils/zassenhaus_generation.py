@@ -266,8 +266,9 @@ def _plan_expr(
     return _clean(dict(out))
 
 
-# Cache the symbolic plan. Since the commutator plan depends purely on the number of leaves
-# and the target order (not on coefficients or time), caching avoids redundant DAG builds.
+# Cache the symbolic plan. Since the commutator plan depends on the specific leaf labels
+# and the target order (not on coefficients or time), caching avoids redundant DAG builds
+# for calls with the same leaf identifiers and order.
 @functools.lru_cache(maxsize=128)
 def _cached_zassenhaus_commutator_plan(
     leaves: tuple[Hashable, ...],
