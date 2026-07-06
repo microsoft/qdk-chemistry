@@ -234,7 +234,7 @@ class TestZassenhausTimeEvolution:
             pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
             cos_val = np.cos(term.angle)
             sin_val = np.sin(term.angle)
-            rotation_matrix = cos_val * np.eye(pauli_matrix.shape[0]) - 1j * sin_val * pauli_matrix
+            rotation_matrix = cos_val * np.eye(pauli_matrix.shape[0], dtype=complex) - 1j * sin_val * pauli_matrix
             step_unitary = rotation_matrix @ step_unitary
 
         return np.linalg.matrix_power(step_unitary, container.step_reps)
