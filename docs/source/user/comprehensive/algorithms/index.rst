@@ -97,7 +97,7 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - TimeDependentQubitHamiltonian → QubitHamiltonian
    * - :doc:`HamiltonianSimulation <hamiltonian_simulation>`
      - Time-dependent Hamiltonian simulation
-     - TimeDependentQubitHamiltonian + Observables → Energy
+     - TimeDependentQubitHamiltonian + Circuit + Observables → (EnergyExpectationResult, MeasurementData) list
    * - :doc:`ControlledCircuitMapper <circuit_mapper>`
      - Controlled-unitary circuit synthesis
      - UnitaryRepresentation → Circuit

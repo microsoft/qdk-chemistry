@@ -22,18 +22,18 @@ This convention keeps propagator and builder responsibilities strictly separated
 Typical workflow
 ~~~~~~~~~~~~~~~~
 
-A propagator is not usually called directly.  Instead, a
-:class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulation`
-algorithm (e.g., ``EulerIntegrator``) creates one internally from its
+A propagator is not usually called directly.  Instead, an
+:doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
+(e.g., ``EulerEvolutionCircuitBuilder``) creates one internally from its
 ``propagator`` setting and calls it once per time step.  The typical
 sequence within each step is:
 
-1. The integrator passes the :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and the current interval :math:`[t_1, t_2]` to the propagator
+1. The circuit builder passes the :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and the current interval :math:`[t_1, t_2]` to the propagator
 2. The propagator returns an effective :class:`~qdk_chemistry.data.QubitHamiltonian`
 3. The :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` implements the effective evolution as a :class:`~qdk_chemistry.data.UnitaryRepresentation`
 4. A :doc:`CircuitMapper <circuit_mapper>` converts the unitary into executable gates
 
-The :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator`
+The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder.EulerEvolutionCircuitBuilder`
 orchestrates this loop for every time step and combines the per-step
 circuits into a single evolution circuit.
 
@@ -68,11 +68,10 @@ Time interval
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      propagator = registry.create("propagator", "magnus")
+   .. literalinclude:: ../../../_static/examples/python/propagator.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 .. rubric:: Configuring settings
 
@@ -81,28 +80,29 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      propagator.settings().set("order", 1)
+   .. literalinclude:: ../../../_static/examples/python/propagator.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 .. rubric:: Running the propagator
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../_static/examples/python/propagator.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
-      h_eff = propagator.run(td_hamiltonian, t_start, t_end)
-
-When used as a nested algorithm inside an ``EulerIntegrator``, the
+When used as a nested algorithm inside an ``EvolutionCircuitBuilder``, the
 propagator is configured via the ``propagator`` setting:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.data import AlgorithmRef
-
-      euler.settings().set("propagator", AlgorithmRef("propagator", "magnus"))
+   .. literalinclude:: ../../../_static/examples/python/propagator.py
+      :language: python
+      :start-after: # start-cell-nested
+      :end-before: # end-cell-nested
 
 
 Available implementations
@@ -113,11 +113,10 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      registry.available("propagator")
+   .. literalinclude:: ../../../_static/examples/python/propagator.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 Time-averaged propagator
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,7 +133,7 @@ This is the default (and currently only) propagator.  It computes the time-avera
 
 where the drive integral is evaluated by numerical quadrature (``scipy.integrate.quad``).
 
-This is the leading-order term of the Magnus expansion.  This approximation gives :math:`O(\delta t^2)` accuracy.
+This is the leading-order term of the Magnus expansion.  This approximation gives :math:`O(\delta t^2)` per-step accuracy.
 
 .. rubric:: Settings
 
@@ -160,13 +159,15 @@ Related classes
 
 - :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`: Input time-dependent Hamiltonian
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output effective Hamiltonian
-- :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator`: The time-stepping integrator that calls the propagator each step
-- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian produced by the propagator
+- :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder`: The circuit builder that calls the propagator each step
+- :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder`: Constructs the time-evolution unitary from the effective Hamiltonian produced by the propagator
 
 Further reading
 ---------------
 
-- :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator`: Time-stepping integrator that uses the propagator
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/propagator.py>`_ script.
+- :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`: Time-evolution circuit composition
+- :doc:`HamiltonianSimulation <hamiltonian_simulation>`: Full simulation with circuit execution and measurement
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

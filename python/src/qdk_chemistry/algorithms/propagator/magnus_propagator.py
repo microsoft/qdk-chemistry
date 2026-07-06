@@ -46,7 +46,7 @@ Hamiltonians of the form :math:`H(t) = H_0 + f(t)\,H_1`.  Requesting an
 
 Accuracy
 --------
-The order-1 propagator gives :math:`O(\Delta t^2)` accuracy.
+The order-1 propagator gives :math:`O(\Delta t^2)` per-step accuracy.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ class MagnusPropagator(Propagator):
     :math:`H_\text{eff} = \Omega_1 / \delta t` (the time-averaged exponent
     divided by :math:`\delta t = t_2 - t_1`) so that a time-stepping
     integrator that multiplies by :math:`\delta t` recovers the full
-    exponent :math:`\Omega_1`.  This gives :math:`O(\Delta t^2)` accuracy.
+    exponent :math:`\Omega_1`.  This gives :math:`O(\Delta t^2)` per-step accuracy.
 
     Requesting an ``order`` greater than 1, or passing any other container
     type, raises :class:`NotImplementedError`.
@@ -191,7 +191,7 @@ class MagnusPropagator(Propagator):
         full exponent :math:`\Omega_1`.
 
         Only the leading-order term is computed; this gives
-        :math:`O(\delta t^2)` accuracy.
+        :math:`O(\delta t^2)` per-step accuracy.
 
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
         :meth:`~qdk_chemistry.data.QubitHamiltonian.__mul__` and

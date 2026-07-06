@@ -8,15 +8,13 @@ Overview
 --------
 
 Hamiltonian simulation solves the time-dependent Schrödinger equation :math:`i\,\partial_t U = H(t)\,U` on a quantum computer.
-For a Hamiltonian that changes with time — for example, a molecule driven by a laser pulse — the algorithm divides the total evolution into discrete time steps and builds a quantum circuit for each step.
+For a Hamiltonian that changes with time — for example, a molecule driven by a laser pulse — the algorithm constructs a quantum circuit for the full evolution and then executes it to measure observable expectation values.
 
-The simulation pipeline for each step is:
+Circuit construction is delegated to an :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`, which handles time-stepping, propagation, and circuit-to-gates mapping.
+The simulation algorithm adds circuit execution and observable measurement on top.
 
-1. A :doc:`Propagator <propagator>` evaluates the effective Hamiltonian for the current time interval
-2. A :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` constructs the time-evolution unitary from the effective Hamiltonian
-3. A :doc:`CircuitMapper <circuit_mapper>` converts the unitary into executable gates
-
-After the full evolution circuit is assembled, observables are measured using an :doc:`EnergyEstimator <energy_estimator>` executed via a :doc:`CircuitExecutor <circuit_executor>`.
+For resource estimation (without circuit execution), use the
+:doc:`EvolutionCircuitBuilder <evolution_circuit_builder>` directly.
 
 
 Using the HamiltonianSimulation
@@ -48,11 +46,10 @@ State preparation circuit
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      sim = registry.create("hamiltonian_simulation", "euler_integrator")
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_simulation.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 .. rubric:: Configuring settings
 
@@ -61,21 +58,19 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      sim.settings().set("total_time", 1.0)
-      sim.settings().set("dt", 0.1)
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_simulation.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 .. rubric:: Running the simulation
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      results = sim.run(td_hamiltonian, observables, state_prep_circuit, shots=1000)
-
-      for energy_result, measurement_data in results:
-          print(energy_result.energy)
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_simulation.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 
 Available implementations
@@ -86,30 +81,28 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      from qdk_chemistry.algorithms import registry
-
-      registry.available("hamiltonian_simulation")
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_simulation.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 Euler integrator
 ~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"euler_integrator"``
 
-The Euler integrator divides the total evolution time :math:`[0, T]` into steps of size ``dt``.
-The number of full steps is ``floor(T / dt)``.
-If ``T`` is not an exact multiple of ``dt``, a final cleanup step of size ``T mod dt`` is appended.
+The Euler integrator delegates circuit construction to an
+:doc:`EulerEvolutionCircuitBuilder <evolution_circuit_builder>`, then
+executes the resulting circuit and measures each observable independently
+using the configured energy estimator.
 
-At each step, a :doc:`Propagator <propagator>` computes the effective Hamiltonian for the interval, which is then converted into a quantum circuit.
-Per-step unitaries are combined via ``UnitaryContainer.combine``, which merges adjacent identical Pauli terms at step boundaries.
-
-After evolving the state, each observable is measured independently using the configured energy estimator.
-The evolution circuit can be retrieved after execution via the ``get_circuit()`` method.
+The circuit builder handles all time-stepping, propagation, and circuit
+mapping.  See :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
+for details on how the evolution circuit is constructed.
 
 .. rubric:: Settings
 
-The Euler integrator inherits settings from :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationSettings`:
+Direct settings on :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationSettings`:
 
 .. list-table::
    :header-rows: 1
@@ -118,27 +111,25 @@ The Euler integrator inherits settings from :class:`~qdk_chemistry.algorithms.ti
    * - Setting
      - Type
      - Description
-   * - ``total_time``
-     - float
-     - Total evolution time :math:`T`. Default: ``1.0``.
-   * - ``dt``
-     - float
-     - Time step size. Must be positive and not exceed ``total_time``. Default: ``0.0`` (must be set by user).
-   * - ``propagator``
+   * - ``evolution_circuit_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Propagator used to evaluate the effective Hamiltonian over each step. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"propagator"`` with method ``"magnus"``.
-   * - ``evolution_builder``
-     - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Time-evolution builder used to construct the unitary from the effective Hamiltonian. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``.
-   * - ``circuit_mapper``
-     - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Circuit mapper used to convert the unitary to executable gates. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"circuit_mapper"`` with method ``"pauli_sequence"``.
+     - Evolution circuit builder used to construct the state-prep + evolution circuit. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"evolution_circuit_builder"`` with method ``"euler"``.
    * - ``circuit_executor``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Circuit executor used to run quantum circuits. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"circuit_executor"`` with method ``"qdk_sparse_state_simulator"``.
    * - ``observable_estimator``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Estimator used to compute observable expectation values. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"energy_estimator"`` with method ``"qdk"``.
+
+Nested algorithm configuration (via ``evolution_circuit_builder``):
+
+See :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>` for configuring:
+
+- ``total_time`` — Total evolution time
+- ``dt`` — Time step size
+- ``propagator`` — Propagator for computing effective Hamiltonians
+- ``evolution_builder`` — Unitary builder (e.g., Trotter)
+- ``circuit_mapper`` — Circuit compilation strategy
 
 
 Related classes
@@ -149,11 +140,13 @@ Related classes
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit and output evolution circuit
 - :class:`~qdk_chemistry.data.EnergyExpectationResult`: Output energy expectation values
 - :class:`~qdk_chemistry.data.MeasurementData`: Output measurement data
-- :doc:`Propagator <propagator>`: Computes effective Hamiltonians for each time step
+- :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder`: Constructs the evolution circuit
 
 Further reading
 ---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hamiltonian_simulation.py>`_ script.
+- :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`: Time-evolution circuit composition
 - :doc:`Propagator <propagator>`: Effective Hamiltonians for time-dependent evolution
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
 - :doc:`EnergyEstimator <energy_estimator>`: Observable expectation value estimation
