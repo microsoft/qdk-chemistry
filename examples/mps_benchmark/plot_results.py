@@ -4,8 +4,9 @@ Plot runtime and physical qubits vs bond dimension for all molecules.
 Reads data from mps_sossa_resource_estimation_*.json files:
   - Fe2S2-20, Fe4S4-36, FeMoCo-76
 
-Produces a single figure with 2 rows x N columns (one column per molecule):
+Produces a single figure with 3 rows x N columns (one column per molecule):
   - Top row: Runtime vs bond dimension
+  - Middle row: Toffoli count vs bond dimension
   - Bottom row: Physical qubits vs bond dimension
 """
 
@@ -24,6 +25,7 @@ JSON_FILES = [
     base_path / "mps_sossa_resource_estimation_fe2s2.json",
     base_path / "mps_sossa_resource_estimation_fe4s4.json",
     base_path / "mps_sossa_resource_estimation_femoco.json",
+    base_path / "mps_sossa_resource_estimation_g1.json"
 ]
 
 TARGET_CHIS = [100, 1000, 5000, 10000]
@@ -58,6 +60,7 @@ for json_path in JSON_FILES:
     # Extract MPS-only data
     mps_only_runtime = {}
     mps_only_qubits = {}
+    mps_only_toffoli = {}
     for entry in mol.get("mps_only", []):
         label = entry["label"]
         if label.startswith("real"):
@@ -66,10 +69,12 @@ for json_path in JSON_FILES:
         if chi in TARGET_CHIS:
             mps_only_runtime[chi] = ns_to_seconds(entry["runtime_ns"])
             mps_only_qubits[chi] = entry["physical_qubits"]
+            mps_only_toffoli[chi] = entry["logical_toffoli"]
 
     # Extract MPS + QPE data
     mps_qpe_runtime = {}
     mps_qpe_qubits = {}
+    mps_qpe_toffoli = {}
     for entry in mol.get("mps_plus_qpe", []):
         label = entry["label"]
         if label.startswith("real"):
@@ -78,20 +83,24 @@ for json_path in JSON_FILES:
         if chi in TARGET_CHIS:
             mps_qpe_runtime[chi] = ns_to_seconds(entry["runtime_ns"])
             mps_qpe_qubits[chi] = entry["physical_qubits"]
+            mps_qpe_toffoli[chi] = entry["total_toffoli"]
 
     # QPE (HF) baseline
     qpe_hf = mol.get("qpe_hf")
     qpe_hf_runtime = ns_to_seconds(qpe_hf["runtime_ns"]) if qpe_hf else None
     qpe_hf_qubits = qpe_hf["physical_qubits"] if qpe_hf else None
+    qpe_hf_toffoli = qpe_hf["logical_toffoli"] if qpe_hf else None
 
     # Prepare sorted arrays
     mps_chis = sorted(mps_only_runtime.keys())
     mps_rt = [mps_only_runtime[c] for c in mps_chis]
     mps_qb = [mps_only_qubits[c] for c in mps_chis]
+    mps_tf = [mps_only_toffoli[c] for c in mps_chis]
 
     qpe_chis = sorted(mps_qpe_runtime.keys())
     qpe_rt = [mps_qpe_runtime[c] for c in qpe_chis]
     qpe_qb = [mps_qpe_qubits[c] for c in qpe_chis]
+    qpe_tf = [mps_qpe_toffoli[c] for c in qpe_chis]
 
     if not mps_chis:
         print(f"  No MPS-only data for target bond dims, skipping.")
@@ -112,11 +121,14 @@ for json_path in JSON_FILES:
         "mps_chis": mps_chis,
         "mps_rt": mps_rt,
         "mps_qb": mps_qb,
+        "mps_tf": mps_tf,
         "qpe_chis": qpe_chis,
         "qpe_rt": qpe_rt,
         "qpe_qb": qpe_qb,
+        "qpe_tf": qpe_tf,
         "qpe_hf_runtime": qpe_hf_runtime,
         "qpe_hf_qubits": qpe_hf_qubits,
+        "qpe_hf_toffoli": qpe_hf_toffoli,
     })
 
 # ============================================================================
@@ -128,11 +140,12 @@ if n_mols == 0:
     print("No data to plot.")
     exit()
 
-fig, axes = plt.subplots(2, n_mols, figsize=(6 * n_mols, 10), squeeze=False)
+fig, axes = plt.subplots(3, n_mols, figsize=(6 * n_mols, 14), squeeze=False)
 
 for col, md in enumerate(mol_data):
     ax_rt = axes[0, col]
-    ax_qb = axes[1, col]
+    ax_tf = axes[1, col]
+    ax_qb = axes[2, col]
 
     # --- Top row: Runtime ---
     ax_rt.plot(md["mps_chis"], md["mps_rt"], "o-", color="tab:blue",
@@ -154,6 +167,25 @@ for col, md in enumerate(mol_data):
     ax_rt.set_xticks(md["mps_chis"])
     ax_rt.set_xticklabels([str(c) for c in md["mps_chis"]])
 
+    # --- Middle row: Toffoli Count ---
+    ax_tf.plot(md["mps_chis"], md["mps_tf"], "o-", color="tab:blue",
+               markersize=7, linewidth=2, label="MPS State Prep Only")
+    if md["qpe_chis"]:
+        ax_tf.plot(md["qpe_chis"], md["qpe_tf"], "s-", color="tab:red",
+                   markersize=7, linewidth=2, label="MPS + SOSSA QPE")
+    if md["qpe_hf_toffoli"]:
+        ax_tf.axhline(md["qpe_hf_toffoli"], color="tab:green", linestyle="--",
+                      linewidth=2, label=f"QPE(HF) = {md['qpe_hf_toffoli']:,}")
+
+    ax_tf.set_xscale("log")
+    ax_tf.set_yscale("log")
+    ax_tf.set_xlabel("Bond Dimension (χ)", fontsize=11)
+    ax_tf.set_ylabel("Toffoli Count", fontsize=11)
+    ax_tf.legend(fontsize=9)
+    ax_tf.grid(True, which="both", alpha=0.3)
+    ax_tf.set_xticks(md["mps_chis"])
+    ax_tf.set_xticklabels([str(c) for c in md["mps_chis"]])
+
     # --- Bottom row: Physical Qubits ---
     ax_qb.plot(md["mps_chis"], md["mps_qb"], "o-", color="tab:blue",
                markersize=7, linewidth=2, label="MPS State Prep Only")
@@ -173,7 +205,7 @@ for col, md in enumerate(mol_data):
     ax_qb.set_xticks(md["mps_chis"])
     ax_qb.set_xticklabels([str(c) for c in md["mps_chis"]])
 
-fig.suptitle("Resource Estimation: Runtime & Physical Qubits vs Bond Dimension",
+fig.suptitle("Resource Estimation vs Bond Dimension",
              fontsize=14, fontweight="bold", y=0.98)
 plt.tight_layout(rect=[0, 0, 1, 0.96])
 

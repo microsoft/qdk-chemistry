@@ -75,28 +75,29 @@ MOLECULES = [
     ("Fe2S2-20", dict(N=20, R=14, B=15, C=5, b_rot=15, b_coeff=11, lambda_eff=6.4690)),
     ("Fe4S4-36", dict(N=36, R=9, B=18, C=18, b_rot=17, b_coeff=13, lambda_eff=14.9842)),
     ("FeMoCo-76", dict(N=76, R=15, B=57, C=19, b_rot=15, b_coeff=9,  lambda_eff=43.6538)),
+#    ("P450-G1-43", dict(N=43, R=None, B=None, C=None, b_rot=10, b_coeff=None, lambda_eff=None)),
 ]
 
 # MPS tensor path for Fe2S2 real tensors (extract fe2s2-2_small.tar.gz first)
 COMPRESSED_PATH = Path("fe2s2-2_small") / "tensors_compressed" / "tensors_compressed_"
-PHASE_BITS = 10  # rotation precision for MPS state prep
+# PHASE_BITS = 10  # rotation precision for MPS state prep
 
 # Target energy precision
 SIGMA_E = 1e-3  # 1 mHa
 
 # QRE v3 architecture
 ARCHITECTURE = Majorana(error_rate=1e-5)
-#trace_query = (
-#    PSSPC.q(ccx_magic_states=False, num_ts_per_rotation=list(range(5, 40)))
-#    * LatticeSurgery.q()
-#)
+TRACE_QUERY = (
+    PSSPC.q()
+    * LatticeSurgery.q(slow_down_factor=[1.0 * j for j in range(1, 20)])
+)
 ISA_QUERY = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
 MAX_ERROR = 0.01
 
 # MPS settings
 SITE_DIM = 4
 DEFAULT_BOND_DIMS = [100, 1000, 5000, 10000]
-OUTPUT_JSON = Path("mps_sossa_resource_estimation_fe2s2.json")
+OUTPUT_JSON = Path("mps_sossa_resource_estimation_full.json")
 
 # Valid molecule names for CLI
 MOLECULE_NAMES = [m[0] for m in MOLECULES]
@@ -161,7 +162,7 @@ def load_mps_tensors():
 def _save_results(results, path=OUTPUT_JSON):
     """Save results dict to JSON, called after each estimation completes."""
     with open(path, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(results, f, indent=2, default=str)
     print(f"   [saved to {path}]")
 
 
@@ -186,7 +187,7 @@ def _print_full_qre_result(qre_result, label=""):
     print()
 
     # Extract extra data for JSON storage
-    r = qre_result[0]
+    r = qre_result[-1]
     extra = {
         "compute_distance": int(r.source[LATTICE_SURGERY].instruction[DISTANCE]),
         "compute_qubits": int(r.properties[PHYSICAL_COMPUTE_QUBITS]),
@@ -205,6 +206,26 @@ def _print_full_qre_result(qre_result, label=""):
     # Also store the human-readable summary
     if "factories" in df.columns:
         extra["factory_summary"] = str(df["factories"].iloc[0])
+
+    # Store full Pareto front (all QRE results, not just the first)
+    pareto_front = []
+    for _, row in df.iterrows():
+        record = {}
+        for col in df.columns:
+            val = row[col]
+            if isinstance(val, (np.integer,)):
+                record[col] = int(val)
+            elif isinstance(val, (np.floating,)):
+                record[col] = float(val)
+            elif isinstance(val, (np.bool_,)):
+                record[col] = bool(val)
+            elif hasattr(val, 'total_seconds'):
+                record[col] = val.total_seconds()
+            else:
+                record[col] = str(val) if not isinstance(val, (int, float, bool, str, type(None))) else val
+        pareto_front.append(record)
+    extra["pareto_front"] = pareto_front
+
     return extra
 
 
@@ -241,6 +262,11 @@ def parse_args():
         default=OUTPUT_JSON,
         help=f"Output JSON path. Default: {OUTPUT_JSON}",
     )
+    parser.add_argument(
+        "--skip-qpe",
+        action="store_true",
+        help="Skip SOSSA QPE parts (2 & 3), only run MPS state prep sweep.",
+    )
     return parser.parse_args()
 
 
@@ -260,7 +286,7 @@ if __name__ == "__main__":
     print("=" * 70)
     print(f"   Molecules: {[m[0] for m in selected_molecules]}")
     print(f"   Bond dimensions: {bond_dims}")
-    print(f"   Site dim: {SITE_DIM}, Phase bits: {PHASE_BITS}")
+    print(f"   Site dim: {SITE_DIM}, Phase bits: {[m[1]['b_rot'] for m in selected_molecules]}")
     print(f"   sigma_E = {SIGMA_E} Ha, max_error = {MAX_ERROR}")
     print(f"   Output: {output_json}")
     print()
@@ -269,7 +295,7 @@ if __name__ == "__main__":
         "parameters": {
             "molecules": [m[0] for m in selected_molecules],
             "site_dim": SITE_DIM,
-            "phase_bits_mps": PHASE_BITS,
+            "phase_bits_mps": [m[1]['b_rot'] for m in selected_molecules],
             "bond_dims": bond_dims,
             "sigma_E": SIGMA_E,
             "architecture": "Majorana(error_rate=1e-5)",
@@ -288,7 +314,7 @@ if __name__ == "__main__":
         }
 
     # ===================================================================
-    # Load real Fe2S2 tensors (only available for Fe2S2)
+    # Load real tensors
     # ===================================================================
     mps_real = None
     try:
@@ -305,14 +331,17 @@ if __name__ == "__main__":
     for mol_name, params in selected_molecules:
         N = params["N"]
         num_sites = N  # each spatial orbital is one site with dim=4
-        lambda_eff = params["lambda_eff"]
-        num_queries = math.ceil(math.pi * lambda_eff / (2 * SIGMA_E))
-        num_phase_qubits = math.ceil(math.log2(num_queries))
+
+        if not args.skip_qpe:
+            lambda_eff = params["lambda_eff"]
+            num_queries = math.ceil(math.pi * lambda_eff / (2 * SIGMA_E))
+            num_phase_qubits = math.ceil(math.log2(num_queries))
 
         print("\n" + "#" * 70)
         print(f"# MOLECULE: {mol_name}")
         print(f"#   N={N}, R={params['R']}, B={params['B']}, C={params['C']}")
-        print(f"#   lambda_eff={lambda_eff}, queries={num_queries}, phase_qubits={num_phase_qubits}")
+        if not args.skip_qpe:
+            print(f"#   lambda_eff={lambda_eff}, queries={num_queries}, phase_qubits={num_phase_qubits}")
         print("#" * 70)
 
         # ---------------------------------------------------------------
@@ -323,24 +352,28 @@ if __name__ == "__main__":
         print(f"{'='*70}")
 
         # Real tensors (only for Fe2S2)
+        real_mps_for_mol = None
         if mol_name == "Fe2S2-20" and mps_real is not None:
-            print("\n--- Real Fe2S2 (DMRG, chi_max ~ 1000) ---")
+            real_mps_for_mol = mps_real
+
+        if real_mps_for_mol is not None:
+            print(f"\n--- Real {mol_name} (DMRG, chi_max ~ {max(real_mps_for_mol.bond_dims)}) ---")
             t0 = time.perf_counter()
-            max_chi = max(mps_real.bond_dims)
-            print(f"   Max bond dim: {max_chi}, Bond dims: {mps_real.bond_dims}")
+            max_chi = max(real_mps_for_mol.bond_dims)
+            print(f"   Max bond dim: {max_chi}, Bond dims: {real_mps_for_mol.bond_dims}")
 
             algo = MPSSequentialStatePreparation()
-            algo.settings().set("rotation_bits", PHASE_BITS)
+            algo.settings().set("rotation_bits", params["b_rot"])
             algo.settings().set("fast_grouped_resource_estimation", True)
-            circuit = algo.run(mps_real)
+            circuit = algo.run(real_mps_for_mol)
             lc = circuit.estimate().logical_counts
 
             app = circuit.get_qre_application()
             qre_result = estimate(
-                app, ARCHITECTURE, ISA_QUERY, max_error=MAX_ERROR,
+                app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
                 name=f"{mol_name} MPS real",
             )
-            r = qre_result[0]
+            r = qre_result[-1]
             t_total = time.perf_counter() - t0
             print(
                 f"   Toffoli={lc['cczCount']:,}, qubits={lc['numQubits']:,}, "
@@ -361,51 +394,56 @@ if __name__ == "__main__":
             )
             _save_results(all_results, output_json)
 
-        # Fake MPS at various bond dims
-        for chi in bond_dims:
-            print(f"\n--- {mol_name} Fake MPS chi = {chi} ---")
-            t0 = time.perf_counter()
-            mps = MPSWavefunction.random(
-                num_sites=num_sites, bond_dim=chi, site_dim=SITE_DIM
-            )
-            max_chi_fake = max(mps.bond_dims)
-            print(f"   Max bond dim: {max_chi_fake}, Sites: {num_sites}")
+        if args.skip_qpe:
+            # MPS only sweep — no QPE
+            # Fake MPS at various bond dims
+            for chi in bond_dims:
+                print(f"\n--- {mol_name} Fake MPS chi = {chi} ---")
+                t0 = time.perf_counter()
+                mps = MPSWavefunction.random(
+                    num_sites=num_sites, bond_dim=chi, site_dim=SITE_DIM
+                )
+                max_chi_fake = max(mps.bond_dims)
+                print(f"   Max bond dim: {max_chi_fake}, Sites: {num_sites}")
 
-            algo = MPSSequentialStatePreparation()
-            algo.settings().set("rotation_bits", PHASE_BITS)
-            algo.settings().set("fast_grouped_resource_estimation", True)
-            circuit = algo.run(mps)
-            lc = circuit.estimate().logical_counts
+                algo = MPSSequentialStatePreparation()
+                algo.settings().set("rotation_bits", params["b_rot"])
+                algo.settings().set("fast_grouped_resource_estimation", True)
+                circuit = algo.run(mps)
+                lc = circuit.estimate().logical_counts
 
-            app = circuit.get_qre_application()
-            qre_result = estimate(
-                app, ARCHITECTURE, ISA_QUERY, max_error=MAX_ERROR,
-                name=f"{mol_name} MPS chi={chi}",
-            )
-            r = qre_result[0]
-            t_total = time.perf_counter() - t0
-            print(
-                f"   Toffoli={lc['cczCount']:,}, qubits={lc['numQubits']:,}, "
-                f"phys_qubits={r.qubits:,}, runtime={r.runtime}, time={t_total:.1f}s"
-            )
-            extra = _print_full_qre_result(qre_result, f"{mol_name} MPS chi={chi}")
+                app = circuit.get_qre_application()
+                qre_result = estimate(
+                    app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
+                    name=f"{mol_name} MPS chi={chi}",
+                )
+                r = qre_result[-1]
+                t_total = time.perf_counter() - t0
+                print(
+                    f"   Toffoli={lc['cczCount']:,}, qubits={lc['numQubits']:,}, "
+                    f"phys_qubits={r.qubits:,}, runtime={r.runtime}, time={t_total:.1f}s"
+                )
+                extra = _print_full_qre_result(qre_result, f"{mol_name} MPS chi={chi}")
 
-            all_results[mol_name]["mps_only"].append(
-                {
-                    "label": str(chi),
-                    "bond_dim": max_chi_fake,
-                    "logical_toffoli": lc["cczCount"],
-                    "logical_qubits": lc["numQubits"],
-                    "physical_qubits": r.qubits,
-                    "runtime_ns": r.runtime,
-                    **extra,
-                }
-            )
-            _save_results(all_results, output_json)
+                all_results[mol_name]["mps_only"].append(
+                    {
+                        "label": str(chi),
+                        "bond_dim": max_chi_fake,
+                        "logical_toffoli": lc["cczCount"],
+                        "logical_qubits": lc["numQubits"],
+                        "physical_qubits": r.qubits,
+                        "runtime_ns": r.runtime,
+                        **extra,
+                    }
+                )
+                _save_results(all_results, output_json)
+            continue
 
         # ---------------------------------------------------------------
+        # Full workflow: QPE(HF), then MPS-only + MPS+QPE (reusing circuits)
+        # ---------------------------------------------------------------
+
         # Part 2: SOSSA QPE with HF initial state
-        # ---------------------------------------------------------------
         print(f"\n{'='*70}")
         print(f"  PART 2: SOSSA QPE with HF Initial State -- {mol_name}")
         print(f"{'='*70}")
@@ -444,10 +482,10 @@ if __name__ == "__main__":
 
         app = qpe_circuit_hf.get_qre_application()
         qre_result = estimate(
-            app, ARCHITECTURE, ISA_QUERY, max_error=MAX_ERROR,
+            app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
             name=f"{mol_name} SOSSA QPE (HF)",
         )
-        r = qre_result[0]
+        r = qre_result[-1]
         t_total = time.perf_counter() - t0
         print(
             f"   Toffoli={lc['cczCount']:,}, qubits={lc['numQubits']:,}, "
@@ -466,43 +504,58 @@ if __name__ == "__main__":
         _save_results(all_results, output_json)
 
         # ---------------------------------------------------------------
-        # Part 3: MPS + SOSSA QPE (MPS as initial state)
+        # Parts 1 & 3: MPS-only + MPS+QPE (build MPS circuit once, reuse)
         # ---------------------------------------------------------------
         print(f"\n{'='*70}")
-        print(f"  PART 3: MPS + SOSSA QPE -- {mol_name}")
+        print(f"  PARTS 1 & 3: MPS State Prep + MPS+QPE -- {mol_name}")
         print(f"{'='*70}")
 
-        # Build shared Hamiltonian and QPE builder
-        fh = make_fake_factorized_hamiltonian(N, params["R"], params["B"], params["C"])
-        qpe_builder = QdkStandardQpeCircuitBuilder(
-            num_bits=num_phase_qubits,
-            controlled_circuit_mapper=AlgorithmRef(
-                "controlled_circuit_mapper",
-                "sossa",
-                outer_prepare=AlgorithmRef("state_prep", "alias_sampling"),
-                inner_prepare_algorithm="controlled_alias_sampling",
-                select_algorithm="qrom_phase_gradient",
-                rotation_bit_precision=params["b_rot"],
-                coefficient_bit_precision=params["b_coeff"],
-            ),
-            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
-        )
-
-        # Fake MPS + QPE at various bond dims
+        # Fake MPS at various bond dims — build once, run MPS-only QRE and MPS+QPE QRE
         for chi in bond_dims:
-            print(f"\n--- {mol_name} MPS(chi={chi})+QPE ---")
+            print(f"\n--- {mol_name} MPS chi={chi} (MPS-only + MPS+QPE) ---")
             t0 = time.perf_counter()
 
             mps_wfn = MPSWavefunction.random(
                 num_sites=num_sites, bond_dim=chi, site_dim=SITE_DIM
             )
+            max_chi_fake = max(mps_wfn.bond_dims)
+            print(f"   Max bond dim: {max_chi_fake}, Sites: {num_sites}")
 
             algo_mps = MPSSequentialStatePreparation()
-            algo_mps.settings().set("rotation_bits", PHASE_BITS)
+            algo_mps.settings().set("rotation_bits", params["b_rot"])
             algo_mps.settings().set("fast_grouped_resource_estimation", True)
             mps_circ = algo_mps.run(mps_wfn)
             mps_lc = mps_circ.estimate().logical_counts
 
+            # --- MPS-only QRE ---
+            app = mps_circ.get_qre_application()
+            qre_result = estimate(
+                app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
+                name=f"{mol_name} MPS chi={chi}",
+            )
+            r = qre_result[-1]
+            t_mps = time.perf_counter() - t0
+            print(
+                f"   [MPS-only] Toffoli={mps_lc['cczCount']:,}, qubits={mps_lc['numQubits']:,}, "
+                f"phys_qubits={r.qubits:,}, runtime={r.runtime}, time={t_mps:.1f}s"
+            )
+            extra = _print_full_qre_result(qre_result, f"{mol_name} MPS chi={chi}")
+
+            all_results[mol_name]["mps_only"].append(
+                {
+                    "label": str(chi),
+                    "bond_dim": max_chi_fake,
+                    "logical_toffoli": mps_lc["cczCount"],
+                    "logical_qubits": mps_lc["numQubits"],
+                    "physical_qubits": r.qubits,
+                    "runtime_ns": r.runtime,
+                    **extra,
+                }
+            )
+            _save_results(all_results, output_json)
+
+            # --- MPS+QPE (reuse mps_circ) ---
+            t0_qpe = time.perf_counter()
             qpe_circuits_mps = qpe_builder.run(
                 state_preparation=mps_circ, qubit_hamiltonian=fh
             )
@@ -511,20 +564,20 @@ if __name__ == "__main__":
 
             app = qpe_circuit_mps.get_qre_application()
             qre_result = estimate(
-                app, ARCHITECTURE, ISA_QUERY, max_error=MAX_ERROR,
+                app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
                 name=f"{mol_name} MPS({chi})+QPE",
             )
-            r = qre_result[0]
-            t_total = time.perf_counter() - t0
+            r = qre_result[-1]
+            t_qpe = time.perf_counter() - t0_qpe
 
             sossa_only_tof = lc["cczCount"] - mps_lc["cczCount"]
             print(
-                f"   MPS Toffoli={mps_lc['cczCount']:,}, SOSSA Toffoli={sossa_only_tof:,}, "
+                f"   [MPS+QPE] MPS Toffoli={mps_lc['cczCount']:,}, SOSSA Toffoli={sossa_only_tof:,}, "
                 f"Total Toffoli={lc['cczCount']:,}"
             )
             print(
                 f"   qubits={lc['numQubits']:,}, phys_qubits={r.qubits:,}, "
-                f"runtime={r.runtime}, time={t_total:.1f}s"
+                f"runtime={r.runtime}, time={t_qpe:.1f}s"
             )
             extra = _print_full_qre_result(qre_result, f"{mol_name} MPS({chi})+QPE")
 
@@ -545,15 +598,17 @@ if __name__ == "__main__":
 
         # Real MPS + QPE (only for Fe2S2)
         if mol_name == "Fe2S2-20" and mps_real is not None:
-            print(f"\n--- {mol_name} MPS(real)+QPE ---")
+            print(f"\n--- {mol_name} MPS(real) + MPS(real)+QPE ---")
             t0 = time.perf_counter()
 
             algo_mps = MPSSequentialStatePreparation()
-            algo_mps.settings().set("rotation_bits", PHASE_BITS)
+            algo_mps.settings().set("rotation_bits", params["b_rot"])
             algo_mps.settings().set("fast_grouped_resource_estimation", True)
             mps_circ = algo_mps.run(mps_real)
             mps_lc = mps_circ.estimate().logical_counts
 
+            # MPS-only QRE for real tensors (already done in Part 1 above,
+            # but the circuit is needed for QPE anyway)
             qpe_circuits_real = qpe_builder.run(
                 state_preparation=mps_circ, qubit_hamiltonian=fh
             )
@@ -562,10 +617,10 @@ if __name__ == "__main__":
 
             app = qpe_circuit_real.get_qre_application()
             qre_result = estimate(
-                app, ARCHITECTURE, ISA_QUERY, max_error=MAX_ERROR,
+                app, ARCHITECTURE, ISA_QUERY, TRACE_QUERY, max_error=MAX_ERROR,
                 name=f"{mol_name} MPS(real)+QPE",
             )
-            r = qre_result[0]
+            r = qre_result[-1]
             t_total = time.perf_counter() - t0
 
             sossa_only_tof = lc["cczCount"] - mps_lc["cczCount"]
