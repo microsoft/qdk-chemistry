@@ -99,6 +99,23 @@ if(NOT qdk_FOUND)
     add_subdirectory("${QDK_CPP_DIR}" qdk_build)
 else()
     message(STATUS "Using installed qdk library")
+    # When building against a pre-installed qdk the C++ CMakeLists.txt is not
+    # included, so the qdk_chemistry_resources install rule never fires. Derive
+    # the install root from qdk_DIR (which is <prefix>/lib/cmake/qdk) and
+    # re-register the install rule here so scikit-build-core picks it up.
+    get_filename_component(_qdk_root "${qdk_DIR}" PATH)  # .../lib/cmake
+    get_filename_component(_qdk_root "${_qdk_root}" PATH) # .../lib
+    get_filename_component(_qdk_root "${_qdk_root}" PATH) # install root
+    set(_qdk_resources "${_qdk_root}/share/qdk/chemistry/scf/resources")
+    if(EXISTS "${_qdk_resources}")
+        install(
+            DIRECTORY "${_qdk_resources}"
+            DESTINATION "share/qdk/chemistry/scf"
+            COMPONENT qdk_chemistry_resources
+        )
+    else()
+        message(FATAL_ERROR "QDK resources not found at '${_qdk_resources}' — wheel will be missing share/qdk/chemistry/scf/resources")
+    endif()
 endif()
 
 if(QDK_CHEMISTRY_ENABLE_GPU)
