@@ -13,11 +13,11 @@ caching and linear-time evaluation of the commutator DAG.
 
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
-import functools
 from math import factorial
 
 Term = Hashable | tuple["Term", "Term"]

@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import scipy.linalg
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
@@ -267,7 +267,6 @@ class TestZassenhausTimeEvolution:
             for pauli in ("X", "Y", "Z")
         ]
         h = QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
-        from qdk_chemistry.algorithms import registry
         grouper = registry.create("term_grouper", "commuting")
         return grouper.run(h)
 
@@ -299,7 +298,6 @@ class TestZassenhausTimeEvolution:
             active_hamiltonian,
             MajoranaMapping.jordan_wigner(n_spin_orbitals),
         )
-        from qdk_chemistry.algorithms import registry
         grouper = registry.create("term_grouper", "commuting")
         return grouper.run(h)
 
