@@ -71,7 +71,7 @@ TRACE_QUERY = (
 ISA_QUERY = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
 MAX_ERROR = 0.01
 
-OUTPUT_JSON = Path(f"mps_sparse_resource_estimation_fe2s2_phase_bits_{PHASE_BITS}_full.json")
+OUTPUT_JSON = Path(f"mps_sparse_resource_estimation_fe2s2_phase_bits_{PHASE_BITS}_new_sparse.json")
 
 
 # ============================================================================
@@ -407,7 +407,7 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
     algo_dense = MPSSequentialStatePreparation()
     algo_dense.settings().set("rotation_bits", PHASE_BITS)
-    # algo_dense.settings().set("fast_grouped_resource_estimation", True)
+    algo_dense.settings().set("fast_grouped_resource_estimation", True)
     dense_circ = algo_dense.run(mps)
     dense_lc = dense_circ.estimate().logical_counts
     t_build = time.perf_counter() - t0

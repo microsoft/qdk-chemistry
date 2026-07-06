@@ -44,11 +44,6 @@ Logger.set_global_level(Logger.LogLevel.off)
 # ============================================================================
 
 DATASETS = {
-    "fe2s2": {
-        "label": "Fe2S2-2_small (20 sites)",
-        "path": Path("..") / "fe2s2-2_small" / "tensors_compressed" / "tensors_compressed_",
-        "description": "Fe2S2 iron-sulfur cluster, 20 spatial orbitals, chi_max~1000",
-    },
     "g1": {
         "label": "P450 G-1 (43 sites)",
         "path": Path("/blob_user/ressource_estimates/p450_enzyme/G-1/tensors_compressed") / "tensors_compressed_",
@@ -65,7 +60,7 @@ TRACE_QUERY = (
 )
 MAX_ERROR = 0.01
 
-OUTPUT_JSON = Path("mps_sequential_vs_sparse_comparison_20.json")
+OUTPUT_JSON = Path("mps_sequential_vs_sparse_comparison_g1.json")
 
 
 # ============================================================================
@@ -163,8 +158,8 @@ def parse_args():
     parser.add_argument(
         "--phase-bits", "-p",
         type=int,
-        default=10,
-        help="Number of rotation bits for phase gradient. Default: 10",
+        default=15,
+        help="Number of rotation bits for phase gradient. Default: 15",
     )
     parser.add_argument(
         "--output", "-o",

@@ -1,15 +1,15 @@
 """
-Plot Pareto fronts (physical qubits vs runtime) for all molecules.
+Plot Pareto fronts (physical qubits vs runtime) for all molecules (grayscale).
 
 Reads:
-  - mps_sossa_resource_estimation.json (Fe2S2-20, Fe4S4-36, FeMoCo-76)
-  - mps_sossa_resource_estimation_g1.json (P450-G1-43)
+  - mps_sossa_resource_estimation*.json (Fe2S2-20, Fe4S4-36, FeMoCo-76)
 
 Layout: one subplot per molecule.
 Legend scheme:
-  - Marker type distinguishes method: 'o' = MPS only, '^' = QPE(HF), 's' = MPS+QPE
-  - Color distinguishes bond dimension: tab:blue=100, tab:orange=1000, tab:red=5000, tab:purple=10000
-  - QPE(HF) always uses tab:green with '^' marker
+  - Shape distinguishes bond dimension: o=100, s=1000, D=5000, ^=10000
+  - MPS only: filled grey
+  - MPS+QPE: open (hollow) shape
+  - QPE(HF): x marker
 """
 
 import json
@@ -26,8 +26,7 @@ base_path = Path(__file__).parent
 # ============================================================================
 
 json_files = [
-    base_path / "mps_sossa_resource_estimation.json",
-    base_path / "mps_sossa_resource_estimation_g1.json",
+    base_path / "mps_sossa_resource_estimation_full.json",
 ]
 
 all_mol_data = {}  # mol_name -> {mps_only: [...], qpe_hf: ..., mps_plus_qpe: [...]}
@@ -58,23 +57,21 @@ for jp in json_files:
 print(f"Molecules with Pareto data: {list(all_mol_data.keys())}")
 
 # ============================================================================
-# Color/marker scheme
+# Grayscale marker scheme
 # ============================================================================
 
-# Colors by bond dimension
-CHI_COLORS = {
-    100: "tab:blue",
-    1000: "tab:orange",
-    5000: "tab:red",
-    10000: "tab:purple",
+# Different shapes by bond dimension
+CHI_MARKERS = {
+    100: "o",       # circle
+    1000: "s",      # square
+    5000: "D",      # diamond
+    10000: "^",     # triangle up
 }
 
-# Markers by method
-MARKER_MPS = "o"        # MPS only
-MARKER_QPE_HF = "^"    # QPE(HF)
-MARKER_MPS_QPE = "s"   # MPS + QPE
-
-QPE_HF_COLOR = "tab:green"
+FILL_COLOR = "0.5"   # grey for filled (MPS only)
+EDGE_COLOR = "black"
+QPE_MARKER = "x"     # QPE(HF)
+MARKER_SIZE = 80
 
 # ============================================================================
 # Plot
@@ -85,67 +82,71 @@ if n_mols == 0:
     print("No Pareto data found.")
     exit()
 
-nrows, ncols = 2, 2
-fig, axes = plt.subplots(nrows, ncols, figsize=(14, 12), squeeze=False)
+nrows, ncols = 1, n_mols
+fig, axes = plt.subplots(nrows, ncols, figsize=(6 * n_mols, 6), squeeze=False)
 
 for idx, (mol_name, mol) in enumerate(all_mol_data.items()):
-    row, col = divmod(idx, ncols)
-    ax = axes[row, col]
+    ax = axes[0, idx]
 
-    # --- MPS only ---
+    # --- MPS only --- filled grey
     for entry in mol.get("mps_only", []):
         if "pareto_front" not in entry:
             continue
+        if entry.get("label", "").startswith("real"):
+            continue
         chi = entry["bond_dim"]
-        color = CHI_COLORS.get(chi, "tab:gray")
+        marker = CHI_MARKERS.get(chi, "o")
         pareto = entry["pareto_front"]
         qubits = [p["qubits"] for p in pareto]
         runtime = [p["runtime"] for p in pareto]
-        ax.scatter(qubits, runtime, marker=MARKER_MPS, color=color, s=80,
-                   edgecolors="k", linewidths=0.5, zorder=3, alpha=0.6,
+        ax.scatter(qubits, runtime, marker=marker, color=FILL_COLOR, s=MARKER_SIZE,
+                   edgecolors=EDGE_COLOR, linewidths=0.8, zorder=3, alpha=0.8,
                    label=f"MPS χ={chi}")
 
-    # --- QPE(HF) ---
+    # --- QPE(HF) --- x marker
     qpe_hf = mol.get("qpe_hf")
     if qpe_hf and "pareto_front" in qpe_hf:
         pareto = qpe_hf["pareto_front"]
         qubits = [p["qubits"] for p in pareto]
         runtime = [p["runtime"] for p in pareto]
-        ax.scatter(qubits, runtime, marker=MARKER_QPE_HF, color=QPE_HF_COLOR, s=100,
-                   edgecolors="k", linewidths=0.5, zorder=4, alpha=0.6,
-                   label="QPE(HF)")
+        ax.scatter(qubits, runtime, marker=QPE_MARKER, color=EDGE_COLOR, s=MARKER_SIZE,
+                   linewidths=1.5, zorder=4, alpha=0.8,
+                   label="QPE-HF")
 
-    # --- MPS + QPE ---
+    # --- MPS + QPE --- open shape
     for entry in mol.get("mps_plus_qpe", []):
         if "pareto_front" not in entry:
             continue
+        if entry.get("label", "").startswith("real"):
+            continue
         chi = entry["bond_dim"]
-        color = CHI_COLORS.get(chi, "tab:gray")
+        marker = CHI_MARKERS.get(chi, "o")
         pareto = entry["pareto_front"]
         qubits = [p["qubits"] for p in pareto]
         runtime = [p["runtime"] for p in pareto]
-        ax.scatter(qubits, runtime, marker=MARKER_MPS_QPE, color=color, s=80,
-                   edgecolors="k", linewidths=0.5, zorder=3, alpha=0.6,
-                   label=f"MPS+QPE χ={chi}")
+        ax.scatter(qubits, runtime, marker=marker, facecolors="none",
+                   s=MARKER_SIZE, edgecolors="0.2", linewidths=1.5,
+                   zorder=3, alpha=0.7,
+                   label=f"QPE-MPS χ={chi}")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Physical Qubits", fontsize=12)
     ax.set_ylabel("Runtime (s)", fontsize=12)
     ax.set_title(mol_name, fontsize=13, fontweight="bold")
-    ax.legend(fontsize=8, loc="best")
+    if idx == 0:
+        ax.legend(fontsize=8, loc="best")
     ax.grid(True, which="both", alpha=0.3)
     ax.tick_params(labelsize=10)
 
 # Hide unused subplots
-for idx in range(n_mols, nrows * ncols):
-    row, col = divmod(idx, ncols)
-    axes[row, col].set_visible(False)
+for idx in range(n_mols, ncols):
+    axes[0, idx].set_visible(False)
 
-fig.suptitle("Pareto Fronts: Physical Qubits vs Runtime", fontsize=14, fontweight="bold", y=0.98)
-plt.tight_layout(rect=[0, 0, 1, 0.95])
+fig.suptitle("Pareto Fronts: Physical Qubits vs Runtime", fontsize=14, fontweight="bold", y=1.02)
+plt.tight_layout()
 
 out_path = base_path / "pareto_all_molecules.png"
-fig.savefig(out_path, dpi=150, bbox_inches="tight")
+fig.savefig(out_path, dpi=250, bbox_inches="tight")
 plt.close(fig)
 print(f"\nSaved: {out_path}")
