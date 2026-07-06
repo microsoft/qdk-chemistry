@@ -232,7 +232,10 @@ class TestZassenhausTimeEvolution:
                 term.pauli_term, num_qubits=hamiltonian.num_qubits
             )
             pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
-            step_unitary = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ step_unitary
+            cos_val = np.cos(term.angle)
+            sin_val = np.sin(term.angle)
+            rotation_matrix = cos_val * np.eye(pauli_matrix.shape[0]) - 1j * sin_val * pauli_matrix
+            step_unitary = rotation_matrix @ step_unitary
 
         return np.linalg.matrix_power(step_unitary, container.step_reps)
 
@@ -263,7 +266,10 @@ class TestZassenhausTimeEvolution:
             for site in range(3)
             for pauli in ("X", "Y", "Z")
         ]
-        return QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
+        h = QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
+        from qdk_chemistry.algorithms import registry
+        grouper = registry.create("term_grouper", "commuting")
+        return grouper.run(h)
 
     @staticmethod
     def _h2_sto3g_jordan_wigner_hamiltonian() -> QubitHamiltonian:
@@ -289,10 +295,13 @@ class TestZassenhausTimeEvolution:
         constructor = create("hamiltonian_constructor")
         active_hamiltonian = constructor.run(active_orbitals)
         n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
-        return create("qubit_mapper", "qdk").run(
+        h = create("qubit_mapper", "qdk").run(
             active_hamiltonian,
             MajoranaMapping.jordan_wigner(n_spin_orbitals),
         )
+        from qdk_chemistry.algorithms import registry
+        grouper = registry.create("term_grouper", "commuting")
+        return grouper.run(h)
 
     def test_zassenhaus_builder_and_decomposition(self):
         """Test metadata, registry creation, settings, decomposition, filtering, and evolution examples."""
@@ -468,11 +477,6 @@ class TestZassenhausTimeEvolution:
 
         assert np.allclose(u_opt, u_raw, atol=1e-12)
 
-    @pytest.mark.slow
-    @pytest.mark.skipif(
-        not _RUN_SLOW_TESTS,
-        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-    )
     def test_zassenhaus_operator_norm_error_scaling(self):
         """Check empirical operator-norm error scaling slopes match order + 1 to within 0.1."""
         cases = [

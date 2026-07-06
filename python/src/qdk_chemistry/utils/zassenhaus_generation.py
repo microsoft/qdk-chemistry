@@ -17,6 +17,7 @@ from collections import defaultdict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+import functools
 from math import factorial
 
 Term = Hashable | tuple["Term", "Term"]
@@ -265,6 +266,25 @@ def _plan_expr(
     return _clean(dict(out))
 
 
+# Cache the symbolic plan. Since the commutator plan depends purely on the number of leaves
+# and the target order (not on coefficients or time), caching avoids redundant DAG builds.
+@functools.lru_cache(maxsize=128)
+def _cached_zassenhaus_commutator_plan(
+    leaves: tuple[Hashable, ...],
+    max_order: int,
+) -> tuple[dict[int, PlanExpr], CommutatorPlan]:
+    exponents = zassenhaus_exponents(leaves, max_order=max_order)
+    plan: CommutatorPlan = {}
+    planned_exponents: dict[int, PlanExpr] = {}
+    primitive_leaves = set(leaves)
+    term_nodes: dict[Term, CommutatorNode] = {}
+
+    for order, expr in exponents.items():
+        planned_exponents[order] = _plan_expr(expr, plan, primitive_leaves, term_nodes)
+
+    return planned_exponents, plan
+
+
 def zassenhaus_commutator_plan(
     leaves: Sequence[Hashable],
     max_order: int = 5,
@@ -278,13 +298,4 @@ def zassenhaus_commutator_plan(
     valid evaluation order.
     """
     leaf_tuple = _normalize_leaves(leaves)
-    exponents = zassenhaus_exponents(leaf_tuple, max_order=max_order)
-    plan: CommutatorPlan = {}
-    planned_exponents: dict[int, PlanExpr] = {}
-    primitive_leaves = set(leaf_tuple)
-    term_nodes: dict[Term, CommutatorNode] = {}
-
-    for order, expr in exponents.items():
-        planned_exponents[order] = _plan_expr(expr, plan, primitive_leaves, term_nodes)
-
-    return planned_exponents, plan
+    return _cached_zassenhaus_commutator_plan(leaf_tuple, max_order)
