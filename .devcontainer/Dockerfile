@@ -105,8 +105,10 @@ RUN python -m venv "$VIRTUAL_ENV" \
 # Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells
 RUN echo "source /usr/local/share/qdk/parallelism.sh" >> ~/.bashrc
 
-# Set ENV variables for the container environment
+# Set ENV variables for the container environment. Override in devcontainer.json if needed.
 #   CMAKE_PREFIX_PATH - Make user-local C++ installations discoverable
 #   QDK_UARCH         - default to native architecture for QDK builds
+#   CMAKE_BUILD_TYPE  - default to Debug builds
 ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local \
-    QDK_UARCH=native
+    QDK_UARCH=native \
+    CMAKE_BUILD_TYPE=Debug

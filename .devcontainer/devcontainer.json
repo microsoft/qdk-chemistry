@@ -69,8 +69,7 @@
         }
     },
     "remoteEnv": {
-        "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
     },
     "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
