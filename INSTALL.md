@@ -219,9 +219,11 @@ Build from source if you need to modify the C++ core, work with unreleased featu
 
 **Linux**: A Debian-based distribution is recommended for the broadest package availability. Other distributions may require building some dependencies (e.g. Eigen3, nlohmann-json) from source.
 
-**Windows**: Native Windows builds are not supported. Use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
+**Windows**: Native Windows builds (MSVC / clang-cl with vcpkg) are **experimental** and in active development. Helper scripts are available under [`.pipelines/windows/`](.pipelines/windows/). For a fully supported build, use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
 
 **macOS**: The latest version of [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) must be installed.
+
+> **NOTE:** QDK/Chemistry requires a **64-bit** platform.
 
 ### Step 2: Install system dependencies
 

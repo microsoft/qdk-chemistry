@@ -605,3 +605,30 @@ class TestQDriftStrictAccuracyBound:
         t = 0.3
         err = _qdrift_state_trace_error(hamiltonian, eps=eps, t=t, seeds=self.SEEDS)
         assert err <= eps, f"State trace distance {err:.4e} exceeds ε = {eps:.4e}"
+
+
+class TestQDriftScale:
+    """Tests that the qDRIFT builder sets scale correctly on the container."""
+
+    def test_scale_equals_time(self):
+        """Container scale should equal the evolution time passed to qDRIFT."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        t = 0.8
+        builder = QDrift(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert container.scale == t
+
+    def test_eigenvalue_from_phase_roundtrip(self):
+        """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
+        t = 1.5
+        energy = 0.3
+        phi = (energy * t / (2 * np.pi)) % 1.0
+        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = QDrift(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert np.isclose(
+            container.eigenvalue_from_phase(phi),
+            energy,
+            rtol=1e-10,
+            atol=1e-12,
+        )

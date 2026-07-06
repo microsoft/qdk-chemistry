@@ -19,6 +19,7 @@ Tests cover:
 # --------------------------------------------------------------------------------------------
 
 import tempfile
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -274,11 +275,15 @@ class TestSerialization:
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 scbk.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded = MajoranaMapping.from_hdf5(hf)
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert loaded.table == scbk.table
         assert loaded.name == scbk.name
         assert loaded.tapering is not None
@@ -557,11 +562,15 @@ class TestTaperingSpecificationSerialization:
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 scbk.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded = MajoranaMapping.from_hdf5(hf)
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert loaded.tapering is not None
         assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
         assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
@@ -582,15 +591,19 @@ class TestTaperingSpecificationSerialization:
         from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
 
         tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            tap.to_hdf5_file(f.name)
-            with h5py.File(f.name, "r") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            tap.to_hdf5_file(fname)
+            with h5py.File(fname, "r") as hf:
                 assert "qubit_indices" in hf
                 assert "eigenvalues" in hf
                 reconstructed = TaperingSpecification(
                     qubit_indices=[int(x) for x in hf["qubit_indices"][:]],
                     eigenvalues=[int(x) for x in hf["eigenvalues"][:]],
                 )
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert reconstructed == tap
 
     def test_parity_tapering_json_roundtrip_via_mapping(self) -> None:
@@ -620,11 +633,15 @@ class TestTaperingSpecificationSerialization:
         from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
 
         tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 tap.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded = TaperingSpecification.from_hdf5(hf)
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert loaded == tap
 
     def test_tapering_hash(self) -> None:
@@ -674,11 +691,15 @@ class TestBilinearOnlySerialization:
     def test_hdf5_roundtrip(self) -> None:
         """Bilinear-only mapping survives HDF5 round-trip."""
         mapping = self._make_bilinear_mapping()
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 mapping.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded = MajoranaMapping.from_hdf5(hf)
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert not loaded.is_majorana_atomic
         assert loaded.num_modes == mapping.num_modes
         assert loaded.num_qubits == mapping.num_qubits
@@ -729,11 +750,15 @@ class TestTaperedQubitHamiltonianSerialization:
         import numpy as np  # noqa: PLC0415
 
         qh = self._make_tapered_qh()
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            fname = f.name
+        try:
+            with h5py.File(fname, "w") as hf:
                 qh.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(fname, "r") as hf:
                 loaded = type(qh).from_hdf5(hf)
+        finally:
+            Path(fname).unlink(missing_ok=True)
         assert loaded.tapering is not None
         assert loaded.tapering.qubit_indices == qh.tapering.qubit_indices
         assert loaded.tapering.eigenvalues == qh.tapering.eigenvalues

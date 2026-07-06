@@ -18,10 +18,12 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-import qsharp.openqasm
-from qsharp.estimator import EstimatorParams, EstimatorResult
-from qsharp.openqasm import OutputSemantics
-from qsharp.openqasm import estimate as openqasm_estimate
+from qdk import qsharp
+from qdk.estimator import EstimatorParams, EstimatorResult
+from qdk.openqasm import OutputSemantics
+from qdk.openqasm import circuit as openqasm_circuit
+from qdk.openqasm import compile as openqasm_compile
+from qdk.openqasm import estimate as openqasm_estimate
 
 from qdk_chemistry.data._hashing import _hash_optional, _hash_str
 from qdk_chemistry.data.base import DataClass
@@ -163,7 +165,7 @@ class Circuit(DataClass):
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return qsharp.openqasm.compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
@@ -197,7 +199,7 @@ class Circuit(DataClass):
                 prune_classical_qubits=prune_classical_qubits,
             )
         if self.qasm:
-            return qsharp.openqasm.circuit(self.qasm)
+            return openqasm_circuit(self.qasm)
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
@@ -227,6 +229,38 @@ class Circuit(DataClass):
             return openqasm_estimate(self.qasm, params)
 
         raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+
+    def get_qre_application(self):
+        """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
+
+        Returns a ``QSharpApplication``, ``OpenQASMApplication``, or ``QIRApplication``
+        depending on the available circuit representation.
+
+        Returns:
+            A ``qdk.qre`` Application instance suitable for passing to ``qdk.qre.estimate()``.
+
+        Raises:
+            RuntimeError: If qdk.qre is not installed or no suitable representation is available.
+
+        """
+        try:
+            from qdk.qre.application import OpenQASMApplication, QIRApplication, QSharpApplication  # noqa: PLC0415
+        except ImportError as err:
+            raise RuntimeError(
+                "qdk.qre is not available. Install QRE dependencies with: pip install 'qdk-chemistry[qre]'"
+            ) from err
+
+        if self._qsharp_factory is not None:
+            return QSharpApplication(
+                self._qsharp_factory.program,
+                args=tuple(self._qsharp_factory.parameter.values()),
+            )
+        if self.qasm is not None:
+            return OpenQASMApplication(self.qasm)
+        if self.qir is not None:
+            return QIRApplication(str(self.qir))
+
+        raise RuntimeError("Cannot create QRE application: no Q# factory, QASM, or QIR representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.

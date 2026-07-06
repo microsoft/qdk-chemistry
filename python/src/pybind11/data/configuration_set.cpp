@@ -175,6 +175,19 @@ Returns:
 
 )");
 
+  bind_getter_as_property(configuration_set, "num_modes",
+                          &ConfigurationSet::num_modes,
+                          R"(
+Actual (non-padded) number of single-particle modes per configuration.
+
+This is derived from the orbital basis: the active-space size if an active
+space is defined, otherwise the total number of molecular orbitals.
+
+Returns:
+    int: Number of modes.
+
+)");
+
   configuration_set.def("empty", &ConfigurationSet::empty,
                         R"(
 Check if the set is empty.

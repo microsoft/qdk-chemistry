@@ -458,24 +458,26 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    auto [active_alpha, active_beta] =
+        get_orbitals()->get_active_space_indices();
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin dependent 1-RDMs not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
           "Mismatched sizes in active orbital occupations for alpha and beta");
     }
-    size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
+    size_t n_orbs = alpha_occupations.size();
     Eigen::MatrixXd tmp_one_rdm_aa = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
     Eigen::MatrixXd tmp_one_rdm_bb = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
 
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm_aa(i, i) = 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm_bb(i, i) = 1.0;
     }
 
@@ -507,11 +509,13 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    auto [active_alpha, active_beta] =
+        get_orbitals()->get_active_space_indices();
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin dependent 2-RDMs not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
@@ -572,19 +576,25 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_one_rdm_spin_traced && !_active_one_rdm) {
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    auto [active_alpha, active_beta] =
+        get_orbitals()->get_active_space_indices();
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin traced 1-RDM not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
+    if (alpha_occupations.size() != beta_occupations.size()) {
+      throw std::runtime_error(
+          "Mismatched sizes in active orbital occupations for alpha and beta");
+    }
+    size_t n_orbs = alpha_occupations.size();
     Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
     _one_rdm_spin_traced =
@@ -599,11 +609,13 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_two_rdm_spin_traced && !_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    auto [active_alpha, active_beta] =
+        get_orbitals()->get_active_space_indices();
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin-traced 2-RDM not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
@@ -655,11 +667,13 @@ Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   if (_is_single_determinant() && !_entropies.single_orbital) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    auto [active_alpha, active_beta] =
+        get_orbitals()->get_active_space_indices();
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Single orbital entropies not implemented for different alpha and "
-          "beta active space sizes");
+          "beta active space indices");
     }
     size_t num_active_orbitals =
         get_orbitals()->get_active_space_indices().first.size();
@@ -695,7 +709,7 @@ StateVectorContainer::_active_occupations_pair() const {
       Eigen::VectorXd alpha_occ = Eigen::VectorXd::Zero(num_orbitals);
       Eigen::VectorXd beta_occ = Eigen::VectorXd::Zero(num_orbitals);
       const auto& det = determinants[0];
-      for (size_t i = 0; i < num_orbitals && i < det.num_modes(); ++i) {
+      for (size_t i = 0; i < num_orbitals && i < det.capacity(); ++i) {
         if (det.bits_per_mode() == 2) {
           if (det.has_alpha_electron(i)) alpha_occ(i) = 1.0;
           if (det.has_beta_electron(i)) beta_occ(i) = 1.0;
@@ -720,7 +734,7 @@ StateVectorContainer::_active_occupations_pair() const {
     const auto& det = determinants[0];
     if (det.bits_per_mode() == 2) {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         if (det.has_alpha_electron(active_idx))
           alpha_occupations(active_idx) = 1.0;
@@ -729,7 +743,7 @@ StateVectorContainer::_active_occupations_pair() const {
       }
     } else {
       for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.num_modes();
+           active_idx < num_active_orbitals && active_idx < det.capacity();
            ++active_idx) {
         alpha_occupations(active_idx) =
             det.get_mode_state(active_idx) ? 1.0 : 0.0;
@@ -843,16 +857,18 @@ StateVectorContainer::_total_occupations_pair() const {
   auto [alpha_active_indices, beta_active_indices] =
       get_orbitals()->get_active_space_indices();
 
-  for (size_t active_idx = 0; active_idx < alpha_active_indices.size() &&
-                              active_idx < alpha_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < alpha_active_indices.size() &&
+       active_idx < static_cast<size_t>(alpha_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = alpha_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(orbital_idx) = alpha_active_occs(active_idx);
     }
   }
-  for (size_t active_idx = 0; active_idx < beta_active_indices.size() &&
-                              active_idx < beta_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < beta_active_indices.size() &&
+       active_idx < static_cast<size_t>(beta_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = beta_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {

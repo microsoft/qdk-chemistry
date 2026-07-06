@@ -13,7 +13,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
@@ -91,6 +90,12 @@ class StandardPhaseEstimation(PhaseEstimation):
                 f"Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder, "
                 f"but got {type(circuit_builder)} instead."
             )
+
+        # Resolve container before running the circuit
+        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        container = unitary_rep.get_container()
+
         num_bits = circuit_builder.settings().get("num_bits")
         circuits = circuit_builder.run(
             state_preparation=state_preparation,
@@ -104,18 +109,11 @@ class StandardPhaseEstimation(PhaseEstimation):
         dominant_bitstring = max(counts, key=counts.get)
         raw_phase = int(dominant_bitstring, 2) / (2**num_bits)
 
-        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
-        if isinstance(unitary_builder, TimeEvolutionBuilder):
-            evolution_time = unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
-                method=self.name(),
-                phase_fraction=raw_phase,
-                evolution_time=evolution_time,
-                bits_msb_first=dominant_bitstring,
-            )
-        raise NotImplementedError(
-            "QPE result construction currently only supports post-processing from time evolution. "
-            f"Got {type(unitary_builder)} instead."
+        return QpeResult.from_phase_fraction(
+            method=self.name(),
+            phase_fraction=raw_phase,
+            eigenvalue_from_phase=container.eigenvalue_from_phase,
+            bits_msb_first=dominant_bitstring,
         )
 
     def name(self) -> str:

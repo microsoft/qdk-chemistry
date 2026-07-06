@@ -36,13 +36,6 @@ Using plugins
 
 To select an implementation, specify it by name:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/interfaces.cpp
-      :language: cpp
-      :start-after: // start-cell-scf
-      :end-before: // end-cell-scf
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/interfaces.py
@@ -50,16 +43,16 @@ To select an implementation, specify it by name:
       :start-after: # start-cell-scf
       :end-before: # end-cell-scf
 
-.. _listing-implementations:
-
-To list available implementations:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/interfaces.cpp
       :language: cpp
-      :start-after: // start-cell-list-methods
-      :end-before: // end-cell-list-methods
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
+
+.. _listing-implementations:
+
+To list available implementations:
 
 .. tab:: Python API
 
@@ -67,6 +60,13 @@ To list available implementations:
       :language: python
       :start-after: # start-cell-list-methods
       :end-before: # end-cell-list-methods
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-list-methods
+      :end-before: // end-cell-list-methods
 
 Documentation pertaining to the availability and configuration of each algorithm implementation provided within QDK/Chemistry can be found on the :doc:`algorithm <algorithms/index>` documentation pages.
 
@@ -213,19 +213,19 @@ Each algorithm type in QDK/Chemistry defines an abstract base class specifying t
 
 When an implementation requires configuration options beyond those provided by the base settings class, a derived settings class can be defined:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
-      :language: cpp
-      :start-after: // start-cell-custom-settings
-      :end-before: // end-cell-custom-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
       :start-after: # start-cell-custom-settings
       :end-before: # end-cell-custom-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-settings
+      :end-before: // end-cell-custom-settings
 
 .. rubric:: Implementation structure
 
@@ -236,13 +236,6 @@ The ``_run_impl()`` method is responsible for:
 2. Invoking the external computation
 3. Converting results back to QDK/Chemistry data structures
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
-      :language: cpp
-      :start-after: // start-cell-custom-scf-solver
-      :end-before: // end-cell-custom-scf-solver
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
@@ -250,17 +243,17 @@ The ``_run_impl()`` method is responsible for:
       :start-after: # start-cell-custom-scf-solver
       :end-before: # end-cell-custom-scf-solver
 
-.. rubric:: Registration
-
-Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
-Registration is typically performed during module initialization:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-registration
-      :end-before: // end-cell-registration
+      :start-after: // start-cell-custom-scf-solver
+      :end-before: // end-cell-custom-scf-solver
+
+.. rubric:: Registration
+
+Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
+Registration is typically performed during module initialization:
 
 .. tab:: Python API
 
@@ -268,6 +261,13 @@ Registration is typically performed during module initialization:
       :language: python
       :start-after: # start-cell-registration
       :end-before: # end-cell-registration
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-registration
+      :end-before: // end-cell-registration
 
 Following registration, the implementation is accessible through the standard API:
 
@@ -299,13 +299,6 @@ Configuration
 
 Define a settings class containing all configuration parameters:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
-      :language: cpp
-      :start-after: // start-cell-geometry-settings
-      :end-before: // end-cell-geometry-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
@@ -313,16 +306,16 @@ Define a settings class containing all configuration parameters:
       :start-after: # start-cell-geometry-settings
       :end-before: # end-cell-geometry-settings
 
-.. rubric:: Base class definition
-
-Define an abstract base class specifying the interface for all implementations:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-base-class
-      :end-before: // end-cell-geometry-base-class
+      :start-after: // start-cell-geometry-settings
+      :end-before: // end-cell-geometry-settings
+
+.. rubric:: Base class definition
+
+Define an abstract base class specifying the interface for all implementations:
 
 .. tab:: Python API
 
@@ -331,16 +324,16 @@ Define an abstract base class specifying the interface for all implementations:
       :start-after: # start-cell-geometry-base-class
       :end-before: # end-cell-geometry-base-class
 
-.. rubric:: Factory definition
-
-The factory manages implementation registration and provides instance creation:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-factory
-      :end-before: // end-cell-geometry-factory
+      :start-after: // start-cell-geometry-base-class
+      :end-before: // end-cell-geometry-base-class
+
+.. rubric:: Factory definition
+
+The factory manages implementation registration and provides instance creation:
 
 .. tab:: Python API
 
@@ -349,16 +342,16 @@ The factory manages implementation registration and provides instance creation:
       :start-after: # start-cell-geometry-factory
       :end-before: # end-cell-geometry-factory
 
-.. rubric:: Concrete implementations
-
-Implement the algorithm by inheriting from the base class:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-implementations
-      :end-before: // end-cell-geometry-implementations
+      :start-after: // start-cell-geometry-factory
+      :end-before: // end-cell-geometry-factory
+
+.. rubric:: Concrete implementations
+
+Implement the algorithm by inheriting from the base class:
 
 .. tab:: Python API
 
@@ -366,6 +359,13 @@ Implement the algorithm by inheriting from the base class:
       :language: python
       :start-after: # start-cell-geometry-implementations
       :end-before: # end-cell-geometry-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-implementations
+      :end-before: // end-cell-geometry-implementations
 
 Additional implementations follow the same pattern:
 
@@ -378,19 +378,19 @@ Additional implementations follow the same pattern:
 
 Register the factory and all implementations:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
-      :language: cpp
-      :start-after: // start-cell-geometry-registration
-      :end-before: // end-cell-geometry-registration
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
       :start-after: # start-cell-geometry-registration
       :end-before: # end-cell-geometry-registration
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
+      :language: cpp
+      :start-after: // start-cell-geometry-registration
+      :end-before: // end-cell-geometry-registration
 
 .. rubric:: Usage
 

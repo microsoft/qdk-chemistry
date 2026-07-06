@@ -83,7 +83,20 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     echo "Downloading and installing libflame..."
     bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+
 elif [ "$MAC_BUILD" == "ON" ]; then
+    # --- Apple Silicon Rosetta self-heal -----------------------------------------
+    # If this script is running under Rosetta on a genuinely arm64 machine, re-exec
+    # it natively so the whole build tree (conda/python/cmake/clang) is arm64.
+    # Uses sysctl (reliable under translation) instead of `uname -m` (which lies).
+    if [ "$(uname -s)" = "Darwin" ] \
+    && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ] \
+    && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
+        echo "Detected Rosetta on Apple Silicon; re-executing natively as arm64..."
+        exec arch -arm64 /bin/bash "$0" "$@"
+    fi
+    # -----------------------------------------------------------------------------
+
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \

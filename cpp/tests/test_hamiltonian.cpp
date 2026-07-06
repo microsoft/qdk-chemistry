@@ -636,49 +636,53 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
       },
       std::runtime_error);
 
-  // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(
-      ({
-        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> alpha_active_indices{};  // Empty alpha
-        std::vector<size_t> beta_active_indices{0, 1};
-        std::vector<size_t> alpha_inactive_indices{};
-        std::vector<size_t> beta_inactive_indices{2};
-        // Create unrestricted orbitals with only beta active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-            basis_set,
-            testing::unrestricted_index_set(
-                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
-            testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                            alpha_inactive_indices,
-                                            beta_inactive_indices));
-        hc->run(orbitals);
-      }),
-      std::runtime_error);
+  // Test that unrestricted orbitals throw when alpha is empty.
+  // GCC statement expressions ({...}) are not supported by MSVC, so we use
+  // a named lambda invoked inside the macro to avoid unprotected commas.
+  {
+    auto throw_empty_alpha = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{};  // Empty alpha
+      std::vector<size_t> beta_active_indices{0, 1};
+      std::vector<size_t> alpha_inactive_indices{};
+      std::vector<size_t> beta_inactive_indices{2};
+      // Create unrestricted orbitals with only beta active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_alpha(), std::runtime_error);
+  }
 
   // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(
-      ({
-        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> alpha_active_indices{0, 1};
-        std::vector<size_t> beta_active_indices{};  // Empty beta
-        std::vector<size_t> alpha_inactive_indices{2};
-        std::vector<size_t> beta_inactive_indices{};
-        // Create unrestricted orbitals with only alpha active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-            basis_set,
-            testing::unrestricted_index_set(
-                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
-            testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                            alpha_inactive_indices,
-                                            beta_inactive_indices));
-        hc->run(orbitals);
-      }),
-      std::runtime_error);
+  {
+    auto throw_empty_beta = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{0, 1};
+      std::vector<size_t> beta_active_indices{};  // Empty beta
+      std::vector<size_t> alpha_inactive_indices{2};
+      std::vector<size_t> beta_inactive_indices{};
+      // Create unrestricted orbitals with only alpha active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_beta(), std::runtime_error);
+  }
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
@@ -1416,29 +1420,32 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
   std::string filename = "test.sparse.hamiltonian.fcidump";
   EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
 
-  std::ifstream file(filename);
-  EXPECT_TRUE(file.is_open());
+  // Scope the stream so it closes before remove() (Windows file lock).
+  {
+    std::ifstream file(filename);
+    EXPECT_TRUE(file.is_open());
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string fcidump_content = buffer.str();
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string fcidump_content = buffer.str();
 
-  // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
-  // (1,1,1,1)), one-body lower triangle in column-major order, then core
-  // energy.
-  const std::string reference_fcidump_contents =
-      "&FCI NORB=2, NELEC=2, MS2=0,\n"
-      "ORBSYM=1,1,\n"
-      "ISYM=1,\n"
-      "&END\n"
-      "      2.0000000000000000e+00    1    1    1    1\n"
-      "      3.0000000000000000e+00    2    2    2    2\n"
-      "      1.0000000000000000e+00    1    1    0    0\n"
-      "      5.0000000000000000e-01    2    1    0    0\n"
-      "      1.0000000000000000e+00    2    2    0    0\n"
-      "      1.5000000000000000e+00    0    0    0    0\n";
+    // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
+    // (1,1,1,1)), one-body lower triangle in column-major order, then core
+    // energy.
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      3.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0\n";
 
-  EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+    EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+  }
 
   std::filesystem::remove(filename);
 }
@@ -1787,13 +1794,15 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
                                    1);
   });
 
-  // Verify file was created and has correct NORB (should be 2, not 3)
-  std::ifstream file("test_active_space.hamiltonian.fcidump");
-  EXPECT_TRUE(file.is_open());
+  // Verify file was created and has correct NORB (should be 2, not 3).
+  {
+    std::ifstream file("test_active_space.hamiltonian.fcidump");
+    EXPECT_TRUE(file.is_open());
 
-  std::string first_line;
-  std::getline(file, first_line);
-  EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+    std::string first_line;
+    std::getline(file, first_line);
+    EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+  }
 
   // Clean up
   std::filesystem::remove("test_active_space.hamiltonian.fcidump");

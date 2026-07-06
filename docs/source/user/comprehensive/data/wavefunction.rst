@@ -41,13 +41,6 @@ Slater determinant container
 
 Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
-      :language: cpp
-      :start-after: // start-cell-create-slater
-      :end-before: // end-cell-create-slater
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
@@ -55,17 +48,17 @@ Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).
       :start-after: # start-cell-create-slater
       :end-before: # end-cell-create-slater
 
-SCI wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-sci
-      :end-before: // end-cell-create-sci
+      :start-after: // start-cell-create-slater
+      :end-before: // end-cell-create-slater
+
+SCI wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.
 
 .. tab:: Python API
 
@@ -74,17 +67,17 @@ Sparse multi-determinant wavefunctions for Selected Configuration Interaction me
       :start-after: # start-cell-create-sci
       :end-before: # end-cell-create-sci
 
-CAS wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A multi-determinant wavefunction from Complete Active Space methods (:term:`CASSCF`/:term:`CASCI`).
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-cas
-      :end-before: // end-cell-create-cas
+      :start-after: // start-cell-create-sci
+      :end-before: // end-cell-create-sci
+
+CAS wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A multi-determinant wavefunction from Complete Active Space methods (:term:`CASSCF`/:term:`CASCI`).
 
 .. tab:: Python API
 
@@ -92,6 +85,13 @@ A multi-determinant wavefunction from Complete Active Space methods (:term:`CASS
       :language: python
       :start-after: # start-cell-create-cas
       :end-before: # end-cell-create-cas
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-cas
+      :end-before: // end-cell-create-cas
 
 Amplitude wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -102,13 +102,6 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 
 The following example tags the amplitudes as :term:`MP2` (T1 is zero for MP2):
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
-      :language: cpp
-      :start-after: // start-cell-create-mp2
-      :end-before: // end-cell-create-mp2
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
@@ -116,14 +109,14 @@ The following example tags the amplitudes as :term:`MP2` (T1 is zero for MP2):
       :start-after: # start-cell-create-mp2
       :end-before: # end-cell-create-mp2
 
-The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-cc
-      :end-before: // end-cell-create-cc
+      :start-after: // start-cell-create-mp2
+      :end-before: // end-cell-create-mp2
+
+The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
 
 .. tab:: Python API
 
@@ -131,6 +124,13 @@ The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
       :language: python
       :start-after: # start-cell-create-cc
       :end-before: # end-cell-create-cc
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-cc
+      :end-before: // end-cell-create-cc
 
 Properties
 ~~~~~~~~~~
@@ -249,13 +249,6 @@ Accessing wavefunction data
 
 The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access coefficients, determinants, and derived properties:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
-      :language: cpp
-      :start-after: // start-cell-access-data
-      :end-before: // end-cell-access-data
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
@@ -263,17 +256,17 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
       :start-after: # start-cell-access-data
       :end-before: # end-cell-access-data
 
-Accessing cluster amplitudes
-----------------------------
-
-For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-access-amplitudes
-      :end-before: // end-cell-access-amplitudes
+      :start-after: // start-cell-access-data
+      :end-before: // end-cell-access-data
+
+Accessing cluster amplitudes
+----------------------------
+
+For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.
 
 .. tab:: Python API
 
@@ -281,6 +274,13 @@ For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 clus
       :language: python
       :start-after: # start-cell-access-amplitudes
       :end-before: # end-cell-access-amplitudes
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-access-amplitudes
+      :end-before: // end-cell-access-amplitudes
 
 Related classes
 ---------------

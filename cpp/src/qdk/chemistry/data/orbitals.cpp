@@ -460,8 +460,8 @@ Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations_alpha.size() != num_molecular_orbitals ||
-      occupations_beta.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations_alpha.size()) != num_molecular_orbitals ||
+      static_cast<size_t>(occupations_beta.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -488,7 +488,7 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -512,10 +512,10 @@ Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm_alpha.rows() != num_molecular_orbitals ||
-      rdm_alpha.cols() != num_molecular_orbitals ||
-      rdm_beta.rows() != num_molecular_orbitals ||
-      rdm_beta.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm_alpha.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_alpha.cols()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -539,8 +539,8 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm.rows() != num_molecular_orbitals ||
-      rdm.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -1208,7 +1208,7 @@ void Orbitals::to_hdf5(H5::Group& group) const {
     // Save essential metadata that can't be computed from data
     unsigned num_atomic_orbitals = get_num_atomic_orbitals();
     unsigned num_molecular_orbitals = get_num_molecular_orbitals();
-    bool restricted = is_restricted();
+    hbool_t restricted = static_cast<hbool_t>(is_restricted());
 
     H5::DataSet aos_dataset = metadata_group.createDataSet(
         "num_atomic_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
@@ -1327,7 +1327,11 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     try {
       H5::Group metadata_group = group.openGroup("metadata");
       H5::DataSet ds = metadata_group.openDataSet("is_restricted");
-      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
+      // hbool_t is typically unsigned int (4 bytes) while C++ bool is 1 byte.
+      // Reading into a bool* with NATIVE_HBOOL is UB; stage through hbool_t.
+      hbool_t hb_restricted = 0;
+      ds.read(&hb_restricted, H5::PredType::NATIVE_HBOOL);
+      restricted = (hb_restricted != 0);
     } catch (const H5::Exception&) {
       throw std::invalid_argument(
           "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
@@ -1658,17 +1662,22 @@ void Orbitals::_save_orbital_metadata_to_hdf5(
   mos_dataset.write(&num_molecular_orbitals, H5::PredType::NATIVE_UINT);
 
   // Save boolean flags
+  // Use hbool_t intermediaries — hbool_t is typically unsigned int (4 bytes),
+  // while C++ bool is 1 byte.  Writing a bool* with NATIVE_HBOOL is UB.
+  hbool_t hb_is_restricted = static_cast<hbool_t>(is_restricted);
   H5::DataSet restricted_dataset = metadata_group.createDataSet(
       "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
-  restricted_dataset.write(&is_restricted, H5::PredType::NATIVE_HBOOL);
+  restricted_dataset.write(&hb_is_restricted, H5::PredType::NATIVE_HBOOL);
 
+  hbool_t hb_has_overlap_matrix = static_cast<hbool_t>(has_overlap_matrix);
   H5::DataSet overlap_dataset = metadata_group.createDataSet(
       "has_overlap_matrix", H5::PredType::NATIVE_HBOOL, scalar_space);
-  overlap_dataset.write(&has_overlap_matrix, H5::PredType::NATIVE_HBOOL);
+  overlap_dataset.write(&hb_has_overlap_matrix, H5::PredType::NATIVE_HBOOL);
 
+  hbool_t hb_has_basis_set = static_cast<hbool_t>(has_basis_set);
   H5::DataSet basis_dataset = metadata_group.createDataSet(
       "has_basis_set", H5::PredType::NATIVE_HBOOL, scalar_space);
-  basis_dataset.write(&has_basis_set, H5::PredType::NATIVE_HBOOL);
+  basis_dataset.write(&hb_has_basis_set, H5::PredType::NATIVE_HBOOL);
 }
 
 bool Orbitals::is_unrestricted() const {
@@ -2199,7 +2208,7 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
 
     // Save ModelOrbitals metadata
     unsigned num_orbitals = _num_orbitals;
-    bool is_restricted = _is_restricted;
+    hbool_t hb_is_restricted = static_cast<hbool_t>(_is_restricted);
 
     H5::DataSet orbitals_dataset = metadata_group.createDataSet(
         "num_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
@@ -2207,7 +2216,7 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
 
     H5::DataSet restricted_dataset = metadata_group.createDataSet(
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
-    restricted_dataset.write(&is_restricted, H5::PredType::NATIVE_HBOOL);
+    restricted_dataset.write(&hb_is_restricted, H5::PredType::NATIVE_HBOOL);
 
     // Save active space indices
     save_vector_to_group(group, "active_space_indices_alpha",

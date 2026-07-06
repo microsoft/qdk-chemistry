@@ -148,6 +148,38 @@ class MacisAsciSettings : public MacisSettings {
                         "Cumulative weight threshold for core selection",
                         data::BoundConstraint<double>{
                             std::numeric_limits<double>::epsilon(), 1.0});
+
+    // Warm-start and tolerance controls
+    set_default<bool>("warm_start_davidson", macis_defaults.warm_start_davidson,
+                      "Warm-start Davidson from previous eigenvector");
+    set_default<double>(
+        "min_warm_start_overlap", macis_defaults.min_warm_start_overlap,
+        "Minimum projected vector norm for warm-start Davidson. "
+        "Measures how much of the previous eigenvector's weight is "
+        "retained in the new determinant set (0=never, 1=always reject)",
+        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>(
+        "min_patch_overlap", macis_defaults.min_patch_overlap,
+        "Minimum determinant overlap for incremental H build. "
+        "The cache persists across iterations; a full rebuild is "
+        "triggered only when overlap drops below this threshold",
+        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>(
+        "grow_ci_residual_tolerance", macis_defaults.grow_ci_residual_tolerance,
+        "CI residual tolerance during grow phase (0 = use refine tolerance)");
+    set_default<double>(
+        "taper_grow_factor", macis_defaults.taper_grow_factor,
+        "Growth factor for final expansion near ntdets_max (0 = disabled)");
+
+    // Hamiltonian build algorithm selection
+    set_default<std::string>("hamiltonian_build_algorithm",
+                             macis_defaults.hamiltonian_build_algorithm,
+                             "Algorithm for diagonal Hamiltonian construction: "
+                             "'' or 'sorted_double_loop' (default), "
+                             "'residue_arrays', 'dynamic_bit_masking'");
+    set_default<size_t>("dynamic_bit_masking_num_masks", 0,
+                        "Number of bit masks for dynamic_bit_masking generator "
+                        "(0 = use generator default)");
   }
 
   /**

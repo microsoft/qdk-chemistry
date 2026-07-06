@@ -59,6 +59,23 @@ ConfigurationSet::sector_layout() const {
   return _sector_layout;
 }
 
+size_t ConfigurationSet::num_modes() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (_orbitals && _orbitals->has_active_space()) {
+    auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
+    return alpha_active.size();
+  }
+  if (_orbitals) {
+    return _orbitals->num_modes();
+  }
+  // Fallback: use the first configuration's padded capacity.
+  if (!_configurations.empty()) {
+    return _configurations[0].get_orbital_capacity();
+  }
+  return 0;
+}
+
 size_t ConfigurationSet::size() const {
   QDK_LOG_TRACE_ENTERING();
 

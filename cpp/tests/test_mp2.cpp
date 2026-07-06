@@ -129,7 +129,7 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
 TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
   // Test the RMP2 energies against PySCF reference for singlet O2 with
   // cc-pvdz
-  float pyscf_rmp2_corr_cc_pvdz = -0.38428662586339435;
+  double pyscf_rmp2_corr_cc_pvdz = -0.38428662586339435;
 
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1);
@@ -165,7 +165,7 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 TEST_F(MP2Test, ActiveRMP2Energies_CCPVDZ) {
   // Test the RMP2 energies against Psi4 reference for singlet O2 with
   // cc-pvdz
-  float psi4_act_rmp2_corr_cc_pvdz = -0.0779663051614509;
+  double psi4_act_rmp2_corr_cc_pvdz = -0.0779663051614509;
 
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1, "cc-pvdz", 2.3, std::make_pair(12, 8));

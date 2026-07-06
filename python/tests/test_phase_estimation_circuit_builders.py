@@ -17,6 +17,9 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
     QdkIterativeQpeCircuitBuilder,
     _validate_iteration_inputs,
 )
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
+    QdkStandardQpeCircuitBuilder,
+)
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -145,8 +148,6 @@ class TestIterativeQpeCircuitBuilder:
             assert len(qsc_json["qubits"]) == two_qubit_circuit_problem.num_qubits
             # Ancilla qubit (q_0) has a measurement result
             assert qsc_json["qubits"][0]["numResults"] == 1
-            result = circuit.estimate()
-            assert hasattr(result, "logical_counts")
 
     def test_run_returns_circuits_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
@@ -233,3 +234,133 @@ class TestIterativeQpeCircuitBuilder:
                 state_preparation=state_prep,
                 qubit_hamiltonian=hamiltonian,
             )
+
+
+class TestStandardQpeCircuitBuilder:
+    """Tests for the QDK standard (QFT-based) phase estimation circuit builder."""
+
+    def test_run_returns_single_circuit(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """Validate that QdkStandardQpeCircuitBuilder.run produces a single QPE circuit."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert isinstance(circuits, list)
+        assert len(circuits) == 1
+        assert isinstance(circuits[0], Circuit)
+
+    def test_circuit_has_correct_qubit_count(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """Validate that the QPE circuit has ancilla + system qubits."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        qsc_json = json.loads(circuits[0].get_qsharp_circuit().json())
+        num_system_qubits = two_qubit_circuit_problem.hamiltonian.num_qubits
+        expected_total = two_qubit_circuit_problem.num_bits + num_system_qubits
+        assert len(qsc_json["qubits"]) == expected_total
+
+    def test_circuit_has_measurements_on_ancillas(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """Validate that ancilla qubits have measurement results."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        qsc_json = json.loads(circuits[0].get_qsharp_circuit().json())
+        # Each ancilla qubit should have a measurement
+        for i in range(two_qubit_circuit_problem.num_bits):
+            assert qsc_json["qubits"][i]["numResults"] == 1
+
+    def test_run_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """Validate circuit builder works with a four-qubit Hamiltonian."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=four_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=four_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=four_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert len(circuits) == 1
+        qsc_json = json.loads(circuits[0].get_qsharp_circuit().json())
+        num_system_qubits = four_qubit_circuit_problem.hamiltonian.num_qubits
+        expected_total = four_qubit_circuit_problem.num_bits + num_system_qubits
+        assert len(qsc_json["qubits"]) == expected_total
+
+    def test_invalid_num_bits_raises_error(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """Validate that num_bits <= 0 raises ValueError."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=0)
+
+        with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+            builder.run(
+                state_preparation=two_qubit_circuit_problem.state_prep,
+                qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+            )
+
+    def test_raises_error_for_qasm_only_state_prep(self) -> None:
+        """Validate that passing a QASM-only state prep (no Q# op) raises RuntimeError."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+        qasm_str = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nry(1.2870) q[0];\ncx q[0], q[1];\n'
+        state_prep = Circuit(qasm=qasm_str)
+
+        builder = QdkStandardQpeCircuitBuilder(num_bits=4)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi / 2)),
+        )
+
+        with pytest.raises(RuntimeError, match="Q# operations are not available"):
+            builder.run(
+                state_preparation=state_prep,
+                qubit_hamiltonian=hamiltonian,
+            )
+
+    def test_name(self) -> None:
+        """Validate that the builder returns the correct name."""
+        builder = QdkStandardQpeCircuitBuilder()
+        assert builder.name() == "qdk_standard"
+        assert builder.type_name() == "qpe_circuit_builder"

@@ -214,11 +214,11 @@ WavefunctionContainer::WavefunctionContainer(
     std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
     std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
     const OrbitalEntropies& entropies, WavefunctionType type)
-    : _one_rdm_spin_traced(std::move(one_rdm_spin_traced)),
+    : _type(type),
+      _one_rdm_spin_traced(std::move(one_rdm_spin_traced)),
       _two_rdm_spin_traced(std::move(two_rdm_spin_traced)),
       _active_one_rdm(std::move(active_one_rdm)),
       _active_two_rdm(std::move(active_two_rdm)),
-      _type(type),
       _entropies(entropies) {
   QDK_LOG_TRACE_ENTERING();
 }

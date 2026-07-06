@@ -10,7 +10,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <unordered_map>
-#include <variant>
 
 #include "microsoft/active_space/autocas_active_space.hpp"
 #include "microsoft/active_space/entropy_active_space.hpp"
@@ -63,14 +62,14 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
         "Wavefunction does not have single orbital entropies.");
   }
   const auto entropies = wavefunction->get_single_orbital_entropies();
-  if (entropies.size() != active_space_indices.size()) {
+  if (static_cast<size_t>(entropies.size()) != active_space_indices.size()) {
     throw std::runtime_error(
         "Entropy size does not match number of active space orbitals.");
   }
 
   // Sort entropies and orbital indices
   std::vector<std::pair<double, size_t>> entropy_index_pairs(entropies.size());
-  for (size_t i = 0; i < entropies.size(); ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(entropies.size()); ++i) {
     entropy_index_pairs[i] = {entropies(i), active_space_indices[i]};
   }
   std::sort(entropy_index_pairs.begin(), entropy_index_pairs.end(),
@@ -96,7 +95,7 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
   if (normalize_entropies) {
     QDK_LOGGER().info("Normalized orbital entropies:");
     QDK_LOGGER().info("  Orbital index   Normalized Entropy   Raw Entropy");
-    for (size_t i = 0; i < sorted_entropies.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(sorted_entropies.size()); ++i) {
       QDK_LOGGER().info("         {:>6}         {:>12.6f}    {:>10.6f}",
                         selected_active_space_indices[i], sorted_entropies[i],
                         sorted_entropies[i] * max_entropy);
@@ -104,7 +103,7 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
   } else {
     QDK_LOGGER().info("Orbital entropies:");
     QDK_LOGGER().info("  Orbital index   Raw Entropy");
-    for (size_t i = 0; i < sorted_entropies.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(sorted_entropies.size()); ++i) {
       QDK_LOGGER().info("         {:>6}  {:>12.6f}",
                         selected_active_space_indices[i], sorted_entropies[i]);
     }

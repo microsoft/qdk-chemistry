@@ -146,19 +146,26 @@ class TestTimeAveragedPropagatorValidation:
 class TestTimeAveragedPropagatorRegistry:
     """Test that the propagator can be created through the registry."""
 
-    def test_create_via_registry(self):
+    def test_can_create_via_registry(self):
         """The magnus propagator should be available through create()."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
         prop = registry.create("propagator", "magnus")
         assert prop.name() == "magnus"
 
-    def test_create_default(self):
+    def test_can_create_default(self):
         """Default propagator should be magnus."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
         prop = registry.create("propagator")
         assert prop.name() == "magnus"
+
+    def test_can_create_with_settings(self):
+        """Test that MagnusPropagator can be created with custom settings."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        prop = registry.create("propagator", "magnus", order=2)
+        assert prop.settings().get("order") == 2
 
 
 class TestMagnusOrder2:
@@ -185,13 +192,6 @@ class TestMagnusOrder2:
         prop.settings().set("order", 3)
         with pytest.raises(NotImplementedError, match="not yet implemented"):
             prop.run(td, 0.0, 1.0)
-
-    def test_order_setting_via_registry(self):
-        """Order should be configurable through the registry create kwargs."""
-        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
-
-        prop = registry.create("propagator", "magnus", order=2)
-        assert prop.settings().get("order") == 2
 
 
 # Higher-order Magnus convergence tests removed — order > 1 is not yet implemented.

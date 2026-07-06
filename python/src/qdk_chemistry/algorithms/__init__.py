@@ -30,6 +30,7 @@ from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
 )
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -44,6 +45,7 @@ from qdk_chemistry.algorithms.multi_configuration_scf import MultiConfigurationS
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
+    QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
@@ -69,6 +71,7 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "EnergyEstimator",
+    "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -86,6 +89,7 @@ __all__ = [
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
+    "QdkNaturalOrbitalLocalizer",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",

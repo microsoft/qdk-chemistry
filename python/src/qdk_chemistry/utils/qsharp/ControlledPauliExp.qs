@@ -5,6 +5,7 @@
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.ResourceEstimation.*;
 
     /// Performs Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters
@@ -56,7 +57,10 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         systems : Qubit[],
     ) : Unit {
         for i in 1..params.repetitions {
-            ControlledPauliExp(params.pauliExponents, params.pauliCoefficients, control, systems);
+            if BeginEstimateCaching("ControlledPauliExp", 0) {
+                ControlledPauliExp(params.pauliExponents, params.pauliCoefficients, control, systems);
+                EndEstimateCaching();
+            }
         }
     }
 

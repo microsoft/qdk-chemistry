@@ -68,19 +68,19 @@ Creating a Hamiltonian object
 The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for molecular systems), the :doc:`model Hamiltonian <../model_hamiltonians>` builders (for lattice models such as Hubbard or PPP), or directly with the appropriate integral data.
 Once properly constructed with all required data, the Hamiltonian object should be considered constant and not modified:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
-      :language: cpp
-      :start-after: // start-cell-hamiltonian-creation
-      :end-before: // end-cell-hamiltonian-creation
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
       :start-after: # start-cell-hamiltonian-creation
       :end-before: # end-cell-hamiltonian-creation
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-hamiltonian-creation
+      :end-before: // end-cell-hamiltonian-creation
 
 Accessing Hamiltonian data
 --------------------------
@@ -120,19 +120,19 @@ From a theoretical perspective, these symmetries can be expressed as:
 These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
 When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the function handles the appropriate index mapping to retrieve the correct value based on the implementation's storage format.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
-      :language: cpp
-      :start-after: // start-cell-properties
-      :end-before: // end-cell-properties
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
       :start-after: # start-cell-properties
       :end-before: # end-cell-properties
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-properties
+      :end-before: // end-cell-properties
 
 Serialization
 -------------
@@ -152,13 +152,6 @@ Validation methods
 
 The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the validity and consistency of its data:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
-      :language: cpp
-      :start-after: // start-cell-validation
-      :end-before: // end-cell-validation
-
 .. tab:: Python API
 
    .. note::
@@ -168,6 +161,13 @@ The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the
       :language: python
       :start-after: # start-cell-validation
       :end-before: # end-cell-validation
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-validation
+      :end-before: // end-cell-validation
 
 Related classes
 ---------------

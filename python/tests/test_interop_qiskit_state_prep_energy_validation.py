@@ -185,10 +185,14 @@ def get_bitstring(circuit: Circuit) -> str:
     return next(iter(counts.keys()))
 
 
-@pytest.mark.parametrize("bitstring", ["1010", "0000", "1111", "101001", "1", "0"])
+@pytest.mark.parametrize(
+    "bitstring",
+    [[1, 0, 1, 0], [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 1, 0, 0, 1], [1], [0]],
+)
 def test_single_reference_state_basic(bitstring):
     """Test basic single reference state preparation with various bitstrings."""
     test_cls = SparseIsometryGF2XStatePreparation()
     circuit = test_cls._prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
-    assert result_bitstring == bitstring, f"Expected {bitstring}, got {result_bitstring}"
+    expected = "".join(str(b) for b in bitstring[::-1])  # Reverse for Qiskit's little-endian format
+    assert result_bitstring == expected, f"Expected {expected}, got {result_bitstring}"

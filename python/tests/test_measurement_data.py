@@ -89,7 +89,7 @@ def test_measurement_data_json_file_io():
         assert Path(filename).exists()
 
         # Verify file contents
-        with open(filename) as f:
+        with open(filename, encoding="utf-8") as f:
             loaded = json.load(f)
 
         assert "0" in loaded

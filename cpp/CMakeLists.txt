@@ -68,10 +68,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Add compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG_INIT "-g -O0 -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
-
 # Options
 option(QDK_CHEMISTRY_ENABLE_COVERAGE    "Enable coverage build" OFF)
 option(QDK_CHEMISTRY_ENABLE_GPU         "Enable GPU acceleration in QDK" OFF)
@@ -82,12 +78,16 @@ option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
-# Enable OpenMP by default, except on Apple platforms with AppleClang
+# Enable OpenMP by default, except on Apple platforms with AppleClang and on
+# Windows (OpenMP + MSVC/clang-cl is not currently supported).
 cmake_dependent_option(QDK_ENABLE_OPENMP
     "Enable OpenMP support" ON
-    "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
+    "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\");NOT WIN32" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
+
+# Make the patches directory available to subdirectories (e.g. external/macis)
+set(QDK_CMAKE_PATCHES_DIR "${PROJECT_SOURCE_DIR}/cmake/patches" CACHE INTERNAL "")
 
 # Custom CMake Find* modules for linear algebra dependencies
 include( FetchContent )
@@ -119,6 +119,7 @@ if(NOT macis_FOUND)
     set(MACIS_ENABLE_MPI    OFF CACHE BOOL "MACIS enable MPI" FORCE)
     set(MACIS_ENABLE_PYTHON OFF CACHE BOOL "MACIS Enable Python" FORCE)
     set(MACIS_ENABLE_EXAMPLES OFF CACHE BOOL "MACIS Build Examples" FORCE)
+    set(MACIS_ENABLE_TESTS  ON CACHE BOOL "MACIS Build Tests")
     set(MACIS_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "MACIS Enable OpenMP" FORCE)
     if(DEFINED QDK_UARCH_USED)
       set(MACIS_UARCH  ${QDK_UARCH_USED} CACHE STRING "MACIS Microarchitecture" FORCE)
@@ -175,6 +176,10 @@ endif()
 
 target_include_directories(chemistry PUBLIC ${HDF5_INCLUDE_DIRS})
 target_compile_definitions(chemistry PUBLIC ${HDF5_DEFINITIONS})
+if(MSVC)
+    # MSVC CRT doesn't define M_PI etc. without this.
+    target_compile_definitions(chemistry PUBLIC _USE_MATH_DEFINES)
+endif()
 target_compile_features(chemistry PUBLIC cxx_std_20)
 set_property(TARGET chemistry PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(DEFINED QDK_UARCH_FLAGS)
@@ -191,8 +196,12 @@ set_target_properties(chemistry PROPERTIES OUTPUT_NAME "qdk_chemistry")
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
-        target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(chemistry PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND NOT MSVC)
+            target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(chemistry PRIVATE --coverage)
+        else()
+            message(WARNING "Coverage build is only supported with GCC or Clang compilers")
+        endif()
     else()
         message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()

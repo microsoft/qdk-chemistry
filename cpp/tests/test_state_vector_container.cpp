@@ -1172,7 +1172,8 @@ TEST_F(SingleDeterminantTest, ClosedShellReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
   expected_one_rdm(0, 0) = 2.0;
@@ -1208,7 +1209,8 @@ TEST_F(SingleDeterminantTest, OpenShellReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
   expected_one_rdm(0, 0) = 2.0;
@@ -1245,7 +1247,8 @@ TEST_F(SingleDeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm_aa = Eigen::MatrixXd::Zero(norb, norb);
   Eigen::MatrixXd expected_one_rdm_bb = Eigen::MatrixXd::Zero(norb, norb);

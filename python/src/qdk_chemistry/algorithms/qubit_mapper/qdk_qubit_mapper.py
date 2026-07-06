@@ -17,7 +17,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry._core.data import majorana_map_hamiltonian, sparse_pauli_word_to_label
+from qdk_chemistry._core.data import (
+    majorana_map_hamiltonian,
+    sparse_pauli_word_to_label,
+)
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -70,6 +73,23 @@ class QdkQubitMapper(QubitMapper):
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, the engine handles all four spin-channel ERI
     blocks (aa, ab, ba, bb) independently.
+
+    The two-body integrals are consumed in the native storage format of the
+    Hamiltonian's container (the C++ engine dispatches on the container type):
+
+    * :class:`~qdk_chemistry.data.SparseHamiltonianContainer`: the engine
+      iterates only the stored non-zero ``(p, q, r, s)`` entries, so both
+      memory and runtime improve for the mostly-zero integrals of lattice /
+      model Hamiltonians.
+    * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
+      three-center factors are kept in their ``O(N**2 * naux)`` form and the
+      auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
+      ``N**4`` tensor is never built and peak additional memory is a single
+      ``N**2`` row.
+    * All other containers use the dense engine path.
+
+    In all cases the result is numerically equivalent (term-by-term, to within
+    ``1e-12``) to the dense path.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -137,9 +157,7 @@ class QdkQubitMapper(QubitMapper):
         threshold = float(self.settings().get("threshold"))
         integral_threshold = float(self.settings().get("integral_threshold"))
 
-        h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
-        h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
-        n_spatial = h1_alpha.shape[0]
+        n_spatial = hamiltonian.get_one_body_integrals()[0].shape[0]
         n_spin_orbitals = 2 * n_spatial
         spin_symmetric = hamiltonian.get_orbitals().is_restricted()
 
@@ -150,21 +168,13 @@ class QdkQubitMapper(QubitMapper):
                 f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
             )
 
-        h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
-        h1_b_flat = h1_a_flat if spin_symmetric else np.ascontiguousarray(h1_beta).ravel()
-        h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
-        h2_aabb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_aabb).ravel()
-        h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
-
+        # The C++ engine dispatches on the container type: sparse and Cholesky
+        # containers feed their native sparse / low-rank two-body integrals
+        # straight into the engine (the dense N^4 tensor is never
+        # materialized); all other containers use the dense engine path.
         words, coefficients = majorana_map_hamiltonian(
             base_mapping,
-            0.0,
-            h1_a_flat,
-            h1_b_flat,
-            h2_aaaa_flat,
-            h2_aabb_flat,
-            h2_bbbb_flat,
-            n_spatial,
+            hamiltonian,
             spin_symmetric,
             threshold,
             integral_threshold,
