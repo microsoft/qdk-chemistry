@@ -12,6 +12,7 @@ source /usr/local/share/qdk/parallelism.sh
 # full rebuild on reconfigure.
 cmake -S cpp -B cpp/build -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
+    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Debug}" \
     -DCMAKE_DISABLE_FIND_PACKAGE_macis=ON
 cmake --build cpp/build
 cmake --install cpp/build
