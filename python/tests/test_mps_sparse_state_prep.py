@@ -16,6 +16,7 @@ from scipy.linalg import block_diag
 
 from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     MPSSparseStatePreparation,
+    _decompose_sparse_site,
     _expand_to_unitary,
     _find_column_permutation,
     _get_rectangles_and_row_permutation,
@@ -144,6 +145,117 @@ _qualtran_mps_expected_state = np.array(
 
 # Qualtran resource estimates for sparse mode.
 QUALTRAN_COST_SPARSE = {"num_qubits": 32, "toffoli": 321}
+
+# =============================================================================
+# Qualtran reference decomposition for 16×4×16 sparse tensor
+# (from SiteUnitarySparse in Rupprecht & Wölk's Qualtran implementation)
+# =============================================================================
+
+# fmt: off
+# Sparse tensor from the Qualtran bloq_example (SiteUnitarySparse).
+# Shape: (16, 4, 16) — a right-canonical MPS tensor with block-sparse structure.
+_qualtran_sparse_tensor_values = np.array(
+    [ 1.        , -0.06529681, -0.21823697,  0.80873407, -0.54227129,
+      0.99196206, -0.05352461,  0.10145871,  0.05340906, -0.0314629 ,
+     -0.97114398, -0.23105394,  0.05003537, -0.10371929, -0.07991947,
+      0.53129032,  0.83701003, -0.71416854,  0.38268343, -0.58610297,
+     -0.29581829, -0.92387953, -0.2427718 , -0.63439328,  0.77301045,
+     -0.70710678, -0.70710678, -0.70710678,  0.70710678, -0.04667196,
+      0.08183508,  0.17913141, -0.4376217 ,  0.50294103,  0.37637954,
+      0.08194149,  0.10117301, -0.3569069 ,  0.47769864,  0.01959044,
+     -0.6091723 ,  0.06806463, -0.27941392, -0.1228121 ,  0.20408854,
+     -0.09277709, -0.18419342,  0.09848402, -0.4107272 , -0.51416707,
+     -0.06458102, -0.00057106,  0.04646671, -0.39307151, -0.05791556,
+     -0.32300574, -0.48580074, -0.13162936, -0.00774822, -0.37507311,
+      0.56000868, -0.16724278,  0.2841895 ,  0.04419075,  0.08735139,
+     -0.81258978, -0.35215065, -0.06047946, -0.06983318, -0.15004217,
+     -0.01491312, -0.3064603 ,  0.01239363, -0.23504973, -0.0787661 ,
+     -0.03991293,  0.00944982,  0.07644049,  0.09293174, -0.05945385,
+     -0.95174013,  0.04407359,  0.10529448, -0.00350562,  0.02966449,
+      0.02995518, -0.16987694,  0.01490345, -0.0160302 , -0.05276522,
+     -0.06852768, -0.00860989, -0.0944491 ,  0.03659029,  0.97522901])
+_qualtran_sparse_tensor_rows = np.array(
+    [ 0,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,  4,  4,  4,
+      4,  5,  5,  5,  6,  6,  6,  7,  7,  8,  8,  9,  9, 10, 10, 10,
+     10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11,
+     11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13,
+     13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14,
+     14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15])
+_qualtran_sparse_tensor_phys = np.array(
+    [3, 0, 3, 3, 3, 0, 3, 3, 3, 0, 3, 3, 3, 0, 3, 3, 3, 2, 3, 3,
+     2, 3, 3, 2, 3, 1, 3, 1, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3,
+     0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2,
+     3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 0, 0, 0, 1, 1, 1, 2,
+     2, 2, 3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3])
+_qualtran_sparse_tensor_cols = np.array(
+    [ 0,  0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,
+      3,  4,  5,  6,  4,  5,  6,  4,  6,  4, 10,  4, 10,  1,  2,  3,
+      7,  8,  9, 11, 12, 13, 14, 15,  1,  2,  3,  7,  8,  9, 11, 12,
+     13, 14, 15,  1,  2,  3,  7,  8,  9, 11, 12, 13, 14, 15,  1,  2,
+      3,  7,  8,  9, 11, 12, 13, 14, 15,  1,  2,  3,  7,  8,  9, 11,
+     12, 13, 14, 15,  1,  2,  3,  7,  8,  9, 11, 12, 13, 14, 15])
+
+
+def _get_qualtran_sparse_tensor() -> np.ndarray:
+    """Reconstruct the 16×4×16 test tensor as a dense array."""
+    from scipy.sparse import coo_array
+    sparse = coo_array(
+        (_qualtran_sparse_tensor_values,
+         (_qualtran_sparse_tensor_rows,
+          _qualtran_sparse_tensor_phys,
+          _qualtran_sparse_tensor_cols)),
+        shape=(16, 4, 16),
+    )
+    return sparse.toarray()
+
+
+# Qualtran reference decomposition results (ancilla_dim=16, active_dim=64).
+# These come from SiteUnitarySparse._decomposition in the Qualtran implementation.
+_QUALTRAN_SPARSE_REF_RECT_SHAPES = [(1, 1), (4, 4), (3, 3), (2, 2), (11, 6)]
+
+_QUALTRAN_SPARSE_REF_ROW_PERM = [
+    1, 2, 3, 23, 24, 25, 43, 44, 45, 62, 63, 0, 49, 50, 51, 36, 53, 54,
+    20, 58, 48, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+    19, 21, 22, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 38, 39, 40,
+    41, 42, 46, 47, 52, 55, 56, 57, 59, 60, 61]
+
+# First 16 entries of col_perm correspond to the data columns and must match exactly.
+_QUALTRAN_SPARSE_REF_COL_PERM_DATA = [20, 11, 12, 13, 14, 15, 16, 17, 18, 19, 0, 1, 2, 3, 4, 5]
+
+_QUALTRAN_SPARSE_REF_BLOCK_SIZES = [
+    11, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1]
+
+# Non-trivial blocks (size > 1) from Qualtran decomposition.
+_QUALTRAN_SPARSE_REF_BLOCK_11 = np.array([
+    [-4.66719600e-02, -6.09172300e-01, -5.71060000e-04,  2.84189500e-01, -2.35049730e-01,  2.96644900e-02, -7.78887764e-02, -5.62845150e-01, -3.00084719e-01, -2.13886358e-02, -2.76530005e-01],
+    [ 8.18350800e-02,  6.80646300e-02,  4.64667100e-02,  4.41907500e-02, -7.87661000e-02,  2.99551800e-02,  2.12332587e-01, -1.02423868e-01,  1.80956226e-01,  9.27899747e-01, -1.67743747e-01],
+    [ 1.79131410e-01, -2.79413920e-01, -3.93071510e-01,  8.73513900e-02, -3.99129300e-02, -1.69876940e-01, -1.94377454e-01,  2.96320577e-01, -4.11523544e-01,  2.82429466e-01,  5.67931859e-01],
+    [-4.37621700e-01, -1.22812100e-01, -5.79155600e-02, -8.12589780e-01,  9.44982000e-03,  1.49034500e-02, -2.49246433e-02, -2.08763878e-02, -3.10632025e-01,  1.31702496e-01, -1.20589376e-01],
+    [ 5.02941030e-01,  2.04088540e-01, -3.23005740e-01, -3.52150650e-01,  7.64404900e-02, -1.60302000e-02, -1.02385827e-01, -6.30288735e-01,  1.42792323e-01, -5.74266003e-02,  1.98799081e-01],
+    [ 3.76379540e-01, -9.27770900e-02, -4.85800740e-01, -6.04794600e-02,  9.29317400e-02, -5.27652200e-02, -2.91772027e-02,  3.54277773e-01, -2.68404030e-02, -6.22028630e-02, -6.83883469e-01],
+    [ 8.19414900e-02, -1.84193420e-01, -1.31629360e-01, -6.98331800e-02, -5.94538500e-02, -6.85276800e-02,  9.37058426e-01,  6.13959385e-03, -4.32501422e-02, -1.65389829e-01,  1.46915119e-01],
+    [ 1.01173010e-01,  9.84840200e-02, -7.74822000e-03, -1.50042170e-01, -9.51740130e-01, -8.60989000e-03, -7.33206196e-02,  1.39656911e-01,  1.40746943e-01, -8.25912867e-02,  9.89163323e-03],
+    [-3.56906900e-01, -4.10727200e-01, -3.75073110e-01, -1.49131200e-02,  4.40735900e-02, -9.44491000e-02, -9.46442210e-02,  9.75208942e-03,  7.26776550e-01, -9.10716239e-03,  1.21719174e-01],
+    [ 4.77698640e-01, -5.14167070e-01,  5.60008680e-01, -3.06460300e-01,  1.05294480e-01,  3.65902900e-02, -7.98087312e-02,  1.90290215e-01,  2.00906998e-01,  2.15479934e-03,  6.73405327e-02],
+    [ 1.95904400e-02, -6.45810200e-02, -1.67242780e-01,  1.23936300e-02, -3.50562000e-03,  9.75229010e-01,  1.81339969e-02,  7.64796339e-02, -1.41988041e-03,  1.71027729e-03,  1.00274234e-01]])
+
+_QUALTRAN_SPARSE_REF_BLOCK_4 = np.array([
+    [-0.06529681,  0.99196206, -0.0314629 , -0.10371929],
+    [-0.21823697, -0.05352461, -0.97114398, -0.07991947],
+    [ 0.80873407,  0.10145871, -0.23105394,  0.53129032],
+    [-0.54227129,  0.05340906,  0.05003537,  0.83701003]])
+
+_QUALTRAN_SPARSE_REF_BLOCK_3 = np.array([
+    [-0.71416854, -0.29581829, -0.63439328],
+    [ 0.38268343, -0.92387953,  0.        ],
+    [-0.58610297, -0.2427718 ,  0.77301045]])
+
+_QUALTRAN_SPARSE_REF_BLOCK_2 = np.array([
+    [-0.70710678, -0.70710678],
+    [-0.70710678,  0.70710678]])
+# fmt: on
 
 
 # =============================================================================
@@ -300,6 +412,125 @@ class TestSparseDecompositionCorrectness:
             h = b.shape[0]
             err = np.max(np.abs(b @ b.T - np.eye(h)))
             assert err < 1e-8, f"Block {i} (size {h}) not unitary: error={err:.2e}"
+
+
+class TestSparseDecompositionMatchesQualtran:
+    """Verify QDK sparse decomposition matches the Qualtran reference implementation.
+
+    Uses the 16×4×16 block-sparse tensor from the Qualtran SiteUnitarySparse bloq_example.
+    Reference values were generated by running SiteUnitarySparse._decomposition from the
+    Qualtran implementation by Rupprecht & Wölk (Zenodo: 20393500).
+    """
+
+    @pytest.fixture()
+    def decomposition_data(self):
+        """Run QDK decomposition on the Qualtran sparse tensor."""
+        tensor = _get_qualtran_sparse_tensor()
+        ancilla_dim = 16  # 2^4, since chi_left = chi_right = 16
+        active_dim = 4 * ancilla_dim  # = 64
+        target_mat = _tensor_to_target_matrix(tensor, ancilla_dim)
+
+        rectangles, row_perm = _get_rectangles_and_row_permutation(target_mat)
+        row_perm_padded = _pad_permutation(row_perm, active_dim)
+        col_perm = _find_column_permutation(rectangles, active_dim)
+
+        blocks = [_expand_to_unitary(r) for r in rectangles]
+        blocks += [np.eye(1)] * (active_dim - sum(b.shape[0] for b in blocks))
+        ordering_perm, sorted_blocks = _order_blocks(blocks, active_dim)
+
+        col_composed = [col_perm[ordering_perm[i]] for i in range(active_dim)]
+        col_perm_final = _invert_perm(col_composed)
+        row_perm_final = [row_perm_padded[ordering_perm[i]] for i in range(active_dim)]
+
+        return {
+            "tensor": tensor,
+            "ancilla_dim": ancilla_dim,
+            "active_dim": active_dim,
+            "target_mat": target_mat,
+            "rectangles": rectangles,
+            "sorted_blocks": sorted_blocks,
+            "col_perm_final": col_perm_final,
+            "row_perm_final": row_perm_final,
+        }
+
+    def test_rectangle_shapes_match(self, decomposition_data):
+        """Verify extracted rectangle shapes match Qualtran."""
+        rects = decomposition_data["rectangles"]
+        shapes = [(r.shape[0], r.shape[1]) for r in rects]
+        assert shapes == _QUALTRAN_SPARSE_REF_RECT_SHAPES
+
+    def test_block_sizes_match(self, decomposition_data):
+        """Verify block sizes after ordering match Qualtran."""
+        sizes = [b.shape[0] for b in decomposition_data["sorted_blocks"]]
+        assert sizes == _QUALTRAN_SPARSE_REF_BLOCK_SIZES
+
+    def test_row_permutation_matches(self, decomposition_data):
+        """Verify final row permutation matches Qualtran exactly."""
+        assert decomposition_data["row_perm_final"] == _QUALTRAN_SPARSE_REF_ROW_PERM
+
+    def test_col_permutation_data_columns_match(self, decomposition_data):
+        """Verify column permutation matches Qualtran for data columns.
+
+        The first chi_left=16 entries of the column permutation determine which
+        columns of V map to the target matrix columns. These MUST match exactly.
+        Entries beyond position 16 are "unused" dimensions (map to zero columns)
+        and may differ without affecting correctness.
+        """
+        chi_left = 16
+        col_perm = decomposition_data["col_perm_final"]
+        assert col_perm[:chi_left] == _QUALTRAN_SPARSE_REF_COL_PERM_DATA
+
+    def test_block_diagonal_11x11_matches(self, decomposition_data):
+        """Verify the largest block (11×11) matches Qualtran."""
+        block = decomposition_data["sorted_blocks"][0]
+        assert block.shape == (11, 11)
+        assert np.allclose(block, _QUALTRAN_SPARSE_REF_BLOCK_11, atol=1e-7)
+
+    def test_block_diagonal_4x4_matches(self, decomposition_data):
+        """Verify the 4×4 block matches Qualtran."""
+        block = decomposition_data["sorted_blocks"][1]
+        assert block.shape == (4, 4)
+        assert np.allclose(block, _QUALTRAN_SPARSE_REF_BLOCK_4, atol=1e-7)
+
+    def test_block_diagonal_3x3_matches(self, decomposition_data):
+        """Verify the 3×3 block matches Qualtran."""
+        block = decomposition_data["sorted_blocks"][2]
+        assert block.shape == (3, 3)
+        assert np.allclose(block, _QUALTRAN_SPARSE_REF_BLOCK_3, atol=1e-7)
+
+    def test_block_diagonal_2x2_matches(self, decomposition_data):
+        """Verify the 2×2 block matches Qualtran."""
+        block = decomposition_data["sorted_blocks"][3]
+        assert block.shape == (2, 2)
+        assert np.allclose(block, _QUALTRAN_SPARSE_REF_BLOCK_2, atol=1e-7)
+
+    def test_full_reconstruction_matches(self, decomposition_data):
+        """Verify V[row_inv][:, col][:, :chi] reproduces the target matrix."""
+        blocks = decomposition_data["sorted_blocks"]
+        row_perm = decomposition_data["row_perm_final"]
+        col_perm = decomposition_data["col_perm_final"]
+        target_dense = decomposition_data["target_mat"].toarray()
+        chi_left = 16
+
+        row_inv = _invert_perm(row_perm)
+        V = block_diag(*blocks)
+        recon = V[row_inv][:, col_perm][:, :chi_left]
+
+        assert np.allclose(recon, target_dense, atol=1e-10)
+
+    def test_decompose_sparse_site_end_to_end(self):
+        """Verify _decompose_sparse_site produces matching permutations."""
+        tensor = _get_qualtran_sparse_tensor()
+        ancilla_dim = 16
+        result = _decompose_sparse_site(tensor, ancilla_dim)
+
+        assert result.row_perm_targets == _QUALTRAN_SPARSE_REF_ROW_PERM
+        assert result.col_perm_targets[:16] == _QUALTRAN_SPARSE_REF_COL_PERM_DATA
+        assert result.target_bits == 6  # log2(64)
+
+        # Inverse permutations should be consistent
+        assert _invert_perm(result.row_perm_targets) == result.row_inv_perm_targets
+        assert _invert_perm(result.col_perm_targets) == result.col_inv_perm_targets
 
 
 class TestGenerateMPSSparsePreparationData:
@@ -484,7 +715,7 @@ class TestMPSSparseResourceEstimate:
 
         # Sparse mode should use comparable qubits to Qualtran
         assert counts["numQubits"] >= QUALTRAN_COST_SPARSE["num_qubits"]
-        assert counts["numQubits"] <= QUALTRAN_COST_SPARSE["num_qubits"] * 3
+        assert counts["numQubits"] <= QUALTRAN_COST_SPARSE["num_qubits"] * 2
 
     def test_resource_estimate_toffoli_count(self):
         """Verify Q# Toffoli count is in a reasonable range."""
@@ -495,8 +726,7 @@ class TestMPSSparseResourceEstimate:
         counts = result.logical_counts
 
         assert counts["cczCount"] >= QUALTRAN_COST_SPARSE["toffoli"]
-        # Allow up to 5x Qualtran (different decomposition choices)
-        assert counts["cczCount"] <= QUALTRAN_COST_SPARSE["toffoli"] * 5
+        assert counts["cczCount"] <= QUALTRAN_COST_SPARSE["toffoli"] * 2
 
 
 # =============================================================================
