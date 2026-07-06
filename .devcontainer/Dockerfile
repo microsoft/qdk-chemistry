@@ -46,7 +46,6 @@ RUN apt-get update && \
     libgtest-dev \
     libgmock-dev \
     libfmt-dev \
-    libecpint-dev \
     ninja-build \
     gcovr \
     patchelf \
