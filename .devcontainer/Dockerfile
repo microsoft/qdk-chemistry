@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y locales && \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    QDK_UARCH=native \
     LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
     PATH=/usr/local/bin:${PATH}
 
@@ -95,8 +94,7 @@ USER $USERNAME
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
 
-# Create the Python virtual environment and pre-install workspace-independent
-# Python dev dependencies.
+# Create the Python virtual environment.
 ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
     PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
 
@@ -107,5 +105,8 @@ RUN python -m venv "$VIRTUAL_ENV" \
 # Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells
 RUN echo "source /usr/local/share/qdk/parallelism.sh" >> ~/.bashrc
 
-# Make user-local C++ installations discoverable
-ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local
+# Set ENV variables for the container environment
+#   CMAKE_PREFIX_PATH - Make user-local C++ installations discoverable
+#   QDK_UARCH         - default to native architecture for QDK builds
+ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local \
+    QDK_UARCH=native
