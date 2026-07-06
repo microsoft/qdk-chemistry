@@ -1,0 +1,14 @@
+// Markdownlint config for agentic instruction files.
+// Agent .md files use YAML frontmatter (breaks MD041), pseudo-code blocks
+// without language tags (MD040), emphasis as sub-headings (MD036),
+// compact table formatting (MD060), and lists/code blocks adjacent to
+// other elements without blank lines (MD031, MD032).  These are
+// intentional conventions for agent instruction files — not documentation.
+{
+    "MD031": false,
+    "MD032": false,
+    "MD036": false,
+    "MD040": false,
+    "MD041": false,
+    "MD060": false
+}
