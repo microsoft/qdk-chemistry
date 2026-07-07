@@ -24,7 +24,7 @@ tar -xzf fe2s2-2_small.tar.gz
 tar -xzf p450_enzyme_G-1.tar.gz
 ```
 
-## 2. Run and plot resource estimation for MPS Dense State Preparation
+## 2. Run resource estimation for MPS Dense State Preparation
 
 Runs resource estimation scenarios for Fe2S2-20, Fe4S4-36, FeMoCo-76 with randomly generated MPS data:
   1. MPS Dense State Preparation at various bond dimensions
@@ -32,22 +32,17 @@ Runs resource estimation scenarios for Fe2S2-20, Fe4S4-36, FeMoCo-76 with random
   3. MPS + SOSSA QPE (MPS as initial state for QPE)
 
 ```bash
-cd examples/mps_benchmark && python run_resource_estimation.py
 python run_resource_estimation.py --molecules Fe2S2-20 Fe4S4-36
 python run_resource_estimation.py --molecules FeMoCo-76 --bond-dims 100 1000
 python run_resource_estimation.py --molecules all --bond-dims 100 1000 5000 10000
 ```
 
-The results are saved in `examples/mps_benchmark/results/` as JSON files. 
-Plot Pareto fronts (physical qubits vs runtime) for all molecules, with one subplot per molecule.
+The raw results are in `examples/mps_benchmark/results/` as JSON files. 
+Visualize Pareto fronts (physical qubits vs runtime) for all molecules, with one subplot per molecule.
 
-```bash
-python plot_pareto_all_molecules.py
-```
+![Pareto Fronts: All Molecules](./results/pareto_all_molecules.png)
 
-![Pareto Fronts: All Molecules](pareto_all_molecules.png)
-
-## 3. Run and plot resource estimation for MPS Sparse State Preparation
+## 3. Run resource estimation for MPS Sparse State Preparation
 
 Runs resource estimation in order:
   1. SOSSA QPE with HF initial state (QPE only)
@@ -57,17 +52,10 @@ Runs resource estimation in order:
   5. Dense MPS + SOSSA QPE
 
 ```bash  
-cd examples/mps_benchmark && python run_sparse_resource_estimation_fe2s2.py
-python run_sparse_resource_estimation_fe2s2.py --output my_results.json
+python run_sparse_vs_dense.py --output my_results.json
 ```
 
-Plot sparse vs dense comparison:
-
-```bash
-python plot_pareto_sparse_vs_dense.py
-```
-
-![Pareto Front: Sparse vs Dense MPS](pareto_sparse_vs_dense.png)
+![Pareto Front: Sparse vs Dense MPS](./results/pareto_sparse_vs_dense.png)
 
 ## References
 
