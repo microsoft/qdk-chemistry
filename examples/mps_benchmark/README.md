@@ -1,6 +1,6 @@
 # MPS & SOSSA QPE Resource Estimation
 
-> **Branch:** `scratch/mps_sossa` | **Commit:** `b1e823d370339d912f58fa8e8a239e0eb64e3e2d` (2026-07-07)
+> **Branch:** `scratch/mps_sossa` | **Commit:** `825351fc6123fba947a5fb6cb545024e396be492` (2026-07-07)
 
 This directory contains scripts for resource estimation of MPS state preparation
 and SOSSA QPE for selected molecules. Use this branch at the commit
@@ -26,7 +26,7 @@ cd qdk-chemistry
 ```bash
 git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
-git checkout b1e823d370339d912f58fa8e8a239e0eb64e3e2d
+git checkout 825351fc6123fba947a5fb6cb545024e396be492
 ```
 
 Then open the repository in the VS Code Dev Container:
