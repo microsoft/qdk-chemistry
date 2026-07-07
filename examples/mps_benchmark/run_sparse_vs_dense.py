@@ -23,13 +23,23 @@ import math
 import time
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from qdk.qre import PSSPC, LatticeSurgery
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms.state_preparation import MPSSequentialStatePreparation
-from qdk_chemistry.algorithms.state_preparation.mps_sparse import MPSSparseStatePreparation
+from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
+    MPSSparseStatePreparation,
+)
 from qdk_chemistry.utils import Logger
-
-from utils import load_mps_tensors, make_fake_factorized_hamiltonian, run_qre, save_results
+from utils import (
+    load_mps_tensors,
+    make_fake_factorized_hamiltonian,
+    run_qre,
+    save_results,
+)
 
 Logger.set_global_level(Logger.LogLevel.info)
 
@@ -38,9 +48,8 @@ Logger.set_global_level(Logger.LogLevel.info)
 # ============================================================================
 
 ARCHITECTURE = Majorana(error_rate=1e-5)
-TRACE_QUERY = (
-    PSSPC.q()
-    * LatticeSurgery.q(slow_down_factor=[1.0 * j for j in range(1, 20)])
+TRACE_QUERY = PSSPC.q() * LatticeSurgery.q(
+    slow_down_factor=[1.0 * j for j in range(1, 20)]
 )
 ISA_QUERY = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
 MAX_ERROR = 0.01
@@ -54,7 +63,9 @@ SIGMA_E = 1e-3
 MOLECULES = {
     "fe2s2": {
         "label": "Fe2S2-20",
-        "tensor_path": Path("fe2s2-2_small") / "tensors_compressed" / "tensors_compressed_",
+        "tensor_path": Path("fe2s2-2_small")
+        / "tensors_compressed"
+        / "tensors_compressed_",
         "N": 20,
         "R": 14,
         "B": 15,
@@ -66,7 +77,7 @@ MOLECULES = {
     },
     "g1": {
         "label": "P450-G1-43",
-        "tensor_path": Path("G-1") / "tensors_compressed" / "tensors_compressed_",
+        "tensor_path": Path("p450_enzyme_G-1") / "tensors_compressed" / "tensors_compressed_",
         "N": 43,
         "R": None,
         "B": None,
@@ -83,23 +94,140 @@ MOLECULES = {
 # Main
 # ============================================================================
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Sparse vs Dense MPS Resource Estimation Comparison.",
     )
     parser.add_argument(
-        "--molecule", "-m",
+        "--molecule",
+        "-m",
         required=True,
         choices=list(MOLECULES.keys()),
         help="Which molecule to run.",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=None,
         help="Output JSON path. Default: auto-generated from molecule name.",
     )
     return parser.parse_args()
+
+
+# ============================================================================
+# Plotting
+# ============================================================================
+
+_MARKER_SPARSE = "o"  # circle for sparse
+_MARKER_DENSE = "D"  # diamond for dense
+_MARKER_QPE_HF = "x"  # x for QPE(HF)
+_MARKER_SIZE = 90
+_ALPHA = 0.8
+_COLOR = "black"
+_FILL_COLOR = "0.5"
+
+
+def _plot_pareto_on_ax(ax, entry, marker, label, filled=True):
+    """Plot a single Pareto series on the given axes."""
+    if entry is None or "pareto_front" not in entry:
+        return
+    pareto = entry["pareto_front"]
+    qubits = [p["qubits"] for p in pareto]
+    runtime = [p["runtime"] for p in pareto]
+    if marker == _MARKER_QPE_HF:
+        ax.scatter(
+            qubits,
+            runtime,
+            marker=marker,
+            color=_COLOR,
+            s=_MARKER_SIZE,
+            alpha=_ALPHA,
+            linewidths=1.5,
+            zorder=4,
+            label=label,
+        )
+    elif filled:
+        ax.scatter(
+            qubits,
+            runtime,
+            marker=marker,
+            color=_FILL_COLOR,
+            s=_MARKER_SIZE,
+            alpha=_ALPHA,
+            edgecolors=_COLOR,
+            linewidths=1.0,
+            zorder=3,
+            label=label,
+        )
+    else:
+        ax.scatter(
+            qubits,
+            runtime,
+            marker=marker,
+            facecolors="none",
+            s=_MARKER_SIZE,
+            alpha=_ALPHA,
+            edgecolors=_COLOR,
+            linewidths=1.5,
+            zorder=3,
+            label=label,
+        )
+
+
+def plot_pareto_sparse_vs_dense(all_results, mol_label, out_path):
+    """Plot Pareto front comparison: sparse vs dense MPS."""
+    mol = all_results.get(mol_label)
+    if not mol:
+        Logger.info("No molecule data to plot.")
+        return
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 7))
+
+    _plot_pareto_on_ax(ax, mol.get("qpe_hf"), _MARKER_QPE_HF, "QPE(HF)")
+    _plot_pareto_on_ax(
+        ax,
+        mol.get("sparse_mps_only"),
+        _MARKER_SPARSE,
+        "Sparse MPS State Prep",
+        filled=True,
+    )
+    _plot_pareto_on_ax(
+        ax,
+        mol.get("sparse_mps_plus_qpe"),
+        _MARKER_SPARSE,
+        "Sparse MPS + QPE",
+        filled=False,
+    )
+    _plot_pareto_on_ax(
+        ax,
+        mol.get("dense_mps_only"),
+        _MARKER_DENSE,
+        "Dense MPS State Prep",
+        filled=True,
+    )
+    _plot_pareto_on_ax(
+        ax,
+        mol.get("dense_mps_plus_qpe"),
+        _MARKER_DENSE,
+        "Dense MPS + QPE",
+        filled=False,
+    )
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Physical Qubits", fontsize=12)
+    ax.set_ylabel("Runtime (s)", fontsize=12)
+    ax.set_title(f"{mol_label} — Sparse vs Dense MPS", fontsize=13, fontweight="bold")
+    ax.legend(fontsize=10, loc="best")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.tick_params(labelsize=10)
+
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=250, bbox_inches="tight")
+    plt.close(fig)
+    Logger.info(f"\nSaved Pareto plot: {out_path}")
 
 
 if __name__ == "__main__":
@@ -108,12 +236,16 @@ if __name__ == "__main__":
     mol_label = mol_cfg["label"]
 
     phase_bits = mol_cfg.get("b_rot")
-    output_json = args.output or Path(f"mps_sparse_vs_dense_{args.molecule}_pb_{phase_bits}.json")
+    output_json = args.output or Path(
+        f"mps_sparse_vs_dense_{args.molecule}_pb_{phase_bits}.json"
+    )
 
     Logger.info(f"\nSparse vs Dense MPS Comparison — {mol_label}")
     Logger.info("=" * 70)
     Logger.info(f"   Phase bits: {phase_bits}")
-    Logger.info(f"   QPE: {'enabled' if mol_cfg['has_qpe'] else 'disabled (R/B/C not available)'}")
+    Logger.info(
+        f"   QPE: {'enabled' if mol_cfg['has_qpe'] else 'disabled (R/B/C not available)'}"
+    )
     Logger.info(f"   Output: {output_json}")
     Logger.info("")
 
@@ -124,7 +256,9 @@ if __name__ == "__main__":
     if not tensor_dir.exists():
         Logger.info(f"ERROR: Tensor directory not found: {tensor_dir}")
         Logger.info("")
-        Logger.info("  The MPS tensor data must be extracted before running this script.")
+        Logger.info(
+            "  The MPS tensor data must be extracted before running this script."
+        )
         Logger.info("  If the data is provided as a .tar.gz archive, extract it with:")
         Logger.info(f"    tar -xzf <archive>.tar.gz -C {tensor_dir.parent}")
         Logger.info("")
@@ -133,7 +267,9 @@ if __name__ == "__main__":
     Logger.info("  Loading MPS tensors...")
     mps = load_mps_tensors(tensor_path)
     max_chi = max(mps.bond_dims)
-    Logger.info(f"   Sites: {mps.num_sites}, qubits: {mps.num_qubits}, chi_max: {max_chi}")
+    Logger.info(
+        f"   Sites: {mps.num_sites}, qubits: {mps.num_qubits}, chi_max: {max_chi}"
+    )
     Logger.info(f"   Bond dims: {mps.bond_dims}")
     Logger.info("")
 
@@ -177,13 +313,17 @@ if __name__ == "__main__":
         num_queries = math.ceil(math.pi * lambda_eff / (2 * SIGMA_E))
         num_phase_qubits = math.ceil(math.log2(num_queries))
 
-        Logger.info(f"{'='*70}")
+        Logger.info(f"{'=' * 70}")
         Logger.info("  PART 1: SOSSA QPE with HF Initial State")
-        Logger.info(f"{'='*70}")
-        Logger.info(f"   Heisenberg queries: {num_queries}, phase qubits: {num_phase_qubits}")
+        Logger.info(f"{'=' * 70}")
+        Logger.info(
+            f"   Heisenberg queries: {num_queries}, phase qubits: {num_phase_qubits}"
+        )
 
         t0 = time.perf_counter()
-        fh = make_fake_factorized_hamiltonian(N, mol_cfg["R"], mol_cfg["B"], mol_cfg["C"])
+        fh = make_fake_factorized_hamiltonian(
+            N, mol_cfg["R"], mol_cfg["B"], mol_cfg["C"]
+        )
         orbitals = fh.get_orbitals()
 
         state_prep = create("state_prep", "sparse_isometry_gf2x")
@@ -215,7 +355,14 @@ if __name__ == "__main__":
         Logger.info(f"   Toffoli (CCZ): {lc['cczCount']:,}")
         Logger.info(f"   Logical qubits: {lc['numQubits']:,}")
 
-        extra = run_qre(qpe_circuit_hf, f"{mol_label} QPE(HF)", ARCHITECTURE, ISA_QUERY, TRACE_QUERY, MAX_ERROR)
+        extra = run_qre(
+            qpe_circuit_hf,
+            f"{mol_label} QPE(HF)",
+            ARCHITECTURE,
+            ISA_QUERY,
+            TRACE_QUERY,
+            MAX_ERROR,
+        )
         all_results[mol_label]["qpe_hf"] = {
             "label": "QPE(HF)",
             "logical_toffoli": lc["cczCount"],
@@ -231,9 +378,9 @@ if __name__ == "__main__":
     # ===================================================================
     # Part 2: Sparse MPS State Preparation
     # ===================================================================
-    Logger.info(f"\n{'='*70}")
+    Logger.info(f"\n{'=' * 70}")
     Logger.info("  PART 2: Sparse MPS State Preparation")
-    Logger.info(f"{'='*70}")
+    Logger.info(f"{'=' * 70}")
 
     t0 = time.perf_counter()
     algo_sparse = MPSSparseStatePreparation()
@@ -245,7 +392,14 @@ if __name__ == "__main__":
     Logger.info(f"   Toffoli (CCZ): {sparse_lc['cczCount']:,}")
     Logger.info(f"   Logical qubits: {sparse_lc['numQubits']:,}")
 
-    extra = run_qre(sparse_circ, f"{mol_label} Sparse MPS", ARCHITECTURE, ISA_QUERY, TRACE_QUERY, MAX_ERROR)
+    extra = run_qre(
+        sparse_circ,
+        f"{mol_label} Sparse MPS",
+        ARCHITECTURE,
+        ISA_QUERY,
+        TRACE_QUERY,
+        MAX_ERROR,
+    )
     all_results[mol_label]["sparse_mps_only"] = {
         "label": f"Sparse MPS chi={max_chi}",
         "bond_dim": max_chi,
@@ -260,9 +414,9 @@ if __name__ == "__main__":
     # Part 3: Sparse MPS + QPE (only if has_qpe)
     # ===================================================================
     if mol_cfg["has_qpe"]:
-        Logger.info(f"\n{'='*70}")
+        Logger.info(f"\n{'=' * 70}")
         Logger.info("  PART 3: Sparse MPS + SOSSA QPE")
-        Logger.info(f"{'='*70}")
+        Logger.info(f"{'=' * 70}")
 
         t0 = time.perf_counter()
         qpe_circuits_sparse = qpe_builder.run(
@@ -277,7 +431,14 @@ if __name__ == "__main__":
         Logger.info(f"   SOSSA Toffoli: {sossa_only_tof:,}")
         Logger.info(f"   Total Toffoli: {lc['cczCount']:,}")
 
-        extra = run_qre(qpe_circuit_sparse, f"{mol_label} SparseMPS+QPE", ARCHITECTURE, ISA_QUERY, TRACE_QUERY, MAX_ERROR)
+        extra = run_qre(
+            qpe_circuit_sparse,
+            f"{mol_label} SparseMPS+QPE",
+            ARCHITECTURE,
+            ISA_QUERY,
+            TRACE_QUERY,
+            MAX_ERROR,
+        )
         all_results[mol_label]["sparse_mps_plus_qpe"] = {
             "label": f"Sparse MPS+QPE chi={max_chi}",
             "bond_dim": max_chi,
@@ -292,9 +453,9 @@ if __name__ == "__main__":
     # ===================================================================
     # Part 4: Dense MPS State Preparation
     # ===================================================================
-    Logger.info(f"\n{'='*70}")
+    Logger.info(f"\n{'=' * 70}")
     Logger.info("  PART 4: Dense MPS State Preparation")
-    Logger.info(f"{'='*70}")
+    Logger.info(f"{'=' * 70}")
 
     t0 = time.perf_counter()
     algo_dense = MPSSequentialStatePreparation()
@@ -307,7 +468,14 @@ if __name__ == "__main__":
     Logger.info(f"   Toffoli (CCZ): {dense_lc['cczCount']:,}")
     Logger.info(f"   Logical qubits: {dense_lc['numQubits']:,}")
 
-    extra = run_qre(dense_circ, f"{mol_label} Dense MPS", ARCHITECTURE, ISA_QUERY, TRACE_QUERY, MAX_ERROR)
+    extra = run_qre(
+        dense_circ,
+        f"{mol_label} Dense MPS",
+        ARCHITECTURE,
+        ISA_QUERY,
+        TRACE_QUERY,
+        MAX_ERROR,
+    )
     all_results[mol_label]["dense_mps_only"] = {
         "label": f"Dense MPS chi={max_chi}",
         "bond_dim": max_chi,
@@ -322,9 +490,9 @@ if __name__ == "__main__":
     # Part 5: Dense MPS + QPE (only if has_qpe)
     # ===================================================================
     if mol_cfg["has_qpe"]:
-        Logger.info(f"\n{'='*70}")
+        Logger.info(f"\n{'=' * 70}")
         Logger.info("  PART 5: Dense MPS + SOSSA QPE")
-        Logger.info(f"{'='*70}")
+        Logger.info(f"{'=' * 70}")
 
         t0 = time.perf_counter()
         qpe_circuits_dense = qpe_builder.run(
@@ -339,7 +507,14 @@ if __name__ == "__main__":
         Logger.info(f"   SOSSA Toffoli: {sossa_only_tof:,}")
         Logger.info(f"   Total Toffoli: {lc['cczCount']:,}")
 
-        extra = run_qre(qpe_circuit_dense, f"{mol_label} DenseMPS+QPE", ARCHITECTURE, ISA_QUERY, TRACE_QUERY, MAX_ERROR)
+        extra = run_qre(
+            qpe_circuit_dense,
+            f"{mol_label} DenseMPS+QPE",
+            ARCHITECTURE,
+            ISA_QUERY,
+            TRACE_QUERY,
+            MAX_ERROR,
+        )
         all_results[mol_label]["dense_mps_plus_qpe"] = {
             "label": f"Dense MPS+QPE chi={max_chi}",
             "bond_dim": max_chi,
@@ -350,3 +525,8 @@ if __name__ == "__main__":
             **extra,
         }
         save_results(all_results, output_json)
+
+    # ===================================================================
+    # Plot Pareto front
+    # ===================================================================
+    plot_pareto_sparse_vs_dense(all_results, mol_label, output_json.with_suffix(".png"))

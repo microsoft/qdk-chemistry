@@ -35,7 +35,9 @@ import math
 import time
 from pathlib import Path
 
-import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from qdk.qre import PSSPC, LatticeSurgery, estimate
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms import create
@@ -124,6 +126,98 @@ def parse_args():
         help=f"Output JSON path. Default: {OUTPUT_JSON}",
     )
     return parser.parse_args()
+
+
+# ============================================================================
+# Plotting
+# ============================================================================
+
+# Marker shapes by bond dimension
+_CHI_MARKERS = {100: "o", 1000: "s", 5000: "D", 10000: "^"}
+_FILL_COLOR = "0.5"
+_EDGE_COLOR = "black"
+_MARKER_SIZE = 80
+
+
+def plot_pareto_all_molecules(all_results, out_path):
+    """Plot Pareto fronts (physical qubits vs runtime) for all molecules."""
+    mol_keys = [k for k in all_results if k != "parameters"]
+    mol_data = []
+
+    for mol_key in mol_keys:
+        mol = all_results[mol_key]
+        if not isinstance(mol, dict):
+            continue
+
+        # MPS-only entries (list)
+        mps_entries = [e for e in mol.get("mps_only", []) if "pareto_front" in e]
+        # QPE(HF)
+        qpe_hf = mol.get("qpe_hf")
+        # MPS+QPE entries (list)
+        qpe_entries = [e for e in mol.get("mps_plus_qpe", []) if "pareto_front" in e]
+
+        if not mps_entries and not (qpe_hf and "pareto_front" in (qpe_hf or {})):
+            continue
+
+        mol_data.append((mol_key, mps_entries, qpe_hf, qpe_entries))
+
+    if not mol_data:
+        Logger.info("No Pareto data to plot.")
+        return
+
+    n_mols = len(mol_data)
+    fig, axes = plt.subplots(1, n_mols, figsize=(6 * n_mols, 6), squeeze=False)
+
+    for idx, (mol_name, mps_entries, qpe_hf, qpe_entries) in enumerate(mol_data):
+        ax = axes[0, idx]
+
+        # MPS only — filled grey
+        for entry in mps_entries:
+            chi = entry["bond_dim"]
+            marker = _CHI_MARKERS.get(chi, "o")
+            pareto = entry["pareto_front"]
+            qubits = [p["qubits"] for p in pareto]
+            runtime = [p["runtime"] for p in pareto]
+            ax.scatter(qubits, runtime, marker=marker, color=_FILL_COLOR,
+                       s=_MARKER_SIZE, edgecolors=_EDGE_COLOR, linewidths=0.8,
+                       zorder=3, alpha=0.8, label=f"MPS χ={chi}")
+
+        # QPE(HF) — x marker
+        if qpe_hf and "pareto_front" in qpe_hf:
+            pareto = qpe_hf["pareto_front"]
+            qubits = [p["qubits"] for p in pareto]
+            runtime = [p["runtime"] for p in pareto]
+            ax.scatter(qubits, runtime, marker="x", color=_EDGE_COLOR,
+                       s=_MARKER_SIZE, linewidths=1.5, zorder=4, alpha=0.8,
+                       label="QPE-HF")
+
+        # MPS+QPE — open shapes
+        for entry in qpe_entries:
+            chi = entry["bond_dim"]
+            marker = _CHI_MARKERS.get(chi, "o")
+            pareto = entry["pareto_front"]
+            qubits = [p["qubits"] for p in pareto]
+            runtime = [p["runtime"] for p in pareto]
+            ax.scatter(qubits, runtime, marker=marker, facecolors="none",
+                       s=_MARKER_SIZE, edgecolors="0.2", linewidths=1.5,
+                       zorder=3, alpha=0.7, label=f"QPE-MPS χ={chi}")
+
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("Physical Qubits", fontsize=12)
+        ax.set_ylabel("Runtime (s)", fontsize=12)
+        ax.set_title(mol_name, fontsize=13, fontweight="bold")
+        if idx == 0:
+            ax.legend(fontsize=8, loc="best")
+        ax.grid(True, which="both", alpha=0.3)
+        ax.tick_params(labelsize=10)
+
+    fig.suptitle("Pareto Fronts: Physical Qubits vs Runtime",
+                 fontsize=14, fontweight="bold", y=1.02)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=250, bbox_inches="tight")
+    plt.close(fig)
+    Logger.info(f"\nSaved Pareto plot: {out_path}")
 
 
 if __name__ == "__main__":
@@ -340,3 +434,8 @@ if __name__ == "__main__":
                 }
             )
             save_results(all_results, output_json)
+
+    # ===================================================================
+    # Plot Pareto fronts
+    # ===================================================================
+    plot_pareto_all_molecules(all_results, output_json.with_suffix(".png"))

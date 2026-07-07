@@ -4,10 +4,15 @@
 - **Commit Hash:** `f3e1c7d` (date: time:)
 
 You can use this branch at this commit hash to reproduce the data presented in "DARPA 2026-07 update".
+Recommended to run on HPC due to high memory requirements at large bond
+dimensions.
 
 ## 1. Setup
 
-Open the repository in the VS Code Dev Container.
+Untar the repository, "", or git pull the qdk-chemistry, switch to branch, and checkout the commit hash above. 
+
+Then, open the repository in the VS Code Dev Container.
+And install dependencies:
 
 ```bash
 cd python
@@ -15,14 +20,6 @@ pip install -e '.[all]'
 ```
 
 The `[all]` extra pulls in Jupyter, QRE, Qiskit interop, and all optional backends.
-
-Untar MPS datasets in `examples/data/`:
-
-```bash
-cd examples/data
-tar -xzf fe2s2-2_small.tar.gz
-tar -xzf p450_enzyme_G-1.tar.gz
-```
 
 ## 2. Run resource estimation for MPS Dense State Preparation
 
@@ -32,8 +29,6 @@ Runs resource estimation scenarios for Fe2S2-20, Fe4S4-36, FeMoCo-76 with random
   3. MPS + SOSSA QPE (MPS as initial state for QPE)
 
 ```bash
-python run_resource_estimation.py --molecules Fe2S2-20 Fe4S4-36
-python run_resource_estimation.py --molecules FeMoCo-76 --bond-dims 100 1000
 python run_resource_estimation.py --molecules all --bond-dims 100 1000 5000 10000
 ```
 
