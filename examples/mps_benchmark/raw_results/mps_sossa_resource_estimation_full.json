@@ -1,0 +1,3751 @@
+{
+  "parameters": {
+    "molecules": [
+      "Fe2S2-20",
+      "Fe4S4-36",
+      "FeMoCo-76"
+    ],
+    "site_dim": 4,
+    "phase_bits_mps": [
+      15,
+      17,
+      15
+    ],
+    "bond_dims": [
+      100,
+      1000,
+      5000,
+      10000
+    ],
+    "sigma_E": 0.001,
+    "architecture": "Majorana(error_rate=1e-5)",
+    "isa": "ThreeAux + RoundBasedFactory",
+    "max_error": 0.01
+  },
+  "Fe2S2-20": {
+    "params": {
+      "N": 20,
+      "R": 14,
+      "B": 15,
+      "C": 5,
+      "b_rot": 15,
+      "b_coeff": 11,
+      "lambda_eff": 6.469
+    },
+    "mps_only": [
+      {
+        "label": "real(DMRG)",
+        "bond_dim": 1000,
+        "logical_toffoli": 15588597,
+        "logical_qubits": 335,
+        "physical_qubits": 340919,
+        "runtime_ns": 2529319480000,
+        "compute_distance": 9,
+        "compute_qubits": 232083,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 13,
+            "runs": 4998655,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 62362116
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 240455,
+            "runtime": 32881.15324,
+            "error": 0.00464952393040462,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 242578,
+            "runtime": 27822.51428,
+            "error": 0.004613018092836278,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 248827,
+            "runtime": 17705.23636,
+            "error": 0.004540006417699592,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 253073,
+            "runtime": 15175.91688,
+            "error": 0.004521753498915421,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 257199,
+            "runtime": 12393.665452,
+            "error": 0.004677245283173414,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 263568,
+            "runtime": 9295.249089,
+            "error": 0.004610992958932659,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 273943,
+            "runtime": 7587.95844,
+            "error": 0.004466994742562907,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 282315,
+            "runtime": 6196.832726,
+            "error": 0.004544740634691904,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 290687,
+            "runtime": 5058.63896,
+            "error": 0.004448741823778736,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 324175,
+            "runtime": 3098.416363,
+            "error": 0.004478488310451148,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS real",
+            "qubits": 340919,
+            "runtime": 2529.31948,
+            "error": 0.004430488904994564,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "13\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "logical_toffoli": 692554,
+        "logical_qubits": 152,
+        "physical_qubits": 90524,
+        "runtime_ns": 92246080000,
+        "compute_distance": 7,
+        "compute_qubits": 65620,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 11,
+            "runs": 258392,
+            "error_rate": 1.471563351790282e-09,
+            "states": 2777944
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 67884,
+            "runtime": 1014.742784,
+            "error": 0.007880083249234148,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 68951,
+            "runtime": 899.494752,
+            "error": 0.009955468967596585,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 17,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 69464,
+            "runtime": 830.21472,
+            "error": 0.009926686659699048,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 70148,
+            "runtime": 553.47648,
+            "error": 0.009151881729606738,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 72282,
+            "runtime": 449.715552,
+            "error": 0.007936651889041751,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 72412,
+            "runtime": 337.27473,
+            "error": 0.009775410405882458,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 74676,
+            "runtime": 276.73824,
+            "error": 0.008377076799514431,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 76940,
+            "runtime": 224.84982,
+            "error": 0.009051030893729013,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 79204,
+            "runtime": 184.49216,
+            "error": 0.00811880848948366,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 85996,
+            "runtime": 112.42491,
+            "error": 0.008326651381575567,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=100",
+            "qubits": 90524,
+            "runtime": 92.24608,
+            "error": 0.007860540179452891,
+            "compute_distance": 7,
+            "compute qubits": 65620,
+            "num_ts_per_rotation": 14,
+            "factories": "11\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "logical_toffoli": 15588597,
+        "logical_qubits": 335,
+        "physical_qubits": 340919,
+        "runtime_ns": 2529319480000,
+        "compute_distance": 9,
+        "compute_qubits": 232083,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 13,
+            "runs": 4998655,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 62362116
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 240455,
+            "runtime": 32881.15324,
+            "error": 0.00464952393040462,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 242578,
+            "runtime": 27822.51428,
+            "error": 0.004613018092836278,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 248827,
+            "runtime": 17705.23636,
+            "error": 0.004540006417699592,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 253073,
+            "runtime": 15175.91688,
+            "error": 0.004521753498915421,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 257199,
+            "runtime": 12393.665452,
+            "error": 0.004677245283173414,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 263568,
+            "runtime": 9295.249089,
+            "error": 0.004610992958932659,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 273943,
+            "runtime": 7587.95844,
+            "error": 0.004466994742562907,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 282315,
+            "runtime": 6196.832726,
+            "error": 0.004544740634691904,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 290687,
+            "runtime": 5058.63896,
+            "error": 0.004448741823778736,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 324175,
+            "runtime": 3098.416363,
+            "error": 0.004478488310451148,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=1000",
+            "qubits": 340919,
+            "runtime": 2529.31948,
+            "error": 0.004430488904994564,
+            "compute_distance": 9,
+            "compute qubits": 232083,
+            "num_ts_per_rotation": 14,
+            "factories": "13\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "logical_toffoli": 330551184,
+        "logical_qubits": 600,
+        "physical_qubits": 722287,
+        "runtime_ns": 53168480800000,
+        "compute_distance": 9,
+        "compute_qubits": 407991,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 79474560,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 1322212464
+          }
+        ],
+        "factory_summary": "2\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 444967,
+            "runtime": 478516.36392,
+            "error": 0.009494687095187694,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 449213,
+            "runtime": 425347.87904,
+            "error": 0.008820174334185301,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 463455,
+            "runtime": 319010.90928,
+            "error": 0.0074711488121805125,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 481728,
+            "runtime": 319010.8848,
+            "error": 0.007565200701242714,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 481943,
+            "runtime": 265842.404,
+            "error": 0.009360678798104743,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 490435,
+            "runtime": 212673.9232,
+            "error": 0.00868616608886256,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 500431,
+            "runtime": 195394.211922,
+            "error": 0.00988805906990501,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 17,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 518919,
+            "runtime": 159505.4424,
+            "error": 0.008011653379620377,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 537407,
+            "runtime": 130262.787956,
+            "error": 0.008320608375523241,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 15,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 572879,
+            "runtime": 106336.9616,
+            "error": 0.007337140670378196,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "8\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 666823,
+            "runtime": 65131.38898,
+            "error": 0.008436383128699173,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=5000",
+            "qubits": 722287,
+            "runtime": 53168.4808,
+            "error": 0.0066626279611360145,
+            "compute_distance": 9,
+            "compute qubits": 407991,
+            "num_ts_per_rotation": 14,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "logical_toffoli": 960851425,
+        "logical_qubits": 1081,
+        "physical_qubits": 1145136,
+        "runtime_ns": 154296686360000,
+        "compute_distance": 9,
+        "compute_qubits": 724176,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 199607614,
+            "error_rate": 2.853671551234548e-15,
+            "states": 3843413428
+          }
+        ],
+        "factory_summary": "10\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS chi=10000",
+            "qubits": 934656,
+            "runtime": 308593.38088,
+            "error": 0.007910174703058992,
+            "compute_distance": 9,
+            "compute qubits": 724176,
+            "num_ts_per_rotation": 15,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS chi=10000",
+            "qubits": 1145136,
+            "runtime": 154296.68636,
+            "error": 0.006999768835131965,
+            "compute_distance": 9,
+            "compute qubits": 724176,
+            "num_ts_per_rotation": 14,
+            "factories": "20\u00d7T"
+          }
+        ]
+      }
+    ],
+    "qpe_hf": {
+      "label": "QPE(HF)",
+      "logical_toffoli": 52327302,
+      "logical_qubits": 450,
+      "physical_qubits": 417317,
+      "runtime_ns": 8342302560000,
+      "compute_distance": 9,
+      "compute_qubits": 308481,
+      "num_ts_per_rotation": 14,
+      "factories": [
+        {
+          "copies": 13,
+          "runs": 16486763,
+          "error_rate": 1.4397919091038791e-11,
+          "states": 209316387
+        }
+      ],
+      "factory_summary": "1\u00d7T",
+      "pareto_front": [
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 316853,
+          "runtime": 108449.93328,
+          "error": 0.007317309263754645,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 318976,
+          "runtime": 100107.63072,
+          "error": 0.007237289058720867,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 325225,
+          "runtime": 58396.11792,
+          "error": 0.006837188033551974,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 329471,
+          "runtime": 50053.81536,
+          "error": 0.006757167828518195,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 333597,
+          "runtime": 40877.282544,
+          "error": 0.007438838776847987,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "3\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 339966,
+          "runtime": 33369.21024,
+          "error": 0.006597127418450638,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "3\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 341969,
+          "runtime": 30657.961908,
+          "error": 0.007148390732214871,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "4\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 350341,
+          "runtime": 25026.90768,
+          "error": 0.006517107213416859,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "5\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 358713,
+          "runtime": 20438.641272,
+          "error": 0.006857942687581755,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "6\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 367085,
+          "runtime": 16684.60512,
+          "error": 0.006437087008383081,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "7\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 400573,
+          "runtime": 10219.320636,
+          "error": 0.00656749464294864,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "11\u00d7T"
+        },
+        {
+          "name": "Fe2S2-20 SOSSA QPE (HF)",
+          "qubits": 417317,
+          "runtime": 8342.30256,
+          "error": 0.006357066803349302,
+          "compute_distance": 9,
+          "compute qubits": 308481,
+          "num_ts_per_rotation": 14,
+          "factories": "13\u00d7T"
+        }
+      ]
+    },
+    "mps_plus_qpe": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "mps_toffoli": 692554,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 53019856,
+        "logical_qubits": 450,
+        "physical_qubits": 417317,
+        "runtime_ns": 8457582160000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 13,
+            "runs": 16714589,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 212094331
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 316853,
+            "runtime": 109948.64608,
+            "error": 0.005941106074733482,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 318976,
+            "runtime": 101491.05792,
+            "error": 0.005859980038631711,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 325225,
+            "runtime": 59203.11712,
+            "error": 0.005454349858122856,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 329471,
+            "runtime": 50745.52896,
+            "error": 0.005373223822021084,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 333597,
+            "runtime": 41442.181984,
+            "error": 0.006064315052547014,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 339966,
+            "runtime": 33830.35264,
+            "error": 0.005210971749817542,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 341969,
+            "runtime": 31081.636488,
+            "error": 0.005769853190762875,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 350341,
+            "runtime": 25372.76448,
+            "error": 0.005129845713715771,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 358713,
+            "runtime": 20721.090992,
+            "error": 0.005475391328978736,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 367085,
+            "runtime": 16915.16432,
+            "error": 0.009993646454061714,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 400573,
+            "runtime": 10360.545496,
+            "error": 0.005180929467194596,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(100)+QPE",
+            "qubits": 417317,
+            "runtime": 8457.58216,
+            "error": 0.009912520475512547,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 14,
+            "factories": "13\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "mps_toffoli": 15588597,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 67915899,
+        "logical_qubits": 450,
+        "physical_qubits": 622777,
+        "runtime_ns": 10871594040000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 16250514,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 271678503
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 316853,
+            "runtime": 141330.80052,
+            "error": 0.007100014943384847,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 318976,
+            "runtime": 130459.20048,
+            "error": 0.006995733462583935,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 325225,
+            "runtime": 76101.20028,
+            "error": 0.006474326058579377,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 329471,
+            "runtime": 65229.60024,
+            "error": 0.006370044577778466,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 333597,
+            "runtime": 53270.840196,
+            "error": 0.0072583909133169125,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 339966,
+            "runtime": 43486.40016,
+            "error": 0.006161481616176643,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 341969,
+            "runtime": 39953.130147,
+            "error": 0.006879882108230933,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 350341,
+            "runtime": 32614.80012,
+            "error": 0.006057200135375731,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 358713,
+            "runtime": 26635.420098,
+            "error": 0.006501373303144955,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 367085,
+            "runtime": 21743.20008,
+            "error": 0.0059529186545748194,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 400573,
+            "runtime": 13317.710049,
+            "error": 0.006122864498058976,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 417317,
+            "runtime": 10871.60004,
+            "error": 0.005848637173773908,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "13\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(1000)+QPE",
+            "qubits": 622777,
+            "runtime": 10871.59404,
+            "error": 0.007390249748195762,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 14,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "mps_toffoli": 330551184,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 382878486,
+        "logical_qubits": 707,
+        "physical_qubits": 899571,
+        "runtime_ns": 61510755360000,
+        "compute_distance": 9,
+        "compute_qubits": 478611,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 79574069,
+            "error_rate": 2.853671551234548e-15,
+            "states": 1531528851
+          }
+        ],
+        "factory_summary": "2\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 520707,
+            "runtime": 615107.6736,
+            "error": 0.009654129224275396,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 16,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 527769,
+            "runtime": 553596.90624,
+            "error": 0.008738711907308627,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 16,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 534075,
+            "runtime": 369064.60416,
+            "error": 0.008853473209611164,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 16,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 552348,
+            "runtime": 369064.56816,
+            "error": 0.007329609276352932,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 552563,
+            "runtime": 307553.8068,
+            "error": 0.009275203334800391,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 561055,
+            "runtime": 246043.04544,
+            "error": 0.008359786107126998,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 589539,
+            "runtime": 184532.28408,
+            "error": 0.007444368879453602,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 608027,
+            "runtime": 150701.394732,
+            "error": 0.009644747330712912,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 17,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 643499,
+            "runtime": 123021.52272,
+            "error": 0.006528951651780208,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "8\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 689091,
+            "runtime": 123021.51072,
+            "error": 0.008612882236629415,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 14,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 737443,
+            "runtime": 75350.682666,
+            "error": 0.008020792309412323,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 792907,
+            "runtime": 61510.76136,
+            "error": 0.005613534424106813,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 15,
+            "factories": "17\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(5000)+QPE",
+            "qubits": 899571,
+            "runtime": 61510.75536,
+            "error": 0.007697465098249393,
+            "compute_distance": 9,
+            "compute qubits": 478611,
+            "num_ts_per_rotation": 14,
+            "factories": "20\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "mps_toffoli": 960851425,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 1013178727,
+        "logical_qubits": 1188,
+        "physical_qubits": 1215435,
+        "runtime_ns": 162638966920000,
+        "compute_distance": 9,
+        "compute_qubits": 794475,
+        "num_ts_per_rotation": 15,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 210399698,
+            "error_rate": 2.853671551234548e-15,
+            "states": 4052730868
+          }
+        ],
+        "factory_summary": "10\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS(10000)+QPE",
+            "qubits": 1004955,
+            "runtime": 325277.93384,
+            "error": 0.009879934470929714,
+            "compute_distance": 9,
+            "compute qubits": 794475,
+            "num_ts_per_rotation": 15,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(10000)+QPE",
+            "qubits": 1215435,
+            "runtime": 162638.96692,
+            "error": 0.005862117530354094,
+            "compute_distance": 9,
+            "compute qubits": 794475,
+            "num_ts_per_rotation": 15,
+            "factories": "20\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "real(DMRG)",
+        "bond_dim": 1000,
+        "mps_toffoli": 15588597,
+        "sossa_toffoli": 52327302,
+        "total_toffoli": 67915899,
+        "logical_qubits": 450,
+        "physical_qubits": 622777,
+        "runtime_ns": 10871594040000,
+        "compute_distance": 9,
+        "compute_qubits": 308481,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 16250514,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 271678503
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 316853,
+            "runtime": 141330.80052,
+            "error": 0.007100014943384847,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 318976,
+            "runtime": 130459.20048,
+            "error": 0.006995733462583935,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 325225,
+            "runtime": 76101.20028,
+            "error": 0.006474326058579377,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 329471,
+            "runtime": 65229.60024,
+            "error": 0.006370044577778466,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 333597,
+            "runtime": 53270.840196,
+            "error": 0.0072583909133169125,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 339966,
+            "runtime": 43486.40016,
+            "error": 0.006161481616176643,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 341969,
+            "runtime": 39953.130147,
+            "error": 0.006879882108230933,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 350341,
+            "runtime": 32614.80012,
+            "error": 0.006057200135375731,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 358713,
+            "runtime": 26635.420098,
+            "error": 0.006501373303144955,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 367085,
+            "runtime": 21743.20008,
+            "error": 0.0059529186545748194,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 400573,
+            "runtime": 13317.710049,
+            "error": 0.006122864498058976,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 417317,
+            "runtime": 10871.60004,
+            "error": 0.005848637173773908,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 15,
+            "factories": "13\u00d7T"
+          },
+          {
+            "name": "Fe2S2-20 MPS(real)+QPE",
+            "qubits": 622777,
+            "runtime": 10871.59404,
+            "error": 0.007390249748195762,
+            "compute_distance": 9,
+            "compute qubits": 308481,
+            "num_ts_per_rotation": 14,
+            "factories": "17\u00d7T"
+          }
+        ]
+      }
+    ]
+  },
+  "Fe4S4-36": {
+    "params": {
+      "N": 36,
+      "R": 9,
+      "B": 18,
+      "C": 18,
+      "b_rot": 17,
+      "b_coeff": 13,
+      "lambda_eff": 14.9842
+    },
+    "mps_only": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "logical_toffoli": 1347268,
+        "logical_qubits": 198,
+        "physical_qubits": 142917,
+        "runtime_ns": 179902144000,
+        "compute_distance": 7,
+        "compute_qubits": 84341,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 14,
+            "runs": 390243,
+            "error_rate": 2.386344720419674e-10,
+            "states": 5399248
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 90648,
+            "runtime": 2158.916352,
+            "error": 0.00939658812793722,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 16,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 92709,
+            "runtime": 1259.34144,
+            "error": 0.007073555083257389,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 15,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 93397,
+            "runtime": 539.740416,
+            "error": 0.009982419629639904,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 17,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 97925,
+            "runtime": 359.819392,
+            "error": 0.009581139107513435,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 16,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 104717,
+            "runtime": 219.269544,
+            "error": 0.009856013599797361,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 17,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 109245,
+            "runtime": 179.90592,
+            "error": 0.009846945172900797,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 15,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=100",
+            "qubits": 142917,
+            "runtime": 179.902144,
+            "error": 0.006570140230112906,
+            "compute_distance": 7,
+            "compute qubits": 84341,
+            "num_ts_per_rotation": 14,
+            "factories": "14\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "logical_toffoli": 30968157,
+        "logical_qubits": 274,
+        "physical_qubits": 300152,
+        "runtime_ns": 5028196360000,
+        "compute_distance": 9,
+        "compute_qubits": 191316,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 13,
+            "runs": 9937146,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 123882804
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 199688,
+            "runtime": 65366.55268,
+            "error": 0.006806822995894528,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 201811,
+            "runtime": 55310.15996,
+            "error": 0.006746998531371456,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 208060,
+            "runtime": 35197.37452,
+            "error": 0.0066273496023253105,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 212306,
+            "runtime": 30169.17816,
+            "error": 0.006597437370063774,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 216432,
+            "runtime": 24638.162164,
+            "error": 0.006852251760051593,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 222801,
+            "runtime": 18478.621623,
+            "error": 0.006743679814162334,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 233176,
+            "runtime": 15084.58908,
+            "error": 0.006507700673279166,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 241548,
+            "runtime": 12319.081082,
+            "error": 0.006635107868273074,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 249920,
+            "runtime": 10056.39272,
+            "error": 0.0064777884410176295,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 283408,
+            "runtime": 6159.540541,
+            "error": 0.006526535922383816,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=1000",
+            "qubits": 300152,
+            "runtime": 5028.19636,
+            "error": 0.006447876208756093,
+            "compute_distance": 9,
+            "compute qubits": 191316,
+            "num_ts_per_rotation": 14,
+            "factories": "13\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "logical_toffoli": 645560597,
+        "logical_qubits": 700,
+        "physical_qubits": 894756,
+        "runtime_ns": 103874784000000,
+        "compute_distance": 9,
+        "compute_qubits": 473796,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 134378763,
+            "error_rate": 2.853671551234548e-15,
+            "states": 2582252564
+          }
+        ],
+        "factory_summary": "3\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 547533,
+            "runtime": 623248.76064,
+            "error": 0.009528248335939425,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 16,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 557988,
+            "runtime": 519373.9436,
+            "error": 0.008912202237193299,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 15,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 579036,
+            "runtime": 415499.15488,
+            "error": 0.007381866056044561,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 15,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 584724,
+            "runtime": 311624.38032,
+            "error": 0.009761081305664714,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 16,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 621132,
+            "runtime": 311624.352,
+            "error": 0.009232686623245428,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 638684,
+            "runtime": 207749.57744,
+            "error": 0.009145034070517581,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 15,
+            "factories": "8\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 684276,
+            "runtime": 207749.568,
+            "error": 0.007702350511634128,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 14,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 788092,
+            "runtime": 103874.78872,
+            "error": 0.007614697889368843,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 15,
+            "factories": "17\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=5000",
+            "qubits": 894756,
+            "runtime": 103874.784,
+            "error": 0.006172014400022829,
+            "compute_distance": 9,
+            "compute qubits": 473796,
+            "num_ts_per_rotation": 14,
+            "factories": "20\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "logical_toffoli": 1905789601,
+        "logical_qubits": 716,
+        "physical_qubits": 905349,
+        "runtime_ns": 306096334120000,
+        "compute_distance": 9,
+        "compute_qubits": 484389,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 395984908,
+            "error_rate": 2.853671551234548e-15,
+            "states": 7623168580
+          }
+        ],
+        "factory_summary": "10\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS chi=10000",
+            "qubits": 694869,
+            "runtime": 612192.68712,
+            "error": 0.009581397060914574,
+            "compute_distance": 9,
+            "compute qubits": 484389,
+            "num_ts_per_rotation": 16,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS chi=10000",
+            "qubits": 905349,
+            "runtime": 306096.33412,
+            "error": 0.00926645382008687,
+            "compute_distance": 9,
+            "compute qubits": 484389,
+            "num_ts_per_rotation": 14,
+            "factories": "20\u00d7T"
+          }
+        ]
+      }
+    ],
+    "qpe_hf": {
+      "label": "QPE(HF)",
+      "logical_toffoli": 192801028,
+      "logical_qubits": 809,
+      "physical_qubits": 859996,
+      "runtime_ns": 31026530840000,
+      "compute_distance": 9,
+      "compute_qubits": 545700,
+      "num_ts_per_rotation": 19,
+      "factories": [
+        {
+          "copies": 17,
+          "runs": 46377475,
+          "error_rate": 1.8709277317759537e-12,
+          "states": 778687105
+        }
+      ],
+      "factory_summary": "1\u00d7T",
+      "pareto_front": [
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 576087,
+          "runtime": 527718.47848,
+          "error": 0.009947747450893761,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 578560,
+          "runtime": 434591.68816,
+          "error": 0.009822921675749108,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 582676,
+          "runtime": 279238.77756,
+          "error": 0.00985999563306185,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 586922,
+          "runtime": 248212.24672,
+          "error": 0.00933352703120221,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 601164,
+          "runtime": 186159.18504,
+          "error": 0.00828058982748293,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "3\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 619652,
+          "runtime": 155132.6542,
+          "error": 0.007754121225623292,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "4\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 628144,
+          "runtime": 124106.12336,
+          "error": 0.007227652623763653,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "4\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 638140,
+          "runtime": 114080.318142,
+          "error": 0.008184274483611895,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 20,
+          "factories": "5\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 656628,
+          "runtime": 93079.59252,
+          "error": 0.006701184021904013,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "6\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 675116,
+          "runtime": 76015.000558,
+          "error": 0.00894360736325904,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "7\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 710588,
+          "runtime": 62053.06168,
+          "error": 0.006174715420044374,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "8\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 804532,
+          "runtime": 38007.500279,
+          "error": 0.007032692789792068,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "14\u00d7T"
+        },
+        {
+          "name": "Fe4S4-36 SOSSA QPE (HF)",
+          "qubits": 859996,
+          "runtime": 31026.53084,
+          "error": 0.005648246818184734,
+          "compute_distance": 9,
+          "compute qubits": 545700,
+          "num_ts_per_rotation": 19,
+          "factories": "17\u00d7T"
+        }
+      ]
+    },
+    "mps_plus_qpe": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "mps_toffoli": 1347268,
+        "sossa_toffoli": 192801028,
+        "total_toffoli": 194148296,
+        "logical_qubits": 809,
+        "physical_qubits": 859996,
+        "runtime_ns": 31251388040000,
+        "compute_distance": 9,
+        "compute_qubits": 545700,
+        "num_ts_per_rotation": 19,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 46713584,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 784089953
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 578560,
+            "runtime": 437739.72256,
+            "error": 0.009888260016621795,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 582676,
+            "runtime": 281262.49236,
+            "error": 0.009911143115012774,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 586922,
+            "runtime": 250011.10432,
+            "error": 0.009380859060619542,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 601164,
+            "runtime": 187508.32824,
+            "error": 0.008320290951833079,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 619652,
+            "runtime": 156256.9402,
+            "error": 0.007790006897439847,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 628144,
+            "runtime": 125005.55216,
+            "error": 0.007259722843046614,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 638140,
+            "runtime": 114906.677172,
+            "error": 0.008237743021469821,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 656628,
+            "runtime": 93754.16412,
+            "error": 0.006729438788653382,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 675116,
+            "runtime": 76565.900698,
+            "error": 0.008988113545171515,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 710588,
+            "runtime": 62502.77608,
+            "error": 0.006199154734260149,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "8\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 804532,
+            "runtime": 38282.950349,
+            "error": 0.007063350085322599,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(100)+QPE",
+            "qubits": 859996,
+            "runtime": 31251.38804,
+            "error": 0.0056688706798669174,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "mps_toffoli": 30968157,
+        "sossa_toffoli": 192801028,
+        "total_toffoli": 223769185,
+        "logical_qubits": 809,
+        "physical_qubits": 859996,
+        "runtime_ns": 36054706720000,
+        "compute_distance": 9,
+        "compute_qubits": 545700,
+        "num_ts_per_rotation": 19,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 53893433,
+            "error_rate": 1.8709277317759537e-12,
+            "states": 902573509
+          }
+        ],
+        "factory_summary": "2\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 582676,
+            "runtime": 324633.97548,
+            "error": 0.008190717861294305,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 586922,
+            "runtime": 288563.53376,
+            "error": 0.007578662484600183,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 601164,
+            "runtime": 216328.24032,
+            "error": 0.009030991075711462,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 619652,
+            "runtime": 180273.5336,
+            "error": 0.008419202695785137,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 628144,
+            "runtime": 144218.82688,
+            "error": 0.007807414315858813,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 638140,
+            "runtime": 132558.873321,
+            "error": 0.009346921990602795,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 656628,
+            "runtime": 108164.12016,
+            "error": 0.007195625935932488,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 675116,
+            "runtime": 88334.031464,
+            "error": 0.009801457581486771,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 710588,
+            "runtime": 72109.41344,
+            "error": 0.006583837556006164,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "8\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 804532,
+            "runtime": 44167.015732,
+            "error": 0.007580859188820143,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(1000)+QPE",
+            "qubits": 859996,
+            "runtime": 36054.70672,
+            "error": 0.005972049176079839,
+            "compute_distance": 9,
+            "compute qubits": 545700,
+            "num_ts_per_rotation": 19,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "mps_toffoli": 645560597,
+        "sossa_toffoli": 192801028,
+        "total_toffoli": 838361625,
+        "logical_qubits": 822,
+        "physical_qubits": 975327,
+        "runtime_ns": 134901294360000,
+        "compute_distance": 9,
+        "compute_qubits": 554367,
+        "num_ts_per_rotation": 19,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 174516551,
+            "error_rate": 2.853671551234548e-15,
+            "states": 3360943269
+          }
+        ],
+        "factory_summary": "7\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS(5000)+QPE",
+            "qubits": 701703,
+            "runtime": 404751.08808,
+            "error": 0.0079794553553257,
+            "compute_distance": 9,
+            "compute qubits": 554367,
+            "num_ts_per_rotation": 20,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(5000)+QPE",
+            "qubits": 764847,
+            "runtime": 269802.58872,
+            "error": 0.008332014025606977,
+            "compute_distance": 9,
+            "compute qubits": 554367,
+            "num_ts_per_rotation": 19,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(5000)+QPE",
+            "qubits": 868663,
+            "runtime": 134917.02936,
+            "error": 0.009607328871903216,
+            "compute_distance": 9,
+            "compute qubits": 554367,
+            "num_ts_per_rotation": 20,
+            "factories": "17\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(5000)+QPE",
+            "qubits": 975327,
+            "runtime": 134901.29436,
+            "error": 0.0060066080209990585,
+            "compute_distance": 9,
+            "compute qubits": 554367,
+            "num_ts_per_rotation": 19,
+            "factories": "20\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "mps_toffoli": 1905789601,
+        "sossa_toffoli": 192801028,
+        "total_toffoli": 2098590629,
+        "logical_qubits": 838,
+        "physical_qubits": 985599,
+        "runtime_ns": 337122844480000,
+        "compute_distance": 9,
+        "compute_qubits": 564639,
+        "num_ts_per_rotation": 19,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 436122696,
+            "error_rate": 2.853671551234548e-15,
+            "states": 8401859285
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 867127,
+            "runtime": 6877306.027392,
+            "error": 0.0038480448278527756,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 870658,
+            "runtime": 5967074.347296,
+            "error": 0.0042010907021455025,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 876466,
+            "runtime": 5663663.787264,
+            "error": 0.0038211405291172554,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 882907,
+            "runtime": 5469818.151688,
+            "error": 0.004158965404884891,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 888175,
+            "runtime": 3480793.369256,
+            "error": 0.003990464215842444,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 895237,
+            "runtime": 2983537.173648,
+            "error": 0.003948338918581832,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 906853,
+            "runtime": 2831831.893632,
+            "error": 0.003758363832067709,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 909223,
+            "runtime": 2427284.480256,
+            "error": 0.003749395732489202,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 919816,
+            "runtime": 1989024.782432,
+            "error": 0.003864088324060609,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 944395,
+            "runtime": 1491768.586824,
+            "error": 0.0038219630267999974,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 968974,
+            "runtime": 1213642.240128,
+            "error": 0.0037224914337536824,
+            "compute_distance": 11,
+            "compute qubits": 846079,
+            "num_ts_per_rotation": 19,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "Fe4S4-36 MPS(10000)+QPE",
+            "qubits": 985599,
+            "runtime": 337122.84448,
+            "error": 0.009614532856832562,
+            "compute_distance": 9,
+            "compute qubits": 564639,
+            "num_ts_per_rotation": 19,
+            "factories": "20\u00d7T"
+          }
+        ]
+      }
+    ]
+  },
+  "FeMoCo-76": {
+    "params": {
+      "N": 76,
+      "R": 15,
+      "B": 57,
+      "C": 19,
+      "b_rot": 15,
+      "b_coeff": 9,
+      "lambda_eff": 43.6538
+    },
+    "mps_only": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "logical_toffoli": 2730170,
+        "logical_qubits": 264,
+        "physical_qubits": 169551,
+        "runtime_ns": 363463488000,
+        "compute_distance": 7,
+        "compute_qubits": 110975,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 14,
+            "runs": 788424,
+            "error_rate": 2.386344720419674e-10,
+            "states": 10928408
+          }
+        ],
+        "factory_summary": "4\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS chi=100",
+            "qubits": 127711,
+            "runtime": 1453.880064,
+            "error": 0.009749123352389113,
+            "compute_distance": 7,
+            "compute qubits": 110975,
+            "num_ts_per_rotation": 16,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=100",
+            "qubits": 131895,
+            "runtime": 1090.400256,
+            "error": 0.008721284258576462,
+            "compute_distance": 7,
+            "compute qubits": 110975,
+            "num_ts_per_rotation": 15,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=100",
+            "qubits": 140263,
+            "runtime": 726.926976,
+            "error": 0.009564183137763558,
+            "compute_distance": 7,
+            "compute qubits": 110975,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=100",
+            "qubits": 161183,
+            "runtime": 442.975104,
+            "error": 0.008385271936204393,
+            "compute_distance": 7,
+            "compute qubits": 110975,
+            "num_ts_per_rotation": 15,
+            "factories": "12\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=100",
+            "qubits": 169551,
+            "runtime": 363.463488,
+            "error": 0.007843214648399596,
+            "compute_distance": 7,
+            "compute qubits": 110975,
+            "num_ts_per_rotation": 14,
+            "factories": "14\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "logical_toffoli": 61508373,
+        "logical_qubits": 447,
+        "physical_qubits": 415391,
+        "runtime_ns": 9979803640000,
+        "compute_distance": 9,
+        "compute_qubits": 306555,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 13,
+            "runs": 19722932,
+            "error_rate": 1.4397919091038791e-11,
+            "states": 246041220
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 314927,
+            "runtime": 129737.44732,
+            "error": 0.008293517757022664,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 317050,
+            "runtime": 109777.84004,
+            "error": 0.008103258542760238,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 323299,
+            "runtime": 69858.62548,
+            "error": 0.007722740114235385,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 327545,
+            "runtime": 59878.82184,
+            "error": 0.007627610507104172,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 331671,
+            "runtime": 48901.037836,
+            "error": 0.008437994453008846,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 338040,
+            "runtime": 36675.778377,
+            "error": 0.008092704055835858,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 348415,
+            "runtime": 29939.41092,
+            "error": 0.007342221685710532,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 356787,
+            "runtime": 24450.518918,
+            "error": 0.00774741365866287,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "6\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 365159,
+            "runtime": 19959.60728,
+            "error": 0.007247092078579319,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 398647,
+            "runtime": 12225.259459,
+            "error": 0.007402123261489882,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "11\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=1000",
+            "qubits": 415391,
+            "runtime": 9979.80364,
+            "error": 0.007151962471448106,
+            "compute_distance": 9,
+            "compute qubits": 306555,
+            "num_ts_per_rotation": 14,
+            "factories": "13\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "logical_toffoli": 1304610312,
+        "logical_qubits": 712,
+        "physical_qubits": 902781,
+        "runtime_ns": 209843795680000,
+        "compute_distance": 9,
+        "compute_qubits": 481821,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 20,
+            "runs": 271466747,
+            "error_rate": 2.853671551234548e-15,
+            "states": 5218448976
+          }
+        ],
+        "factory_summary": "7\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS chi=5000",
+            "qubits": 629157,
+            "runtime": 629531.41152,
+            "error": 0.009703528461090198,
+            "compute_distance": 9,
+            "compute qubits": 481821,
+            "num_ts_per_rotation": 16,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=5000",
+            "qubits": 692301,
+            "runtime": 419687.59136,
+            "error": 0.009817020396522429,
+            "compute_distance": 9,
+            "compute qubits": 481821,
+            "num_ts_per_rotation": 14,
+            "factories": "10\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=5000",
+            "qubits": 902781,
+            "runtime": 209843.79568,
+            "error": 0.006673131710801614,
+            "compute_distance": 9,
+            "compute qubits": 481821,
+            "num_ts_per_rotation": 14,
+            "factories": "20\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "logical_toffoli": 3792442929,
+        "logical_qubits": 1193,
+        "physical_qubits": 1553101,
+        "runtime_ns": 730803522000000,
+        "compute_distance": 11,
+        "compute_qubits": 1195285,
+        "num_ts_per_rotation": 14,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 945412059,
+            "error_rate": 2.853671551234548e-15,
+            "states": 15169779444
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1216333,
+            "runtime": 12423659.874,
+            "error": 0.003946722818118524,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1219864,
+            "runtime": 10779351.9495,
+            "error": 0.004847718889445575,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1225672,
+            "runtime": 10231249.308,
+            "error": 0.0038780612949918898,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1232113,
+            "runtime": 9881072.620375,
+            "error": 0.004740212386469632,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1237381,
+            "runtime": 6287955.303875,
+            "error": 0.0043101863745658615,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1244443,
+            "runtime": 5389675.97475,
+            "error": 0.004202679871589919,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1256059,
+            "runtime": 5115624.654,
+            "error": 0.0037178510743630768,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1258429,
+            "runtime": 4384821.132,
+            "error": 0.003694963899987532,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1269022,
+            "runtime": 3593117.3165,
+            "error": 0.003987666865638034,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1293601,
+            "runtime": 2694837.987375,
+            "error": 0.003880160362662091,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1318180,
+            "runtime": 2192410.566,
+            "error": 0.0036263023768608976,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1342621,
+            "runtime": 1796558.65825,
+            "error": 0.0037726538596861486,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1384717,
+            "runtime": 1461607.044,
+            "error": 0.0036034152024853527,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1489957,
+            "runtime": 898279.329125,
+            "error": 0.003665147356710206,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS chi=10000",
+            "qubits": 1553101,
+            "runtime": 730803.522,
+            "error": 0.0035805280281098082,
+            "compute_distance": 11,
+            "compute qubits": 1195285,
+            "num_ts_per_rotation": 14,
+            "factories": "17\u00d7T"
+          }
+        ]
+      }
+    ],
+    "qpe_hf": {
+      "label": "QPE(HF)",
+      "logical_toffoli": 1601163336,
+      "logical_qubits": 1405,
+      "physical_qubits": 1761374,
+      "runtime_ns": 307234760352000,
+      "compute_distance": 11,
+      "compute_qubits": 1403558,
+      "num_ts_per_rotation": 20,
+      "factories": [
+        {
+          "copies": 17,
+          "runs": 397457645,
+          "error_rate": 2.853671551234548e-15,
+          "states": 6436123134
+        }
+      ],
+      "factory_summary": "1\u00d7T",
+      "pareto_front": [
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1424606,
+          "runtime": 5222990.925984,
+          "error": 0.004169832080469692,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1428137,
+          "runtime": 4531712.715192,
+          "error": 0.004614618491173771,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1433945,
+          "runtime": 4301286.644928,
+          "error": 0.004135936580370574,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1440386,
+          "runtime": 4154069.988926,
+          "error": 0.004561546748568292,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "1\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1445654,
+          "runtime": 2643499.083862,
+          "error": 0.004349259778146377,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1452716,
+          "runtime": 2265856.357596,
+          "error": 0.004296188035540898,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1464332,
+          "runtime": 2150643.322464,
+          "error": 0.004056847080139299,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "2\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1466702,
+          "runtime": 1843408.562112,
+          "error": 0.00404554858010626,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "3\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1477295,
+          "runtime": 1510570.905064,
+          "error": 0.00419004455032994,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "3\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1501874,
+          "runtime": 1132928.178798,
+          "error": 0.004136972807724461,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "4\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1526453,
+          "runtime": 921704.281056,
+          "error": 0.004011653080007142,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "5\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1550894,
+          "runtime": 755285.452532,
+          "error": 0.004083901065118982,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "7\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1592990,
+          "runtime": 614469.520704,
+          "error": 0.004000354579974103,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "9\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1698230,
+          "runtime": 377642.726266,
+          "error": 0.004030829322513503,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "14\u00d7T"
+        },
+        {
+          "name": "FeMoCo-76 SOSSA QPE (HF)",
+          "qubits": 1761374,
+          "runtime": 307234.760352,
+          "error": 0.003989056079941064,
+          "compute_distance": 11,
+          "compute qubits": 1403558,
+          "num_ts_per_rotation": 20,
+          "factories": "17\u00d7T"
+        }
+      ]
+    },
+    "mps_plus_qpe": [
+      {
+        "label": "100",
+        "bond_dim": 100,
+        "mps_toffoli": 2730170,
+        "sossa_toffoli": 1601163336,
+        "total_toffoli": 1603893506,
+        "logical_qubits": 1405,
+        "physical_qubits": 1761374,
+        "runtime_ns": 307779936960000,
+        "compute_distance": 11,
+        "compute_qubits": 1403558,
+        "num_ts_per_rotation": 20,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 398162919,
+            "error_rate": 2.853671551234548e-15,
+            "states": 6447054818
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1424606,
+            "runtime": 5232258.92832,
+            "error": 0.004171578015383659,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1428137,
+            "runtime": 4539754.07016,
+            "error": 0.00461715368296217,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1433945,
+            "runtime": 4308919.11744,
+            "error": 0.004137622368985505,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1440386,
+            "runtime": 4161441.23098,
+            "error": 0.004563987766531499,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1445654,
+            "runtime": 2648189.87426,
+            "error": 0.0043513241008088155,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1452716,
+            "runtime": 2269877.03508,
+            "error": 0.0042981581843781445,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1464332,
+            "runtime": 2154459.55872,
+            "error": 0.0040583925273898125,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1466702,
+            "runtime": 1846679.62176,
+            "error": 0.004047073978590427,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1477295,
+            "runtime": 1513251.35672,
+            "error": 0.004191826351516803,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1501874,
+            "runtime": 1134938.51754,
+            "error": 0.004138660435086132,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1526453,
+            "runtime": 923339.81088,
+            "error": 0.004013118332192273,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1550894,
+            "runtime": 756625.67836,
+            "error": 0.004085494518655461,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1592990,
+            "runtime": 615559.87392,
+            "error": 0.004001799783392888,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1698230,
+            "runtime": 378312.83918,
+            "error": 0.00403232860222479,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(100)+QPE",
+            "qubits": 1761374,
+            "runtime": 307779.93696,
+            "error": 0.003990481234593504,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "1000",
+        "bond_dim": 1000,
+        "mps_toffoli": 61508373,
+        "sossa_toffoli": 1601163336,
+        "total_toffoli": 1662671709,
+        "logical_qubits": 1405,
+        "physical_qubits": 1761374,
+        "runtime_ns": 319210506096000,
+        "compute_distance": 11,
+        "compute_qubits": 1403558,
+        "num_ts_per_rotation": 20,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 412950201,
+            "error_rate": 2.853671551234548e-15,
+            "states": 6682167630
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1424606,
+            "runtime": 5426578.603632,
+            "error": 0.0041793950193259825,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1428137,
+            "runtime": 4708354.964916,
+            "error": 0.004641518820365959,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1433945,
+            "runtime": 4468947.085344,
+            "error": 0.004144178301892642,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1440386,
+            "runtime": 4315992.051173,
+            "error": 0.004586378387046884,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1445654,
+            "runtime": 2746540.396201,
+            "error": 0.004365816653770582,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1452716,
+            "runtime": 2354177.482458,
+            "error": 0.004310676220451506,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1464332,
+            "runtime": 2234473.542672,
+            "error": 0.004062005961214849,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1466702,
+            "runtime": 1915263.036576,
+            "error": 0.004050267055403735,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1477295,
+            "runtime": 1569451.654972,
+            "error": 0.004200395353813356,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1501874,
+            "runtime": 1177088.741229,
+            "error": 0.004145254920494281,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1526453,
+            "runtime": 957631.518288,
+            "error": 0.004015050337970395,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1550894,
+            "runtime": 784725.827486,
+            "error": 0.004090114487175205,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1592990,
+            "runtime": 638421.012192,
+            "error": 0.004003311432159281,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1698230,
+            "runtime": 392362.913743,
+            "error": 0.00403497405385613,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(1000)+QPE",
+            "qubits": 1761374,
+            "runtime": 319210.506096,
+            "error": 0.003991572526348168,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "5000",
+        "bond_dim": 5000,
+        "mps_toffoli": 1304610312,
+        "sossa_toffoli": 1601163336,
+        "total_toffoli": 2905773648,
+        "logical_qubits": 1405,
+        "physical_qubits": 1761374,
+        "runtime_ns": 559047296544000,
+        "compute_distance": 11,
+        "compute_qubits": 1403558,
+        "num_ts_per_rotation": 20,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 723217718,
+            "error_rate": 2.853671551234548e-15,
+            "states": 11654575386
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1424606,
+            "runtime": 9503804.041248,
+            "error": 0.0043435238299459064,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1428137,
+            "runtime": 8245947.624024,
+            "error": 0.005152861419737953,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1433945,
+            "runtime": 7826662.151616,
+            "error": 0.004281847255089245,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1440386,
+            "runtime": 7558785.322022,
+            "error": 0.005056291571350748,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1445654,
+            "runtime": 4810136.114014,
+            "error": 0.004670012177801927,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1452716,
+            "runtime": 4122973.812012,
+            "error": 0.004573442329414722,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1464332,
+            "runtime": 3913331.075808,
+            "error": 0.004137935247090367,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1466702,
+            "runtime": 3354283.779264,
+            "error": 0.004117376388804814,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1477295,
+            "runtime": 2748649.208008,
+            "error": 0.004380302632640311,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1501874,
+            "runtime": 2061486.906006,
+            "error": 0.004283732784253105,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1526453,
+            "runtime": 1677141.889632,
+            "error": 0.004055699813948151,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1550894,
+            "runtime": 1374324.604004,
+            "error": 0.004187162935865901,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1592990,
+            "runtime": 1118094.593088,
+            "error": 0.004035140955662598,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1698230,
+            "runtime": 687162.302002,
+            "error": 0.004090593087478695,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(5000)+QPE",
+            "qubits": 1761374,
+            "runtime": 559047.296544,
+            "error": 0.004014582097377044,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "17\u00d7T"
+          }
+        ]
+      },
+      {
+        "label": "10000",
+        "bond_dim": 10000,
+        "mps_toffoli": 3792442929,
+        "sossa_toffoli": 1601163336,
+        "total_toffoli": 5393606265,
+        "logical_qubits": 1405,
+        "physical_qubits": 1761374,
+        "runtime_ns": 1038038263728000,
+        "compute_distance": 11,
+        "compute_qubits": 1403558,
+        "num_ts_per_rotation": 20,
+        "factories": [
+          {
+            "copies": 17,
+            "runs": 1342869681,
+            "error_rate": 2.853671551234548e-15,
+            "states": 21605905854
+          }
+        ],
+        "factory_summary": "1\u00d7T",
+        "pareto_front": [
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1424606,
+            "runtime": 17646650.483376,
+            "error": 0.0046713732919041765,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1428137,
+            "runtime": 15311064.389988,
+            "error": 0.006174150233445862,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1433945,
+            "runtime": 14532535.692192,
+            "error": 0.004556852311170196,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1440386,
+            "runtime": 14035142.357489,
+            "error": 0.005994839469637454,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "1\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1445654,
+            "runtime": 8931454.227493,
+            "error": 0.0052775964144038175,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1452716,
+            "runtime": 7655532.194994,
+            "error": 0.005098285650595408,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1464332,
+            "runtime": 7266267.846096,
+            "error": 0.0042896366894575755,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "2\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1466702,
+            "runtime": 6228229.582368,
+            "error": 0.0042514630292129155,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1477295,
+            "runtime": 5103688.129996,
+            "error": 0.00473966412297859,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "3\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1501874,
+            "runtime": 3827766.097497,
+            "error": 0.004560353359170181,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "4\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1526453,
+            "runtime": 3114114.791184,
+            "error": 0.004136942048478935,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "5\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1550894,
+            "runtime": 2551844.064998,
+            "error": 0.004381042595361773,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "7\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1592990,
+            "runtime": 2076076.527456,
+            "error": 0.004098768388234275,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "9\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1698230,
+            "runtime": 1275922.032499,
+            "error": 0.004201731831553364,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "14\u00d7T"
+          },
+          {
+            "name": "FeMoCo-76 MPS(10000)+QPE",
+            "qubits": 1761374,
+            "runtime": 1038038.263728,
+            "error": 0.004060594727989615,
+            "compute_distance": 11,
+            "compute qubits": 1403558,
+            "num_ts_per_rotation": 20,
+            "factories": "17\u00d7T"
+          }
+        ]
+      }
+    ]
+  }
+}
