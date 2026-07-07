@@ -1,53 +1,43 @@
 # MPS & SOSSA Resource Estimation
 
-> **Branch:** `scratch/mps_sossa` | **Commit:** `825351fc6123fba947a5fb6cb545024e396be492` (2026-07-07)
-
 This directory contains scripts to reproduce the data presented in the DARPA 2026-07 update.
-It uses the MPS state preparation and SOSSA resource estimation functionalities available in the above branch, together with published MPS tensors for selected molecules (Rupprecht 2026).
+The archive is based on branch `scratch/mps_sossa` commit `825351fc6123fba947a5fb6cb545024e396be492` (2026-07-07) of [QDK-Chemistry](https://github.com/microsoft/qdk-chemistry.git).
+It uses the MPS state preparation and SOSSA resource estimation functionalities, together with published MPS tensors for selected molecules (Rupprecht 2026).
 
 **NOTE:** Recommended running on HPC due to high memory requirements at large bond dimensions.
 
-## Prerequisites
+## Setup
 
-**Option A — Extract the tarball in OneDrive**:
+1. Download and extract the tarball from OneDrive:
 
-```bash
-tar -xzf qdk-chemistry-mps-sossa.tar.gz
-cd qdk-chemistry
-```
+   ```bash
+   tar -xzf qdk-chemistry-mps-sossa.tar.gz
+   cd qdk-chemistry
+   ```
 
-**Option B — Clone and checkout from GitHub:**
+2. Build from source (see `INSTALL.md` for full instructions).
+   The easiest way is to open the repository in the VS Code Dev Container:
 
-```bash
-git clone https://github.com/microsoft/qdk-chemistry.git
-cd qdk-chemistry
-git checkout 825351fc6123fba947a5fb6cb545024e396be492
-```
+   - Open the `qdk-chemistry` folder in VS Code.
+   - When prompted, click **"Reopen in Container"** (or use Command Palette →
+     "Dev Containers: Reopen in Container").
+   - After the container builds, restart VS Code once to load the Python
+     virtual environment.
+   - Install the package:
 
-See `INSTALL.md` for instructions to build from this source.
-The easiest way is to open the repository in the VS Code Dev Container:
+     ```bash
+     cd python
+     pip install -e '.[all]'
+     ```
 
-1. Open the `qdk-chemistry` folder in VS Code.
-2. When prompted, click **"Reopen in Container"** (or use Command Palette →
-   "Dev Containers: Reopen in Container").
-3. After the container builds, restart VS Code once to load the Python
-   virtual environment.
+     The `[all]` extra pulls in Jupyter, QRE, Qiskit interop, and all optional
+     backends.
 
-Install dependencies:
+3. Navigate to the MPS benchmark directory:
 
-```bash
-cd python
-pip install -e '.[all]'
-```
-
-The `[all]` extra pulls in Jupyter, QRE, Qiskit interop, and all optional
-backends.
-
-Navigate to the MPS benchmark directory:
-
-```bash
-cd ./examples/mps_benchmark
-```
+   ```bash
+   cd ./examples/mps_benchmark
+   ```
 
 ## Usage
 
