@@ -694,6 +694,9 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
+        EvolutionCircuitBuilderFactory,
+    )
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import (  # noqa: PLC0415
         HamiltonianSimulationFactory,
     )
@@ -701,6 +704,7 @@ def _register_python_factories():
     register_factory(EnergyEstimatorFactory())
     register_factory(CircuitMapperFactory())
     register_factory(HamiltonianSimulationFactory())
+    register_factory(EvolutionCircuitBuilderFactory())
     register_factory(StatePreparationFactory())
     register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
@@ -811,6 +815,9 @@ def _register_python_algorithms():
         IdentityTermGrouper,
         QubitWiseCommutingTermGrouper,
     )
+    from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
+        EulerEvolutionCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
     register(lambda: QdkEnergyEstimator())
@@ -831,6 +838,7 @@ def _register_python_algorithms():
     register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
+    register(lambda: EulerEvolutionCircuitBuilder())
     register(lambda: MagnusPropagator())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())

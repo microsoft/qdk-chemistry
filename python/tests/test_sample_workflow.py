@@ -34,6 +34,13 @@ try:
 except ImportError:
     _HAS_NOTEBOOK_DEPS = False
 
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
+
 _requires_notebook_deps = pytest.mark.xfail(
     not _HAS_NOTEBOOK_DEPS,
     reason="nbclient and nbformat are optional dependencies",
@@ -46,6 +53,13 @@ try:
     _HAS_JUPYTER_CLIENT = True
 except ImportError:
     _HAS_JUPYTER_CLIENT = False
+
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
 
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
@@ -251,6 +265,10 @@ def test_factory_list():
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
 )
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
+)
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
@@ -278,6 +296,14 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
