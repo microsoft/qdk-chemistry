@@ -8,11 +8,11 @@ It uses the MPS state preparation and SOSSA resource estimation functionalities 
 **NOTE:** Recommended running on HPC due to high memory requirements at large bond dimensions.
 
 ## Prerequisites
-
+<!-- 
 You need [Docker](https://docs.docker.com/get-docker/) and
 [VS Code](https://code.visualstudio.com/) with the
 [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-extension installed.
+extension installed. -->
 
 **Option A — Extract the tarball in OneDrive**:
 
@@ -29,7 +29,8 @@ cd qdk-chemistry
 git checkout 825351fc6123fba947a5fb6cb545024e396be492
 ```
 
-Then open the repository in the VS Code Dev Container:
+See `INSTALL.md` for instructions to build from this source.
+The easiest way is to open the repository in the VS Code Dev Container:
 
 1. Open the `qdk-chemistry` folder in VS Code.
 2. When prompted, click **"Reopen in Container"** (or use Command Palette →
@@ -50,7 +51,7 @@ backends.
 Navigate to the MPS benchmark directory:
 
 ```bash
-cd ../examples/mps_benchmark
+cd ./examples/mps_benchmark
 ```
 
 ## Usage
@@ -69,7 +70,7 @@ python run_resource_estimation.py --molecules all --bond-dims 100 1000 5000 1000
 ```
 
 Results are saved as JSON alongside a Pareto-front plot (physical qubits vs
-runtime):
+runtime).
 
 ### Sparse vs dense MPS comparison (real tensor data)
 
