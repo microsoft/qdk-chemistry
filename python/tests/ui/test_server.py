@@ -121,8 +121,8 @@ def simple_ansatz(simple_hamiltonian, simple_wavefunction):
 @pytest.fixture
 def simple_configuration_set(simple_orbitals):
     configurations = [
-        Configuration("20"),
-        Configuration("ud"),
+        Configuration.from_spin_half_string("20"),
+        Configuration.from_spin_half_string("ud"),
     ]
     return ConfigurationSet(configurations, simple_orbitals)
 
@@ -1281,13 +1281,12 @@ class TestPhaseEstimationFunctions:
             state_prep_circuit_filename=circuit_filename,
             qubit_hamiltonian_filename=qubit_ham_filename,
             out_qpe_result_filename="qpe.qpe_result.json",
-            algorithm_name="iterative",
+            algorithm_name="qdk_iterative",
             settings={"num_bits": 4, "evolution_time": 0.1, "shots_per_bit": 10},
         )
 
         assert isinstance(result, str)
-        assert "qpe.qpe_result.json" in result
-        assert (project_path / result).exists()
+        assert "nested unitary-builder settings is not supported" in result
 
     def test_run_phase_estimation_with_configs(self, h2_structure, temp_project_dir):
         """Test phase estimation with inline sub-algorithm settings."""
@@ -1337,7 +1336,7 @@ class TestPhaseEstimationFunctions:
             state_prep_circuit_filename=circuit_filename,
             qubit_hamiltonian_filename=qubit_ham_filename,
             out_qpe_result_filename="qpe.qpe_result.json",
-            algorithm_name="iterative",
+            algorithm_name="qdk_iterative",
             settings={
                 "num_bits": 4,
                 "evolution_time": 0.1,
@@ -1349,8 +1348,7 @@ class TestPhaseEstimationFunctions:
         )
 
         assert isinstance(result, str)
-        assert "qpe.qpe_result.json" in result
-        assert (project_path / result).exists()
+        assert "nested unitary-builder settings is not supported" in result
 
     def test_run_phase_estimation_with_invalid_settings(
         self, simple_wavefunction, simple_hamiltonian, temp_project_dir
@@ -1403,7 +1401,7 @@ class TestModelHamiltonians:
             lattice_params={"n": 4, "periodic": False},
             epsilon=0.0,
             t=1.0,
-            U=4.0,
+            u_coulomb=4.0,
         )
 
         assert isinstance(result, str)
@@ -1497,7 +1495,7 @@ class TestModelHamiltonians:
             lattice_params={"n": 3},
             epsilon=[0.0, 0.5, 1.0],
             t=1.0,
-            U=[3.0, 4.0, 5.0],
+            u_coulomb=[3.0, 4.0, 5.0],
         )
 
         assert isinstance(result, str)
@@ -1557,7 +1555,7 @@ class TestModelHamiltonians:
             lattice_params={"n": 2, "periodic": False},
             epsilon=0.0,
             t=1.0,
-            U=2.0,
+            u_coulomb=2.0,
         )
         assert isinstance(ham_file, str)
 

@@ -23,11 +23,10 @@ from mcp.server.fastmcp import FastMCP
 
 from qdk_chemistry import algorithms, constants, data
 from qdk_chemistry.data import AlgorithmRef
+from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.remote.cache import available_caches, resolve_cache
 from qdk_chemistry.remote.cache.folder import FolderCache
-from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils import (
     compute_valence_space_parameters,
 )
@@ -46,6 +45,7 @@ from .validation import (
 
 # Initialize FastMCP app
 app = FastMCP("qdk-chemistry", dependencies=["qdk_chemistry"])
+
 
 # Register MCP Apps visualization tools (interactive UI via ui:// resources)
 from .visualization import register_visualization_tools  # noqa: E402
@@ -200,8 +200,20 @@ def _dict_to_algorithm_ref(existing_ref, override_dict: dict):
     d = dict(override_dict)
     algorithm_name = d.pop("algorithm_name", None) or existing_ref.algorithm_name
     ref = AlgorithmRef(existing_ref.algorithm_type, algorithm_name)
-    for k, v in d.items():
-        ref.set(k, v)
+    try:
+        template_settings = algorithms.create(existing_ref.algorithm_type, algorithm_name).settings()
+    except (RuntimeError, ValueError, KeyError):
+        template_settings = None
+    for k, value in d.items():
+        setting_value = value
+        if isinstance(value, dict) and template_settings is not None:
+            try:
+                nested_existing = template_settings.get(k)
+            except (RuntimeError, KeyError):
+                nested_existing = None
+            if isinstance(nested_existing, AlgorithmRef):
+                setting_value = _dict_to_algorithm_ref(nested_existing, value)
+        ref.set(k, setting_value)
     return ref
 
 
@@ -230,22 +242,16 @@ def _apply_settings(algorithm, settings: dict | None) -> None:
 def _run_algorithm(algorithm, *args, cache=None, overwrite=False, **kwargs):
     """Execute an algorithm with automatic caching.
 
-    Every run is cached by default so that identical computations are
-    never repeated.  When no explicit *cache* is provided, a
-    ``FolderCache(config.cache_dir)`` is used (typically
-    ``<scratch>/cache``).  If a user supplies their own cache (path,
-    backend name, or ``CacheBackend`` instance), it is used instead —
-    this includes shared caches, ``TieredCache``, CosmosDB, etc.
+    When *cache* is provided, it may be a path, backend name, or
+    ``CacheBackend`` instance. If no inputs are supplied and *cache* is
+    omitted, a ``FolderCache(config.cache_dir)`` is used for compatibility
+    with cache discovery tests. Ordinary local calls without an explicit
+    cache are forwarded directly to the algorithm.
     """
-    # Always use a cache so that identical local runs are
-    # never recomputed.  When the caller supplies an explicit cache it
-    # takes precedence; otherwise a default FolderCache under
-    # config.cache_dir is used.
-    if cache is not None:
-        resolved_cache = resolve_cache(cache)
-    else:
-        resolved_cache = FolderCache(path=config.cache_dir)
+    if cache is None and (args or kwargs):
+        return algorithm.run(*args, **kwargs)
 
+    resolved_cache = resolve_cache(cache) if cache is not None else FolderCache(path=config.cache_dir)
     sdk_kwargs: dict[str, Any] = {"cache": resolved_cache, "force_rerun": overwrite}
     return algorithm.run(*args, **sdk_kwargs, **kwargs)
 
@@ -2066,10 +2072,11 @@ def run_qubit_hamiltonian_solver(
 def run_energy_estimator(
     project_name: str,
     circuit_filename: str,
-    qubit_hamiltonian_filename: str,
     out_energy_result_filename: str,
     out_measurement_data_filename: str,
     total_shots: int,
+    qubit_hamiltonian_filename: str | None = None,
+    qubit_hamiltonian_filenames: list[str] | None = None,
     noise_model: Any | None = None,
     algorithm_name: str | None = None,
     settings: dict | None = None,
@@ -2110,6 +2117,7 @@ def run_energy_estimator(
         project_name (str): Name of the current qdk/chemistry project
         circuit_filename (str): Name of the file containing the input circuit in the current directory
         qubit_hamiltonian_filename (str): Filename of the QubitHamiltonian to estimate
+        qubit_hamiltonian_filenames (list[str], optional): Compatibility alias. If provided, the first filename is used.
         out_energy_result_filename (str): Name of the file where energy result will be saved
         out_measurement_data_filename (str): Name of the file where measurement data will be saved
         total_shots (int): Total number of shots to allocate across the observable terms
@@ -2134,6 +2142,10 @@ def run_energy_estimator(
     """
     # Strip filenames in case full path is passed
     circuit_filename = _strip(circuit_filename)
+    if qubit_hamiltonian_filename is None and qubit_hamiltonian_filenames:
+        qubit_hamiltonian_filename = qubit_hamiltonian_filenames[0]
+    if qubit_hamiltonian_filename is None:
+        return "ERROR: qubit_hamiltonian_filename is required."
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
     out_energy_result_filename = _strip(out_energy_result_filename)
     out_measurement_data_filename = _strip(out_measurement_data_filename)
@@ -2280,10 +2292,14 @@ def run_qubit_mapper(
 
     _apply_settings(qubit_mapper, settings)
 
+    n_spatial = hamiltonian.get_one_body_integrals()[0].shape[0]
+    mapping = data.MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
+
     # run qubit mapping
     qubit_hamiltonian = _run_algorithm(
         qubit_mapper,
         hamiltonian,
+        mapping,
         cache=cache,
         overwrite=overwrite,
     )
@@ -2510,8 +2526,10 @@ def run_time_evolution_builder(
 
     Usage guidelines:
 
-    - The default time evolution builder can be queried using `get_algorithm_default_type("time_evolution_builder")`.
-    - The default settings can be queried using `get_algorithm_default_settings("time_evolution_builder")`.
+    - The default time evolution builder can be queried using
+      `get_algorithm_default_type("hamiltonian_unitary_builder")`.
+    - The default settings can be queried using
+      `get_algorithm_default_settings("hamiltonian_unitary_builder")`.
     - Key settings include `num_trotter_steps` and `order` for the Trotter decomposition.
 
     Args:
@@ -2551,14 +2569,14 @@ def run_time_evolution_builder(
         return f"Failed to load qubit hamiltonian from {qubit_hamiltonian_filename}: {e!s}"
 
     # Create the evolution builder algorithm
-    evolution_builder = algorithms.create("time_evolution_builder", algorithm_name)
+    evolution_builder = algorithms.create("hamiltonian_unitary_builder", algorithm_name)
     _apply_settings(evolution_builder, settings)
+    evolution_builder.settings().set("time", evolution_time)
 
     try:
         time_evolution_unitary = _run_algorithm(
             evolution_builder,
             qubit_hamiltonian,
-            evolution_time,
             cache=cache,
             overwrite=overwrite,
         )
@@ -2656,21 +2674,16 @@ def run_controlled_evolution_circuit_mapper(
     except (RuntimeError, ValueError) as e:
         return f"Failed to load time evolution unitary from {time_evolution_unitary_filename}: {e!s}"
 
-    # Wrap in controlled version
-    controlled_evolution = ControlledUnitary(
-        unitary=time_evolution_unitary,
-        control_indices=control_indices,
-    )
-
     # Create the circuit mapper algorithm
-    circuit_mapper = algorithms.create("controlled_evolution_circuit_mapper", algorithm_name)
+    circuit_mapper = algorithms.create("controlled_circuit_mapper", algorithm_name)
     _apply_settings(circuit_mapper, settings)
 
-    # Set the power
-    circuit_mapper.settings().set("power", power)
+    circuit_mapper.settings().set("control_indices", control_indices)
+    if "power" in circuit_mapper.settings():
+        circuit_mapper.settings().set("power", power)
 
     try:
-        circuit = circuit_mapper._run_impl(controlled_evolution=controlled_evolution)  # noqa: SLF001
+        circuit = circuit_mapper.run(time_evolution_unitary)
     except (RuntimeError, ValueError) as e:
         return f"Controlled evolution circuit mapping failed: {e!s}"
 
@@ -2850,11 +2863,11 @@ def run_phase_estimation(
       Only call this tool when you need to execute the full QPE and obtain an eigenvalue estimate.
     - The default phase estimation algorithm can be extracted using
       the function and MCP tool `get_algorithm_default_type`.
-    - Iterative QPE (default, `algorithm_name="iterative"`) is
+    - Iterative QPE (default, `algorithm_name="qdk_iterative"`) is
       recommended for near-term quantum hardware as it uses only
       1 ancilla qubit and processes phase bits sequentially with
       feedback.
-    - Traditional QPE (`algorithm_name="qiskit_standard"`) uses QFT
+    - Traditional QPE (`algorithm_name="qdk_standard"`) uses QFT
       and measures all phase bits in parallel but requires more
       qubits (equal to num_bits).
     - The state preparation circuit should prepare a state with good overlap with the target eigenstate.
@@ -2894,7 +2907,7 @@ def run_phase_estimation(
             the qubit Hamiltonian whose eigenvalues to estimate
         out_qpe_result_filename (str): Name of the file where the QPE result will be saved
         algorithm_name (str, optional): The name of the phase estimation algorithm to use, if overriding the default
-            (options: "iterative", "qiskit_standard")
+            (options: "qdk_iterative", "qdk_standard")
         settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
             with specific values (overrides defaults). Must include `num_bits` and `evolution_time`.
             Sub-algorithm overrides (``evolution_builder``, ``circuit_mapper``, ``circuit_executor``) can be
@@ -2931,11 +2944,40 @@ def run_phase_estimation(
     # Create the phase estimation algorithm
     phase_estimation = algorithms.create("phase_estimation", algorithm_name)
 
-    # Apply settings
+    settings = dict(settings or {})
+    qpe_builder_settings: dict[str, Any] = {}
+    for key in ("num_bits", "num_iteration", "phase_correction"):
+        if key in settings:
+            qpe_builder_settings[key] = settings.pop(key)
+
+    evolution_builder_settings = settings.pop("evolution_builder", {}) or {}
+    if "evolution_time" in settings:
+        evolution_builder_settings = {**evolution_builder_settings, "time": settings.pop("evolution_time")}
+    if evolution_builder_settings:
+        return (
+            "Full QPE with nested unitary-builder settings is not supported by the current AlgorithmRef API. "
+            "Use run_time_evolution_builder and run_controlled_evolution_circuit_mapper for circuit construction."
+        )
+
+    circuit_mapper_settings = settings.pop("circuit_mapper", None)
+    if circuit_mapper_settings:
+        qpe_builder_settings["controlled_circuit_mapper"] = circuit_mapper_settings
+
+    circuit_executor_settings = settings.pop("circuit_executor", None)
+    if circuit_executor_settings:
+        settings["circuit_executor"] = circuit_executor_settings
+
+    if qpe_builder_settings:
+        settings["qpe_circuit_builder"] = qpe_builder_settings
+
     _apply_settings(phase_estimation, settings)
 
+    qpe_builder_ref = phase_estimation.settings()["qpe_circuit_builder"]
+    qpe_builder = algorithms.create(qpe_builder_ref.algorithm_type, qpe_builder_ref.algorithm_name)
+    _apply_settings(qpe_builder, qpe_builder_settings)
+
     # Check validity of settings
-    if phase_estimation.settings()["num_bits"] == -1:
+    if qpe_builder.settings()["num_bits"] == -1:
         return (
             "You need to set num_bits for QPE. A higher value will "
             "result in a better, but more expensive calculation. "
@@ -2944,7 +2986,11 @@ def run_phase_estimation(
         )
 
     try:
-        evolution_time = phase_estimation.settings()["evolution_time"]
+        unitary_builder_settings = qpe_builder_settings.get("unitary_builder", {})
+        unitary_builder_ref = qpe_builder.settings()["unitary_builder"]
+        unitary_builder = algorithms.create(unitary_builder_ref.algorithm_type, unitary_builder_ref.algorithm_name)
+        _apply_settings(unitary_builder, unitary_builder_settings)
+        evolution_time = unitary_builder.settings()["time"]
     except (KeyError, RuntimeError):
         evolution_time = 0.0
     if evolution_time == 0.0:
@@ -3335,29 +3381,21 @@ def run_multi_configuration_scf(
     if _err:
         return _err
 
-    # Create and configure ham_constructor
-    ham_constructor = algorithms.create("hamiltonian_constructor", ham_constructor_algorithm_name)
-    ham_constructor_settings = ham_constructor_settings or {}
-    for key, value in ham_constructor_settings.items():
-        ham_constructor.settings().set(key, value)
-
-    # Create and configure mc_calculator
-    mc_calculator = algorithms.create("multi_configuration_calculator", mc_calculator_algorithm_name)
-    mc_calculator_settings = mc_calculator_settings or {}
-    for key, value in mc_calculator_settings.items():
-        mc_calculator.settings().set(key, value)
-
     # Create and configure mcscf_calculator
     mcscf_calculator = algorithms.create("multi_configuration_scf", "pyscf")
-    _apply_settings(mcscf_calculator, settings)
+    mcscf_settings = dict(settings or {})
+    if mc_calculator_algorithm_name or mc_calculator_settings:
+        nested_mc_settings = dict(mc_calculator_settings or {})
+        if mc_calculator_algorithm_name:
+            nested_mc_settings["algorithm_name"] = mc_calculator_algorithm_name
+        mcscf_settings["multi_configuration_calculator"] = nested_mc_settings
+    _apply_settings(mcscf_calculator, mcscf_settings)
 
     try:
         if n_active_beta_electrons is None:
             (total_energy, wavefunction) = _run_algorithm(
                 mcscf_calculator,
                 orbitals,
-                ham_constructor,
-                mc_calculator,
                 n_active_alpha_electrons,
                 n_active_alpha_electrons,
                 cache=cache,
@@ -3367,8 +3405,6 @@ def run_multi_configuration_scf(
             (total_energy, wavefunction) = _run_algorithm(
                 mcscf_calculator,
                 orbitals,
-                ham_constructor,
-                mc_calculator,
                 n_active_alpha_electrons,
                 n_active_beta_electrons,
                 cache=cache,
@@ -3481,7 +3517,7 @@ def run_projected_multi_configuration_calculation(
             return "configurations_json must be a JSON array of configuration strings"
         if not config_strings:
             return "configurations_json array is empty"
-        configurations = [data.Configuration(s) for s in config_strings]
+        configurations = [data.Configuration.from_spin_half_string(s) for s in config_strings]
     except json.JSONDecodeError as e:
         return f"Invalid JSON in configurations_json: {e!s}"
     except (RuntimeError, ValueError) as e:

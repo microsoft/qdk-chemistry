@@ -27,6 +27,7 @@ Use ``--dry-run`` before any command to preview parameters without executing.
 import argparse
 import inspect
 import json
+import math
 import os
 import re
 import shutil
@@ -40,7 +41,6 @@ from qdk_chemistry import algorithms, constants
 from qdk_chemistry import data as qdk_data
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from qdk_chemistry.utils import compute_valence_space_parameters
-from qdk_chemistry.utils.phase import energy_from_phase, resolve_energy_aliases
 
 from .config import config
 from .io import load_data_object, save_data_object
@@ -235,6 +235,20 @@ def _get_execution_kwargs(args: argparse.Namespace) -> dict[str, Any]:
     return kwargs
 
 
+def _energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:
+    """Convert a QPE phase fraction to energy for ``exp(-i H t)``."""
+    return -(2 * math.pi * phase_fraction) / evolution_time
+
+
+def _resolve_energy_aliases(raw_energy: float, *, evolution_time: float, reference_energy: float | None) -> float:
+    """Choose the 2π alias closest to ``reference_energy`` when provided."""
+    if reference_energy is None:
+        return raw_energy
+    period = (2 * math.pi) / evolution_time
+    offset = round((reference_energy - raw_energy) / period)
+    return raw_energy + offset * period
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ALGORITHM group — command handlers
 # ═══════════════════════════════════════════════════════════════════════════
@@ -336,8 +350,8 @@ def cmd_model_hamiltonian(args):
         lattice_params=parse_json_arg(args.lattice_params),
         epsilon=parse_json_arg(args.epsilon) if args.epsilon else 0.0,
         t=parse_json_arg(args.t) if args.t else 1.0,
-        U=parse_json_arg(args.U) if args.U else 0.0,
-        V=parse_json_arg(args.V) if args.V else None,
+        u_coulomb=parse_json_arg(args.U) if args.U else 0.0,
+        v_coulomb=parse_json_arg(args.V) if args.V else None,
         z=parse_json_arg(args.z) if args.z else 1.0,
         potential=args.potential,
         potential_params=parse_json_arg(args.potential_params) if args.potential_params else None,
@@ -495,6 +509,7 @@ def cmd_energy(args):
         project_name=args.project_name,
         circuit_filename=args.circuit_filename,
         qubit_hamiltonian_filename=args.qubit_hamiltonian_filename,
+        qubit_hamiltonian_filenames=args.qubit_hamiltonian_filenames,
         out_energy_result_filename=args.out_energy_result_filename,
         out_measurement_data_filename=args.out_measurement_data_filename,
         total_shots=args.total_shots,
@@ -1097,8 +1112,8 @@ def cmd_utils_compute_valence_params(args):
 
 def cmd_utils_resolve_phase_energy(args):
     """Resolve QPE phase to energy with alias handling."""
-    raw_energy = energy_from_phase(args.phase_fraction, evolution_time=args.evolution_time)
-    resolved = resolve_energy_aliases(
+    raw_energy = _energy_from_phase(args.phase_fraction, evolution_time=args.evolution_time)
+    resolved = _resolve_energy_aliases(
         raw_energy,
         evolution_time=args.evolution_time,
         reference_energy=args.reference_energy,
@@ -1368,7 +1383,9 @@ def _create_algorithm_parsers(subparsers):
         description="Compute exact eigenvalues of a qubit Hamiltonian (for small systems).",
     )
     p.add_argument("--project-name", required=True, help="Project name")
-    p.add_argument("--qubit-hamiltonian-filename", required=True, help="Qubit Hamiltonian filename")
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument("--qubit-hamiltonian-filename", help="Qubit Hamiltonian filename")
+    group.add_argument("--qubit-hamiltonian-filenames", nargs="+", help="Compatibility alias; first file is used")
     _add_simple_algorithm_args(p)
     p.set_defaults(func=cmd_qubit_solve)
 
@@ -1403,7 +1420,9 @@ def _create_algorithm_parsers(subparsers):
     )
     p.add_argument("--project-name", required=True, help="Project name")
     p.add_argument("--circuit-filename", required=True, help="Circuit filename")
-    p.add_argument("--qubit-hamiltonian-filename", required=True, help="Qubit Hamiltonian filename")
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument("--qubit-hamiltonian-filename", help="Qubit Hamiltonian filename")
+    group.add_argument("--qubit-hamiltonian-filenames", nargs="+", help="Compatibility alias; first file is used")
     p.add_argument("--out-energy-result-filename", required=True, help="Output energy result filename")
     p.add_argument("--out-measurement-data-filename", required=True, help="Output measurement data filename")
     p.add_argument("--total-shots", type=int, required=True, help="Total measurement shots")
@@ -2492,7 +2511,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     """
     parser = argparse.ArgumentParser(
-        prog="qc",
+        prog="qdk_chem_cli",
         description=(
             "QDK Chemistry CLI — quantum chemistry from the command line.\n\n"
             "Commands are organised into groups:\n\n"
