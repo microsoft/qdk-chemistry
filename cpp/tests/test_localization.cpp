@@ -1635,8 +1635,9 @@ TEST_F(LocalizationTest, QIO) {
   });
   ASSERT_NE(qio_wfn_ptr, nullptr);
   // The returned wavefunction is an Aufbau determinant carrier.
-  ASSERT_TRUE(qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
-      qio_wfn_ptr));
+  ASSERT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          qio_wfn_ptr));
 
   auto& qio_orbitals = *qio_wfn_ptr->get_orbitals();
   const auto& Ca_can = active_orbitals->get_coefficients().first;
@@ -1690,8 +1691,8 @@ TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
       coeffs, std::nullopt, std::make_optional(overlap), basis_set,
       std::make_tuple(active_indices, inactive_indices));
 
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           Configuration::from_spin_half_string("2200"), orbitals));
 
   // QIO produces a single spatial orbital set: alpha and beta selection
@@ -1753,8 +1754,8 @@ TEST_F(LocalizationTest, QIORejectsUnrestricted) {
   auto orbitals = std::make_shared<Orbitals>(
       coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
       std::make_optional(overlap), basis_set);
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           Configuration::from_spin_half_string("2200"), orbitals));
   std::vector<size_t> idx({0, 1});
   EXPECT_THROW(localizer->run(wfn, idx, idx), std::invalid_argument);
@@ -1783,8 +1784,8 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
   std::vector<Configuration> dets(
       {Configuration::from_spin_half_string("2200"),
        Configuration::from_spin_half_string("0022")});
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
           std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
           std::optional<ContainerTypes::VectorVariant>(std::nullopt)));
@@ -1871,8 +1872,8 @@ TEST_F(LocalizationTest, QIOThreadedPathLargeActiveSpace) {
   Eigen::VectorXd ci_coeffs(2);
   ci_coeffs << 0.9, std::sqrt(1.0 - 0.81);
 
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
           std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
           std::optional<ContainerTypes::MatrixVariant>(
@@ -1919,4 +1920,3 @@ TEST_F(LocalizationTest, QIOSettings) {
   EXPECT_NO_THROW(settings.set("max_cycles", int64_t{50}));
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 50);
 }
-

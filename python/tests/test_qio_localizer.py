@@ -104,9 +104,7 @@ class TestQIOLocalizerBindings:
         ga, gb = (np.asarray(m) for m in cas_wfn.get_active_one_rdm_spin_dependent())
         _, aabb, _ = cas_wfn.get_active_two_rdm_spin_dependent()
         g2 = np.asarray(aabb).reshape(n, n, n, n)
-        np.testing.assert_allclose(
-            _single_orbital_entropy_sum(ga, gb, g2), entropy_before, atol=1e-8
-        )
+        np.testing.assert_allclose(_single_orbital_entropy_sum(ga, gb, g2), entropy_before, atol=1e-8)
 
         # Run the QIO localizer (single rotation).
         localizer = create("orbital_localizer", "qdk_qio")

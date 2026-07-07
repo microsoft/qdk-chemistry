@@ -40,25 +40,26 @@ class QIOLocalizerSettings : public data::Settings {
  *
  *     F_QI = sum_{i in active} S(rho_i),
  *
- * following the quantum-information CAS (QICAS) scheme of Ding, Knecht & Schilling
- * (arXiv:2309.01676). The single-orbital entropy S(rho_i) is built from the four
- * orbital occupation eigenvalues {1 - n_a - n_b + D, n_a - D, n_b - D, D} where
- * D = Gamma_{i ibar i ibar} is the alpha-beta (aabb) two-particle RDM diagonal.
- * This is the same Boguslawski & Tecmer (2015) convention used by
+ * following the quantum-information CAS (QICAS) scheme of Ding, Knecht &
+ * Schilling (arXiv:2309.01676). The single-orbital entropy S(rho_i) is built
+ * from the four orbital occupation eigenvalues {1 - n_a - n_b + D, n_a - D, n_b
+ * - D, D} where D = Gamma_{i ibar i ibar} is the alpha-beta (aabb) two-particle
+ * RDM diagonal. This is the same Boguslawski & Tecmer (2015) convention used by
  * Wavefunction::get_single_orbital_entropies.
  *
- * The objective is minimized with the paper's gradient-free Jacobi-sweep scheme:
- * each active orbital pair (i, j) is rotated by the angle that minimizes the only
- * two entropy terms that change (S_i + S_j), located by a coarse-then-fine 1-D
- * scan. The corresponding plane rotation is applied to the cached active 1- and
- * 2-RDMs and accumulated into a single unitary U, and the active orbital
- * coefficients are updated once as C_active <- C_active * U.
+ * The objective is minimized with the paper's gradient-free Jacobi-sweep
+ * scheme: each active orbital pair (i, j) is rotated by the angle that
+ * minimizes the only two entropy terms that change (S_i + S_j), located by a
+ * coarse-then-fine 1-D scan. The corresponding plane rotation is applied to the
+ * cached active 1- and 2-RDMs and accumulated into a single unitary U, and the
+ * active orbital coefficients are updated once as C_active <- C_active * U.
  *
- * @note This localizer performs a SINGLE orbital rotation: the Jacobi sweeps are
- * iterated to convergence against the FIXED input RDMs. It does not re-solve the
- * electronic structure problem to refresh the RDMs. Callers wanting the full
- * self-consistent QICAS outer loop (rotate -> recompute RDMs -> repeat) should
- * implement that loop themselves around repeated calls to this localizer.
+ * @note This localizer performs a SINGLE orbital rotation: the Jacobi sweeps
+ * are iterated to convergence against the FIXED input RDMs. It does not
+ * re-solve the electronic structure problem to refresh the RDMs. Callers
+ * wanting the full self-consistent QICAS outer loop (rotate -> recompute RDMs
+ * -> repeat) should implement that loop themselves around repeated calls to
+ * this localizer.
  *
  * Restrictions:
  * - Requires a single spatial orbital set (RHF or ROHF). Open-shell / high-spin

@@ -21,8 +21,8 @@ namespace {
 // Jacobi-sweep controls. The maximum sweep count, convergence tolerance and
 // coarse angle step are configurable through QIOLocalizerSettings; the
 // following are fixed implementation details.
-constexpr int kFineSamples = 201;           // fine-refinement samples
-constexpr double kImproveTol = 1e-12;       // minimum accepted entropy decrease
+constexpr int kFineSamples = 201;      // fine-refinement samples
+constexpr double kImproveTol = 1e-12;  // minimum accepted entropy decrease
 constexpr double kPi = 3.14159265358979323846;
 
 // Minimum active-space dimension at which the 2-RDM rotation is threaded.
@@ -67,13 +67,12 @@ void rotate_two_rdm_axis(std::vector<double>& g2, std::size_t n, int axis,
   // Each (x, y, z, active in {i, j}) maps to a unique flat index, so every
   // touched element is written at most once: the (x, y) iterations are
   // independent and safe to run in parallel.
-#pragma omp parallel for collapse(2) schedule(static) \
-    if (n >= kParallelMinDim)
+#pragma omp parallel for collapse(2) schedule(static) if (n >= kParallelMinDim)
   for (std::size_t x = 0; x < n; ++x) {
     for (std::size_t y = 0; y < n; ++y) {
       for (std::size_t z = 0; z < n; ++z) {
-        const std::size_t base = x * strides[other[0]] +
-                                 y * strides[other[1]] + z * strides[other[2]];
+        const std::size_t base = x * strides[other[0]] + y * strides[other[1]] +
+                                 z * strides[other[2]];
         double& ti = g2[base + i * sa];
         double& tj = g2[base + j * sa];
         const double vi = ti;
@@ -116,7 +115,8 @@ double entropy_sum(const Eigen::MatrixXd& ga, const Eigen::MatrixXd& gb,
   double f = 0.0;
   for (std::size_t i = 0; i < n; ++i) {
     const Eigen::Index ii = static_cast<Eigen::Index>(i);
-    f += single_orbital_entropy(ga(ii, ii), gb(ii, ii), g2[idx4(n, i, i, i, i)]);
+    f +=
+        single_orbital_entropy(ga(ii, ii), gb(ii, ii), g2[idx4(n, i, i, i, i)]);
   }
   return f;
 }
@@ -128,9 +128,8 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& ga, Eigen::MatrixXd& gb,
                                   std::vector<double>& g2, std::size_t n,
                                   std::size_t max_cycles, double tol,
                                   double coarse_step) {
-  Eigen::MatrixXd u =
-      Eigen::MatrixXd::Identity(static_cast<Eigen::Index>(n),
-                                static_cast<Eigen::Index>(n));
+  Eigen::MatrixXd u = Eigen::MatrixXd::Identity(static_cast<Eigen::Index>(n),
+                                                static_cast<Eigen::Index>(n));
   if (n < 2) {
     return u;
   }
