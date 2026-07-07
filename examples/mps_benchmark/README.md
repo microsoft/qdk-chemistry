@@ -8,11 +8,6 @@ It uses the MPS state preparation and SOSSA resource estimation functionalities 
 **NOTE:** Recommended running on HPC due to high memory requirements at large bond dimensions.
 
 ## Prerequisites
-<!-- 
-You need [Docker](https://docs.docker.com/get-docker/) and
-[VS Code](https://code.visualstudio.com/) with the
-[Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-extension installed. -->
 
 **Option A — Extract the tarball in OneDrive**:
 
