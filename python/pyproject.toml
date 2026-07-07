@@ -60,6 +60,7 @@ dev = [
   "mypy",
   "nbclient",
   "nbformat",
+  "pre-commit",
   "pytest",
   "pytest-env",
   "ruff"
@@ -87,7 +88,7 @@ openfermion-extras = [
   "openfermion>=1.0.0; python_version < '3.14'"
 ]
 plugins = [
-  "pyscf>=2.9.0,<2.12.1"
+  "pyscf>=2.9.0,<2.12.1; sys_platform != 'win32'"
 ]
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
@@ -261,7 +262,7 @@ cmake.build-type = "Release"
 # Build in current directory (python/)
 cmake.source-dir = "."
 # Enable verbose output for debugging
-cmake.verbose = true
+build.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
 metadata.version.provider = "_dev_version"
 metadata.version.provider-path = "."

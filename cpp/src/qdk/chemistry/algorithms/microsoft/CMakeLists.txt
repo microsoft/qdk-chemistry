@@ -6,6 +6,7 @@ target_sources(chemistry PRIVATE
     active_space/valence_active_space.cpp
     localization/iterative_localizer_base.cpp
     localization/mp2_natural_orbitals.cpp
+    localization/natural_orbitals.cpp
     localization/pipek_mezey.cpp
     localization/vvhv.cpp
     hamiltonian.cpp

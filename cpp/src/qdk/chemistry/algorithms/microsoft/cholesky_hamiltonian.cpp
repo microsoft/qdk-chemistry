@@ -490,7 +490,7 @@ Eigen::MatrixXd transform_cholesky_to_mo(
   if (n_ao == 0 || n_mo == 0) {
     throw std::invalid_argument("C matrix has zero dimensions");
   }
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
+  if (static_cast<size_t>(ao_cholesky_vectors.rows()) != n_ao * n_ao) {
     throw std::invalid_argument(
         "ao_cholesky_vectors dimensions do not match n_ao");
   }
@@ -524,7 +524,7 @@ Eigen::MatrixXd build_J_from_cholesky(
   if (density.cols() != density.rows()) {
     throw std::invalid_argument("Density matrix must be square");
   }
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
+  if (static_cast<size_t>(ao_cholesky_vectors.rows()) != n_ao * n_ao) {
     throw std::invalid_argument(
         "ao_cholesky_vectors dimensions do not match density matrix");
   }
@@ -555,7 +555,7 @@ Eigen::MatrixXd build_K_from_cholesky(
   size_t rank = ao_cholesky_vectors.cols();
 
   // Validate dimensions
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
+  if (static_cast<size_t>(ao_cholesky_vectors.rows()) != n_ao * n_ao) {
     throw std::invalid_argument(
         "ao_cholesky_vectors dimensions do not match density matrix");
   }

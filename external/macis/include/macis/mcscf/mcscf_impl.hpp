@@ -183,10 +183,10 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
     logger->info("Computing Initial RDMs");
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
-    rdm_op.rdms(settings, NumOrbital(na), nalpha.get(), nbeta.get(),
-                T_active.data(), V_active.data(), A1RDM, A2RDM,
-                X_CI MACIS_MPI_CODE(, comm)) +
-        E_inactive;
+    (void)(rdm_op.rdms(settings, NumOrbital(na), nalpha.get(), nbeta.get(),
+                       T_active.data(), V_active.data(), A1RDM, A2RDM,
+                       X_CI MACIS_MPI_CODE(, comm)) +
+           E_inactive);
   } else {
     logger->info("Using Passed RDMs");
   }

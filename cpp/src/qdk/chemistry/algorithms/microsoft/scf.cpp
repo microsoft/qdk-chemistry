@@ -93,6 +93,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
+  } else {
+    throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
 
   // Extract geometry from structure object
@@ -469,21 +471,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Create canonical Hartree-Fock Configuration
   size_t n_orbitals = orbitals->get_num_molecular_orbitals();
-
-  // Create canonical HF configuration string
-  std::string config_str(n_orbitals, '0');
-
-  for (size_t i = 0; i < n_orbitals; ++i) {
-    if (nelec[0] > i and nelec[1] > i) {
-      config_str[i] = '2';
-    } else if (nelec[0] > i) {
-      config_str[i] = 'u';
-    } else if (nelec[1] > i) {
-      config_str[i] = 'd';
-    }
-  }
-  // Create Configuration object
-  auto hf_det = data::Configuration::from_spin_half_string(config_str);
+  auto hf_det = data::Configuration::canonical_hf_configuration(
+      nelec[0], nelec[1], n_orbitals);
 
   // Create StateVectorContainer
   auto container = std::make_unique<data::StateVectorContainer>(

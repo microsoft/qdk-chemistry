@@ -24,8 +24,10 @@ repos:
     files: *linted_files
   - id: trailing-whitespace
     files: *linted_files
+    exclude: \.patch$
   - id: end-of-file-fixer
     files: *linted_files
+    exclude: \.patch$
   - id: debug-statements
     files: *linted_files
   - id: check-case-conflict

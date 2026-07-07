@@ -12,13 +12,14 @@ from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.data import (
-    Structure,
-    Hamiltonian,
     CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
     ModelOrbitals,
+    Structure,
 )
 
 # Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
+# Substitute the path with your own, if needed.
 structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
 
 # For demonstration: create a structure with custom masses and charges

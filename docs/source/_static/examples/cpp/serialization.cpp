@@ -10,8 +10,8 @@
 using namespace qdk::chemistry::data;
 
 int main() {
-  // Load structure from XYZ file (the file uses Angstrom, converted to Bohr
-  // internally)
+  // Load structure from an XYZ file (the file uses Angstrom, converted to Bohr
+  // internally). Substitute the path with your own, if needed.
   Structure structure_from_file =
       Structure::from_xyz_file("../data/h2.structure.xyz");
 
