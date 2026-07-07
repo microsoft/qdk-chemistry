@@ -351,10 +351,14 @@ with a gradient-free Jacobi sweep over active orbital pairs.
     (rotate, recompute RDMs, repeat) yourself if required.
 
 .. note::
-    Requires restricted orbitals with a defined active space.
+    Requires a single spatial orbital set (RHF or ROHF) with a defined active
+    space. Open-shell / high-spin states are supported (alpha and beta
+    occupations may differ); unrestricted (UHF) orbitals are not.
     Requires ``loc_indices_a == loc_indices_b`` matching the orbitals'
     active-space indices exactly (QIO is a single spatial orbital set).
     Requires spin-dependent active 1- and 2-RDMs in the wavefunction.
+    Jacobi-sweep controls are configurable via ``settings()``:
+    ``max_cycles``, ``convergence_tolerance``, ``coarse_angle_step``.
 
 Typical usage:
 

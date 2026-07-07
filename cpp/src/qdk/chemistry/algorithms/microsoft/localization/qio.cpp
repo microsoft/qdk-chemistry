@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -17,10 +18,9 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace {
 
-// Jacobi-sweep controls.
-constexpr std::size_t kMaxCycles = 200;     // outer sweeps over all pairs
-constexpr double kConvergenceTol = 1e-10;   // sweep-to-sweep entropy change
-constexpr double kCoarseStep = 0.02;        // radians, coarse scan over [0, pi)
+// Jacobi-sweep controls. The maximum sweep count, convergence tolerance and
+// coarse angle step are configurable through QIOLocalizerSettings; the
+// following are fixed implementation details.
 constexpr int kFineSamples = 201;           // fine-refinement samples
 constexpr double kImproveTol = 1e-12;       // minimum accepted entropy decrease
 constexpr double kPi = 3.14159265358979323846;
@@ -125,7 +125,9 @@ double entropy_sum(const Eigen::MatrixXd& ga, const Eigen::MatrixXd& gb,
 // gb (n x n) and g2 (n^4 alpha-beta block) are rotated in place and the
 // accumulated active-space rotation U (n x n) is returned.
 Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& ga, Eigen::MatrixXd& gb,
-                                  std::vector<double>& g2, std::size_t n) {
+                                  std::vector<double>& g2, std::size_t n,
+                                  std::size_t max_cycles, double tol,
+                                  double coarse_step) {
   Eigen::MatrixXd u =
       Eigen::MatrixXd::Identity(static_cast<Eigen::Index>(n),
                                 static_cast<Eigen::Index>(n));
@@ -134,7 +136,7 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& ga, Eigen::MatrixXd& gb,
   }
 
   double f_prev = entropy_sum(ga, gb, g2, n);
-  for (std::size_t cycle = 0; cycle < kMaxCycles; ++cycle) {
+  for (std::size_t cycle = 0; cycle < max_cycles; ++cycle) {
     for (std::size_t i = 0; i < n; ++i) {
       for (std::size_t j = i + 1; j < n; ++j) {
         const Eigen::Index ii = static_cast<Eigen::Index>(i);
@@ -176,15 +178,15 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& ga, Eigen::MatrixXd& gb,
         const double f_current = eval(0.0);
         double best_theta = 0.0;
         double best_val = f_current;
-        for (double theta = 0.0; theta < kPi; theta += kCoarseStep) {
+        for (double theta = 0.0; theta < kPi; theta += coarse_step) {
           const double v = eval(theta);
           if (v < best_val) {
             best_val = v;
             best_theta = theta;
           }
         }
-        const double lo = best_theta - kCoarseStep;
-        const double hi = best_theta + kCoarseStep;
+        const double lo = best_theta - coarse_step;
+        const double hi = best_theta + coarse_step;
         for (int k = 0; k < kFineSamples; ++k) {
           const double theta =
               lo + (hi - lo) * k / static_cast<double>(kFineSamples - 1);
@@ -211,7 +213,7 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& ga, Eigen::MatrixXd& gb,
       }
     }
     const double f_now = entropy_sum(ga, gb, g2, n);
-    if (std::abs(f_prev - f_now) < kConvergenceTol) {
+    if (std::abs(f_prev - f_now) < tol) {
       break;
     }
     f_prev = f_now;
@@ -249,7 +251,8 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
 
   if (!orbitals->is_restricted()) {
     throw std::invalid_argument(
-        "QIOLocalizer currently supports restricted orbitals only.");
+        "QIOLocalizer requires a single spatial orbital set (RHF/ROHF); "
+        "unrestricted (UHF) orbitals are not supported.");
   }
 
   if (!orbitals->has_active_space()) {
@@ -310,7 +313,12 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
   std::vector<double> g2(rdm_aabb->data(), rdm_aabb->data() + rdm_aabb->size());
 
   // Minimize the single-orbital entropy sum -> accumulated rotation U.
-  const Eigen::MatrixXd u = optimize_rotation(ga, gb, g2, n);
+  const auto max_cycles =
+      static_cast<std::size_t>(_settings->get<int64_t>("max_cycles"));
+  const double tol = _settings->get<double>("convergence_tolerance");
+  const double coarse_step = _settings->get<double>("coarse_angle_step");
+  const Eigen::MatrixXd u =
+      optimize_rotation(ga, gb, g2, n, max_cycles, tol, coarse_step);
 
   // Apply the rotation to the active orbital columns (alpha == beta basis).
   const Eigen::MatrixXd& coeffs_alpha = orbitals->get_coefficients_alpha();

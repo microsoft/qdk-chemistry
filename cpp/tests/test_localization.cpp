@@ -1908,3 +1908,15 @@ TEST_F(LocalizationTest, QIOThreadedPathLargeActiveSpace) {
   EXPECT_GT((u_rot - Eigen::MatrixXd::Identity(n, n)).norm(), 0.1);
 }
 
+TEST_F(LocalizationTest, QIOSettings) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto& settings = localizer->settings();
+  // Jacobi-sweep controls are exposed with documented defaults.
+  EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
+  EXPECT_NEAR(settings.get<double>("convergence_tolerance"), 1e-10, 1e-20);
+  EXPECT_NEAR(settings.get<double>("coarse_angle_step"), 0.02, 1e-12);
+  // ... and are user-configurable.
+  EXPECT_NO_THROW(settings.set("max_cycles", int64_t{50}));
+  EXPECT_EQ(settings.get<int64_t>("max_cycles"), 50);
+}
+

@@ -3,9 +3,32 @@
 // license information.
 
 #pragma once
+#include <cstdint>
 #include <qdk/chemistry/algorithms/localization.hpp>
+#include <qdk/chemistry/data/settings.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+/**
+ * @class QIOLocalizerSettings
+ * @brief Tunable Jacobi-sweep controls for the QIO localizer.
+ *
+ * - "max_cycles" (int): maximum number of Jacobi sweeps over all active
+ *   orbital pairs (default 200).
+ * - "convergence_tolerance" (double): sweep-to-sweep change in the
+ *   single-orbital entropy sum below which the optimization stops
+ *   (default 1e-10).
+ * - "coarse_angle_step" (double): coarse grid spacing in radians for the
+ *   per-pair angle scan over [0, pi) (default 0.02).
+ */
+class QIOLocalizerSettings : public data::Settings {
+ public:
+  QIOLocalizerSettings() {
+    set_default("max_cycles", int64_t{200});
+    set_default("convergence_tolerance", 1e-10);
+    set_default("coarse_angle_step", 0.02);
+  }
+};
 
 /**
  * @class QIOLocalizer
@@ -38,7 +61,11 @@ namespace qdk::chemistry::algorithms::microsoft {
  * implement that loop themselves around repeated calls to this localizer.
  *
  * Restrictions:
- * - Requires restricted orbitals with a defined active space.
+ * - Requires a single spatial orbital set (RHF or ROHF). Open-shell / high-spin
+ *   states are supported: the alpha and beta occupations may differ, and the
+ *   spin-resolved 1-RDMs are handled separately. Unrestricted (UHF) orbitals,
+ *   where alpha and beta use different spatial orbitals, are not supported --
+ *   a single spatial rotation is ill-defined in that case.
  * - Requires loc_indices_a == loc_indices_b, matching the active-space indices
  *   exactly (QIO produces a single spatial orbital set).
  * - Requires spin-dependent active 1- and 2-RDMs in the input wavefunction.
@@ -50,7 +77,7 @@ class QIOLocalizer : public Localizer {
   /**
    * @brief Default constructor
    */
-  QIOLocalizer() = default;
+  QIOLocalizer() { _settings = std::make_unique<QIOLocalizerSettings>(); }
 
   /**
    * @brief Virtual destructor

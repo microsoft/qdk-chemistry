@@ -131,3 +131,51 @@ class TestQIOLocalizerBindings:
 
         # The QIO objective must not increase under the optimized rotation.
         assert entropy_after <= entropy_before + 1e-9
+
+    def test_open_shell_triplet_energy_invariant(self):
+        """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.
+
+        "Restricted" means a single spatial orbital set (RHF/ROHF), not
+        closed-shell: an open-shell reference with na != nb is supported.
+        """
+        # Triplet O2 (ground state) via ROHF -> restricted open-shell orbitals.
+        coords = np.array([[0.0, 0.0, 1.14], [0.0, 0.0, -1.14]])  # Bohr
+        mol = data.Structure(coords, [8, 8])
+        scf = algorithms.create("scf_solver")
+        scf.settings().set("method", "hf")
+        scf.settings().set("scf_type", "restricted")
+        _, hf_wfn = scf.run(mol, 0, 3, "cc-pvdz")  # charge 0, multiplicity 3
+        assert hf_wfn.get_orbitals().is_restricted()
+
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 8)
+        selector.settings().set("num_active_orbitals", 6)
+        active_wfn = selector.run(hf_wfn)
+        active_orbs = active_wfn.get_orbitals()
+        n_a, n_b = active_wfn.get_active_num_electrons()
+        assert n_a != n_b  # genuinely open-shell
+
+        idx = list(active_orbs.get_active_space_indices()[0])
+
+        def cas(orbs):
+            ham = algorithms.create("hamiltonian_constructor").run(orbs)
+            mc = algorithms.create("multi_configuration_calculator", "macis_cas")
+            mc.settings().set("calculate_one_rdm", True)
+            mc.settings().set("calculate_two_rdm", True)
+            return mc.run(ham, n_a, n_b)
+
+        e_before, cas_wfn = cas(active_orbs)
+        qio_wfn = create("orbital_localizer", "qdk_qio").run(cas_wfn, idx, idx)
+        e_after, _ = cas(qio_wfn.get_orbitals())
+
+        # A unitary rotation of the active orbitals leaves the CASCI energy
+        # invariant, even for an open-shell (na != nb) reference.
+        assert abs(e_before - e_after) < 1e-8
+
+    def test_settings_defaults_and_override(self):
+        """The Jacobi-sweep controls are exposed with defaults and settable."""
+        localizer = QdkQIOLocalizer()
+        settings = localizer.settings()
+        assert settings.get("max_cycles") == 200
+        settings.set("max_cycles", 50)
+        assert settings.get("max_cycles") == 50
