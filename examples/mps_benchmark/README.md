@@ -1,19 +1,19 @@
-# MPS & SOSSA QPE Resource Estimation
+# MPS & SOSSA Resource Estimation
 
 > **Branch:** `scratch/mps_sossa` | **Commit:** `825351fc6123fba947a5fb6cb545024e396be492` (2026-07-07)
 
-This directory contains scripts for resource estimation of MPS state preparation
-and SOSSA QPE for selected molecules. Use this branch at the commit
-above to reproduce the data presented in the DARPA 2026-07 update.
+This directory contains scripts to reproduce the data presented in the DARPA 2026-07 update.
+It uses the MPS state preparation and SOSSA resource estimation functionalities available in the above branch, together with published MPS tensors for selected molecules (Rupprecht 2026).
 
-> **NOTE:** Recommended to run on HPC due to high memory requirements at large
-> bond dimensions.
+**NOTE:** Recommended running on HPC due to high memory requirements at large bond dimensions.
 
 ## Prerequisites
+
 You need [Docker](https://docs.docker.com/get-docker/) and
 [VS Code](https://code.visualstudio.com/) with the
 [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 extension installed.
+
 **Option A — Extract the tarball in OneDrive**:
 
 ```bash
@@ -71,8 +71,6 @@ python run_resource_estimation.py --molecules all --bond-dims 100 1000 5000 1000
 Results are saved as JSON alongside a Pareto-front plot (physical qubits vs
 runtime):
 
-![Pareto Fronts: All Molecules](./results/mps_sossa_resource_estimation_full.png)
-
 ### Sparse vs dense MPS comparison (real tensor data)
 
 Compares sparse (U(1)-block-sparsity) and dense (sequential) MPS state
@@ -88,8 +86,6 @@ preparation, with optional SOSSA QPE wrapping:
 python run_sparse_vs_dense.py --molecule fe2s2
 python run_sparse_vs_dense.py --molecule g1
 ```
-
-![Pareto Front: Sparse vs Dense MPS](./results/mps_sparse_vs_dense_fe2s2_pb_15.png)
 
 ## References
 
