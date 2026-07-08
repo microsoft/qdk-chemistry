@@ -41,10 +41,6 @@ import matplotlib.pyplot as plt
 from qdk.qre import PSSPC, LatticeSurgery, estimate
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
-    QdkStandardQpeCircuitBuilder,
-)
-from qdk_chemistry.algorithms.state_preparation import MPSSequentialStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Configuration,
@@ -300,7 +296,9 @@ if __name__ == "__main__":
         )
         hf_circuit = state_prep.run(hf_wavefunction)
 
-        qpe_builder = QdkStandardQpeCircuitBuilder(
+        qpe_builder = create(
+            "qpe_circuit_builder",
+            "qdk_standard",
             num_bits=num_phase_qubits,
             controlled_circuit_mapper=AlgorithmRef(
                 "controlled_circuit_mapper",
@@ -360,9 +358,12 @@ if __name__ == "__main__":
             max_chi_fake = max(mps_wfn.bond_dims)
             Logger.info(f"   Max bond dim: {max_chi_fake}, Sites: {num_sites}")
 
-            algo_mps = MPSSequentialStatePreparation()
-            algo_mps.settings().set("rotation_bits", params["b_rot"])
-            algo_mps.settings().set("fast_grouped_resource_estimation", True)
+            algo_mps = create(
+                "state_prep",
+                "mps_sequential",
+                rotation_bits=params["b_rot"],
+                fast_grouped_resource_estimation=True,
+            )
             mps_circ = algo_mps.run(mps_wfn)
             mps_lc = mps_circ.estimate().logical_counts
 

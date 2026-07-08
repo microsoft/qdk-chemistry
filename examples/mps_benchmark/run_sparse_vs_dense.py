@@ -29,10 +29,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from qdk.qre import PSSPC, LatticeSurgery
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
-from qdk_chemistry.algorithms.state_preparation import MPSSequentialStatePreparation
-from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
-    MPSSparseStatePreparation,
-)
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.utils import Logger
 from utils import (
     load_mps_tensors,
@@ -297,7 +294,6 @@ if __name__ == "__main__":
     # Part 1: QPE(HF) — only if has_qpe
     # ===================================================================
     if mol_cfg["has_qpe"]:
-        from qdk_chemistry.algorithms import create
         from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
             QdkStandardQpeCircuitBuilder,
         )
@@ -383,8 +379,7 @@ if __name__ == "__main__":
     Logger.info(f"{'=' * 70}")
 
     t0 = time.perf_counter()
-    algo_sparse = MPSSparseStatePreparation()
-    algo_sparse.settings().set("rotation_bits", phase_bits)
+    algo_sparse = create("state_prep", "mps_sparse", rotation_bits=phase_bits)
     sparse_circ = algo_sparse.run(mps)
     sparse_lc = sparse_circ.estimate().logical_counts
     t_build = time.perf_counter() - t0
@@ -458,9 +453,11 @@ if __name__ == "__main__":
     Logger.info(f"{'=' * 70}")
 
     t0 = time.perf_counter()
-    algo_dense = MPSSequentialStatePreparation()
-    algo_dense.settings().set("rotation_bits", phase_bits)
-    algo_dense.settings().set("fast_grouped_resource_estimation", True)
+    algo_dense = create(
+        "state_prep", "mps_sequential",
+        rotation_bits=phase_bits,
+        fast_grouped_resource_estimation=True,
+    )
     dense_circ = algo_dense.run(mps)
     dense_lc = dense_circ.estimate().logical_counts
     t_build = time.perf_counter() - t0
