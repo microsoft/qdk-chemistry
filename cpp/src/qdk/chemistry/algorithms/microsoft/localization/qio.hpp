@@ -20,11 +20,12 @@ namespace qdk::chemistry::algorithms::microsoft {
  *   single-orbital entropy sum below which the optimization stops
  *   (default 1e-10, must be >= 0).
  * - "coarse_angle_step" (double): coarse grid spacing in radians for the
- *   per-pair angle scan over [0, pi) (default 0.02, must be > 0).
+ *   per-pair angle scan over [0, pi) (default 0.02, must be in [1e-4, pi]).
  *
  * The numeric bounds are enforced at set-time, so out-of-range values are
  * rejected (e.g. a negative max_cycles that would underflow to a huge size_t,
- * or a non-positive coarse_angle_step that would make the scan run forever).
+ * or a coarse_angle_step outside [1e-4, pi] that would make the scan run
+ * forever or take pathologically many iterations).
  */
 class QIOLocalizerSettings : public data::Settings {
  public:
@@ -41,9 +42,8 @@ class QIOLocalizerSettings : public data::Settings {
     set_default(
         "coarse_angle_step", 0.02,
         "Coarse grid spacing (radians) for the per-pair angle scan over "
-        "[0, pi); must be positive",
-        data::BoundConstraint<double>{std::numeric_limits<double>::min(),
-                                      std::numeric_limits<double>::max()});
+        "[0, pi); practical range [1e-4, pi]",
+        data::BoundConstraint<double>{1e-4, 3.14159265358979323846});
   }
 };
 

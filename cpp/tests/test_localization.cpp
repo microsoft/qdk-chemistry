@@ -1939,4 +1939,8 @@ TEST_F(LocalizationTest, QIOSettings) {
                std::invalid_argument);
   EXPECT_THROW(settings.set("coarse_angle_step", 0.0), std::invalid_argument);
   EXPECT_THROW(settings.set("coarse_angle_step", -0.1), std::invalid_argument);
+  // A tiny-but-positive step (which would make the coarse scan take an
+  // astronomical number of iterations) and a step larger than pi are rejected.
+  EXPECT_THROW(settings.set("coarse_angle_step", 1e-10), std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", 4.0), std::invalid_argument);
 }
