@@ -340,8 +340,9 @@ This class provides a concrete implementation that rotates the active orbitals
 to minimize the total single-orbital entanglement entropy
 ``F_QI = sum_i S(rho_i)``, following the quantum-information CAS (QICAS) scheme
 of Ding, Knecht & Schilling (arXiv:2309.01676). The single-orbital entropy uses
-the same Boguslawski & Tecmer (2015) convention as
-:meth:`Wavefunction.get_single_orbital_entropies`. The objective is minimized
+the same Boguslawski & Tecmer (2015) convention as the
+``get_single_orbital_entropies`` method of
+:class:`qdk_chemistry.data.Wavefunction`. The objective is minimized
 with a gradient-free Jacobi sweep over active orbital pairs.
 
 .. note::
