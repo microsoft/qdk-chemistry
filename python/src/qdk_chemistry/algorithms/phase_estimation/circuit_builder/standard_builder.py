@@ -120,6 +120,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
+        num_ancilla_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
             circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
@@ -184,7 +185,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
             "statePrep": state_prep_op,
-            "controlledEvolutions": ctrl_unitary_ops,
+            "controlledUnitary": ctrl_unitary_ops,
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,

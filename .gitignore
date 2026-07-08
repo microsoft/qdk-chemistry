@@ -12,16 +12,20 @@ docs/*.txt
 # Distribution / packaging
 .Python
 build/
+build-*/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
+install/
+install-*/
 lib/
 lib64/
 parts/
 sdist/
 var/
+vcpkg_installed/
 wheels/
 share/python-wheels/
 *.egg-info/
@@ -235,3 +239,6 @@ python/VERSION
 
 # Claude
 .claude
+
+# Copilot agent
+agency.toml
