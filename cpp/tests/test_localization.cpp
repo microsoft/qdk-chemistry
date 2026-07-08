@@ -1728,13 +1728,28 @@ TEST_F(LocalizationTest, QIORejectsUnsortedIndices) {
   std::vector<size_t> unsorted({2, 0, 1, 3});
   EXPECT_THROW(localizer->run(wfn, unsorted, unsorted), std::invalid_argument);
 }
-
 TEST_F(LocalizationTest, QIORejectsDuplicateIndices) {
   auto localizer = LocalizerFactory::create("qdk_qio");
   auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> duplicated({0, 1, 1, 2});  // sorted but not unique
   EXPECT_THROW(localizer->run(wfn, duplicated, duplicated),
                std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIORejectsMissingOverlap) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  const std::vector<size_t> active({0, 1, 2, 3});
+  const std::vector<size_t> inactive;
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  // Restricted orbitals with an active space but no AO overlap matrix.
+  auto orbitals =
+      std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt, basis_set,
+                                 std::make_tuple(active, inactive));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2200"), orbitals));
+  EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);
 }
 
 TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {

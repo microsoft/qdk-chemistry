@@ -264,6 +264,15 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
         "QIOLocalizer requires an active space to be defined in the orbitals.");
   }
 
+  // The output Orbitals carry the AO overlap matrix; require it up front so a
+  // missing overlap fails as std::invalid_argument (consistent with the other
+  // input checks) rather than a std::runtime_error from get_overlap_matrix().
+  if (!orbitals->has_overlap_matrix()) {
+    throw std::invalid_argument(
+        "QIOLocalizer requires an overlap matrix to be available in the "
+        "orbitals.");
+  }
+
   const auto& [active_indices_a, active_indices_b] =
       orbitals->get_active_space_indices();
   if (loc_indices_a != active_indices_a || loc_indices_b != active_indices_b) {

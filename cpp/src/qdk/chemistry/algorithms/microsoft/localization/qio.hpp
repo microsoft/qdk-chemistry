@@ -87,6 +87,8 @@ class QIOLocalizerSettings : public data::Settings {
  * - Requires loc_indices_a == loc_indices_b, matching the active-space indices
  *   exactly (QIO produces a single spatial orbital set).
  * - Requires spin-dependent active 1- and 2-RDMs in the input wavefunction.
+ * - Requires an AO overlap matrix in the orbitals (carried over to the output
+ *   orbitals).
  *
  * @see Wavefunction::get_single_orbital_entropies
  */
@@ -124,8 +126,8 @@ class QIOLocalizer : public Localizer {
    *
    * @throws std::invalid_argument if the selected indices are invalid or do not
    * match the active space, the orbitals are unrestricted or lack an active
-   * space, or the required spin-dependent active RDMs are unavailable or not
-   * real-valued.
+   * space or overlap matrix, or the required spin-dependent active RDMs are
+   * unavailable or not real-valued.
    */
   std::shared_ptr<data::Wavefunction> _run_impl(
       std::shared_ptr<data::Wavefunction> wavefunction,
