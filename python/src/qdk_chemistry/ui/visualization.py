@@ -39,6 +39,8 @@ from qdk_chemistry import data
 from .io import load_data_object
 from .validation import validate_project
 
+__all__ = ["register_visualization_tools"]
+
 # ---------------------------------------------------------------------------
 # Check for qsharp_widgets availability
 # ---------------------------------------------------------------------------

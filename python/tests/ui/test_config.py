@@ -47,7 +47,7 @@ def test_explicit_scratch_dir_error_is_not_replaced_with_fallback(monkeypatch, t
 
     monkeypatch.setattr(QDKMCPConfig, "_setup_directories", fake_setup)
 
-    with pytest.raises(OSError) as exc_info:
+    with pytest.raises(OSError, match="Read-only file system") as exc_info:
         QDKMCPConfig()
 
     assert exc_info.value.errno == errno.EROFS

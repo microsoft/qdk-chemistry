@@ -21,6 +21,8 @@ import sys
 
 from .tools import app
 
+__all__ = ["main"]
+
 _TRANSPORTS = ("stdio", "streamable-http", "sse")
 
 

@@ -7,8 +7,8 @@
 
 # ruff: noqa: ARG001, PLR0911
 # ARG001: All MCP tool functions accept ``project_name`` which is consumed by
-# the ``@validate_project`` decorator (validates & chdir's into the project
-# dir) before the function body runs.
+# the ``@validate_project`` decorator (validates & temporarily chdir's into the
+# project dir) before the function body runs.
 # PLR0911: MCP tools use early-return error handling at each validation step,
 # which legitimately requires many return statements.
 
@@ -586,6 +586,46 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "describe_backend",
     ],
 }
+
+__all__ = [
+    "convert_coordinates",
+    "convert_energy",
+    "create_model_hamiltonian",
+    "create_project",
+    "create_spin_model_hamiltonian",
+    "create_structure",
+    "describe_backend",
+    "get_active_space_indices",
+    "get_algorithm_default_settings",
+    "get_algorithm_default_type",
+    "get_ansatz",
+    "get_circuit_stats",
+    "get_orbitals_from_input",
+    "get_summary",
+    "get_top_configurations",
+    "list_cache_backends",
+    "list_project_files",
+    "list_projects",
+    "list_tools",
+    "run_active_space_selector",
+    "run_circuit_executor",
+    "run_controlled_evolution_circuit_mapper",
+    "run_dynamical_correlation_calculator",
+    "run_energy_estimator",
+    "run_hamiltonian_constructor",
+    "run_multi_configuration_calculation",
+    "run_multi_configuration_scf",
+    "run_orbital_localization",
+    "run_phase_estimation",
+    "run_projected_multi_configuration_calculation",
+    "run_qubit_hamiltonian_solver",
+    "run_qubit_mapper",
+    "run_resource_estimation",
+    "run_scf",
+    "run_stability_checker",
+    "run_state_preparation",
+    "run_time_evolution_builder",
+]
 
 
 @app.tool()

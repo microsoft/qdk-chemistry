@@ -80,6 +80,13 @@ from .tools import (
     run_time_evolution_builder,
 )
 
+__all__ = [
+    "create_parser",
+    "format_output",
+    "main",
+    "parse_json_arg",
+]
+
 # Registry of all subparser commands, populated by create_parser().
 # Maps command name → argparse sub-parser instance.
 _SUBPARSER_REGISTRY: dict[str, Any] = {}

@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -23,10 +24,14 @@ def _dirs():
     """Temp projects dir, restored after test."""
     with tempfile.TemporaryDirectory() as t:
         orig_p = config.projects_dir
+        orig_cwd = Path.cwd()
         config.projects_dir = Path(t) / "projects"
         config.projects_dir.mkdir()
-        yield
-        config.projects_dir = orig_p
+        try:
+            yield
+        finally:
+            os.chdir(orig_cwd)
+            config.projects_dir = orig_p
 
 
 @pytest.fixture

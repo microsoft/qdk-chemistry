@@ -129,12 +129,16 @@ def validate_project(func: F) -> str | F:
             returns the result of the decorated function
 
         """
+        original_cwd = Path.cwd()
         is_valid, message = is_project_valid(project_name, config.projects_dir)
         if not is_valid:
             return f"Project validation failed: {message} for project_name: {project_name}"
 
-        #  proceed with original function
-        return func(project_name, *args, **kwargs)
+        try:
+            # Proceed with the original function while relative file access resolves inside the project.
+            return func(project_name, *args, **kwargs)
+        finally:
+            os.chdir(original_cwd)
 
     return cast("F", wrapper)
 

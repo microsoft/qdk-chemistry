@@ -7,8 +7,7 @@
 
 import functools
 import json
-
-# Import functions from server module
+import os
 import tempfile
 from pathlib import Path
 
@@ -48,6 +47,12 @@ def _make_unwrapped(fn):
         return _unwrap(fn(*args, **kwargs))
 
     return wrapper
+
+
+def _requires_algorithm(algorithm_type: str, algorithm_name: str) -> None:
+    """Skip when an optional algorithm implementation is unavailable."""
+    if algorithm_name not in algorithms.available(algorithm_type):
+        pytest.skip(f"{algorithm_type}/{algorithm_name} is not available in this environment")
 
 
 # Re-export all server functions with auto-unwrapping so tests stay unchanged
@@ -132,10 +137,14 @@ def temp_project_dir():
     """Create a temporary project directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         original_projects_dir = config.projects_dir
+        original_cwd = Path.cwd()
         config.projects_dir = Path(tmpdir) / "projects"
         config.projects_dir.mkdir(parents=True, exist_ok=True)
-        yield config.projects_dir
-        config.projects_dir = original_projects_dir
+        try:
+            yield config.projects_dir
+        finally:
+            os.chdir(original_cwd)
+            config.projects_dir = original_projects_dir
 
 
 class TestValidation:
@@ -143,12 +152,16 @@ class TestValidation:
 
     def test_is_project_valid_creates_directory(self):
         """Test that is_project_valid creates project directory."""
+        original_cwd = Path.cwd()
         with tempfile.TemporaryDirectory() as tmpdir:
-            projects_dir = Path(tmpdir) / "projects"
-            is_valid, _ = is_project_valid("test_project", projects_dir)
+            try:
+                projects_dir = Path(tmpdir) / "projects"
+                is_valid, _ = is_project_valid("test_project", projects_dir)
 
-            assert is_valid is True
-            assert (projects_dir / "test_project").exists()
+                assert is_valid is True
+                assert (projects_dir / "test_project").exists()
+            finally:
+                os.chdir(original_cwd)
 
 
 class TestFilenameFormat:
@@ -748,6 +761,7 @@ class TestAlgorithmFunctions:
 
     def test_run_dynamical_correlation_calculator(self, simple_ansatz, temp_project_dir):
         """Test dynamical correlation calculator."""
+        _requires_algorithm("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         project_path = temp_project_dir / "test_project5"
         project_path.mkdir(exist_ok=True)
         simple_ansatz.to_json_file(project_path / "simple.ansatz.json")
@@ -880,6 +894,7 @@ class TestAlgorithmFunctions:
 
     def test_run_multi_configuration_scf(self, h2_structure, temp_project_dir):
         """Test multi-configuration SCF calculation."""
+        _requires_algorithm("multi_configuration_scf", "pyscf")
         project_path = temp_project_dir / "test_mcscf"
         project_path.mkdir(exist_ok=True)
 
@@ -2026,6 +2041,7 @@ class TestNonDefaultAlgorithms:
 
     def test_cc_mp2(self, simple_ansatz, temp_project_dir):
         """Test cc calculator (non default)."""
+        _requires_algorithm("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         project_path = temp_project_dir / "test_cc"
         project_path.mkdir(exist_ok=True)
         simple_ansatz.to_json_file(project_path / "simple.ansatz.json")
