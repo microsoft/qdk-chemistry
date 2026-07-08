@@ -41,6 +41,11 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
+  - name: windows_x86_64
+    os: windows
+    arch: x86_64
+    march: x86-64-v3
+    imageName: windows-2025-1espt
   displayName: Target platforms
 - name: pythonVersions
   type: stringList
@@ -69,24 +74,28 @@ parameters:
   type: string
   default: None
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
+- name: runSlowTests
+  type: boolean
+  default: true
+  displayName: Run slow tests
 
 variables:
 - group: QdkChemistry
+- name: ComponentDetection.MaxDetectionThreads
+  value: '16'
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     sdl:
       autobaseline:
         enableForGitHub: true
+      componentgovernance:
+        useAgentBuildDirectory: true
       codeql:
         compiled:
           enabled: true
         sourceLanguages: python
         binaryLanguages: cpp
-      psscriptanalyzer:
-        enabled: false
-        justificationForDisabling: Powershell is not used in this repository.
-        break: false
       armory:
         enabled: false
         justificationForDisabling: ARM templates are not used in this repository.
@@ -103,6 +112,22 @@ extends:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
       jobs:
+      # Windows C++ dependency build (vcpkg + FetchContent targets).
+      # Runs once so the 5 parallel Python-version wheel jobs share a single
+      # warm cache entry instead of each rebuilding deps independently.
+      - job: Build_windows_x86_64_deps
+        pool:
+          name: $(CPU_POOL_X86)
+          demands:
+          - ImageOverride -equals windows-2025-1espt
+          os: windows
+        timeoutInMinutes: 480
+        displayName: Build Windows x86_64 C++ dependencies
+        steps:
+        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+          parameters:
+            march: x86-64-v3
+
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
           ${{ if eq(target.os, 'macOS') }}:
@@ -111,13 +136,21 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+              hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
-              name: $(CPU_POOL_ARM)
+              name: aqe-1es-Dpsd_v5-arm-pool
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
+          ${{ elseif eq(target.os, 'windows') }}:
+            dependsOn: Build_windows_x86_64_deps
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: windows
           ${{ else }}:
             pool:
               name: $(CPU_POOL_X86)
@@ -149,7 +182,7 @@ extends:
               onlyAddExtraIndex: false
 
           # Build - Linux x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
+          - ${{ if and(eq(target.arch, 'x86_64'), eq(target.os, 'linux')) }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
                 march: ${{ target.march }}
@@ -162,13 +195,17 @@ extends:
                 devTag: ${{ parameters.devTag }}
 
           # Test - Linux x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
+          - ${{ if and(eq(target.arch, 'x86_64'), eq(target.os, 'linux')) }}:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -191,6 +228,10 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
@@ -211,13 +252,37 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
+
+          # Build - Windows x86_64
+          - ${{ if eq(target.os, 'windows') }}:
+            - template: .pipelines/templates/build-pip-wheels-windows.yml@self
+              parameters:
+                march: ${{ target.march }}
+                buildTesting: OFF
+                enableCoverage: OFF
+                pythonVersion: $(pythonVersion)
+                devTag: ${{ parameters.devTag }}
+
+          # Test - Windows x86_64
+          - ${{ if eq(target.os, 'windows') }}:
+            - template: .pipelines/templates/test-pip-wheels-windows.yml@self
+              parameters:
+                pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
+                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
+                # the wheel is still built and published.
+                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
-          # back to the original base image user
-          - script: |
-              sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-            displayName: Fix wheel directory ownership
-
+          # back to the original base image user (Linux/macOS only; not needed on Windows).
+          - ${{ if ne(target.os, 'windows') }}:
+            - script: |
+                sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+              displayName: Fix wheel directory ownership
 
           - task: TwineAuthenticate@1
             inputs:
@@ -244,6 +309,7 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
@@ -259,6 +325,7 @@ extends:
             notifyUsers: ''
             instructions: Please verify artifacts and approve the release
             onTimeout: reject
+
 
     - stage: Release
       displayName: Release
@@ -319,6 +386,21 @@ extends:
           - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
+          - input: pipelineArtifact
+            artifactName: windows-x86_64-wheels-python3.10
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.10
+          - input: pipelineArtifact
+            artifactName: windows-x86_64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: windows-x86_64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: windows-x86_64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: windows-x86_64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
@@ -328,7 +410,7 @@ extends:
 
         # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
         # publishing anything, according to the ESRP docs. When debugging, set contenttype: NPM to prevent publishing to PyPI.
-        - task: EsrpRelease@9
+        - task: EsrpRelease@12
           condition: succeeded()
           displayName: Publish Python Packages
           inputs:
@@ -337,10 +419,13 @@ extends:
             keyvaultname: quantum-esrp-kv
             signcertname: ESRPCert
             clientid: 832c049d-cd07-4c1c-bfa5-c07250d190cb
-            contenttype: PyPI
-            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
+            intent: PackageDistribution
+            contenttype: PyPi
+            contentsource: Folder
             folderlocation: $(System.DefaultWorkingDirectory)/target/wheels
             waitforreleasecompletion: true
             owners: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
             approvers: davidwillia@microsoft.com, janunsleber@microsoft.com, nathanbaker@microsoft.com
+            serviceendpointurl: https://api.esrp.microsoft.com
             mainpublisher: ESRPRELPACMAN
+            domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346

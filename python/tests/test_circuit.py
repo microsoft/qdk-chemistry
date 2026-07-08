@@ -292,7 +292,7 @@ class TestCircuitSerialization:
         try:
             circuit.to_json_file(tmp_path)
 
-            with open(tmp_path) as f:
+            with open(tmp_path, encoding="utf-8") as f:
                 loaded_data = json.load(f)
 
             assert "qasm" in loaded_data
@@ -472,3 +472,61 @@ class TestCircuitEstimate:
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
             circuit.estimate()
+
+
+class TestGetQreApplication:
+    """Test cases for Circuit.get_qre_application method."""
+
+    def test_get_qre_application_from_factory(self):
+        """Test that get_qre_application works with Q# factory data."""
+        from qdk.qre.application import QSharpApplication  # noqa: PLC0415
+
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        app = circuit.get_qre_application()
+        assert isinstance(app, QSharpApplication)
+
+    def test_get_qre_application_from_qasm(self):
+        """Test that get_qre_application works with QASM-only circuit."""
+        from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
+
+        qasm = """
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+        """
+        circuit = Circuit(qasm=qasm)
+        app = circuit.get_qre_application()
+        assert isinstance(app, OpenQASMApplication)
+
+    def test_get_qre_application_from_qir(self):
+        """Test that get_qre_application works with QIR-only circuit."""
+        from qdk.qre.application import QIRApplication  # noqa: PLC0415
+
+        qir = openqasm_compile("""
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+        """)
+        circuit = Circuit(qir=qir)
+        app = circuit.get_qre_application()
+        assert isinstance(app, QIRApplication)

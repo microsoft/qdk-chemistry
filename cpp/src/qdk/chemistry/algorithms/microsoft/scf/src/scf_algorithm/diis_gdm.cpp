@@ -68,6 +68,14 @@ void DIIS_GDM::iterate(SCFImpl& scf_impl) {
   if (use_gdm_) {
     gdm_algorithm_->iterate(scf_impl);
   } else {
+    // For ROHF, propagate the ROHF convergence cache computed by our
+    // check_convergence() to the inner DIIS object so it can read from
+    // its own cache without expensive recomputation.
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+      diis_algorithm_->set_rohf_convergence_cache(
+          get_rohf_convergence_fock_matrix(),
+          get_rohf_convergence_density_matrix());
+    }
     diis_algorithm_->iterate(scf_impl);
   }
 }

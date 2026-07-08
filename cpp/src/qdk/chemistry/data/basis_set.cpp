@@ -63,7 +63,17 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   }
 
   // unpack the tar.gz file
-  auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
+  // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
+  // host:path. BSD tar (System32\tar.exe) rejects the flag, detect at runtime.
+#ifdef _WIN32
+  static const bool tar_has_force_local =
+      (std::system("tar --force-local --version > nul 2>&1") == 0);
+  const std::string tar_cmd =
+      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
+#else
+  const std::string tar_cmd = "tar -xzf ";
+#endif
+  auto cmd = tar_cmd + "\"" + file_path.generic_string() + "\" --directory \"" +
              temp_dir.generic_string() + "\"";
   int return_code = std::system(cmd.c_str());
   if (return_code != 0) {
@@ -310,6 +320,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
@@ -347,38 +358,15 @@ BasisSet::BasisSet(const std::string& name,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    std::shared_ptr<Structure> structure,
                    AOType atomic_orbital_type)
-    : _name(name),
-      _atomic_orbital_type(atomic_orbital_type),
-      _structure(structure),
-      _ecp_name("none") {
+    : BasisSet(name, shells, std::move(structure), nullptr, {},
+               atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
-  if (!structure) {
-    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
-  }
-
-  // Organize shells by atom index
-  for (const auto& shell : shells) {
-    size_t atom_index = shell.atom_index;
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-
-    _shells_per_atom[atom_index].push_back(shell);
-  }
-
-  // Initialize ECP electrons vector with zeros for each atom
-  _ecp_electrons.resize(structure->get_num_atoms(), 0);
-
-  if (!_is_valid()) {
-    throw std::invalid_argument("Tried to generate invalid BasisSet");
-  }
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
@@ -432,6 +420,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
@@ -492,6 +481,40 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
+}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   std::shared_ptr<Structure> structure,
+                   std::shared_ptr<const SymmetryProduct> ao_symmetries,
+                   std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
+                   AOType atomic_orbital_type)
+    : _name(name),
+      _atomic_orbital_type(atomic_orbital_type),
+      _structure(structure),
+      _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  // Organize shells by atom index.
+  for (const auto& shell : shells) {
+    size_t atom_index = shell.atom_index;
+    if (atom_index >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(atom_index + 1);
+    }
+    _shells_per_atom[atom_index].push_back(shell);
+  }
+
+  // Initialize ECP electrons vector with zeros for each atom.
+  _ecp_electrons.resize(_structure->get_num_atoms(), 0);
+
+  if (!_is_valid()) {
+    throw std::invalid_argument("Tried to generate invalid BasisSet");
+  }
+
+  _init_ao_symmetries(std::move(ao_symmetries), std::move(ao_extents));
 }
 
 std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
@@ -584,8 +607,8 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-       ++atom_index) {
+  for (size_t atom_index = 0;
+       atom_index < static_cast<size_t>(nuclear_charges.size()); ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
 
     auto [shells, ecp_shells, ecp_electrons] =
@@ -665,8 +688,8 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-       ++atom_index) {
+  for (size_t atom_index = 0;
+       atom_index < static_cast<size_t>(nuclear_charges.size()); ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
     auto it = index_to_basis_map.find(atom_index);
     if (it == index_to_basis_map.end()) {
@@ -707,9 +730,11 @@ BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
       _atomic_orbital_type(other._atomic_orbital_type),
       _shells_per_atom(other._shells_per_atom),
-      _ecp_name(other._ecp_name),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
-      _ecp_electrons(other._ecp_electrons) {
+      _ecp_name(other._ecp_name),
+      _ecp_electrons(other._ecp_electrons),
+      _ao_symmetries(other._ao_symmetries),
+      _ao_extents(other._ao_extents) {
   QDK_LOG_TRACE_ENTERING();
   if (other._structure) {
     _structure = std::make_shared<Structure>(*other._structure);
@@ -730,6 +755,8 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
     _ecp_name = other._ecp_name;
     _ecp_shells_per_atom = other._ecp_shells_per_atom;
     _ecp_electrons = other._ecp_electrons;
+    _ao_symmetries = other._ao_symmetries;
+    _ao_extents = other._ao_extents;
     if (other._structure) {
       _structure = std::make_shared<Structure>(*other._structure);
     } else {
@@ -872,6 +899,84 @@ size_t BasisSet::get_num_atomic_orbitals() const {
     _compute_mappings();
   }
   return _cached_num_atomic_orbitals;
+}
+
+std::shared_ptr<const SymmetryProduct> BasisSet::ao_symmetries() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ao_symmetries;
+}
+
+const std::unordered_map<SymmetryLabel, std::size_t>& BasisSet::ao_extents()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ao_extents;
+}
+
+void BasisSet::_init_ao_symmetries(
+    std::shared_ptr<const SymmetryProduct> ao_symmetries,
+    std::unordered_map<SymmetryLabel, std::size_t> ao_extents) {
+  if (ao_symmetries) {
+    _ao_symmetries = std::move(ao_symmetries);
+  } else {
+    _ao_symmetries = std::make_shared<const SymmetryProduct>(
+        std::vector<SymmetryAxis>{axes::spin(1, true)});
+  }
+
+  if (!ao_extents.empty()) {
+    _ao_extents = std::move(ao_extents);
+  } else {
+    const std::size_t num_ao = get_num_atomic_orbitals();
+    _ao_extents.clear();
+    for (const auto& axis : _ao_symmetries->axes()) {
+      for (const auto& label : axis.labels()) {
+        _ao_extents.emplace(SymmetryLabel{label}, num_ao);
+      }
+    }
+  }
+
+  _validate_ao_symmetries();
+}
+
+void BasisSet::_validate_ao_symmetries() const {
+  // Every extent key must be admissible under the AO SymmetryProduct.
+  for (const auto& [label, extent] : _ao_extents) {
+    (void)extent;
+    for (const auto& axis : _ao_symmetries->axes()) {
+      if (!label.has(axis.name())) {
+        throw std::invalid_argument(
+            "AO extent label is missing a value for axis '" +
+            to_string(axis.name()) + "'.");
+      }
+      if (!axis.admits(*label.get(axis.name()))) {
+        throw std::invalid_argument(
+            "AO extent label is not admissible under the AO symmetries.");
+      }
+    }
+  }
+
+  // Symmetry aliasing: for an equivalent axis, every present label of that
+  // axis must carry the same extent.
+  for (const auto& axis : _ao_symmetries->axes()) {
+    if (!axis.equivalent()) {
+      continue;
+    }
+    bool have_ref = false;
+    std::size_t reference = 0;
+    for (const auto& value : axis.labels()) {
+      auto it = _ao_extents.find(SymmetryLabel{value});
+      if (it == _ao_extents.end()) {
+        continue;
+      }
+      if (!have_ref) {
+        reference = it->second;
+        have_ref = true;
+      } else if (it->second != reference) {
+        throw std::invalid_argument(
+            "Equivalent AO symmetry axis '" + to_string(axis.name()) +
+            "' requires symmetry-equivalent labels to share an extent.");
+      }
+    }
+  }
 }
 
 size_t BasisSet::get_atom_index_for_atomic_orbital(
@@ -2388,6 +2493,47 @@ std::pair<size_t, int> BasisSet::basis_to_shell_index(
 
   // Should never reach here if mapping is correct
   throw std::out_of_range("Shell index not found in basis set");
+}
+
+void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, _name);
+  hash_value(ctx, static_cast<int64_t>(_atomic_orbital_type));
+  if (_structure) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _structure->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  // Hash all shells per atom
+  hash_value(ctx, static_cast<uint64_t>(_shells_per_atom.size()));
+  for (const auto& atom_shells : _shells_per_atom) {
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
+    for (const auto& shell : atom_shells) {
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
+    }
+  }
+  // Hash ECP shells
+  hash_value(ctx, static_cast<uint64_t>(_ecp_shells_per_atom.size()));
+  for (const auto& atom_shells : _ecp_shells_per_atom) {
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
+    for (const auto& shell : atom_shells) {
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
+    }
+  }
+  hash_value(ctx, _ecp_name);
+  hash_value(ctx, static_cast<uint64_t>(_ecp_electrons.size()));
+  for (auto e : _ecp_electrons) {
+    hash_value(ctx, static_cast<uint64_t>(e));
+  }
 }
 
 }  // namespace qdk::chemistry::data

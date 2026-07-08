@@ -4,18 +4,25 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "qdk/chemistry/data/settings.hpp"
+#include "qdk/chemistry/utils/hash_context.hpp"
+#include "qdk/chemistry/utils/logger.hpp"
 
 namespace qdk::chemistry::algorithms {
+
+namespace detail {
+struct DeprecationAccess;
+}  // namespace detail
 
 /**
  * @brief Base class for algorithms
@@ -62,6 +69,27 @@ class Algorithm {
   }
 
   /**
+   * @brief Compute a deterministic content hash for a run with these inputs.
+   *
+   * Hashes the algorithm type, algorithm name, current settings, and arguments
+   * that would be passed to run(). The result identifies a run for cache and
+   * checkpoint/restart workflows among compatible builds.
+   *
+   * @param args Arguments that would be forwarded to run()
+   * @return 16-character hex content hash
+   */
+  virtual std::string hash(Args... args) const {
+    qdk::chemistry::utils::HashContext ctx;
+    using qdk::chemistry::utils::hash_value;
+    hash_value(ctx, this->type_name());
+    hash_value(ctx, this->name());
+    hash_value(ctx, this->_settings->content_hash());
+    hash_value(ctx, static_cast<uint64_t>(sizeof...(Args)));
+    (hash_value(ctx, args), ...);
+    return ctx.hexdigest();
+  }
+
+  /**
    * @brief Access the algorithm's settings
    *
    * @return Reference to the algorithm's Settings object
@@ -97,6 +125,23 @@ class Algorithm {
    * @brief Lock settings before execution
    */
   void lock_settings() const { this->_settings->lock(); }
+
+  /**
+   * @brief Internal hook for construction-time deprecation warnings.
+   *
+   * Deprecated implementations may override this to provide replacement
+   * guidance that factories and language bindings emit when they construct the
+   * implementation. The default returns std::nullopt so ordinary algorithms do
+   * not participate in deprecation-warning plumbing.
+   *
+   * @return Warning text to emit at construction time, or std::nullopt when the
+   *         implementation is not deprecated.
+   */
+  virtual std::optional<std::string> _deprecation_message() const {
+    return std::nullopt;
+  }
+
+  friend struct detail::DeprecationAccess;
 
   /**
    * @brief Create a nested algorithm from an AlgorithmRef stored in settings.
@@ -144,6 +189,24 @@ class Algorithm {
   std::unique_ptr<data::Settings> _settings =
       std::make_unique<data::Settings>();
 };
+
+namespace detail {
+/**
+ * @brief Internal reader for protected deprecation-warning hooks.
+ *
+ * This is intentionally the only non-derived access path to
+ * Algorithm::_deprecation_message(). It lets factories and language bindings
+ * emit the same construction-time warnings without exposing deprecation
+ * metadata as part of the public Algorithm API.
+ */
+struct DeprecationAccess {
+  template <typename Derived, typename ReturnType, typename... Args>
+  static std::optional<std::string> message(
+      const Algorithm<Derived, ReturnType, Args...>& algorithm) {
+    return algorithm._deprecation_message();
+  }
+};
+}  // namespace detail
 
 /**
  * @brief Base class template for algorithm factories
@@ -219,7 +282,16 @@ class AlgorithmFactory {
           })());
     }
 
-    return it->second();
+    auto instance = it->second();
+    if (!instance) {
+      throw std::runtime_error(
+          "Algorithm factory for " + Derived::algorithm_type_name() +
+          ": Algorithm with name '" + key + "' returned nullptr");
+    }
+    if (const auto message = detail::DeprecationAccess::message(*instance)) {
+      QDK_LOGGER().warn(*message);
+    }
+    return instance;
   }
 
   /**

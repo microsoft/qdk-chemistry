@@ -10,9 +10,14 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import h5py
-from qdk.simulation import NoiseConfig
 from ruamel.yaml import YAML
 
+try:
+    from qdk.simulation import NoiseConfig
+except ImportError:
+    from qsharp._simulation import NoiseConfig
+
+from qdk_chemistry.data._hashing import _hash_float, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -173,6 +178,33 @@ class QuantumErrorProfile(DataClass):
         # Make instance immutable after construction (handled by base class)
         super().__init__()
 
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "quantum_error_profile")
+        _hash_str(h, self.name)
+        _hash_str(h, self.description)
+
+        # Hash errors dict in sorted order
+        _hash_uint(h, len(self.errors))
+        for gate_key in sorted(self.errors.keys(), key=str):
+            _hash_str(h, str(gate_key))
+            error_dict = self.errors[gate_key]
+            _hash_uint(h, len(error_dict))
+            for error_type in sorted(error_dict.keys(), key=str):
+                _hash_str(h, str(error_type))
+                _hash_float(h, error_dict[error_type])
+
+        # These sets are derived from `errors`, but include them deterministically
+        for label, gates in (
+            ("one_qubit_gates", self.one_qubit_gates),
+            ("two_qubit_gates", self.two_qubit_gates),
+            ("three_qubit_gates", self.three_qubit_gates),
+        ):
+            _hash_str(h, label)
+            _hash_uint(h, len(gates))
+            for g in sorted(gates, key=str):
+                _hash_str(h, str(g))
+
     def __eq__(self, other: object) -> bool:
         """Check equality between two QuantumErrorProfile instances.
 
@@ -228,7 +260,7 @@ class QuantumErrorProfile(DataClass):
         # Convert to serializable dict
         data = self.to_json()
 
-        with Path(yaml_file).open("w") as f:
+        with Path(yaml_file).open("w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
     @classmethod
@@ -246,7 +278,7 @@ class QuantumErrorProfile(DataClass):
         if not Path(yaml_file).exists():
             raise FileNotFoundError(f"File {yaml_file} not found")
 
-        with Path(yaml_file).open("r") as f:
+        with Path(yaml_file).open("r", encoding="utf-8") as f:
             data = yaml.load(f)
 
         if not isinstance(data, dict):

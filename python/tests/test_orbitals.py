@@ -9,11 +9,13 @@ import contextlib
 import pickle
 import re
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.data import ModelOrbitals, Orbitals
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -202,8 +204,10 @@ def test_json_serialization():
     )
 
     # Test file-based serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp:
         filename = tmp.name
+
+    try:
         orb_out.to_json_file(filename)
 
         orb_file = Orbitals.from_json_file(filename)
@@ -221,6 +225,8 @@ def test_json_serialization():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_hdf5_serialization():
@@ -231,29 +237,32 @@ def test_hdf5_serialization():
     basis_set = create_test_basis_set(3, "test-hdf5-serialization")
     orb_out = Orbitals(coeffs, energies, overlap, basis_set)
 
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp:
+        filename = tmp.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp:
-            filename = tmp.name
-            orb_out.to_hdf5_file(filename)
+        orb_out.to_hdf5_file(filename)
 
-            orb_in = Orbitals.from_hdf5_file(filename)
+        orb_in = Orbitals.from_hdf5_file(filename)
 
-            coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
-            coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
-            assert np.allclose(
-                coeffs_out_a,
-                coeffs_in_a,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                coeffs_out_b,
-                coeffs_in_b,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
+        coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
+        coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
+        assert np.allclose(
+            coeffs_out_a,
+            coeffs_in_a,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            coeffs_out_b,
+            coeffs_in_b,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_complete_orbitals_workflow():
@@ -268,8 +277,10 @@ def test_complete_orbitals_workflow():
     assert orb.get_num_molecular_orbitals() == 2
     assert orb.is_restricted()
 
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
         orb2 = Orbitals.from_json_file(json_filename)
         assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
@@ -288,6 +299,8 @@ def test_complete_orbitals_workflow():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_generic():
@@ -299,9 +312,10 @@ def test_orbitals_file_io_generic():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test JSON file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using generic method
         orb.to_file(json_filename, "json")
 
@@ -327,11 +341,14 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using generic method
         orb.to_file(hdf5_filename, "hdf5")
 
@@ -357,6 +374,8 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test unsupported file type
     with pytest.raises(RuntimeError, match="Unsupported file type"):
@@ -375,9 +394,10 @@ def test_orbitals_hdf5_specific():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test HDF5 file I/O methods
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using new method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -427,11 +447,14 @@ def test_orbitals_hdf5_specific():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O methods work correctly
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -441,6 +464,8 @@ def test_orbitals_hdf5_specific():
         # Check equality
         assert orb3.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
         assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_validation():
@@ -491,9 +516,10 @@ def test_orbitals_file_io_round_trip():
     )
 
     # Test JSON round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save and reload
         orb.to_json_file(json_filename)
         orb_json = Orbitals.from_json_file(json_filename)
@@ -541,11 +567,14 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save and reload
         orb.to_hdf5_file(hdf5_filename)
         orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
@@ -593,6 +622,8 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_management():
@@ -607,7 +638,9 @@ def test_active_space_management():
     )
     active_indices = [1, 2]
     basis_set = create_test_basis_set(4, "test-active-space-management")
-    orb = Orbitals(coeffs, None, None, basis_set, [active_indices, []])
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(4, active_indices, active_indices), spin_index_set(4, [], [])
+    )
 
     assert orb.has_active_space()
     alpha_indices, beta_indices = orb.get_active_space_indices()
@@ -627,7 +660,9 @@ def test_inactive_space_management():
     )
     inactive_indices = [0, 1]
     basis_set = create_test_basis_set(4, "test-inactive-space-management")
-    orb = Orbitals(coeffs, None, None, basis_set, [[], inactive_indices])
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(4, [], []), spin_index_set(4, inactive_indices, inactive_indices)
+    )
 
     alpha_indices, beta_indices = orb.get_inactive_space_indices()
     assert np.array_equal(alpha_indices, inactive_indices)
@@ -648,7 +683,8 @@ def test_active_space_unrestricted():
         None,
         None,
         basis_set,
-        [alpha_active, beta_active, [], []],
+        spin_index_set(3, alpha_active, beta_active, equivalent=False),
+        spin_index_set(3, [], [], equivalent=False),
     )
 
     retrieved_alpha, retrieved_beta = orb.get_active_space_indices()
@@ -661,11 +697,15 @@ def test_active_space_serialization():
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     active_indices = [0, 2]
     basis_set = create_test_basis_set(3, "test-active-space-serialization")
-    orb = Orbitals(coeffs, None, None, basis_set, [active_indices, []])
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(3, active_indices, active_indices), spin_index_set(3, [], [])
+    )
 
     # Test JSON serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
 
         # Load into a new object
@@ -678,33 +718,38 @@ def test_active_space_serialization():
         json_alpha, json_beta = orb_json.get_active_space_indices()
         assert np.array_equal(json_alpha, active_indices)
         assert np.array_equal(json_beta, active_indices)
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 serialization
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
-            hdf5_filename = tmp_hdf5.name
-            orb.to_hdf5_file(hdf5_filename)
+        orb.to_hdf5_file(hdf5_filename)
 
-            # Load into a new object
-            orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
+        # Load into a new object
+        orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
 
-            # Check that active space was preserved
-            assert orb_hdf5.has_active_space()
+        # Check that active space was preserved
+        assert orb_hdf5.has_active_space()
 
-            # Verify active space indices
-            hdf5_alpha, hdf5_beta = orb_hdf5.get_active_space_indices()
-            assert np.array_equal(hdf5_alpha, active_indices)
-            assert np.array_equal(hdf5_beta, active_indices)
+        # Verify active space indices
+        hdf5_alpha, hdf5_beta = orb_hdf5.get_active_space_indices()
+        assert np.array_equal(hdf5_alpha, active_indices)
+        assert np.array_equal(hdf5_beta, active_indices)
 
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_copy_assign():
     """Test that active space is preserved when copying or assigning orbitals."""
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9]])
     basis_set = create_test_basis_set(2, "test-active-space-copy-assign")
-    orb = Orbitals(coeffs, None, None, basis_set, [[0], []])
+    orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(2, [0], [0]), spin_index_set(2, [], []))
 
     # Test copy constructor
     orb_copy = Orbitals(orb)
@@ -721,7 +766,7 @@ def test_active_space_validation():
     # Set up basic data with 3 MOs and valid active space in constructor
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-active-space-validation")
-    orb = Orbitals(coeffs, None, None, basis_set, [[0, 1], []])
+    orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(3, [0, 1], [0, 1]), spin_index_set(3, [], []))
     alpha_indices, beta_indices = orb.get_active_space_indices()
     assert np.array_equal(alpha_indices, [0, 1])
     assert np.array_equal(beta_indices, [0, 1])
@@ -923,7 +968,7 @@ def test_orbitals_unrestricted_pickling():
 def test_model_orbitals_pickling_and_repr():
     """Test pickling support and string representation for ModelOrbitals."""
     # Create a test ModelOrbitals object
-    original = ModelOrbitals(4, True)  # 4 orbitals, restricted
+    original = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))  # 4 orbitals, restricted
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -945,7 +990,7 @@ def test_model_orbitals_pickling_and_repr():
     assert repr_output == summary_output
 
     # Test unrestricted ModelOrbitals
-    original_unres = ModelOrbitals(6, False)  # 6 orbitals, unrestricted
+    original_unres = ModelOrbitals(6, SymmetryProduct([axes.spin(1, False)]))  # 6 orbitals, unrestricted
 
     pickled_data = pickle.dumps(original_unres)
     unpickled_unres = pickle.loads(pickled_data)

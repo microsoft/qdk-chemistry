@@ -8,7 +8,6 @@
 #include <blas.hh>
 #include <macis/mcscf/orbital_energies.hpp>
 #include <macis/util/moller_plesset.hpp>
-#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -22,6 +21,9 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     const std::vector<size_t>& loc_indices_b) const {
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
+
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
+
   // Get electron counts from settings
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();
 
@@ -41,7 +43,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
 
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return wavefunction;
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   if (nalpha == 0 && nbeta == 0) {
@@ -94,7 +96,8 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   }
 
   // Extract selected orbitals for MP2 natural orbital calculation
-  const auto& full_coeffs = orbitals->get_coefficients().first;
+  const auto& full_coeffs = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
   const size_t num_orbitals = loc_indices_a.size();
   const size_t num_occupied = occ_indices.size();
   const size_t num_virtual = virt_indices.size();
@@ -116,8 +119,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   auto selected_orbitals = std::make_shared<data::Orbitals>(
       selected_coeffs,
       std::nullopt,  // no energies needed
-      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      std::nullopt);  // no active space indices
+      orbitals->get_overlap_matrix(), orbitals->get_basis_set());
 
   // Construct Hamiltonian from selected orbitals
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -157,24 +159,14 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     coeffs.col(loc_indices_a[i]) = selected_no_coeffs.col(i);
   }
 
-  // Preserve active space indices from input orbitals if they exist
-  // MP2 natural orbitals only supports restricted orbitals (alpha == beta)
-  std::optional<data::Orbitals::RestrictedCASIndices> restricted_indices;
-  if (orbitals->has_active_space()) {
-    const auto& active = orbitals->get_active_space_indices().first;
-    const auto& inactive = orbitals->get_inactive_space_indices().first;
-    restricted_indices =
-        std::make_tuple(std::vector<size_t>(active.begin(), active.end()),
-                        std::vector<size_t>(inactive.begin(), inactive.end()));
-  }
-
   // Create new orbitals with MP2 natural orbital data
   auto new_orbitals = std::make_shared<data::Orbitals>(
       coeffs,
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      restricted_indices);  // preserve active space indices from input
-  return detail::new_wavefunction(wavefunction, new_orbitals);
+      orbitals->active_indices(), orbitals->inactive_indices());
+  return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                     new_orbitals);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

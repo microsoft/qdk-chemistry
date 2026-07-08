@@ -81,19 +81,19 @@ Factory pattern
 
 QDK/Chemistry's :doc:`plugin architecture <../plugins>` leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
-      :language: cpp
-      :start-after: // start-cell-scf-create
-      :end-before: // end-cell-scf-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-scf-create
       :end-before: # end-cell-scf-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
+      :language: cpp
+      :start-after: // start-cell-scf-create
+      :end-before: // end-cell-scf-create
 
 This pattern allows:
 
@@ -109,19 +109,19 @@ Runtime configuration with settings
 
 Algorithm configuration is managed through instances of :doc:`Settings <../algorithms/settings>` objects, which contain a type-safe data store of configuration parameters consistent between the python and C++ APIs:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
-      :language: cpp
-      :start-after: // start-cell-scf-settings
-      :end-before: // end-cell-scf-settings
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-scf-settings
       :end-before: # end-cell-scf-settings
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
+      :language: cpp
+      :start-after: // start-cell-scf-settings
+      :end-before: // end-cell-scf-settings
 
 Read more on how one can configure, discover, and extend instances of Settings objects in the
 :doc:`Settings <../algorithms/settings>` documentation.
@@ -133,19 +133,19 @@ A complete dataflow example
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
-      :language: cpp
-      :start-after: // start-cell-data-flow
-      :end-before: // end-cell-data-flow
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-data-flow
       :end-before: # end-cell-data-flow
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
+      :language: cpp
+      :start-after: // start-cell-data-flow
+      :end-before: // end-cell-data-flow
 
 Further reading
 ===============

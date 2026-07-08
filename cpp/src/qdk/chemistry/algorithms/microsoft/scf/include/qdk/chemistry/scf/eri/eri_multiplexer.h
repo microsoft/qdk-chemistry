@@ -64,9 +64,9 @@ class ERIMultiplexer : public ERI {
                  const SCFConfig& cfg, double omega);
 
   /**
-   * @brief Default constructor (private, used by factory methods)
+   * @brief Default constructor (deleted — base class ERI has no default ctor)
    */
-  ERIMultiplexer() noexcept = default;
+  ERIMultiplexer() noexcept = delete;
 
  public:
   /**

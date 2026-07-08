@@ -83,7 +83,20 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     echo "Downloading and installing libflame..."
     bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+
 elif [ "$MAC_BUILD" == "ON" ]; then
+    # --- Apple Silicon Rosetta self-heal -----------------------------------------
+    # If this script is running under Rosetta on a genuinely arm64 machine, re-exec
+    # it natively so the whole build tree (conda/python/cmake/clang) is arm64.
+    # Uses sysctl (reliable under translation) instead of `uname -m` (which lies).
+    if [ "$(uname -s)" = "Darwin" ] \
+    && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ] \
+    && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
+        echo "Detected Rosetta on Apple Silicon; re-executing natively as arm64..."
+        exec arch -arm64 /bin/bash "$0" "$@"
+    fi
+    # -----------------------------------------------------------------------------
+
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \
@@ -120,10 +133,20 @@ python3 -m pip install --upgrade pip
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
 python3 -m pip install -r .pipelines/requirements.txt
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in buildenv.
+# The report is auto-discovered when it sits next to a setup.py or
+# requirements.txt in a non-hidden directory (the detector skips dotdirs
+# like .pipelines/). See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
+mkdir -p python/build/build-manifest
+echo "------------------ Installed Python packages (buildenv) ------------------"
+python3 -m pip list --format=freeze | tee python/build/build-manifest/requirements.txt
+echo "---------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report python/build/build-manifest/component-detection-pip-report.json \
+    -r python/build/build-manifest/requirements.txt
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh

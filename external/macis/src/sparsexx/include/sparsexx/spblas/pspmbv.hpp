@@ -253,9 +253,9 @@ auto generate_spmv_comm_info(const DistSpMatrixType& A) {
 
   // Linearize the send/recv data structures
   size_t nrecv_indices =
-      std::accumulate(recv_counts.begin(), recv_counts.end(), 0ul);
+      std::accumulate(recv_counts.begin(), recv_counts.end(), size_t{0});
   size_t nsend_indices =
-      std::accumulate(send_counts.begin(), send_counts.end(), 0ul);
+      std::accumulate(send_counts.begin(), send_counts.end(), size_t{0});
   std::vector<index_type> send_indices, recv_indices;
   send_indices.reserve(nsend_indices);
   recv_indices.reserve(nrecv_indices);

@@ -26,6 +26,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCi
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -40,10 +41,12 @@ from qdk_chemistry.algorithms.multi_configuration_scf import MultiConfigurationS
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
+    QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -63,6 +66,7 @@ __all__ = [
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
+    "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -78,6 +82,7 @@ __all__ = [
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
+    "QdkNaturalOrbitalLocalizer",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",
@@ -85,6 +90,7 @@ __all__ = [
     "QdkStabilityChecker",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
+    "QpeCircuitBuilder",
     "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",
