@@ -4,6 +4,7 @@
 
 #pragma once
 #include <cstdint>
+#include <limits>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 
@@ -14,19 +15,35 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @brief Tunable Jacobi-sweep controls for the QIO localizer.
  *
  * - "max_cycles" (int): maximum number of Jacobi sweeps over all active
- *   orbital pairs (default 200).
+ *   orbital pairs (default 200, must be >= 1).
  * - "convergence_tolerance" (double): sweep-to-sweep change in the
  *   single-orbital entropy sum below which the optimization stops
- *   (default 1e-10).
+ *   (default 1e-10, must be >= 0).
  * - "coarse_angle_step" (double): coarse grid spacing in radians for the
- *   per-pair angle scan over [0, pi) (default 0.02).
+ *   per-pair angle scan over [0, pi) (default 0.02, must be > 0).
+ *
+ * The numeric bounds are enforced at set-time, so out-of-range values are
+ * rejected (e.g. a negative max_cycles that would underflow to a huge size_t,
+ * or a non-positive coarse_angle_step that would make the scan run forever).
  */
 class QIOLocalizerSettings : public data::Settings {
  public:
   QIOLocalizerSettings() {
-    set_default("max_cycles", int64_t{200});
-    set_default("convergence_tolerance", 1e-10);
-    set_default("coarse_angle_step", 0.02);
+    set_default(
+        "max_cycles", int64_t{200},
+        "Maximum number of Jacobi sweeps over all active orbital pairs",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default(
+        "convergence_tolerance", 1e-10,
+        "Sweep-to-sweep single-orbital entropy-sum change below which the "
+        "optimization stops",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default(
+        "coarse_angle_step", 0.02,
+        "Coarse grid spacing (radians) for the per-pair angle scan over "
+        "[0, pi); must be positive",
+        data::BoundConstraint<double>{std::numeric_limits<double>::min(),
+                                      std::numeric_limits<double>::max()});
   }
 };
 

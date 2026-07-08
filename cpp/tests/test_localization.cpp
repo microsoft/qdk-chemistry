@@ -45,7 +45,9 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
 
 TEST_F(LocalizationTest, Factory) {
   auto available_localizers = LocalizerFactory::available();
-  EXPECT_EQ(available_localizers.size(), 5);
+  // Lower bound rather than an exact count: adding future localizers should not
+  // break this test. The specific expected IDs are asserted individually below.
+  EXPECT_GE(available_localizers.size(), 5u);
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_pipek_mezey") != available_localizers.end());
@@ -96,7 +98,7 @@ TEST_F(LocalizationTest,
   const std::vector<size_t> empty_indices;
   const std::vector<std::string> localizer_names = {
       "qdk_pipek_mezey", "qdk_mp2_natural_orbitals", "qdk_natural_orbitals",
-      "qdk_vvhv"};
+      "qdk_qio", "qdk_vvhv"};
 
   for (const auto& localizer_name : localizer_names) {
     auto localizer = LocalizerFactory::create(localizer_name);
@@ -1741,8 +1743,18 @@ TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {
   std::shared_ptr<Wavefunction> result;
   std::vector<size_t> empty;
   EXPECT_NO_THROW({ result = localizer->run(wfn, empty, empty); });
-  // Empty selection is a no-op: the input wavefunction is returned unchanged.
-  EXPECT_EQ(result, wfn);
+  // Empty selection is a no-op, but (like the other localizers) it returns a
+  // fresh single-reference (Aufbau determinant) carrier with the input orbitals
+  // left unchanged, rather than the original wavefunction object.
+  ASSERT_NE(result, nullptr);
+  EXPECT_NE(result.get(), wfn.get());
+  EXPECT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          result));
+  const auto& original_alpha = wfn->get_orbitals()->get_coefficients_alpha();
+  const auto& result_alpha = result->get_orbitals()->get_coefficients_alpha();
+  EXPECT_NEAR(0.0, (result_alpha - original_alpha).norm(),
+              testing::numerical_zero_tolerance);
 }
 
 TEST_F(LocalizationTest, QIORejectsUnrestricted) {
@@ -1919,4 +1931,12 @@ TEST_F(LocalizationTest, QIOSettings) {
   // ... and are user-configurable.
   EXPECT_NO_THROW(settings.set("max_cycles", int64_t{50}));
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 50);
+  // Numeric bounds are enforced at set-time so pathological values (size_t
+  // underflow / non-terminating angle scan) are rejected up front.
+  EXPECT_THROW(settings.set("max_cycles", int64_t{0}), std::invalid_argument);
+  EXPECT_THROW(settings.set("max_cycles", int64_t{-1}), std::invalid_argument);
+  EXPECT_THROW(settings.set("convergence_tolerance", -1e-6),
+               std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", 0.0), std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", -0.1), std::invalid_argument);
 }

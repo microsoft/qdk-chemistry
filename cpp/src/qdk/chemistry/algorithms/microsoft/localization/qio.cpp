@@ -97,13 +97,15 @@ void rotate_two_rdm(std::vector<double>& g2, std::size_t n, std::size_t i,
 // Apply a Givens rotation G(i, j; c, s) to both axes of a (symmetric) 1-RDM.
 void rotate_one_rdm(Eigen::MatrixXd& g, std::size_t i, std::size_t j, double c,
                     double s) {
-  for (Eigen::Index p = 0; p < g.cols(); ++p) {  // rows
+  // Left rotation: mix rows i and j (iterate over all columns p).
+  for (Eigen::Index p = 0; p < g.cols(); ++p) {
     const double gi = g(static_cast<Eigen::Index>(i), p);
     const double gj = g(static_cast<Eigen::Index>(j), p);
     g(static_cast<Eigen::Index>(i), p) = c * gi + s * gj;
     g(static_cast<Eigen::Index>(j), p) = -s * gi + c * gj;
   }
-  for (Eigen::Index p = 0; p < g.rows(); ++p) {  // columns
+  // Right rotation: mix columns i and j (iterate over all rows p).
+  for (Eigen::Index p = 0; p < g.rows(); ++p) {
     const double gi = g(p, static_cast<Eigen::Index>(i));
     const double gj = g(p, static_cast<Eigen::Index>(j));
     g(p, static_cast<Eigen::Index>(i)) = c * gi + s * gj;
@@ -245,9 +247,10 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
     throw std::invalid_argument("loc_indices_a contains duplicate indices");
   }
 
-  // If both index vectors are empty, return original orbitals unchanged.
+  // Empty selection is a no-op, but still returns the standard single-reference
+  // (Aufbau determinant) carrier for consistency with the Localizer contract.
   if (loc_indices_a.empty()) {
-    return wavefunction;
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   if (!orbitals->is_restricted()) {
@@ -303,7 +306,9 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
         "QIOLocalizer requires real-valued active RDMs.");
   }
   if (static_cast<std::size_t>(rdm_aa->rows()) != n ||
+      static_cast<std::size_t>(rdm_aa->cols()) != n ||
       static_cast<std::size_t>(rdm_bb->rows()) != n ||
+      static_cast<std::size_t>(rdm_bb->cols()) != n ||
       static_cast<std::size_t>(rdm_aabb->size()) != n * n * n * n) {
     throw std::invalid_argument(
         "Active RDM dimensions do not match the active-space size.");
