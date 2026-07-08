@@ -34,6 +34,12 @@ Running orbital localization
 This section demonstrates how to create, configure, and run orbital localization.
 The ``run`` method takes a :class:`~qdk_chemistry.data.Wavefunction` instance and returns a new :class:`~qdk_chemistry.data.Wavefunction` object with transformed orbitals.
 
+.. note::
+   The returned wavefunction is a single-reference container built from the transformed orbitals.
+   Localizers do not preserve a multi-configuration expansion, coupled-cluster amplitudes, or other correlated-state coefficients from the input wavefunction.
+   To obtain a correlated wavefunction in the transformed orbital basis, construct a new Hamiltonian from the returned orbitals with :doc:`HamiltonianConstructor <hamiltonian_constructor>` and run the appropriate correlated solver, such as :doc:`MultiConfigurationCalculator <mc_calculator>`.
+   Some localizers may attach derived density-matrix data, such as natural-orbital occupation numbers, when those data are part of the transformation.
+
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
@@ -51,13 +57,6 @@ Beta orbital indices (``loc_indices_b``)
 
 .. rubric:: Creating a localizer
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/localizer.py
@@ -65,17 +64,17 @@ Beta orbital indices (``loc_indices_b``)
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-.. rubric:: Configuring settings
-
-Settings can be modified using the ``settings()`` object.
-See `Available implementations`_ below for implementation-specific options.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
       :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+.. rubric:: Configuring settings
+
+Settings can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
@@ -84,17 +83,17 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-.. rubric:: Running localization
-
-.. note::
-   For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
       :language: cpp
-      :start-after: // start-cell-localize
-      :end-before: // end-cell-localize
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running localization
+
+.. note::
+   For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
 
 .. tab:: Python API
 
@@ -103,18 +102,18 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-localize
       :end-before: # end-cell-localize
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-localize
+      :end-before: // end-cell-localize
+
 Available implementations
 -------------------------
 
 QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization methods.
 You can discover available implementations programmatically:
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
@@ -122,6 +121,13 @@ You can discover available implementations programmatically:
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. _localizer-qdk-pipek-mezey:
 
@@ -156,13 +162,37 @@ This produces orbitals that are maximally localized on specific atoms or bonds, 
      - ``1e-12``
      - Threshold for small rotation detection
 
+.. _localizer-qdk-natural-orbitals:
+
+QDK Natural Orbitals
+~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_natural_orbitals"``
+
+Transforms active orbitals to natural orbitals :cite:`Lowdin1956` by diagonalizing the active-space one-particle reduced density matrix (1-RDM).
+The eigenvalues are the natural-orbital occupation numbers.
+
+The input wavefunction must define an active space and contain active-space 1-RDM data.
+The selected alpha and beta indices must be identical and must match the active-space indices.
+For unrestricted inputs, spin-dependent active-space 1-RDM blocks are combined into a single spin-traced density, and the returned orbitals are restricted.
+
+.. rubric:: Settings
+
+This implementation has no configurable settings.
+
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qdk_mp2_natural_orbitals"``
 
+.. deprecated:: 2.0.0
+
+   Use :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` (``"qdk_natural_orbitals"``) with a wavefunction that already contains the active-space 1-RDM.
+   This keeps the correlated calculation that produces the density matrix separate from the orbital transformation.
+
 Computes natural orbitals :cite:`Lowdin1956` from the :term:`MP2` one-particle density matrix.
-These orbitals diagonalize the correlation effects and provide occupation numbers that can guide :doc:`active space selection <active_space>`.
+This implementation is retained for compatibility with older MP2 workflows.
+For new workflows, compute the desired active-space 1-RDM first and use ``"qdk_natural_orbitals"``.
 
 .. rubric:: Settings
 

@@ -5,10 +5,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <memory>
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp"
 
@@ -45,6 +47,29 @@ class LocalizerBase : public Localizer,
 };
 
 void bind_localizer(py::module &m) {
+  m.def(
+      "new_aufbau_determinant_wavefunction",
+      [](std::shared_ptr<Wavefunction> wavefunction,
+         std::shared_ptr<Orbitals> orbitals) {
+        return qdk::chemistry::algorithms::detail::
+            new_aufbau_determinant_wavefunction(std::move(wavefunction),
+                                                std::move(orbitals));
+      },
+      py::arg("wavefunction"), py::arg("orbitals"), R"(
+Create an Aufbau determinant wavefunction for an orbital basis.
+
+The determinant is the canonical Aufbau determinant implied by the input
+wavefunction's electron counts and the supplied orbitals. If the orbitals define
+an active space, the determinant is projected into that active space.
+
+Args:
+    wavefunction (qdk_chemistry.data.Wavefunction): Wavefunction providing electron counts
+    orbitals (qdk_chemistry.data.Orbitals): Orbital basis for the returned wavefunction
+
+Returns:
+    qdk_chemistry.data.Wavefunction: Aufbau determinant wavefunction with the supplied orbitals
+)");
+
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
       m, "OrbitalLocalizer", R"(
@@ -155,6 +180,9 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  localizer.def("hash", &Localizer::hash, py::arg("wavefunction"),
+                py::arg("loc_indices_a"), py::arg("loc_indices_b"));
+
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
@@ -213,6 +241,11 @@ Initializes a Pipek-Mezey localizer with default settings.
              py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
 QDK MP2 natural orbital transformer.
 
+.. deprecated:: 2.0.0
+    Use :class:`QdkNaturalOrbitalLocalizer` (``qdk_natural_orbitals``) with a
+    wavefunction that already contains the active-space one-particle reduced
+    density matrix (1-RDM).
+
 This class provides a concrete implementation that transforms canonical
 molecular orbitals into natural orbitals derived from second-order
 Møller-Plesset perturbation theory (MP2). Natural orbitals are eigenfunctions
@@ -242,10 +275,58 @@ See Also:
     :class:`qdk_chemistry.data.Wavefunction`
 
 )")
-      .def(py::init<>(), R"(
+      .def(py::init([]() {
+             auto instance =
+                 std::make_unique<microsoft::MP2NaturalOrbitalLocalizer>();
+             qdk::chemistry::python::warn_if_deprecated_algorithm(*instance);
+             return instance;
+           }),
+           R"(
 Default constructor.
 
 Initializes an MP2 natural orbital transformer with default settings.
+
+)");
+
+  // Bind concrete microsoft::NaturalOrbitalLocalizer implementation
+  py::class_<microsoft::NaturalOrbitalLocalizer, Localizer, py::smart_holder>(
+      m, "QdkNaturalOrbitalLocalizer", R"(
+QDK natural orbital transformer.
+
+This class provides a concrete implementation that transforms molecular
+orbitals into natural orbitals by diagonalizing the spin-traced one-particle
+reduced density matrix (1-RDM). Natural orbitals are eigenfunctions of the
+1-RDM, and their eigenvalues are the occupation numbers.
+
+.. note::
+    Requires ``loc_indices_a == loc_indices_b`` (natural orbitals are a single set).
+    Requires ``loc_indices_a``/``loc_indices_b`` to match the orbitals' active-space indices exactly.
+    Requires a spin-traced 1-RDM and an active space in the wavefunction.
+    For unrestricted Slaterdeterminant, the 1-RDM is expressed in the
+    alpha MO basis and the output is always a restricted set of natural orbitals.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a natural orbital localizer
+    localizer = alg.QdkNaturalOrbitalLocalizer()
+
+    # Transform to natural orbitals
+    no_wfn = localizer.run(wavefunction, active_indices, active_indices)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`QdkMP2NaturalOrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a natural orbital transformer with default settings.
 
 )");
 

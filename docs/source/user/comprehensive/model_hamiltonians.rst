@@ -75,19 +75,19 @@ The Hückel (tight-binding) model describes non-interacting electrons hopping on
 where :math:`\hat{a}_i^\dagger` and :math:`\hat{a}_i` are the fermionic creation and annihilation operators for site *i*, :math:`\hat{n}_i = \sum_\sigma \hat{a}_{i,\sigma}^\dagger \hat{a}_{i,\sigma}` is the number operator, :math:`\varepsilon_i` are on-site energies, :math:`t_{ij}` are hopping integrals, :math:`w_{ij}` is the edge weight from the lattice adjacency matrix, and the sum runs over connected site pairs.
 This model produces a :doc:`Hamiltonian <data/hamiltonian>` with one-body integrals only.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-create-huckel
-      :end-before: // end-cell-create-huckel
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
       :start-after: # start-cell-create-huckel
       :end-before: # end-cell-create-huckel
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-create-huckel
+      :end-before: // end-cell-create-huckel
 
 .. _model-hubbard:
 
@@ -103,13 +103,6 @@ The Hubbard model extends the Hückel model with on-site Coulomb repulsion:
 where :math:`U_i` is the on-site repulsion strength.
 This model produces a :doc:`Hamiltonian <data/hamiltonian>` with both one-body and two-body integrals.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-create-hubbard
-      :end-before: // end-cell-create-hubbard
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
@@ -117,14 +110,14 @@ This model produces a :doc:`Hamiltonian <data/hamiltonian>` with both one-body a
       :start-after: # start-cell-create-hubbard
       :end-before: # end-cell-create-hubbard
 
-The Hubbard model naturally extends to 2D lattices for studying strongly correlated materials:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
       :language: cpp
-      :start-after: // start-cell-create-hubbard-2d
-      :end-before: // end-cell-create-hubbard-2d
+      :start-after: // start-cell-create-hubbard
+      :end-before: // end-cell-create-hubbard
+
+The Hubbard model naturally extends to 2D lattices for studying strongly correlated materials:
 
 .. tab:: Python API
 
@@ -132,6 +125,13 @@ The Hubbard model naturally extends to 2D lattices for studying strongly correla
       :language: python
       :start-after: # start-cell-create-hubbard-2d
       :end-before: # end-cell-create-hubbard-2d
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-create-hubbard-2d
+      :end-before: // end-cell-create-hubbard-2d
 
 .. _model-ppp:
 
@@ -152,19 +152,19 @@ The intersite potential :math:`V_{ij}` is typically computed using the Ohno or M
    The stored two-body integrals do **not** include the :math:`\frac{1}{2}` prefactor.
    This follows the standard quantum chemistry convention where the factor is applied at contraction time rather than stored in the integrals.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-create-ppp
-      :end-before: // end-cell-create-ppp
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
       :start-after: # start-cell-create-ppp
       :end-before: # end-cell-create-ppp
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-create-ppp
+      :end-before: // end-cell-create-ppp
 
 .. _intersite-potentials:
 
@@ -199,19 +199,19 @@ Custom pairwise potential
 
 The ``pairwise_potential`` function accepts a user-defined callable ``func(i, j, U_ij, R_ij) -> V_ij`` for arbitrary distance-dependent potentials.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-potentials
-      :end-before: // end-cell-potentials
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
       :start-after: # start-cell-potentials
       :end-before: # end-cell-potentials
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-potentials
+      :end-before: // end-cell-potentials
 
 Spin models
 -----------
@@ -301,19 +301,19 @@ Per-pair parameters
    Scalar ``float`` (broadcast to all pairs) or ``(n, n)`` ``numpy.ndarray`` (one value per pair).
    Used for: hopping (:math:`t`), intersite potential (:math:`V`), spin couplings (:math:`J_x, J_y, J_z`).
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-site-dependent
-      :end-before: // end-cell-site-dependent
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
       :start-after: # start-cell-site-dependent
       :end-before: # end-cell-site-dependent
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-site-dependent
+      :end-before: // end-cell-site-dependent
 
 Using model Hamiltonians with algorithms
 -----------------------------------------
@@ -328,19 +328,19 @@ Spin model Hamiltonians produce :class:`~qdk_chemistry.data.QubitHamiltonian` ob
 
 .. rubric:: Example: exact diagonalization of the Hubbard model
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
-      :language: cpp
-      :start-after: // start-cell-solve-hubbard
-      :end-before: // end-cell-solve-hubbard
-
 .. tab:: Python API
 
    .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
       :start-after: # start-cell-solve-hubbard
       :end-before: # end-cell-solve-hubbard
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../_static/examples/cpp/model_hamiltonians.cpp
+      :language: cpp
+      :start-after: // start-cell-solve-hubbard
+      :end-before: // end-cell-solve-hubbard
 
 .. rubric:: Example: exact diagonalization of the Ising model
 

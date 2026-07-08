@@ -18,6 +18,10 @@
 
 namespace qdk::chemistry::data {
 
+class Hamiltonian;
+
+class LatticeGraph;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -99,6 +103,15 @@ class MajoranaMapping : public DataClass {
   /// Optional post-mapping tapering specification.
   const std::optional<TaperingSpecification>& tapering() const {
     return tapering_;
+  }
+
+  /**
+   * @brief Stabilizer terms carried by this mapping.
+   * @return Reference to the vector of stabilizers.
+   */
+  const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+  stabilizers() const {
+    return stabilizers_;
   }
 
   /**
@@ -244,13 +257,25 @@ class MajoranaMapping : public DataClass {
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
+  /**
+   * @brief Verstraete-Cirac encoding.
+   *
+   * Maps fermionic modes on a `LatticeGraph` to qubits.
+   *
+   * @param lattice The `LatticeGraph` connectivity.
+   * @return MajoranaMapping with name ``"verstraete-cirac"``.
+   */
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
-      std::optional<TaperingSpecification> tapering = std::nullopt);
+      std::optional<TaperingSpecification> tapering = std::nullopt,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+          stabilizers = {});
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
@@ -275,6 +300,12 @@ class MajoranaMapping : public DataClass {
 
   /// Optional tapering metadata for post-mapping qubit reduction.
   std::optional<TaperingSpecification> tapering_;
+
+  /// Feed the mapping's identifying data into a content hash.
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+  /// Optional stabilizer terms.
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers_;
 
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
@@ -329,5 +360,115 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold);
+
+/**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms.
+ *
+ * Dispatches to the dense, Cholesky, or sparse engine entry point based on
+ * the Hamiltonian's container type, without materializing a dense N^4
+ * two-body tensor when a specialized container is present.  One-body
+ * integrals are flattened to row-major layout internally.
+ *
+ * The constant energy shift (nuclear repulsion / frozen core) is excluded
+ * from the mapped operator (`core_energy = 0`), matching the buffer-based
+ * overload as invoked by ``QdkQubitMapper``.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param hamiltonian The fermionic Hamiltonian.
+ * @param spin_symmetric Use the spin-summed restricted fast path when true.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           bool spin_symmetric,
+                                           double threshold,
+                                           double integral_threshold);
+
+/**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms directly from
+ *        three-center (Cholesky/density-fitted) two-body factors.
+ *
+ * Equivalent to ::majorana_map_hamiltonian but consumes the low-rank
+ * factors instead of a dense N^4 tensor.  The auxiliary index is
+ * contracted in integral space one (pq|.) row at a time — a vectorized
+ * matrix-vector product per orbital pair — so the dense four-center
+ * tensor is never materialized and peak additional memory is a single
+ * N^2 row.  The result is numerically equivalent to the dense path for
+ * the same integrals.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param core_energy Core (nuclear repulsion + frozen core) energy.
+ * @param h1_alpha One-body integrals, alpha spin (n_spatial x n_spatial),
+ *        row-major.
+ * @param h1_beta One-body integrals, beta spin (row-major).
+ * @param three_center_aa Alpha three-center factors, column-major
+ *        [n_spatial^2 x naux] with the orbital pair index in row-major order.
+ * @param three_center_bb Beta three-center factors (same layout). For
+ *        restricted inputs this may alias @p three_center_aa.
+ * @param n_spatial Number of spatial orbitals.
+ * @param naux Number of auxiliary (Cholesky) vectors.
+ * @param spin_symmetric If true, use the spin-summed restricted fast path.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian_cholesky(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* three_center_aa,
+    const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
+    bool spin_symmetric, double threshold, double integral_threshold);
+
+/**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms directly from a
+ *        sparse two-body integral list.
+ *
+ * Equivalent to ::majorana_map_hamiltonian but consumes the stored
+ * non-zero (p,q,r,s) integrals instead of a dense N^4 tensor, which is
+ * never materialized.  Missing entries are treated as zero, exactly as in
+ * the dense layout.
+ *
+ * Stored entries are canonicalized under the 8-fold ERI symmetry and
+ * symmetry-expanded before mapping.  The dense reference path for
+ * ``SparseHamiltonianContainer`` materializes each stored tuple at its
+ * exact index with no symmetry expansion, so the two paths agree when
+ * stored integrals are canonical or symmetry-complete (as for in-repo
+ * model builders), while this entry point is more robust when a container
+ * stores only non-canonical symmetry representatives.
+ *
+ * Entries are canonicalized under the 8-fold ERI symmetry at ingestion
+ * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the
+ * mapped operator does not depend on which symmetry-related permutation(s)
+ * of an integral the caller stored, nor on the order of the entry list.
+ * Duplicate entries for the same position must agree exactly (bitwise
+ * floating-point equality); conflicting duplicates are rejected rather
+ * than resolved in encounter order.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param core_energy Core (nuclear repulsion + frozen core) energy.
+ * @param h1_alpha One-body integrals, alpha spin (row-major).
+ * @param h1_beta One-body integrals, beta spin (row-major).
+ * @param two_body_indices Flattened (p,q,r,s) indices, 4 ints per entry;
+ *        each index must lie in [0, n_spatial).
+ * @param two_body_values Integral values, one per entry.
+ * @param num_entries Number of stored non-zero two-body integrals.
+ * @param n_spatial Number of spatial orbitals.
+ * @param spin_symmetric Must be true: the sparse fast path is spin-summed
+ *        (SparseHamiltonianContainer is restricted-only).  Unrestricted
+ *        Hamiltonians must use ::majorana_map_hamiltonian.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ * @throws std::invalid_argument If spin_symmetric is false, any two-body
+ *         index is outside [0, n_spatial), or duplicate entries for the
+ *         same position carry conflicting values.
+ */
+MajoranaMapResult majorana_map_hamiltonian_sparse(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const int* two_body_indices,
+    const double* two_body_values, std::size_t num_entries,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold);
 
 }  // namespace qdk::chemistry::data

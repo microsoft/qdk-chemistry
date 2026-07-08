@@ -6,12 +6,18 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
+#include <cstdint>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -35,26 +41,57 @@ namespace qdk::chemistry::data {
 class Orbitals : public DataClass,
                  public std::enable_shared_from_this<Orbitals> {
  public:
-  typedef std::tuple<std::vector<size_t>, std::vector<size_t>>
-      RestrictedCASIndices;
-  typedef std::tuple<std::vector<size_t>, std::vector<size_t>,
-                     std::vector<size_t>, std::vector<size_t>>
-      UnrestrictedCASIndices;
+  /// Legacy (v1) active/inactive index tuple for restricted spaces:
+  /// (active_indices, inactive_indices), applied to both spin channels.
+  using RestrictedCASIndices =
+      std::tuple<std::vector<size_t>, std::vector<size_t>>;
+
+  /// Legacy (v1) active/inactive index tuple for unrestricted spaces:
+  /// (active_alpha, active_beta, inactive_alpha, inactive_beta).
+  using UnrestrictedCASIndices =
+      std::tuple<std::vector<size_t>, std::vector<size_t>, std::vector<size_t>,
+                 std::vector<size_t>>;
+
   /**
    * @brief Constructor for restricted orbitals with shared pointer to basis set
    * @param coefficients The molecular orbital coefficients matrix
    * @param energies The orbital energies (optional)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
-   * @param indices Orbital indices as tuple of (active, inactive) space
-   * indices. For restricted calculations, the same indices are used for both
-   * alpha and beta spin channels.
+   * @param active_indices Active-space index set (default: all orbitals)
+   * @param inactive_indices Inactive-space index set (default: empty)
    */
-  Orbitals(const Eigen::MatrixXd& coefficients,
-           const std::optional<Eigen::VectorXd>& energies,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           const std::optional<RestrictedCASIndices>& indices = std::nullopt);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients,
+      const std::optional<Eigen::VectorXd>& energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
+
+  /**
+   * @brief (v1) Construct restricted orbitals from legacy CAS index tuples.
+   *
+   * Convenience overload accepting the legacy @ref RestrictedCASIndices tuple
+   * of (active, inactive) molecular-orbital indices. The indices are plumbed
+   * through the v2 @ref SymmetryBlockedIndexSet construction path and applied
+   * to both spin channels.
+   *
+   * @param coefficients The molecular orbital coefficients matrix
+   * @param energies The orbital energies (optional)
+   * @param ao_overlap The atomic orbital overlap matrix (optional)
+   * @param basis_set The basis set as shared pointer
+   * @param indices (active, inactive) indices; @c std::nullopt selects the full
+   *        active space.
+   */
+  Orbitals(
+      const Eigen::MatrixXd& coefficients,
+      const std::optional<Eigen::VectorXd>& energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      const std::optional<std::tuple<std::vector<size_t>, std::vector<size_t>>>&
+          indices);
 
   /**
    * @brief Constructor for unrestricted orbitals with shared pointer to basis
@@ -65,18 +102,72 @@ class Orbitals : public DataClass,
    * @param energies_beta The beta orbital energies (optional)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
-   * @param indices Orbital indices as tuple of (active_alpha, active_beta,
-   * inactive_alpha, inactive_beta) space indices. For unrestricted
-   * calculations, separate indices can be specified for alpha and beta spin
-   * channels.
+   * @param active_indices Active-space index set (default: all orbitals)
+   * @param inactive_indices Inactive-space index set (default: empty)
    */
-  Orbitals(const Eigen::MatrixXd& coefficients_alpha,
-           const Eigen::MatrixXd& coefficients_beta,
-           const std::optional<Eigen::VectorXd>& energies_alpha,
-           const std::optional<Eigen::VectorXd>& energies_beta,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           const std::optional<UnrestrictedCASIndices>& indices = std::nullopt);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients_alpha,
+      const Eigen::MatrixXd& coefficients_beta,
+      const std::optional<Eigen::VectorXd>& energies_alpha,
+      const std::optional<Eigen::VectorXd>& energies_beta,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
+
+  /**
+   * @brief (v1) Construct unrestricted orbitals from legacy CAS index tuples.
+   *
+   * Convenience overload accepting the legacy @ref UnrestrictedCASIndices tuple
+   * of (active_alpha, active_beta, inactive_alpha, inactive_beta)
+   * molecular-orbital indices. The indices are plumbed through the v2
+   * @ref SymmetryBlockedIndexSet construction path.
+   *
+   * @param coefficients_alpha The alpha molecular orbital coefficients matrix
+   * @param coefficients_beta The beta molecular orbital coefficients matrix
+   * @param energies_alpha The alpha orbital energies (optional)
+   * @param energies_beta The beta orbital energies (optional)
+   * @param ao_overlap The atomic orbital overlap matrix (optional)
+   * @param basis_set The basis set as shared pointer
+   * @param indices (active_alpha, active_beta, inactive_alpha, inactive_beta)
+   *        indices; @c std::nullopt selects the full active space.
+   */
+  Orbitals(
+      const Eigen::MatrixXd& coefficients_alpha,
+      const Eigen::MatrixXd& coefficients_beta,
+      const std::optional<Eigen::VectorXd>& energies_alpha,
+      const std::optional<Eigen::VectorXd>& energies_beta,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      const std::optional<std::tuple<std::vector<size_t>, std::vector<size_t>,
+                                     std::vector<size_t>, std::vector<size_t>>>&
+          indices);
+
+  /**
+   * @brief Constructor from symmetry-blocked storage primitives
+   * (SymmetryBlockedTensor).
+   *
+   * This is the preferred construction path: it builds an Orbitals object
+   * directly from the symmetry-blocked containers, without going through the
+   * dense (deprecated) v1 inputs. It emits no deprecation warnings.
+   *
+   * @param coefficients Basis coefficient tensor (AO x MO blocks)
+   * @param energies Orbital energy tensor (may be nullptr if unavailable)
+   * @param ao_overlap The atomic orbital overlap matrix (optional)
+   * @param basis_set The basis set as shared pointer (may be nullptr)
+   * @param active_indices Active-space index set (default: all orbitals)
+   * @param inactive_indices Inactive-space index set (default: empty)
+   * @throws std::runtime_error if the containers are inconsistent
+   */
+  Orbitals(
+      std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
+      std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
 
   /**
    * @brief Destructor
@@ -95,6 +186,39 @@ class Orbitals : public DataClass,
    * @return Reference to this object
    */
   Orbitals& operator=(const Orbitals& other);
+
+  /**
+   * @brief Get the molecular-orbital basis coefficients as a symmetry-blocked
+   * container.
+   * @return Shared pointer to the basis-coefficient tensor
+   * @throws std::runtime_error if coefficients are not set
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients() const;
+
+  /**
+   * @brief Get the orbital energies as a symmetry-blocked container
+   * @return Shared pointer to the orbital-energy tensor
+   * @throws std::runtime_error if energies are not set
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> energies() const;
+
+  /**
+   * @brief Single-particle symmetries over the molecular-orbital modes.
+   * @return Shared pointer to the molecular-orbital symmetries
+   */
+  std::shared_ptr<const SymmetryProduct> symmetries() const;
+
+  /**
+   * @brief Molecular-orbital extents keyed by symmetry label.
+   * @return Map from symmetry label to number of molecular orbitals
+   */
+  std::unordered_map<SymmetryLabel, std::size_t> mo_extents() const;
+
+  /**
+   * @brief Number of single-particle modes (molecular orbitals).
+   * @return Number of molecular orbitals
+   */
+  std::size_t num_modes() const;
 
   /**
    * @brief Get orbital coefficients
@@ -138,6 +262,18 @@ class Orbitals : public DataClass,
    */
   std::pair<std::vector<size_t>, std::vector<size_t>>
   get_virtual_space_indices() const;
+
+  /**
+   * @brief Get active-space indices as a symmetry-blocked index set.
+   * @return Shared pointer to the active-space index set, or null if unset
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> active_indices() const;
+
+  /**
+   * @brief Get inactive-space indices as a symmetry-blocked index set.
+   * @return Shared pointer to the inactive-space index set, or null if unset
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices() const;
 
   // === Molecular orbital overlap ===
 
@@ -434,17 +570,40 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> from_json(const nlohmann::json& j);
 
  protected:
-  /**
-   * Orbital coefficients [AO x MO] for (alpha, beta) spin channels
-   */
-  std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-      _coefficients = {nullptr, nullptr};
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /**
-   * Orbital energies for (alpha, beta) spin channels
+   * Canonical symmetry-blocked coefficient/energy storage. Both are null for
+   * @ref ModelOrbitals, which carries no basis.
    */
-  std::pair<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>>
-      _energies = {nullptr, nullptr};
+  std::shared_ptr<const SymmetryBlockedTensor<2>> _coefficients = nullptr;
+  std::shared_ptr<const SymmetryBlockedTensor<1>> _energies = nullptr;
+
+  /**
+   * @brief Explicitly declared single-particle symmetries for orbitals that
+   *        carry no coefficient container (e.g. @ref ModelOrbitals).
+   *
+   * Null means no symmetries were declared, in which case @ref symmetries
+   * reports the trivial (empty) product. This is never used to fabricate a
+   * default spin (@f$S_z@f$) axis: any spin symmetry must be supplied
+   * explicitly by the constructor.
+   */
+  std::shared_ptr<const SymmetryProduct> _symmetries = nullptr;
+
+  /**
+   * @brief Build the canonical symmetry-blocked tensors from dense spin blocks.
+   * @param coefficients_alpha Alpha coefficient block [AO x MO] (required)
+   * @param coefficients_beta Beta coefficient block [AO x MO] (ignored when
+   *        @p restricted)
+   * @param energies_alpha Alpha energy block, or null when energies are unset
+   * @param energies_beta Beta energy block (ignored when @p restricted)
+   * @param restricted True iff the spin blocks alias (restricted)
+   */
+  void _set_coefficient_containers(
+      std::shared_ptr<const Eigen::MatrixXd> coefficients_alpha,
+      std::shared_ptr<const Eigen::MatrixXd> coefficients_beta,
+      std::shared_ptr<const Eigen::VectorXd> energies_alpha,
+      std::shared_ptr<const Eigen::VectorXd> energies_beta, bool restricted);
 
   /**
    * Active space indices for (alpha, beta) spin channels
@@ -453,10 +612,20 @@ class Orbitals : public DataClass,
       {}, {}};
 
   /**
+   * Active-space indices as a derived symmetry-blocked index-set view.
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> _active_indices = nullptr;
+
+  /**
    * Inactive space indices for (alpha, beta) spin channels
    */
   std::pair<std::vector<size_t>, std::vector<size_t>> _inactive_space_indices =
       {{}, {}};
+
+  /**
+   * Inactive-space indices as a derived symmetry-blocked index-set view.
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> _inactive_indices = nullptr;
 
   /**
    * Atomic orbital overlap matrix [AO x AO]
@@ -469,7 +638,7 @@ class Orbitals : public DataClass,
   std::shared_ptr<BasisSet> _basis_set;
 
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * Save orbital metadata to HDF5 file
@@ -531,6 +700,34 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> _from_hdf5_file(const std::string& filename);
 
  protected:
+  /**
+   * @brief Build @ref _active_indices and @ref _inactive_indices from the
+   *        current @ref _active_space_indices and @ref _inactive_space_indices.
+   *
+   * Called by every Orbitals construction path (ctors, @c from_json,
+   * @c from_hdf5, and the @ref ModelOrbitals copy ctor / assignment operator)
+   * once @ref _active_space_indices and @ref _inactive_space_indices have
+   * been populated. The two derived containers are immutable after this
+   * helper returns.
+   */
+  void _build_space_index_sets();
+
+  /**
+   * @brief Adopt SBID active/inactive inputs, derive v1 index vectors, and
+   *        fill defaults for the null case.
+   *
+   * Shared by all three Orbitals constructors so the SBID → v1 projection
+   * and default-fill logic is not duplicated.
+   *
+   * @param active  Caller's active-space SBID (may be null → full active).
+   * @param inactive Caller's inactive-space SBID (may be null → empty).
+   * @param num_molecular_orbitals Number of MOs for the full-active default.
+   */
+  void _init_index_spaces(
+      std::shared_ptr<const SymmetryBlockedIndexSet> active,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive,
+      std::size_t num_molecular_orbitals);
+
   // Protected default constructor for use by subclasses
   Orbitals() = default;
 };
@@ -551,25 +748,65 @@ class Orbitals : public DataClass,
  */
 class ModelOrbitals : public Orbitals {
  public:
-  ModelOrbitals(size_t basis_size, bool restricted);
+  /**
+   * @brief Construct model orbitals over a full active space.
+   *
+   * Restricted-ness is inferred from @p symmetries (a spin axis whose labels
+   * are equivalent is restricted); the default is no symmetry, i.e. a single
+   * statistics-generic mode block.
+   *
+   * @param basis_size Number of single-particle modes.
+   * @param symmetries Explicit single-particle symmetries (default: none). For
+   *        spin-resolved (@f$S_z@f$) quantities pass a spin symmetry, e.g.
+   *        @c std::make_shared<SymmetryProduct>(SymmetryProduct({axes::spin(1,
+   *        true)})).
+   */
+  explicit ModelOrbitals(
+      size_t basis_size,
+      std::shared_ptr<const SymmetryProduct> symmetries = nullptr);
 
   /**
-   * @brief Constructor with active and inactive space indices (restricted)
-   * @param basis_size Number of atomic orbitals (and molecular orbitals)
-   * @param indices Orbital indices as tuple of (active, inactive) space
-   * indices. For restricted calculations, the same indices are used for both
-   * alpha and beta spin channels.
+   * @brief Construct model orbitals from symmetry-blocked active/inactive
+   *        index sets.
+   *
+   * The single-particle symmetries, per-mode extents, and restricted-ness are
+   * taken from the index sets; no spin convention is assumed.
+   *
+   * @param active_indices Active-space index set (must not be null).
+   * @param inactive_indices Inactive-space index set (default: none).
+   */
+  explicit ModelOrbitals(
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
+
+  /**
+   * @brief (v1) Construct restricted model orbitals from legacy CAS index
+   *        tuples.
+   *
+   * Convenience overload accepting the legacy (active, inactive) index tuple,
+   * plumbed through the v2 @ref SymmetryBlockedIndexSet path with an equivalent
+   * spin (@f$S_z@f$) axis. The same indices apply to both spin channels.
+   *
+   * @param basis_size Number of single-particle modes.
+   * @param indices (active, inactive) mode-index tuple.
    */
   ModelOrbitals(
       size_t basis_size,
       const std::tuple<std::vector<size_t>, std::vector<size_t>>& indices);
 
   /**
-   * @brief Constructor with active and inactive space indices (unrestricted)
-   * @param basis_size Number of atomic orbitals (and molecular orbitals)
-   * @param indices Orbital indices as tuple of (active_alpha, inactive_alpha,
-   * active_beta, inactive_beta) space indices. For unrestricted calculations,
-   * separate indices can be specified for alpha and beta spin channels.
+   * @brief (v1) Construct unrestricted model orbitals from legacy CAS index
+   *        tuples.
+   *
+   * Convenience overload accepting the legacy (active_alpha, active_beta,
+   * inactive_alpha, inactive_beta) index tuple, plumbed through the v2
+   * @ref SymmetryBlockedIndexSet path with a (non-equivalent) spin (@f$S_z@f$)
+   * axis.
+   *
+   * @param basis_size Number of single-particle modes.
+   * @param indices (active_alpha, active_beta, inactive_alpha, inactive_beta)
+   *        mode-index tuple.
    */
   ModelOrbitals(
       size_t basis_size,

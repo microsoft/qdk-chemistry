@@ -6,13 +6,24 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import sys
 
 # Disable telemetry before any qdk_chemistry imports.
 # Uses setdefault so an explicit env override is still respected.
 os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
 
+# Force UTF-8 stdout/stderr (Windows cp1252 breaks circuit diagrams).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
+
+# Non-interactive backend; must precede any matplotlib.pyplot import.
+import matplotlib
+
+matplotlib.use("Agg")
+
 import platform as plt
-import sys
 import tempfile
 from pathlib import Path
 
@@ -21,12 +32,12 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     MajoranaMapping,
     Orbitals,
     QuantumErrorProfile,
+    StateVectorContainer,
     Wavefunction,
 )
 
@@ -132,12 +143,12 @@ def hamiltonian_10e6o(test_data_files_path):
 def wavefunction_4e4o():
     """Fixture to create the Wavefunction for 4e4o ethylene 2det problem."""
     test_orbitals = create_test_orbitals(4)
-    det1 = Configuration("2200")
-    det2 = Configuration("2020")
+    det1 = Configuration.from_spin_half_string("2200")
+    det2 = Configuration.from_spin_half_string("2020")
     dets = [det1, det2]
     coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals, "electrons")
     return Wavefunction(container)
 
 
@@ -145,13 +156,13 @@ def wavefunction_4e4o():
 def wavefunction_10e6o():
     """Fixture to create the Wavefunction for 10e6o f2 problem."""
     test_orbitals = create_test_orbitals(6)
-    det1 = Configuration("222220")
-    det2 = Configuration("220222")
-    det3 = Configuration("222202")
+    det1 = Configuration.from_spin_half_string("222220")
+    det2 = Configuration.from_spin_half_string("220222")
+    det3 = Configuration.from_spin_half_string("222202")
     dets = [det1, det2, det3]
     coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals, "electrons")
     return Wavefunction(container)
 
 

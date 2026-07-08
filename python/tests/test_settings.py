@@ -13,6 +13,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
 from qdk_chemistry.data import (
     AlgorithmRef,
     SettingNotFoundError,
@@ -570,7 +577,7 @@ class TestSettings:
             assert Path(json_file).exists()
 
             # Verify file content
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
@@ -650,7 +657,7 @@ class TestSettings:
             assert Path(json_file).exists()
 
             # Verify content
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
@@ -825,7 +832,7 @@ class TestSettings:
             settings.to_json_file(json_file2)
 
             # Files should be identical
-            with open(json_file1) as f1, open(json_file2) as f2:
+            with open(json_file1, encoding="utf-8") as f1, open(json_file2, encoding="utf-8") as f2:
                 assert f1.read() == f2.read()
 
             # Load with both methods and verify consistency
@@ -1391,6 +1398,7 @@ class TestAlgorithmRefSettings:
         with pytest.raises(ValueError, match="cannot be changed"):
             s.set("inner_algo", AlgorithmRef("wrong_type", "whatever"))
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_algorithm_ref_with_kwargs(self):
         """AlgorithmRef constructed with kwargs stores them in .settings."""
         ref = AlgorithmRef("scf_solver", "pyscf", max_iterations=200, method="dft")
@@ -1406,6 +1414,7 @@ class TestAlgorithmRefSettings:
         # In either case the construction must succeed.
         assert ref.settings is None or isinstance(ref.settings, Settings)
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_single_level_nesting_in_settings(self):
         """An AlgorithmRef with kwargs can be stored in Settings."""
         s = _SettingsWithAlgorithmRef()
@@ -1476,7 +1485,7 @@ class TestAlgorithmRefSettings:
         outer_ref_json = {
             "__type__": "algorithm_ref",
             "algorithm_type": "phase_estimation",
-            "algorithm_name": "iterative",
+            "algorithm_name": "qdk_iterative",
             "settings": {
                 "num_bits": 10,
                 "circuit_executor": inner_ref_json,
@@ -1492,7 +1501,7 @@ class TestAlgorithmRefSettings:
         outer = restored.get("my_algo")
         assert isinstance(outer, AlgorithmRef)
         assert outer.algorithm_type == "phase_estimation"
-        assert outer.algorithm_name == "iterative"
+        assert outer.algorithm_name == "qdk_iterative"
         assert outer.settings is not None
         assert outer.settings.get("num_bits") == 10
 

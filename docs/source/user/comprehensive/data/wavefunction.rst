@@ -41,13 +41,6 @@ Slater determinant container
 
 Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
-      :language: cpp
-      :start-after: // start-cell-create-slater
-      :end-before: // end-cell-create-slater
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
@@ -55,17 +48,17 @@ Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).
       :start-after: # start-cell-create-slater
       :end-before: # end-cell-create-slater
 
-SCI wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-sci
-      :end-before: // end-cell-create-sci
+      :start-after: // start-cell-create-slater
+      :end-before: // end-cell-create-slater
+
+SCI wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.
 
 .. tab:: Python API
 
@@ -74,17 +67,17 @@ Sparse multi-determinant wavefunctions for Selected Configuration Interaction me
       :start-after: # start-cell-create-sci
       :end-before: # end-cell-create-sci
 
-CAS wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A multi-determinant wavefunction from Complete Active Space methods (:term:`CASSCF`/:term:`CASCI`).
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-cas
-      :end-before: // end-cell-create-cas
+      :start-after: // start-cell-create-sci
+      :end-before: // end-cell-create-sci
+
+CAS wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A multi-determinant wavefunction from Complete Active Space methods (:term:`CASSCF`/:term:`CASCI`).
 
 .. tab:: Python API
 
@@ -93,18 +86,21 @@ A multi-determinant wavefunction from Complete Active Space methods (:term:`CASS
       :start-after: # start-cell-create-cas
       :end-before: # end-cell-create-cas
 
-MP2 wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A wavefunction container for second-order Møller-Plesset perturbation theory (:term:`MP2`), which stores a reference wavefunction and Hamiltonian.
-From these, T1 and T2 amplitudes can be computed on demand.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-mp2
-      :end-before: // end-cell-create-mp2
+      :start-after: // start-cell-create-cas
+      :end-before: // end-cell-create-cas
+
+Amplitude wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A single container, :class:`~qdk_chemistry.data.AmplitudeContainer`, represents amplitude-based correlated wavefunctions such as :term:`MP2` and coupled cluster.
+It stores a reference wavefunction together with T1/T2 excitation amplitudes, and records which correlated method produced them via :class:`~qdk_chemistry.data.AmplitudeType` (``MP2``, ``CCSD``, or ``Unspecified``).
+It is pure storage: the amplitudes are supplied by the producing algorithm and are not expanded into a determinant/coefficient representation, so determinant-, coefficient-, and :term:`RDM`-based accessors raise.
+
+The following example tags the amplitudes as :term:`MP2` (T1 is zero for MP2):
 
 .. tab:: Python API
 
@@ -113,18 +109,14 @@ From these, T1 and T2 amplitudes can be computed on demand.
       :start-after: # start-cell-create-mp2
       :end-before: # end-cell-create-mp2
 
-Coupled cluster wavefunction container
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-The container supports reduced density matrices (:term:`RDM`), which are available if they are provided at construction or computed and stored; otherwise, :term:`RDM`-related operations are not available.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-create-cc
-      :end-before: // end-cell-create-cc
+      :start-after: // start-cell-create-mp2
+      :end-before: // end-cell-create-mp2
+
+The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
 
 .. tab:: Python API
 
@@ -132,6 +124,13 @@ The container supports reduced density matrices (:term:`RDM`), which are availab
       :language: python
       :start-after: # start-cell-create-cc
       :end-before: # end-cell-create-cc
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-cc
+      :end-before: // end-cell-create-cc
 
 Properties
 ~~~~~~~~~~
@@ -250,13 +249,6 @@ Accessing wavefunction data
 
 The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access coefficients, determinants, and derived properties:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
-      :language: cpp
-      :start-after: // start-cell-access-data
-      :end-before: // end-cell-access-data
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
@@ -264,17 +256,17 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
       :start-after: # start-cell-access-data
       :end-before: # end-cell-access-data
 
-Accessing cluster amplitudes
-----------------------------
-
-For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
       :language: cpp
-      :start-after: // start-cell-access-amplitudes
-      :end-before: // end-cell-access-amplitudes
+      :start-after: // start-cell-access-data
+      :end-before: // end-cell-access-data
+
+Accessing cluster amplitudes
+----------------------------
+
+For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.
 
 .. tab:: Python API
 
@@ -282,6 +274,13 @@ For :term:`MP2` and coupled cluster wavefunctions, one can access T1 and T2 clus
       :language: python
       :start-after: # start-cell-access-amplitudes
       :end-before: # end-cell-access-amplitudes
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-access-amplitudes
+      :end-before: // end-cell-access-amplitudes
 
 Related classes
 ---------------

@@ -26,7 +26,7 @@ This example walks through the full quantum applications workflow: from building
 The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
-Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
+To run the examples, either clone the repository or download the packaged examples from the `GitHub releases page <https://github.com/microsoft/qdk-chemistry/releases>`_, as individual examples may depend on accompanying files within the examples directory.
 
 .. note::
 
@@ -41,6 +41,8 @@ Companion chemistry datasets and supporting assets are also available in `micros
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
+Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
+
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -51,19 +53,19 @@ Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units;
 See below for language specific examples of creating and serializing :doc:`comprehensive/data/structure` objects.
 
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-structure
-      :end-before: // end-cell-structure
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-structure
       :end-before: # end-cell-structure
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-structure
+      :end-before: // end-cell-structure
 
 Run a self-consistent field (SCF) calculation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -78,19 +80,19 @@ The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structu
 Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured to control the execution of the :term:`SCF` algorithm (e.g. convergence tolerances, etc) by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-scf
-      :end-before: // end-cell-scf
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-scf
       :end-before: # end-cell-scf
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
 
 
 Select an active space
@@ -104,19 +106,19 @@ See the :doc:`comprehensive/algorithms/active_space` documentation for a list of
 
 The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this case 6 electrons to be distributed in 6 orbitals (6e, 6o).
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-active-space
-      :end-before: // end-cell-active-space
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-active-space
       :end-before: # end-cell-active-space
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-active-space
+      :end-before: // end-cell-active-space
 
 
 Calculate the Hamiltonian
@@ -126,19 +128,19 @@ Once an active space has been selected, the electronic Hamiltonian can be comput
 QDK/Chemistry provides flexible Hamiltonian construction capabilities through the :doc:`comprehensive/algorithms/hamiltonian_constructor` algorithm.
 The Hamiltonian constructor generates the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum many-body calculations and quantum algorithms.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-hamiltonian-constructor
-      :end-before: // end-cell-hamiltonian-constructor
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-hamiltonian-constructor
       :end-before: # end-cell-hamiltonian-constructor
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-hamiltonian-constructor
+      :end-before: // end-cell-hamiltonian-constructor
 
 Compute a multi-configurational wavefunction for the active space
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -153,13 +155,6 @@ These methods also serve as a critical analysis tool, allowing users to better u
 
 In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a :term:`CASCI` calculation to obtain the exact ground state wavefunction within the active space.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-mc-compute
-      :end-before: // end-cell-mc-compute
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
@@ -167,18 +162,18 @@ In the following example, as the aforementioned (6e, 6o) active space is relativ
       :start-after: # start-cell-mc-compute
       :end-before: # end-cell-mc-compute
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-mc-compute
+      :end-before: // end-cell-mc-compute
+
 Select important configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For large active spaces, the multi-configuration :class:`~qdk_chemistry.data.Wavefunction` may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
-      :start-after: // start-cell-wfn-select-configs
-      :end-before: // end-cell-wfn-select-configs
 
 .. tab:: Python API
 
@@ -186,6 +181,13 @@ By identifying and retaining only the dominant configurations (those with the la
       :language: python
       :start-after: # start-cell-wfn-select-configs
       :end-before: # end-cell-wfn-select-configs
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-wfn-select-configs
+      :end-before: // end-cell-wfn-select-configs
 
 Preparing a qubit representation of the Hamiltonian
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -200,18 +202,18 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
 1. Filter out terms that have negligible expectation values given the sparse :class:`~qdk_chemistry.data.Wavefunction`, pre-computing their classical contributions.
 2. Group the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.
 
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // This step is currently only available in the Python API.
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-qubit-hamiltonian
       :end-before: # end-cell-qubit-hamiltonian
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // This step is currently only available in the Python API.
 
 Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -222,18 +224,18 @@ However, when the wavefunction is very sparse, these methods can be inefficient.
 In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates, provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
 See :doc:`comprehensive/algorithms/state_preparation` for more details on the other algorithms provided for state preparation in QDK/Chemistry.
 
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // This step is currently only available in the Python API.
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-state-prep-circuit
       :end-before: # end-state-prep-circuit
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // This step is currently only available in the Python API.
 
 
 Estimate the ground state energy by sampling
@@ -246,18 +248,18 @@ The measurement outcomes are repeated many times (shots) to build up statistics 
 The energy expectation value is computed by combining the measurement statistics from each group with their corresponding Hamiltonian coefficients and the pre-computed classical contributions.
 The statistical nature of quantum measurements introduces variance in the energy estimate, which decreases as the number of shots is increased.
 
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // This step is currently only available in the Python API.
-
 .. tab:: Python API
 
    .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-energy-estimation
       :end-before: # end-cell-energy-estimation
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // This step is currently only available in the Python API.
 
 Additional examples
 -------------------

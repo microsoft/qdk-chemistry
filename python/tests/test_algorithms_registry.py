@@ -100,7 +100,7 @@ class TestRegistryShowDefault:
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")
         assert isinstance(default_phase_estimation, str)
-        assert default_phase_estimation == "iterative"
+        assert default_phase_estimation == "qdk_iterative"
 
         # Test for time evolution builder
         default_unitary_builder = registry.show_default("hamiltonian_unitary_builder")
@@ -219,6 +219,41 @@ class TestRegistryCreate:
         mapper = registry.create("qubit_mapper", "qdk")
         assert mapper is not None
         assert mapper.type_name() == "qubit_mapper"
+
+
+class TestRegistryCachingWarnings:
+    """Test cache fallback warnings emitted by the algorithm wrapper."""
+
+    def test_cache_fallback_warns_when_hash_is_missing(self, tmp_path):
+        """A missing hash method falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithoutHash:
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithoutHash())
+
+        with pytest.warns(UserWarning, match="does not expose a compatible hash method"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
+
+    def test_cache_fallback_warns_when_hash_signature_rejects_arguments(self, tmp_path):
+        """A hash TypeError falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithNarrowHash:
+            def hash(self):
+                return "hash"
+
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithNarrowHash())
+
+        with pytest.warns(UserWarning, match="with the provided arguments"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
 
 
 class TestRegistryAvailable:
