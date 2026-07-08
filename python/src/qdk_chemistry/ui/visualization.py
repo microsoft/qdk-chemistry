@@ -368,8 +368,8 @@ def register_visualization_tools(app) -> None:
 
     Parameters
     ----------
-    app : FastMCP
-        The FastMCP application instance from ``tools.py``.
+    app
+        FastMCP application instance from ``tools.py``.
 
     """
     if not _WIDGETS_AVAILABLE:

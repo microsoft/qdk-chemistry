@@ -10,14 +10,11 @@ import os
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any
 
 from qdk_chemistry import data
 
 from .config import config
-
-F = TypeVar("F", bound=Callable[..., Any])
-T = TypeVar("T")
 
 
 class FilenameFormatError(Exception):
@@ -89,7 +86,7 @@ def ensure_filename_format(filename: str, data_type: str) -> str:
     raise FilenameFormatError(f"Unrecognized file extension for '{filename}'. Must end with .json, .hdf5, or .h5")
 
 
-def validate_project(func: F) -> str | F:
+def validate_project(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to validate project before executing the function.
 
     Validates that a project exists, is properly structured, and is the
@@ -102,8 +99,7 @@ def validate_project(func: F) -> str | F:
         func: The function to decorate. Must have ``project_name: str`` as a parameter.
 
     Returns:
-        F: The decorated function with project validation logic,
-        or str: a JSON string with error information.
+        Callable[..., Any]: The decorated function with project validation logic.
 
     Example::
 
@@ -140,7 +136,7 @@ def validate_project(func: F) -> str | F:
         finally:
             os.chdir(original_cwd)
 
-    return cast("F", wrapper)
+    return wrapper
 
 
 def is_project_valid(  # noqa: PLR0911

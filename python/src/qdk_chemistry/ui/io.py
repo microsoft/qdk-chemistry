@@ -6,9 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from typing import Any
 
 
-def check_output_exists(filename: str, data_class: type | None = None) -> str | None:
+def check_output_exists(filename: str, data_class: Any | None = None) -> str | None:
     """Check if an output file already exists with valid content.
 
     Args:

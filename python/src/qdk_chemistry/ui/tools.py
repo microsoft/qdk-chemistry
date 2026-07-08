@@ -862,7 +862,7 @@ def create_structure(
             without prompting. Default ``False``.
 
     Returns:
-        Path: The path where the json file was saved to
+        pathlib.Path: The path where the json file was saved to
         str: A string containing an error message, if there was a problem with the workflow.
 
     Examples:
