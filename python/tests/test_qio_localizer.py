@@ -26,7 +26,8 @@ def _single_orbital_entropy_sum(ga, gb, g2):
     for i in range(n):
         d = g2[i, i, i, i]
         omega = np.array([1.0 - ga[i, i] - gb[i, i] + d, ga[i, i] - d, gb[i, i] - d, d])
-        omega = omega[omega > 1e-14]
+        # Match the library convention (w > 0); w -> 0+ gives w*ln(w) -> 0.
+        omega = omega[omega > 0.0]
         total -= float(np.sum(omega * np.log(omega)))
     return total
 

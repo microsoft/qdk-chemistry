@@ -34,12 +34,14 @@ constexpr double kPi = 3.14159265358979323846;
 
 // Boguslawski & Tecmer (2015), doi:10.1002/qua.24832 single-orbital (von
 // Neumann) entropy from the orbital occupation eigenvalues
-// {1 - na - nb + d, na - d, nb - d, d}.
+// {1 - na - nb + d, na - d, nb - d, d}. Only strictly-positive eigenvalues
+// contribute (w -> 0+ gives w*ln(w) -> 0), matching the convention in
+// WavefunctionContainer::get_single_orbital_entropies (w > 0).
 double single_orbital_entropy(double na, double nb, double d) {
   const double omega[4] = {1.0 - na - nb + d, na - d, nb - d, d};
   double s = 0.0;
   for (double w : omega) {
-    if (w > 1e-14) {
+    if (w > 0.0) {
       s -= w * std::log(w);
     }
   }
