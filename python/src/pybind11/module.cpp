@@ -31,6 +31,7 @@ void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
+void bind_population_analysis(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
@@ -93,6 +94,7 @@ PYBIND11_MODULE(_core, m) {
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
+  bind_population_analysis(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);

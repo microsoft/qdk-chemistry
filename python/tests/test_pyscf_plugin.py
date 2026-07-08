@@ -153,6 +153,9 @@ class TestPyscfPlugin:
         available_stability_checkers = algorithms.available("stability_checker")
         assert "pyscf" in available_stability_checkers
 
+        available_population_analyzers = algorithms.available("population_analyzer")
+        assert "pyscf" in available_population_analyzers
+
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
@@ -177,6 +180,22 @@ class TestPyscfPlugin:
         """Test creating PySCF stability checker."""
         stability_checker = algorithms.create("stability_checker", "pyscf")
         assert stability_checker is not None
+
+    def test_pyscf_population_analyzer_creation(self):
+        """Test creating PySCF population analyzer."""
+        population_analyzer = algorithms.create("population_analyzer", "pyscf")
+        assert population_analyzer is not None
+
+    def test_pyscf_h2_population_analysis(self):
+        """Test PySCF Mulliken population analysis on neutral H2."""
+        h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        analyzer.settings().set("basis_set", "sto-3g")
+
+        charges = analyzer.run(h2)
+
+        assert len(charges) == 2
+        np.testing.assert_allclose(charges, [0.0, 0.0], atol=1e-8)
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""

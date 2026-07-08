@@ -10,6 +10,7 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
+#include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/settings.hpp>
@@ -37,6 +38,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(ScfSolverFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceSelectorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(HamiltonianConstructorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(PopulationAnalyzerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ProjectedMultiConfigurationCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(DynamicalCorrelationCalculatorFactory)

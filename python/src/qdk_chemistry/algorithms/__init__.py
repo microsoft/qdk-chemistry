@@ -14,6 +14,7 @@ import importlib
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
+from qdk_chemistry._core._algorithms import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.active_space_selector import (
     ActiveSpaceSelector,
     QdkAutocasActiveSpaceSelector,
@@ -73,6 +74,7 @@ __all__ = [
     "MultiConfigurationScf",
     "OrbitalLocalizer",
     "PhaseEstimation",
+    "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
@@ -85,6 +87,7 @@ __all__ = [
     "QdkNaturalOrbitalLocalizer",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
