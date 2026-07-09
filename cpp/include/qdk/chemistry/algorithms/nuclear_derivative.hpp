@@ -66,7 +66,7 @@ class NuclearDerivativeSettings : public data::Settings {
                 data::AlgorithmRef("hamiltonian_constructor", "qdk"),
                 "Hamiltonian constructor used when energy_calculator is a "
                 "multi_configuration_calculator. It builds the active-space "
-                "Hamiltonian from the reference orbitals before the MR energy "
+                "Hamiltonian from the reference orbitals before the energy "
                 "calculation.");
     set_default("compute_hessian", false,
                 "Whether to compute a nuclear Hessian in addition to energy "
