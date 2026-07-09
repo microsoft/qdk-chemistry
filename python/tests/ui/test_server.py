@@ -56,6 +56,7 @@ def _requires_algorithm(algorithm_type: str, algorithm_name: str) -> None:
 
 
 # Re-export all server functions with auto-unwrapping so tests stay unchanged
+create_majorana_mapping = _make_unwrapped(_server.create_majorana_mapping)
 create_model_hamiltonian = _make_unwrapped(_server.create_model_hamiltonian)
 create_spin_model_hamiltonian = _make_unwrapped(_server.create_spin_model_hamiltonian)
 get_algorithm_default_settings = _make_unwrapped(_server.get_algorithm_default_settings)
@@ -115,6 +116,16 @@ def simple_hamiltonian(simple_orbitals):
     """Create hamiltonian from simple orbitals."""
     ham_constructor = algorithms.create("hamiltonian_constructor")
     return ham_constructor.run(simple_orbitals)
+
+
+def create_test_mapping(project_name, hamiltonian_filename, out_mapping_filename="mapping.majorana_mapping.json"):
+    """Create a Jordan-Wigner mapping file for UI workflow tests."""
+    return create_majorana_mapping(
+        project_name=project_name,
+        hamiltonian_filename=hamiltonian_filename,
+        out_mapping_filename=out_mapping_filename,
+        overwrite=True,
+    )
 
 
 @pytest.fixture
@@ -218,6 +229,7 @@ class TestFilenameFormat:
             "Wavefunction": ".wavefunction.",
             "Orbitals": ".orbitals.",
             "Hamiltonian": ".hamiltonian.",
+            "MajoranaMapping": ".majorana_mapping.",
             "QubitHamiltonian": ".qubit_hamiltonian.",
             "Ansatz": ".ansatz.",
             "Circuit": ".circuit.",
@@ -274,10 +286,12 @@ class TestFilenameFormatInServerFunctions:
 
         # Save hamiltonian
         simple_hamiltonian.to_json_file(str(project_path / "test.hamiltonian.json"))
+        mapping_filename = create_test_mapping("test_project_qm_ext", "test.hamiltonian.json")
 
         result = run_qubit_mapper(
             project_name="test_project_qm_ext",
             hamiltonian_filename="test.hamiltonian.json",
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="output.dat",  # Invalid extension
         )
         assert isinstance(result, str)
@@ -733,15 +747,18 @@ class TestAlgorithmFunctions:
         project_path = temp_project_dir / "test_project4"
         project_path.mkdir(exist_ok=True)
         simple_hamiltonian.to_hdf5_file(project_path / "simple.hamiltonian.h5")
+        mapping_filename = create_test_mapping("test_project4", "simple.hamiltonian.h5")
 
         result = run_qubit_mapper(
             project_name="test_project4",
             hamiltonian_filename="simple.hamiltonian.h5",
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="out.qubit_hamiltonian.h5",
         )
 
         assert isinstance(result, str)
         assert "out.qubit_hamiltonian.h5" in result
+        assert (project_path / mapping_filename).exists()
         assert (project_path / "out.qubit_hamiltonian.h5").exists()
 
     @pytest.mark.usefixtures("simple_wavefunction")
@@ -788,9 +805,11 @@ class TestAlgorithmFunctions:
         simple_hamiltonian.to_json_file(project_path / "simple.hamiltonian.json")
 
         # First map to qubit Hamiltonian
+        mapping_filename = create_test_mapping("test_project6", "simple.hamiltonian.json")
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_project6",
             hamiltonian_filename="simple.hamiltonian.json",
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -849,9 +868,11 @@ class TestAlgorithmFunctions:
             orbitals_filename="orbitals.orbitals.json",
             out_hamiltonian_filename="hamiltonian.hamiltonian.json",
         )
+        mapping_filename = create_test_mapping("test_energy", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_energy",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.h5",
         )
 
@@ -1171,9 +1192,11 @@ class TestPhaseEstimationFunctions:
             orbitals_filename="orbitals.orbitals.json",
             out_hamiltonian_filename="hamiltonian.hamiltonian.json",
         )
+        mapping_filename = create_test_mapping("test_rteb", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_rteb",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -1217,9 +1240,11 @@ class TestPhaseEstimationFunctions:
             orbitals_filename="orbitals.orbitals.json",
             out_hamiltonian_filename="hamiltonian.hamiltonian.json",
         )
+        mapping_filename = create_test_mapping("test_rcecm", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_rcecm",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
         teu_filename = run_time_evolution_builder(
@@ -1284,9 +1309,11 @@ class TestPhaseEstimationFunctions:
             orbitals_filename="orbitals.orbitals.json",
             out_hamiltonian_filename="hamiltonian.hamiltonian.json",
         )
+        mapping_filename = create_test_mapping("test_qpe", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_qpe",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -1339,9 +1366,11 @@ class TestPhaseEstimationFunctions:
             orbitals_filename="orbitals.orbitals.json",
             out_hamiltonian_filename="hamiltonian.hamiltonian.json",
         )
+        mapping_filename = create_test_mapping("test_qpe_configs", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_qpe_configs",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -1382,6 +1411,7 @@ class TestPhaseEstimationFunctions:
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_qpe_invalid",
             hamiltonian_filename="ham.hamiltonian.json",
+            mapping_filename=create_test_mapping("test_qpe_invalid", "ham.hamiltonian.json"),
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -1574,9 +1604,11 @@ class TestModelHamiltonians:
         )
         assert isinstance(ham_file, str)
 
+        mapping_filename = create_test_mapping("test_hub_workflow", ham_file)
         qh_file = run_qubit_mapper(
             project_name="test_hub_workflow",
             hamiltonian_filename=ham_file,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="hub.qubit_hamiltonian.json",
         )
         assert isinstance(qh_file, str)
@@ -1654,9 +1686,11 @@ class TestIntegrationWorkflows:
         )
 
         # Map to qubits
+        mapping_filename = create_test_mapping("test_integration2", hamiltonian_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_integration2",
             hamiltonian_filename=hamiltonian_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -1728,9 +1762,11 @@ class TestIntegrationWorkflows:
         hamiltonian = data.Hamiltonian.from_hdf5_file(str(project_path / ham_filename))
         assert isinstance(hamiltonian, data.Hamiltonian)
 
+        mapping_filename = create_test_mapping("test_full_workflow", ham_filename)
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_full_workflow",
             hamiltonian_filename=ham_filename,
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubitham.qubit_hamiltonian.hdf5",
         )
 
@@ -1788,6 +1824,7 @@ class TestErrorHandling:
         result = run_qubit_mapper(
             project_name="test_error3",
             hamiltonian_filename="not_hamiltonian.hamiltonian.json",
+            mapping_filename="missing.majorana_mapping.json",
             out_qubit_hamiltonian_filename="out.qubit_hamiltonian.json",
         )
 
@@ -1827,9 +1864,11 @@ class TestNonDefaultAlgorithms:
         simple_hamiltonian.to_json_file(project_path / "simple.hamiltonian.json")
 
         # First map to qubit Hamiltonian
+        mapping_filename = create_test_mapping("test_dense_solver", "simple.hamiltonian.json")
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_dense_solver",
             hamiltonian_filename="simple.hamiltonian.json",
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 
@@ -2106,9 +2145,11 @@ class TestNonDefaultAlgorithms:
         simple_hamiltonian.to_json_file(project_path / "simple.hamiltonian.json")
 
         # First map to qubit Hamiltonian
+        mapping_filename = create_test_mapping("test_sparse_solver_settings", "simple.hamiltonian.json")
         qubit_ham_filename = run_qubit_mapper(
             project_name="test_sparse_solver_settings",
             hamiltonian_filename="simple.hamiltonian.json",
+            mapping_filename=mapping_filename,
             out_qubit_hamiltonian_filename="qubit.qubit_hamiltonian.hdf5",
         )
 

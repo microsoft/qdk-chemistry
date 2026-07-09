@@ -86,7 +86,8 @@ These tools bypass the molecular workflow (SCF, active space, etc.) and produce 
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `run_qubit_mapper` | Jordan-Wigner fermion-to-qubit mapping | `project_name`, `hamiltonian_filename`, `out_qubit_hamiltonian_filename` |
+| `create_majorana_mapping` | Create fermion-to-qubit mapping file | `project_name`, `out_mapping_filename`, `encoding?`, `num_modes?`, `hamiltonian_filename?` |
+| `run_qubit_mapper` | Apply mapping file to fermionic Hamiltonian | `project_name`, `hamiltonian_filename`, `mapping_filename`, `out_qubit_hamiltonian_filename` |
 | `run_state_preparation` | Build state-prep circuit from classical wavefunction | `project_name`, `wavefunction_filename`, `out_circuit_filename` |
 | `run_qubit_hamiltonian_solver` | Exact diagonalization (small systems only) | `project_name`, `qubit_hamiltonian_filename` |
 | `run_energy_estimator` | Shot-based energy estimation from circuit measurements | `project_name`, `circuit_filename`, `qubit_hamiltonian_filename`, `out_energy_result_filename`, `out_measurement_data_filename`, `total_shots` |
@@ -147,9 +148,10 @@ A typical workflow chains tools in order with a consistent `project_name`.
 4. **Select active space** → `run_active_space_selector` (choose strategy based on system — see below)
 5. **Extract orbitals** → `get_orbitals_from_input`
 6. **Build Hamiltonian** → `run_hamiltonian_constructor`
-7. **Map to qubits** → `run_qubit_mapper`
-8. **Prepare state** → `run_state_preparation`
-9. **Choose endpoint:**
+7. **Create mapping** → `create_majorana_mapping`
+8. **Map to qubits** → `run_qubit_mapper`
+9. **Prepare state** → `run_state_preparation`
+10. **Choose endpoint:**
    - **Resource analysis (Mode A):** `run_time_evolution_builder` → `run_controlled_evolution_circuit_mapper` → `run_resource_estimation` for full logical + physical resource profile
    - **Energy (Mode B):** `run_phase_estimation` with sub-algorithms configured inline via `settings`
    - **Shot-based energy:** `run_energy_estimator` (grouping is handled internally)
@@ -158,7 +160,7 @@ A typical workflow chains tools in order with a consistent `project_name`.
 
 For lattice models (Hubbard, Ising, Heisenberg, etc.), skip the molecular pipeline entirely:
 
-- **Fermionic models** (Hückel, Hubbard, PPP): `create_model_hamiltonian` → `run_qubit_mapper` → continue with quantum steps
+- **Fermionic models** (Hückel, Hubbard, PPP): `create_model_hamiltonian` → `create_majorana_mapping` → `run_qubit_mapper` → continue with quantum steps
 - **Spin models** (Heisenberg, Ising): `create_spin_model_hamiltonian` → produces a qubit Hamiltonian directly (no qubit mapping needed)
 
 The agent must determine appropriate model parameters (couplings, lattice geometry, etc.) from the user's description of the physical system.
@@ -240,8 +242,13 @@ qc run correlate --project-name h2 --ansatz-filename h2.ansatz.json \
 qc run hamiltonian --project-name h2 --orbitals-filename h2_as.orbitals.json \
   --out-hamiltonian-filename h2.hamiltonian.json
 
+# Majorana mapping
+qc run majorana-map --project-name h2 --hamiltonian-filename h2.hamiltonian.json \
+  --out-mapping-filename h2.majorana_mapping.json
+
 # Qubit mapping
 qc run qubit-map --project-name h2 --hamiltonian-filename h2.hamiltonian.json \
+  --mapping-filename h2.majorana_mapping.json \
   --out-qubit-hamiltonian-filename h2.qubit_hamiltonian.json
 
 # State preparation

@@ -90,11 +90,16 @@ The full qubit Hamiltonian has 1247 Pauli terms. After filtering based on the pr
      algorithm_name="sparse_isometry_gf2x")
    → VISUALIZE: circuit (note: ~1 fine rotation)
 
-10. run_qubit_mapper(project_name="benzene_dirad",
+10. create_majorana_mapping(project_name="benzene_dirad",
+     hamiltonian_filename="bd.hamiltonian.json",
+     out_mapping_filename="bd.majorana_mapping.json")
+
+11. run_qubit_mapper(project_name="benzene_dirad",
       hamiltonian_filename="bd.hamiltonian.json",
+     mapping_filename="bd.majorana_mapping.json",
       out_qubit_hamiltonian_filename="bd.qubit_hamiltonian.json")
 
-11. run_energy_estimator(project_name="benzene_dirad",
+12. run_energy_estimator(project_name="benzene_dirad",
       circuit_filename="bd_sparse.circuit.json",
       qubit_hamiltonian_filename="bd.qubit_hamiltonian.json",
       # Pauli term grouping is handled internally by the energy estimator

@@ -49,6 +49,7 @@ from .io import load_data_object, save_data_object
 # Imports from the MCP server (shared backend)
 # ---------------------------------------------------------------------------
 from .tools import (
+    create_majorana_mapping,
     create_model_hamiltonian,
     create_spin_model_hamiltonian,
     create_structure,
@@ -388,6 +389,19 @@ def cmd_spin_model(args):
     _print_result(result)
 
 
+def cmd_majorana_mapping(args):
+    """Create a MajoranaMapping data file."""
+    result = create_majorana_mapping(
+        project_name=args.project_name,
+        out_mapping_filename=args.out_mapping_filename,
+        encoding=args.encoding,
+        num_modes=args.num_modes,
+        hamiltonian_filename=args.hamiltonian_filename,
+        overwrite=getattr(args, "overwrite", False),
+    )
+    _print_result(result)
+
+
 def cmd_casci(args):
     """Run multi-configuration (CASCI / selected-CI) calculation."""
     settings = getattr(args, "settings", None) or {}
@@ -454,6 +468,7 @@ def cmd_qubit_map(args):
     result = run_qubit_mapper(
         project_name=args.project_name,
         hamiltonian_filename=args.hamiltonian_filename,
+        mapping_filename=args.mapping_filename,
         out_qubit_hamiltonian_filename=args.out_qubit_hamiltonian_filename,
         algorithm_name=args.algorithm_name,
         settings=settings,
@@ -1305,6 +1320,25 @@ def _create_algorithm_parsers(subparsers):
     p.add_argument("--overwrite", action="store_true", help="Overwrite existing output")
     p.set_defaults(func=cmd_spin_model)
 
+    # majorana-map
+    p = subparsers.add_parser(
+        "majorana-map",
+        help="Create a MajoranaMapping data file",
+        description="Create a fermion-to-qubit mapping file for downstream qubit mapping.",
+    )
+    p.add_argument("--project-name", required=True, help="Project name")
+    p.add_argument("--out-mapping-filename", required=True, help="Output MajoranaMapping filename")
+    p.add_argument(
+        "--encoding",
+        default="jordan-wigner",
+        choices=["jordan-wigner", "bravyi-kitaev", "bravyi-kitaev-tree", "parity"],
+        help="Fermion-to-qubit encoding to create",
+    )
+    p.add_argument("--num-modes", type=int, help="Number of fermionic spin-orbital modes")
+    p.add_argument("--hamiltonian-filename", help="Hamiltonian filename used to derive num_modes")
+    p.add_argument("--overwrite", action="store_true", help="Overwrite existing output")
+    p.set_defaults(func=cmd_majorana_mapping)
+
     # casci
     p = subparsers.add_parser(
         "casci",
@@ -1363,10 +1397,11 @@ def _create_algorithm_parsers(subparsers):
     p = subparsers.add_parser(
         "qubit-map",
         help="Map fermionic Hamiltonian to qubit Hamiltonian",
-        description="Apply Jordan-Wigner or other fermion-to-qubit mapping.",
+        description="Apply a MajoranaMapping file to a fermionic Hamiltonian.",
     )
     p.add_argument("--project-name", required=True, help="Project name")
     p.add_argument("--hamiltonian-filename", required=True, help="Fermionic Hamiltonian filename")
+    p.add_argument("--mapping-filename", required=True, help="MajoranaMapping filename")
     p.add_argument("--out-qubit-hamiltonian-filename", required=True, help="Output qubit Hamiltonian filename")
     _add_simple_algorithm_args(p)
     p.set_defaults(func=cmd_qubit_map)
@@ -1784,6 +1819,7 @@ _WORKFLOW_COMMANDS = {
     "hamiltonian": run_hamiltonian_constructor,
     "model-hamiltonian": create_model_hamiltonian,
     "spin-model": create_spin_model_hamiltonian,
+    "majorana-map": create_majorana_mapping,
     "casci": run_multi_configuration_calculation,
     "mcscf": run_multi_configuration_scf,
     "sparse-ci": run_projected_multi_configuration_calculation,

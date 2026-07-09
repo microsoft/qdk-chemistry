@@ -44,7 +44,7 @@ scf = create("scf_solver", "pyscf", convergence_threshold=1e-8)
 | `multi_configuration_calculator` | CASCI / Selected CI | `macis_cas`, `macis_asci` |
 | `multi_configuration_scf` | CASSCF | (default) |
 | `hamiltonian_constructor` | Fermionic Hamiltonian | `qdk` |
-| `qubit_mapper` | Fermion-to-qubit encoding | `qdk`, `qiskit` |
+| `qubit_mapper` | Apply a `MajoranaMapping` to a Hamiltonian | `qdk`, `qiskit` |
 | `state_prep` | State preparation circuit | `sparse_isometry_gf2x` |
 | `dynamical_correlation_calculator` | MP2 / CCSD / CCSD(T) | `pyscf_mp2`, `pyscf_ccsd` |
 | `stability_checker` | SCF solution stability | `qdk` |
@@ -170,8 +170,11 @@ autocas = create("active_space_selector", "qdk_autocas_eos")
 wfn_refined = autocas.run(wfn_cas)
 
 # 9. Qubit mapping
+from qdk_chemistry.data import MajoranaMapping
+
 qubit_mapper = create("qubit_mapper")
-qubit_ham = qubit_mapper.run(hamiltonian)
+mapping = MajoranaMapping.jordan_wigner(num_modes=2 * hamiltonian.get_one_body_integrals()[0].shape[0])
+qubit_ham = qubit_mapper.run(hamiltonian, mapping)
 
 # 10. State preparation
 state_prep = create("state_prep")

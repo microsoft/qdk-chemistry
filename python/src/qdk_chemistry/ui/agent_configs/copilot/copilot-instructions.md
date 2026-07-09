@@ -91,7 +91,8 @@ These tools bypass the molecular workflow (SCF, active space, etc.) and produce 
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `run_qubit_mapper` | Jordan-Wigner fermion-to-qubit mapping | `project_name`, `hamiltonian_filename`, `out_qubit_hamiltonian_filename` |
+| `create_majorana_mapping` | Create fermion-to-qubit mapping file | `project_name`, `out_mapping_filename`, `encoding?`, `num_modes?`, `hamiltonian_filename?` |
+| `run_qubit_mapper` | Apply mapping file to fermionic Hamiltonian | `project_name`, `hamiltonian_filename`, `mapping_filename`, `out_qubit_hamiltonian_filename` |
 | `run_state_preparation` | Build state-prep circuit from wavefunction | `project_name`, `wavefunction_filename`, `out_circuit_filename` |
 | `run_qubit_hamiltonian_solver` | Exact diagonalization (small systems) | `project_name`, `qubit_hamiltonian_filename` |
 | `run_energy_estimator` | Shot-based energy estimation | `project_name`, `circuit_filename`, `qubit_hamiltonian_filename`, `total_shots`, `out_energy_result_filename`, `out_measurement_data_filename` |
@@ -256,7 +257,7 @@ qc run correlate \
 For lattice models (Hubbard, Ising, Heisenberg, etc.), skip the entire molecular pipeline and go directly to a Hamiltonian. The agent must determine appropriate model parameters (couplings, lattice size, etc.) from the user's description of the physical system.
 
 ```bash
-# Fermionic model → use create_model_hamiltonian, then qubit-map
+# Fermionic model → use create_model_hamiltonian, then majorana-map and qubit-map
 qc run model-hamiltonian \
   --project-name myproj \
   --model hubbard \
@@ -278,13 +279,20 @@ Then continue with Stage 3 (qubit mapping for fermionic models) or Stage 4 (quan
 ### Stage 3: Quantum Preparation & Compression
 
 ```bash
-# 7. Map fermions to qubits (Jordan-Wigner)
+# 7. Create a fermion-to-qubit mapping file
+qc run majorana-map \
+  --project-name myproj \
+  --hamiltonian-filename as.hamiltonian.json \
+  --out-mapping-filename as.majorana_mapping.json
+
+# 8. Map fermions to qubits
 qc run qubit-map \
   --project-name myproj \
   --hamiltonian-filename as.hamiltonian.json \
+  --mapping-filename as.majorana_mapping.json \
   --out-qubit-hamiltonian-filename as.qubit_hamiltonian.json
 
-# 8. Build state preparation circuit
+# 9. Build state preparation circuit
 qc run state-prep \
   --project-name myproj \
   --wavefunction-filename as.wavefunction.json \
@@ -400,7 +408,8 @@ qc workflow --config pipeline.json --project-name myproj
     {"command": "scf", "args": {"structure_filename": "$prev", "out_wavefunction_filename": "scf.wavefunction.json", "charge": 0, "spin_multiplicity": 1, "basis_set": "sto-3g"}},
     {"command": "get-orbitals", "args": {"input_filename": "$prev", "out_orbitals_filename": "scf.orbitals.json"}},
     {"command": "hamiltonian", "args": {"orbitals_filename": "$prev", "out_hamiltonian_filename": "h2.hamiltonian.json"}},
-    {"command": "qubit-map", "args": {"hamiltonian_filename": "$prev", "out_qubit_hamiltonian_filename": "h2.qubit_hamiltonian.json"}},
+    {"command": "majorana-map", "args": {"hamiltonian_filename": "$prev", "out_mapping_filename": "h2.majorana_mapping.json"}},
+    {"command": "qubit-map", "args": {"hamiltonian_filename": "$step.4", "mapping_filename": "$prev", "out_qubit_hamiltonian_filename": "h2.qubit_hamiltonian.json"}},
     {"command": "state-prep", "args": {"wavefunction_filename": "$step.2", "out_circuit_filename": "h2.circuit.json"}}
   ]
 }
@@ -553,10 +562,11 @@ qc --dry-run run scf --project-name h2 --structure-filename h2.structure.json ..
 | `run hamiltonian` | Build fermionic Hamiltonian |
 | `run model-hamiltonian` | Build lattice model Hamiltonian (Hückel, Hubbard, PPP) |
 | `run spin-model` | Build spin model Hamiltonian (Heisenberg, Ising) |
+| `run majorana-map` | Create fermion-to-qubit mapping file |
 | `run casci` | CASCI / selected CI |
 | `run mcscf` | MCSCF / CASSCF (compound, `--config`) |
 | `run sparse-ci` | Projected/sparse multi-configuration CI |
-| `run qubit-map` | Map fermionic → qubit Hamiltonian |
+| `run qubit-map` | Apply mapping file to fermionic Hamiltonian |
 | `run state-prep` | Generate state preparation circuit |
 | `run qubit-solve` | Exact diagonalization of qubit Hamiltonian |
 | `run resource-estimation` | Quantum resource estimation (logical + physical) |

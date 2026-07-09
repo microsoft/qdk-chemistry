@@ -381,10 +381,11 @@ def _get_loadable_data_classes() -> list[type]:
     classes = []
     for name in data.__all__:
         cls = getattr(data, name, None)
+        type_name = getattr(cls, "_data_type_name", None) if cls is not None else None
         if (
             cls is not None
             and inspect.isclass(cls)
-            and getattr(cls, "_data_type_name", None) is not None
+            and (type_name is not None or name == "MajoranaMapping")
             and hasattr(cls, "from_json_file")
         ):
             classes.append(cls)
@@ -562,6 +563,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_dynamical_correlation_calculator",
     ],
     "quantum_preparation": [
+        "create_majorana_mapping",
         "run_qubit_mapper",
         "run_state_preparation",
         "run_qubit_hamiltonian_solver",
@@ -590,6 +592,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
 __all__ = [
     "convert_coordinates",
     "convert_energy",
+    "create_majorana_mapping",
     "create_model_hamiltonian",
     "create_project",
     "create_spin_model_hamiltonian",
@@ -2240,9 +2243,92 @@ def run_energy_estimator(
 @app.tool()
 @_structured
 @validate_project
+def create_majorana_mapping(
+    project_name: str,
+    out_mapping_filename: str,
+    encoding: str = "jordan-wigner",
+    num_modes: int | None = None,
+    hamiltonian_filename: str | None = None,
+    overwrite: bool = False,
+) -> str:
+    """Create a MajoranaMapping data file for fermion-to-qubit mapping.
+
+    The qubit mapper algorithm expects an explicit
+    :class:`~qdk_chemistry.data.MajoranaMapping` object. This tool creates
+    that object as a project file so it can be passed to `run_qubit_mapper`.
+
+    Provide either `num_modes` directly or a `hamiltonian_filename` from which
+    the number of spin-orbital modes is derived as twice the number of spatial
+    orbitals. If both are provided, they must agree.
+
+    Supported encodings: `"jordan-wigner"`, `"bravyi-kitaev"`,
+    `"bravyi-kitaev-tree"`, and `"parity"`.
+
+    Args:
+        project_name (str): Name of the current qdk/chemistry project
+        out_mapping_filename (str): Name of the file where the mapping will be saved
+        encoding (str): Fermion-to-qubit mapping factory to use
+        num_modes (int, optional): Number of fermionic spin-orbital modes
+        hamiltonian_filename (str, optional): Hamiltonian file used to derive `num_modes`
+        overwrite (bool): If ``True``, overwrite existing output files
+            without prompting. Default ``False``.
+
+    Returns:
+        str: Filename where the MajoranaMapping was saved
+        OR error message if there was a problem in the workflow.
+
+    """
+    out_mapping_filename = _strip(out_mapping_filename)
+    out_mapping_filename, _err = _prepare_output(
+        out_mapping_filename, "MajoranaMapping", data.MajoranaMapping, overwrite=overwrite
+    )
+    if _err:
+        return _err
+
+    derived_num_modes = None
+    if hamiltonian_filename is not None:
+        hamiltonian_filename = _strip(hamiltonian_filename)
+        hamiltonian, _err = _load_or_error(hamiltonian_filename, data.Hamiltonian, "hamiltonian")
+        if _err:
+            return _err
+        n_spatial_orbitals = hamiltonian.get_one_body_integrals()[0].shape[0]
+        derived_num_modes = 2 * n_spatial_orbitals
+
+    if num_modes is None:
+        if derived_num_modes is None:
+            return "ERROR: Provide either num_modes or hamiltonian_filename to create a MajoranaMapping."
+        num_modes = derived_num_modes
+    elif derived_num_modes is not None and num_modes != derived_num_modes:
+        return (
+            f"ERROR: num_modes ({num_modes}) does not match the Hamiltonian-derived spin-orbital mode count "
+            f"({derived_num_modes})."
+        )
+
+    if num_modes <= 0:
+        return f"ERROR: num_modes must be positive, got {num_modes}."
+
+    mapping_factories = {
+        "jordan-wigner": data.MajoranaMapping.jordan_wigner,
+        "bravyi-kitaev": data.MajoranaMapping.bravyi_kitaev,
+        "bravyi-kitaev-tree": data.MajoranaMapping.bravyi_kitaev_tree,
+        "parity": data.MajoranaMapping.parity,
+    }
+    if encoding not in mapping_factories:
+        return f"ERROR: Unsupported encoding '{encoding}'. Supported encodings: {', '.join(mapping_factories)}."
+
+    mapping = mapping_factories[encoding](num_modes=num_modes)
+    save_data_object(mapping, out_mapping_filename)
+
+    return out_mapping_filename
+
+
+@app.tool()
+@_structured
+@validate_project
 def run_qubit_mapper(
     project_name: str,
     hamiltonian_filename: str,
+    mapping_filename: str,
     out_qubit_hamiltonian_filename: str,
     algorithm_name: str | None = None,
     settings: dict | None = None,
@@ -2252,7 +2338,7 @@ def run_qubit_mapper(
     """Map a fermionic Hamiltonian to a qubit Hamiltonian.
 
     This method transforms a fermionic Hamiltonian (expressed in terms of fermionic creation/annihilation operators)
-    into a qubit Hamiltonian (expressed as a weighted sum of Pauli strings) using a specified fermion-to-qubit encoding.
+    into a qubit Hamiltonian (expressed as a weighted sum of Pauli strings) using an explicit MajoranaMapping file.
 
     Typical workflow context:
 
@@ -2261,16 +2347,18 @@ def run_qubit_mapper(
     **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
     1. Run `run_scf` to get an initial wavefunction
     2. Extract orbitals → `run_hamiltonian_constructor` on full SCF orbitals
-    3. (THIS TOOL) `run_qubit_mapper` to convert to qubits
-    4. Proceed to state preparation / QPE / resource estimation
+    3. Run `create_majorana_mapping` using the Hamiltonian to create the mapping file
+    4. (THIS TOOL) `run_qubit_mapper` to convert to qubits
+    5. Proceed to state preparation / QPE / resource estimation
 
     **Active-space path** (larger systems):
     1. Run `run_scf` → active space analysis (SCI + AutoCAS) → compress orbital space
     2. (Optional) `run_multi_configuration_calculation` for classical reference energy
     3. (Optional) Sparsify wavefunction via `run_projected_multi_configuration_calculation`
     4. Extract orbitals → `run_hamiltonian_constructor` on active-space orbitals
-    5. (THIS TOOL) `run_qubit_mapper` to convert to qubits
-    6. Proceed to state preparation / QPE / resource estimation
+    5. Run `create_majorana_mapping` using the Hamiltonian to create the mapping file
+    6. (THIS TOOL) `run_qubit_mapper` to convert to qubits
+    7. Proceed to state preparation / QPE / resource estimation
 
     Ask the user which approach they prefer if it's not clear from the system size.
 
@@ -2285,6 +2373,7 @@ def run_qubit_mapper(
 
     Usage guidelines:
 
+    - Create the mapping explicitly with `create_majorana_mapping` before using this tool.
     - The default qubit mapper can be extracted using the function and MCP tool `get_algorithm_default_type`.
     - The qubit Hamiltonian output is compatible with energy estimation and quantum circuit algorithms.
 
@@ -2293,16 +2382,15 @@ def run_qubit_mapper(
     - The current set of default settings can be obtained by using
       the function and MCP tool
       `get_algorithm_default_settings`.
-    - The key setting is `encoding` (default, `"jordan-wigner"`), which specifies the fermion-to-qubit transformation.
-      The choice of encoding affects the qubit Hamiltonian structure but not the final energy.
-      The default encoding should be used unless there is specific justification.
+        - The fermion-to-qubit encoding is not a mapper setting. It is carried by the `MajoranaMapping` file passed via
+            `mapping_filename`.
 
     Args:
         project_name (str): Name of the current qdk/chemistry project
         hamiltonian_filename (str): Name of the file containing the fermionic Hamiltonian in the current directory
+        mapping_filename (str): Name of the MajoranaMapping file to use for fermion-to-qubit mapping
         out_qubit_hamiltonian_filename (str): Name of the file where the output qubit Hamiltonian will be saved
         algorithm_name (str, optional): The name of the qubit mapper algorithm to use, if overriding the default
-            (options: "qiskit")
         settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
             with specific values (overrides defaults)
         cache (str, optional): Cache backend identifier for result caching
@@ -2317,6 +2405,7 @@ def run_qubit_mapper(
     """
     # Strip filenames in case full path is passed
     hamiltonian_filename = _strip(hamiltonian_filename)
+    mapping_filename = _strip(mapping_filename)
     out_qubit_hamiltonian_filename = _strip(out_qubit_hamiltonian_filename)
     out_qubit_hamiltonian_filename, _err = _prepare_output(
         out_qubit_hamiltonian_filename, "QubitHamiltonian", data.QubitHamiltonian, overwrite=overwrite
@@ -2328,12 +2417,13 @@ def run_qubit_mapper(
     if _err:
         return _err
 
+    mapping, _err = _load_or_error(mapping_filename, data.MajoranaMapping, "majorana mapping")
+    if _err:
+        return _err
+
     qubit_mapper = algorithms.create("qubit_mapper", algorithm_name)
 
     _apply_settings(qubit_mapper, settings)
-
-    n_spatial = hamiltonian.get_one_body_integrals()[0].shape[0]
-    mapping = data.MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
 
     # run qubit mapping
     qubit_hamiltonian = _run_algorithm(

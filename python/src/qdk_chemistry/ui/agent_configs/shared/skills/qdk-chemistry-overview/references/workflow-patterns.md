@@ -21,8 +21,9 @@ For lattice models (Hubbard, Hückel, PPP, Ising, Heisenberg), skip SCF and acti
 
 **Fermionic models** (Hückel, Hubbard, PPP):
 1. `create_model_hamiltonian` — specify model type, lattice geometry, and coupling parameters
-2. `run_qubit_mapper` — map to qubit Hamiltonian
-3. Continue with the chosen endpoint below
+2. `create_majorana_mapping` — create a mapping file sized from the Hamiltonian
+3. `run_qubit_mapper` — apply the mapping file to produce a qubit Hamiltonian
+4. Continue with the chosen endpoint below
 
 **Spin models** (Heisenberg, Ising):
 1. `create_spin_model_hamiltonian` — produces a qubit Hamiltonian directly (no qubit mapping needed)
@@ -36,11 +37,12 @@ The user wants a resource profile — qubit count, circuit depth, gate counts, T
 
 Continue from the common stem:
 
-7. **Map to qubits** — `run_qubit_mapper` (Jordan-Wigner)
-8. **State preparation** — `run_state_preparation`
-9. **Build time evolution** — `run_time_evolution_builder` (constructs U = exp(-iHt))
-10. **Build controlled circuit** — `run_controlled_evolution_circuit_mapper`
-11. **Resource estimation** — `run_resource_estimation` on the circuit(s)
+7. **Create mapping** — `create_majorana_mapping` (Jordan-Wigner by default)
+8. **Map to qubits** — `run_qubit_mapper`
+9. **State preparation** — `run_state_preparation`
+10. **Build time evolution** — `run_time_evolution_builder` (constructs U = exp(-iHt))
+11. **Build controlled circuit** — `run_controlled_evolution_circuit_mapper`
+12. **Resource estimation** — `run_resource_estimation` on the circuit(s)
 
 Extract the resource profile from steps 10–11 and present it: logical qubits, circuit depth, total gates, Clifford gates, T-count, T-depth, physical qubits, runtime, code distance, and error budget.
 
@@ -52,9 +54,10 @@ The user wants an actual energy number from QPE.
 
 Continue from the common stem:
 
-7. **Map to qubits** — `run_qubit_mapper`
-8. **State preparation** — `run_state_preparation`
-9. **Run phase estimation** — `run_phase_estimation` with sub-algorithm overrides in `settings`
+7. **Create mapping** — `create_majorana_mapping`
+8. **Map to qubits** — `run_qubit_mapper`
+9. **State preparation** — `run_state_preparation`
+10. **Run phase estimation** — `run_phase_estimation` with sub-algorithm overrides in `settings`
 
 **Critical:** `run_phase_estimation` has intentionally invalid defaults: `num_bits=-1` and `evolution_time=0.0`. You MUST override these in settings. Typical values: `num_bits=10` (≈1 mHa precision), `evolution_time` computed from the Hamiltonian's spectral norm.
 

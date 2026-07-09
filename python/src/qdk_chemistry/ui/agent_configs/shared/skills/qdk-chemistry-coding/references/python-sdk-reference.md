@@ -88,11 +88,14 @@ circuit = state_prep.run(wfn_sparse)
 ### Qubit Mapper
 
 ```python
-mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-qubit_H = mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+mapper = create("qubit_mapper", "qiskit")
+mapping = MajoranaMapping.jordan_wigner(num_modes=2 * hamiltonian.get_one_body_integrals()[0].shape[0])
+qubit_H = mapper.run(hamiltonian, mapping)
 ```
 
-Encodings: `"jordan-wigner"` (default), `"bravyi-kitaev"`, `"parity"`
+Common mapping factories: `MajoranaMapping.jordan_wigner(...)`, `.bravyi_kitaev(...)`, `.parity(...)`
 
 ### Dynamical Correlation Calculator
 

@@ -39,6 +39,8 @@ def _build_data_type_markers() -> dict[str, str]:
 
         # Get _data_type_name if it exists and is not None
         type_name = getattr(obj, "_data_type_name", None)
+        if type_name is None and name == "MajoranaMapping":
+            type_name = "majorana_mapping"
         if type_name is not None:
             markers[name] = f".{type_name}."
 

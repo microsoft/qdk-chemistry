@@ -1014,3 +1014,51 @@ def test_cli_spin_model_parser():
     assert args.lattice_type == "square"
     assert args.j == "1.0"
     assert args.h == "0.5"
+
+
+def test_cli_majorana_map_parser():
+    """Test majorana-map parser."""
+    parser = create_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "majorana-map",
+            "--project-name",
+            "test_project",
+            "--out-mapping-filename",
+            "mapping.majorana_mapping.json",
+            "--encoding",
+            "bravyi-kitaev",
+            "--hamiltonian-filename",
+            "ham.hamiltonian.json",
+        ]
+    )
+
+    assert args.subcommand == "majorana-map"
+    assert args.out_mapping_filename == "mapping.majorana_mapping.json"
+    assert args.encoding == "bravyi-kitaev"
+    assert args.hamiltonian_filename == "ham.hamiltonian.json"
+
+
+def test_cli_qubit_map_parser():
+    """Test qubit-map parser with explicit MajoranaMapping input."""
+    parser = create_parser()
+    args = parser.parse_args(
+        [
+            "run",
+            "qubit-map",
+            "--project-name",
+            "test_project",
+            "--hamiltonian-filename",
+            "ham.hamiltonian.json",
+            "--mapping-filename",
+            "mapping.majorana_mapping.json",
+            "--out-qubit-hamiltonian-filename",
+            "ham.qubit_hamiltonian.json",
+        ]
+    )
+
+    assert args.subcommand == "qubit-map"
+    assert args.hamiltonian_filename == "ham.hamiltonian.json"
+    assert args.mapping_filename == "mapping.majorana_mapping.json"
+    assert args.out_qubit_hamiltonian_filename == "ham.qubit_hamiltonian.json"

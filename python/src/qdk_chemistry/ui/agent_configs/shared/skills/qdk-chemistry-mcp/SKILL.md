@@ -114,13 +114,14 @@ Use these tools to discover available resources before configuring caching strat
 | `create_model_hamiltonian` | Fermionic lattice Hamiltonian (Hückel, Hubbard, PPP) | `project_name`, `model`, `out_hamiltonian_filename`, `lattice_type`, `lattice_params`, `epsilon?`, `t?`, `U?`, `V?` |
 | `create_spin_model_hamiltonian` | Qubit spin Hamiltonian (Heisenberg, Ising) | `project_name`, `model`, `out_qubit_hamiltonian_filename`, `lattice_type`, `lattice_params`, `jx?`, `jy?`, `jz?`, `j?`, `h?` |
 
-These bypass the molecular workflow. Fermionic models produce a `Hamiltonian` (needs `run_qubit_mapper`). Spin models produce a `QubitHamiltonian` directly. The agent must determine model parameters from the user's description.
+These bypass the molecular workflow. Fermionic models produce a `Hamiltonian` (needs `create_majorana_mapping` then `run_qubit_mapper`). Spin models produce a `QubitHamiltonian` directly. The agent must determine model parameters from the user's description.
 
 ### Quantum Preparation
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `run_qubit_mapper` | Jordan-Wigner encoding | `project_name`, `hamiltonian_filename`, `out_qubit_hamiltonian_filename` |
+| `create_majorana_mapping` | Create fermion-to-qubit mapping file | `project_name`, `out_mapping_filename`, `encoding?`, `num_modes?`, `hamiltonian_filename?` |
+| `run_qubit_mapper` | Apply mapping file to fermionic Hamiltonian | `project_name`, `hamiltonian_filename`, `mapping_filename`, `out_qubit_hamiltonian_filename` |
 | `run_state_preparation` | Build state-prep circuit | `project_name`, `wavefunction_filename`, `out_circuit_filename` |
 | `run_qubit_hamiltonian_solver` | Exact diagonalization | `project_name`, `qubit_hamiltonian_filename` |
 | `run_energy_estimator` | Shot-based energy | `project_name`, `circuit_filename`, `qubit_hamiltonian_filenames`, `total_shots` |
@@ -169,16 +170,18 @@ Molecular workflow:
 5. get_orbitals_from_input → "h2_as.orbitals.json"
 6. run_hamiltonian_constructor → "h2.hamiltonian.json"
 7. run_multi_configuration_calculation → "h2_mc.wavefunction.json"
-8. run_qubit_mapper        → "h2.qubithamiltonian.json"
-9. run_state_preparation   → "h2.circuit.json"
-10. (Mode A) run_time_evolution_builder → run_controlled_evolution_circuit_mapper → run_resource_estimation
+8. create_majorana_mapping → "h2.majorana_mapping.json"
+9. run_qubit_mapper        → "h2.qubithamiltonian.json"
+10. run_state_preparation  → "h2.circuit.json"
+11. (Mode A) run_time_evolution_builder → run_controlled_evolution_circuit_mapper → run_resource_estimation
     (Mode B) run_phase_estimation (sub-algorithms configured inline via settings)
 
 Model Hamiltonian shortcut (no molecular structure):
 1. create_model_hamiltonian  → "hubbard.hamiltonian.json"     (fermionic: Hückel, Hubbard, PPP)
    OR create_spin_model_hamiltonian → "ising.qubit_hamiltonian.json"  (spin: Heisenberg, Ising — already a qubit Hamiltonian)
-2. run_qubit_mapper          → "hubbard.qubithamiltonian.json" (fermionic models only)
-3. Continue with quantum steps (state prep, QPE, energy estimation, resource estimation)
+2. create_majorana_mapping   → "hubbard.majorana_mapping.json" (fermionic models only)
+3. run_qubit_mapper          → "hubbard.qubithamiltonian.json" (fermionic models only)
+4. Continue with quantum steps (state prep, QPE, energy estimation, resource estimation)
 ```
 
 The agent must determine appropriate model parameters from the user's description of the physical system.

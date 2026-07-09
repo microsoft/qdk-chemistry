@@ -58,7 +58,7 @@ Key principles:
 
 **Stage 2 — Qubit Mapping & State Preparation**
 
-Encode the Hamiltonian as a qubit Hamiltonian (`run_qubit_mapper`), then optionally prepare a trial state (`run_state_preparation`). Sparsifying the wavefunction before state prep reduces circuit depth — see `.github/skills/qdk-chemistry-mcp/references/quantum-resource-compression.md`.
+Create a fermion-to-qubit mapping file (`create_majorana_mapping`), encode the Hamiltonian as a qubit Hamiltonian (`run_qubit_mapper` with `mapping_filename`), then optionally prepare a trial state (`run_state_preparation`). Sparsifying the wavefunction before state prep reduces circuit depth — see `.github/skills/qdk-chemistry-mcp/references/quantum-resource-compression.md`.
 
 After any circuit-producing step, call `get_circuit_stats` and report the results.
 

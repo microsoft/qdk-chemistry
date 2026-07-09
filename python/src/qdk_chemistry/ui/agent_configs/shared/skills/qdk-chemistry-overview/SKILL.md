@@ -64,8 +64,9 @@ Regardless of interface, all workflows follow the same conceptual pipeline:
 The agent must determine model parameters from the user's description of the physical system.
 
 **Stage 2 — Quantum Mapping & State Preparation**
-7. Map fermions to qubits (Jordan-Wigner) — skip for spin models
-8. Prepare quantum state from classical wavefunction (sparse isometry)
+7. Create a fermion-to-qubit mapping file — skip for spin models
+8. Map fermions to qubits with the mapping file — skip for spin models
+9. Prepare quantum state from classical wavefunction (sparse isometry)
 
 **Stage 3 — Quantum Circuit & Execution** (three distinct endpoints)
 - **Classical energy only** → stop after Stage 1
