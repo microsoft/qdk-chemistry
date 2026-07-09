@@ -431,6 +431,17 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
       static_cast<int>(_settings->get<int64_t>("fine_samples"));
   const double improvement_tolerance =
       _settings->get<double>("improvement_tolerance");
+  // BoundConstraint range checks pass NaN (every comparison with NaN is false),
+  // so reject non-finite double settings explicitly.
+  const auto require_finite = [](const char* setting_name, double value) {
+    if (!std::isfinite(value)) {
+      throw std::invalid_argument(std::string("QIOLocalizer setting '") +
+                                  setting_name + "' must be finite.");
+    }
+  };
+  require_finite("convergence_tolerance", convergence_tolerance);
+  require_finite("coarse_angle_step", coarse_angle_step);
+  require_finite("improvement_tolerance", improvement_tolerance);
   const Eigen::MatrixXd u = detail::_optimize_rotation(
       rdm_alpha, rdm_beta, rdm_aabb_flat, n, max_cycles, convergence_tolerance,
       coarse_angle_step, fine_samples, improvement_tolerance);

@@ -1972,3 +1972,16 @@ TEST_F(LocalizationTest, QIOSettings) {
   EXPECT_THROW(settings.set("improvement_tolerance", -1e-9),
                std::invalid_argument);
 }
+
+TEST_F(LocalizationTest, QIORejectsNonFiniteSetting) {
+  // A NaN slips past the BoundConstraint range check (every comparison with NaN
+  // is false), so it must be rejected at run time with std::invalid_argument.
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  localizer->settings().set("coarse_angle_step",
+                            std::numeric_limits<double>::quiet_NaN());
+  const size_t n = 4;
+  auto wfn = make_scrambled_meanfield_qio_wfn(n);
+  std::vector<size_t> active(n);
+  std::iota(active.begin(), active.end(), 0);
+  EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);
+}

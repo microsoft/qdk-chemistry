@@ -123,7 +123,7 @@ class QIOLocalizer : public Localizer {
    *
    * @return The algorithm's name
    */
-  virtual std::string name() const final { return "qdk_qio"; };
+  virtual std::string name() const final { return "qdk_qio"; }
 
  protected:
   /**
