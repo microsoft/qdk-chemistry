@@ -32,6 +32,17 @@ std::shared_ptr<data::Structure> copy_structure(
 std::shared_ptr<data::Structure> displace_structure(
     const std::shared_ptr<data::Structure>& structure, Eigen::Index coordinate,
     double displacement) {
+  if (!structure) {
+    throw std::invalid_argument("Structure must not be null");
+  }
+  const auto dimension =
+      static_cast<Eigen::Index>(3 * structure->get_num_atoms());
+  if (coordinate < 0 || coordinate >= dimension) {
+    throw std::out_of_range(
+        "Coordinate index " + std::to_string(coordinate) +
+        " is out of range for dimension " + std::to_string(dimension));
+  }
+
   Eigen::MatrixXd coordinates = structure->get_coordinates();
   const Eigen::Index atom = coordinate / 3;
   const Eigen::Index component = coordinate % 3;
