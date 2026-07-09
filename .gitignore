@@ -239,3 +239,6 @@ python/VERSION
 
 # Claude
 .claude
+
+# Copilot agent
+agency.toml
