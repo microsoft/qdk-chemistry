@@ -14,6 +14,12 @@ from qdk_chemistry.algorithms import (
     create,
 )
 
+from .reference_tolerances import (
+    ci_energy_tolerance,
+    float_comparison_absolute_tolerance,
+    orthonormality_error_tolerance,
+)
+
 
 def _single_orbital_entropy_sum(ga, gb, g2):
     """Boguslawski & Tecmer (2015) single-orbital entropy sum from RDMs.
@@ -105,7 +111,11 @@ class TestQIOLocalizerBindings:
         ga, gb = (np.asarray(m) for m in cas_wfn.get_active_one_rdm_spin_dependent())
         _, aabb, _ = cas_wfn.get_active_two_rdm_spin_dependent()
         g2 = np.asarray(aabb).reshape(n, n, n, n)
-        np.testing.assert_allclose(_single_orbital_entropy_sum(ga, gb, g2), entropy_before, atol=1e-8)
+        np.testing.assert_allclose(
+            _single_orbital_entropy_sum(ga, gb, g2),
+            entropy_before,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Run the QIO localizer (single rotation).
         localizer = create("orbital_localizer", "qdk_qio")
@@ -119,8 +129,8 @@ class TestQIOLocalizerBindings:
         u = ca_can.T @ s @ ca_qio
 
         # U is unitary and the QIO orbitals are orthonormal.
-        np.testing.assert_allclose(u @ u.T, np.eye(n), atol=1e-8)
-        np.testing.assert_allclose(ca_qio.T @ s @ ca_qio, np.eye(n), atol=1e-8)
+        np.testing.assert_allclose(u @ u.T, np.eye(n), atol=orthonormality_error_tolerance)
+        np.testing.assert_allclose(ca_qio.T @ s @ ca_qio, np.eye(n), atol=orthonormality_error_tolerance)
 
         # Transform the input RDMs into the QIO basis and recompute the entropy.
         ga_rot = u.T @ ga @ u
@@ -129,7 +139,7 @@ class TestQIOLocalizerBindings:
         entropy_after = _single_orbital_entropy_sum(ga_rot, gb_rot, g2_rot)
 
         # The QIO objective must not increase under the optimized rotation.
-        assert entropy_after <= entropy_before + 1e-9
+        assert entropy_after <= entropy_before + float_comparison_absolute_tolerance
 
     def test_open_shell_triplet_energy_invariant(self):
         """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.
@@ -169,7 +179,7 @@ class TestQIOLocalizerBindings:
 
         # A unitary rotation of the active orbitals leaves the CASCI energy
         # invariant, even for an open-shell (na != nb) reference.
-        assert abs(e_before - e_after) < 1e-8
+        assert abs(e_before - e_after) < ci_energy_tolerance
 
     def test_settings_defaults_and_override(self):
         """The Jacobi-sweep controls are exposed with defaults and settable."""
