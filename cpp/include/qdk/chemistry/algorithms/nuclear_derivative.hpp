@@ -187,7 +187,7 @@ struct NuclearDerivativeCalculatorFactory
   /**
    * @brief Return the default nuclear derivative implementation name.
    */
-  static std::string default_algorithm_name() { return "finite_difference"; }
+  static std::string default_algorithm_name() { return "qdk_finite_difference"; }
 };
 
 /**
