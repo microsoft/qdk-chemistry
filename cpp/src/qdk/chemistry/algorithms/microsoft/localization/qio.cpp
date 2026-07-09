@@ -19,13 +19,6 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace detail {
 
-// Minimum active-space dimension at which the 2-RDM rotation is threaded.
-// Below this, the tensor is small enough that OpenMP fork/join overhead
-// outweighs the benefit and the loop runs serially (bitwise-identical results).
-// [[maybe_unused]]: referenced only inside the OpenMP `if` clause below, which
-// is compiled out when OpenMP is disabled (e.g. the Windows build).
-[[maybe_unused]] constexpr std::size_t kParallelMinDim = 32;
-
 /**
  * @brief Single-orbital (von Neumann) entropy from orbital occupations.
  *
@@ -97,9 +90,9 @@ void _rotate_two_rdm_axis(std::vector<double>& rdm_aabb, std::size_t dim,
   }
   // Each (x, y, z, active in {i, j}) maps to a unique flat index, so every
   // touched element is written at most once: the (x, y) iterations are
-  // independent and safe to run in parallel.
-#pragma omp parallel for collapse(2) \
-    schedule(static) if (dim >= kParallelMinDim)
+  // independent and safe to run in parallel. OpenMP schedules the outer two
+  // axes; when OpenMP is disabled the pragma is ignored and the loop is serial.
+#pragma omp parallel for collapse(2) schedule(static)
   for (std::size_t x = 0; x < dim; ++x) {
     for (std::size_t y = 0; y < dim; ++y) {
       for (std::size_t z = 0; z < dim; ++z) {

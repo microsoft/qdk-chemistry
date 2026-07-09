@@ -1825,9 +1825,8 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
 // fractional occupations in a deliberately scrambled (non-natural-orbital)
 // basis, so QIO must perform real rotations to lower the single-orbital
 // entropy. Orbital coefficients and overlap are the identity, so the QIO output
-// coefficients are exactly the accumulated active-space rotation. Used to drive
-// the OpenMP-threaded 2-RDM rotation kernel (active only when n >=
-// kParallelMinDim).
+// coefficients are exactly the accumulated active-space rotation. A large `n`
+// gives the OpenMP-parallel 2-RDM rotation kernel a substantial workload.
 static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
     size_t n) {
   // Fractional closed-shell occupations in (0, 1) -> nonzero single-orbital
@@ -1911,9 +1910,10 @@ static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
 }
 
 TEST_F(LocalizationTest, QIOThreadedPathLargeActiveSpace) {
-  // n >= kParallelMinDim (32) exercises the OpenMP-threaded 2-RDM rotation
-  // kernel. The synthetic mean-field state is in a scrambled (non-natural-
-  // orbital) basis, so QIO performs real rotations that drive that kernel.
+  // A large active space (n = 32) gives the OpenMP-parallel 2-RDM rotation
+  // kernel a substantial workload. The synthetic mean-field state is in a
+  // scrambled (non-natural-orbital) basis, so QIO performs real rotations that
+  // drive that kernel.
   auto localizer = LocalizerFactory::create("qdk_qio");
   const size_t n = 32;
   auto wfn = make_scrambled_meanfield_qio_wfn(n);
