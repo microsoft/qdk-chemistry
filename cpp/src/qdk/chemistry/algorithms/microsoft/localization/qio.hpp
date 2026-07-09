@@ -49,10 +49,10 @@ class QIOLocalizerSettings : public data::Settings {
         "Coarse grid spacing (radians) for the per-pair angle scan over "
         "[0, pi); practical range [1e-4, pi]",
         data::BoundConstraint<double>{1e-4, std::numbers::pi});
-    set_default(
-        "fine_samples", int64_t{201},
-        "Number of samples in the fine-refinement angle scan",
-        data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
+    set_default("fine_samples", int64_t{201},
+                "Number of samples in the fine-refinement angle scan",
+                data::BoundConstraint<int64_t>{
+                    2, static_cast<int64_t>(std::numeric_limits<int>::max())});
     set_default(
         "improvement_tolerance", 1e-12,
         "Minimum single-orbital entropy decrease required to accept a "
