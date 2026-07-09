@@ -32,8 +32,8 @@ namespace detail {
  * @param double_occ Double occupation Gamma_{i,ibar,i,ibar} (aabb 2-RDM diag).
  * @return The single-orbital entropy S(rho_i) >= 0.
  */
-double _single_orbital_entropy(double occ_alpha, double occ_beta,
-                               double double_occ) {
+double single_orbital_entropy(double occ_alpha, double occ_beta,
+                              double double_occ) {
   const double omega[4] = {1.0 - occ_alpha - occ_beta + double_occ,
                            occ_alpha - double_occ, occ_beta - double_occ,
                            double_occ};
@@ -56,8 +56,8 @@ double _single_orbital_entropy(double occ_alpha, double occ_beta,
  * @param l Fourth axis index.
  * @return The flattened row-major offset.
  */
-inline std::size_t _flat_index(std::size_t dim, std::size_t i, std::size_t j,
-                               std::size_t k, std::size_t l) {
+inline std::size_t flat_index(std::size_t dim, std::size_t i, std::size_t j,
+                              std::size_t k, std::size_t l) {
   return ((i * dim + j) * dim + k) * dim + l;
 }
 
@@ -76,9 +76,9 @@ inline std::size_t _flat_index(std::size_t dim, std::size_t i, std::size_t j,
  * @param cos_theta Cosine of the rotation angle.
  * @param sin_theta Sine of the rotation angle.
  */
-void _rotate_two_rdm_axis(std::vector<double>& rdm_aabb, std::size_t dim,
-                          int axis, std::size_t i, std::size_t j,
-                          double cos_theta, double sin_theta) {
+void rotate_two_rdm_axis(std::vector<double>& rdm_aabb, std::size_t dim,
+                         int axis, std::size_t i, std::size_t j,
+                         double cos_theta, double sin_theta) {
   const std::size_t strides[4] = {dim * dim * dim, dim * dim, dim, 1};
   const std::size_t axis_stride = strides[axis];
   int other_axes[3];
@@ -120,11 +120,11 @@ void _rotate_two_rdm_axis(std::vector<double>& rdm_aabb, std::size_t dim,
  * @param cos_theta Cosine of the rotation angle.
  * @param sin_theta Sine of the rotation angle.
  */
-void _rotate_two_rdm(std::vector<double>& rdm_aabb, std::size_t dim,
-                     std::size_t i, std::size_t j, double cos_theta,
-                     double sin_theta) {
+void rotate_two_rdm(std::vector<double>& rdm_aabb, std::size_t dim,
+                    std::size_t i, std::size_t j, double cos_theta,
+                    double sin_theta) {
   for (int axis = 0; axis < 4; ++axis) {
-    _rotate_two_rdm_axis(rdm_aabb, dim, axis, i, j, cos_theta, sin_theta);
+    rotate_two_rdm_axis(rdm_aabb, dim, axis, i, j, cos_theta, sin_theta);
   }
 }
 
@@ -137,8 +137,8 @@ void _rotate_two_rdm(std::vector<double>& rdm_aabb, std::size_t dim,
  * @param cos_theta Cosine of the rotation angle.
  * @param sin_theta Sine of the rotation angle.
  */
-void _rotate_one_rdm(Eigen::MatrixXd& rdm, std::size_t i, std::size_t j,
-                     double cos_theta, double sin_theta) {
+void rotate_one_rdm(Eigen::MatrixXd& rdm, std::size_t i, std::size_t j,
+                    double cos_theta, double sin_theta) {
   const Eigen::Index ii = static_cast<Eigen::Index>(i);
   const Eigen::Index jj = static_cast<Eigen::Index>(j);
   // Left rotation: mix rows i and j (iterate over all columns p).
@@ -166,15 +166,15 @@ void _rotate_one_rdm(Eigen::MatrixXd& rdm, std::size_t i, std::size_t j,
  * @param dim Active-space dimension.
  * @return The summed single-orbital entropy over all active orbitals.
  */
-double _total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
-                                     const Eigen::MatrixXd& rdm_beta,
-                                     const std::vector<double>& rdm_aabb,
-                                     std::size_t dim) {
+double total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
+                                    const Eigen::MatrixXd& rdm_beta,
+                                    const std::vector<double>& rdm_aabb,
+                                    std::size_t dim) {
   double entropy = 0.0;
   for (std::size_t i = 0; i < dim; ++i) {
     const Eigen::Index ii = static_cast<Eigen::Index>(i);
-    entropy += _single_orbital_entropy(rdm_alpha(ii, ii), rdm_beta(ii, ii),
-                                       rdm_aabb[_flat_index(dim, i, i, i, i)]);
+    entropy += single_orbital_entropy(rdm_alpha(ii, ii), rdm_beta(ii, ii),
+                                      rdm_aabb[flat_index(dim, i, i, i, i)]);
   }
   return entropy;
 }
@@ -199,13 +199,13 @@ double _total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
  * @param improvement_tolerance Minimum entropy decrease to accept a rotation.
  * @return The accumulated active-space rotation U (dim x dim).
  */
-Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
-                                   Eigen::MatrixXd& rdm_beta,
-                                   std::vector<double>& rdm_aabb,
-                                   std::size_t dim, std::size_t max_cycles,
-                                   double convergence_tolerance,
-                                   double coarse_angle_step, int fine_samples,
-                                   double improvement_tolerance) {
+Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
+                                  Eigen::MatrixXd& rdm_beta,
+                                  std::vector<double>& rdm_aabb,
+                                  std::size_t dim, std::size_t max_cycles,
+                                  double convergence_tolerance,
+                                  double coarse_angle_step, int fine_samples,
+                                  double improvement_tolerance) {
   Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(
       static_cast<Eigen::Index>(dim), static_cast<Eigen::Index>(dim));
   if (dim < 2) {
@@ -213,7 +213,7 @@ Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
   }
 
   double entropy_prev =
-      _total_single_orbital_entropy(rdm_alpha, rdm_beta, rdm_aabb, dim);
+      total_single_orbital_entropy(rdm_alpha, rdm_beta, rdm_aabb, dim);
   for (std::size_t cycle = 0; cycle < max_cycles; ++cycle) {
     for (std::size_t i = 0; i < dim; ++i) {
       for (std::size_t j = i + 1; j < dim; ++j) {
@@ -234,8 +234,8 @@ Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
               for (int c = 0; c < 2; ++c) {
                 for (int d = 0; d < 2; ++d) {
                   value += weight[a] * weight[b] * weight[c] * weight[d] *
-                           rdm_aabb[_flat_index(dim, pair[a], pair[b], pair[c],
-                                                pair[d])];
+                           rdm_aabb[flat_index(dim, pair[a], pair[b], pair[c],
+                                               pair[d])];
                 }
               }
             }
@@ -261,9 +261,8 @@ Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
                                     cos_theta * cos_theta * b_jj;
           const double double_occ_i = double_occupation(cos_theta, sin_theta);
           const double double_occ_j = double_occupation(-sin_theta, cos_theta);
-          return _single_orbital_entropy(occ_alpha_i, occ_beta_i,
-                                         double_occ_i) +
-                 _single_orbital_entropy(occ_alpha_j, occ_beta_j, double_occ_j);
+          return single_orbital_entropy(occ_alpha_i, occ_beta_i, double_occ_i) +
+                 single_orbital_entropy(occ_alpha_j, occ_beta_j, double_occ_j);
         };
 
         const double entropy_current = pair_entropy(0.0);
@@ -293,9 +292,9 @@ Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
         if (best_entropy < entropy_current - improvement_tolerance) {
           const double cos_theta = std::cos(best_theta);
           const double sin_theta = std::sin(best_theta);
-          _rotate_one_rdm(rdm_alpha, i, j, cos_theta, sin_theta);
-          _rotate_one_rdm(rdm_beta, i, j, cos_theta, sin_theta);
-          _rotate_two_rdm(rdm_aabb, dim, i, j, cos_theta, sin_theta);
+          rotate_one_rdm(rdm_alpha, i, j, cos_theta, sin_theta);
+          rotate_one_rdm(rdm_beta, i, j, cos_theta, sin_theta);
+          rotate_two_rdm(rdm_aabb, dim, i, j, cos_theta, sin_theta);
           // Accumulate U <- U * G(i, j; c, s) (in-place column update).
           for (Eigen::Index p = 0; p < rotation.rows(); ++p) {
             const double rot_i = rotation(p, ii);
@@ -307,7 +306,7 @@ Eigen::MatrixXd _optimize_rotation(Eigen::MatrixXd& rdm_alpha,
       }
     }
     const double entropy_now =
-        _total_single_orbital_entropy(rdm_alpha, rdm_beta, rdm_aabb, dim);
+        total_single_orbital_entropy(rdm_alpha, rdm_beta, rdm_aabb, dim);
     if (std::abs(entropy_prev - entropy_now) < convergence_tolerance) {
       break;
     }
@@ -442,7 +441,7 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
   require_finite("convergence_tolerance", convergence_tolerance);
   require_finite("coarse_angle_step", coarse_angle_step);
   require_finite("improvement_tolerance", improvement_tolerance);
-  const Eigen::MatrixXd u = detail::_optimize_rotation(
+  const Eigen::MatrixXd u = detail::optimize_rotation(
       rdm_alpha, rdm_beta, rdm_aabb_flat, n, max_cycles, convergence_tolerance,
       coarse_angle_step, fine_samples, improvement_tolerance);
 
