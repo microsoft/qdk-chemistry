@@ -20,6 +20,11 @@ on:
         required: false
         default: false
         type: boolean
+      test_with_qdk_branch:
+        description: Run full test against the qdk main branch
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -751,6 +756,7 @@ jobs:
 
   test-with-qdk-branch:
     name: Full Test with QDK Branch
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
       BUILD_DIR: cpp/build
