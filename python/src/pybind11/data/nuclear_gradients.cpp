@@ -88,6 +88,9 @@ Args:
       .def("get_values", &NuclearGradients::get_values,
            py::return_value_policy::reference_internal,
            R"(Return the atom-major gradient vector in Hartree/Bohr.)")
+      .def("get_atom_gradient", &NuclearGradients::get_atom_gradient,
+           py::arg("atom_index"),
+           R"(Return the x, y, z gradient components for one atom.)")
       .def("as_matrix", &NuclearGradients::as_matrix,
            R"(Return gradients as an ``(num_atoms, 3)`` matrix.)")
       .def("get_data_type_name", &NuclearGradients::get_data_type_name,

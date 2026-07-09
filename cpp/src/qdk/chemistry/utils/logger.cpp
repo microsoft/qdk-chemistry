@@ -306,6 +306,21 @@ LogLevel Logger::get_global_level() {
   return from_spdlog_level(g_global_level);
 }
 
+ScopedLogLevel::ScopedLogLevel(LogLevel minimum_level)
+    : previous_level_(Logger::get_global_level()) {
+  if (static_cast<int>(previous_level_) < static_cast<int>(minimum_level)) {
+    Logger::set_global_level(minimum_level);
+    scoped_level_ = minimum_level;
+    changed_ = true;
+  }
+}
+
+ScopedLogLevel::~ScopedLogLevel() {
+  if (changed_) {
+    Logger::restore_global_level_if_unchanged(scoped_level_, previous_level_);
+  }
+}
+
 void log_trace_entering(const std::source_location& location) {
   auto logger = Logger::get();
   std::string file_ctx = path_to_colon_string(location.file_name(), "qdk");

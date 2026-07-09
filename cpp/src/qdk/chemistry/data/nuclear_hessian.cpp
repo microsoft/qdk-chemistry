@@ -33,6 +33,25 @@ const std::shared_ptr<Structure> NuclearHessian::get_structure() const {
   return structure_;
 }
 
+Eigen::Matrix3d NuclearHessian::get_atom_pair_block(
+    size_t row_atom_index, size_t column_atom_index) const {
+  const auto num_atoms = get_structure()->get_num_atoms();
+  if (row_atom_index >= num_atoms) {
+    throw std::out_of_range("Row atom index " + std::to_string(row_atom_index) +
+                            " is out of range for " +
+                            std::to_string(num_atoms) + " atoms");
+  }
+  if (column_atom_index >= num_atoms) {
+    throw std::out_of_range(
+        "Column atom index " + std::to_string(column_atom_index) +
+        " is out of range for " + std::to_string(num_atoms) + " atoms");
+  }
+
+  const auto row_offset = static_cast<Eigen::Index>(3 * row_atom_index);
+  const auto column_offset = static_cast<Eigen::Index>(3 * column_atom_index);
+  return matrix_.block<3, 3>(row_offset, column_offset);
+}
+
 std::string NuclearHessian::get_summary() const {
   std::ostringstream oss;
   oss << "NuclearHessian(" << get_structure()->get_num_atoms() << " atoms, "

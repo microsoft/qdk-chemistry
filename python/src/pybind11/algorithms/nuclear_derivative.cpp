@@ -8,6 +8,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/finite_difference_nuclear_derivative.hpp"
+#include "qdk/chemistry/algorithms/qdk_nuclear_derivative.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -34,10 +36,12 @@ class NuclearDerivativeCalculatorBase
  protected:
   NuclearDerivativeResult _run_impl(
       std::shared_ptr<Structure> structure, int charge, int spin_multiplicity,
-      NuclearDerivativeSeedType seed) const override {
+      NuclearDerivativeSeedType seed, unsigned int n_active_alpha_electrons,
+      unsigned int n_active_beta_electrons) const override {
     PYBIND11_OVERRIDE_PURE(NuclearDerivativeResult, NuclearDerivativeCalculator,
                            _run_impl, structure, charge, spin_multiplicity,
-                           seed);
+                           seed, n_active_alpha_electrons,
+                           n_active_beta_electrons);
   }
 };
 
@@ -57,11 +61,15 @@ void bind_nuclear_derivative(py::module& m) {
       "run",
       [](const NuclearDerivativeCalculator& self,
          std::shared_ptr<Structure> structure, int charge,
-         int spin_multiplicity, NuclearDerivativeSeedType seed) {
-        return self.run(structure, charge, spin_multiplicity, seed);
+         int spin_multiplicity, NuclearDerivativeSeedType seed,
+         unsigned int n_active_alpha_electrons,
+         unsigned int n_active_beta_electrons) {
+        return self.run(structure, charge, spin_multiplicity, seed,
+                        n_active_alpha_electrons, n_active_beta_electrons);
       },
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("seed_or_basis"),
+      py::arg("seed_or_basis"), py::arg("n_active_alpha_electrons"),
+      py::arg("n_active_beta_electrons"),
       R"(
 Compute nuclear derivatives for a molecular structure.
 
@@ -70,6 +78,8 @@ Args:
     charge: Total molecular charge.
     spin_multiplicity: Spin multiplicity of the molecular system.
     seed_or_basis: Basis name, basis set, orbitals, or wavefunction seed.
+    n_active_alpha_electrons: Active-space alpha electron count for multi-reference energy paths.
+    n_active_beta_electrons: Active-space beta electron count for multi-reference energy paths.
 
 Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.

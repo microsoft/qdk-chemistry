@@ -25,6 +25,7 @@ def test_nuclear_gradients_roundtrip_json():
     assert gradients.get_structure().get_num_atoms() == 2
     np.testing.assert_allclose(gradients.get_values(), values)
     assert gradients.as_matrix().shape == (2, 3)
+    np.testing.assert_allclose(gradients.get_atom_gradient(1), [3.0, 4.0, 5.0])
 
     loaded = data.NuclearGradients.from_json(gradients.to_json())
     np.testing.assert_allclose(loaded.get_values(), values)
@@ -37,12 +38,13 @@ def test_nuclear_gradients_roundtrip_json():
 def test_nuclear_hessian_roundtrip_json():
     """Round-trip a nuclear Hessian through JSON."""
     structure = _h2_structure()
-    matrix = np.eye(6)
+    matrix = np.arange(36, dtype=float).reshape(6, 6)
 
     hessian = data.NuclearHessian(structure, matrix)
 
     assert hessian.get_structure().get_num_atoms() == 2
     np.testing.assert_allclose(hessian.get_matrix(), matrix)
+    np.testing.assert_allclose(hessian.get_atom_pair_block(0, 1), matrix[:3, 3:])
 
     loaded = data.NuclearHessian.from_json(hessian.to_json())
     np.testing.assert_allclose(loaded.get_matrix(), matrix)
@@ -57,7 +59,7 @@ def test_nuclear_derivative_factory_registered():
     calculator = algorithms.create("nuclear_derivative_calculator")
 
     assert isinstance(calculator, algorithms.NuclearDerivativeCalculator)
-    assert calculator.name() == "finite_difference"
+    assert calculator.name() == "qdk_finite_difference"
 
 
 def test_qdk_nuclear_derivative_factory_registered():

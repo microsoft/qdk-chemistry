@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
@@ -304,6 +305,28 @@ TEST_F(ScfTest, WaterDftPbe) {
   // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
+  auto water = testing::create_water_structure();
+
+  auto direct_solver = ScfSolverFactory::create();
+  direct_solver->settings().set("method", "cam-b3lyp");
+  direct_solver->settings().set("eri_method", "direct");
+  auto [direct_energy, direct_wavefunction] =
+      direct_solver->run(water, 0, 1, "sto-3g");
+
+  auto incore_solver = ScfSolverFactory::create();
+  incore_solver->settings().set("method", "cam-b3lyp");
+  incore_solver->settings().set("eri_method", "incore");
+  auto [incore_energy, incore_wavefunction] =
+      incore_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(std::isfinite(direct_energy));
+  EXPECT_TRUE(std::isfinite(incore_energy));
+  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(direct_energy, incore_energy, 1.0e-7);
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {

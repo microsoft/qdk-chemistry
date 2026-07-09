@@ -85,6 +85,9 @@ Args:
       .def("get_matrix", &NuclearHessian::get_matrix,
            py::return_value_policy::reference_internal,
            R"(Return the Hessian matrix in Hartree/Bohr^2.)")
+      .def("get_atom_pair_block", &NuclearHessian::get_atom_pair_block,
+           py::arg("row_atom_index"), py::arg("column_atom_index"),
+           R"(Return the 3 by 3 Hessian block coupling two atoms.)")
       .def("get_data_type_name", &NuclearHessian::get_data_type_name,
            R"(Return the serialized data type name.)")
       .def("get_summary", &NuclearHessian::get_summary,

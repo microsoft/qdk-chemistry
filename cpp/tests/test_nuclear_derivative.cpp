@@ -22,32 +22,13 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 std::vector<std::vector<size_t>> recorded_active_spaces;
 std::vector<std::vector<size_t>> recorded_inactive_spaces;
 std::vector<std::vector<size_t>> recorded_localized_alpha_spaces;
 std::vector<std::vector<size_t>> recorded_localized_beta_spaces;
-constexpr double kDftAnalyticNumericGradientTolerance = 5.0e-5;
-
-std::string determinant_string(size_t n_active_orbitals, unsigned int n_alpha,
-                               unsigned int n_beta) {
-  std::string determinant(n_active_orbitals, '0');
-  for (auto& occupation : determinant) {
-    if (n_alpha > 0 && n_beta > 0) {
-      occupation = '2';
-      --n_alpha;
-      --n_beta;
-    } else if (n_alpha > 0) {
-      occupation = 'u';
-      --n_alpha;
-    } else if (n_beta > 0) {
-      occupation = 'd';
-      --n_beta;
-    }
-  }
-  return determinant;
-}
+constexpr double dft_analytic_numeric_gradient_tolerance = 5.0e-5;
 
 class RecordingMultiConfigurationCalculator
     : public MultiConfigurationCalculator {
@@ -66,8 +47,8 @@ class RecordingMultiConfigurationCalculator
     recorded_inactive_spaces.push_back(
         orbitals->get_inactive_space_indices().first);
 
-    auto determinant = Configuration::from_spin_half_string(determinant_string(
-        orbitals->get_active_space_indices().first.size(), n_alpha, n_beta));
+    auto determinant = Configuration::canonical_hf_configuration(
+        n_alpha, n_beta, orbitals->get_active_space_indices().first.size());
     auto container =
         std::make_unique<StateVectorContainer>(determinant, orbitals);
     return {0.0, std::make_shared<Wavefunction>(std::move(container))};
@@ -119,7 +100,10 @@ void expect_same_structure(const std::shared_ptr<Structure>& left,
 }
 
 NuclearDerivativeResult run_qdk_derivative_for_functional(
-    const std::string& calculator_name, const std::string& functional) {
+    const std::string& calculator_name, const std::string& functional,
+    const std::shared_ptr<Structure>& structure =
+        testing::create_lih_structure(),
+    int charge = 0, int spin_multiplicity = 1) {
   auto calculator = NuclearDerivativeCalculatorFactory::create(calculator_name);
   AlgorithmRef scf_ref("scf_solver", "qdk");
   scf_ref.get_settings()->set("method", functional);
@@ -128,25 +112,32 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
     calculator->settings().set("finite_difference_step", 1.0e-2);
   }
 
-  return calculator->run(testing::create_lih_structure(), 0, 1,
-                         std::string("sto-3g"));
+  return calculator->run(structure, charge, spin_multiplicity,
+                         std::string("sto-3g"), 0, 0);
 }
 
 void expect_qdk_analytic_gradient_matches_numeric(
     const std::string& functional,
-    double gradient_tolerance = kDftAnalyticNumericGradientTolerance) {
+    double gradient_tolerance = dft_analytic_numeric_gradient_tolerance,
+    const std::shared_ptr<Structure>& structure =
+        testing::create_lih_structure(),
+    int charge = 0, int spin_multiplicity = 1) {
   auto [numeric_energy, numeric_gradients, numeric_hessian,
         numeric_wavefunction] =
-      run_qdk_derivative_for_functional("finite_difference", functional);
+      run_qdk_derivative_for_functional("qdk_finite_difference", functional,
+                                        structure, charge, spin_multiplicity);
   auto [analytic_energy, analytic_gradients, analytic_hessian,
         analytic_wavefunction] =
-      run_qdk_derivative_for_functional("qdk", functional);
+      run_qdk_derivative_for_functional("qdk", functional, structure, charge,
+                                        spin_multiplicity);
 
   EXPECT_NEAR(analytic_energy, numeric_energy, 1.0e-8);
   ASSERT_NE(numeric_gradients, nullptr);
   ASSERT_NE(analytic_gradients, nullptr);
-  EXPECT_EQ(analytic_gradients->get_structure()->get_num_atoms(), 2);
-  EXPECT_EQ(analytic_gradients->get_values().size(), 6);
+  const auto num_atoms = structure->get_num_atoms();
+  EXPECT_EQ(analytic_gradients->get_structure()->get_num_atoms(), num_atoms);
+  EXPECT_EQ(analytic_gradients->get_values().size(),
+            static_cast<Eigen::Index>(3 * num_atoms));
   EXPECT_TRUE(analytic_gradients->get_values().allFinite());
   EXPECT_TRUE(numeric_gradients->get_values().allFinite());
   EXPECT_FALSE(numeric_hessian.has_value());
@@ -163,39 +154,52 @@ void expect_qdk_analytic_gradient_matches_numeric(
   }
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
+using test_support::dft_analytic_numeric_gradient_tolerance;
+using test_support::expect_qdk_analytic_gradient_matches_numeric;
+using test_support::expect_same_structure;
+using test_support::recorded_active_spaces;
+using test_support::recorded_inactive_spaces;
+using test_support::recorded_localized_alpha_spaces;
+using test_support::recorded_localized_beta_spaces;
+using test_support::RecordingLocalizer;
+using test_support::RecordingMultiConfigurationCalculator;
+using test_support::ScopedFactoryRegistration;
 
 TEST(NuclearDerivativeSettingsTest, SettingsHaveUserFacingDescriptions) {
   NuclearDerivativeSettings settings;
   for (const auto& key :
        {"energy_calculator", "orbital_solver", "hamiltonian_constructor",
-        "compute_hessian", "reuse_seed_active_space",
-        "localize_reference_orbitals", "orbital_localizer",
-        "n_active_alpha_electrons", "n_active_beta_electrons"}) {
+        "compute_hessian", "suppress_child_algorithm_logging",
+        "localize_reference_orbitals", "orbital_localizer"}) {
     EXPECT_TRUE(settings.has_description(key)) << key;
     EXPECT_FALSE(settings.get_description(key).empty()) << key;
   }
+  EXPECT_FALSE(settings.has("reuse_seed_active_space"));
   EXPECT_FALSE(settings.has("finite_difference_step"));
-  EXPECT_FALSE(settings.has("symmetrize_hessian"));
 }
 
 TEST(NuclearDerivativeSettingsTest,
      FiniteDifferenceSettingsHaveUserFacingDescriptions) {
-  FiniteDifferenceNuclearDerivativeSettings settings;
-  for (const auto& key : {"finite_difference_step", "symmetrize_hessian"}) {
-    EXPECT_TRUE(settings.has_description(key)) << key;
-    EXPECT_FALSE(settings.get_description(key).empty()) << key;
+  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  for (const auto& key :
+       {"reuse_seed_active_space", "finite_difference_step"}) {
+    EXPECT_TRUE(calculator->settings().has_description(key)) << key;
+    EXPECT_FALSE(calculator->settings().get_description(key).empty()) << key;
   }
 }
 
-TEST(NuclearDerivativeSettingsTest, NumericStepBelongsToFiniteDifferenceOnly) {
+TEST(NuclearDerivativeSettingsTest,
+     ImplementationSettingsBelongToFiniteDifferenceOnly) {
   auto finite_difference = NuclearDerivativeCalculatorFactory::create();
   auto analytic = NuclearDerivativeCalculatorFactory::create("qdk");
 
+  EXPECT_TRUE(finite_difference->settings().has("reuse_seed_active_space"));
   EXPECT_TRUE(finite_difference->settings().has("finite_difference_step"));
-  EXPECT_TRUE(finite_difference->settings().has("symmetrize_hessian"));
+  EXPECT_FALSE(analytic->settings().has("reuse_seed_active_space"));
   EXPECT_FALSE(analytic->settings().has("finite_difference_step"));
-  EXPECT_FALSE(analytic->settings().has("symmetrize_hessian"));
 }
 
 TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
@@ -209,6 +213,9 @@ TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
   EXPECT_TRUE(gradients.get_values().isApprox(values));
   EXPECT_EQ(gradients.as_matrix().rows(), 3);
   EXPECT_EQ(gradients.as_matrix().cols(), 3);
+  EXPECT_TRUE(
+      gradients.get_atom_gradient(1).isApprox(Eigen::Vector3d(0.3, 0.4, 0.5)));
+  EXPECT_THROW(gradients.get_atom_gradient(3), std::out_of_range);
   expect_same_structure(structure, gradients.get_structure());
 
   auto loaded = NuclearGradients::from_json(gradients.to_json());
@@ -219,11 +226,17 @@ TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
 TEST(NuclearDerivativeDataTest, HessianReferencesStructureAndRoundTripsJson) {
   auto structure = testing::create_water_structure();
   Eigen::MatrixXd matrix = Eigen::MatrixXd::Identity(9, 9);
+  Eigen::Matrix3d atom_pair_block;
+  atom_pair_block << 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0;
+  matrix.block<3, 3>(3, 6) = atom_pair_block;
 
   NuclearHessian hessian(structure, matrix);
 
   EXPECT_EQ(hessian.get_structure()->get_num_atoms(), 3);
   EXPECT_TRUE(hessian.get_matrix().isApprox(matrix));
+  EXPECT_TRUE(hessian.get_atom_pair_block(1, 2).isApprox(atom_pair_block));
+  EXPECT_THROW(hessian.get_atom_pair_block(3, 0), std::out_of_range);
+  EXPECT_THROW(hessian.get_atom_pair_block(0, 3), std::out_of_range);
   expect_same_structure(structure, hessian.get_structure());
 
   auto loaded = NuclearHessian::from_json(hessian.to_json());
@@ -237,7 +250,7 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
   calculator->settings().set("finite_difference_step", 1.0e-3);
 
   auto [energy, gradients, hessian, wavefunction] = calculator->run(
-      testing::create_water_structure(), 0, 1, std::string("sto-3g"));
+      testing::create_water_structure(), 0, 1, std::string("sto-3g"), 0, 0);
 
   ASSERT_TRUE(std::isfinite(energy));
   EXPECT_LT(energy, 0.0);
@@ -265,11 +278,11 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
 }
 
 TEST(NuclearDerivativeCalculatorTest, NullStructureThrowsInvalidArgument) {
-  for (const auto& calculator_name : {"finite_difference", "qdk"}) {
+  for (const auto& calculator_name : {"qdk_finite_difference", "qdk"}) {
     auto calculator =
         NuclearDerivativeCalculatorFactory::create(calculator_name);
     try {
-      calculator->run(nullptr, 0, 1, std::string("sto-3g"));
+      calculator->run(nullptr, 0, 1, std::string("sto-3g"), 0, 0);
       FAIL() << calculator_name << " accepted a null structure";
     } catch (const std::invalid_argument& ex) {
       EXPECT_STREQ(ex.what(), "Structure must not be null");
@@ -301,12 +314,10 @@ TEST(NuclearDerivativeCalculatorTest,
       "energy_calculator",
       AlgorithmRef("multi_configuration_calculator",
                    "_test_nuclear_derivative_recording_mc"));
-  calculator->settings().set("n_active_alpha_electrons", 1);
-  calculator->settings().set("n_active_beta_electrons", 1);
   calculator->settings().set("finite_difference_step", 1.0e-2);
 
   auto [energy, gradients, hessian, result_wavefunction] =
-      calculator->run(structure, 0, 1, seed_orbitals);
+      calculator->run(structure, 0, 1, seed_orbitals, 1, 1);
 
   EXPECT_TRUE(std::isfinite(energy));
   ASSERT_NE(gradients, nullptr);
@@ -357,12 +368,10 @@ TEST(NuclearDerivativeCalculatorTest,
       AlgorithmRef("orbital_localizer",
                    "_test_nuclear_derivative_recording_localizer"));
   calculator->settings().set("localize_reference_orbitals", true);
-  calculator->settings().set("n_active_alpha_electrons", 1);
-  calculator->settings().set("n_active_beta_electrons", 1);
   calculator->settings().set("finite_difference_step", 1.0e-2);
 
   auto [energy, gradients, hessian, result_wavefunction] =
-      calculator->run(structure, 0, 2, seed_orbitals);
+      calculator->run(structure, 0, 2, seed_orbitals, 1, 1);
 
   EXPECT_TRUE(std::isfinite(energy));
   ASSERT_NE(gradients, nullptr);
@@ -389,9 +398,16 @@ TEST(NuclearDerivativeCalculatorTest,
   expect_qdk_analytic_gradient_matches_numeric("pbe");
 }
 
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientMatchesNumericOpenShellHybridGgaDftForHydroxyl) {
+  expect_qdk_analytic_gradient_matches_numeric(
+      "b3lyp", dft_analytic_numeric_gradient_tolerance,
+      testing::create_oh_structure(), 0, 2);
+}
+
 TEST(
     NuclearDerivativeCalculatorTest,
     QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForLithiumHydride) {
   expect_qdk_analytic_gradient_matches_numeric(
-      "wB97x", kDftAnalyticNumericGradientTolerance);
+      "wB97x", dft_analytic_numeric_gradient_tolerance);
 }
