@@ -359,7 +359,8 @@ with a gradient-free Jacobi sweep over active orbital pairs.
     active-space indices exactly (QIO is a single spatial orbital set).
     Requires spin-dependent active 1- and 2-RDMs in the wavefunction.
     Jacobi-sweep controls are configurable via ``settings()``:
-    ``max_cycles``, ``convergence_tolerance``, ``coarse_angle_step``.
+    ``max_cycles``, ``convergence_tolerance``, ``coarse_angle_step``,
+    ``fine_samples``, ``improvement_tolerance``.
 
 Typical usage:
 
