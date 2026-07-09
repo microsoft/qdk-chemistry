@@ -38,9 +38,9 @@ std::shared_ptr<data::Structure> displace_structure(
   const auto dimension =
       static_cast<Eigen::Index>(3 * structure->get_num_atoms());
   if (coordinate < 0 || coordinate >= dimension) {
-    throw std::out_of_range(
-        "Coordinate index " + std::to_string(coordinate) +
-        " is out of range for dimension " + std::to_string(dimension));
+    throw std::out_of_range("Coordinate index " + std::to_string(coordinate) +
+                            " is out of range for dimension " +
+                            std::to_string(dimension));
   }
 
   Eigen::MatrixXd coordinates = structure->get_coordinates();
