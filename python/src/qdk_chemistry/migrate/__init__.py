@@ -1,7 +1,9 @@
-"""Migrate v1 (<= 1.1.0) serialized data files to the v2 (2.0) schema.
+"""Migrate serialized data files across serialization-schema versions.
 
-The v2 data-class deserializers intentionally accept only the current schema. Use
-this module to upgrade files written by an older ``qdk-chemistry`` release.
+Each qdk-chemistry data class versions its serialization schema independently, and
+its deserializer accepts only the version the installed library was built against.
+Loading a file written against an older version of that class's schema raises an
+error; use this module to upgrade such a file to the version the library accepts.
 
 Command line::
 
@@ -13,17 +15,17 @@ Python::
     migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction``) and the serialization format
-from the file extension (``.json`` or ``.h5`` / ``.hdf5``). Input and output
-formats may differ.
+(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the
+serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
+Input and output formats may differ.
 
-Migration is keyed point-by-point on each object's serialization version, not on
-a release: every migratable type exposes a ``STEPS`` table mapping a source
-version to a ``(next_version, transform)`` pair, and the chain is followed until
-it reaches the schema the installed library accepts. To support a future
-serialization-version bump, register the next step in that type's ``STEPS`` table
-(``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated document is
-validated against the live deserializer, so a missing step fails loudly.
+Migration is keyed point-by-point on each data class's serialization version, not
+on a library release: every migratable type exposes a ``STEPS`` table mapping a
+source version to a ``(next_version, transform)`` pair, and the chain is followed
+until it reaches the version the installed library accepts. To support a future
+serialization-version bump for a data class, register the next step in that type's
+``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated
+document is validated against the live deserializer, so a missing step fails loudly.
 
 This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.
@@ -51,7 +53,20 @@ _PathLike = str | Path
 
 
 class MigrationError(RuntimeError):
-    """Raised when a file cannot be migrated to the current schema."""
+    """Raised when a file cannot be migrated to the current serialization version."""
+
+
+def _resolves_to_same_file(src: Path, dst: Path) -> bool:
+    """Return True if ``src`` and ``dst`` point at the same file on disk."""
+    try:
+        if src.exists() and dst.exists():
+            return src.samefile(dst)
+    except OSError:
+        pass
+    try:
+        return src.resolve() == dst.resolve()
+    except OSError:
+        return src == dst
 
 
 _MODULES = {
@@ -70,22 +85,28 @@ _CLASSES = {
 
 
 def convert_file(src: _PathLike, dst: _PathLike) -> Path:
-    """Migrate a single v1 data file to the v2 schema.
+    """Migrate a single data file to the serialization version the library accepts.
 
     Args:
-        src: Path to the v1 file to read (format inferred from its extension).
-        dst: Path to write the migrated v2 file (format inferred from its extension).
+        src: Path to the file to read (format inferred from its extension).
+        dst: Path to write the migrated file (format inferred from its extension).
 
     Returns:
         The ``dst`` path as a :class:`pathlib.Path`.
 
     Raises:
-        MigrationError: If the data type/format cannot be determined, the file is
-            already in the v2 schema, or the migration fails.
+        MigrationError: If the data type/format cannot be determined, the source and
+            destination are the same file, the file is already at the current
+            serialization version, or the migration fails.
 
     """
     src_path = Path(src)
     dst_path = Path(dst)
+    if _resolves_to_same_file(src_path, dst_path):
+        raise MigrationError(
+            f"Refusing to migrate '{src_path}' in place: the source and destination resolve to "
+            "the same file. Choose a different output path so the original is not overwritten."
+        )
     try:
         data_type = _io.detect_type(src_path)
         src_format = _io.detect_format(src_path)
@@ -123,7 +144,7 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
 
 
 def _read_old(module, data_type: str, src: Path, src_format: str):
-    """Read a v1 file into a normalized old-doc for ``data_type``."""
+    """Read a legacy file into a normalized old-doc for ``data_type``."""
     if src_format == "json":
         doc = json.loads(src.read_text(encoding="utf-8"))
         return module.from_json_doc(doc)

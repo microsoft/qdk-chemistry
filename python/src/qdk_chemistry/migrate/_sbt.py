@@ -1,10 +1,10 @@
 """Build ``SymmetryBlockedTensor`` JSON from dense spin-channel arrays.
 
-The v1 (<= 1.1.0) serialization stored integrals and orbital coefficients as
-plain dense arrays. The v2 schema stores them as ``SymmetryBlockedTensor``
-documents. These helpers rebuild the v2 tensor JSON using only the v2 bindings
-(``qdk_chemistry.data.symmetry``) and serializing the result, so the migration
-never hand-writes the symmetry-blocked JSON layout.
+Legacy serializations stored integrals and orbital coefficients as plain dense
+arrays; the current schema stores them as ``SymmetryBlockedTensor`` documents.
+These helpers rebuild the tensor JSON using only the live
+``qdk_chemistry.data.symmetry`` bindings and serializing the result, so the
+migration never hand-writes the symmetry-blocked JSON layout.
 """
 
 # --------------------------------------------------------------------------------------------

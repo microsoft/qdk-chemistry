@@ -17,11 +17,11 @@ def main(argv: list[str] | None = None) -> int:
     """Run the migration CLI; return a process exit code."""
     parser = argparse.ArgumentParser(
         prog="python -m qdk_chemistry.migrate",
-        description="Migrate a qdk-chemistry data file written by an older "
-        "release (<= 1.1.0) to the current (2.0) schema.",
+        description="Migrate a qdk-chemistry data file written against an older "
+        "serialization version to the version the installed library accepts.",
     )
-    parser.add_argument("src", help="Input file written by an older release (.json or .h5)")
-    parser.add_argument("dst", help="Output file to write in the current schema (.json or .h5)")
+    parser.add_argument("src", help="Input file written against an older serialization version (.json or .h5)")
+    parser.add_argument("dst", help="Output file to write at the current serialization version (.json or .h5)")
     args = parser.parse_args(argv)
 
     try:

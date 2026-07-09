@@ -1,4 +1,4 @@
-"""Convert v1 ``Ansatz`` serialization to the v2 schema.
+"""Migrate the ``Ansatz`` serialization schema to the current version.
 
 An ``Ansatz`` is an envelope around a :class:`~qdk_chemistry.data.Hamiltonian`
 and a :class:`~qdk_chemistry.data.Wavefunction`. The envelope itself
@@ -22,7 +22,7 @@ ANSATZ_VERSION = "0.1.0"
 
 
 def from_json_doc(doc: dict) -> dict:
-    """Normalize a parsed v1 Ansatz JSON object into an old-doc."""
+    """Normalize a parsed legacy Ansatz JSON object into an old-doc."""
     hamiltonian = doc.get("hamiltonian")
     wavefunction = doc.get("wavefunction")
     return {
@@ -32,7 +32,7 @@ def from_json_doc(doc: dict) -> dict:
 
 
 def from_hdf5_file(path) -> dict:
-    """Read a v1 Ansatz HDF5 file into an old-doc."""
+    """Read a legacy Ansatz HDF5 file into an old-doc."""
     with h5py.File(path, "r") as handle:
         group = handle.get("ansatz", handle)
         hamiltonian = _hamiltonian.from_hdf5_group(group["hamiltonian"]) if "hamiltonian" in group else None
@@ -41,7 +41,7 @@ def from_hdf5_file(path) -> dict:
 
 
 def to_new_json(old: dict) -> dict:
-    """Build the v2 Ansatz JSON object by migrating each embedded payload's chain."""
+    """Build the migrated Ansatz JSON object by migrating each embedded payload's chain."""
     new: dict = {"version": ANSATZ_VERSION, "type": "Ansatz"}
     hamiltonian = old["hamiltonian"]
     wavefunction = old["wavefunction"]

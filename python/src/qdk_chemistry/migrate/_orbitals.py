@@ -1,4 +1,4 @@
-"""Convert v1 ``Orbitals`` serialization to the v2 schema.
+"""Migrate the ``Orbitals`` serialization schema to the current version.
 
 The only fields whose representation changed are ``coefficients`` and
 ``energies`` (dense per-spin arrays -> ``SymmetryBlockedTensor``). Everything
@@ -29,7 +29,7 @@ OLD_VERSION = "0.1.0"
 
 
 def from_json_doc(doc: dict) -> dict:
-    """Normalize a parsed v1 orbitals JSON object into the internal old-doc."""
+    """Normalize a parsed legacy orbitals JSON object into the internal old-doc."""
     coeff = doc["coefficients"]
     energies = doc.get("energies")
     return {
@@ -49,7 +49,7 @@ def from_json_doc(doc: dict) -> dict:
 
 
 def from_hdf5_group(group: h5py.Group) -> dict:
-    """Normalize a v1 orbitals HDF5 group into the internal old-doc."""
+    """Normalize a legacy orbitals HDF5 group into the internal old-doc."""
     metadata = group["metadata"]
     is_restricted = bool(np.asarray(metadata["is_restricted"]).ravel()[0])
 
@@ -82,7 +82,7 @@ def from_hdf5_group(group: h5py.Group) -> dict:
 
 
 def to_new_json(old: dict) -> dict:
-    """Build the v2 orbitals JSON object from a normalized old-doc."""
+    """Build the migrated orbitals JSON object from a normalized old-doc."""
     restricted = old["is_restricted"]
     coeff_beta = None if restricted else old["coefficients_beta"]
     new: dict = {

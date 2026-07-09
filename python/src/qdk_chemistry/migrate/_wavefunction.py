@@ -1,7 +1,7 @@
-"""Convert v1 ``Wavefunction`` serialization to the v2 schema.
+"""Migrate the ``Wavefunction`` serialization schema to the current version.
 
-The v1 single-determinant (``sd``), complete-active-space (``cas``) and
-selected-CI (``sci``) containers were flattened into ``state_vector``; the v1
+The legacy single-determinant (``sd``), complete-active-space (``cas``) and
+selected-CI (``sci``) containers were flattened into ``state_vector``; the legacy
 ``mp2``/``coupled_cluster`` containers were flattened into ``amplitude``.
 
 The envelope (``{version, container_type, container}``) and the coefficient /
@@ -38,25 +38,25 @@ _SPIN_HALF_CHARS = "0ud2"
 
 
 def from_json_doc(doc: dict) -> dict:
-    """Normalize a parsed v1 Wavefunction JSON object into an old-doc."""
+    """Normalize a parsed legacy Wavefunction JSON object into an old-doc."""
     container = doc.get("container", doc)
     tag = container.get("container_type", container.get("type"))
     return {"_source_version": str(doc.get("version")), "tag": tag, "container": container}
 
 
 def from_hdf5_file(path) -> dict:
-    """Read a v1 Wavefunction HDF5 file into an old-doc."""
+    """Read a legacy Wavefunction HDF5 file into an old-doc."""
     with h5py.File(path, "r") as handle:
         return _read_wavefunction_group(handle["wavefunction"])
 
 
 def from_hdf5_group(group) -> dict:
-    """Read a v1 Wavefunction HDF5 group (the ``wavefunction`` group) into an old-doc."""
+    """Read a legacy Wavefunction HDF5 group (the ``wavefunction`` group) into an old-doc."""
     return _read_wavefunction_group(group)
 
 
 def to_new_json(old: dict) -> dict:
-    """Build the v2 Wavefunction JSON object from a normalized old-doc."""
+    """Build the migrated Wavefunction JSON object from a normalized old-doc."""
     container = _convert_container(old["container"], old["tag"])
     return {
         "version": WAVEFUNCTION_VERSION,
@@ -66,7 +66,7 @@ def to_new_json(old: dict) -> dict:
 
 
 def _convert_container(container: dict, tag: str) -> dict:
-    """Dispatch a legacy wavefunction container to its v2 converter."""
+    """Dispatch a legacy wavefunction container to its converter."""
     if tag in _STATE_VECTOR_TYPES:
         return _to_state_vector(container, tag)
     if tag in _AMPLITUDE_TYPES:
@@ -75,7 +75,7 @@ def _convert_container(container: dict, tag: str) -> dict:
 
 
 def _convert_orbitals(orbitals_json: dict) -> dict:
-    """Convert an embedded v1 orbitals JSON object to the v2 schema (idempotent)."""
+    """Migrate an embedded legacy orbitals JSON object to the current schema (idempotent)."""
     coefficients = orbitals_json.get("coefficients")
     if isinstance(coefficients, dict) and coefficients.get("type") == "SymmetryBlockedTensor":
         return orbitals_json  # already migrated (HDF5 reader path)
@@ -116,7 +116,7 @@ def _to_state_vector(container: dict, tag: str) -> dict:
 
 
 def _convert_rdms(rdms):
-    """Convert legacy RDM fields to the v2 RDM layout."""
+    """Convert legacy RDM fields to the current RDM layout."""
     if not rdms:
         return None
     new: dict = {}
@@ -179,10 +179,10 @@ def _to_amplitude(container: dict, tag: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# HDF5 readers: rebuild the old-JSON-equivalent container from the v1 layout.
+# HDF5 readers: rebuild the old-JSON-equivalent container from the legacy layout.
 # --------------------------------------------------------------------------- #
 def _read_wavefunction_group(group: h5py.Group) -> dict:
-    """Read a v1 wavefunction HDF5 group into an old-doc."""
+    """Read a legacy wavefunction HDF5 group into an old-doc."""
     container_group = group["container"]
     tag = _io.read_attr(container_group, "container_type")
     if tag in _AMPLITUDE_TYPES:
@@ -214,9 +214,9 @@ def _decode_configuration(packed, orbital_capacity: int, bits_per_mode: int) -> 
 
 
 def _decode_configuration_dataset(dataset) -> dict:
-    """Decode a single packed v1 ``Configuration`` dataset using its stored attrs.
+    """Decode a single packed legacy ``Configuration`` dataset using its stored attrs.
 
-    The v1 ``Configuration`` HDF5 dataset stores ``orbital_capacity`` (and, when
+    The legacy ``Configuration`` HDF5 dataset stores ``orbital_capacity`` (and, when
     present, ``bits_per_mode``) as attributes; legacy files omit ``bits_per_mode``
     and default to 2 (spin-1/2). Inferring the capacity from the packed byte count
     would over-decode trailing orbitals when it is not a multiple of the modes per

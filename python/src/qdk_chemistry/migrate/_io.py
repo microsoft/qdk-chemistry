@@ -28,7 +28,7 @@ _TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz")
 
 
 def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
-    """Upgrade ``read_doc`` to the current schema by following ``steps``.
+    """Upgrade ``read_doc`` to the current serialization version by following ``steps``.
 
     ``steps`` maps a serialization version to a ``(next_version, transform)`` pair.
     The chain is walked from the document's own ``_source_version`` until no further
@@ -39,8 +39,8 @@ def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
     if version not in steps:
         raise ValueError(
             f"No migration step is registered for the {label} serialization version {version!r}. "
-            "The file may already be in the current schema, or a new step must be added to its "
-            "qdk_chemistry.migrate STEPS table."
+            "The file may already be at the current serialization version, or a new step must be "
+            "added to its qdk_chemistry.migrate STEPS table."
         )
     doc: dict = read_doc
     while version in steps:
@@ -60,7 +60,7 @@ def detect_format(path: Path) -> str:
 
 
 def detect_type(path: Path) -> str:
-    """Return the data type ('orbitals'/'hamiltonian'/'wavefunction').
+    """Return the data type ('orbitals'/'hamiltonian'/'wavefunction'/'ansatz').
 
     Uses the ``name.type.ext`` filename convention (e.g. ``foo.hamiltonian.h5``).
     """
@@ -118,8 +118,9 @@ def subgroup_to_json(group: h5py.Group, data_class, type_token: str) -> dict:
 
     Copies ``group`` into a standalone temporary HDF5 file and loads it with the
     given data class' (current, unchanged-schema) ``from_hdf5_file``, then emits
-    JSON. Used for nested objects whose schema did not change between v1 and v2
-    (e.g. ``BasisSet``), so the migration need not know their internal layout.
+    JSON. Used for nested objects whose serialization schema is unchanged across the
+    migrated versions (e.g. ``BasisSet``), so the migration need not know their
+    internal layout.
     """
     with tempfile.TemporaryDirectory() as tmp:
         h5_path = Path(tmp) / f"sub.{type_token}.h5"
@@ -134,7 +135,7 @@ def subgroup_to_json(group: h5py.Group, data_class, type_token: str) -> dict:
 
 
 def write_object(obj, dst: Path, fmt: str) -> None:
-    """Write a reconstructed v2 data object to ``dst`` in the given format."""
+    """Write a reconstructed data object to ``dst`` in the given format."""
     if fmt == "json":
         obj.to_json_file(str(dst))
     elif fmt == "hdf5":

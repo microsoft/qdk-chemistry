@@ -1,4 +1,4 @@
-"""Tests for the v1 -> v2 schema migration utilities (``qdk_chemistry.migrate``).
+"""Tests for the v1 -> v2 migration utilities (``qdk_chemistry.migrate``).
 
 Old-schema fixtures are written by hand to mirror exactly what qdk-chemistry
 <= 1.1.0 produced (matrix = list-of-rows in JSON; Eigen column-major matrices in
@@ -387,6 +387,61 @@ def test_sparse(tmp_path, fmt):
     assert abs(flat[0, 1, 1, 0] - 0.3) < 1e-12
 
 
+def _write_v1_sparse_hdf5(path, norb, one_body, two_body, *, norb_on_one_body=True, norb_in_metadata=False):
+    """Write a v1 sparse-container HDF5 file, controlling where num_orbitals lives."""
+
+    def pack(a, b):
+        return np.array([a, b], dtype=np.uint32).view(np.float64)[0]
+
+    ob_packed = np.array([[pack(r, c), v] for r, c, v in one_body], dtype=np.float64)
+    tb_packed = np.array([[pack(p, q), pack(r, s), v] for p, q, r, s, v in two_body], dtype=np.float64)
+    with h5py.File(path, "w") as handle:
+        handle.attrs["version"] = "0.1.0"
+        group = handle.create_group("container")
+        group.attrs["version"] = "0.1.0"
+        group.attrs["container_type"] = "sparse"
+        metadata = group.create_group("metadata")
+        metadata.attrs["core_energy"] = 2.5
+        metadata.attrs["type"] = "Hermitian"
+        metadata.attrs["is_restricted"] = True
+        if norb_in_metadata:
+            metadata.create_dataset("num_orbitals", data=np.int32(norb))
+        one_body_ds = group.create_dataset("one_body_integrals_alpha_sparse", data=ob_packed)
+        if norb_on_one_body:
+            one_body_ds.attrs["num_orbitals"] = np.int32(norb)
+        group.create_dataset("two_body_integrals_sparse", data=tb_packed)
+
+
+def test_sparse_num_orbitals_from_metadata_dataset(tmp_path):
+    # Regression: num_orbitals stored as a scalar dataset in metadata (not an
+    # attribute) must be read as its value, not silently defaulted to 0.
+    norb = 3
+    src = tmp_path / "e.hamiltonian.h5"
+    dst = tmp_path / "e_new.hamiltonian.h5"
+    _write_v1_sparse_hdf5(
+        src,
+        norb,
+        [[0, 1, 1.0], [1, 0, 1.0]],
+        [[0, 0, 1, 1, 0.7], [0, 1, 1, 0, 0.3]],
+        norb_on_one_body=False,
+        norb_in_metadata=True,
+    )
+    migrate.convert_file(src, dst)
+    ham = Hamiltonian.from_file(str(dst), "hdf5")
+    aaaa, _, _ = ham.get_two_body_integrals()
+    flat = np.asarray(aaaa).reshape(norb, norb, norb, norb)
+    assert abs(flat[0, 0, 1, 1] - 0.7) < 1e-12
+
+
+def test_sparse_missing_num_orbitals_raises(tmp_path):
+    # Regression: a sparse container with no num_orbitals anywhere must fail
+    # loudly rather than build a zero-orbital Hamiltonian.
+    src = tmp_path / "e.hamiltonian.h5"
+    _write_v1_sparse_hdf5(src, 3, [[0, 1, 1.0]], [[0, 0, 1, 1, 0.7]], norb_on_one_body=False, norb_in_metadata=False)
+    with pytest.raises(migrate.MigrationError, match="num_orbitals"):
+        migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
+
+
 # --------------------------------------------------------------------------- #
 # Wavefunction containers: state_vector and amplitude variants
 # --------------------------------------------------------------------------- #
@@ -530,6 +585,17 @@ def test_unknown_type_raises(tmp_path):
     bad.write_text("{}")
     with pytest.raises(migrate.MigrationError):
         migrate.convert_file(bad, tmp_path / "y.unknown.json")
+
+
+def test_convert_file_rejects_in_place(tmp_path):
+    # Migrating a file onto itself would truncate the source before producing
+    # valid output, so it must be rejected up front and leave the original intact.
+    src = tmp_path / "x.orbitals.json"
+    original = json.dumps(_old_orbitals_json(2, 2, True, (np.eye(2), np.eye(2))))
+    src.write_text(original)
+    with pytest.raises(migrate.MigrationError, match="in place"):
+        migrate.convert_file(src, src)
+    assert src.read_text() == original
 
 
 # --------------------------------------------------------------------------- #
@@ -677,12 +743,12 @@ def test_already_v2_input_raises(tmp_path, fixture, type_token):
 
 
 def test_already_v2_wavefunction_does_not_drop_rdms(tmp_path):
-    # The v2 schema renamed the active-RDM fields; re-running the converter on a
-    # v2 file would silently drop them, so it must fail fast instead.
+    # The current wavefunction schema renamed the active-RDM fields; re-running the
+    # converter on an already-migrated file would silently drop them, so it must fail fast.
     v2_file = tmp_path / "v2.wavefunction.json"
     migrate.convert_file(_REAL_DATA / "h2_v1_0_0_cas_rdm.wavefunction.h5", v2_file)
     assert "rdms" in json.loads(v2_file.read_text())["container"]
-    with pytest.raises(migrate.MigrationError, match="current schema"):
+    with pytest.raises(migrate.MigrationError, match="current serialization version"):
         migrate.convert_file(v2_file, tmp_path / "again.wavefunction.json")
 
 

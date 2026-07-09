@@ -1,18 +1,18 @@
-Migrating data files to the 2.0 schema
-======================================
+Migrating data files between serialization versions
+===================================================
 
-The on-disk serialization format for several QDK/Chemistry data classes changed
-between the 1.x and 2.0 releases. To keep loading unambiguous, the 2.0
-deserializers (:meth:`~qdk_chemistry.data.Orbitals.from_file`,
+Each QDK/Chemistry data class versions its on-disk serialization schema
+independently. A deserializer (:meth:`~qdk_chemistry.data.Orbitals.from_file`,
 :meth:`~qdk_chemistry.data.Hamiltonian.from_file`,
 :meth:`~qdk_chemistry.data.Wavefunction.from_file`, and their ``from_json`` /
-``from_hdf5`` counterparts) accept **only** the current schema. Loading a file
-written by an older release raises an error that points back here.
+``from_hdf5`` counterparts) accepts **only** the serialization version the
+installed library was built against. Loading a file written against an older
+version of that class's schema raises an error that points back here.
 
-A standalone converter upgrades older files in place of guessing at load time.
-It lives outside the core data classes so that no legacy-schema knowledge leaks
-into the serialization code, and it is expected to be removed once 1.x files are
-no longer in circulation.
+The ``qdk_chemistry.migrate`` converter upgrades such a file to the serialization
+version the installed library accepts. It migrates each data class point-for-point
+along that class's own chain of serialization versions, and lives outside the core
+data classes so that no legacy-schema knowledge leaks into the serialization code.
 
 Command line
 ------------
@@ -25,9 +25,10 @@ single file:
    python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction``) and the serialization format
-from the file extension (``.json`` or ``.h5`` / ``.hdf5``). The input and output
-formats may differ, so the same command also converts between JSON and HDF5:
+(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the
+serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
+The input and output formats may differ, so the same command also converts between
+JSON and HDF5:
 
 .. code-block:: bash
 
@@ -44,12 +45,15 @@ The same conversion is available programmatically:
 
    migrate.convert_file("old.wavefunction.json", "new.wavefunction.json")
 
-``migrate.convert_file`` raises
-``migrate.MigrationError`` if the file is already in the 2.0
-schema, the data type or format cannot be determined, or the conversion fails.
+``migrate.convert_file`` raises ``migrate.MigrationError`` if the file is already
+at the current serialization version, the source and destination are the same
+file, the data type or format cannot be determined, or the conversion fails.
 
 What is converted
 -----------------
+
+Each data class carries its own ordered migration steps. The steps currently
+registered make the following changes:
 
 - :class:`~qdk_chemistry.data.Orbitals` — molecular-orbital coefficients and
   energies are re-expressed as symmetry-blocked tensors. Active/inactive index
@@ -61,20 +65,19 @@ What is converted
   state-vector container; the MP2 and coupled-cluster containers upgrade to the
   amplitude container.
 - :class:`~qdk_chemistry.data.Ansatz` — the embedded Hamiltonian and
-  Wavefunction are each migrated in place.
+  Wavefunction are each migrated through their own serialization-version chains.
 
-Other data types (for example :class:`~qdk_chemistry.data.Structure`,
-:class:`~qdk_chemistry.data.BasisSet`, and the qubit-level classes) did not
-change format and load directly without conversion.
+Data classes whose serialization schema has not changed (for example
+:class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.BasisSet`, and
+the qubit-level classes) load directly without conversion.
 
 Cholesky Hamiltonians
 ---------------------
 
-The 1.x release shipped a Cholesky Hamiltonian container that derived from the
-four-center container: it stored the full four-center two-electron integrals and
-never persisted its molecular-orbital three-center vectors. Such a container
-cannot be reconstructed as a Cholesky representation, so the converter migrates
-it to a
+An earlier Cholesky Hamiltonian container derived from the four-center container:
+it stored the full four-center two-electron integrals and never persisted its
+molecular-orbital three-center vectors. Such a container cannot be reconstructed
+as a Cholesky representation, so the converter migrates it to a
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`, preserving
 the integrals and dropping the now-unused AO Cholesky vectors. Re-run the
 Cholesky decomposition from the orbitals if a Cholesky representation is needed

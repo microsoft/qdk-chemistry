@@ -1,4 +1,4 @@
-"""Convert v1 ``Hamiltonian`` serialization to the v2 schema.
+"""Migrate the ``Hamiltonian`` serialization schema to the current version.
 
 The Hamiltonian envelope (``{version, container}``) is schema-stable; only the
 container payload changed (dense integral arrays -> ``SymmetryBlockedTensor``).
@@ -37,7 +37,7 @@ _CHOLESKY = "cholesky"
 
 
 def from_json_doc(doc: dict) -> dict:
-    """Normalize a parsed v1 Hamiltonian JSON object into a container old-doc."""
+    """Normalize a parsed legacy Hamiltonian JSON object into a container old-doc."""
     container = doc["container"]
     container_type = container["container_type"]
     if container_type == "sparse":
@@ -48,13 +48,13 @@ def from_json_doc(doc: dict) -> dict:
 
 
 def from_hdf5_file(path) -> dict:
-    """Normalize a v1 Hamiltonian HDF5 file into a container old-doc."""
+    """Normalize a legacy Hamiltonian HDF5 file into a container old-doc."""
     with h5py.File(path, "r") as handle:
         return from_hdf5_group(handle)
 
 
 def from_hdf5_group(group) -> dict:
-    """Normalize a v1 Hamiltonian HDF5 group (with a ``container`` subgroup)."""
+    """Normalize a legacy Hamiltonian HDF5 group (with a ``container`` subgroup)."""
     container = group["container"]
     container_type = _io.read_attr(container, "container_type")
     if container_type == "sparse":
@@ -65,7 +65,7 @@ def from_hdf5_group(group) -> dict:
 
 
 def to_new_json(old: dict) -> dict:
-    """Build the v2 Hamiltonian JSON object from a normalized container old-doc."""
+    """Build the migrated Hamiltonian JSON object from a normalized container old-doc."""
     container_type = old["container_type"]
     if container_type == "sparse":
         container = _sparse.to_new_json(old)
@@ -117,7 +117,7 @@ def _four_center_from_hdf5(container: h5py.Group) -> dict:
 
 
 def _four_center_to_new_json(old: dict) -> dict:
-    """Build the v2 four-center container JSON from an old-doc."""
+    """Build the migrated four-center container JSON from an old-doc."""
     restricted = old["is_restricted"]
     container: dict = {
         "version": CONTAINER_VERSION,
@@ -193,7 +193,7 @@ def _cholesky_from_hdf5(container: h5py.Group) -> dict:
 
 
 def _cholesky_to_new_json(old: dict) -> dict:
-    """Build the v2 Cholesky container JSON from an old-doc."""
+    """Build the migrated Cholesky container JSON from an old-doc."""
     restricted = old["is_restricted"]
     container: dict = {
         "version": CONTAINER_VERSION,
@@ -221,6 +221,6 @@ def _cholesky_to_new_json(old: dict) -> dict:
 
 
 # The Hamiltonian envelope version is unchanged; the chain is keyed on the
-# container's serialization version (the v1 cholesky/sparse/four-center
+# container's serialization version (the legacy cholesky/sparse/four-center
 # containers all serialized version 0.1.0).
 STEPS = {OLD_CONTAINER_VERSION: (CONTAINER_VERSION, to_new_json)}
