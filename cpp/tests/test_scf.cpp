@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
