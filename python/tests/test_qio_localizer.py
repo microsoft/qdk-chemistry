@@ -38,31 +38,38 @@ def _single_orbital_entropy_sum(ga, gb, g2):
     return total
 
 
-def _correlated_ethylene_wavefunction(structure_path):
-    """Restricted ethylene CAS(4e, 4o) wavefunction carrying spin-dependent RDMs.
+def _run_cas(orbitals, n_alpha, n_beta):
+    """Run macis_cas (with spin-dependent RDMs); return (energy, wavefunction)."""
+    hamil = algorithms.create("hamiltonian_constructor").run(orbitals)
+    mc = algorithms.create("multi_configuration_calculator", "macis_cas")
+    mc.settings().set("calculate_one_rdm", True)
+    mc.settings().set("calculate_two_rdm", True)
+    return mc.run(hamil, n_alpha, n_beta)
 
-    Reuses the shared ``test_data/ethylene.structure.xyz`` geometry (the same
-    closed-shell molecule behind the ``ethylene_4e4o`` reference fixtures).
+
+def _correlated_cas_wavefunction(structure_path, multiplicity, n_active_e, n_active_o, basis):
+    """Restricted CAS(n_active_e, n_active_o) wavefunction with spin-dependent RDMs.
+
+    Loads the geometry from a shared ``test_data`` .xyz file (charge 0).
+    ``multiplicity`` 1 gives a closed-shell RHF reference; > 1 an open-shell
+    ROHF reference (a single spatial orbital set with na != nb).
+    Returns ``(active_wavefunction, cas_energy, cas_wavefunction)``.
     """
     mol = data.Structure.from_xyz_file(structure_path)
 
     scf = algorithms.create("scf_solver")
     scf.settings().set("method", "hf")
-    _, hf_wfn = scf.run(mol, 0, 1, "def2-svp")
+    scf.settings().set("scf_type", "restricted")
+    _, hf_wfn = scf.run(mol, 0, multiplicity, basis)
 
     selector = algorithms.create("active_space_selector", "qdk_valence")
-    selector.settings().set("num_active_electrons", 4)
-    selector.settings().set("num_active_orbitals", 4)
+    selector.settings().set("num_active_electrons", n_active_e)
+    selector.settings().set("num_active_orbitals", n_active_o)
     active_wfn = selector.run(hf_wfn)
 
-    hamil_constructor = algorithms.create("hamiltonian_constructor")
-    hamil = hamil_constructor.run(active_wfn.get_orbitals())
-    mc = algorithms.create("multi_configuration_calculator", "macis_cas")
-    mc.settings().set("calculate_one_rdm", True)
-    mc.settings().set("calculate_two_rdm", True)
     n_a, n_b = active_wfn.get_active_num_electrons()
-    _, cas_wfn = mc.run(hamil, n_a, n_b)
-    return active_wfn.get_orbitals(), cas_wfn
+    cas_energy, cas_wfn = _run_cas(active_wfn.get_orbitals(), n_a, n_b)
+    return active_wfn, cas_energy, cas_wfn
 
 
 class TestQIOLocalizerBindings:
@@ -94,7 +101,10 @@ class TestQIOLocalizerBindings:
 
     def test_reduces_single_orbital_entropy(self, test_data_files_path):
         """QIO rotation does not increase the total single-orbital entropy."""
-        active_orbitals, cas_wfn = _correlated_ethylene_wavefunction(test_data_files_path / "ethylene.structure.xyz")
+        active_wfn, _, cas_wfn = _correlated_cas_wavefunction(
+            test_data_files_path / "ethylene.structure.xyz", 1, 4, 4, "def2-svp"
+        )
+        active_orbitals = active_wfn.get_orbitals()
 
         alpha_indices, beta_indices = active_orbitals.get_active_space_indices()
         assert alpha_indices == beta_indices
@@ -138,41 +148,24 @@ class TestQIOLocalizerBindings:
         # The QIO objective must not increase under the optimized rotation.
         assert entropy_after <= entropy_before + float_comparison_absolute_tolerance
 
-    def test_open_shell_triplet_energy_invariant(self):
+    def test_open_shell_triplet_energy_invariant(self, test_data_files_path):
         """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.
 
         "Restricted" means a single spatial orbital set (RHF/ROHF), not
         closed-shell: an open-shell reference with na != nb is supported.
         """
         # Triplet O2 (ground state) via ROHF -> restricted open-shell orbitals.
-        coords = np.array([[0.0, 0.0, 1.14], [0.0, 0.0, -1.14]])  # Bohr
-        mol = data.Structure(coords, [8, 8])
-        scf = algorithms.create("scf_solver")
-        scf.settings().set("method", "hf")
-        scf.settings().set("scf_type", "restricted")
-        _, hf_wfn = scf.run(mol, 0, 3, "cc-pvdz")  # charge 0, multiplicity 3
-        assert hf_wfn.get_orbitals().is_restricted()
-
-        selector = algorithms.create("active_space_selector", "qdk_valence")
-        selector.settings().set("num_active_electrons", 8)
-        selector.settings().set("num_active_orbitals", 6)
-        active_wfn = selector.run(hf_wfn)
+        active_wfn, e_before, cas_wfn = _correlated_cas_wavefunction(
+            test_data_files_path / "o2.structure.xyz", 3, 8, 6, "cc-pvdz"
+        )
         active_orbs = active_wfn.get_orbitals()
+        assert active_orbs.is_restricted()
         n_a, n_b = active_wfn.get_active_num_electrons()
         assert n_a != n_b  # genuinely open-shell
 
         idx = list(active_orbs.get_active_space_indices()[0])
-
-        def cas(orbs):
-            ham = algorithms.create("hamiltonian_constructor").run(orbs)
-            mc = algorithms.create("multi_configuration_calculator", "macis_cas")
-            mc.settings().set("calculate_one_rdm", True)
-            mc.settings().set("calculate_two_rdm", True)
-            return mc.run(ham, n_a, n_b)
-
-        e_before, cas_wfn = cas(active_orbs)
         qio_wfn = create("orbital_localizer", "qdk_qio").run(cas_wfn, idx, idx)
-        e_after, _ = cas(qio_wfn.get_orbitals())
+        e_after, _ = _run_cas(qio_wfn.get_orbitals(), n_a, n_b)
 
         # A unitary rotation of the active orbitals leaves the CASCI energy
         # invariant, even for an open-shell (na != nb) reference.
