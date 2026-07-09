@@ -53,13 +53,13 @@ if PYSCF_AVAILABLE:
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 
 
-def create_n2_structure():
+def create_n2_structure(distance_angstrom=2.0):
     """Create a nitrogen molecule structure."""
     symbols = ["N", "N"]
     coords = np.array(
         [
-            [0.000000000, 0.0000000000, 2.000000000000 * ANGSTROM_TO_BOHR],
             [0.000000000, 0.0000000000, 0.000000000000],
+            [distance_angstrom * ANGSTROM_TO_BOHR, 0.0000000000, 0.000000000000],
         ]
     )
     return Structure(symbols, coords)
@@ -143,6 +143,7 @@ class TestPyscfPlugin:
         """Test that PySCF plugin is properly registered."""
         available_solvers = algorithms.available("scf_solver")
         assert "pyscf" in available_solvers
+        assert "pyscf_stabilized" in available_solvers
 
         available_localizers = algorithms.available("orbital_localizer")
         assert "pyscf_multi" in available_localizers
@@ -156,6 +157,11 @@ class TestPyscfPlugin:
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
+        assert scf_solver is not None
+
+    def test_pyscf_stabilized_scf_solver_creation(self):
+        """Test creating PySCF stabilized SCF solver."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
         assert scf_solver is not None
 
     def test_pyscf_localizer_creation(self):
@@ -195,6 +201,38 @@ class TestPyscfPlugin:
         # Test setting other parameters
         settings.set("scf_type", "restricted")
         assert settings.get("scf_type") == "restricted"
+
+    def test_pyscf_stabilized_scf_solver_settings(self):
+        """Test PySCF stabilized SCF solver settings interface."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        settings = scf_solver.settings()
+
+        assert settings is not None
+        assert settings.get("max_stability_iterations") == 5
+        assert settings.get("check_internal") is True
+        assert settings.get("check_external") is True
+        assert settings.get("fail_on_unstable") is True
+
+        settings.set("max_stability_iterations", 2)
+        assert settings.get("max_stability_iterations") == 2
+
+    def test_pyscf_stabilized_scf_solver_stretched_n2(self):
+        """Test PySCF stabilized SCF solver on the stretched N2 system used by C++ tests."""
+        n2 = create_n2_structure(1.6)
+
+        regular_scf_solver = algorithms.create("scf_solver", "pyscf")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        stabilized_scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        stabilized_scf_solver.settings().set("method", "hf")
+        stabilized_scf_solver.settings().set("max_stability_iterations", 1)
+        stabilized_scf_solver.settings().set("fail_on_unstable", False)
+        stabilized_energy, stabilized_wavefunction = stabilized_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        assert regular_wavefunction.get_orbitals().is_restricted()
+        assert stabilized_energy < regular_energy
+        assert not stabilized_wavefunction.get_orbitals().is_restricted()
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""

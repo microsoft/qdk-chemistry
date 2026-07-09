@@ -20,7 +20,7 @@ def load():
     from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator  # noqa: PLC0415
     from qdk_chemistry.plugins.pyscf.localization import PyscfLocalizer  # noqa: PLC0415
     from qdk_chemistry.plugins.pyscf.mcscf import PyscfMcscfCalculator  # noqa: PLC0415
-    from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver  # noqa: PLC0415
+    from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver, PyscfStabilizedScfSolver  # noqa: PLC0415
     from qdk_chemistry.plugins.pyscf.stability import PyscfStabilityChecker  # noqa: PLC0415
 
     register(lambda: PyscfAVAS())
@@ -28,4 +28,5 @@ def load():
     register(lambda: PyscfLocalizer())
     register(lambda: PyscfMcscfCalculator())
     register(lambda: PyscfScfSolver())
+    register(lambda: PyscfStabilizedScfSolver())
     register(lambda: PyscfStabilityChecker())
