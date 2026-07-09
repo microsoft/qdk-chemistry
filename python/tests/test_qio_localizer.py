@@ -38,24 +38,21 @@ def _single_orbital_entropy_sum(ga, gb, g2):
     return total
 
 
-def _correlated_water_wavefunction():
-    """Restricted water CAS(6e, 6o) wavefunction carrying spin-dependent RDMs."""
-    coords = np.array(
-        [
-            [0.0, 0.0, 0.117],
-            [0.0, 0.757, -0.467],
-            [0.0, -0.757, -0.467],
-        ]
-    )
-    mol = data.Structure(coords, [8, 1, 1])
+def _correlated_ethylene_wavefunction(structure_path):
+    """Restricted ethylene CAS(4e, 4o) wavefunction carrying spin-dependent RDMs.
+
+    Reuses the shared ``test_data/ethylene.structure.xyz`` geometry (the same
+    closed-shell molecule behind the ``ethylene_4e4o`` reference fixtures).
+    """
+    mol = data.Structure.from_xyz_file(structure_path)
 
     scf = algorithms.create("scf_solver")
     scf.settings().set("method", "hf")
-    _, hf_wfn = scf.run(mol, 0, 1, "cc-pvdz")
+    _, hf_wfn = scf.run(mol, 0, 1, "def2-svp")
 
     selector = algorithms.create("active_space_selector", "qdk_valence")
-    selector.settings().set("num_active_electrons", 6)
-    selector.settings().set("num_active_orbitals", 6)
+    selector.settings().set("num_active_electrons", 4)
+    selector.settings().set("num_active_orbitals", 4)
     active_wfn = selector.run(hf_wfn)
 
     hamil_constructor = algorithms.create("hamiltonian_constructor")
@@ -95,9 +92,9 @@ class TestQIOLocalizerBindings:
         localizer = QdkQIOLocalizer()
         assert localizer.settings() is not None
 
-    def test_reduces_single_orbital_entropy(self):
+    def test_reduces_single_orbital_entropy(self, test_data_files_path):
         """QIO rotation does not increase the total single-orbital entropy."""
-        active_orbitals, cas_wfn = _correlated_water_wavefunction()
+        active_orbitals, cas_wfn = _correlated_ethylene_wavefunction(test_data_files_path / "ethylene.structure.xyz")
 
         alpha_indices, beta_indices = active_orbitals.get_active_space_indices()
         assert alpha_indices == beta_indices
