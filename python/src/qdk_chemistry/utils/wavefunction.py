@@ -35,8 +35,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
     orbitals = wavefunction.get_orbitals()
     num_orbital_chars = 0
     if orbitals.has_active_space():
-        alpha_indices = orbitals.get_active_space_indices()[0]
-        num_orbital_chars = len(alpha_indices)
+        num_orbital_chars = orbitals.num_active_orbitals()
 
     for det, coeff in wavefunction.get_top_determinants(max_determinants=max_determinants).items():
         det_string = det.to_string()

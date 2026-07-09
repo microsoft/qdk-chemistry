@@ -63,7 +63,8 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   // Get the orbitals to consider (existing active space or all orbitals)
   std::vector<size_t> candidate_indices;
   if (orbitals->has_active_space()) {
-    candidate_indices = orbitals->get_active_space_indices().first;
+    candidate_indices =
+        data::spin_channel_indices(orbitals->active_indices(), /*beta=*/false);
   } else {
     candidate_indices.resize(orbitals->get_num_molecular_orbitals());
     std::iota(candidate_indices.begin(), candidate_indices.end(), 0);
@@ -95,7 +96,8 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   std::vector<size_t> inactive_indices;
   if (orbitals->has_active_space()) {
     // Append the newly selected inactive indices to any existing ones
-    inactive_indices = orbitals->get_inactive_space_indices().first;
+    inactive_indices =
+        data::spin_channel_indices(orbitals->inactive_indices(), /*beta=*/false);
     for (int i = 0; i < n_inactive_orbitals; ++i) {
       inactive_indices.push_back(
           candidate_indices[i]);  // Fill from start of candidates

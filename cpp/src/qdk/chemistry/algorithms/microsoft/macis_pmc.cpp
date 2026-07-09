@@ -47,9 +47,7 @@ struct pmc_helper {
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    std::vector<size_t> active_indices =
-        orbitals->get_active_space_indices().first;
-    const size_t num_molecular_orbitals = active_indices.size();
+    const size_t num_molecular_orbitals = orbitals->num_active_orbitals();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
     const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
@@ -184,10 +182,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
         "MacisPmc does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
-  std::vector<size_t> active_indices =
-      orbitals->get_active_space_indices().first;
   auto result = dispatch_by_norb<pmc_helper>(
-      active_indices.size(), *hamiltonian, configurations, *_settings);
+      orbitals->num_active_orbitals(), *hamiltonian, configurations,
+      *_settings);
   return std::make_pair(result.first, std::make_shared<data::Wavefunction>(
                                           std::move(result.second)));
 }

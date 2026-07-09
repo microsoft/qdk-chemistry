@@ -135,7 +135,7 @@ class QiskitQubitMapper(QubitMapper):
 
         h1_a, h1_b = hamiltonian.get_one_body_integrals()
         h2_aa, h2_ab, h2_bb = hamiltonian.get_two_body_integrals()
-        num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
+        num_orbs = hamiltonian.get_orbitals().num_active_orbitals()
         is_restricted = hamiltonian.get_orbitals().is_restricted()
 
         if is_restricted:

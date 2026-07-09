@@ -25,34 +25,16 @@ namespace qdk::chemistry {
 namespace data {
 
 // Project a symmetry-blocked index set onto the legacy (alpha, beta) index
-// vectors used by v1 accessors. A spin axis maps to its alpha/beta segments; no
-// spin axis maps the single trivial-label segment onto both channels.
-//
-// NOTE: the trivial-symmetry path intentionally duplicates the mode indices
-// into both alpha and beta. This keeps Orbitals construction/serialization
-// working for spinless ModelOrbitals. Sz-only semantics are guarded at the
-// Wavefunction level (see _read_spin_count / _read_spin_occupations).
+// vectors used by the deprecated v1 accessors, via the shared
+// spin_channel_indices helper (single source of truth).
 static std::pair<std::vector<size_t>, std::vector<size_t>>
-v1_indices_from_index_set(const SymmetryBlockedIndexSet& index_set) {
-  auto to_vec = [](std::span<const std::uint32_t> s) {
-    return std::vector<size_t>(s.begin(), s.end());
-  };
-  auto symmetries = index_set.symmetries();
-  if (symmetries && symmetries->has_axis(AxisName::Spin)) {
-    std::vector<size_t> alpha = index_set.has(axes::alpha())
-                                    ? to_vec(index_set.indices(axes::alpha()))
-                                    : std::vector<size_t>{};
-    std::vector<size_t> beta = index_set.has(axes::beta())
-                                   ? to_vec(index_set.indices(axes::beta()))
-                                   : std::vector<size_t>{};
-    return {std::move(alpha), std::move(beta)};
-  }
-  std::vector<size_t> modes = index_set.has(SymmetryLabel{})
-                                  ? to_vec(index_set.indices(SymmetryLabel{}))
-                                  : std::vector<size_t>{};
-  return {modes, modes};
+v1_indices_from_index_set(
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& index_set) {
+  return {spin_channel_indices(index_set, /*beta=*/false),
+          spin_channel_indices(index_set, /*beta=*/true)};
 }
 
+// Build a symmetry-blocked index set from legacy (alpha, beta) index vectors.
 static std::shared_ptr<const SymmetryBlockedIndexSet> index_set_from_v1_indices(
     std::shared_ptr<const SymmetryProduct> symmetries,
     std::unordered_map<SymmetryLabel, std::size_t> extents,
@@ -874,6 +856,16 @@ bool Orbitals::has_inactive_space() const {
          !_inactive_space_indices.second.empty();
 }
 
+std::size_t Orbitals::num_active_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _active_space_indices.first.size();
+}
+
+std::size_t Orbitals::num_inactive_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _inactive_space_indices.first.size();
+}
+
 bool Orbitals::_is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if coefficients are set
@@ -1033,6 +1025,10 @@ std::string Orbitals::get_summary() const {
   summary +=
       "  Has active space: " + std::string(has_active_space() ? "Yes" : "No") +
       "\n";
+// The v1 (alpha, beta) index accessors are used here only to render a
+// human-readable summary; the data itself is stored via the v2 index sets.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   if (has_active_space()) {
     auto [act_orbitals_alpha, act_orbitals_beta] = get_active_space_indices();
     summary +=
@@ -1048,6 +1044,7 @@ std::string Orbitals::get_summary() const {
                std::to_string(inact_orbitals_alpha.size()) +
                ", β=" + std::to_string(inact_orbitals_beta.size()) + "\n";
   }
+#pragma GCC diagnostic pop
   auto [virt_orbitals_alpha, virt_orbitals_beta] = get_virtual_space_indices();
   summary +=
       "  Virtual Orbitals: α=" + std::to_string(virt_orbitals_alpha.size()) +
@@ -1795,9 +1792,9 @@ ModelOrbitals::ModelOrbitals(
 
   // Mirror the v1 (alpha, beta) index vectors for the v1 accessor surface, and
   // adopt the supplied symmetry-blocked index sets as the v2 surface directly.
-  _active_space_indices = v1_indices_from_index_set(*active_indices);
+  _active_space_indices = v1_indices_from_index_set(active_indices);
   if (inactive_indices) {
-    _inactive_space_indices = v1_indices_from_index_set(*inactive_indices);
+    _inactive_space_indices = v1_indices_from_index_set(inactive_indices);
   }
   _active_indices = std::move(active_indices);
   _inactive_indices = std::move(inactive_indices);
@@ -1904,7 +1901,7 @@ void Orbitals::_init_index_spaces(
     std::shared_ptr<const SymmetryBlockedIndexSet> inactive,
     std::size_t num_molecular_orbitals) {
   if (active) {
-    _active_space_indices = v1_indices_from_index_set(*active);
+    _active_space_indices = v1_indices_from_index_set(active);
     _active_indices = std::move(active);
   } else {
     std::vector<size_t> all(num_molecular_orbitals);
@@ -1912,7 +1909,7 @@ void Orbitals::_init_index_spaces(
     _active_space_indices = {all, all};
   }
   if (inactive) {
-    _inactive_space_indices = v1_indices_from_index_set(*inactive);
+    _inactive_space_indices = v1_indices_from_index_set(inactive);
     _inactive_indices = std::move(inactive);
   }
   if (!_active_indices || !_inactive_indices) {

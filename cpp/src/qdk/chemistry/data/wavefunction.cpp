@@ -326,7 +326,7 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
     auto bbbb = extract(axes::beta(), axes::beta(), axes::beta(), axes::beta());
     auto two_rdm_ss_part = detail::add_vector_variants(aaaa, bbbb);
     auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-        aabb, get_orbitals()->get_active_space_indices().first.size());
+        aabb, get_orbitals()->num_active_orbitals());
     auto two_rdm_os_part =
         detail::add_vector_variants(aabb, *two_rdm_spin_bbaa);
 
@@ -1088,8 +1088,8 @@ Configuration Wavefunction::get_active_determinant(
     return total_determinant;
   }
 
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), /*beta=*/false);
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
@@ -1122,12 +1122,12 @@ Configuration Wavefunction::get_total_determinant(
     return active_determinant;
   }
 
-  auto [alpha_inactive, beta_inactive] = orbitals->get_inactive_space_indices();
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  const auto inactive_indices =
+      spin_channel_indices(orbitals->inactive_indices(), /*beta=*/false);
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), /*beta=*/false);
   auto [alpha_virtual, beta_virtual] = orbitals->get_virtual_space_indices();
 
-  const auto& inactive_indices = alpha_inactive;
-  const auto& active_indices = alpha_active;
   const auto& virtual_indices = alpha_virtual;
 
   size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();

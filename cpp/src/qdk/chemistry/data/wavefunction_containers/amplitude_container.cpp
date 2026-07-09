@@ -130,7 +130,7 @@ AmplitudeContainer::AmplitudeContainer(
     auto [n_alpha, n_beta] = _wavefunction->get_active_num_electrons();
     size_t active_space_size = orbitals->get_num_molecular_orbitals();
     if (orbitals->has_active_space()) {
-      active_space_size = orbitals->get_active_space_indices().first.size();
+      active_space_size = orbitals->num_active_orbitals();
     }
 
     size_t n_occ_alpha = n_alpha;
@@ -331,19 +331,18 @@ AmplitudeContainer::total_num_particles() const {
     throw std::runtime_error("No determinants available");
   }
   if (determinants[0].bits_per_mode() != 2) {
-    // Generic (non-spin-½): aggregate count, no spin decomposition.
-    // Use only one channel of inactive indices — for spinless bases
-    // v1_indices_from_index_set duplicates the trivial-label indices into
-    // both alpha and beta, so summing both would double-count.
+    // Generic (non-spin-½): aggregate count, no spin decomposition. Use a
+    // single inactive channel; num_inactive_orbitals() reads the alpha (or, for
+    // spin-free bases, the sole trivial) channel.
     std::size_t active = determinants[0].total_occupation();
-    auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
-    return _make_particle_count(active + alpha_inactive.size(), 0);
+    return _make_particle_count(
+        active + get_orbitals()->num_inactive_orbitals(), 0);
   }
   auto [n_alpha, n_beta] = determinants[0].get_n_electrons();
-  auto [alpha_inactive, beta_inactive] =
-      get_orbitals()->get_inactive_space_indices();
-  return _make_particle_count(n_alpha + alpha_inactive.size(),
-                              n_beta + beta_inactive.size());
+  const auto inactive = get_orbitals()->inactive_indices();
+  return _make_particle_count(
+      n_alpha + spin_channel_indices(inactive, /*beta=*/false).size(),
+      n_beta + spin_channel_indices(inactive, /*beta=*/true).size());
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>

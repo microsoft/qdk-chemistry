@@ -58,6 +58,7 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryProduct,
     axes,
     axis_name_to_string,
+    spin_channel_indices,
 )
 
 __all__ = [
@@ -80,6 +81,9 @@ __all__ = [
     "SymmetryProduct",
     "axes",
     "axis_name_to_string",
+    "spin_channel_indices",
+    "spin_channel_matrix",
+    "spin_channel_vector",
     "spin_index_set",
 ]
 
@@ -115,3 +119,39 @@ def spin_index_set(
         beta_label: list(beta),
     }
     return SymmetryBlockedIndexSet(sym, extents, indices)
+
+
+def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, *, beta: bool = False):
+    """Per-spin dense block of a rank-2 (coefficient-like) SymmetryBlockedTensor.
+
+    Returns the alpha or beta block per ``beta``; for a restricted (spin-equivalent)
+    tensor the alpha and beta blocks share storage, so both selections succeed.
+
+    Args:
+        coefficients: A rank-2 SymmetryBlockedTensor (e.g. orbital coefficients).
+        beta: Select the beta channel when True, otherwise alpha.
+
+    Returns:
+        The requested spin channel's dense block as a NumPy array.
+
+    """
+    label = SymmetryLabel([axes.beta() if beta else axes.alpha()])
+    return coefficients.block([label, label])
+
+
+def spin_channel_vector(energies: SymmetryBlockedTensorRank1, *, beta: bool = False):
+    """Per-spin dense block of a rank-1 (energy-like) SymmetryBlockedTensor.
+
+    Returns the alpha or beta block per ``beta``; for a restricted (spin-equivalent)
+    tensor the alpha and beta blocks share storage, so both selections succeed.
+
+    Args:
+        energies: A rank-1 SymmetryBlockedTensor (e.g. orbital energies).
+        beta: Select the beta channel when True, otherwise alpha.
+
+    Returns:
+        The requested spin channel's dense block as a NumPy array.
+
+    """
+    label = SymmetryLabel([axes.beta() if beta else axes.alpha()])
+    return energies.block([label])

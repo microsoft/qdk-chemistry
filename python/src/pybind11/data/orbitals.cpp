@@ -13,11 +13,16 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+#include <utility>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
 
 namespace py = pybind11;
+
+// This translation unit intentionally binds the deprecated v1 facade
+// accessors/constructors to Python; suppress their deprecation warnings here.
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 // Wrapper functions for file I/O methods that accept both strings and pathlib
 // Path objects
@@ -57,6 +62,38 @@ std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals_from_json_file_wrapper(
 }
 
 void bind_model_orbitals(py::module &data);
+
+namespace {
+
+// C++ [[deprecated]] does not propagate to Python callers, so the deprecated
+// v1 facade accessors raise a DeprecationWarning explicitly from the binding.
+void warn_v1_deprecated(const char *message) {
+  if (PyErr_WarnEx(PyExc_DeprecationWarning, message, 1) < 0) {
+    throw py::error_already_set();
+  }
+}
+
+// Bind a deprecated "get_*" accessor as both a method and a read-only property,
+// emitting a DeprecationWarning on each access.
+template <typename ClassBinding, typename Getter, typename... Extra>
+void bind_deprecated_getter_as_property(ClassBinding &cls,
+                                        const char *method_name,
+                                        const char *property_name,
+                                        Getter getter, const char *message,
+                                        const char *docstring,
+                                        const Extra &...extra) {
+  using Ret = decltype((std::declval<const qdk::chemistry::data::Orbitals &>().*
+                        getter)());
+  auto wrapper = [getter,
+                  message](const qdk::chemistry::data::Orbitals &self) -> Ret {
+    warn_v1_deprecated(message);
+    return (self.*getter)();
+  };
+  cls.def(method_name, wrapper, docstring, extra...);
+  cls.def_property_readonly(property_name, wrapper, docstring, extra...);
+}
+
+}  // namespace
 
 void bind_orbitals(py::module &data) {
   using namespace qdk::chemistry::algorithms;
@@ -221,6 +258,13 @@ Args:
   orbitals.def("energies", &Orbitals::energies,
                "The orbital energies as a rank-1 "
                "SymmetryBlockedTensor.");
+  orbitals.def("active_indices", &Orbitals::active_indices,
+               "Active-space indices as a SymmetryBlockedIndexSet (or None if "
+               "no active space is set).");
+  orbitals.def(
+      "inactive_indices", &Orbitals::inactive_indices,
+      "Inactive-space indices as a SymmetryBlockedIndexSet (or None if "
+      "no inactive space is set).");
   orbitals.def(
       "symmetries", &Orbitals::symmetries,
       "SymmetryProduct the molecular-orbital modes are blocked under.");
@@ -230,8 +274,15 @@ Args:
   orbitals.def("num_modes", &Orbitals::num_modes,
                "Total number of molecular-orbital modes across all symmetry "
                "blocks.");
-  orbitals.def("get_coefficients", &Orbitals::get_coefficients,
-               R"(
+  orbitals.def(
+      "get_coefficients",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_coefficients() is deprecated in v2.0; use "
+            "coefficients() (SymmetryBlockedTensor) instead.");
+        return self.get_coefficients();
+      },
+      R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.
 
 ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
@@ -249,8 +300,15 @@ Examples:
 )");
 
   // Energy access (read-only)
-  orbitals.def("get_energies", &Orbitals::get_energies,
-               R"(
+  orbitals.def(
+      "get_energies",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_energies() is deprecated in v2.0; use energies() "
+            "(SymmetryBlockedTensor) instead.");
+        return self.get_energies();
+      },
+      R"(
 Get orbital energies in Hartrees as pair of (alpha, beta) vectors.
 
 Returns:
@@ -495,9 +553,12 @@ Examples:
 )");
 
   // Individual alpha/beta access
-  bind_getter_as_property(orbitals, "get_coefficients_alpha",
-                          &Orbitals::get_coefficients_alpha,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_coefficients_alpha", "coefficients_alpha",
+      &Orbitals::get_coefficients_alpha,
+      "Orbitals.get_coefficients_alpha() is deprecated in v2.0; use "
+      "coefficients() (SymmetryBlockedTensor) instead.",
+      R"(
 Get alpha orbital coefficients matrix.
 
 Returns:
@@ -508,11 +569,14 @@ Examples:
     >>> print(f"Alpha coefficients shape: {alpha_coeffs.shape}")
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_coefficients_beta",
-                          &Orbitals::get_coefficients_beta,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_coefficients_beta", "coefficients_beta",
+      &Orbitals::get_coefficients_beta,
+      "Orbitals.get_coefficients_beta() is deprecated in v2.0; use "
+      "coefficients() (SymmetryBlockedTensor) instead.",
+      R"(
 Get beta orbital coefficients matrix.
 
 Returns:
@@ -523,11 +587,14 @@ Examples:
     >>> print(f"Beta coefficients shape: {beta_coeffs.shape}")
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_energies_alpha",
-                          &Orbitals::get_energies_alpha,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_energies_alpha", "energies_alpha",
+      &Orbitals::get_energies_alpha,
+      "Orbitals.get_energies_alpha() is deprecated in v2.0; use energies() "
+      "(SymmetryBlockedTensor) instead.",
+      R"(
 Get alpha orbital energies (Hartree).
 
 Returns:
@@ -538,11 +605,14 @@ Examples:
     >>> homo_energy = alpha_energies[homo_index]
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_energies_beta",
-                          &Orbitals::get_energies_beta,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_energies_beta", "energies_beta",
+      &Orbitals::get_energies_beta,
+      "Orbitals.get_energies_beta() is deprecated in v2.0; use energies() "
+      "(SymmetryBlockedTensor) instead.",
+      R"(
 Get beta orbital energies (Hartree).
 
 Returns:
@@ -553,7 +623,7 @@ Examples:
     >>> homo_energy = beta_energies[homo_index]
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
   bind_getter_as_property(orbitals, "get_summary", &Orbitals::get_summary,
                           R"(
@@ -569,8 +639,15 @@ Examples:
 )");
 
   // Active space information (read-only)
-  orbitals.def("get_active_space_indices", &Orbitals::get_active_space_indices,
-               R"(
+  orbitals.def(
+      "get_active_space_indices",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_active_space_indices() is deprecated in v2.0; use "
+            "active_indices() (SymmetryBlockedIndexSet) instead.");
+        return self.get_active_space_indices();
+      },
+      R"(
 Get the active space orbital indices.
 
 Returns:
@@ -582,23 +659,15 @@ Examples:
 
 )");
 
-  orbitals.def("get_inactive_space_indices",
-               &Orbitals::get_inactive_space_indices,
-               R"(
-Get the inactive space orbital indices.
-
-Returns:
-    tuple: Pair of ``(alpha_indices, beta_indices)`` for inactive space orbitals
-
-Examples:
-    >>> alpha_inactive, beta_inactive = orbitals.get_inactive_space_indices()
-    >>> print(f"Inactive space size: {len(alpha_inactive)}")
-
-)");
-
-  orbitals.def("get_inactive_space_indices",
-               &Orbitals::get_inactive_space_indices,
-               R"(
+  orbitals.def(
+      "get_inactive_space_indices",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_inactive_space_indices() is deprecated in v2.0; use "
+            "inactive_indices() (SymmetryBlockedIndexSet) instead.");
+        return self.get_inactive_space_indices();
+      },
+      R"(
 Get the inactive space orbital indices.
 
 Returns:
@@ -637,6 +706,30 @@ Examples:
     ... else:
     ...     print("No active space defined")
 
+)");
+
+  orbitals.def("num_active_orbitals", &Orbitals::num_active_orbitals,
+               R"(
+Number of active orbitals (per spin channel).
+
+Returns the active-space orbital count for the alpha channel (equal to the beta
+count for restricted/spin-balanced spaces), falling back to the full molecular
+orbital count when no active space is set.
+
+Returns:
+    int: Number of active orbitals.
+)");
+
+  orbitals.def("num_inactive_orbitals", &Orbitals::num_inactive_orbitals,
+               R"(
+Number of inactive orbitals (per spin channel).
+
+Returns the inactive-space orbital count for the alpha channel (equal to the
+beta count for restricted/spin-balanced spaces), or zero when no inactive space
+is set.
+
+Returns:
+    int: Number of inactive orbitals.
 )");
 
   // Serialization

@@ -141,15 +141,14 @@ double Ansatz::calculate_energy() const {
     const auto& h2 = h2_aaaa;
 
     // check that active space indices are consistent
-    auto active_space_indices =
-        _wavefunction->get_orbitals()->get_active_space_indices();
-    if (active_space_indices.first.size() !=
-        active_space_indices.second.size()) {
+    const auto active_ai = _wavefunction->get_orbitals()->active_indices();
+    if (spin_channel_indices(active_ai, /*beta=*/false).size() !=
+        spin_channel_indices(active_ai, /*beta=*/true).size()) {
       throw std::runtime_error(
           "Active space indices are inconsistent between Hamiltonian and "
           "wavefunction");
     }
-    size_t norb = active_space_indices.first.size();
+    size_t norb = _wavefunction->get_orbitals()->num_active_orbitals();
 
     // One-body contribution
     for (int p = 0; p < norb; ++p) {
@@ -205,15 +204,14 @@ double Ansatz::calculate_energy() const {
         _hamiltonian->get_two_body_integrals();
 
     // check that active space indices are consistent
-    auto active_space_indices =
-        _wavefunction->get_orbitals()->get_active_space_indices();
-    if (active_space_indices.first.size() !=
-        active_space_indices.second.size()) {
+    const auto active_ai = _wavefunction->get_orbitals()->active_indices();
+    if (spin_channel_indices(active_ai, /*beta=*/false).size() !=
+        spin_channel_indices(active_ai, /*beta=*/true).size()) {
       throw std::runtime_error(
           "Active space indices are inconsistent between Hamiltonian and "
           "wavefunction");
     }
-    size_t norb = active_space_indices.first.size();
+    size_t norb = _wavefunction->get_orbitals()->num_active_orbitals();
 
     // One-body contribution (alpha + beta)
     for (int p = 0; p < norb; ++p) {
@@ -353,10 +351,12 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   // Check active space indices consistency
-  const auto& [ham_active_alpha, ham_active_beta] =
-      ham_orbitals.get_active_space_indices();
-  const auto& [wf_active_alpha, wf_active_beta] =
-      wf_orbitals.get_active_space_indices();
+  const auto ham_active = ham_orbitals.active_indices();
+  const auto wf_active = wf_orbitals.active_indices();
+  const auto ham_active_alpha = spin_channel_indices(ham_active, /*beta=*/false);
+  const auto ham_active_beta = spin_channel_indices(ham_active, /*beta=*/true);
+  const auto wf_active_alpha = spin_channel_indices(wf_active, /*beta=*/false);
+  const auto wf_active_beta = spin_channel_indices(wf_active, /*beta=*/true);
 
   if (ham_active_alpha != wf_active_alpha) {
     throw std::runtime_error(
@@ -370,10 +370,16 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   // Check inactive space indices consistency
-  const auto& [ham_inactive_alpha, ham_inactive_beta] =
-      ham_orbitals.get_inactive_space_indices();
-  const auto& [wf_inactive_alpha, wf_inactive_beta] =
-      wf_orbitals.get_inactive_space_indices();
+  const auto ham_inactive = ham_orbitals.inactive_indices();
+  const auto wf_inactive = wf_orbitals.inactive_indices();
+  const auto ham_inactive_alpha =
+      spin_channel_indices(ham_inactive, /*beta=*/false);
+  const auto ham_inactive_beta =
+      spin_channel_indices(ham_inactive, /*beta=*/true);
+  const auto wf_inactive_alpha =
+      spin_channel_indices(wf_inactive, /*beta=*/false);
+  const auto wf_inactive_beta =
+      spin_channel_indices(wf_inactive, /*beta=*/true);
 
   if (ham_inactive_alpha != wf_inactive_alpha) {
     throw std::runtime_error(

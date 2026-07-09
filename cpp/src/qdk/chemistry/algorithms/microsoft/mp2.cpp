@@ -83,7 +83,7 @@ std::unique_ptr<data::AmplitudeContainer> MP2Calculator::compute_amplitudes(
   // Active-space size (falls back to the full MO count).
   size_t active_space_size = orbitals->get_num_molecular_orbitals();
   if (orbitals->has_active_space()) {
-    active_space_size = orbitals->get_active_space_indices().first.size();
+    active_space_size = orbitals->num_active_orbitals();
   }
   const Eigen::Index active_size_idx =
       static_cast<Eigen::Index>(active_space_size);
@@ -94,8 +94,9 @@ std::unique_ptr<data::AmplitudeContainer> MP2Calculator::compute_amplitudes(
   Eigen::VectorXd eps_active_alpha(active_space_size);
   Eigen::VectorXd eps_active_beta(active_space_size);
   if (orbitals->has_active_space()) {
-    const auto& [active_alpha, active_beta] =
-        orbitals->get_active_space_indices();
+    const auto active_ai = orbitals->active_indices();
+    const auto active_alpha = data::spin_channel_indices(active_ai, false);
+    const auto active_beta = data::spin_channel_indices(active_ai, true);
     for (Eigen::Index i = 0; i < active_size_idx; ++i) {
       eps_active_alpha[i] = eps_alpha[active_alpha[i]];
       eps_active_beta[i] = eps_beta[active_beta[i]];
@@ -182,10 +183,10 @@ double MP2Calculator::calculate_restricted_mp2_energy(
 
   size_t active_space_size;
   if (orbitals->has_active_space()) {
-    const auto& [active_space_ind_alpha, active_space_ind_beta] =
-        orbitals->get_active_space_indices();
-    active_space_size = active_space_ind_alpha.size();
-    size_t active_space_size_beta = active_space_ind_beta.size();
+    const auto active_ai = orbitals->active_indices();
+    active_space_size = data::spin_channel_indices(active_ai, false).size();
+    size_t active_space_size_beta =
+        data::spin_channel_indices(active_ai, true).size();
     if (active_space_size_beta != active_space_size) {
       throw std::runtime_error(
           "Active space sizes of alpha and beta should be the same");
@@ -203,8 +204,8 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   const auto& eps_alpha = orbitals->energies()->block({data::axes::alpha()});
   const auto& eps_beta = orbitals->energies()->block({data::axes::beta()});
 
-  const auto& active_space_indices = orbitals->get_active_space_indices();
-  const auto& active_indices_alpha = active_space_indices.first;
+  const auto active_indices_alpha =
+      data::spin_channel_indices(orbitals->active_indices(), false);
   Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
   for (size_t i = 0; i < active_indices_alpha.size(); ++i) {
     eps_active_alpha[i] = eps_alpha[active_indices_alpha[i]];
@@ -254,10 +255,10 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
 
   size_t active_space_size;
   if (orbitals->has_active_space()) {
-    const auto& [active_space_ind_alpha, active_space_ind_beta] =
-        orbitals->get_active_space_indices();
-    active_space_size = active_space_ind_alpha.size();
-    size_t active_space_size_beta = active_space_ind_beta.size();
+    const auto active_ai = orbitals->active_indices();
+    active_space_size = data::spin_channel_indices(active_ai, false).size();
+    size_t active_space_size_beta =
+        data::spin_channel_indices(active_ai, true).size();
     if (active_space_size_beta != active_space_size) {
       throw std::runtime_error(
           "Active space sizes of alpha and beta should be the same");
@@ -275,8 +276,9 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   const auto& eps_alpha = orbitals->energies()->block({data::axes::alpha()});
   const auto& eps_beta = orbitals->energies()->block({data::axes::beta()});
 
-  const auto& [active_indices_alpha, active_indices_beta] =
-      orbitals->get_active_space_indices();
+  const auto active_ai = orbitals->active_indices();
+  const auto active_indices_alpha = data::spin_channel_indices(active_ai, false);
+  const auto active_indices_beta = data::spin_channel_indices(active_ai, true);
   Eigen::VectorXd eps_active_alpha(active_indices_alpha.size());
   Eigen::VectorXd eps_active_beta(active_indices_beta.size());
 

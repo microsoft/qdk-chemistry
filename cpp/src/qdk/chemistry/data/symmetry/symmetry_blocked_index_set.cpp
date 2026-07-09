@@ -90,6 +90,18 @@ std::string SymmetryBlockedIndexSet::get_summary() const {
   return oss.str();
 }
 
+std::vector<std::size_t> spin_channel_indices(
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& set, bool beta) {
+  if (!set) return {};
+  const auto sym = set->symmetries();
+  const SymmetryLabel label = (sym && sym->has_axis(AxisName::Spin))
+                                  ? (beta ? axes::beta() : axes::alpha())
+                                  : SymmetryLabel{};
+  if (!set->has(label)) return {};
+  const auto s = set->indices(label);
+  return std::vector<std::size_t>(s.begin(), s.end());
+}
+
 nlohmann::json SymmetryBlockedIndexSet::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;

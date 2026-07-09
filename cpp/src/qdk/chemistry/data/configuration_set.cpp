@@ -150,11 +150,9 @@ void ConfigurationSet::_validate_configurations() const {
   // PR.  Keeping them out avoids baking Sz assumptions into the structural
   // validation layer.
   if (_orbitals && _orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
-    const auto& active_indices = alpha_active;
+    size_t active_space_size = _orbitals->num_active_orbitals();
 
-    if (!active_indices.empty()) {
-      size_t active_space_size = active_indices.size();
+    if (active_space_size != 0) {
 
       for (size_t i = 0; i < _configurations.size(); ++i) {
         const auto& config = _configurations[i];

@@ -48,7 +48,7 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
         "selection.");
   }
   std::vector<size_t> candidate_indices =
-      orbitals->get_active_space_indices().first;
+      data::spin_channel_indices(orbitals->active_indices(), /*beta=*/false);
 
   // Make sure that the occupation numbers are sorted for the candidate orbitals
   std::vector<std::pair<size_t, double>> orbital_occupations;

@@ -51,9 +51,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
 
     """
     orbitals = wavefunction.get_orbitals()
-    indices, _ = orbitals.get_active_space_indices()
-
-    num_orbs = len(indices)
+    num_orbs = orbitals.num_active_orbitals()
     num_qubits = num_orbs * 2
     dim = 1 << num_qubits  # 2^num_qubits
 

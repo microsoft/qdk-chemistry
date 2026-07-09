@@ -41,6 +41,7 @@ import qdk_chemistry.plugins.qiskit
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.symmetry import spin_channel_indices
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -115,7 +116,9 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             )
 
         # Active Space Consistency Check
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
+        active_indices = wavefunction.get_orbitals().active_indices()
+        alpha_indices = spin_channel_indices(active_indices, beta=False)
+        beta_indices = spin_channel_indices(active_indices, beta=True)
         if alpha_indices != beta_indices:
             raise ValueError(
                 f"Active space contains {len(alpha_indices)} alpha orbitals and "
@@ -125,7 +128,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
+        num_orbitals = wavefunction.get_orbitals().num_active_orbitals()
         bitstrings = []
         for det in dets:
             alpha_str, beta_str = det.to_binary_strings(num_orbitals)

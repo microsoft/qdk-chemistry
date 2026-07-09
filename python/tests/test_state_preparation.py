@@ -39,6 +39,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     gf2x_with_tracking,
 )
 from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
+from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_test_orbitals
@@ -320,9 +321,9 @@ def test_asymmetric_active_space_error():
     class MockOrbitals:
         """Mock orbitals with asymmetric active space indices."""
 
-        def get_active_space_indices(self):
+        def active_indices(self):
             """Return asymmetric active space indices."""
-            return ([0, 1, 2], [0, 1, 2, 3])
+            return spin_index_set(4, [0, 1, 2], [0, 1, 2, 3], equivalent=False)
 
     class MockWavefunction:
         """Mock wavefunction for testing asymmetric active space."""
