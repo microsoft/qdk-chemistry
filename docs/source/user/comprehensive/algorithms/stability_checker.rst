@@ -37,6 +37,8 @@ The typical workflow for handling instabilities involves an iterative procedure:
 6. Repeat until a stable solution is found
 
 When an external instability is detected in a restricted calculation, the procedure typically switches to an unrestricted calculation type, as the instability indicates that spin symmetry breaking would lower the energy.
+For the common case where this full procedure should be automated, use the :ref:`qdk-stabilized-scf-native` :class:`~qdk_chemistry.algorithms.ScfSolver` implementation.
+The PySCF plugin also provides :ref:`pyscf-stabilized-scf`, which uses PySCF's native stability workflow.
 
 Running a stability check
 --------------------------
