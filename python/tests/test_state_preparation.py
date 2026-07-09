@@ -82,6 +82,15 @@ def test_sparse_isometry_basic(wavefunction_4e4o):
     assert f"{expected_theta:.4f}" in qsc_json_str  # expected angle
 
 
+def test_sparse_isometry_backward_compatibility():
+    """Test that the sparse isometry StatePreparation algorithm can be created using the deprecated name."""
+    prep_deprecated = create("state_prep", "sparse_isometry_gf2x")
+    assert isinstance(prep_deprecated, SparseIsometryStatePreparation)
+
+    prep = create("state_prep", "sparse_isometry")
+    assert isinstance(prep, SparseIsometryStatePreparation)
+
+
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_sparse_isometry_qiskit_dense_prepare(wavefunction_4e4o):
     """Test the sparse isometry GF(2^X) StatePreparation algorithm basic functionality."""
