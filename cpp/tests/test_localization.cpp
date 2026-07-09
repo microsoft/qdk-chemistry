@@ -1943,6 +1943,8 @@ TEST_F(LocalizationTest, QIOSettings) {
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
   EXPECT_NEAR(settings.get<double>("convergence_tolerance"), 1e-10, 1e-20);
   EXPECT_NEAR(settings.get<double>("coarse_angle_step"), 0.02, 1e-12);
+  EXPECT_EQ(settings.get<int64_t>("fine_samples"), 201);
+  EXPECT_NEAR(settings.get<double>("improvement_tolerance"), 1e-12, 1e-22);
   // ... and are user-configurable.
   EXPECT_NO_THROW(settings.set("max_cycles", int64_t{50}));
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 50);
@@ -1958,4 +1960,10 @@ TEST_F(LocalizationTest, QIOSettings) {
   // astronomical number of iterations) and a step larger than pi are rejected.
   EXPECT_THROW(settings.set("coarse_angle_step", 1e-10), std::invalid_argument);
   EXPECT_THROW(settings.set("coarse_angle_step", 4.0), std::invalid_argument);
+  // fine_samples must be >= 2; improvement_tolerance must be >= 0.
+  EXPECT_NO_THROW(settings.set("fine_samples", int64_t{51}));
+  EXPECT_EQ(settings.get<int64_t>("fine_samples"), 51);
+  EXPECT_THROW(settings.set("fine_samples", int64_t{1}), std::invalid_argument);
+  EXPECT_THROW(settings.set("improvement_tolerance", -1e-9),
+               std::invalid_argument);
 }

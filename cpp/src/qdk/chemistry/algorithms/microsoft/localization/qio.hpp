@@ -5,6 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <limits>
+#include <numbers>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 
@@ -21,6 +22,10 @@ namespace qdk::chemistry::algorithms::microsoft {
  *   (default 1e-10, must be >= 0).
  * - "coarse_angle_step" (double): coarse grid spacing in radians for the
  *   per-pair angle scan over [0, pi) (default 0.02, must be in [1e-4, pi]).
+ * - "fine_samples" (int): number of samples in the fine-refinement angle scan
+ *   around the best coarse angle (default 201, must be >= 2).
+ * - "improvement_tolerance" (double): minimum single-orbital entropy decrease
+ *   required to accept a pair rotation (default 1e-12, must be >= 0).
  *
  * The numeric bounds are enforced at set-time, so out-of-range values are
  * rejected (e.g. a negative max_cycles that would underflow to a huge size_t,
@@ -43,7 +48,16 @@ class QIOLocalizerSettings : public data::Settings {
         "coarse_angle_step", 0.02,
         "Coarse grid spacing (radians) for the per-pair angle scan over "
         "[0, pi); practical range [1e-4, pi]",
-        data::BoundConstraint<double>{1e-4, 3.14159265358979323846});
+        data::BoundConstraint<double>{1e-4, std::numbers::pi});
+    set_default(
+        "fine_samples", int64_t{201},
+        "Number of samples in the fine-refinement angle scan",
+        data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
+    set_default(
+        "improvement_tolerance", 1e-12,
+        "Minimum single-orbital entropy decrease required to accept a "
+        "pair rotation",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
   }
 };
 
