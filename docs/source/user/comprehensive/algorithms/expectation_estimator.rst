@@ -28,7 +28,7 @@ A typical workflow connects :doc:`StatePreparation <state_preparation>` (which l
 4. Estimate the energy using ExpectationEstimator
 
 Using the ExpectationEstimator
--------------------------
+------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
