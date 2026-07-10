@@ -9,6 +9,7 @@ The module contains:
 
 * :class:`PyscfScfSettings`: Configuration class for SCF calculation parameters
 * :class:`PyscfScfSolver`: Main solver class that performs HF and DFT calculations
+* :class:`PyscfStabilizedScfSolver`: Solver that uses PySCF's stability workflow to rerun unstable SCF solutions
 * Registration utilities to integrate the solver with QDK/Chemistry's plugin system
 
 The solver handles automatic conversion between QDK/Chemistry molecular structures and PySCF
@@ -58,7 +59,7 @@ from qdk_chemistry.plugins.pyscf.conversion import (
 )
 from qdk_chemistry.utils import Logger
 
-__all__ = ["PyscfScfSettings", "PyscfScfSolver"]
+__all__ = ["PyscfScfSettings", "PyscfScfSolver", "PyscfStabilizedScfSettings", "PyscfStabilizedScfSolver"]
 
 
 class PyscfScfSettings(ElectronicStructureSettings):
@@ -103,6 +104,19 @@ class PyscfScfSettings(ElectronicStructureSettings):
         self._set_default(
             "xc_grid", "int", 3, "Density functional integration grid level (0=coarse, 9=very fine)", list(range(10))
         )
+
+
+class PyscfStabilizedScfSettings(PyscfScfSettings):
+    """Settings for PySCF's automated stable-SCF workflow."""
+
+    def __init__(self):
+        """Initialize stabilized SCF settings."""
+        Logger.trace_entering()
+        super().__init__()
+        self._set_default("max_stability_iterations", "int", 5)
+        self._set_default("check_internal", "bool", True)
+        self._set_default("check_external", "bool", True)
+        self._set_default("fail_on_unstable", "bool", True)
 
 
 class PyscfScfSolver(ScfSolver):
@@ -177,6 +191,14 @@ class PyscfScfSolver(ScfSolver):
 
         """
         Logger.trace_entering()
+        mf, scf_type, basis_name, _ = self._build_scf(structure, charge, spin_multiplicity, basis_or_guess)
+        energy = self._run_scf(mf, scf_type, basis_or_guess)
+        return self._to_wavefunction(mf, structure, basis_name, scf_type, energy)
+
+    def _build_scf(
+        self, structure: Structure, charge: int, spin_multiplicity: int, basis_or_guess: Orbitals | BasisSet | str
+    ):
+        """Create and configure a PySCF mean-field object."""
         atoms, _, _ = structure_to_pyscf_atom_labels(structure)
 
         # Determine basis set name and initial guess
@@ -262,11 +284,17 @@ class PyscfScfSolver(ScfSolver):
         mf.conv_tol = convergence_threshold * 0.1
         mf.max_cycle = max_iterations
 
+        return mf, scf_type, basis_name, initial_guess
+
+    def _run_scf(self, mf, scf_type: SCFType, basis_or_guess: Orbitals | BasisSet | str) -> float:
+        """Run PySCF, using a QDK orbitals object as the initial density when provided."""
+        initial_guess = basis_or_guess if isinstance(basis_or_guess, Orbitals) else None
+
         # Set initial guess if provided
         if initial_guess is not None and hasattr(initial_guess, "get_coefficients"):
             # Validate initial guess compatibility with reference type
             initial_guess_is_unrestricted = initial_guess.is_unrestricted()
-            unrestricted = scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mol.spin != 0)
+            unrestricted = scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mf.mol.spin != 0)
             if unrestricted and not initial_guess_is_unrestricted:
                 warnings.warn(
                     "Unrestricted calculation requested but restricted initial guess provided.",
@@ -277,8 +305,8 @@ class PyscfScfSolver(ScfSolver):
 
             # Create occupation arrays based on electron configuration
             norb = initial_guess.get_num_molecular_orbitals()
-            num_alpha = mol.nelec[0]  # Number of alpha electrons
-            num_beta = mol.nelec[1]  # Number of beta electrons
+            num_alpha = mf.mol.nelec[0]  # Number of alpha electrons
+            num_beta = mf.mol.nelec[1]  # Number of beta electrons
 
             occ_alpha = np.array([1.0 if i < num_alpha else 0.0 for i in range(norb)])
             occ_beta = np.array([1.0 if i < num_beta else 0.0 for i in range(norb)])
@@ -295,6 +323,13 @@ class PyscfScfSolver(ScfSolver):
             # No initial guess provided, use default
             energy = mf.kernel()
 
+        return energy
+
+    def _to_wavefunction(
+        self, mf, structure: Structure, basis_name: str, scf_type: SCFType, energy: float
+    ) -> tuple[float, Wavefunction]:
+        """Convert a completed PySCF mean-field object to QDK/Chemistry data."""
+        mol = mf.mol
         basis_set = pyscf_mol_to_qdk_basis(mf.mol, structure, basis_name)
         _ovlp = mf.get_ovlp()
 
@@ -344,3 +379,111 @@ class PyscfScfSolver(ScfSolver):
         """Return the name of the SCF solver."""
         Logger.trace_entering()
         return "pyscf"
+
+
+class PyscfStabilizedScfSolver(PyscfScfSolver):
+    """PySCF SCF solver that reruns unstable references with PySCF's stability routine."""
+
+    def __init__(self):
+        """Initialize the PySCF stabilized SCF solver with default settings."""
+        Logger.trace_entering()
+        super().__init__()
+        self._settings = PyscfStabilizedScfSettings()
+
+    def _run_impl(
+        self, structure: Structure, charge: int, spin_multiplicity: int, basis_or_guess: Orbitals | BasisSet | str
+    ) -> tuple[float, Wavefunction]:
+        """Run SCF and iterate PySCF stability-driven reruns until stable or exhausted."""
+        Logger.trace_entering()
+        mf, scf_type, basis_name, _ = self._build_scf(structure, charge, spin_multiplicity, basis_or_guess)
+        energy = self._run_scf(mf, scf_type, basis_or_guess)
+
+        max_iterations = self._settings.get("max_stability_iterations")
+        if max_iterations == 0:
+            return self._to_wavefunction(mf, structure, basis_name, scf_type, energy)
+
+        check_internal = self._settings.get("check_internal")
+        check_external_setting = self._settings.get("check_external")
+
+        is_stable = False
+        for _ in range(max_iterations):
+            check_external = check_external_setting and self._can_check_external_stability(mf)
+            stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
+            mo_internal, mo_external, internal_stable, external_stable = self._unpack_stability(stability)
+
+            is_stable = (not check_internal or internal_stable) and (not check_external or external_stable)
+            if is_stable:
+                break
+
+            if check_external and not external_stable and mo_external is not None:
+                mf = self._convert_to_unrestricted(mf)
+                dm0 = self._make_external_density(mf, mo_external)
+                energy = mf.kernel(dm0=dm0)
+            elif check_internal and not internal_stable and mo_internal is not None:
+                dm0 = mf.make_rdm1(mo_internal, mf.mo_occ)
+                energy = mf.kernel(dm0=dm0)
+            else:
+                break
+
+        check_external = check_external_setting and self._can_check_external_stability(mf)
+        stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
+        _, _, internal_stable, external_stable = self._unpack_stability(stability)
+        is_stable = (not check_internal or internal_stable) and (not check_external or external_stable)
+
+        if not is_stable and self._settings.get("fail_on_unstable"):
+            raise RuntimeError("PySCF stabilized SCF did not reach a stable reference.")
+
+        final_scf_type = SCFType.UNRESTRICTED if isinstance(mf, scf.uhf.UHF) else scf_type
+        return self._to_wavefunction(mf, structure, basis_name, final_scf_type, energy)
+
+    def name(self) -> str:
+        """Return the name of the stabilized SCF solver."""
+        Logger.trace_entering()
+        return "pyscf_stabilized"
+
+    @staticmethod
+    def _unpack_stability(stability):
+        """Normalize PySCF stability return values across supported versions."""
+        if len(stability) == 4:
+            return stability
+        if len(stability) == 2:
+            mo_internal, mo_external = stability
+            internal_stable = mo_internal is None
+            external_stable = mo_external is None
+            return mo_internal, mo_external, internal_stable, external_stable
+        raise RuntimeError("Unexpected PySCF stability return value.")
+
+    @staticmethod
+    def _convert_to_unrestricted(mf):
+        """Convert a restricted PySCF mean-field object to the unrestricted counterpart."""
+        if isinstance(mf, scf.uhf.UHF):
+            return mf
+        if hasattr(scf.addons, "convert_to_uhf"):
+            return scf.addons.convert_to_uhf(mf)
+        raise RuntimeError("PySCF does not provide convert_to_uhf for external stability reruns.")
+
+    @staticmethod
+    def _can_check_external_stability(mf) -> bool:
+        """Return whether PySCF external stability is applicable for this reference."""
+        if isinstance(mf, scf.uhf.UHF):
+            return False
+        nalpha, nbeta = mf.mol.nelec
+        return nalpha == nbeta
+
+    @staticmethod
+    def _make_external_density(mf, mo_external):
+        """Build an unrestricted density matrix from PySCF external-stability orbitals."""
+        if isinstance(mo_external, tuple | list):
+            mo_alpha, mo_beta = mo_external
+        else:
+            mo_alpha = mo_external
+            mo_beta = mo_external
+        mo_occ = mf.mo_occ
+        if not isinstance(mo_occ, tuple | list):
+            nalpha, nbeta = mf.mol.nelec
+            norb = mo_alpha.shape[1]
+            mo_occ = (
+                np.array([1.0 if i < nalpha else 0.0 for i in range(norb)]),
+                np.array([1.0 if i < nbeta else 0.0 for i in range(norb)]),
+            )
+        return mf.make_rdm1((mo_alpha, mo_beta), mo_occ)

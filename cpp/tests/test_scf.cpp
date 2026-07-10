@@ -4,8 +4,11 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -55,8 +58,18 @@ class TestSCF : public ScfSolver {
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
+  EXPECT_NE(
+      std::find(available_solvers.begin(), available_solvers.end(), "qdk"),
+      available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "qdk_stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized_scf"),
+            available_solvers.end());
   EXPECT_THROW(ScfSolverFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(ScfSolverFactory::register_instance(
@@ -69,6 +82,53 @@ TEST_F(ScfTest, Factory) {
                    }),
                std::runtime_error);
   auto test_scf = ScfSolverFactory::create("test_scf");
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
+  auto water = testing::create_water_structure();
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("max_stability_iterations", 0);
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, regular_energy, testing::scf_energy_tolerance);
+  EXPECT_TRUE(regular_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPrefersExternalInstability) {
+  auto n2 = testing::create_stretched_n2_structure(1.6);
+
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [_regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+  auto [regular_is_stable, regular_stability_result] =
+      stability_checker->run(regular_wavefunction);
+
+  EXPECT_FALSE(regular_stability_result->is_internal_stable());
+  EXPECT_FALSE(regular_stability_result->is_external_stable());
+  EXPECT_FALSE(regular_is_stable);
+
+  auto stabilized_scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  stabilized_scf_solver->settings().set("method", "hf");
+  stabilized_scf_solver->settings().set("max_stability_iterations", 1);
+  stabilized_scf_solver->settings().set("fail_on_unstable", false);
+  auto [stabilized_energy, stabilized_wavefunction] =
+      stabilized_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  EXPECT_LT(stabilized_energy, _regular_energy);
+  EXPECT_FALSE(stabilized_wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, Water) {
@@ -301,9 +361,55 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
-  // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
+  auto water = testing::create_water_structure();
+
+  auto direct_solver = ScfSolverFactory::create();
+  direct_solver->settings().set("method", "cam-b3lyp");
+  direct_solver->settings().set("eri_method", "direct");
+  auto [direct_energy, direct_wavefunction] =
+      direct_solver->run(water, 0, 1, "sto-3g");
+
+  auto incore_solver = ScfSolverFactory::create();
+  incore_solver->settings().set("method", "cam-b3lyp");
+  incore_solver->settings().set("eri_method", "incore");
+  auto [incore_energy, incore_wavefunction] =
+      incore_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(std::isfinite(direct_energy));
+  EXPECT_TRUE(std::isfinite(incore_energy));
+  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(direct_energy, incore_energy,
+              2.0 * testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectEnergy) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -75.27665598860905, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
+  auto lithium = testing::create_li_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(energy, -7.3499880727469851, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
