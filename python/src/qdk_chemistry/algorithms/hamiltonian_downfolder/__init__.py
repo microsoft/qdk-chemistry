@@ -65,3 +65,13 @@ def load():
         register(lambda: WickedDuccSolver())
     except ImportError:
         pass  # wicked not installed
+
+    # Spin-integrated wicked DUCC (requires wicked library)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_si import (
+            WickedDuccSISolver,
+        )
+
+        register(lambda: WickedDuccSISolver())
+    except ImportError:
+        pass  # wicked not installed
