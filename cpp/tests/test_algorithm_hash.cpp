@@ -12,7 +12,7 @@
 #include "qdk/chemistry/algorithms/algorithm.hpp"
 #include "qdk/chemistry/data/settings.hpp"
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 class AlgorithmHashSettings : public qdk::chemistry::data::Settings {
  public:
@@ -48,18 +48,20 @@ class TestAlgorithm
   std::string algorithm_name_;
 };
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
 
 TEST(AlgorithmHashTest, SameRunInputsProduceSameHash) {
-  TestAlgorithm first;
-  TestAlgorithm second;
+  test_support::TestAlgorithm first;
+  test_support::TestAlgorithm second;
   const std::vector<size_t> indices{1, 2, 3};
 
   EXPECT_EQ(first.hash(7, "basis", indices), second.hash(7, "basis", indices));
 }
 
 TEST(AlgorithmHashTest, RunArgumentsParticipateInHash) {
-  TestAlgorithm algorithm;
+  test_support::TestAlgorithm algorithm;
   const std::vector<size_t> indices{1, 2, 3};
   const std::vector<size_t> different_indices{1, 2, 4};
 
@@ -72,9 +74,9 @@ TEST(AlgorithmHashTest, RunArgumentsParticipateInHash) {
 }
 
 TEST(AlgorithmHashTest, AlgorithmIdentityAndSettingsParticipateInHash) {
-  TestAlgorithm first("first");
-  TestAlgorithm second("second");
-  TestAlgorithm with_settings_change("first");
+  test_support::TestAlgorithm first("first");
+  test_support::TestAlgorithm second("second");
+  test_support::TestAlgorithm with_settings_change("first");
   const std::vector<size_t> indices{1, 2, 3};
 
   with_settings_change.settings().set("threshold", 1.0);
@@ -85,8 +87,8 @@ TEST(AlgorithmHashTest, AlgorithmIdentityAndSettingsParticipateInHash) {
 }
 
 TEST(AlgorithmHashTest, NestedAlgorithmRefSettingsParticipateInHash) {
-  TestAlgorithm first;
-  TestAlgorithm second;
+  test_support::TestAlgorithm first;
+  test_support::TestAlgorithm second;
   const std::vector<size_t> indices{1, 2, 3};
 
   second.settings().set(

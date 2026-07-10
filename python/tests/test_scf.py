@@ -78,6 +78,10 @@ class TestScfSolver:
         available_solvers = algorithms.available("scf_solver")
         assert isinstance(available_solvers, list)
         assert len(available_solvers) >= 1
+        assert "qdk" in available_solvers
+        assert "qdk_stabilized" in available_solvers
+        assert "stabilized" in available_solvers
+        assert "stabilized_scf" in available_solvers
 
         # Test creating default solver
         scf_solver = algorithms.create("scf_solver")
@@ -87,9 +91,29 @@ class TestScfSolver:
         scf_solver_default = algorithms.create("scf_solver", "qdk")
         assert scf_solver_default is not None
 
+        scf_solver_stabilized = algorithms.create("scf_solver", "qdk_stabilized")
+        assert scf_solver_stabilized is not None
+
         # Test that nonexistent solver raises error
         with pytest.raises(KeyError):
             algorithms.create("scf_solver", "nonexistent_solver")
+
+    def test_stabilized_scf_solver_passthrough(self):
+        """Test stabilized SCF solver can run a regular SCF calculation."""
+        water = create_water_structure()
+        regular_scf_solver = algorithms.create("scf_solver", "qdk")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(water, 0, 1, "sto-3g")
+
+        scf_solver = algorithms.create("scf_solver", "qdk_stabilized")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("max_stability_iterations", 0)
+
+        energy, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        assert np.isclose(energy, regular_energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert regular_wavefunction.get_orbitals().is_restricted()
+        assert wavefunction.get_orbitals().is_restricted()
 
     def test_scf_solver_water_default_settings(self):
         """Test SCF solver on water molecule with default settings."""

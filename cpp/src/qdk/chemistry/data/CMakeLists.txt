@@ -15,6 +15,8 @@ target_sources(chemistry PRIVATE
     majorana_mapping.cpp
     majorana_mapping_factories.cpp
     orbitals.cpp
+    nuclear_gradients.cpp
+    nuclear_hessian.cpp
     pauli_operator.cpp
     settings.cpp
     stability_result.cpp

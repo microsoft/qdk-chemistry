@@ -919,33 +919,33 @@ WavefunctionType WavefunctionContainer::get_type() const {
   return _type;
 }
 
-namespace {
+namespace detail {
 constexpr const char* kNotDeterminantExpansionMessage =
     "This wavefunction container is not a determinant/coefficient expansion, "
     "so determinant and coefficient accessors are not available.";
-}  // namespace
+}  // namespace detail
 
 const ContainerTypes::VectorVariant& WavefunctionContainer::get_coefficients()
     const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 ContainerTypes::ScalarVariant WavefunctionContainer::get_coefficient(
     const Configuration&) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 const ContainerTypes::DeterminantVector&
 WavefunctionContainer::get_active_determinants() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 size_t WavefunctionContainer::size() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 // Wavefunction implementations
