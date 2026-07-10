@@ -361,7 +361,6 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
-  // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
 }
@@ -385,7 +384,32 @@ TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
   EXPECT_TRUE(std::isfinite(incore_energy));
   EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
   EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
-  EXPECT_NEAR(direct_energy, incore_energy, 1.0e-7);
+  EXPECT_NEAR(direct_energy, incore_energy,
+              2.0 * testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectEnergy) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -75.27665598860905, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
+  auto lithium = testing::create_li_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(energy, -7.3499880727469851, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
