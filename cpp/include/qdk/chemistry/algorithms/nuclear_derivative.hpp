@@ -3,7 +3,6 @@
 // license information.
 
 #pragma once
-#include <limits>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
@@ -14,6 +13,7 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -66,17 +66,17 @@ class NuclearDerivativeSettings : public data::Settings {
                 data::AlgorithmRef("hamiltonian_constructor", "qdk"),
                 "Hamiltonian constructor used when energy_calculator is a "
                 "multi_configuration_calculator. It builds the active-space "
-                "Hamiltonian from the reference orbitals before the MR energy "
+                "Hamiltonian from the reference orbitals before the energy "
                 "calculation.");
     set_default("compute_hessian", false,
                 "Whether to compute a nuclear Hessian in addition to energy "
                 "and gradients.");
     set_default(
-        "reuse_seed_active_space", true,
-        "For multi-reference energy paths, reuse active and inactive orbital "
-        "indices from an Orbitals or Wavefunction seed when fresh reference "
-        "orbitals are generated for another geometry. Orbital coefficients are "
-        "not reused for displaced finite-difference geometries.");
+        "suppress_child_algorithm_logging", true,
+        "Whether to temporarily raise the process-global log level to error "
+        "while nuclear derivative calculators run child energy evaluations. "
+        "Set false to preserve the current logger verbosity during those "
+        "sub-runs.");
     set_default(
         "localize_reference_orbitals", false,
         "Whether to localize reference orbitals before multi-reference energy "
@@ -88,39 +88,6 @@ class NuclearDerivativeSettings : public data::Settings {
         "Orbital localizer used when localize_reference_orbitals is true. The "
         "localizer runs after reference orbitals are obtained and active-space "
         "metadata from the seed has been reapplied.");
-    set_default(
-        "n_active_alpha_electrons", static_cast<int64_t>(0),
-        "Number of alpha electrons in the active space for "
-        "multi_configuration_scf and multi_configuration_calculator energy "
-        "paths. Must be positive when those energy paths are selected.",
-        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
-    set_default(
-        "n_active_beta_electrons", static_cast<int64_t>(0),
-        "Number of beta electrons in the active space for "
-        "multi_configuration_scf and multi_configuration_calculator energy "
-        "paths. Must be positive when those energy paths are selected.",
-        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
-  }
-};
-
-/**
- * @class FiniteDifferenceNuclearDerivativeSettings
- * @brief Settings for finite-difference nuclear derivative calculations.
- */
-class FiniteDifferenceNuclearDerivativeSettings
-    : public NuclearDerivativeSettings {
- public:
-  /**
-   * @brief Construct settings with finite-difference defaults.
-   */
-  FiniteDifferenceNuclearDerivativeSettings() : NuclearDerivativeSettings() {
-    set_default("finite_difference_step", 1.0e-3,
-                "Central finite-difference nuclear displacement step in Bohr. "
-                "Used for numeric gradients and Hessians.",
-                data::BoundConstraint<double>{1.0e-8, 1.0});
-    set_default("symmetrize_hessian", true,
-                "Whether to replace the finite-difference Hessian by the "
-                "average of itself and its transpose before returning it.");
   }
 };
 
@@ -136,7 +103,7 @@ class FiniteDifferenceNuclearDerivativeSettings
 class NuclearDerivativeCalculator
     : public Algorithm<NuclearDerivativeCalculator, NuclearDerivativeResult,
                        std::shared_ptr<data::Structure>, int, int,
-                       NuclearDerivativeSeedType> {
+                       NuclearDerivativeSeedType, unsigned int> {
  public:
   /**
    * @brief Construct a calculator with nuclear derivative settings.
@@ -146,7 +113,24 @@ class NuclearDerivativeCalculator
   }
   virtual ~NuclearDerivativeCalculator() = default;
 
-  using Algorithm::run;
+  /**
+   * @brief Compute nuclear derivatives for a molecular structure.
+   *
+   * @param structure Molecular structure to evaluate.
+   * @param charge Total molecular charge.
+   * @param spin_multiplicity Spin multiplicity of the molecular system.
+   * @param seed Basis name, basis set, orbitals, or wavefunction seed.
+   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded from
+   * the active space.
+   * @return Energy, gradients, optional Hessian, and optional wavefunction.
+   */
+  NuclearDerivativeResult run(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, NuclearDerivativeSeedType seed,
+      unsigned int n_inactive_orbitals = 0) const override {
+    return Algorithm::run(structure, charge, spin_multiplicity, std::move(seed),
+                          n_inactive_orbitals);
+  }
 
   virtual std::string name() const = 0;
 
@@ -163,7 +147,8 @@ class NuclearDerivativeCalculator
    */
   virtual NuclearDerivativeResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, NuclearDerivativeSeedType seed) const = 0;
+      int spin_multiplicity, NuclearDerivativeSeedType seed,
+      unsigned int n_inactive_orbitals) const = 0;
 };
 
 /**
@@ -187,72 +172,9 @@ struct NuclearDerivativeCalculatorFactory
   /**
    * @brief Return the default nuclear derivative implementation name.
    */
-  static std::string default_algorithm_name() { return "finite_difference"; }
-};
-
-/**
- * @class FiniteDifferenceNuclearDerivativeCalculator
- * @brief Numeric nuclear derivative calculator using central finite
- * differences.
- */
-class FiniteDifferenceNuclearDerivativeCalculator
-    : public NuclearDerivativeCalculator {
- public:
-  /**
-   * @brief Construct a calculator with finite-difference settings.
-   */
-  FiniteDifferenceNuclearDerivativeCalculator() {
-    _settings = std::make_unique<FiniteDifferenceNuclearDerivativeSettings>();
+  static std::string default_algorithm_name() {
+    return "qdk_finite_difference";
   }
-
-  /**
-   * @brief Return the implementation name.
-   */
-  std::string name() const final { return "finite_difference"; }
-
-  /**
-   * @brief Return accepted factory aliases for this implementation.
-   */
-  std::vector<std::string> aliases() const final {
-    return {"finite_difference", "numeric"};
-  }
-
- protected:
-  /**
-   * @brief Compute finite-difference nuclear derivatives.
-   */
-  NuclearDerivativeResult _run_impl(
-      std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity,
-      NuclearDerivativeSeedType seed_or_basis) const override;
-};
-
-/**
- * @class QdkNuclearDerivativeCalculator
- * @brief Internal QDK derivative calculator using analytic SCF gradients.
- */
-class QdkNuclearDerivativeCalculator : public NuclearDerivativeCalculator {
- public:
-  /**
-   * @brief Return the implementation name.
-   */
-  std::string name() const final { return "qdk"; }
-
-  /**
-   * @brief Return accepted factory aliases for this implementation.
-   */
-  std::vector<std::string> aliases() const final {
-    return {"qdk", "analytical_gradient"};
-  }
-
- protected:
-  /**
-   * @brief Compute analytic nuclear gradients with the internal SCF backend.
-   */
-  NuclearDerivativeResult _run_impl(
-      std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity,
-      NuclearDerivativeSeedType seed_or_basis) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms

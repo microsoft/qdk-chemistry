@@ -52,6 +52,10 @@ Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
 Bravyi-Kitaev tree :cite:`Havlicek2017`
    A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
 
+.. _encoding-verstraete-cirac:
+
+Verstraete-Cirac :cite:`Verstraete2005`
+   An auxiliary qubit encoding that eliminates non-local Z-strings by locally tracking parity. It operates on any connected :class:`~qdk_chemistry.data.LatticeGraph`; an optional Hamiltonian-path reordering (``dfs_ordering=True`` on the lattice factories) minimizes the number of auxiliary qubits and stabilizers. Use :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with a :class:`~qdk_chemistry.data.LatticeGraph`.
 
 Using the QubitMapper
 ---------------------
@@ -188,7 +192,7 @@ This is a **table-driven** backend: it reads the Pauli-string table from the :cl
 Any valid ``MajoranaMapping`` works — factory-produced or custom user-defined tables.
 The mapping's ``name`` and ``base_encoding`` are used only for metadata on the output, not to select a transform.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, and any custom encoding
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, :ref:`Verstraete-Cirac <encoding-verstraete-cirac>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
@@ -196,6 +200,41 @@ Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if nee
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
+
+.. rubric:: Container-aware fast paths
+
+The ``"qdk"`` backend consumes two-body integrals directly from the underlying
+:doc:`HamiltonianContainer <../data/hamiltonian>` without ever materializing a
+dense :math:`N^4` two-body tensor when the container stores its integrals in a
+compressed form:
+
+- :class:`~qdk_chemistry.data.SparseHamiltonianContainer` — the mapping loop
+  iterates over **only the stored non-zero** ``(p, q, r, s)`` integrals rather
+  than the full :math:`O(N^4)` index space, skipping the zeros that dominate
+  lattice/model Hamiltonians (e.g. those produced by
+  :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`
+  and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
+  This improves **both memory and runtime**, since neither the dense tensor nor
+  the zero entries are ever touched. Stored entries are canonicalized under the
+  8-fold integral symmetry before mapping, so the result does not depend on
+  which symmetry-related permutations of an integral the container stores, nor
+  on their order.
+- :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
+  (Cholesky / density-fitted) factors are kept in their
+  :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
+  in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
+  product per orbital pair). The dense four-center tensor is never built and
+  peak additional memory is a single :math:`N^2`-length row, making this path
+  suitable for systems whose dense ERI tensor does not fit in memory.
+
+In all cases the result is a :class:`~qdk_chemistry.data.QubitHamiltonian` that
+is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
+:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
+the same integrals. The behaviour of ``run()`` and the shape of the returned
+operator are unchanged, and the selection is fully automatic based on the
+container type. The
+:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues
+to use the dense path.
 
 .. rubric:: Settings
 

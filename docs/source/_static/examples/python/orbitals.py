@@ -5,14 +5,20 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, ModelOrbitals
+from qdk_chemistry.data.symmetry import spin_index_set
 
 ################################################################################
+# docs:xyz ../data/h2.structure.xyz
 # start-cell-create
-# Load H2 molecule from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+# Load H2 molecule from inline XYZ file
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")
@@ -34,9 +40,11 @@ beta_active = [2, 3, 4]
 alpha_inactive = [0, 3, 4, 5]
 beta_inactive = [0, 1, 5]
 
-model_orbitals = ModelOrbitals(
-    basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive)
+active_indices = spin_index_set(basis_size, alpha_active, beta_active, equivalent=False)
+inactive_indices = spin_index_set(
+    basis_size, alpha_inactive, beta_inactive, equivalent=False
 )
+model_orbitals = ModelOrbitals(active_indices, inactive_indices)
 
 # We can then pass this object to a custom Hamiltonian constructor
 # end-cell-model-orbitals-create

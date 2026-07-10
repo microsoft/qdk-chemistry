@@ -16,6 +16,10 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+# Ensure emoji and other Unicode characters can be printed on Windows (cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Expected license headers for different file types
 CPP_LICENSE_PATTERNS = [
     # Full MIT license header - standard C-style comment with line breaks

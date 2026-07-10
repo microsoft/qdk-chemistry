@@ -10,7 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
@@ -93,6 +93,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
     }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
+  } else {
+    throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
 
   // Extract geometry from structure object
@@ -449,15 +451,9 @@ ScfCalculationResult ScfSolver::_run_with_options(
     Eigen::VectorXd energies_alpha = eps.row(0);
     Eigen::VectorXd energies_beta = eps.row(1);
 
-    // Construct orbitals with correct parameter order:
-    // (coeff_alpha, coeff_beta,
-    //  energies_alpha, energies_beta, ao_overlap,
-    //  basis_set_name, active_indices_alpha,
-    //  active_indices_beta)
-    orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(C_alpha, C_beta, energies_alpha,
+                                                energies_beta, ao_overlap,
+                                                qdk_raw_basis_set);
 
   } else {
     // Restricted case - store matrices first to avoid
@@ -469,35 +465,18 @@ ScfCalculationResult ScfSolver::_run_with_options(
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
-    // Construct orbitals with correct parameter order:
-    // (coefficients, energies, ao_overlap, basis_set_name,
-    // active_space_indices)
-    orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(coefficients, energies,
+                                                ao_overlap, qdk_raw_basis_set);
   }
 
   // Create canonical Hartree-Fock Configuration
   size_t n_orbitals = orbitals->get_num_molecular_orbitals();
+  auto hf_det = data::Configuration::canonical_hf_configuration(
+      nelec[0], nelec[1], n_orbitals);
 
-  // Create canonical HF configuration string
-  std::string config_str(n_orbitals, '0');
-
-  for (size_t i = 0; i < n_orbitals; ++i) {
-    if (nelec[0] > i and nelec[1] > i) {
-      config_str[i] = '2';
-    } else if (nelec[0] > i) {
-      config_str[i] = 'u';
-    } else if (nelec[1] > i) {
-      config_str[i] = 'd';
-    }
-  }
-  // Create Configuration object
-  data::Configuration hf_det(config_str);
-
-  // Create SlaterDeterminantContainer
-  auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(hf_det, orbitals);
+  // Create StateVectorContainer
+  auto container = std::make_unique<data::StateVectorContainer>(
+      hf_det, orbitals, "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

@@ -5,16 +5,35 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# On Windows, register extra DLL directories (QDK_DLL_DIR) before importing _core.
+import os as _os
+import sys as _sys
 from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _get_version
 from pathlib import Path
+
+# Force UTF-8 stdout/stderr; Windows' default cp1252 can't encode Q# circuit diagrams.
+if hasattr(_sys.stdout, "reconfigure"):
+    _sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(_sys.stderr, "reconfigure"):
+    _sys.stderr.reconfigure(encoding="utf-8")
+
+if _sys.platform == "win32":
+    # QDK_DLL_DIR: semicolon-separated extra DLL dirs; bundled DLLs are found automatically.
+    _dll_dirs = _os.environ.get("QDK_DLL_DIR", "")
+    _dll_dir_handles = []
+    for _d in _dll_dirs.split(";"):
+        _d = _d.strip()
+        if _d and _os.path.isdir(_d):
+            _dll_dir_handles.append(_os.add_dll_directory(_d))  # type: ignore[attr-defined]
+    del _dll_dirs
 
 try:
     __version__ = _get_version("qdk-chemistry")
 except _PackageNotFoundError:
     # Fallback for development/uninstalled use - read from VERSION file
     try:
-        __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
+        __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text(encoding="utf-8").strip()
     except (OSError, UnicodeDecodeError):
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
         __version__ = "0.0.0+local"
@@ -145,7 +164,7 @@ def _is_placeholder_stub(stub_file: Path) -> bool:
     if not stub_file.exists():
         return True
     try:
-        content = stub_file.read_text()
+        content = stub_file.read_text(encoding="utf-8")
         return "placeholder" in content.lower()
     except (OSError, PermissionError):
         return False
@@ -161,7 +180,7 @@ def _update_stub_references(stub_file: Path) -> None:
     Also adds necessary imports if they don't exist.
     """
     try:
-        content = stub_file.read_text()
+        content = stub_file.read_text(encoding="utf-8")
         original_content = content
         needs_data_import = False
         needs_algorithms_import = False
@@ -209,7 +228,7 @@ def _update_stub_references(stub_file: Path) -> None:
                 lines[import_section_end:import_section_end] = new_imports
                 content = "\n".join(lines)
 
-            stub_file.write_text(content)
+            stub_file.write_text(content, encoding="utf-8")
     except (OSError, PermissionError):
         pass  # Skip files that can't be read/written
 
@@ -253,6 +272,7 @@ def _generate_stubs_on_first_import() -> None:
                 check=False,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 cwd=str(chemistry_dir),
             )
 
@@ -373,7 +393,7 @@ def _generate_registry_stubs() -> None:
         )
 
         overload_code = "\n".join(overloads)
-        stub_file.write_text(overload_code)
+        stub_file.write_text(overload_code, encoding="utf-8")
 
     except (ImportError, AttributeError, RuntimeError, OSError) as e:
         # Log but don't fail - type stubs are optional

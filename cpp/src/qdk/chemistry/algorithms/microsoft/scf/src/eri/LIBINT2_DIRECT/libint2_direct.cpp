@@ -17,6 +17,7 @@
 #include <blas.hh>
 #include <stdexcept>
 #include <unordered_set>
+#include <vector>
 
 #include "util/timer.h"
 
@@ -343,6 +344,7 @@ class ERI {
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
       auto* engine_erf = need_erf_exchange ? &engines_erf[thread_id] : nullptr;
+      const auto& buf_erf = need_erf_exchange ? engine_erf->results() : buf;
 
       // Get pointers to thread-local buffers
       double* J_thread = nullptr;
@@ -421,12 +423,15 @@ class ERI {
                                      ::libint2::BraKet::xx_xx, 0>(
                     obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
                     sp34_data);
-                buf_erf_1234 = engine_erf->results()[0];
+                buf_erf_1234 = buf_erf[0];
               }
-              if (buf_1234 == nullptr && buf_erf_1234 == nullptr) continue;
+              const bool has_coulomb = buf_1234 != nullptr;
+              const bool has_erf = buf_erf_1234 != nullptr;
+              if (!has_coulomb && !has_erf) continue;
 
-              // Contract shell quartet (J)
-              if (J && buf_1234)
+              // J uses the Coulomb operator; range-separated ERF contributes
+              // only to exchange below.
+              if (J && has_coulomb)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* J_cur =
                       use_thread_local_buffers_
@@ -479,8 +484,10 @@ class ERI {
                   }  // i
                 }  // idm
 
-              // Contract shell quartet (K)
-              if (K)
+              auto contract_K_buffer = [&](const double* K_buf_1234,
+                                           double K_scale) {
+                if (!K || K_buf_1234 == nullptr || K_scale == 0.0) return;
+
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* K_cur =
                       use_thread_local_buffers_
@@ -504,13 +511,8 @@ class ERI {
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const size_t bf4 = bf4_st + l;
 
-                          const auto coulomb_value =
-                              buf_1234 ? buf_1234[ijkl] : 0.0;
-                          const auto erf_value =
-                              buf_erf_1234 ? buf_erf_1234[ijkl] : 0.0;
-                          const auto value = (exchange_scale * coulomb_value -
-                                              beta * erf_value) *
-                                             s1234_deg;
+                          const auto value =
+                              K_scale * K_buf_1234[ijkl] * s1234_deg;
 
                           // K contractions
                           K_ik += 0.25 *
@@ -557,6 +559,12 @@ class ERI {
                     }  // j
                   }  // i
                 }  // idm
+              };
+
+              // Contract shell quartet (K)
+              contract_K_buffer(has_coulomb ? buf_1234 : nullptr,
+                                exchange_scale);
+              contract_K_buffer(has_erf ? buf_erf_1234 : nullptr, -beta);
 
             }  // s4
           }  // s3
@@ -682,25 +690,34 @@ class ERI {
       }
       P_J = P_total.data();
     }
+    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_atomic_orbitals);
 
     const auto ln_max_engine_precision = std::log(max_engine_precision);
-    std::vector<std::vector<std::shared_ptr<::libint2::ShellPair>>>
-        shell_pair_data(nsh, std::vector<std::shared_ptr<::libint2::ShellPair>>(
-                                 nsh, nullptr));
+    struct OrderedShellPair {
+      size_t first;
+      size_t second;
+      std::shared_ptr<::libint2::ShellPair> data;
+    };
+    std::vector<OrderedShellPair> ordered_shell_pairs;
     for (size_t s1 = 0; s1 < nsh; ++s1) {
-      const auto& shell_pairs = splist_.at(s1);
+      const auto& shell_pair_indices = splist_.at(s1);
       const auto& shell_pair_data_for_s1 = spdata_.at(s1);
-      for (size_t pair_index = 0; pair_index < shell_pairs.size();
+      for (size_t pair_index = 0; pair_index < shell_pair_indices.size();
            ++pair_index) {
-        const size_t s2 = shell_pairs[pair_index];
-        shell_pair_data[s1][s2] = shell_pair_data_for_s1[pair_index];
+        const size_t s2 = shell_pair_indices[pair_index];
+        auto shell_pair_data = shell_pair_data_for_s1[pair_index];
+        ordered_shell_pairs.push_back({s1, s2, shell_pair_data});
         if (s1 != s2) {
-          shell_pair_data[s2][s1] = std::make_shared<::libint2::ShellPair>(
-              obs_[s2], obs_[s1], ln_max_engine_precision,
-              ::libint2::ScreeningMethod::Original);
+          ordered_shell_pairs.push_back(
+              {s2, s1,
+               std::make_shared<::libint2::ShellPair>(
+                   obs_[s2], obs_[s1], ln_max_engine_precision,
+                   ::libint2::ScreeningMethod::Original)});
         }
       }
     }
+    const size_t num_shell_pairs = ordered_shell_pairs.size();
+    const size_t num_shell_pair_quartets = num_shell_pairs * num_shell_pairs;
 
 #ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
@@ -741,104 +758,131 @@ class ERI {
       auto& engine = engines[thread_id];
       const auto& buf = engine.results();
       auto* engine_erf = need_erf_exchange ? &engines_erf[thread_id] : nullptr;
+      const auto& buf_erf = need_erf_exchange ? engine_erf->results() : buf;
 
-      for (size_t s1 = 0, s1234 = 0; s1 < nsh; ++s1) {
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+      // Derivative components are tied to ordered shell centers, so keep
+      // ordered significant pairs rather than applying build_JK's quartet
+      // degeneracy.
+      for (size_t shell_pair_quartet = 0;
+           shell_pair_quartet < num_shell_pair_quartets; ++shell_pair_quartet) {
+        const auto& pair12 =
+            ordered_shell_pairs[shell_pair_quartet / num_shell_pairs];
+        const auto& pair34 =
+            ordered_shell_pairs[shell_pair_quartet % num_shell_pairs];
+        const auto s1 = pair12.first;
+        const auto s2 = pair12.second;
+        const auto s3 = pair34.first;
+        const auto s4 = pair34.second;
         const auto bf1_st = shell2bf_[s1];
+        const auto bf2_st = shell2bf_[s2];
+        const auto bf3_st = shell2bf_[s3];
+        const auto bf4_st = shell2bf_[s4];
         const auto n1 = obs_[s1].size();
-        for (size_t s2 = 0; s2 < nsh; ++s2) {
-          const auto bf2_st = shell2bf_[s2];
-          const auto n2 = obs_[s2].size();
-          const auto* sp12_data = shell_pair_data[s1][s2].get();
-          for (size_t s3 = 0; s3 < nsh; ++s3) {
-            const auto bf3_st = shell2bf_[s3];
-            const auto n3 = obs_[s3].size();
-            for (size_t s4 = 0; s4 < nsh; ++s4, ++s1234) {
-              if (s1234 % nthreads != static_cast<size_t>(thread_id)) continue;
+        const auto n2 = obs_[s2].size();
+        const auto n3 = obs_[s3].size();
+        const auto n4 = obs_[s4].size();
+        const auto* sp12_data = pair12.data.get();
+        const auto* sp34_data = pair34.data.get();
 
-              if (!sp12_data) continue;
-              const auto* sp34_data = shell_pair_data[s3][s4].get();
-              if (!sp34_data) continue;
+        const auto P12_nrm = P_shnrm(s1, s2);
+        const auto P13_nrm = P_shnrm(s1, s3);
+        const auto P14_nrm = P_shnrm(s1, s4);
+        const auto P23_nrm = P_shnrm(s2, s3);
+        const auto P24_nrm = P_shnrm(s2, s4);
+        const auto P34_nrm = P_shnrm(s3, s4);
+        const auto P1234_nrm =
+            std::max({P12_nrm, P13_nrm, P14_nrm, P23_nrm, P24_nrm, P34_nrm});
+        if (P1234_nrm * K_schwarz_(s1, s2) * K_schwarz_(s3, s4) <
+            eri_threshold_)
+          continue;
 
-              if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < eri_threshold_)
-                continue;
+        if (need_coulomb) {
+          engine.compute2<::libint2::Operator::coulomb,
+                          ::libint2::BraKet::xx_xx, 1>(
+              obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+        }
+        if (need_erf_exchange) {
+          engine_erf->compute2<::libint2::Operator::erf_coulomb,
+                               ::libint2::BraKet::xx_xx, 1>(
+              obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+        }
 
-              const auto bf4_st = shell2bf_[s4];
-              const auto n4 = obs_[s4].size();
+        const bool has_coulomb = need_coulomb && buf[0] != nullptr;
+        const bool has_erf = need_erf_exchange && buf_erf[0] != nullptr;
+        if (!has_coulomb && !has_erf) continue;
 
-              if (need_coulomb) {
-                engine.compute2<::libint2::Operator::coulomb,
-                                ::libint2::BraKet::xx_xx, 1>(
-                    obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
-                    sp34_data);
-              }
-              if (need_erf_exchange) {
-                engine_erf->compute2<::libint2::Operator::erf_coulomb,
-                                     ::libint2::BraKet::xx_xx, 1>(
-                    obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
-                    sp34_data);
-              }
+        for (int d = 0; d < 12; ++d) {
+          const int center = d / 3;
+          const int xyz = d % 3;
+          const int atom = center == 0   ? sh2atom_[s1]
+                           : center == 1 ? sh2atom_[s2]
+                           : center == 2 ? sh2atom_[s3]
+                                         : sh2atom_[s4];
+          const size_t coord = static_cast<size_t>(atom) + xyz * n_atoms_;
+          const auto* shset = has_coulomb ? buf[d] : nullptr;
+          const auto* shset_erf = has_erf ? buf_erf[d] : nullptr;
+          const bool contract_J = need_J && shset != nullptr;
+          const bool contract_K_coulomb =
+              need_K && shset != nullptr && exchange_scale != 0.0;
+          const bool contract_K_erf =
+              need_K && shset_erf != nullptr && beta != 0.0;
+          if (!contract_J && !contract_K_coulomb && !contract_K_erf) continue;
 
-              const bool has_coulomb = need_coulomb && buf[0] != nullptr;
-              const bool has_erf =
-                  need_erf_exchange && engine_erf->results()[0] != nullptr;
-              if (!has_coulomb && !has_erf) continue;
-
-              const auto& buf_erf =
-                  need_erf_exchange ? engine_erf->results() : engine.results();
-
-              for (int d = 0; d < 12; ++d) {
-                const int center = d / 3;
-                const int xyz = d % 3;
-                const int atom = center == 0   ? sh2atom_[s1]
-                                 : center == 1 ? sh2atom_[s2]
-                                 : center == 2 ? sh2atom_[s3]
-                                               : sh2atom_[s4];
-                const size_t coord = static_cast<size_t>(atom) + xyz * n_atoms_;
-                const auto* shset = has_coulomb ? buf[d] : nullptr;
-                const auto* shset_erf = has_erf ? buf_erf[d] : nullptr;
-                if (shset == nullptr && shset_erf == nullptr) continue;
-
-                double dJ_coord = 0.0;
-                double dK_coord = 0.0;
-                for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                  const size_t bf1 = bf1_st + i;
-                  for (size_t j = 0; j < n2; ++j) {
-                    const size_t bf2 = bf2_st + j;
-                    for (size_t k = 0; k < n3; ++k) {
-                      const size_t bf3 = bf3_st + k;
-                      for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                        const size_t bf4 = bf4_st + l;
-                        const double coulomb_value = shset ? shset[ijkl] : 0.0;
-                        const double erf_value =
-                            shset_erf ? shset_erf[ijkl] : 0.0;
-                        if (need_J && shset) {
-                          dJ_coord += P_J[bf1 * num_atomic_orbitals + bf2] *
-                                      P_J[bf3 * num_atomic_orbitals + bf4] *
-                                      coulomb_value;
-                        }
-                        if (need_K) {
-                          for (size_t idm = 0; idm < spin_density_factor_;
-                               ++idm) {
-                            const auto* P_cur = P + idm * num_atomic_orbitals2;
-                            const double scaled_value =
-                                exchange_scale * coulomb_value -
-                                beta * erf_value;
-                            dK_coord += P_cur[bf1 * num_atomic_orbitals + bf3] *
-                                        P_cur[bf2 * num_atomic_orbitals + bf4] *
-                                        scaled_value;
-                          }
-                        }
-                      }
-                    }
+          double dJ_coord = 0.0;
+          if (contract_J) {
+            for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+              const size_t bf1 = bf1_st + i;
+              for (size_t j = 0; j < n2; ++j) {
+                const size_t bf2 = bf2_st + j;
+                for (size_t k = 0; k < n3; ++k) {
+                  const size_t bf3 = bf3_st + k;
+                  for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                    const size_t bf4 = bf4_st + l;
+                    dJ_coord += P_J[bf1 * num_atomic_orbitals + bf2] *
+                                P_J[bf3 * num_atomic_orbitals + bf4] *
+                                shset[ijkl];
                   }
-                }
-
-                if (need_J) dJ_out[coord] += 0.5 * dJ_coord;
-                if (need_K) {
-                  dK_out[coord] -= 0.25 * dK_coord;
                 }
               }
             }
+          }
+
+          double dK_coord = 0.0;
+          auto contract_K_buffer = [&](const double* K_shset, double K_scale) {
+            if (K_shset == nullptr || K_scale == 0.0) return;
+
+            for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+              const size_t bf1 = bf1_st + i;
+              for (size_t j = 0; j < n2; ++j) {
+                const size_t bf2 = bf2_st + j;
+                for (size_t k = 0; k < n3; ++k) {
+                  const size_t bf3 = bf3_st + k;
+                  for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                    const size_t bf4 = bf4_st + l;
+                    const auto value = K_scale * K_shset[ijkl];
+                    for (size_t idm = 0; idm < spin_density_factor_; ++idm) {
+                      const auto* P_cur = P + idm * num_atomic_orbitals2;
+                      dK_coord += P_cur[bf1 * num_atomic_orbitals + bf3] *
+                                  P_cur[bf2 * num_atomic_orbitals + bf4] *
+                                  value;
+                    }
+                  }
+                }
+              }
+            }
+          };
+
+          contract_K_buffer(shset, exchange_scale);
+          contract_K_buffer(shset_erf, -beta);
+
+          if (need_J) dJ_out[coord] += 0.5 * dJ_coord;
+          if (need_K) {
+            const double exchange_gradient_scale =
+                spin_density_factor_ == 1 ? -0.25 : -0.5;
+            dK_out[coord] += exchange_gradient_scale * dK_coord;
           }
         }
       }

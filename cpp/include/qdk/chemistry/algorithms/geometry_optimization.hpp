@@ -7,13 +7,15 @@
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
-#include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 #include <tuple>
+#include <variant>
 
 namespace qdk::chemistry::algorithms {
 
@@ -25,6 +27,15 @@ using GeometryOptimizationResult =
     std::tuple<double, std::shared_ptr<data::Structure>,
                std::optional<std::shared_ptr<data::Wavefunction>>,
                std::optional<std::shared_ptr<data::NuclearHessian>>>;
+
+/**
+ * @brief Initial basis-set name, basis, orbitals, or wavefunction seed for a
+ * geometry optimization run.
+ */
+using GeometryOptimizationSeedType =
+    std::variant<std::shared_ptr<data::Orbitals>,
+                 std::shared_ptr<data::BasisSet>,
+                 std::shared_ptr<data::Wavefunction>, std::string>;
 
 /**
  * @class GeometryOptimizerSettings
@@ -69,14 +80,14 @@ class GeometryOptimizerSettings : public data::Settings {
  * @class GeometryOptimizer
  * @brief Base class for geometry optimization algorithms.
  *
- * Implementations optimize molecular coordinates using the same input
- * arguments as nuclear derivative calculators. Results include the optimized
- * energy and structure plus optional wavefunction and Hessian values.
+ * Implementations optimize molecular coordinates and derive active-space
+ * electron counts for nuclear derivative calculations. Results include the
+ * optimized energy and structure plus optional wavefunction and Hessian values.
  */
 class GeometryOptimizer
     : public Algorithm<GeometryOptimizer, GeometryOptimizationResult,
                        std::shared_ptr<data::Structure>, int, int,
-                       NuclearDerivativeSeedType> {
+                       GeometryOptimizationSeedType, unsigned int> {
  public:
   /**
    * @brief Construct a geometry optimizer with shared settings.
@@ -86,7 +97,25 @@ class GeometryOptimizer
   }
   virtual ~GeometryOptimizer() = default;
 
-  using Algorithm::run;
+  /**
+   * @brief Optimize a molecular structure.
+   *
+   * @param structure Initial molecular structure to optimize.
+   * @param charge Total molecular charge.
+   * @param spin_multiplicity Spin multiplicity of the molecular system.
+   * @param seed Basis name, basis set, orbitals, or wavefunction seed.
+   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded from
+   * the active space.
+   * @return Optimized energy, structure, optional wavefunction, and optional
+   * Hessian.
+   */
+  GeometryOptimizationResult run(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, GeometryOptimizationSeedType seed,
+      unsigned int n_inactive_orbitals = 0) const override {
+    return Algorithm::run(structure, charge, spin_multiplicity, std::move(seed),
+                          n_inactive_orbitals);
+  }
 
   virtual std::string name() const = 0;
 
@@ -101,7 +130,8 @@ class GeometryOptimizer
    */
   virtual GeometryOptimizationResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, NuclearDerivativeSeedType seed) const = 0;
+      int spin_multiplicity, GeometryOptimizationSeedType seed,
+      unsigned int n_inactive_orbitals) const = 0;
 };
 
 /**

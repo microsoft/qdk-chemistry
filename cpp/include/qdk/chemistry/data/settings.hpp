@@ -1176,6 +1176,8 @@ class Settings : public DataClass,
   std::map<std::string, bool> documented_;
   std::set<std::string> algorithm_ref_type_change_allowed_;
 
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Flag to indicate if settings are locked
   mutable bool _locked = false;
 

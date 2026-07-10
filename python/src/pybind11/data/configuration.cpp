@@ -22,14 +22,17 @@ void bind_configuration(pybind11::module &data) {
   py::class_<Configuration, DataClass, py::smart_holder> configuration(
       data, "Configuration",
       R"(
-Represents a molecular electronic configuration.
+Represents a single-particle occupation pattern with efficient bit-packing.
 
-This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:
+For spin-½ systems (``bits_per_mode=2``), each mode can be in one of four states:
 
-- UNOCCUPIED ('0'): No electrons
-- ALPHA ('u'): One alpha electron
-- BETA ('d'): One beta electron
-- DOUBLY ('2'): Both alpha and beta electrons
+- UNOCCUPIED ('0'): Empty
+- ALPHA ('u'): One alpha particle
+- BETA ('d'): One beta particle
+- DOUBLY ('2'): Both alpha and beta particles
+
+For generic systems (``bits_per_mode=1``), each mode is either '0' (empty)
+or '1' (occupied).
 
 The class provides methods for constructing, manipulating, and querying configurations.
 )");
@@ -44,39 +47,124 @@ Examples:
 
 )");
 
-  configuration.def(py::init<const std::string &>(),
-                    R"(
-Constructs a configuration from a string representation.
+  configuration.def_static("from_spin_half_string",
+                           &Configuration::from_spin_half_string,
+                           R"(
+Construct a spin-½ configuration from a string representation.
 
 Args:
-    str (str): String representation of the configuration
+    str (str): String with alphabet '0'/'u'/'d'/'2'.
 
-        Where '0' = unoccupied orbital, 'u' = alpha-occupied orbital,
-        'd' = beta-occupied orbital, '2' = doubly-occupied orbital
+Returns:
+    Configuration: A configuration with bits_per_mode == 2.
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")  # 7 orbitals with different occupations
-
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
 )",
-                    py::arg("str"));
+                           py::arg("str"));
+
+  configuration.def_static("from_bitstring", &Configuration::from_bitstring,
+                           R"(
+Construct a bitstring configuration (1 bit per mode) from a string representation.
+
+Args:
+    str (str): String with alphabet '0'/'1'.
+
+Returns:
+    Configuration: A configuration with bits_per_mode == 1.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("01100")
+)",
+                           py::arg("str"));
 
   // Configuration methods
   configuration.def("to_string", &Configuration::to_string,
                     R"(
 Convert the configuration to a string representation.
 
+For spin-½ (bits_per_mode=2): '0'/'u'/'d'/'2'.
+For bitstring (bits_per_mode=1): '0'/'1'.
+
 Returns:
     str: String representation
 
-        where '0' = unoccupied orbital, 'u' = alpha-occupied orbital,
-        'd' = beta-occupied orbital, '2' = doubly-occupied orbital
-
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> print(config.to_string())
     22ud0ud
 
 )");
+
+  bind_getter_as_property(configuration, "bits_per_mode",
+                          &Configuration::bits_per_mode,
+                          R"(
+Bits used to encode each mode (1 for spinless, 2 for spin-½).
+
+Returns:
+    int: Bits per mode.
+
+Examples:
+    >>> qdk_chemistry.Configuration.from_bitstring("101").bits_per_mode
+    1
+    >>> qdk_chemistry.Configuration.from_spin_half_string("2u0").bits_per_mode
+    2
+
+)");
+
+  bind_getter_as_property(configuration, "capacity", &Configuration::capacity,
+                          R"(
+Number of single-particle modes in the configuration.
+
+Returns:
+    int: Number of modes.
+
+Examples:
+    >>> qdk_chemistry.Configuration.from_bitstring("1010").capacity
+    8
+
+)");
+
+  bind_getter_as_property(configuration, "total_occupation",
+                          &Configuration::total_occupation,
+                          R"(
+Total occupation summed over all modes.
+
+For spin-½ modes the per-mode occupation is the popcount of the 2-bit state. For spinless modes it is the 1-bit value itself.
+
+Returns:
+    int: Sum of per-mode occupations.
+
+Examples:
+    >>> qdk_chemistry.Configuration.from_bitstring("1010").total_occupation
+    2
+    >>> qdk_chemistry.Configuration.from_spin_half_string("2u0").total_occupation
+    3
+
+)");
+
+  configuration.def("get_mode_state", &Configuration::get_mode_state,
+                    R"(
+Raw state value for a given mode index.
+
+Args:
+    idx (int): Mode index (0-indexed).
+
+Returns:
+    int: Packed state value (range 0 to 2^bits_per_mode - 1).
+
+Raises:
+    IndexError: If idx >= capacity.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("101")
+    >>> config.get_mode_state(0)
+    1
+    >>> config.get_mode_state(1)
+    0
+
+)",
+                    py::arg("idx"));
 
   configuration.def("to_binary_strings", &Configuration::to_binary_strings,
                     py::arg("num_orbitals"),
@@ -95,7 +183,7 @@ Returns:
         and '0' indicates unoccupied for each spin channel
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("2du0")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("2du0")
     >>> print(config.to_binary_strings(4))
     ("1010", "1100")
 
@@ -110,7 +198,7 @@ Returns:
     tuple: A tuple containing (n_alpha, n_beta)
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> n_alpha, n_beta = config.get_n_electrons()
     >>> print(f"Alpha electrons: {n_alpha}, Beta electrons: {n_beta}")
 
@@ -127,8 +215,8 @@ Returns:
     bool: True if configurations are identical, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
-    >>> config2 = qdk_chemistry.Configuration("22ud0ud")
+    >>> config1 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> print(config1 == config2)
     True
 
@@ -146,8 +234,8 @@ Returns:
     bool: True if configurations are different, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
-    >>> config2 = qdk_chemistry.Configuration("22ud0u0")
+    >>> config1 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration.from_spin_half_string("22ud0u0")
     >>> print(config1 != config2)
     True
 
@@ -216,6 +304,82 @@ Returns:
     str: String representation of the Configuration as a orbital occupation string
 
 )");
+
+  configuration.def(
+      "to_bits",
+      [](const Configuration &self, size_t n_bits) -> py::list {
+        const auto &packed = self.packed_data();
+        uint8_t bpm = self.bits_per_mode();
+        if ((n_bits % bpm) != 0) {
+          throw py::value_error(
+              "n_bits must be a multiple of bits_per_mode().");
+        }
+        size_t modes_per_byte = 8 / bpm;
+        size_t n_modes = n_bits / bpm;
+
+        py::list result;
+        if (bpm == 1) {
+          for (size_t i = 0; i < n_bits; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = i % modes_per_byte;
+            uint8_t val = (byte_idx < packed.size())
+                              ? (packed[byte_idx] >> bit_offset) & 1
+                              : 0;
+            result.append(static_cast<int>(val));
+          }
+        } else {
+          // bpm == 2: alpha block then beta block (Jordan-Wigner)
+          // First half: alpha occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // ALPHA=1, DOUBLY=3 have bit 0 set
+            result.append(static_cast<int>(state & 1));
+          }
+          // Second half: beta occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // BETA=2, DOUBLY=3 have bit 1 set
+            result.append(static_cast<int>((state >> 1) & 1));
+          }
+        }
+        return result;
+      },
+      R"(
+Return a flat list of 0/1 bit values representing the configuration.
+
+Args:
+    n_bits (int): Number of output bits. For bits_per_mode == 1 this equals
+        the number of modes to read; for bits_per_mode == 2 it equals
+        2 * (number of modes to read). Obtain the true mode count from the
+        owning container (e.g. ``configuration_set.capacity``) and compute
+        ``n_bits = capacity * bits_per_mode``.
+
+For bits_per_mode == 1: returns a list of length n_bits.
+For bits_per_mode == 2 (spin-½): returns a list of length n_bits with
+the first half being alpha occupations and the second half beta
+occupations (Jordan-Wigner ordering).
+
+Returns:
+    list[int]: List of 0s and 1s of length n_bits.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("10110")
+    >>> config.to_bits(5)
+    [1, 0, 1, 1, 0]
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("2u0d")
+    >>> config.to_bits(8)
+    [1, 1, 0, 0, 1, 0, 0, 1]
+
+)",
+      py::arg("n_bits"));
   // Data type name class attribute
   configuration.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(Configuration);

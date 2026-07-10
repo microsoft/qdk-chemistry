@@ -8,14 +8,14 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry import algorithms, data
-from qdk_chemistry.plugins.geometric import QDK_CHEMISTRY_HAS_GEOMETRIC
-from qdk_chemistry.plugins.geometric.geometry_optimizer import GEOMETRIC_OPTIMIZER_ALGORITHMS
+pytest.importorskip("geometric", reason="geomeTRIC not available")
 
-pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_GEOMETRIC, reason="geomeTRIC not available")
+from qdk_chemistry import algorithms, data
+from qdk_chemistry.plugins.geometric.geometry_optimizer import GEOMETRIC_OPTIMIZER_ALGORITHMS
 
 
 def _h2_structure():
+    """Create the H2 test structure."""
     return data.Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]], [1, 1])
 
 
@@ -62,7 +62,7 @@ def test_geometric_optimizer_smoke_run():
     """Run a small geometry optimization through the optional geomeTRIC backend."""
     optimizer = algorithms.create("geometry_optimizer", "geometric_geoopt_tric")
     optimizer.settings().set("max_iterations", 20)
-    derivative_ref = data.AlgorithmRef("nuclear_derivative_calculator", "finite_difference")
+    derivative_ref = data.AlgorithmRef("nuclear_derivative_calculator", "qdk_finite_difference")
     derivative_ref.set("finite_difference_step", 1.0e-2)
     optimizer.settings().set("derivative_calculator", derivative_ref)
 

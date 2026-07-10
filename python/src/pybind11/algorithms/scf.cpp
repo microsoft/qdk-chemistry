@@ -11,6 +11,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/stabilized_scf.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -163,6 +164,17 @@ Returns:
 
 )");
 
+  scf_solver.def(
+      "hash",
+      [](const ScfSolver &solver,
+         std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
+         int spin_multiplicity, BasisOrGuessType basis_or_guess) {
+        return solver.hash(structure, charge, spin_multiplicity,
+                           basis_or_guess);
+      },
+      py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
+      py::arg("basis_or_guess"));
+
   // Factory class binding - creates ScfSolverFactory class with static methods
   bind_algorithm_factory<ScfSolverFactory, ScfSolver, ScfSolverBase>(
       m, "ScfSolverFactory");
@@ -215,4 +227,34 @@ Default constructor.
 Initializes an SCF solver with default settings.
 
 )");
+
+  py::class_<microsoft::StabilizedScfSolver, ScfSolver, py::smart_holder>(
+      m, "QdkStabilizedScfSolver", R"(
+    QDK implementation of an automated stabilized SCF workflow.
+
+    This solver runs a regular SCF calculation, checks wavefunction stability,
+    rotates orbitals along detected instability directions, and reruns SCF until a
+    stable wavefunction is found or the configured stability cycle limit is reached.
+
+    Typical usage:
+
+    .. code-block:: python
+
+      import qdk_chemistry.algorithms as alg
+
+      scf_solver = alg.create("scf_solver", "qdk_stabilized")
+      energy, wavefunction = scf_solver.run(structure, 0, 1, "sto-3g")
+
+    See Also:
+      :class:`ScfSolver`
+      :class:`QdkScfSolver`
+      :class:`qdk_chemistry.algorithms.QdkStabilityChecker`
+
+    )")
+      .def(py::init<>(), R"(
+    Default constructor.
+
+    Initializes a stabilized SCF solver with default nested SCF and stability checker settings.
+
+    )");
 }

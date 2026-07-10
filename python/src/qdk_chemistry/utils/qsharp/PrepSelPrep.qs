@@ -1,0 +1,193 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+/// Generic PREPARE-SELECT-PREPARE block encoding operations.
+///
+/// These operations compose arbitrary PREPARE and SELECT callables into
+/// block encodings and quantum walk steps.  They are agnostic to the
+/// concrete decomposition (LCU, double-factorized, etc.) — callers supply
+/// the two callables and this module handles the stitching.
+namespace QDKChemistry.Utils.PrepSelPrep {
+
+    import Std.Canon.ApplyToEachCA;
+    import Std.Core.Length;
+    import Std.Math.PI;
+    import Std.Intrinsic.R;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+
+    /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
+    operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
+
+    /// REFLECT oracle: reflection about the zero state on the ancilla register.
+    ///
+    /// $$
+    ///     \mathrm{REFLECT} = 2|0\rangle\langle 0| - I
+    /// $$
+    operation Reflect(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {
+        let n = Length(ancillaRegister);
+        if n == 0 {
+            // No ancilla — reflection is a global phase (no-op).
+        } elif n == 1 {
+            Z(ancillaRegister[0]);
+        } else {
+            within {
+                ApplyToEachCA(X, ancillaRegister);
+            } apply {
+                Controlled Z(ancillaRegister[1...], ancillaRegister[0]);
+            }
+            R(PauliI, 2.0 * PI(), ancillaRegister[0]);
+        }
+    }
+
+    /// # Summary
+    /// Block encoding: PREPARE† · SELECT · PREPARE.
+    ///
+    /// Takes `prepareOp` and `selectOp` as callables so they can be swapped
+    /// for different implementations.
+    ///
+    /// When controlled (via `within/apply`), only SELECT is controlled while
+    /// PREPARE and UNPREPARE run unconditionally.
+    ///
+    /// $$
+    ///     B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
+    /// $$
+    operation PrepSelPrep(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        targetRegister : Qubit[],
+        ancillaRegister : Qubit[],
+    ) : Unit is Adj + Ctl {
+        body ... {
+            let numAncillaQubits = Length(ancillaRegister);
+            if (numAncillaQubits == 0) {
+                selectOp([], targetRegister);
+            } else {
+                within {
+                    prepareOp(ancillaRegister);
+                } apply {
+                    selectOp(ancillaRegister, targetRegister);
+                }
+            }
+        }
+        adjoint auto;
+        controlled (ctls, ...) {
+            // Per Babbush et al. (arXiv:1805.03662): only SELECT is controlled;
+            // PREPARE and PREPARE† run unconditionally.
+            let numAncillaQubits = Length(ancillaRegister);
+            if (numAncillaQubits == 0) {
+                Controlled selectOp(ctls, ([], targetRegister));
+            } else {
+                prepareOp(ancillaRegister);
+                Controlled selectOp(ctls, (ancillaRegister, targetRegister));
+                Adjoint prepareOp(ancillaRegister);
+            }
+        }
+        controlled adjoint auto;
+    }
+
+    /// # Summary
+    /// PSP-based quantum walk: W = REFLECT · B[H].
+    ///
+    /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
+    /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
+    /// This follows Babbush et al. (arXiv:1805.03662): c-W = c-R · (PREP† · c-SEL · PREP).
+    ///
+    /// $$
+    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
+    /// $$
+    operation PSPWalk(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        targetRegister : Qubit[],
+        ancillaRegister : Qubit[],
+    ) : Unit is Adj + Ctl {
+        body ... {
+            PrepSelPrep(prepareOp, selectOp, targetRegister, ancillaRegister);
+            Reflect(ancillaRegister);
+        }
+        adjoint auto;
+        controlled (ctls, ...) {
+            Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
+            Controlled Reflect(ctls, (ancillaRegister));
+        }
+        controlled adjoint auto;
+    }
+
+    /// # Summary
+    /// Creates a controlled block-encoding callable.
+    ///
+    /// The caller passes system + ancilla qubits together since the ancilla
+    /// becomes entangled with the control qubit during the controlled operation.
+    function MakeControlledPrepSelPrepOp(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+    ) : (Qubit, Qubit[]) => Unit {
+        (control, allQubits) => {
+            let systems = allQubits[0..numSystemQubits - 1];
+            let ancilla = allQubits[numSystemQubits...];
+            for _ in 0..power - 1 {
+                if BeginEstimateCaching("Controlled PrepSelPrep", 0) {
+                    Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                    EndEstimateCaching();
+                }
+            }
+        }
+    }
+
+    /// # Summary
+    /// Creates a controlled PSP-based quantum-walk callable.
+    ///
+    /// System and ancilla qubits are passed together; the caller is responsible
+    /// for allocation since the walk operator leaves ancilla entangled.
+    function MakeControlledPSPWalkOp(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+    ) : (Qubit, Qubit[]) => Unit {
+        (control, allQubits) => {
+            let systems = allQubits[0..numSystemQubits - 1];
+            let ancilla = allQubits[numSystemQubits...];
+            for _ in 0..power - 1 {
+                if BeginEstimateCaching("Controlled PSPWalk", 0) {
+                    Controlled PSPWalk([control], (prepareOp, selectOp, systems, ancilla));
+                    EndEstimateCaching();
+                }
+            }
+        }
+    }
+
+    /// Circuit entry point for prep-sel-prep (allocates qubits).
+    operation MakeControlledPrepSelPrepCircuit(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+    ) : Unit {
+        use control = Qubit();
+        use systems = Qubit[numSystemQubits + numAncillaQubits];
+        let op = MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        op(control, systems);
+    }
+
+    /// Circuit entry point for quantum walk (allocates qubits).
+    operation MakeControlledPSPWalkCircuit(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+    ) : Unit {
+        use control = Qubit();
+        use systems = Qubit[numSystemQubits + numAncillaQubits];
+        let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        op(control, systems);
+    }
+}

@@ -31,19 +31,19 @@ Orbitals
 
 .. rubric:: Creating a constructor
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. rubric:: Configuring settings
 
@@ -53,13 +53,6 @@ See `Available implementations`_ below for implementation-specific options.
 .. note::
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
@@ -67,14 +60,14 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-.. rubric:: Running the calculation
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
       :language: cpp
-      :start-after: // start-cell-construct
-      :end-before: // end-cell-construct
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -83,18 +76,18 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-construct
       :end-before: # end-cell-construct
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-construct
+      :end-before: // end-cell-construct
+
 Available implementations
 -------------------------
 
 QDK/Chemistry's ``HamiltonianConstructor`` provides a unified interface for Hamiltonian construction methods.
 You can discover available implementations programmatically:
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
@@ -102,6 +95,13 @@ You can discover available implementations programmatically:
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 QDK (Native)
 ~~~~~~~~~~~~

@@ -147,6 +147,29 @@ class Logger {
 };
 
 /**
+ * @class ScopedLogLevel
+ * @brief Temporarily raises the global log level for a scope.
+ *
+ * If the current global log level is more verbose than the requested minimum,
+ * the constructor raises it to that minimum. The destructor restores the
+ * previous level only if no other code changed the global level while the guard
+ * was active.
+ */
+class ScopedLogLevel {
+ public:
+  explicit ScopedLogLevel(LogLevel minimum_level);
+  ~ScopedLogLevel();
+
+  ScopedLogLevel(const ScopedLogLevel&) = delete;
+  ScopedLogLevel& operator=(const ScopedLogLevel&) = delete;
+
+ private:
+  LogLevel previous_level_;
+  LogLevel scoped_level_ = LogLevel::off;
+  bool changed_ = false;
+};
+
+/**
  * @brief Logs a standardized trace message for entering a function
  *
  * Automatically uses std::source_location to determine the calling

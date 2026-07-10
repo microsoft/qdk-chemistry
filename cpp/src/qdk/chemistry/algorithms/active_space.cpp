@@ -2,14 +2,14 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <cstdint>
 #include <optional>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <variant>
+#include <unordered_map>
 
 #include "microsoft/active_space/autocas_active_space.hpp"
 #include "microsoft/active_space/entropy_active_space.hpp"
@@ -19,6 +19,27 @@
 namespace qdk::chemistry::algorithms {
 
 namespace detail {
+
+static std::shared_ptr<const data::SymmetryBlockedIndexSet>
+make_orbital_index_set(const std::shared_ptr<data::Orbitals>& orbitals,
+                       const std::vector<size_t>& alpha,
+                       const std::vector<size_t>& beta) {
+  auto to_u32 = [](const std::vector<size_t>& v) {
+    return std::vector<std::uint32_t>(v.begin(), v.end());
+  };
+
+  std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>> indices;
+  auto symmetries = orbitals->symmetries();
+  if (symmetries && symmetries->has_axis(data::AxisName::Spin)) {
+    indices[data::axes::alpha()] = to_u32(alpha);
+    indices[data::axes::beta()] = to_u32(beta);
+  } else {
+    indices[data::SymmetryLabel{}] = to_u32(alpha);
+  }
+
+  return std::make_shared<const data::SymmetryBlockedIndexSet>(
+      symmetries, orbitals->mo_extents(), std::move(indices));
+}
 
 std::tuple<double, std::vector<size_t>, Eigen::VectorXd>
 _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
@@ -41,14 +62,14 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
         "Wavefunction does not have single orbital entropies.");
   }
   const auto entropies = wavefunction->get_single_orbital_entropies();
-  if (entropies.size() != active_space_indices.size()) {
+  if (static_cast<size_t>(entropies.size()) != active_space_indices.size()) {
     throw std::runtime_error(
         "Entropy size does not match number of active space orbitals.");
   }
 
   // Sort entropies and orbital indices
   std::vector<std::pair<double, size_t>> entropy_index_pairs(entropies.size());
-  for (size_t i = 0; i < entropies.size(); ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(entropies.size()); ++i) {
     entropy_index_pairs[i] = {entropies(i), active_space_indices[i]};
   }
   std::sort(entropy_index_pairs.begin(), entropy_index_pairs.end(),
@@ -74,7 +95,7 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
   if (normalize_entropies) {
     QDK_LOGGER().info("Normalized orbital entropies:");
     QDK_LOGGER().info("  Orbital index   Normalized Entropy   Raw Entropy");
-    for (size_t i = 0; i < sorted_entropies.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(sorted_entropies.size()); ++i) {
       QDK_LOGGER().info("         {:>6}         {:>12.6f}    {:>10.6f}",
                         selected_active_space_indices[i], sorted_entropies[i],
                         sorted_entropies[i] * max_entropy);
@@ -82,7 +103,7 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
   } else {
     QDK_LOGGER().info("Orbital entropies:");
     QDK_LOGGER().info("  Orbital index   Raw Entropy");
-    for (size_t i = 0; i < sorted_entropies.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(sorted_entropies.size()); ++i) {
       QDK_LOGGER().info("         {:>6}  {:>12.6f}",
                         selected_active_space_indices[i], sorted_entropies[i]);
     }
@@ -134,8 +155,9 @@ std::shared_ptr<data::Orbitals> new_orbitals(
         orbitals->coefficients(),
         orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
         basis_set,
-        std::make_pair(active_space_indices_a, active_space_indices_a),
-        std::make_pair(inactive_indices, inactive_indices));
+        make_orbital_index_set(orbitals, active_space_indices_a,
+                               active_space_indices_a),
+        make_orbital_index_set(orbitals, inactive_indices, inactive_indices));
   } else {
     // get inactive indices
     size_t nelec_a = wavefunction->get_total_num_electrons().first;
@@ -181,8 +203,10 @@ std::shared_ptr<data::Orbitals> new_orbitals(
         orbitals->coefficients(),
         orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
         basis_set,
-        std::make_pair(active_space_indices_a, active_space_indices_b.value()),
-        std::make_pair(inactive_indices_a, inactive_indices_b));
+        make_orbital_index_set(orbitals, active_space_indices_a,
+                               active_space_indices_b.value()),
+        make_orbital_index_set(orbitals, inactive_indices_a,
+                               inactive_indices_b));
   }
 }
 
@@ -286,7 +310,7 @@ data::Configuration _extract_active_orbitals(
     }
   }
 
-  return data::Configuration(active_det_string);
+  return data::Configuration::from_spin_half_string(active_det_string);
 }
 
 std::shared_ptr<data::Wavefunction> new_wavefunction(
@@ -329,32 +353,8 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
   } else {
     // Multi-determinant wavefunction - create aufbau occupations in old space,
     // then truncate
-    std::string aufbau_string(old_active_indices_a.size(), '0');
-
-    size_t nalpha_filled = 0;
-    size_t nbeta_filled = 0;
-
-    for (size_t i = 0; i < old_active_indices_a.size(); ++i) {
-      if (nalpha_filled < expected_nelec_a && nbeta_filled < expected_nelec_b) {
-        // Doubly occupy
-        aufbau_string[i] = '2';
-        nalpha_filled++;
-        nbeta_filled++;
-      } else if (nalpha_filled < expected_nelec_a) {
-        // Alpha only
-        aufbau_string[i] = 'u';
-        nalpha_filled++;
-      } else if (nbeta_filled < expected_nelec_b) {
-        // Beta only
-        aufbau_string[i] = 'd';
-        nbeta_filled++;
-      } else {
-        // Unoccupied
-        aufbau_string[i] = '0';
-      }
-    }
-
-    data::Configuration aufbau_det(aufbau_string);
+    auto aufbau_det = data::Configuration::canonical_hf_configuration(
+        expected_nelec_a, expected_nelec_b, old_active_indices_a.size());
     // Now truncate the aufbau determinant to the new active space
     truncated_det = _extract_active_orbitals(aufbau_det, old_active_indices_a,
                                              new_active_indices_a);
@@ -362,8 +362,8 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
 
   // Create a new container with the truncated/aufbau determinant
   std::unique_ptr<data::WavefunctionContainer> new_container;
-  new_container = std::make_unique<data::SlaterDeterminantContainer>(
-      truncated_det, new_orbitals, wavefunction_type);
+  new_container = std::make_unique<data::StateVectorContainer>(
+      truncated_det, new_orbitals, "electrons", wavefunction_type);
 
   return std::make_shared<data::Wavefunction>(std::move(new_container));
 }

@@ -4,6 +4,7 @@
 
 #pragma once
 #include <Eigen/Dense>
+#include <cstddef>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
@@ -44,6 +45,18 @@ class NuclearHessian : public DataClass,
    * @brief Get the Hessian matrix in Hartree/Bohr^2.
    */
   const Eigen::MatrixXd& get_matrix() const { return matrix_; }
+
+  /**
+   * @brief Get the 3 by 3 Hessian block coupling two atoms.
+   *
+   * @param row_atom_index Zero-based atom index for the row coordinate block.
+   * @param column_atom_index Zero-based atom index for the column coordinate
+   * block.
+   * @throws std::out_of_range If either atom index is not in the associated
+   * structure.
+   */
+  Eigen::Matrix3d get_atom_pair_block(size_t row_atom_index,
+                                      size_t column_atom_index) const;
 
   /**
    * @brief Return the serialized data type name.
@@ -121,6 +134,7 @@ class NuclearHessian : public DataClass,
       const std::string& filename);
   static std::shared_ptr<NuclearHessian> _from_hdf5_file(
       const std::string& filename);
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   std::shared_ptr<Structure> structure_;
   Eigen::MatrixXd matrix_;

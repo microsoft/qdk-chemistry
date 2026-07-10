@@ -73,6 +73,7 @@ class _QdkDerivativeEngine(Engine):
         charge: int,
         spin_multiplicity: int,
         seed_or_basis: Any,
+        n_inactive_orbitals: int,
         derivative_calculator: Any,
         molecule: Any,
     ):
@@ -81,6 +82,7 @@ class _QdkDerivativeEngine(Engine):
         self._charge = charge
         self._spin_multiplicity = spin_multiplicity
         self._seed_or_basis = seed_or_basis
+        self._n_inactive_orbitals = n_inactive_orbitals
         self._derivative_calculator = derivative_calculator
         self._last_energy = None
         self._last_structure = structure
@@ -101,7 +103,11 @@ class _QdkDerivativeEngine(Engine):
         """Evaluate energy and gradients for geomeTRIC."""
         structure = self.structure_from_coordinates(coordinates)
         energy, gradients, _hessian, wavefunction = self._derivative_calculator.run(
-            structure, self._charge, self._spin_multiplicity, self._seed_or_basis
+            structure,
+            self._charge,
+            self._spin_multiplicity,
+            self._seed_or_basis,
+            self._n_inactive_orbitals,
         )
         self._last_energy = energy
         self._last_structure = structure
@@ -139,7 +145,12 @@ class GeometricOptimizer(GeometryOptimizer):
         return [self.name()]
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, seed_or_basis: Any
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        seed_or_basis: Any,
+        n_inactive_orbitals: int = 0,
     ) -> tuple[float, Structure, Any | None, NuclearHessian | None]:
         """Optimize a molecular structure using geomeTRIC."""
         Logger.trace_entering()
@@ -153,7 +164,13 @@ class GeometricOptimizer(GeometryOptimizer):
         derivative_calculator = self._create_nested("derivative_calculator")
         derivative_calculator.settings().set("compute_hessian", False)
         engine = _QdkDerivativeEngine(
-            structure, charge, spin_multiplicity, seed_or_basis, derivative_calculator, molecule
+            structure,
+            charge,
+            spin_multiplicity,
+            seed_or_basis,
+            n_inactive_orbitals,
+            derivative_calculator,
+            molecule,
         )
 
         params = self._geometric_options()
@@ -168,7 +185,11 @@ class GeometricOptimizer(GeometryOptimizer):
         final_calculator = self._create_nested("derivative_calculator")
         final_calculator.settings().set("compute_hessian", self._settings["compute_hessian"])
         final_energy, _gradients, hessian, wavefunction = final_calculator.run(
-            optimized_structure, charge, spin_multiplicity, seed_or_basis
+            optimized_structure,
+            charge,
+            spin_multiplicity,
+            seed_or_basis,
+            n_inactive_orbitals,
         )
         if not self._settings["compute_hessian"]:
             hessian = None

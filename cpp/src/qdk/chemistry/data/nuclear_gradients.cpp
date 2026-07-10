@@ -33,6 +33,18 @@ const std::shared_ptr<Structure> NuclearGradients::get_structure() const {
   return structure_;
 }
 
+Eigen::Vector3d NuclearGradients::get_atom_gradient(size_t atom_index) const {
+  const auto num_atoms = get_structure()->get_num_atoms();
+  if (atom_index >= num_atoms) {
+    throw std::out_of_range("Atom index " + std::to_string(atom_index) +
+                            " is out of range for " +
+                            std::to_string(num_atoms) + " atoms");
+  }
+
+  const auto offset = static_cast<Eigen::Index>(3 * atom_index);
+  return {values_(offset), values_(offset + 1), values_(offset + 2)};
+}
+
 Eigen::MatrixXd NuclearGradients::as_matrix() const {
   const auto num_atoms = get_structure()->get_num_atoms();
   Eigen::MatrixXd matrix(num_atoms, 3);
@@ -214,6 +226,13 @@ std::shared_ptr<NuclearGradients> NuclearGradients::_from_hdf5_file(
   }
   H5::H5File file(filename, H5F_ACC_RDONLY);
   return from_hdf5(file);
+}
+
+void NuclearGradients::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, get_structure()->content_hash());
+  hash_value(ctx, values_);
 }
 
 }  // namespace qdk::chemistry::data

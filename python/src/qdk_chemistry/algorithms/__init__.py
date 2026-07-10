@@ -27,6 +27,7 @@ from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalC
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer
+from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -46,6 +47,7 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
+    QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
@@ -57,7 +59,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
-from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
+from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -72,6 +74,7 @@ __all__ = [
     "EnergyEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
     "GeometryOptimizer",
+    "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -88,12 +91,14 @@ __all__ = [
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
+    "QdkNaturalOrbitalLocalizer",
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
+    "QdkStabilizedScfSolver",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QpeCircuitBuilder",

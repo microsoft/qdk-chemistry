@@ -18,7 +18,7 @@
 
 namespace qdk::chemistry::algorithms {
 
-namespace {
+namespace detail {
 
 /// Try to create an algorithm via @p Factory and return a copy of its settings.
 /// Returns nullptr if the name is not found.
@@ -28,7 +28,7 @@ std::shared_ptr<data::Settings> try_factory(const std::string& name) {
   return std::make_shared<data::Settings>(algo->settings());
 }
 
-}  // namespace
+}  // namespace detail
 
 namespace detail {
 

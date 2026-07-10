@@ -4,6 +4,7 @@
 
 #pragma once
 #include <Eigen/Dense>
+#include <cstddef>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
@@ -45,6 +46,15 @@ class NuclearGradients : public DataClass,
    * @brief Get the atom-major gradient vector in Hartree/Bohr.
    */
   const Eigen::VectorXd& get_values() const { return values_; }
+
+  /**
+   * @brief Get the x, y, z gradient components for one atom.
+   *
+   * @param atom_index Zero-based atom index.
+   * @throws std::out_of_range If atom_index is not in the associated
+   * structure.
+   */
+  Eigen::Vector3d get_atom_gradient(size_t atom_index) const;
 
   /**
    * @brief Return gradients as a num_atoms by 3 matrix.
@@ -127,6 +137,7 @@ class NuclearGradients : public DataClass,
       const std::string& filename);
   static std::shared_ptr<NuclearGradients> _from_hdf5_file(
       const std::string& filename);
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   std::shared_ptr<Structure> structure_;
   Eigen::VectorXd values_;

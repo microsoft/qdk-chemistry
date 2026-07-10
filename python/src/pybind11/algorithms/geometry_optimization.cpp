@@ -32,10 +32,11 @@ class GeometryOptimizerBase : public GeometryOptimizer,
  protected:
   GeometryOptimizationResult _run_impl(
       std::shared_ptr<Structure> structure, int charge, int spin_multiplicity,
-      NuclearDerivativeSeedType seed) const override {
+      GeometryOptimizationSeedType seed,
+      unsigned int n_inactive_orbitals) const override {
     PYBIND11_OVERRIDE_PURE(GeometryOptimizationResult, GeometryOptimizer,
                            _run_impl, structure, charge, spin_multiplicity,
-                           seed);
+                           seed, n_inactive_orbitals);
   }
 };
 
@@ -45,20 +46,22 @@ void bind_geometry_optimization(py::module& m) {
                 R"(
     Base class for geometry optimization algorithms.
 
-    Optimizers take the same arguments as nuclear derivative calculators and
-    return the optimized energy, optimized structure, optional wavefunction,
-    and optional Hessian.
+    Optimizers derive active-space electron counts for nuclear derivative
+    calculations and return the optimized energy, optimized structure,
+    optional wavefunction, and optional Hessian.
     )");
 
   optimizer.def(py::init<>(), R"(Create a geometry optimizer.)");
   optimizer.def(
       "run",
       [](const GeometryOptimizer& self, std::shared_ptr<Structure> structure,
-         int charge, int spin_multiplicity, NuclearDerivativeSeedType seed) {
-        return self.run(structure, charge, spin_multiplicity, seed);
+         int charge, int spin_multiplicity, GeometryOptimizationSeedType seed,
+         unsigned int n_inactive_orbitals) {
+        return self.run(structure, charge, spin_multiplicity, seed,
+                        n_inactive_orbitals);
       },
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("seed_or_basis"),
+      py::arg("seed_or_basis"), py::arg("n_inactive_orbitals") = 0,
       R"(
 Optimize a molecular structure.
 
@@ -67,6 +70,7 @@ Args:
     charge: Total molecular charge.
     spin_multiplicity: Spin multiplicity of the molecular system.
     seed_or_basis: Basis name, basis set, orbitals, or wavefunction seed.
+    n_inactive_orbitals: Number of doubly occupied orbitals excluded from the active space.
 
 Returns:
     tuple: ``(energy, structure, wavefunction, hessian)``.

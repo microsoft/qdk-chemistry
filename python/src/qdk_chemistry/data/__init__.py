@@ -6,17 +6,16 @@ primary interface for managing quantum chemical data within the QDK/Chemistry fr
 
 Exposed classes are:
 
+- :class:`AmplitudeContainer`: Amplitude-based correlated wavefunction (coupled cluster or MP2).
+- :class:`AmplitudeType`: Enumeration of amplitude expansion types (MP2, CCSD, Unspecified).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
-- :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
-- :class:`ControlledUnitary`: Controlled unitary.
-- :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
@@ -29,7 +28,6 @@ Exposed classes are:
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
-- :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
 - :class:`NuclearHessian`: Nuclear Hessian matrix associated with a molecular structure.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -39,12 +37,11 @@ Exposed classes are:
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
-- :class:`SciWavefunctionContainer`: Selected Configuration Interaction (SCI) wavefunction with CI coefficients.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
-- :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
+- :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state.
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
@@ -71,15 +68,15 @@ from contextlib import suppress
 
 from qdk_chemistry._core.data import (
     AlgorithmRef,
+    AmplitudeContainer,
+    AmplitudeType,
     Ansatz,
     AOType,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
-    CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -88,24 +85,22 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
-    MP2Container,
     NuclearGradients,
     NuclearHessian,
     Orbitals,
     OrbitalType,
     PauliOperator,
     PauliTermAccumulator,
-    SciWavefunctionContainer,
     SettingNotFound,
     Settings,
     SettingsAreLocked,
     SettingTypeMismatch,
     SettingValue,
     Shell,
-    SlaterDeterminantContainer,
     SparseHamiltonianContainer,
     SpinChannel,
     StabilityResult,
+    StateVectorContainer,
     Structure,
     TaperingSpecification,
     Wavefunction,
@@ -116,7 +111,6 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
@@ -141,17 +135,16 @@ SettingsAreLockedError = SettingsAreLocked
 __all__ = [
     "AOType",
     "AlgorithmRef",
+    "AmplitudeContainer",
+    "AmplitudeType",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
-    "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
-    "ControlledUnitary",
-    "CoupledClusterContainer",
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
@@ -165,7 +158,6 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
-    "MP2Container",
     "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
@@ -179,7 +171,6 @@ __all__ = [
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
-    "SciWavefunctionContainer",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",
@@ -189,10 +180,10 @@ __all__ = [
     "SettingsAreLocked",
     "SettingsAreLockedError",
     "Shell",
-    "SlaterDeterminantContainer",
     "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
+    "StateVectorContainer",
     "Structure",
     "Symmetries",
     "TaperingSpecification",

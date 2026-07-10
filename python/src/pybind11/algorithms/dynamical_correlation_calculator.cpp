@@ -121,6 +121,9 @@ Returns:
   str: The type name of the algorithm
         )");
 
+  ref_calc.def("hash", &DynamicalCorrelationCalculator::hash,
+               py::arg("ansatz"));
+
   ref_calc.def("settings", &DynamicalCorrelationCalculator::settings,
                R"(
 Access the calculator's configuration settings.

@@ -10,6 +10,8 @@ import pytest
 
 from qdk_chemistry import algorithms, data
 from qdk_chemistry.data import AlgorithmRef, Ansatz, Settings, Structure
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -51,13 +53,13 @@ if PYSCF_AVAILABLE:
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 
 
-def create_n2_structure():
+def create_n2_structure(distance_angstrom=2.0):
     """Create a nitrogen molecule structure."""
     symbols = ["N", "N"]
     coords = np.array(
         [
-            [0.000000000, 0.0000000000, 2.000000000000 * ANGSTROM_TO_BOHR],
             [0.000000000, 0.0000000000, 0.000000000000],
+            [distance_angstrom * ANGSTROM_TO_BOHR, 0.0000000000, 0.000000000000],
         ]
     )
     return Structure(symbols, coords)
@@ -141,6 +143,7 @@ class TestPyscfPlugin:
         """Test that PySCF plugin is properly registered."""
         available_solvers = algorithms.available("scf_solver")
         assert "pyscf" in available_solvers
+        assert "pyscf_stabilized" in available_solvers
 
         available_localizers = algorithms.available("orbital_localizer")
         assert "pyscf_multi" in available_localizers
@@ -154,6 +157,11 @@ class TestPyscfPlugin:
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
+        assert scf_solver is not None
+
+    def test_pyscf_stabilized_scf_solver_creation(self):
+        """Test creating PySCF stabilized SCF solver."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
         assert scf_solver is not None
 
     def test_pyscf_localizer_creation(self):
@@ -193,6 +201,38 @@ class TestPyscfPlugin:
         # Test setting other parameters
         settings.set("scf_type", "restricted")
         assert settings.get("scf_type") == "restricted"
+
+    def test_pyscf_stabilized_scf_solver_settings(self):
+        """Test PySCF stabilized SCF solver settings interface."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        settings = scf_solver.settings()
+
+        assert settings is not None
+        assert settings.get("max_stability_iterations") == 5
+        assert settings.get("check_internal") is True
+        assert settings.get("check_external") is True
+        assert settings.get("fail_on_unstable") is True
+
+        settings.set("max_stability_iterations", 2)
+        assert settings.get("max_stability_iterations") == 2
+
+    def test_pyscf_stabilized_scf_solver_stretched_n2(self):
+        """Test PySCF stabilized SCF solver on the stretched N2 system used by C++ tests."""
+        n2 = create_n2_structure(1.6)
+
+        regular_scf_solver = algorithms.create("scf_solver", "pyscf")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        stabilized_scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        stabilized_scf_solver.settings().set("method", "hf")
+        stabilized_scf_solver.settings().set("max_stability_iterations", 1)
+        stabilized_scf_solver.settings().set("fail_on_unstable", False)
+        stabilized_energy, stabilized_wavefunction = stabilized_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        assert regular_wavefunction.get_orbitals().is_restricted()
+        assert stabilized_energy < regular_energy
+        assert not stabilized_wavefunction.get_orbitals().is_restricted()
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""
@@ -1345,6 +1385,42 @@ class TestPyscfPlugin:
         assert list(alpha_before) == list(alpha_after), f"{localizer_name}: alpha indices changed"
         assert list(beta_before) == list(beta_after), f"{localizer_name}: beta indices changed"
 
+    def test_pyscf_localization_multi_determinant_warns(self, monkeypatch):
+        """Localizing a multi-determinant wavefunction warns and returns one determinant."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Select an active space (6 electrons, 5 orbitals -> 3 alpha, 3 beta)
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 6)
+        selector.settings().set("num_active_orbitals", 5)
+        active_wfn = selector.run(wavefunction)
+
+        active_alpha, active_beta = active_wfn.get_orbitals().get_active_space_indices()
+        active_orbitals = active_wfn.get_orbitals()
+
+        # Build a two-determinant expansion over the active space
+        expected_mean_field_det = data.Configuration.canonical_hf_configuration(3, 3, 5)
+        dets = [data.Configuration.from_spin_half_string("22020"), expected_mean_field_det]
+        coeffs = np.array([0.96, np.sqrt(1.0 - 0.96**2)])
+        multi_wfn = data.Wavefunction(data.StateVectorContainer(coeffs, dets, active_orbitals))
+        assert len(multi_wfn.get_active_determinants()) == 2
+
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", "pipek-mezey")
+
+        warnings: list[str] = []
+        monkeypatch.setattr(Logger, "warn", warnings.append)
+
+        localized_wfn = localizer.run(multi_wfn, list(active_alpha), list(active_beta))
+
+        assert warnings
+        assert any("multi-determinant wavefunction" in warn for warn in warnings)
+        assert len(localized_wfn.get_active_determinants()) == 1
+        assert localized_wfn.get_active_determinants()[0] == expected_mean_field_det
+        self._verify_active_space_preserved(multi_wfn, localized_wfn, "pyscf_multi")
+
     @pytest.mark.parametrize("method", ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"])
     def test_pyscf_localization_preserves_active_space_restricted(self, method):
         """Test that PySCF localization preserves active space indices (restricted)."""
@@ -1379,7 +1455,7 @@ class TestPyscfPlugin:
         num_mo = orbitals.get_num_molecular_orbitals()
 
         # Define active space: frozen core (first 2 are inactive), rest are active
-        # Must include all occupied orbitals in active space for SlaterDeterminantContainer
+        # Must include all occupied orbitals in active space for StateVectorContainer
         active_alpha = list(range(2, num_mo))
         active_beta = list(range(2, num_mo))
         inactive_alpha = [0, 1]
@@ -1392,11 +1468,12 @@ class TestPyscfPlugin:
             coefficients_beta=coeffs_beta,
             ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
             basis_set=orbitals.get_basis_set(),
-            indices=(active_alpha, active_beta, inactive_alpha, inactive_beta),
+            active_indices=spin_index_set(num_mo, active_alpha, active_beta, equivalent=False),
+            inactive_indices=spin_index_set(num_mo, inactive_alpha, inactive_beta, equivalent=False),
         )
 
         active_wfn = data.Wavefunction(
-            data.SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], active_orbitals)
+            data.StateVectorContainer(wavefunction.get_active_determinants()[0], active_orbitals)
         )
 
         # Localize only the active orbitals
@@ -1482,7 +1559,7 @@ class TestPyscfPlugin:
         # Verify we have unrestricted orbitals
         orbitals = wavefunction.get_orbitals()
         assert orbitals.is_unrestricted(), "O2 triplet should have unrestricted orbitals"
-        assert wavefunction.get_container_type() == "sd"
+        assert wavefunction.get_container_type() == "state_vector"
         assert wavefunction.size() == 1, "single determinant"
 
         # Create Hamiltonian
@@ -1547,7 +1624,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1577,7 +1654,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1633,7 +1710,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()
@@ -1699,7 +1776,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1724,7 +1801,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1761,7 +1838,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()
@@ -2148,7 +2225,7 @@ class TestPyscfPlugin:
         )
 
         # 2. Unrestricted model Hamiltonian should throw
-        model_orbitals_unrestricted = data.ModelOrbitals(4, False)  # unrestricted
+        model_orbitals_unrestricted = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))  # unrestricted
         one_body_alpha = np.eye(4)
         one_body_beta = np.eye(4) * 1.1
         two_body_aaaa = np.zeros(4**4)
@@ -2177,7 +2254,9 @@ class TestPyscfPlugin:
         # 3. Non-rerouting for valid model Hamiltonian
 
         # Create a model Hamiltonian (restricted, closed-shell, full active space)
-        model_orbitals_proper = data.ModelOrbitals(4, True)  # All orbitals are active by default
+        model_orbitals_proper = data.ModelOrbitals(
+            4, SymmetryProduct([axes.spin(1, True)])
+        )  # All orbitals are active by default
         one_body_model = np.eye(4) * 0.5
         two_body_model = np.zeros(4**4)
         h_model = data.Hamiltonian(
