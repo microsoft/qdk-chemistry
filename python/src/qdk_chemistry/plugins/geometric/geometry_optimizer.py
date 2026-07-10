@@ -43,7 +43,7 @@ class GeometricOptimizerSettings(Settings):
         self._set_default(
             "derivative_calculator",
             "algorithm_ref",
-            AlgorithmRef("nuclear_derivative_calculator", "finite_difference"),
+            AlgorithmRef("nuclear_derivative_calculator", "qdk_finite_difference"),
             "Nuclear derivative calculator used to evaluate energies and gradients.",
         )
         self._set_default(

@@ -49,6 +49,10 @@ def test_geometric_optimizer_settings():
     optimizer = algorithms.create("geometry_optimizer", "geometric_geoopt_cartesian")
     settings = optimizer.settings()
 
+    derivative_ref = settings.get("derivative_calculator")
+    assert derivative_ref.algorithm_type == "nuclear_derivative_calculator"
+    assert derivative_ref.algorithm_name == "qdk_finite_difference"
+
     assert settings.get("transition_state") is False
     assert settings.get("coordinate_system") == "cart"
     assert settings.get("compute_hessian") is False

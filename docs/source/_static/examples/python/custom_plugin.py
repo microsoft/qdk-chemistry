@@ -187,7 +187,12 @@ class BfgsOptimizer(GeometryOptimizer):
         return "bfgs"
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, seed
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        seed,
+        n_inactive_orbitals: int = 0,
     ):
         # max_steps = self.settings().get("max_steps")
         # threshold = self.settings().get("convergence_threshold")
@@ -215,7 +220,12 @@ class SteepestDescentOptimizer(GeometryOptimizer):
         return "steepest_descent"
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, seed
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        seed,
+        n_inactive_orbitals: int = 0,
     ):
         # Steepest descent implementation
         # Placeholder for optimized structure
