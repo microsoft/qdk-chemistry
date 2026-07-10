@@ -153,6 +153,10 @@ def _import_plugins() -> None:
         import qdk_chemistry.plugins.networkx as networkx_plugin  # noqa: PLC0415
 
         networkx_plugin.load()
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.azure_quantum as azure_quantum_plugin  # noqa: PLC0415
+
+        azure_quantum_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
