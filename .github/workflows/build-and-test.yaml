@@ -875,8 +875,10 @@ jobs:
 
     - name: Build and install qdk from branch (overwrite released version)
       run: |
-        git clone --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
-        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
+        echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
+        pip install --force-reinstall "${{ runner.temp }}/qdk/source/widgets" "${{ runner.temp }}/qdk/source/jupyterlab"
+        pip install --force-reinstall "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 
