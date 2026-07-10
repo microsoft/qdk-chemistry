@@ -237,15 +237,6 @@ class TestZassenhausTimeEvolution:
             sin_val = np.sin(term.angle)
             rotation_matrix = cos_val * identity - 1j * sin_val * pauli_matrix
             step_unitary = rotation_matrix @ step_unitary
-        for term in container.step_terms:
-            pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
-                term.pauli_term, num_qubits=hamiltonian.num_qubits
-            )
-            pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
-            cos_val = np.cos(term.angle)
-            sin_val = np.sin(term.angle)
-            rotation_matrix = cos_val * np.eye(pauli_matrix.shape[0], dtype=complex) - 1j * sin_val * pauli_matrix
-            step_unitary = rotation_matrix @ step_unitary
 
         return np.linalg.matrix_power(step_unitary, container.step_reps)
 
