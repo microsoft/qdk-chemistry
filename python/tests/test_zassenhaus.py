@@ -479,16 +479,6 @@ class TestZassenhausTimeEvolution:
     def test_zassenhaus_operator_norm_error_scaling(self):
         """Check empirical operator-norm error scaling slopes match order + 1 to within 0.1."""
         cases = [
-            (self._open_heisenberg_chain_4_site, 2),
-            (self._open_heisenberg_chain_4_site, 3),
-            (self._open_heisenberg_chain_4_site, 4),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 2),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 3),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 4),
-        ]
-        for factory, order in cases:
-            slope = self._fit_zassenhaus_error_slope(factory(), order=order)
-        cases = [
             (self._open_heisenberg_chain_4_site(), (2, 3, 4)),
             (self._h2_sto3g_jordan_wigner_hamiltonian(), (2, 3, 4)),
         ]
