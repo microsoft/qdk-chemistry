@@ -23,7 +23,7 @@ from qdk_chemistry._core.data import (
 )
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class QdkQubitMapper(QubitMapper):
     ``MajoranaMapping`` works — built-in (Jordan-Wigner, Bravyi-Kitaev,
     parity, BK-tree, SCBK) or custom user-defined tables.  The mapping's
     ``name`` and ``base_encoding`` are used only for metadata on the
-    output :class:`~qdk_chemistry.data.QubitHamiltonian`, not for dispatch.
+    output :class:`~qdk_chemistry.data.QubitOperator`, not for dispatch.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, the engine handles all four spin-channel ERI
@@ -93,7 +93,7 @@ class QdkQubitMapper(QubitMapper):
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
-    number of spatial orbitals). Use ``QubitHamiltonian.to_interleaved()``
+    number of spatial orbitals). Use ``QubitOperator.to_interleaved()``
     for alternative qubit orderings.
 
     Examples:
@@ -130,7 +130,7 @@ class QdkQubitMapper(QubitMapper):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-    ) -> QubitHamiltonian:
+    ) -> QubitOperator:
         """Transform a fermionic Hamiltonian to a qubit Hamiltonian (table-driven).
 
         This backend passes the C++ ``MajoranaMapping`` directly to the
@@ -146,7 +146,7 @@ class QdkQubitMapper(QubitMapper):
             mapping: The Majorana-to-Pauli encoding (table is consumed directly by the C++ engine).
 
         Returns:
-            QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.
+            QubitOperator: The qubit Hamiltonian with Pauli strings and coefficients.
 
         """
         Logger.trace_entering()
@@ -185,7 +185,7 @@ class QdkQubitMapper(QubitMapper):
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {n_qubits} qubits")
 
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             pauli_strings=pauli_strings,
             coefficients=np.array(coefficients, dtype=complex),
             encoding=base_mapping.base_encoding,

@@ -12,7 +12,7 @@ import json
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitHamiltonian
+from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -305,7 +305,7 @@ class TestFolderCacheData:
             variances_each_term=[np.array([0.001, 0.002])],
         )
         measurement = MeasurementData(
-            hamiltonians=[QubitHamiltonian(["ZI", "XI"], np.array([1.0, 0.5]))],
+            hamiltonians=[QubitOperator(["ZI", "XI"], np.array([1.0, 0.5]))],
             bitstring_counts=[{"0": 50, "1": 50}],
             shots_list=[100],
         )

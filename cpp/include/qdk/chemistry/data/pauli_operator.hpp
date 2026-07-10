@@ -35,18 +35,18 @@ namespace qdk::chemistry::data {
 using SparsePauliWord = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
 
 /**
- * @brief Convert a sparse Pauli word to a QubitHamiltonian label.
+ * @brief Convert a sparse Pauli word to a QubitOperator label.
  *
- * The returned label uses the QubitHamiltonian convention: qubit 0 is the
+ * The returned label uses the QubitOperator convention: qubit 0 is the
  * rightmost character.
  */
 std::string sparse_pauli_word_to_label(const SparsePauliWord& word,
                                        std::uint64_t num_qubits);
 
 /**
- * @brief Convert a QubitHamiltonian label to a sparse Pauli word.
+ * @brief Convert a QubitOperator label to a sparse Pauli word.
  *
- * The input label uses the QubitHamiltonian convention: qubit 0 is the
+ * The input label uses the QubitOperator convention: qubit 0 is the
  * rightmost character.  Identity characters are omitted from the output.
  *
  * @param label Dense Pauli-string label (e.g. "XIZZ").

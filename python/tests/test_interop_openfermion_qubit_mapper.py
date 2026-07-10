@@ -48,7 +48,7 @@ if OPENFERMION_AVAILABLE:
     }
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import QubitOperator
 
 pytestmark = pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
 
@@ -58,7 +58,7 @@ def _num_spin_orbitals(hamiltonian: Hamiltonian) -> int:
     return 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
 
 
-def _assert_pauli_ops_equal(actual: QubitHamiltonian, expected: QubitHamiltonian) -> None:
+def _assert_pauli_ops_equal(actual: QubitOperator, expected: QubitOperator) -> None:
     """Assert two QubitHamiltonians have identical Pauli terms and coefficients."""
     assert actual.equiv(expected, atol=float_comparison_absolute_tolerance), (
         f"Pauli operators differ.\n  actual:   {actual.pauli_strings}\n  expected: {expected.pauli_strings}"
@@ -101,7 +101,7 @@ def test_openfermion_matches_qdk_native(encoding):
 
 
 def test_openfermion_bk_tree_encoding():
-    """BK-tree encoding produces the correct QubitHamiltonian (no QDK native equivalent).
+    """BK-tree encoding produces the correct QubitOperator (no QDK native equivalent).
 
     Builds an independent reference by re-indexing the interleaved
     InteractionOperator to blocked ordering, applying the BK-tree transform,
@@ -143,7 +143,7 @@ def test_openfermion_bk_tree_encoding():
 
 
 def test_scbk_one_step_produces_reduced_hamiltonian():
-    """One-step symmetry-conserving BK mapping produces a QubitHamiltonian with 2 fewer qubits."""
+    """One-step symmetry-conserving BK mapping produces a QubitOperator with 2 fewer qubits."""
     hamiltonian = create_nontrivial_test_hamiltonian()
     n_spin = _num_spin_orbitals(hamiltonian)
     mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n_spin, Symmetries(n_alpha=1, n_beta=1))
@@ -302,12 +302,12 @@ def test_hamiltonian_to_fermion_operator():
 
 
 # -------------------------------------------------------------------------------------
-# QubitOperator ↔ QubitHamiltonian round-trip
+# QubitOperator ↔ QubitOperator round-trip
 # -------------------------------------------------------------------------------------
 
 
 def test_qubit_operator_round_trip():
-    """QubitOperator → QubitHamiltonian → QubitOperator preserves terms."""
+    """QubitOperator → QubitOperator → QubitOperator preserves terms."""
     original = of.QubitOperator("X0 Z1", 0.5) + of.QubitOperator("Y0 Y1", 0.3) + of.QubitOperator("", 1.0)
 
     qh = qubit_operator_to_qubit_hamiltonian(original, encoding="jordan-wigner")
@@ -351,7 +351,7 @@ def test_qubit_operator_to_qubit_hamiltonian_zero_identity_raises():
 
 
 def test_full_pipeline_round_trip():
-    """Hamiltonian → FermionOp → QubitOp → QubitHamiltonian → QubitOp preserves terms."""
+    """Hamiltonian → FermionOp → QubitOp → QubitOperator → QubitOp preserves terms."""
     hamiltonian = create_nontrivial_test_hamiltonian()
 
     fop = hamiltonian_to_fermion_operator(hamiltonian)

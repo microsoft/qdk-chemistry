@@ -13,7 +13,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     FlatPartition,
     LayeredPartition,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
     TermPartition,
     UnitaryRepresentation,
@@ -38,14 +38,14 @@ class HamiltonianUnitaryBuilder(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation for the given QubitHamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation for the given QubitOperator.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation for the given QubitOperator.
 
         """
 
@@ -133,26 +133,26 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitHamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
 
         """
 
     def _group_terms(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
-    ) -> list[list[QubitHamiltonian]]:
+        qubit_hamiltonian: QubitOperator,
+    ) -> list[list[QubitOperator]]:
         """Group Hamiltonian terms for decomposition."""
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
             Logger.debug(
-                f"{self.name().capitalize()}: consuming QubitHamiltonian.term_partition "
+                f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
                 f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
             )
             return self._groups_from_partition(qubit_hamiltonian, partition)
@@ -162,7 +162,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         )
         return [
             [
-                QubitHamiltonian(
+                QubitOperator(
                     pauli_strings=[label],
                     coefficients=[coeff],
                     encoding=qubit_hamiltonian.encoding,
@@ -174,17 +174,17 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
 
     def _groups_from_partition(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         partition: TermPartition,
-    ) -> list[list[QubitHamiltonian]]:
+    ) -> list[list[QubitOperator]]:
         """Materialise a :class:`TermPartition` into sub-groups."""
         labels = qubit_hamiltonian.pauli_strings
         coeffs = qubit_hamiltonian.coefficients
         encoding = qubit_hamiltonian.encoding
         fmo = qubit_hamiltonian.fermion_mode_order
 
-        def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
-            return QubitHamiltonian(
+        def _make(indices: tuple[int, ...]) -> QubitOperator:
+            return QubitOperator(
                 pauli_strings=[labels[i] for i in indices],
                 coefficients=np.asarray([coeffs[i] for i in indices]),
                 encoding=encoding,
@@ -201,7 +201,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups: list[list[QubitHamiltonian]] = [
+        groups: list[list[QubitOperator]] = [
             [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
         ]
 
@@ -211,7 +211,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
 
     def _exponentiate_commuting(
         self,
-        group: QubitHamiltonian,
+        group: QubitOperator,
         time: float,
         *,
         atol: float = 1e-12,

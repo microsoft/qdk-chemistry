@@ -44,7 +44,7 @@ class TestRegistryShowDefault:
             "projected_multi_configuration_calculator",
             "scf_solver",
             "stability_checker",
-            "energy_estimator",
+            "expectation_estimator",
             "state_prep",
             "qubit_mapper",
             "circuit_executor",
@@ -93,9 +93,9 @@ class TestRegistryShowDefault:
         assert default_circuit_executor == "qdk_sparse_state_simulator"
 
         # Test for energy estimator
-        default_energy_estimator = registry.show_default("energy_estimator")
-        assert isinstance(default_energy_estimator, str)
-        assert default_energy_estimator == "qdk"
+        default_expectation_estimator = registry.show_default("expectation_estimator")
+        assert isinstance(default_expectation_estimator, str)
+        assert default_expectation_estimator == "qdk"
 
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")

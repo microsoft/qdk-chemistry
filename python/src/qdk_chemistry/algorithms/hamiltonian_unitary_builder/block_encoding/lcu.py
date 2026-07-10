@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
 from qdk_chemistry.data import (
     Configuration,
     ModelOrbitals,
-    QubitHamiltonian,
+    QubitOperator,
     StateVectorContainer,
     UnitaryRepresentation,
     Wavefunction,
@@ -100,7 +100,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using LCU block encoding.
 
         Computes normalized amplitudes, signs, and controlled operations from the
@@ -144,9 +144,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(
-        qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int, tolerance: float
-    ) -> "Wavefunction":
+    def _build_prepare(qubit_hamiltonian: QubitOperator, num_prepare_ancillas: int, tolerance: float) -> "Wavefunction":
         """Compute the prepare wavefunction from Hamiltonian coefficients.
 
         Normalizes the absolute Hamiltonian coefficients by the L1 norm and
@@ -194,7 +192,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return Wavefunction(container)
 
     @staticmethod
-    def _build_select(qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int) -> Select:
+    def _build_select(qubit_hamiltonian: QubitOperator, num_prepare_ancillas: int) -> Select:
         """Compute SELECT controlled operations and phases from Hamiltonian terms.
 
         Builds a list of controlled Pauli-string operations (one per Hamiltonian term)

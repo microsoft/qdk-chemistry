@@ -24,6 +24,19 @@ Breaking changes
   them with the current version. Backward-compatible loading of ``0.1.0`` files
   is planned for a future release.
 
+Deprecations
+------------
+
+- The ``QubitHamiltonian`` data class has been renamed to
+  :class:`~qdk_chemistry.data.QubitOperator`. ``QubitHamiltonian`` remains
+  available as a deprecated alias that emits a ``DeprecationWarning``.
+
+- The ``EnergyEstimator`` base algorithm class has been renamed to
+  :class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
+  ``"energy_estimator"`` registry type key to ``"expectation_estimator"``. The
+  old name and key remain available as deprecated aliases that emit a
+  ``DeprecationWarning``.
+
 Version 1.1.0
 =============
 

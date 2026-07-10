@@ -1,6 +1,6 @@
-"""QDK/Chemistry Qubit Hamiltonian module.
+"""QDK/Chemistry Qubit Operator module.
 
-This module provides the QubitHamiltonian dataclass for electronic structure problems. It bridges fermionic Hamiltonians
+This module provides the QubitOperator dataclass for electronic structure problems. It bridges fermionic Hamiltonians
 and quantum circuit construction or measurement workflows.
 
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -31,7 +32,7 @@ from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = []
+__all__: list[str] = ["QubitHamiltonian", "QubitOperator"]
 
 
 def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
@@ -65,11 +66,11 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
     _hash_arg(h, tapering.to_json())
 
 
-class QubitHamiltonian(DataClass):
+class QubitOperator(DataClass):
     """Data class for representing chemical electronic Hamiltonians in qubits.
 
     Attributes:
-        pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
+        pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
@@ -106,10 +107,10 @@ class QubitHamiltonian(DataClass):
         term_partition: TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
-        """Initialize a QubitHamiltonian.
+        """Initialize a QubitOperator.
 
         Args:
-            pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
+            pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
             encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
             fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
@@ -203,31 +204,31 @@ class QubitHamiltonian(DataClass):
             return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
         return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
 
-    def equiv(self, other: QubitHamiltonian, atol: float = 1e-12) -> bool:
-        """Check mathematical equivalence with another QubitHamiltonian.
+    def equiv(self, other: QubitOperator, atol: float = 1e-12) -> bool:
+        """Check mathematical equivalence with another QubitOperator.
 
         Two QubitHamiltonians are equivalent if they contain the same Pauli
         terms with the same coefficients (within tolerance), regardless of
         term ordering.  Duplicate Pauli strings are summed before comparison.
 
         Args:
-            other: The QubitHamiltonian to compare against.
+            other: The QubitOperator to compare against.
             atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
 
         Returns:
             ``True`` if the two QubitHamiltonians are mathematically equivalent.
 
         Examples:
-            >>> qh1 = QubitHamiltonian(["XI", "ZZ"], np.array([0.5, 0.3]))
-            >>> qh2 = QubitHamiltonian(["ZZ", "XI"], np.array([0.3, 0.5]))
+            >>> qh1 = QubitOperator(["XI", "ZZ"], np.array([0.5, 0.3]))
+            >>> qh2 = QubitOperator(["ZZ", "XI"], np.array([0.3, 0.5]))
             >>> qh1.equiv(qh2)
             True
 
         """
-        if not isinstance(other, QubitHamiltonian):
+        if not isinstance(other, QubitOperator):
             return False
 
-        def _sum_terms(qh: QubitHamiltonian) -> dict[str, complex]:
+        def _sum_terms(qh: QubitOperator) -> dict[str, complex]:
             d: dict[str, complex] = {}
             for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
                 d[ps] = d.get(ps, 0) + c
@@ -255,7 +256,7 @@ class QubitHamiltonian(DataClass):
         """
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
-    def __add__(self, other: QubitHamiltonian) -> QubitHamiltonian:
+    def __add__(self, other: QubitOperator) -> QubitOperator:
         """Return the sum of two qubit Hamiltonians.
 
         Pauli strings and coefficients are concatenated.  The ``encoding``,
@@ -269,15 +270,15 @@ class QubitHamiltonian(DataClass):
             other: The qubit Hamiltonian to add.
 
         Returns:
-            A new ``QubitHamiltonian`` with concatenated terms.
+            A new ``QubitOperator`` with concatenated terms.
 
         Raises:
-            TypeError: If *other* is not a ``QubitHamiltonian``.
+            TypeError: If *other* is not a ``QubitOperator``.
             ValueError: If the two Hamiltonians have different qubit counts, encodings, or modes.
 
         """
-        if not isinstance(other, QubitHamiltonian):
-            raise TypeError(f"Cannot add QubitHamiltonian with {type(other).__name__}.")
+        if not isinstance(other, QubitOperator):
+            raise TypeError(f"Cannot add QubitOperator with {type(other).__name__}.")
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add Hamiltonians with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:
@@ -301,7 +302,7 @@ class QubitHamiltonian(DataClass):
         if self.term_partition is not None and other.term_partition is not None:
             partition = _merge_term_partitions(self.term_partition, other.term_partition)
 
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings,
             coefficients,
             encoding=self.encoding,
@@ -310,7 +311,7 @@ class QubitHamiltonian(DataClass):
             tapering=self.tapering,
         )
 
-    def __mul__(self, scalar) -> QubitHamiltonian:
+    def __mul__(self, scalar) -> QubitOperator:
         """Return the Hamiltonian with all coefficients scaled by *scalar*.
 
         The :attr:`term_partition` is preserved since term indices are unchanged.
@@ -319,12 +320,12 @@ class QubitHamiltonian(DataClass):
             scalar: The scalar multiplier.
 
         Returns:
-            A new ``QubitHamiltonian`` with scaled coefficients.
+            A new ``QubitOperator`` with scaled coefficients.
 
         """
         if not isinstance(scalar, int | float | complex | np.number):
             return NotImplemented
-        return QubitHamiltonian(
+        return QubitOperator(
             list(self.pauli_strings),
             self.coefficients * scalar,
             encoding=self.encoding,
@@ -333,7 +334,7 @@ class QubitHamiltonian(DataClass):
             tapering=self.tapering,
         )
 
-    def __rmul__(self, scalar: float) -> QubitHamiltonian:
+    def __rmul__(self, scalar: float) -> QubitOperator:
         """Support ``scalar * hamiltonian``."""
         return self.__mul__(scalar)
 
@@ -366,7 +367,7 @@ class QubitHamiltonian(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def to_interleaved(self, n_spatial: int) -> QubitHamiltonian:
+    def to_interleaved(self, n_spatial: int) -> QubitOperator:
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
@@ -380,7 +381,7 @@ class QubitHamiltonian(DataClass):
                 qubits should be 2 * n_spatial.
 
         Returns:
-            QubitHamiltonian: A new QubitHamiltonian with interleaved ordering.
+            QubitOperator: A new QubitOperator with interleaved ordering.
 
         Raises:
             ValueError: If num_qubits != 2 * n_spatial.
@@ -416,7 +417,7 @@ class QubitHamiltonian(DataClass):
                 new_chars[permutation[old_pos]] = char
             reordered_strings.append("".join(new_chars))
 
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=reordered_strings,
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
@@ -488,14 +489,14 @@ class QubitHamiltonian(DataClass):
             group.attrs["tapering"] = json.dumps(self.tapering.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
-        """Create a QubitHamiltonian from a JSON dictionary.
+    def from_json(cls, json_data: dict[str, Any]) -> QubitOperator:
+        """Create a QubitOperator from a JSON dictionary.
 
         Args:
             json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            QubitHamiltonian: New instance reconstructed from JSON data.
+            QubitOperator: New instance reconstructed from JSON data.
 
         Raises:
             RuntimeError: If version field is missing or incompatible.
@@ -523,14 +524,14 @@ class QubitHamiltonian(DataClass):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> QubitHamiltonian:
-        """Load a QubitHamiltonian from an HDF5 group.
+    def from_hdf5(cls, group: h5py.Group) -> QubitOperator:
+        """Load a QubitOperator from an HDF5 group.
 
         Args:
             group (h5py.Group): HDF5 group or file containing the data.
 
         Returns:
-            QubitHamiltonian: New instance reconstructed from HDF5 data.
+            QubitOperator: New instance reconstructed from HDF5 data.
 
         Raises:
             RuntimeError: If version attribute is missing or incompatible.
@@ -592,3 +593,45 @@ def _validate_pauli_strings(pauli_strings: list[str]) -> None:
         if not valid_pauli_pattern.fullmatch(ps):
             invalid = set(ps) - set("IXYZ")
             raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")
+
+
+class _DeprecatedQubitOperatorAliasMeta(type(QubitOperator)):  # type: ignore[misc]
+    """Metaclass that makes the deprecated alias behave like :class:`QubitOperator` for type checks.
+
+    ``isinstance`` and ``issubclass`` tests against the alias delegate to
+    :class:`QubitOperator`, so existing checks keep working in both directions
+    even though :class:`QubitHamiltonian` is a distinct subclass.
+    """
+
+    def __instancecheck__(cls, instance: object) -> bool:
+        """Report any :class:`QubitOperator` instance as an instance of the alias."""
+        return isinstance(instance, QubitOperator)
+
+    def __subclasscheck__(cls, subclass: type) -> bool:
+        """Report any :class:`QubitOperator` subclass as a subclass of the alias."""
+        return issubclass(subclass, QubitOperator)
+
+
+class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMeta):
+    """Deprecated alias for :class:`QubitOperator`.
+
+    .. deprecated::
+        ``QubitHamiltonian`` was renamed to :class:`QubitOperator`. This subclass
+        is retained for backward compatibility and will be removed in a future
+        release. Constructing it emits a :class:`DeprecationWarning`. Thanks to a
+        custom metaclass, ``isinstance(obj, QubitHamiltonian)`` still matches any
+        :class:`QubitOperator` instance (and vice versa), so existing type checks
+        keep working.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Construct a :class:`QubitOperator`, warning that ``QubitHamiltonian`` is deprecated."""
+        warnings.warn(
+            "'QubitHamiltonian' has been renamed to 'QubitOperator' and is deprecated; it will be "
+            "removed in a future release. Replace 'QubitHamiltonian' with 'QubitOperator' "
+            "(import it from 'qdk_chemistry.data'). The classes are fully compatible: 'isinstance' "
+            "checks against 'QubitHamiltonian' continue to match 'QubitOperator' instances.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)

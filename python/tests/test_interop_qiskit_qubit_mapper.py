@@ -23,7 +23,7 @@ if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
         Hamiltonian,
         MajoranaMapping,
         Orbitals,
-        QubitHamiltonian,
+        QubitOperator,
     )
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
@@ -46,7 +46,7 @@ def test_qiskit_qubit_mappers(encoding) -> None:
     }[encoding]
     mapping = factory(n_modes)
     qubit_hamiltonian = qubit_mapper.run(hamiltonian, mapping)
-    assert isinstance(qubit_hamiltonian, QubitHamiltonian)
+    assert isinstance(qubit_hamiltonian, QubitOperator)
     assert qubit_hamiltonian.num_qubits == 4
     assert isinstance(qubit_hamiltonian.pauli_strings, list)
     assert (

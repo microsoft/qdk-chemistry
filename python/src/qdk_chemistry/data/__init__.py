@@ -25,7 +25,7 @@ Exposed classes are:
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
-- :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
+- :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
@@ -36,7 +36,7 @@ Exposed classes are:
 - :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of time evolution unitary.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
-- :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
+- :class:`QubitOperator`: Molecular electronic Hamiltonians mapped to qubits.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
@@ -115,7 +115,9 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+# ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
+from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -171,6 +173,7 @@ __all__ = [
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
+    "QubitOperator",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",

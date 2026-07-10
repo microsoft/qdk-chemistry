@@ -28,7 +28,7 @@ from qdk_chemistry.utils import Logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 
@@ -49,7 +49,7 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
 
 
 class OpenFermionQubitMapper(QubitMapper):
-    """Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.
+    """Map an electronic structure Hamiltonian to a QubitOperator using OpenFermion.
 
     This is a **third-party** backend: it reads
     ``mapping.base_encoding`` to select the corresponding OpenFermion
@@ -101,7 +101,7 @@ class OpenFermionQubitMapper(QubitMapper):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-    ) -> QubitHamiltonian:
+    ) -> QubitOperator:
         """Build a qubit Hamiltonian via OpenFermion.
 
         Reads ``mapping.base_encoding`` to select an OpenFermion transform
@@ -117,7 +117,7 @@ class OpenFermionQubitMapper(QubitMapper):
             mapping: Encoding selector — only ``base_encoding`` is read.
 
         Returns:
-            QubitHamiltonian: An instance of the QubitHamiltonian.
+            QubitOperator: An instance of the QubitOperator.
 
         Raises:
             NotImplementedError: If ``mapping.base_encoding`` is not a supported OpenFermion encoding.

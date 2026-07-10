@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
-from qdk_chemistry.data import FlatPartition, QubitHamiltonian
+from qdk_chemistry.data import FlatPartition, QubitOperator
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 if TYPE_CHECKING:
@@ -70,7 +70,7 @@ class FullCommutingTermGrouper(TermGrouper):
     """Group terms by full Pauli commutation (``[P_i, P_j] = 0``).
 
     The resulting :class:`~qdk_chemistry.data.FlatPartition` stores a
-    :class:`~qdk_chemistry.data.QubitHamiltonian` partition where every pair of
+    :class:`~qdk_chemistry.data.QubitOperator` partition where every pair of
     terms in the same group commutes globally.  Useful for Trotter-style
     decompositions, which can exponentiate a commuting block as a single
     ordered product without splitting error.
@@ -81,19 +81,19 @@ class FullCommutingTermGrouper(TermGrouper):
         """Return ``commuting`` as the algorithm name."""
         return "commuting"
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
         """Return a copy of ``qubit_hamiltonian`` with a full-commutation partition.
 
         Args:
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"commuting"``).
+            QubitOperator: New instance with a ``FlatPartition`` (strategy ``"commuting"``).
 
         """
         groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
         partition = FlatPartition(strategy="commuting", groups=groups)
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
             coefficients=qubit_hamiltonian.coefficients.copy(),
             encoding=qubit_hamiltonian.encoding,
@@ -117,19 +117,19 @@ class QubitWiseCommutingTermGrouper(TermGrouper):
         """Return ``qubit_wise_commuting`` as the algorithm name."""
         return "qubit_wise_commuting"
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
         """Return a copy of ``qubit_hamiltonian`` with a qubit-wise commutation partition.
 
         Args:
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"qubit_wise_commuting"``).
+            QubitOperator: New instance with a ``FlatPartition`` (strategy ``"qubit_wise_commuting"``).
 
         """
         groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
         partition = FlatPartition(strategy="qubit_wise_commuting", groups=groups)
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
             coefficients=qubit_hamiltonian.coefficients.copy(),
             encoding=qubit_hamiltonian.encoding,

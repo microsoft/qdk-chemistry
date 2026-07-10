@@ -30,7 +30,7 @@ except ImportError as ex:
     ) from ex
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -59,7 +59,7 @@ hamiltonian_op = SparsePauliOp.from_list(
         ("ZZ", 1.0),
     ]
 )
-hamiltonian_1 = QubitHamiltonian(
+hamiltonian_1 = QubitOperator(
     pauli_strings=hamiltonian_op.paulis.to_labels(),
     coefficients=hamiltonian_op.coeffs,
 )
@@ -141,7 +141,7 @@ hamiltonian_op_2 = SparsePauliOp.from_list(
         ("ZZ", 0.0590),
     ]
 )
-hamiltonian_2 = QubitHamiltonian(
+hamiltonian_2 = QubitOperator(
     pauli_strings=hamiltonian_op_2.paulis.to_labels(),
     coefficients=hamiltonian_op_2.coeffs,
 )

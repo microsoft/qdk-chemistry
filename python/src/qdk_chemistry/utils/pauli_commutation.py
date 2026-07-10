@@ -36,7 +36,7 @@ from qdk_chemistry.data import PauliTermAccumulator
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import QubitOperator
 
 __all__: list[str] = [
     "commutator",
@@ -53,7 +53,7 @@ __all__: list[str] = [
 ]
 
 
-def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian:
+def commutator(h_a: QubitOperator, h_b: QubitOperator) -> QubitOperator:
     r"""Compute the commutator :math:`[H_a, H_b] = H_a H_b - H_b H_a`.
 
     Uses :class:`~qdk_chemistry.data.PauliTermAccumulator` to multiply
@@ -64,10 +64,10 @@ def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian
         h_b: Second qubit Hamiltonian.
 
     Returns:
-        The commutator as a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+        The commutator as a :class:`~qdk_chemistry.data.QubitOperator`.
 
     """
-    from qdk_chemistry.data import QubitHamiltonian as _QubitHamiltonian  # noqa: PLC0415
+    from qdk_chemistry.data import QubitOperator as _QubitOperator  # noqa: PLC0415
 
     num_qubits = max(h_a.num_qubits, h_b.num_qubits)
     acc = PauliTermAccumulator()
@@ -84,12 +84,12 @@ def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian
 
     terms = acc.get_terms_as_strings(num_qubits)
     if not terms:
-        return _QubitHamiltonian(["I" * num_qubits], np.array([0.0]))
+        return _QubitOperator(["I" * num_qubits], np.array([0.0]))
 
-    # PauliTermAccumulator returns qubit-0-first ordering; reverse to Qiskit/QubitHamiltonian convention (qubit-0-last).
+    # PauliTermAccumulator returns qubit-0-first ordering; reverse to Qiskit/QubitOperator convention (qubit-0-last).
     labels = [label[::-1] for _, label in terms]
     coeffs = np.array([complex(c) for c, _ in terms])
-    return _QubitHamiltonian(labels, coeffs)
+    return _QubitOperator(labels, coeffs)
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:
@@ -308,7 +308,7 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
 
 
 def commutator_bound_first_order(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     weight_threshold: float = 1e-12,
 ) -> float:
     r"""Compute the first-order Trotter commutator bound.
@@ -354,7 +354,7 @@ def commutator_bound_first_order(
 
 
 def commutator_bound_second_order(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     weight_threshold: float = 1e-12,
 ) -> float:
     r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
@@ -389,7 +389,7 @@ def commutator_bound_second_order(
 
 
 def commutator_bound_higher_order(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     order: int,
     weight_threshold: float = 1e-12,
 ) -> float:

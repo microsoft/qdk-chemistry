@@ -15,7 +15,7 @@ from .containers.driven import DrivenContainer
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+    from qdk_chemistry.data.qubit_operator import QubitOperator
 
 __all__: list[str] = []
 
@@ -39,8 +39,8 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
 
     def __init__(
         self,
-        h0: QubitHamiltonian,
-        h1: QubitHamiltonian,
+        h0: QubitOperator,
+        h1: QubitOperator,
         drive: Callable[[float], float],
     ) -> None:
         """Initialize a driven time-dependent qubit Hamiltonian.
@@ -54,13 +54,13 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
         super().__init__(DrivenContainer(h0, h1, drive))
 
     @property
-    def h0(self) -> QubitHamiltonian:
+    def h0(self) -> QubitOperator:
         """The time-independent Hamiltonian."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
         return container.base_hamiltonian
 
     @property
-    def h1(self) -> QubitHamiltonian:
+    def h1(self) -> QubitOperator:
         """The time-dependent Hamiltonian (modulated by the drive)."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
         return container.drive_hamiltonian

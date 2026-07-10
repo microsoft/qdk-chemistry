@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitIterativeQpeCircuitBuilder", "QiskitStandardQpeCircuitBuilder"]
@@ -74,7 +74,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -94,7 +94,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def build_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> Circuit:
         """Build the standard QPE circuit using Qiskit.
 
@@ -166,7 +166,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         control_qubit: int,
         target_qubits: list,
         *,
@@ -244,7 +244,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits using Qiskit.
 
@@ -293,7 +293,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         iteration: int,
         total_iterations: int,

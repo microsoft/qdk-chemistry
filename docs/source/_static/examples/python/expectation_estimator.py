@@ -13,11 +13,11 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 
 # Create energy estimator using Qsharp simulator as backend
-qdk_estimator = create("energy_estimator", "qdk")
+qdk_estimator = create("expectation_estimator", "qdk")
 # end-cell-create
 ################################################################################
 
@@ -33,11 +33,11 @@ circuit = Circuit(
     cx q[0], q[1];
     """
 )
-qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
+qubit_hamiltonian = QubitOperator(["ZZ"], np.array([1.0]))
 
 # Run energy estimation using Qsharp simulator without noise
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
 )
@@ -61,7 +61,7 @@ noise_model = QuantumErrorProfile(
     },
 )
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef(
         "circuit_executor", "qdk_full_state_simulator", type="cpu"
@@ -84,7 +84,7 @@ print(
 # start-cell-qiskit
 # Run energy estimation using Qiskit Aer simulator without noise
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
 )
@@ -107,7 +107,7 @@ noise_model = QuantumErrorProfile(
     },
 )
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
 )
@@ -128,7 +128,7 @@ print(
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("energy_estimator"))
+print(registry.available("expectation_estimator"))
 # ['qdk']
 print(registry.available("circuit_executor"))
 # ['qdk_full_state_simulator', 'qdk_sparse_state_simulator', 'qiskit_aer_simulator']

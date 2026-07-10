@@ -18,7 +18,7 @@ from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -67,7 +67,7 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:

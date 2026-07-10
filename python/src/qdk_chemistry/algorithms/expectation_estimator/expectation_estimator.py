@@ -14,18 +14,18 @@ from qdk_chemistry.data import (
     EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
 )
 
-__all__: list[str] = ["EnergyEstimator", "EnergyEstimatorFactory"]
+__all__: list[str] = ["ExpectationEstimator", "ExpectationEstimatorFactory"]
 
 
-class EnergyEstimatorSettings(Settings):
-    """Settings for EnergyEstimator algorithms."""
+class ExpectationEstimatorSettings(Settings):
+    """Settings for ExpectationEstimator algorithms."""
 
     def __init__(self):
-        """Initialize the EnergyEstimatorSettings."""
+        """Initialize the ExpectationEstimatorSettings."""
         super().__init__()
         self._set_default(
             "circuit_executor",
@@ -35,23 +35,23 @@ class EnergyEstimatorSettings(Settings):
         )
 
 
-class EnergyEstimator(Algorithm):
+class ExpectationEstimator(Algorithm):
     """Abstract base class for energy estimator algorithms."""
 
     def __init__(self):
-        """Initialize the EnergyEstimator."""
+        """Initialize the ExpectationEstimator."""
         super().__init__()
-        self._settings = EnergyEstimatorSettings()
+        self._settings = ExpectationEstimatorSettings()
 
     def type_name(self) -> str:
-        """Return ``energy_estimator`` as the algorithm type name."""
-        return "energy_estimator"
+        """Return ``expectation_estimator`` as the algorithm type name."""
+        return "expectation_estimator"
 
     @abstractmethod
     def _run_impl(
         self,
         circuit: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
@@ -59,7 +59,7 @@ class EnergyEstimator(Algorithm):
 
         Args:
             circuit: Circuit.
-            qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
+            qubit_hamiltonian: ``QubitOperator`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
 
@@ -72,12 +72,12 @@ class EnergyEstimator(Algorithm):
         """
 
 
-class EnergyEstimatorFactory(AlgorithmFactory):
-    """Factory class for creating EnergyEstimator instances."""
+class ExpectationEstimatorFactory(AlgorithmFactory):
+    """Factory class for creating ExpectationEstimator instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return ``energy_estimator`` as the algorithm type name."""
-        return "energy_estimator"
+        """Return ``expectation_estimator`` as the algorithm type name."""
+        return "expectation_estimator"
 
     def default_algorithm_name(self) -> str:
         """Return ``qdk`` as the default algorithm name."""

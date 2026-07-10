@@ -9,6 +9,6 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .energy_estimator import EnergyEstimatorFactory
+from .expectation_estimator import ExpectationEstimatorFactory
 
-__all__ = ["EnergyEstimatorFactory"]
+__all__ = ["ExpectationEstimatorFactory"]
