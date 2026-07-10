@@ -364,6 +364,17 @@ class TestDuccIntegration:
             nva=2,
         )
 
+    def test_lih_631g_1o1v(self):
+        """LiH / 6-31G, Pople SP-shell basis, tests inter-shell AO reordering."""
+        _run_ducc_comparison(
+            ["Li 0 0 0", "H 0 0 1.6"],
+            [[0, 0, 0], [0, 0, 1.6]],
+            [Element.Li, Element.H],
+            "6-31g",
+            noa=1,
+            nva=1,
+        )
+
     def test_h2o_ccpvdz_3o3v(self):
         """H2O / cc-pVDZ, larger active space (924 determinants)."""
         _run_ducc_comparison(_H2O_ATOMS, _H2O_COORDS, _H2O_ELEMS, "cc-pvdz", noa=3, nva=3)

@@ -205,9 +205,11 @@ class ExachemDuccSolver(Algorithm):
 
         atom_coords = []
         atom_elements = []
+        element_symbols = []
         for line in atoms:
             parts = line.split()
             atom_elements.append(getattr(Element, parts[0]))
+            element_symbols.append(parts[0])
             atom_coords.append([float(x) for x in parts[1:4]])
         coords_np = np.array(atom_coords)
         if s.get("units").lower() == "angstrom":
@@ -226,6 +228,9 @@ class ExachemDuccSolver(Algorithm):
             ao_tilesize=30,
             runcontext_prefix=runcontext_prefix,
             basis_set=basis_set,
+            basis_name=s.get("basis"),
+            elements=element_symbols,
+            exachem_binary=binary,
         )
         logger.info("Exported SCF data for noscf mode to %s", scf_dir)
 
