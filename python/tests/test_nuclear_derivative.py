@@ -87,3 +87,30 @@ def test_nuclear_derivative_data_roundtrip_json_file(tmp_path):
     hessian.to_json_file(hessian_path)
     loaded_hessian = data.NuclearHessian.from_json_file(hessian_path)
     np.testing.assert_allclose(loaded_hessian.get_matrix(), matrix)
+
+
+def test_nuclear_derivative_data_roundtrip_hdf5_file(tmp_path):
+    """Round-trip nuclear derivative data through HDF5 files."""
+    structure = _h2_structure()
+
+    values = np.arange(6, dtype=float)
+    gradients = data.NuclearGradients(structure, values)
+    gradients_path = tmp_path / "gradients.nuclear_gradients.h5"
+    gradients.to_hdf5_file(gradients_path)
+    loaded_gradients = data.NuclearGradients.from_hdf5_file(gradients_path)
+    np.testing.assert_allclose(loaded_gradients.get_values(), values)
+    np.testing.assert_allclose(
+        loaded_gradients.get_structure().get_coordinates(),
+        structure.get_coordinates(),
+    )
+
+    matrix = np.arange(36, dtype=float).reshape(6, 6)
+    hessian = data.NuclearHessian(structure, matrix)
+    hessian_path = tmp_path / "hessian.nuclear_hessian.h5"
+    hessian.to_hdf5_file(hessian_path)
+    loaded_hessian = data.NuclearHessian.from_hdf5_file(hessian_path)
+    np.testing.assert_allclose(loaded_hessian.get_matrix(), matrix)
+    np.testing.assert_allclose(
+        loaded_hessian.get_structure().get_coordinates(),
+        structure.get_coordinates(),
+    )
