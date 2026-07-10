@@ -80,11 +80,13 @@ function(add_gtest_executable test_source)
         endif()
     endif()
 
-    # Discover tests automatically. The default 5s timeout for test
-    # discovery is unreliable on Windows when many test exes link and
-    # discover in parallel — disk/IO contention causes spurious timeouts.
-    # Bump to 60s.
-    gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 60)
+    # Discover tests automatically. Build-time discovery is fragile on CI when
+    # many freshly linked coverage-instrumented test executables discover in
+    # parallel. Defer discovery to CTest while preserving parameterized tests.
+    gtest_discover_tests(${test_name}
+        DISCOVERY_MODE PRE_TEST
+        DISCOVERY_TIMEOUT 60
+    )
 
     # Set properties for better organization
     set_target_properties(${test_name} PROPERTIES
