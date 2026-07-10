@@ -23,7 +23,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .expectation_estimator import ExpectationEstimator
 
-__all__: list[str] = ["QdkEnergyEstimator"]
+__all__: list[str] = ["QdkExpectationEstimator"]
 
 
 def _parity(integer: int) -> int:
@@ -184,11 +184,11 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     return Circuit(qasm=qasm3.dumps(qc))
 
 
-class QdkEnergyEstimator(ExpectationEstimator):
+class QdkExpectationEstimator(ExpectationEstimator):
     """QDK implementation of the ExpectationEstimator."""
 
     def __init__(self):
-        """Initialize the QdkEnergyEstimator."""
+        """Initialize the QdkExpectationEstimator."""
         super().__init__()
 
     def type_name(self) -> str:

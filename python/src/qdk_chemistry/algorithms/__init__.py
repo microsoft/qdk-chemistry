@@ -25,7 +25,7 @@ from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
-from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -83,7 +83,7 @@ __all__ = [
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
-    "QdkEnergyEstimator",
+    "QdkExpectationEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",
@@ -132,6 +132,7 @@ _REGISTRY_EXPORTS = frozenset(
 # DeprecationWarning but returns the new class object, so existing code keeps working.
 _DEPRECATED_ALIASES = {
     "EnergyEstimator": "ExpectationEstimator",
+    "QdkEnergyEstimator": "QdkExpectationEstimator",
 }
 
 _registry_module: ModuleType | None = None

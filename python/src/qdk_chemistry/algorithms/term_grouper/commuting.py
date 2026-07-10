@@ -108,7 +108,7 @@ class QubitWiseCommutingTermGrouper(TermGrouper):
     Two labels qubit-wise commute when, on every qubit position, the two
     single-qubit Paulis individually commute (i.e. one is identity or both are
     equal).  All members of a group can be measured in a single basis, which
-    is the property exploited by :class:`~qdk_chemistry.algorithms.QdkEnergyEstimator`
+    is the property exploited by :class:`~qdk_chemistry.algorithms.QdkExpectationEstimator`
     for measurement-cost reduction.
 
     """

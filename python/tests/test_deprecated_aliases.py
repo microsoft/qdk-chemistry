@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator
+from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
 
 
@@ -82,6 +82,12 @@ class TestEnergyEstimatorDeprecation:
         with pytest.warns(DeprecationWarning, match="EnergyEstimator"):
             alias = algorithms.EnergyEstimator
         assert alias is ExpectationEstimator
+
+    def test_qdk_energy_estimator_alias_resolves_to_qdk_expectation_estimator(self):
+        """``algorithms.QdkEnergyEstimator`` is the same object as ``QdkExpectationEstimator``."""
+        with pytest.warns(DeprecationWarning, match="QdkEnergyEstimator"):
+            alias = algorithms.QdkEnergyEstimator
+        assert alias is QdkExpectationEstimator
 
     def test_energy_estimator_alias_import_warns(self):
         """Importing the old algorithm name emits a ``DeprecationWarning``."""

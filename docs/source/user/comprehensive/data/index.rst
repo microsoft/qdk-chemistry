@@ -92,7 +92,7 @@ FlatPartition
 ~~~~~~~~~~~~~
 
 :class:`~qdk_chemistry.data.FlatPartition` stores a single-level grouping: each group is a tuple of term indices.
-It is suitable for algorithms that only need to know which terms belong together, such as qubit-wise commuting measurement grouping in :class:`~qdk_chemistry.algorithms.QdkEnergyEstimator`.
+It is suitable for algorithms that only need to know which terms belong together, such as qubit-wise commuting measurement grouping in :class:`~qdk_chemistry.algorithms.QdkExpectationEstimator`.
 
 The ``groups`` field is a tuple of tuples: ``((idx0, idx1, ...), (idx2, ...), ...)``.
 Each inner tuple lists the indices of terms in :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` that belong to that group.
