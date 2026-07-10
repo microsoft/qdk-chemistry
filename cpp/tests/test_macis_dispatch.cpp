@@ -18,7 +18,7 @@
 
 #include "../src/qdk/chemistry/algorithms/microsoft/macis_base.hpp"
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 /// Returns `N` so we can observe which bitset tier dispatch_by_norb chose
 /// without instantiating any real MACIS solver.
@@ -29,18 +29,21 @@ struct DispatchProbe {
   }
 };
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
 
 TEST(MacisDispatchTest, ThresholdTableSupportsUpTo2048Orbitals) {
   using qdk::chemistry::algorithms::microsoft::dispatch_by_norb;
 
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(31), 64u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(32), 128u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(127), 256u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(255), 512u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(511), 1024u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(1023), 2048u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(1024), 4096u);
-  EXPECT_EQ(dispatch_by_norb<DispatchProbe>(2048), 4096u);
-  EXPECT_THROW(dispatch_by_norb<DispatchProbe>(2049), std::runtime_error);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(31), 64u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(32), 128u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(127), 256u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(255), 512u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(511), 1024u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(1023), 2048u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(1024), 4096u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(2048), 4096u);
+  EXPECT_THROW(dispatch_by_norb<test_support::DispatchProbe>(2049),
+               std::runtime_error);
 }

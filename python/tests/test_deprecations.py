@@ -11,6 +11,10 @@ These tests assert that:
   helpers still resolve (with a ``DeprecationWarning``).
 - A name whose v2 replacement is unavailable (``ControlledTimeEvolutionUnitary``)
   raises ``AttributeError`` rather than crashing the shim.
+- The deprecated v1 :class:`~qdk_chemistry.data.Orbitals` /
+  :class:`~qdk_chemistry.data.ModelOrbitals` constructor facades (index tuples
+  and the ``restricted`` flag) emit a ``DeprecationWarning`` and forward to the
+  v2 (symmetry-blocked) construction path.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -26,6 +30,7 @@ from qdk_chemistry.data import (
     AmplitudeContainer,
     AmplitudeType,
     Configuration,
+    ModelOrbitals,
     Orbitals,
     StateVectorContainer,
     UnitaryContainer,
@@ -177,3 +182,95 @@ def test_amplitude_container_aliases_construct():
         container = cls(orbitals, reference, amplitude_type, t1, t2)
         assert isinstance(container, AmplitudeContainer)
         assert container.get_amplitude_type() == amplitude_type
+
+
+# --------------------------------------------------------------------------------------------
+# Deprecated v1 constructor facades (index tuples / restricted flag).
+# --------------------------------------------------------------------------------------------
+
+
+def test_orbitals_restricted_index_tuple_ctor_warns_and_constructs():
+    """The v1 restricted ``Orbitals(..., (active, inactive))`` ctor warns and matches the v2 path."""
+    coeffs = np.eye(4)
+    energies = np.array([-1.0, -0.5, 0.5, 1.0])
+    basis_set = create_test_basis_set(4, "dep-orb-restricted")
+    active, inactive = [1, 2], [0, 3]
+    with pytest.warns(DeprecationWarning, match="coefficients, energies, ao_overlap"):
+        orb = Orbitals(coeffs, energies, None, basis_set, (active, inactive))
+    assert orb.is_restricted()
+    assert orb.num_active_orbitals() == len(active)
+    assert orb.num_inactive_orbitals() == len(inactive)
+    assert spin_channel_indices(orb.active_indices(), beta=False) == active
+    assert spin_channel_indices(orb.active_indices(), beta=True) == active
+    assert spin_channel_indices(orb.inactive_indices(), beta=False) == inactive
+    v2 = Orbitals(coeffs, energies, None, basis_set, spin_index_set(4, active, active))
+    assert orb.num_active_orbitals() == v2.num_active_orbitals()
+
+
+def test_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
+    """The v1 unrestricted ``Orbitals(..., (aa, ab, ia, ib))`` ctor warns and constructs unrestricted."""
+    coeffs_a, coeffs_b = np.eye(4), np.eye(4) * 2.0
+    energies = np.array([-1.0, -0.5, 0.5, 1.0])
+    basis_set = create_test_basis_set(4, "dep-orb-unrestricted")
+    active_a, active_b, inactive_a, inactive_b = [1], [2], [0, 3], [0, 3]
+    with pytest.warns(DeprecationWarning, match="coefficients_alpha, coefficients_beta"):
+        orb = Orbitals(
+            coeffs_a, coeffs_b, energies, energies, None, basis_set, (active_a, active_b, inactive_a, inactive_b)
+        )
+    assert orb.is_unrestricted()
+    assert spin_channel_indices(orb.active_indices(), beta=False) == active_a
+    assert spin_channel_indices(orb.active_indices(), beta=True) == active_b
+    assert spin_channel_indices(orb.inactive_indices(), beta=False) == inactive_a
+    assert spin_channel_indices(orb.inactive_indices(), beta=True) == inactive_b
+
+
+def test_orbitals_restricted_index_tuple_ctor_none_warns_and_constructs_full():
+    """The v1 restricted ctor with explicit ``indices=None`` still warns and yields the full space."""
+    basis_set = create_test_basis_set(4, "dep-orb-restricted-none")
+    with pytest.warns(DeprecationWarning, match="coefficients, energies, ao_overlap"):
+        orb = Orbitals(np.eye(4), None, None, basis_set, indices=None)
+    assert orb.is_restricted()
+    assert orb.num_active_orbitals() == 4
+
+
+def test_orbitals_unrestricted_index_tuple_ctor_none_warns_and_constructs_full():
+    """The v1 unrestricted ctor with explicit ``indices=None`` still warns and yields the unrestricted full space."""
+    basis_set = create_test_basis_set(4, "dep-orb-unrestricted-none")
+    with pytest.warns(DeprecationWarning, match="coefficients_alpha, coefficients_beta"):
+        orb = Orbitals(np.eye(4), np.eye(4) * 2.0, None, None, None, basis_set, indices=None)
+    assert orb.is_unrestricted()
+    assert orb.num_active_orbitals() == 4
+
+
+@pytest.mark.parametrize("restricted", [True, False])
+def test_model_orbitals_restricted_flag_ctor_warns_and_constructs(restricted):
+    """The v1 ``ModelOrbitals(size, restricted)`` flag ctor warns and maps to the spin symmetry."""
+    with pytest.warns(DeprecationWarning, match="basis_size, restricted"):
+        model = ModelOrbitals(6, restricted)
+    assert model.get_num_molecular_orbitals() == 6
+    assert model.is_restricted() == restricted
+    assert model.is_unrestricted() != restricted
+
+
+def test_model_orbitals_restricted_index_tuple_ctor_warns_and_constructs():
+    """The v1 restricted ``ModelOrbitals(size, (active, inactive))`` ctor warns and constructs."""
+    active, inactive = [2, 3], [0, 1, 4, 5]
+    with pytest.warns(DeprecationWarning, match="use the SymmetryBlockedIndexSet constructor"):
+        model = ModelOrbitals(6, (active, inactive))
+    assert model.is_restricted()
+    assert model.num_active_orbitals() == len(active)
+    assert model.num_inactive_orbitals() == len(inactive)
+    assert spin_channel_indices(model.active_indices(), beta=False) == active
+    assert spin_channel_indices(model.active_indices(), beta=True) == active
+
+
+def test_model_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
+    """The v1 unrestricted ``ModelOrbitals(size, (aa, ab, ia, ib))`` ctor warns and constructs unrestricted."""
+    active_a, active_b, inactive_a, inactive_b = [1, 2], [2, 3], [0, 3, 4], [0, 1, 4]
+    with pytest.warns(DeprecationWarning, match="active_alpha, active_beta"):
+        model = ModelOrbitals(5, (active_a, active_b, inactive_a, inactive_b))
+    assert model.is_unrestricted()
+    assert spin_channel_indices(model.active_indices(), beta=False) == active_a
+    assert spin_channel_indices(model.active_indices(), beta=True) == active_b
+    assert spin_channel_indices(model.inactive_indices(), beta=False) == inactive_a
+    assert spin_channel_indices(model.inactive_indices(), beta=True) == inactive_b

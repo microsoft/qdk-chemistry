@@ -17,11 +17,11 @@
 
 namespace qdk::chemistry::data {
 
-namespace {
+namespace detail {
 constexpr const char* kNoOccupationMessage =
     "Orbital occupations require reduced density matrices, which are not "
     "available for amplitude wavefunctions.";
-}  // namespace
+}  // namespace detail
 
 std::string amplitude_type_to_string(AmplitudeType type) {
   switch (type) {
@@ -362,13 +362,13 @@ AmplitudeContainer::active_num_particles() const {
 std::shared_ptr<const SymmetryBlockedTensor<1>>
 AmplitudeContainer::total_orbital_occupations() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNoOccupationMessage);
+  throw std::runtime_error(detail::kNoOccupationMessage);
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
 AmplitudeContainer::active_orbital_occupations() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNoOccupationMessage);
+  throw std::runtime_error(detail::kNoOccupationMessage);
 }
 
 std::string AmplitudeContainer::get_container_type() const {

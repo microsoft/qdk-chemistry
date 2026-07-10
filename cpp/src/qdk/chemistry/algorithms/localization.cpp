@@ -160,11 +160,17 @@ std::unique_ptr<Localizer> make_pipek_mezey_localizer() {
   return std::make_unique<microsoft::PipekMezeyLocalizer>();
 }
 
+// MP2NaturalOrbitalLocalizer is deprecated (superseded by NaturalOrbitalLocalizer),
+// but this factory intentionally still provides it through the localizer registry.
+// Suppress the self-referential deprecation warning at this facade site only.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 std::unique_ptr<Localizer> make_mp2_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::MP2NaturalOrbitalLocalizer>();
 }
+#pragma GCC diagnostic pop
 
 std::unique_ptr<Localizer> make_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();

@@ -1025,26 +1025,29 @@ std::string Orbitals::get_summary() const {
   summary +=
       "  Has active space: " + std::string(has_active_space() ? "Yes" : "No") +
       "\n";
-// The v1 (alpha, beta) index accessors are used here only to render a
-// human-readable summary; the data itself is stored via the v2 index sets.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   if (has_active_space()) {
-    auto [act_orbitals_alpha, act_orbitals_beta] = get_active_space_indices();
-    summary +=
-        "  Active Orbitals: α=" + std::to_string(act_orbitals_alpha.size()) +
-        ", β=" + std::to_string(act_orbitals_beta.size()) + "\n";
+    summary += "  Active Orbitals: α=" +
+               std::to_string(spin_channel_indices(active_indices(),
+                                                   /*beta=*/false)
+                                  .size()) +
+               ", β=" +
+               std::to_string(
+                   spin_channel_indices(active_indices(), /*beta=*/true).size()) +
+               "\n";
   }
   summary += "  Has inactive space: " +
              std::string(has_inactive_space() ? "Yes" : "No") + "\n";
   if (has_inactive_space()) {
-    auto [inact_orbitals_alpha, inact_orbitals_beta] =
-        get_inactive_space_indices();
     summary += "  Inactive Orbitals: α=" +
-               std::to_string(inact_orbitals_alpha.size()) +
-               ", β=" + std::to_string(inact_orbitals_beta.size()) + "\n";
+               std::to_string(spin_channel_indices(inactive_indices(),
+                                                   /*beta=*/false)
+                                  .size()) +
+               ", β=" +
+               std::to_string(spin_channel_indices(inactive_indices(),
+                                                   /*beta=*/true)
+                                  .size()) +
+               "\n";
   }
-#pragma GCC diagnostic pop
   auto [virt_orbitals_alpha, virt_orbitals_beta] = get_virtual_space_indices();
   summary +=
       "  Virtual Orbitals: α=" + std::to_string(virt_orbitals_alpha.size()) +
@@ -1925,7 +1928,10 @@ void Orbitals::_build_space_index_sets() {
     return std::make_shared<const SymmetryBlockedIndexSet>(
         symmetries(), mo_extents(), std::move(indices));
   };
-  _active_indices = build(_active_space_indices, has_active_space());
+  // An Orbitals always has a defined active space (the full space, a subset, or
+  // an explicitly empty 0-orbital space), so always materialize a non-null
+  // active index set; only the inactive space may be genuinely absent (null).
+  _active_indices = build(_active_space_indices, /*has_space=*/true);
   _inactive_indices = build(_inactive_space_indices, has_inactive_space());
 }
 

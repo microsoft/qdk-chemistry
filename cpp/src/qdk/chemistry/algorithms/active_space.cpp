@@ -359,32 +359,8 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
   } else {
     // Multi-determinant wavefunction - create aufbau occupations in old space,
     // then truncate
-    std::string aufbau_string(old_active_indices_a.size(), '0');
-
-    size_t nalpha_filled = 0;
-    size_t nbeta_filled = 0;
-
-    for (size_t i = 0; i < old_active_indices_a.size(); ++i) {
-      if (nalpha_filled < expected_nelec_a && nbeta_filled < expected_nelec_b) {
-        // Doubly occupy
-        aufbau_string[i] = '2';
-        nalpha_filled++;
-        nbeta_filled++;
-      } else if (nalpha_filled < expected_nelec_a) {
-        // Alpha only
-        aufbau_string[i] = 'u';
-        nalpha_filled++;
-      } else if (nbeta_filled < expected_nelec_b) {
-        // Beta only
-        aufbau_string[i] = 'd';
-        nbeta_filled++;
-      } else {
-        // Unoccupied
-        aufbau_string[i] = '0';
-      }
-    }
-
-    auto aufbau_det = data::Configuration::from_spin_half_string(aufbau_string);
+    auto aufbau_det = data::Configuration::canonical_hf_configuration(
+        expected_nelec_a, expected_nelec_b, old_active_indices_a.size());
     // Now truncate the aufbau determinant to the new active space
     truncated_det = _extract_active_orbitals(aufbau_det, old_active_indices_a,
                                              new_active_indices_a);

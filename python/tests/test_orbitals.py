@@ -21,6 +21,7 @@ from qdk_chemistry.data.symmetry import (
     SymmetryLabel,
     SymmetryProduct,
     axes,
+    spin_channel_indices,
     spin_channel_matrix,
     spin_channel_vector,
     spin_index_set,
@@ -1088,6 +1089,22 @@ def test_full_active_space_round_trip_unaffected():
         assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 4
     finally:
         Path(hdf5_filename).unlink(missing_ok=True)
+
+
+def test_explicit_empty_active_space_index_set_non_null():
+    """active_indices() stays a non-null empty set for an explicit-empty active space.
+
+    Regression: constructing with a null inactive space, copying, or reloading
+    previously rebuilt active_indices() to None even though num_active_orbitals()
+    was 0, so forwarding it into another Orbitals read as a full active space.
+    """
+    basis_set = create_test_basis_set(4, "empty-active-index-set")
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, basis_set, spin_index_set(4, [], []), None)
+    for candidate in (orb, Orbitals(orb), Orbitals.from_json(orb.to_json())):
+        active = candidate.active_indices()
+        assert active is not None
+        assert spin_channel_indices(active, beta=False) == []
+        assert candidate.num_active_orbitals() == 0
 
 
 def test_model_orbitals_explicit_empty_active_space_round_trips():

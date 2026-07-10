@@ -20,7 +20,7 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 // Spin (S_z) symmetry; equivalent=true is restricted, false is unrestricted.
 std::shared_ptr<const SymmetryProduct> spin_sym(bool equivalent) {
@@ -56,7 +56,12 @@ std::shared_ptr<const SymmetryBlockedIndexSet> spin_iset(
       spin_sym(equivalent), ext, std::move(indices));
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
+using test_support::spin_iset;
+using test_support::spin_sym;
+using test_support::trivial_iset;
 
 class ModelOrbitalsTest : public ::testing::Test {
  protected:
