@@ -1,0 +1,53 @@
+parameters:
+- name: march
+  type: string
+  default: x86-64-v3
+- name: buildType
+  type: string
+  default: Release
+
+steps:
+- checkout: self
+  persistCredentials: true
+  path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
+
+# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# cl.exe and the MSVC linker are available to all subsequent steps.
+# Also resolves the MSVC toolset version for the dependency cache key.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
+  displayName: Set up MSVC environment
+
+- task: Cache@2
+  displayName: Restore/save vcpkg dependency cache
+  inputs:
+    key: >-
+      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      vcpkg.json |
+      vcpkg-configuration.json |
+      vcpkg-overlay/**/* |
+      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+    path: $(System.DefaultWorkingDirectory)/vcpkg_installed
+    cacheHitVar: VCPKG_CACHE_RESTORED
+
+- task: Cache@2
+  displayName: Restore/save C++ deps install cache
+  inputs:
+    key: >-
+      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      cpp/cmake/patches/**/* |
+      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
+      .pipelines/toolchains/windows.cmake
+    path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+    cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
+
+- pwsh: |
+    & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+        -SrcDir    "$(System.DefaultWorkingDirectory)" `
+        -BuildType "${{ parameters.buildType }}" `
+        -ClPath    "$(CL_PATH)"
+  displayName: Build and install C++ dependencies
+  condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))

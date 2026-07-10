@@ -214,11 +214,11 @@ WavefunctionContainer::WavefunctionContainer(
     std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
     std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
     const OrbitalEntropies& entropies, WavefunctionType type)
-    : _one_rdm_spin_traced(std::move(one_rdm_spin_traced)),
+    : _type(type),
+      _one_rdm_spin_traced(std::move(one_rdm_spin_traced)),
       _two_rdm_spin_traced(std::move(two_rdm_spin_traced)),
       _active_one_rdm(std::move(active_one_rdm)),
       _active_two_rdm(std::move(active_two_rdm)),
-      _type(type),
       _entropies(entropies) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -879,7 +879,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -899,7 +899,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // implemented (bypassing the version gate above), existing cas/sci files
     // will load through this path without additional changes.
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
@@ -907,7 +907,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       throw std::runtime_error(
           "Unrecognized container_type '" + container_type +
           "' in WavefunctionContainer::from_json. Expected 'state_vector', "
-          "'cas', or 'sci'.");
+          "'cas', 'sci', or 'sd'.");
     }
   } catch (const std::exception& e) {
     throw std::runtime_error("JSON error: " + std::string(e.what()));
@@ -1909,7 +1909,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -1920,14 +1920,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     }
 
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
-          "state_vector/cas/sci. Expected delegation to container-specific "
+          "state_vector/cas/sci/sd. Expected delegation to container-specific "
           "methods.");
     }
   } catch (const H5::Exception& e) {

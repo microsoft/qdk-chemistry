@@ -18,11 +18,13 @@ Breaking changes
 
 - The on-disk serialization format for :class:`~qdk_chemistry.data.Orbitals`,
   :class:`~qdk_chemistry.data.ModelOrbitals`, :class:`~qdk_chemistry.data.Hamiltonian` containers, and
-  :class:`~qdk_chemistry.data.Wavefunction` containers was bumped from ``0.1.0`` to ``0.2.0`` to
-  reflect the switch to ``SymmetryBlockedTensor``-backed storage. Files
-  written by earlier versions are **not** loaded by this release; re-generate
-  them with the current version. Backward-compatible loading of ``0.1.0`` files
-  is planned for a future release.
+  the :class:`~qdk_chemistry.data.StateVectorContainer` wavefunction container was bumped from
+  ``0.1.0`` to ``0.2.0`` to reflect the switch to ``SymmetryBlockedTensor``-backed storage
+  (:class:`~qdk_chemistry.data.AmplitudeContainer` is unchanged at ``0.1.0``). Direct loading
+  rejects files written by earlier versions; upgrade them in place with the shipped converter
+  (``python -m qdk_chemistry.migrate old.h5 new.h5``; see :doc:`user/migrating-data-files`) or
+  re-generate them. Backward-compatible direct loading of ``0.1.0`` files is planned for a future
+  release.
 
 - Wavefunction containers were consolidated. The single-determinant,
   complete-active-space, and selected-configuration-interaction containers are
@@ -56,8 +58,8 @@ Breaking changes
 
 - The ``TimeEvolutionUnitary`` family was renamed to the ``Unitary`` family
   (:class:`~qdk_chemistry.data.UnitaryRepresentation`,
-  :class:`~qdk_chemistry.data.UnitaryContainer`, ``ControlledUnitary``); the old
-  names remain importable as deprecated aliases.
+  :class:`~qdk_chemistry.data.UnitaryContainer`); the old names remain importable
+  as deprecated aliases.
 
 - C++ only: the FCIDUMP writer (``Hamiltonian::to_fcidump_file``), the Cholesky
   container's base class and dense constructor, and the

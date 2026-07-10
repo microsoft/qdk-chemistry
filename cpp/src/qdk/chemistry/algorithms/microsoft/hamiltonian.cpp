@@ -98,18 +98,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Get alpha and beta active space indices
   const auto active_ai = orbitals->active_indices();
-  const auto channel_to_vec =
-      [](const std::shared_ptr<const data::SymmetryBlockedIndexSet>& set,
-         const data::SymmetryLabel& label) {
-        std::vector<size_t> v;
-        if (set && set->has(label)) {
-          const auto s = set->indices(label);
-          v.assign(s.begin(), s.end());
-        }
-        return v;
-      };
-  auto active_indices_alpha = channel_to_vec(active_ai, data::axes::alpha());
-  auto active_indices_beta = channel_to_vec(active_ai, data::axes::beta());
+  auto active_indices_alpha =
+      data::spin_channel_indices(active_ai, /*beta=*/false);
+  auto active_indices_beta =
+      data::spin_channel_indices(active_ai, /*beta=*/true);
 
   if (orbitals->is_restricted() && active_indices_alpha.empty()) {
     throw std::runtime_error("Need to specify an active space.");
@@ -295,8 +287,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Get inactive space indices for both alpha and beta
   const auto inactive_ai = orbitals->inactive_indices();
-  auto inactive_indices_alpha = channel_to_vec(inactive_ai, data::axes::alpha());
-  auto inactive_indices_beta = channel_to_vec(inactive_ai, data::axes::beta());
+  auto inactive_indices_alpha =
+      data::spin_channel_indices(inactive_ai, /*beta=*/false);
+  auto inactive_indices_beta =
+      data::spin_channel_indices(inactive_ai, /*beta=*/true);
 
   // For restricted calculations, alpha and beta inactive spaces should be
   // identical

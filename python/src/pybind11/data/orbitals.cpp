@@ -234,7 +234,9 @@ Examples:
       py::init<std::shared_ptr<const SymmetryBlockedTensor<2>>,
                std::shared_ptr<const SymmetryBlockedTensor<1>>,
                const std::optional<Eigen::MatrixXd> &,
-               std::shared_ptr<qdk::chemistry::data::BasisSet>>(),
+               std::shared_ptr<qdk::chemistry::data::BasisSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
       R"(
 Construct from symmetry-blocked tensors.
 
@@ -246,10 +248,16 @@ Args:
     energies (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1 | None): Rank-1 energy tensor, can be None
     ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
     basis_set (BasisSet | None): The basis set, can be None
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be None
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be None
 )",
       py::arg("coefficients"), py::arg("energies"),
       py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
-      py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{});
+      py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{},
+      py::arg("active_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>(),
+      py::arg("inactive_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // SBT-native accessors
   orbitals.def("coefficients", &Orbitals::coefficients,

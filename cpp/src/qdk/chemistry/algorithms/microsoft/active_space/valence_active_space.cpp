@@ -79,7 +79,7 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   }
 
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();
-  if (num_active_electrons > (nalpha + nbeta)) {
+  if (static_cast<size_t>(num_active_electrons) > (nalpha + nbeta)) {
     throw std::runtime_error(
         "Number of active electrons exceeds total number of electrons.");
   }

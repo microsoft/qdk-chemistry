@@ -52,13 +52,6 @@ Basis set or initial guess
 
 .. rubric:: Creating a :term:`SCF` solver
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/scf_solver.py
@@ -66,17 +59,17 @@ Basis set or initial guess
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-.. rubric:: Configuring settings
-
-Settings can be modified using the ``settings()`` object.
-See `Available settings`_ below for a complete list of options.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+.. rubric:: Configuring settings
+
+Settings can be modified using the ``settings()`` object.
+See `Available settings`_ below for a complete list of options.
 
 .. tab:: Python API
 
@@ -85,14 +78,14 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-.. rubric:: Running the calculation
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-run
-      :end-before: // end-cell-run
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -101,16 +94,16 @@ See `Available settings`_ below for a complete list of options.
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-.. rubric:: Alternative run options
-
-The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-alternative-run
-      :end-before: // end-cell-alternative-run
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
+
+.. rubric:: Alternative run options
+
+The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
 
 .. tab:: Python API
 
@@ -118,6 +111,13 @@ The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an 
       :language: python
       :start-after: # start-cell-alternative-run
       :end-before: # end-cell-alternative-run
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-alternative-run
+      :end-before: // end-cell-alternative-run
 
 
 Available settings
@@ -155,19 +155,19 @@ Available implementations
 QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ScfSolver` provides a unified interface to :term:`SCF` calculations across various quantum chemistry packages.
 You can discover available implementations programmatically:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 .. _qdk-scf-native:
 
@@ -284,6 +284,31 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - ``1073741824``
      - Number of steps between Fock matrix resets
 
+.. _qdk-stabilized-scf-native:
+
+QDK Stabilized
+~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_stabilized"``
+
+The stabilized QDK/Chemistry implementation automates the common stability-analysis workflow around the native :term:`SCF` solver.
+It runs an initial :term:`SCF` calculation, checks wavefunction stability, rotates orbitals along any detected instability direction, and reruns :term:`SCF` using the rotated orbitals as the initial guess.
+For restricted singlet wavefunctions with an external instability, it can switch subsequent reruns to unrestricted :term:`SCF`.
+
+.. code-block:: python
+
+  from qdk_chemistry.algorithms import create
+
+  scf_solver = create("scf_solver", "qdk_stabilized")
+  scf_solver.settings().set("max_stability_iterations", 5)
+  scf_solver.settings().set("check_external", True)
+
+  energy, wavefunction = scf_solver.run(structure, 0, 1, "def2-svp")
+
+The stabilized solver accepts the standard :class:`~qdk_chemistry.algorithms.ScfSolver` inputs and returns the same energy and wavefunction pair as a regular :term:`SCF` calculation.
+Its settings include nested ``scf_solver`` and ``stability_checker`` references for choosing or configuring the underlying implementations.
+Set ``max_stability_iterations`` to ``0`` to run only the initial nested :term:`SCF` calculation.
+
 PySCF
 ~~~~~
 
@@ -327,6 +352,33 @@ The PySCF plugin provides access to the comprehensive `PySCF <https://pyscf.org/
        * ``"auto"``: Automatically detect based on spin
        * ``"restricted"``: Force restricted calculation
        * ``"unrestricted"``: Force unrestricted calculation
+
+.. _pyscf-stabilized-scf:
+
+PySCF Stabilized
+~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"pyscf_stabilized"``
+
+The PySCF stabilized implementation uses PySCF's native stability workflow to automate stable-reference :term:`SCF` calculations.
+It runs the requested PySCF :term:`SCF` calculation, calls PySCF stability analysis with ``return_status=True``, and reruns from the stable-orbital guesses returned by PySCF until the reference is stable or the configured iteration limit is reached.
+When PySCF reports an external restricted-to-unrestricted instability, the solver reruns with an unrestricted reference.
+
+.. code-block:: python
+
+  import qdk_chemistry.plugins.pyscf as pyscf_plugin
+  from qdk_chemistry.algorithms import create
+
+  pyscf_plugin.load()
+
+  scf_solver = create("scf_solver", "pyscf_stabilized")
+  scf_solver.settings().set("method", "hf")
+  scf_solver.settings().set("max_stability_iterations", 5)
+
+  energy, wavefunction = scf_solver.run(structure, 0, 1, "def2-svp")
+
+The ``pyscf_stabilized`` solver accepts the same input arguments and most of the same settings as ``pyscf``.
+It adds ``max_stability_iterations``, ``check_internal``, ``check_external``, and ``fail_on_unstable`` for controlling the stability loop.
 
 .. rubric:: Example
 

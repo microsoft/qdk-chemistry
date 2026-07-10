@@ -16,7 +16,6 @@ Exposed classes are:
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
-- :class:`ControlledUnitary`: Controlled unitary.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
@@ -109,7 +108,6 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
@@ -144,7 +142,6 @@ __all__ = [
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
-    "ControlledUnitary",
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
@@ -209,7 +206,6 @@ _DEPRECATED_ALIASES = {
     "CoupledClusterContainer": "AmplitudeContainer",
     "TimeEvolutionUnitary": "UnitaryRepresentation",
     "TimeEvolutionUnitaryContainer": "UnitaryContainer",
-    "ControlledTimeEvolutionUnitary": "ControlledUnitary",
 }
 
 

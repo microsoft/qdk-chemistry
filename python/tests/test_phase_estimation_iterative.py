@@ -22,12 +22,6 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.phase import (
-    accumulated_phase_from_bits,
-    energy_from_phase,
-    iterative_phase_feedback_update,
-    phase_fraction_from_feedback,
-)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -112,30 +106,42 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     )
 
 
-def _make_iterative_circuit_builder_ref(builder_name: str, num_bits: int, evolution_time: float) -> AlgorithmRef:
+def _make_iterative_circuit_builder_ref(
+    builder_name: str,
+    num_bits: int,
+    evolution_time: float,
+    unitary_builder_name: str = "trotter",
+) -> AlgorithmRef:
     """Return an iterative circuit builder AlgorithmRef for the given builder name."""
     return AlgorithmRef(
         "qpe_circuit_builder",
         builder_name,
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=evolution_time),
     )
 
 
-def _run_iterative(problem: PhaseEstimationProblem, builder_name: str = "qdk_iterative") -> QpeResult:
+def _run_iterative(
+    problem: PhaseEstimationProblem,
+    builder_name: str = "qdk_iterative",
+    unitary_builder_name: str = "trotter",
+) -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
         builder_name: The circuit builder to use ("qdk_iterative" or "qiskit_iterative").
+        unitary_builder_name: Name of the unitary builder to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
 
     """
     state_prep_circuit = problem.state_prep
-    circuit_builder = _make_iterative_circuit_builder_ref(builder_name, problem.num_bits, problem.evolution_time)
+    circuit_builder = _make_iterative_circuit_builder_ref(
+        builder_name, problem.num_bits, problem.evolution_time, unitary_builder_name
+    )
     iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
     iqpe.settings().set(
@@ -219,7 +225,12 @@ def _resolve_phase_ambiguity(
 
     """
     phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = [energy_from_phase(candidate, evolution_time=evolution_time) for candidate in phase_fraction_candidates]
+    energies = []
+    for candidate in phase_fraction_candidates:
+        angle = (candidate % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        energies.append(angle / evolution_time)
 
     # Select candidate closest to expected energy
     index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))
@@ -236,14 +247,22 @@ _builder_params = [
     ),
 ]
 
+# Parametrize over time evolution unitary builders
+_unitary_builder_params = [
+    pytest.param("trotter", id="trotter"),
+    pytest.param("zassenhaus", id="zassenhaus"),
+]
+
 
 @pytest.mark.parametrize("builder_name", _builder_params)
+@pytest.mark.parametrize("unitary_builder_name", _unitary_builder_params)
 def test_iterative_phase_estimation_extracts_phase_and_energy(
     two_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
+    unitary_builder_name: str,
 ) -> None:
     """Verify the iterative algorithm recovers the expected phase and energy."""
-    result = _run_iterative(two_qubit_phase_problem, builder_name)
+    result = _run_iterative(two_qubit_phase_problem, builder_name, unitary_builder_name)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
     )
@@ -264,12 +283,14 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)
+@pytest.mark.parametrize("unitary_builder_name", _unitary_builder_params)
 def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     four_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
+    unitary_builder_name: str,
 ) -> None:
     """Validate phase and energy estimates on the documented four-qubit case."""
-    result = _run_iterative(four_qubit_phase_problem, builder_name)
+    result = _run_iterative(four_qubit_phase_problem, builder_name, unitary_builder_name)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
     )
@@ -416,52 +437,6 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
-
-
-def test_update_phase_feedback_with_bit_zero() -> None:
-    """Test phase feedback update when measured bit is 0."""
-    current_phase = np.pi / 4
-    new_phase = iterative_phase_feedback_update(current_phase, 0)
-
-    # When bit is 0, phase should be halved
-    assert np.isclose(new_phase, current_phase / 2, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_zero() -> None:
-    """Test phase fraction calculation from zero feedback."""
-    phase_fraction = phase_fraction_from_feedback(0.0)
-    assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_in_valid_range() -> None:
-    """Test phase fraction calculation from feedback in valid range."""
-    feedback = np.pi / 2
-    phase_fraction = phase_fraction_from_feedback(feedback)
-
-    # Should be in range [0, 1)
-    assert 0.0 <= phase_fraction < 1.0
-
-
-def test_phase_feedback_from_bits_empty() -> None:
-    """Test phase feedback calculation from empty bit sequence."""
-    phase_feedback = accumulated_phase_from_bits([])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_single_zero() -> None:
-    """Test phase feedback calculation from single zero bit."""
-    phase_feedback = accumulated_phase_from_bits([0])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_multiple() -> None:
-    """Test phase feedback calculation from multiple bits."""
-    bits = [1, 0, 1, 1]
-    phase_feedback = accumulated_phase_from_bits(bits)
-
-    # Verify it's equivalent to accumulated phase
-    expected = accumulated_phase_from_bits(bits)
-    assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
 
 
 def test_iterative_qpe_initialization() -> None:

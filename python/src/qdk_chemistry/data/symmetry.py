@@ -135,8 +135,13 @@ def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, *, beta: bool 
         The requested spin channel's dense block as a NumPy array.
 
     """
-    label = SymmetryLabel([axes.beta() if beta else axes.alpha()])
-    return coefficients.block([label, label])
+    slots = coefficients.symmetries()
+
+    def _slot_label(index: int) -> SymmetryLabel:
+        spin_axis = index < len(slots) and slots[index].has_axis(AxisName.Spin)
+        return SymmetryLabel([axes.beta() if beta else axes.alpha()]) if spin_axis else SymmetryLabel([])
+
+    return coefficients.block([_slot_label(0), _slot_label(1)])
 
 
 def spin_channel_vector(energies: SymmetryBlockedTensorRank1, *, beta: bool = False):
@@ -154,4 +159,7 @@ def spin_channel_vector(energies: SymmetryBlockedTensorRank1, *, beta: bool = Fa
 
     """
     label = SymmetryLabel([axes.beta() if beta else axes.alpha()])
+    slots = energies.symmetries()
+    if not (slots and slots[0].has_axis(AxisName.Spin)):
+        label = SymmetryLabel([])
     return energies.block([label])

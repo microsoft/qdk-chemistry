@@ -446,32 +446,14 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
       wavefunction = Wavefunction::from_json(j.at("wavefunction"));
     }
 
-    // Sector name; legacy files predating sectors are migrated as electronic.
+    // Sector name; defaults to the electronic sector when unspecified.
     std::string sector =
         j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
 
-    // Determine the amplitude expansion type. New "amplitude" files store an
-    // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
-    // encode it in the container tag, and anything else is left unspecified.
-    const std::string container_tag =
-        j.value("container_type", j.value("type", std::string{}));
     AmplitudeType amplitude_type = AmplitudeType::Unspecified;
-    if (container_tag == "mp2") {
-      amplitude_type = AmplitudeType::MollerPlesset;
-    } else if (container_tag == "coupled_cluster") {
-      amplitude_type = AmplitudeType::CoupledCluster;
-    } else if (j.contains("amplitude_type")) {
+    if (j.contains("amplitude_type")) {
       amplitude_type =
           amplitude_type_from_string(j.at("amplitude_type").get<std::string>());
-    }
-
-    // Legacy "mp2" JSON did not store amplitudes (they were recomputed from a
-    // Hamiltonian). Such files load as an amplitude container with no
-    // amplitudes.
-    if (container_tag == "mp2") {
-      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
-                                                  amplitude_type, std::nullopt,
-                                                  std::nullopt, sector);
     }
 
     bool is_complex = j.value("is_complex", false);
@@ -554,12 +536,6 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
     version_attr.read(string_type, version_str);
     validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
-    std::string container_type;
-    if (group.attrExists("container_type")) {
-      H5::Attribute type_attr = group.openAttribute("container_type");
-      type_attr.read(string_type, container_type);
-    }
-
     std::shared_ptr<Orbitals> orbitals = nullptr;
     if (group.nameExists("orbitals")) {
       H5::Group orbitals_group = group.openGroup("orbitals");
@@ -571,40 +547,18 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
       wavefunction = Wavefunction::from_hdf5(wavefunction_group);
     }
 
-    // Sector name; legacy files predating sectors are migrated as electronic.
+    // Sector name; defaults to the electronic sector when unspecified.
     std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (group.attrExists("sector")) {
       group.openAttribute("sector").read(string_type, sector);
     }
 
-    // Determine the amplitude expansion type. New "amplitude" files store an
-    // explicit "amplitude_type" attribute; legacy "coupled_cluster"/"mp2"
-    // files encode it in the container tag, and anything else is unspecified.
     AmplitudeType amplitude_type = AmplitudeType::Unspecified;
-    if (container_type == "mp2") {
-      amplitude_type = AmplitudeType::MollerPlesset;
-    } else if (container_type == "coupled_cluster") {
-      amplitude_type = AmplitudeType::CoupledCluster;
-    } else if (group.attrExists("amplitude_type")) {
+    if (group.attrExists("amplitude_type")) {
       H5::Attribute amplitude_type_attr = group.openAttribute("amplitude_type");
       std::string amplitude_type_str;
       amplitude_type_attr.read(string_type, amplitude_type_str);
       amplitude_type = amplitude_type_from_string(amplitude_type_str);
-    }
-
-    // Legacy "mp2" HDF5 stored a Hamiltonian instead of amplitudes; such files
-    // load as an amplitude container with no amplitudes. For legacy "mp2"
-    // files orbitals come from the Hamiltonian, which we read but otherwise
-    // discard.
-    if (container_type == "mp2") {
-      if (!orbitals && group.nameExists("hamiltonian")) {
-        H5::Group hamiltonian_group = group.openGroup("hamiltonian");
-        auto hamiltonian = Hamiltonian::from_hdf5(hamiltonian_group);
-        orbitals = hamiltonian->get_orbitals();
-      }
-      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
-                                                  amplitude_type, std::nullopt,
-                                                  std::nullopt, sector);
     }
 
     bool is_complex = false;

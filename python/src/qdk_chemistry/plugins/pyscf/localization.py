@@ -30,7 +30,8 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
-from qdk_chemistry.data import Orbitals, Settings, StateVectorContainer, Wavefunction
+from qdk_chemistry.algorithms.orbital_localizer import new_aufbau_determinant_wavefunction
+from qdk_chemistry.data import Orbitals, Settings, Wavefunction
 from qdk_chemistry.data.symmetry import spin_channel_indices, spin_channel_matrix, spin_channel_vector, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
@@ -154,21 +155,20 @@ class PyscfLocalizer(OrbitalLocalizer):
         if loc_indices_b != sorted(loc_indices_b):
             raise ValueError("loc_indices_b must be sorted")
 
-        # If both index vectors are empty, return original orbitals unchanged
-        if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
-            return wavefunction
-
-        # Localization rotates the (active) orbital basis. A single Slater determinant is
-        # invariant under such a rotation, but a multi-determinant CI expansion is not: its
-        # coefficients are defined in the original basis and would have to be re-expressed in
-        # the localized basis. Carrying them over unchanged would silently yield a different
-        # physical state, so only single-determinant wavefunctions are supported.
+        # Localization rotates the (active) orbital basis. Correlated-state coefficients
+        # are not re-expressed in the localized basis; the returned wavefunction is an
+        # Aufbau determinant built from the transformed orbitals.
         if len(wavefunction.get_active_determinants()) > 1:
-            raise NotImplementedError(
-                "Orbital localization is only supported for single-determinant wavefunctions; "
-                "localizing the orbitals of a multi-determinant expansion would invalidate its "
-                "CI coefficients."
+            Logger.warn(
+                "PyscfLocalizer received a multi-determinant wavefunction. The returned wavefunction will contain "
+                "an Aufbau determinant built from the transformed orbitals; correlated-state coefficients are not "
+                "preserved."
             )
+
+        # If both index vectors are empty, return an Aufbau determinant wavefunction
+        # with the original orbital coefficients unchanged.
+        if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
+            return new_aufbau_determinant_wavefunction(wavefunction, wavefunction.get_orbitals())
 
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
@@ -263,8 +263,8 @@ class PyscfLocalizer(OrbitalLocalizer):
                 if has_active
                 else None,
             )
-        # Only single-determinant wavefunctions reach this point (guarded above).
-        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals, "electrons"))
+        # Return an Aufbau determinant wavefunction in the transformed orbital basis.
+        return new_aufbau_determinant_wavefunction(wavefunction, loc_orbitals)
 
     def name(self) -> str:
         """Return the settings for the localizer."""

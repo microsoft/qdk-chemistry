@@ -16,29 +16,67 @@ endif()
 set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
 message( WARNING "Turning off GPU Backend for BLAS++/LAPACK++")
 set(build_tests OFF CACHE BOOL "Build BLAS++/LAPACK++ tests" FORCE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+endif()
 
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
-include( FetchContent )
+  include( FetchContent )
+  # MSVC (native cl and clang-cl): apply combined compatibility patch
+  # (replaces __PRETTY_FUNCTION__ with __FUNCSIG__ and fixes BLASFinder cache
+  # bug). The cache fix is always required on MSVC; the __FUNCSIG__ swap is
+  # benign under clang-cl since it also supports __FUNCSIG__.
+  if(MSVC)
+      set(_blaspp_patch PATCH_COMMAND "${CMAKE_COMMAND}"
+          -DPATCH_FILE=${QDK_CMAKE_PATCHES_DIR}/blaspp-msvc.patch
+          -P ${QDK_CMAKE_PATCHES_DIR}/apply-patch.cmake)
+  else()
+      set(_blaspp_patch "")
+  endif()
   FetchContent_Declare( blaspp
     GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
     GIT_TAG v2025.05.28
+    ${_blaspp_patch}
+    UPDATE_DISCONNECTED TRUE
   )
+  if(MSVC)
+      set(_lapackpp_patch PATCH_COMMAND "${CMAKE_COMMAND}"
+          -DPATCH_FILE=${QDK_CMAKE_PATCHES_DIR}/lapackpp-msvc-allocator.patch
+          -P ${QDK_CMAKE_PATCHES_DIR}/apply-patch.cmake)
+  else()
+      set(_lapackpp_patch "")
+  endif()
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
     GIT_TAG v2025.05.28
+    UPDATE_DISCONNECTED TRUE
+    ${_lapackpp_patch}
   )
 
+  # blaspp's option(use_openmp) reads from the CMake cache, not local variables.
+  set(use_openmp ${use_openmp} CACHE BOOL "blaspp: enable OpenMP" FORCE)
   FetchContent_MakeAvailable( blaspp )
   FetchContent_MakeAvailable( lapackpp )
-  target_compile_definitions( lapackpp PUBLIC LAPACK_COMPLEX_CPP )
+
+  if(MSVC)
+    # lapackpp sources use std::complex directly but on Windows _MSC_VER causes
+    # config.h to skip #include <complex>. Force-include it.
+    target_compile_options( lapackpp PRIVATE /FIcomplex )
+  endif()
 endif()
 
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )
 target_compile_features( lobpcgxx INTERFACE cxx_std_20 )
-target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
+if(NOT MSVC)
+  # On non-MSVC (Linux/macOS), instruct lapack/config.h to use <complex> (C++)
+  # rather than <complex.h> (C99).  The C99 header defines the `I` macro as
+  # `__extension__ _Complex_I`, which conflicts with Boost template parameter
+  # names used in downstream headers.  On MSVC the equivalent is achieved via
+  # /FIcomplex on the lapackpp target directly (see above).
+  target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
+endif()
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

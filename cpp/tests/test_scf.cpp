@@ -4,8 +4,10 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -55,8 +57,18 @@ class TestSCF : public ScfSolver {
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
+  EXPECT_NE(
+      std::find(available_solvers.begin(), available_solvers.end(), "qdk"),
+      available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "qdk_stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized_scf"),
+            available_solvers.end());
   EXPECT_THROW(ScfSolverFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(ScfSolverFactory::register_instance(
@@ -69,6 +81,53 @@ TEST_F(ScfTest, Factory) {
                    }),
                std::runtime_error);
   auto test_scf = ScfSolverFactory::create("test_scf");
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
+  auto water = testing::create_water_structure();
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("max_stability_iterations", 0);
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, regular_energy, testing::scf_energy_tolerance);
+  EXPECT_TRUE(regular_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPrefersExternalInstability) {
+  auto n2 = testing::create_stretched_n2_structure(1.6);
+
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [_regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+  auto [regular_is_stable, regular_stability_result] =
+      stability_checker->run(regular_wavefunction);
+
+  EXPECT_FALSE(regular_stability_result->is_internal_stable());
+  EXPECT_FALSE(regular_stability_result->is_external_stable());
+  EXPECT_FALSE(regular_is_stable);
+
+  auto stabilized_scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  stabilized_scf_solver->settings().set("method", "hf");
+  stabilized_scf_solver->settings().set("max_stability_iterations", 1);
+  stabilized_scf_solver->settings().set("fail_on_unstable", false);
+  auto [stabilized_energy, stabilized_wavefunction] =
+      stabilized_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  EXPECT_LT(stabilized_energy, _regular_energy);
+  EXPECT_FALSE(stabilized_wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, Water) {
@@ -151,14 +210,15 @@ TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
+TEST_F(ScfTest, OH_ROKS_invalid) {
   auto oh = testing::create_oh_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("scf_type", "restricted");
 
-  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::runtime_error);
+  // Restricted ROKS should reject this open-shell doublet case.
+  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_gdm) {
@@ -228,6 +288,34 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, OH_ROHF_GDM) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
+
+  // Check doublet orbitals
+  EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_ROHF_GDM) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_triplet, wfn_triplet] = scf_solver->run(oxygen, 0, 3, "cc-pvdz");
+
+  EXPECT_NEAR(E_triplet, -74.787513074624, testing::scf_energy_tolerance);
+
+  // Check triplet orbitals are restricted (ROHF)
+  EXPECT_TRUE(wfn_triplet->get_orbitals()->is_restricted());
+}
+
 TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
@@ -235,9 +323,8 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
-  // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
-               std::invalid_argument);  // open-shell dublet
+
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
@@ -247,7 +334,7 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
-  // Default should be a singlet
+
   EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 

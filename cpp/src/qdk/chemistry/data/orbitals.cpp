@@ -442,8 +442,8 @@ Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations_alpha.size() != num_molecular_orbitals ||
-      occupations_beta.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations_alpha.size()) != num_molecular_orbitals ||
+      static_cast<size_t>(occupations_beta.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -470,7 +470,7 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (occupations.size() != num_molecular_orbitals) {
+  if (static_cast<size_t>(occupations.size()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -494,10 +494,10 @@ Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm_alpha.rows() != num_molecular_orbitals ||
-      rdm_alpha.cols() != num_molecular_orbitals ||
-      rdm_beta.rows() != num_molecular_orbitals ||
-      rdm_beta.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm_alpha.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_alpha.cols()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm_beta.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -521,8 +521,8 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
   }
 
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
-  if (rdm.rows() != num_molecular_orbitals ||
-      rdm.cols() != num_molecular_orbitals) {
+  if (static_cast<size_t>(rdm.rows()) != num_molecular_orbitals ||
+      static_cast<size_t>(rdm.cols()) != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -1205,7 +1205,7 @@ void Orbitals::to_hdf5(H5::Group& group) const {
     // Save essential metadata that can't be computed from data
     unsigned num_atomic_orbitals = get_num_atomic_orbitals();
     unsigned num_molecular_orbitals = get_num_molecular_orbitals();
-    bool restricted = is_restricted();
+    hbool_t restricted = static_cast<hbool_t>(is_restricted());
 
     H5::DataSet aos_dataset = metadata_group.createDataSet(
         "num_atomic_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
@@ -1228,13 +1228,22 @@ void Orbitals::to_hdf5(H5::Group& group) const {
       _energies->to_hdf5(energies_group);
     }
 
-    // Save active space indices if available
+    // Save active space indices if available. save_vector_to_group omits empty
+    // vectors, so an explicitly empty active space (0 active orbitals) is
+    // recorded via the active_space_is_empty marker below; on load it is
+    // distinguished from an absent active space, which defaults to the full
+    // space.
     if (has_active_space()) {
       save_vector_to_group(group, "active_space_indices_alpha",
                            _active_space_indices.first);
       save_vector_to_group(group, "active_space_indices_beta",
                            _active_space_indices.second);
     }
+    hbool_t active_space_is_empty = static_cast<hbool_t>(!has_active_space());
+    H5::DataSet active_empty_dataset = group.createDataSet(
+        "active_space_is_empty", H5::PredType::NATIVE_HBOOL, scalar_space);
+    active_empty_dataset.write(&active_space_is_empty,
+                               H5::PredType::NATIVE_HBOOL);
 
     // Save inactive space indices if available
     if (has_inactive_space()) {
@@ -1324,7 +1333,11 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     try {
       H5::Group metadata_group = group.openGroup("metadata");
       H5::DataSet ds = metadata_group.openDataSet("is_restricted");
-      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
+      // hbool_t is typically unsigned int (4 bytes) while C++ bool is 1 byte.
+      // Reading into a bool* with NATIVE_HBOOL is UB; stage through hbool_t.
+      hbool_t hb_restricted = 0;
+      ds.read(&hb_restricted, H5::PredType::NATIVE_HBOOL);
+      restricted = (hb_restricted != 0);
     } catch (const H5::Exception&) {
       throw std::invalid_argument(
           "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
@@ -1374,6 +1387,22 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
         active_indices_beta =
             load_size_vector_from_group(group, "active_space_indices_beta");
         has_active_indices = true;
+      }
+    } catch (const std::exception&) { /* optional */
+    }
+    // An explicitly empty active space is flagged separately, since
+    // save_vector_to_group omits empty index vectors. Treat the flag as a
+    // present-but-empty active space (distinct from an absent one).
+    try {
+      if (!has_active_indices && group.nameExists("active_space_is_empty")) {
+        H5::DataSet active_empty_dataset =
+            group.openDataSet("active_space_is_empty");
+        hbool_t active_space_is_empty = 0;
+        active_empty_dataset.read(&active_space_is_empty,
+                                  H5::PredType::NATIVE_HBOOL);
+        if (active_space_is_empty) {
+          has_active_indices = true;
+        }
       }
     } catch (const std::exception&) { /* optional */
     }
@@ -1499,12 +1528,11 @@ nlohmann::json Orbitals::to_json() const {
     j["ao_overlap"] = matrix_to_json(*_ao_overlap);
   }
 
-  // Save active space information if available
-  if (has_active_space()) {
-    // Save active space indices
-    j["active_space_indices"] = {{"alpha", _active_space_indices.first},
-                                 {"beta", _active_space_indices.second}};
-  }
+  // Save active space indices. Emit them unconditionally (even when empty) so an
+  // explicitly empty active space (0 active orbitals) is distinguished from an
+  // absent one, which defaults to the full space on load.
+  j["active_space_indices"] = {{"alpha", _active_space_indices.first},
+                               {"beta", _active_space_indices.second}};
 
   // Save inactive space information if available
   if (has_inactive_space()) {
@@ -1655,17 +1683,22 @@ void Orbitals::_save_orbital_metadata_to_hdf5(
   mos_dataset.write(&num_molecular_orbitals, H5::PredType::NATIVE_UINT);
 
   // Save boolean flags
+  // Use hbool_t intermediaries — hbool_t is typically unsigned int (4 bytes),
+  // while C++ bool is 1 byte.  Writing a bool* with NATIVE_HBOOL is UB.
+  hbool_t hb_is_restricted = static_cast<hbool_t>(is_restricted);
   H5::DataSet restricted_dataset = metadata_group.createDataSet(
       "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
-  restricted_dataset.write(&is_restricted, H5::PredType::NATIVE_HBOOL);
+  restricted_dataset.write(&hb_is_restricted, H5::PredType::NATIVE_HBOOL);
 
+  hbool_t hb_has_overlap_matrix = static_cast<hbool_t>(has_overlap_matrix);
   H5::DataSet overlap_dataset = metadata_group.createDataSet(
       "has_overlap_matrix", H5::PredType::NATIVE_HBOOL, scalar_space);
-  overlap_dataset.write(&has_overlap_matrix, H5::PredType::NATIVE_HBOOL);
+  overlap_dataset.write(&hb_has_overlap_matrix, H5::PredType::NATIVE_HBOOL);
 
+  hbool_t hb_has_basis_set = static_cast<hbool_t>(has_basis_set);
   H5::DataSet basis_dataset = metadata_group.createDataSet(
       "has_basis_set", H5::PredType::NATIVE_HBOOL, scalar_space);
-  basis_dataset.write(&has_basis_set, H5::PredType::NATIVE_HBOOL);
+  basis_dataset.write(&hb_has_basis_set, H5::PredType::NATIVE_HBOOL);
 }
 
 bool Orbitals::is_unrestricted() const {
@@ -2153,8 +2186,12 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     }
 
     // Reconstruct via the symmetry-blocked index sets (or the full-active
-    // constructor when no active indices were stored).
-    const bool has_active = !active_alpha.empty() || !active_beta.empty();
+    // constructor when no active indices were recorded). A recorded
+    // active_space_indices key (even with empty index vectors) denotes an
+    // explicitly bounded active space, distinct from an absent one which
+    // defaults to the full space; to_json always records it, so the fallback
+    // only applies to files predating the field.
+    const bool has_active = j.contains("active_space_indices");
     const bool has_inactive = !inactive_alpha.empty() || !inactive_beta.empty();
     if (!has_active) {
       return std::make_shared<ModelOrbitals>(num_orbitals, symmetries);
@@ -2196,7 +2233,7 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
 
     // Save ModelOrbitals metadata
     unsigned num_orbitals = _num_orbitals;
-    bool is_restricted = _is_restricted;
+    hbool_t hb_is_restricted = static_cast<hbool_t>(_is_restricted);
 
     H5::DataSet orbitals_dataset = metadata_group.createDataSet(
         "num_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
@@ -2204,13 +2241,20 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
 
     H5::DataSet restricted_dataset = metadata_group.createDataSet(
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
-    restricted_dataset.write(&is_restricted, H5::PredType::NATIVE_HBOOL);
+    restricted_dataset.write(&hb_is_restricted, H5::PredType::NATIVE_HBOOL);
 
-    // Save active space indices
+    // Save active space indices. save_vector_to_group omits empty vectors, so an
+    // explicitly empty active space (0 active orbitals) is recorded via the
+    // active_space_is_empty marker below and distinguished from an absent one.
     save_vector_to_group(group, "active_space_indices_alpha",
                          _active_space_indices.first);
     save_vector_to_group(group, "active_space_indices_beta",
                          _active_space_indices.second);
+    hbool_t active_space_is_empty = static_cast<hbool_t>(!has_active_space());
+    H5::DataSet active_empty_dataset = group.createDataSet(
+        "active_space_is_empty", H5::PredType::NATIVE_HBOOL, scalar_space);
+    active_empty_dataset.write(&active_space_is_empty,
+                               H5::PredType::NATIVE_HBOOL);
 
     // Save inactive space indices
     save_vector_to_group(group, "inactive_space_indices_alpha",
@@ -2291,9 +2335,25 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     }
 
     // Reconstruct via the symmetry-blocked index sets (or the full-active
-    // constructor when no active indices were stored).
-    const bool has_active =
+    // constructor when no active indices were recorded). save_vector_to_group
+    // omits empty vectors, so an explicitly empty active space is flagged by the
+    // active_space_is_empty marker; treat it as a present-but-empty active
+    // space, distinct from an absent one which defaults to the full space.
+    bool has_active =
         !active_indices_alpha.empty() || !active_indices_beta.empty();
+    try {
+      if (!has_active && group.nameExists("active_space_is_empty")) {
+        H5::DataSet active_empty_dataset =
+            group.openDataSet("active_space_is_empty");
+        hbool_t active_space_is_empty = 0;
+        active_empty_dataset.read(&active_space_is_empty,
+                                  H5::PredType::NATIVE_HBOOL);
+        if (active_space_is_empty) {
+          has_active = true;
+        }
+      }
+    } catch (const std::exception&) { /* optional */
+    }
     const bool has_inactive =
         !inactive_indices_alpha.empty() || !inactive_indices_beta.empty();
     if (!has_active) {

@@ -63,7 +63,17 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   }
 
   // unpack the tar.gz file
-  auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
+  // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
+  // host:path. BSD tar (System32\tar.exe) rejects the flag, detect at runtime.
+#ifdef _WIN32
+  static const bool tar_has_force_local =
+      (std::system("tar --force-local --version > nul 2>&1") == 0);
+  const std::string tar_cmd =
+      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
+#else
+  const std::string tar_cmd = "tar -xzf ";
+#endif
+  auto cmd = tar_cmd + "\"" + file_path.generic_string() + "\" --directory \"" +
              temp_dir.generic_string() + "\"";
   int return_code = std::system(cmd.c_str());
   if (return_code != 0) {
@@ -597,8 +607,8 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-       ++atom_index) {
+  for (size_t atom_index = 0;
+       atom_index < static_cast<size_t>(nuclear_charges.size()); ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
 
     auto [shells, ecp_shells, ecp_electrons] =
@@ -678,8 +688,8 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   std::vector<size_t> all_ecp_electrons;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-       ++atom_index) {
+  for (size_t atom_index = 0;
+       atom_index < static_cast<size_t>(nuclear_charges.size()); ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
     auto it = index_to_basis_map.find(atom_index);
     if (it == index_to_basis_map.end()) {
@@ -720,8 +730,8 @@ BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
       _atomic_orbital_type(other._atomic_orbital_type),
       _shells_per_atom(other._shells_per_atom),
-      _ecp_name(other._ecp_name),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
+      _ecp_name(other._ecp_name),
       _ecp_electrons(other._ecp_electrons),
       _ao_symmetries(other._ao_symmetries),
       _ao_extents(other._ao_extents) {

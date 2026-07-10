@@ -9,12 +9,22 @@ import contextlib
 import pickle
 import re
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.data import ModelOrbitals, Orbitals
-from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
+from qdk_chemistry.data.symmetry import (
+    SymmetryBlockedTensorRank1,
+    SymmetryBlockedTensorRank2,
+    SymmetryLabel,
+    SymmetryProduct,
+    axes,
+    spin_channel_matrix,
+    spin_channel_vector,
+    spin_index_set,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -203,8 +213,10 @@ def test_json_serialization():
     )
 
     # Test file-based serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp:
         filename = tmp.name
+
+    try:
         orb_out.to_json_file(filename)
 
         orb_file = Orbitals.from_json_file(filename)
@@ -222,6 +234,8 @@ def test_json_serialization():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_hdf5_serialization():
@@ -232,29 +246,32 @@ def test_hdf5_serialization():
     basis_set = create_test_basis_set(3, "test-hdf5-serialization")
     orb_out = Orbitals(coeffs, energies, overlap, basis_set)
 
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp:
+        filename = tmp.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp:
-            filename = tmp.name
-            orb_out.to_hdf5_file(filename)
+        orb_out.to_hdf5_file(filename)
 
-            orb_in = Orbitals.from_hdf5_file(filename)
+        orb_in = Orbitals.from_hdf5_file(filename)
 
-            coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
-            coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
-            assert np.allclose(
-                coeffs_out_a,
-                coeffs_in_a,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                coeffs_out_b,
-                coeffs_in_b,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
+        coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
+        coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
+        assert np.allclose(
+            coeffs_out_a,
+            coeffs_in_a,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            coeffs_out_b,
+            coeffs_in_b,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_complete_orbitals_workflow():
@@ -269,8 +286,10 @@ def test_complete_orbitals_workflow():
     assert orb.get_num_molecular_orbitals() == 2
     assert orb.is_restricted()
 
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
         orb2 = Orbitals.from_json_file(json_filename)
         assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
@@ -289,6 +308,8 @@ def test_complete_orbitals_workflow():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_generic():
@@ -300,9 +321,10 @@ def test_orbitals_file_io_generic():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test JSON file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using generic method
         orb.to_file(json_filename, "json")
 
@@ -328,11 +350,14 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using generic method
         orb.to_file(hdf5_filename, "hdf5")
 
@@ -358,6 +383,8 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test unsupported file type
     with pytest.raises(RuntimeError, match="Unsupported file type"):
@@ -376,9 +403,10 @@ def test_orbitals_hdf5_specific():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test HDF5 file I/O methods
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using new method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -428,11 +456,14 @@ def test_orbitals_hdf5_specific():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O methods work correctly
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -442,6 +473,8 @@ def test_orbitals_hdf5_specific():
         # Check equality
         assert orb3.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
         assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_validation():
@@ -492,9 +525,10 @@ def test_orbitals_file_io_round_trip():
     )
 
     # Test JSON round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save and reload
         orb.to_json_file(json_filename)
         orb_json = Orbitals.from_json_file(json_filename)
@@ -542,11 +576,14 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save and reload
         orb.to_hdf5_file(hdf5_filename)
         orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
@@ -594,6 +631,8 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_management():
@@ -672,8 +711,10 @@ def test_active_space_serialization():
     )
 
     # Test JSON serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
 
         # Load into a new object
@@ -686,26 +727,31 @@ def test_active_space_serialization():
         json_alpha, json_beta = orb_json.get_active_space_indices()
         assert np.array_equal(json_alpha, active_indices)
         assert np.array_equal(json_beta, active_indices)
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 serialization
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
-            hdf5_filename = tmp_hdf5.name
-            orb.to_hdf5_file(hdf5_filename)
+        orb.to_hdf5_file(hdf5_filename)
 
-            # Load into a new object
-            orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
+        # Load into a new object
+        orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
 
-            # Check that active space was preserved
-            assert orb_hdf5.has_active_space()
+        # Check that active space was preserved
+        assert orb_hdf5.has_active_space()
 
-            # Verify active space indices
-            hdf5_alpha, hdf5_beta = orb_hdf5.get_active_space_indices()
-            assert np.array_equal(hdf5_alpha, active_indices)
-            assert np.array_equal(hdf5_beta, active_indices)
+        # Verify active space indices
+        hdf5_alpha, hdf5_beta = orb_hdf5.get_active_space_indices()
+        assert np.array_equal(hdf5_alpha, active_indices)
+        assert np.array_equal(hdf5_beta, active_indices)
 
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_copy_assign():
@@ -966,3 +1012,93 @@ def test_orbitals_data_type_name():
     """Test that Orbitals has the correct _data_type_name class attribute."""
     assert hasattr(Orbitals, "_data_type_name")
     assert Orbitals._data_type_name == "orbitals"
+
+
+def test_sbt_native_constructor_accepts_active_indices():
+    """The symmetry-blocked-tensor Orbitals constructor accepts active/inactive index sets."""
+    coeffs = np.eye(4)
+    energies = np.arange(4.0)
+    basis_set = create_test_basis_set(4, "sbt-native-active")
+    seed = Orbitals(coeffs, energies, None, basis_set)
+    orb = Orbitals(
+        seed.coefficients(),
+        seed.energies(),
+        None,
+        basis_set,
+        spin_index_set(4, [1, 2], [1, 2]),
+        spin_index_set(4, [0], [0]),
+    )
+    assert orb.num_active_orbitals() == 2
+    assert orb.num_inactive_orbitals() == 1
+
+
+def test_spin_channel_helpers_trivial_orbitals():
+    """spin_channel_matrix/vector return the sole block for spin-free (trivial) tensors."""
+    trivial = SymmetryProduct([])
+    label = SymmetryLabel([])
+    matrix = np.arange(9.0).reshape(3, 3)
+    coeffs = SymmetryBlockedTensorRank2([trivial, trivial], [{label: 3}, {label: 3}], [((label, label), matrix)])
+    assert np.allclose(spin_channel_matrix(coeffs), matrix)
+    assert np.allclose(spin_channel_matrix(coeffs, beta=True), matrix)
+    vector = np.array([1.0, 2.0, 3.0])
+    energies = SymmetryBlockedTensorRank1([trivial], [{label: 3}], [((label,), vector)])
+    assert np.allclose(spin_channel_vector(energies), vector)
+    assert np.allclose(spin_channel_vector(energies, beta=True), vector)
+
+
+def test_explicit_empty_active_space_round_trips():
+    """An explicitly empty active space (0 orbitals) survives JSON/HDF5 round-trips.
+
+    Regression: an empty active space previously reloaded as the full space because
+    it was indistinguishable from an absent one.
+    """
+    basis_set = create_test_basis_set(4, "empty-active-roundtrip")
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, basis_set, spin_index_set(4, [], []), spin_index_set(4, [], []))
+    assert orb.num_active_orbitals() == 0
+    assert not orb.has_active_space()
+
+    assert Orbitals.from_json(orb.to_json()).num_active_orbitals() == 0
+
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
+        json_filename = tmp_json.name
+    try:
+        orb.to_json_file(json_filename)
+        assert Orbitals.from_json_file(json_filename).num_active_orbitals() == 0
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
+
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        orb.to_hdf5_file(hdf5_filename)
+        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 0
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
+
+
+def test_full_active_space_round_trip_unaffected():
+    """A default (full) active space still round-trips through JSON and HDF5."""
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, create_test_basis_set(4, "full-active-roundtrip"))
+    assert orb.num_active_orbitals() == 4
+    assert Orbitals.from_json(orb.to_json()).num_active_orbitals() == 4
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        orb.to_hdf5_file(hdf5_filename)
+        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 4
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
+
+
+def test_model_orbitals_explicit_empty_active_space_round_trips():
+    """A ModelOrbitals explicit-empty active space survives JSON/HDF5 round-trips."""
+    model = ModelOrbitals(spin_index_set(4, [], []))
+    assert model.num_active_orbitals() == 0
+    assert ModelOrbitals.from_json(model.to_json()).num_active_orbitals() == 0
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        model.to_hdf5_file(hdf5_filename)
+        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 0
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
