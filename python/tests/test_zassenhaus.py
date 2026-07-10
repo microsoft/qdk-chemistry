@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 import scipy.linalg
 
-from qdk_chemistry.algorithms import create, registry
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
@@ -226,7 +226,17 @@ class TestZassenhausTimeEvolution:
         builder = Zassenhaus(num_divisions=1, order=order, time=time)
         container = builder.run(hamiltonian).get_container()
 
-        step_unitary = np.eye(2**hamiltonian.num_qubits, dtype=complex)
+        identity = np.eye(2**hamiltonian.num_qubits, dtype=complex)
+        step_unitary = identity
+        for term in container.step_terms:
+            pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
+                term.pauli_term, num_qubits=hamiltonian.num_qubits
+            )
+            pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
+            cos_val = np.cos(term.angle)
+            sin_val = np.sin(term.angle)
+            rotation_matrix = cos_val * identity - 1j * sin_val * pauli_matrix
+            step_unitary = rotation_matrix @ step_unitary
         for term in container.step_terms:
             pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
                 term.pauli_term, num_qubits=hamiltonian.num_qubits
@@ -267,7 +277,7 @@ class TestZassenhausTimeEvolution:
             for pauli in ("X", "Y", "Z")
         ]
         h = QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
-        grouper = registry.create("term_grouper", "commuting")
+        grouper = create("term_grouper", "commuting")
         return grouper.run(h)
 
     @staticmethod
@@ -298,7 +308,7 @@ class TestZassenhausTimeEvolution:
             active_hamiltonian,
             MajoranaMapping.jordan_wigner(n_spin_orbitals),
         )
-        grouper = registry.create("term_grouper", "commuting")
+        grouper = create("term_grouper", "commuting")
         return grouper.run(h)
 
     def test_zassenhaus_builder_and_decomposition(self):
@@ -487,7 +497,14 @@ class TestZassenhausTimeEvolution:
         ]
         for factory, order in cases:
             slope = self._fit_zassenhaus_error_slope(factory(), order=order)
-            assert np.isclose(slope, order + 1, atol=0.1)
+        cases = [
+            (self._open_heisenberg_chain_4_site(), (2, 3, 4)),
+            (self._h2_sto3g_jordan_wigner_hamiltonian(), (2, 3, 4)),
+        ]
+        for hamiltonian, orders in cases:
+            for order in orders:
+                slope = self._fit_zassenhaus_error_slope(hamiltonian, order=order)
+                assert np.isclose(slope, order + 1, atol=0.1)
 
 
 class TestZassenhausPhaseEstimation:
