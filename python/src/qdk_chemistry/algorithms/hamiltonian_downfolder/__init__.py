@@ -55,3 +55,13 @@ def load():
 
     register(lambda: NativeDuccSolver())
     register(lambda: ReferenceDuccSolver())
+
+    # Wicked-based DUCC (requires wicked library)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc import (
+            WickedDuccSolver,
+        )
+
+        register(lambda: WickedDuccSolver())
+    except ImportError:
+        pass  # wicked not installed

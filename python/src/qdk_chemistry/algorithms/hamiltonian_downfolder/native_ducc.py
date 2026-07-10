@@ -598,7 +598,7 @@ class NativeDuccSolver(Algorithm):
         )
 
         n_spatial_active = norb_active // 2
-        active_orbitals = ModelOrbitals(n_spatial_active, True)  # restricted
+        active_orbitals = ModelOrbitals(n_spatial_active)
 
         container = CanonicalFourCenterHamiltonianContainer(
             spatial_fcidump.one_body,
