@@ -124,32 +124,39 @@ class WickedDuccSolver(Algorithm):
         )
 
         # ── 2. Convert spatial → spin-orbital (interleaved α,β) ──
+        # Spin-orbital index layout: p_α = 2p, p_β = 2p+1 (interleaved).
         nso = 2 * nmo
         nocc_so = 2 * nocc
         nvir_so = nso - nocc_so
 
-        # 1-body: h1_so[2p+s, 2q+s] = h1[p,q]
+        # 1-body spin-orbital integrals: h_{PQ} = h_{pq} δ_{σ_P σ_Q}
         h1_so = np.zeros((nso, nso))
         for spin in range(2):
             h1_so[spin::2, spin::2] = h1_spatial
 
-        # 2-body: chemist → spin-orbital chemist → physicist antisymmetrized
+        # 2-body: spatial chemist (pq|rs) → spin-orbital physicist <PQ||RS>.
+        # First expand: (PQ|RS)_{chemist} = (pq|rs) δ_{σ_P σ_Q} δ_{σ_R σ_S}
+        # Then convert: <PQ||RS> = (PR|QS) - (PS|QR)  [Szabo & Ostlund Eq. 2.115]
         eri_so = np.zeros((nso,) * 4)
         for s1 in range(2):
             for s2 in range(2):
                 eri_so[s1::2, s1::2, s2::2, s2::2] = eri_spatial
         h2_so = np.einsum("prqs->pqrs", eri_so) - np.einsum("psqr->pqrs", eri_so)
 
-        # ── 3. Normal-order w.r.t. HF ──
+        # ── 3. Normal-order w.r.t. HF (Fermi vacuum) ──
+        # H = E_0 + {F_N} + {V_N}  where {.} denotes normal ordering.
+        # E_0 = V_nuc + Σ_m h_{mm} + ½ Σ_{mn} <mn||mn>  [Shavitt & Bartlett Eq. 3.54]
         occ_idx = list(range(nocc_so))
         E0_hf = core_energy_input
         for m in occ_idx:
             E0_hf += h1_so[m, m]
         E0_hf += 0.5 * sum(h2_so[m, n, m, n] for m in occ_idx for n in occ_idx)
 
+        # Fock matrix: f_{pq} = h_{pq} + Σ_m <pm||qm>  [Shavitt & Bartlett Eq. 3.56]
         f_no = h1_so.copy()
         for m in occ_idx:
             f_no += h2_so[:, m, :, m]
+        # V_N = <pq||rs> (unchanged; the normal ordering only affects contractions)
         v_no = h2_so
 
         # ── 4. CCSD amplitudes via PySCF ──
@@ -182,6 +189,8 @@ class WickedDuccSolver(Algorithm):
         t2_so = t2_so - t2_so.transpose(0, 1, 3, 2)
 
         # ── 5. Active space definition (interleaved) ──
+        # Orbital partitioning: core | active_occ | active_vir | external_vir
+        # The active space is the top nactive_oa occupied + bottom nactive_va virtual.
         nocc_spatial = nocc
         ncore_spatial = nocc_spatial - nactive_oa
         active_so = []
@@ -193,7 +202,10 @@ class WickedDuccSolver(Algorithm):
         nact = len(active_so)
         nocc_act = 2 * nactive_oa
 
-        # Zero all-active T amplitudes → σ_ext
+        # Build σ_ext = T_ext - T_ext† by zeroing all-active amplitudes.
+        # T_ext retains only excitations involving at least one external orbital.
+        # This is the key DUCC ansatz: e^{σ_ext} dresses the Hamiltonian with
+        # external correlation.  [Bauman et al., JCP 151, 014107, Eq. (6)-(8)]
         t1_ext = t1_so.copy()
         t2_ext = t2_so.copy()
         aoc = [g for g in active_so if g < nocc_so]
@@ -311,27 +323,47 @@ class WickedDuccSolver(Algorithm):
         sigma = w.op("t", ["v+ o", "v+ v+ o o"])
         sigma.add2(T.adjoint(), w.rational(-1))
 
-        # BCH expansion — paper's Eq.(33) and extensions.
-        # Equivalently: w.bch_series(E0op + H_N, sigma, 1) gives E0 + H_N + [H_N, σ]
-        # (since [E0, σ] = 0), then add the double/triple commutator corrections.
+        # BCH expansion of H̄ = e^{-σ} H e^{σ} truncated at each level.
+        # [Bauman et al., JCP 151, 014107, Eqs. (20)-(24)]
+        #
+        # Level 0: H̄ = E_0 + H_N  (bare, no dressing)
+        # Level 1: H̄ = E_0 + H_N + [H_N, σ] + ½[[F, σ], σ]
+        #          (single commutator of full H_N, double commutator of F only)
+        # Level 2: H̄ = E_0 + H_N + [H_N, σ] + ½[[H_N, σ], σ] + ⅙[[[F, σ], σ], σ]
+        #          (double commutator of full H_N, triple commutator of F only)
+        #
+        # The asymmetry (F vs H_N) comes from the DUCC truncation: higher-body
+        # commutators of V produce 3-body+ operators that are discarded, while
+        # F commutators stay at most 2-body at one order higher.
+        #
+        # Note: wicked's w.bch_series(E0 + H_N, σ, n) computes the standard BCH
+        # e^{-σ} H e^{σ} = H + [H,σ] + ½[[H,σ],σ] + ... truncated at order n,
+        # treating F and V symmetrically. The DUCC levels differ from this because
+        # they use F at one order higher than V (e.g., level 1 has [[F,σ],σ] but
+        # only [H_N,σ]). We therefore build the commutators explicitly rather than
+        # calling bch_series.
         if bch_order == 0:
             Hbar = E0op + H_N
         elif bch_order == 1:
-            comm1 = w.commutator(H_N, sigma)
-            comm2_F = w.commutator(F, sigma, sigma)
+            comm1 = w.commutator(H_N, sigma)           # [H_N, σ]
+            comm2_F = w.commutator(F, sigma, sigma)     # [[F, σ], σ]
             Hbar = E0op + H_N + comm1
-            Hbar.add2(comm2_F, w.rational(1, 2))
+            Hbar.add2(comm2_F, w.rational(1, 2))        # + ½[[F, σ], σ]
         elif bch_order == 2:
-            comm1 = w.commutator(H_N, sigma)
-            comm2_HN = w.commutator(H_N, sigma, sigma)
-            comm3_F = w.commutator(F, sigma, sigma, sigma)
+            comm1 = w.commutator(H_N, sigma)            # [H_N, σ]
+            comm2_HN = w.commutator(H_N, sigma, sigma)  # [[H_N, σ], σ]
+            comm3_F = w.commutator(F, sigma, sigma, sigma)  # [[[F, σ], σ], σ]
             Hbar = E0op + H_N + comm1
-            Hbar.add2(comm2_HN, w.rational(1, 2))
-            Hbar.add2(comm3_F, w.rational(1, 6))
+            Hbar.add2(comm2_HN, w.rational(1, 2))       # + ½[[H_N, σ], σ]
+            Hbar.add2(comm3_F, w.rational(1, 6))        # + ⅙[[[F, σ], σ], σ]
         else:
             raise ValueError(f"Unsupported BCH order {bch_order} (must be 0, 1, or 2)")
 
-        # Wick contraction → many-body equations → einsum evaluation
+        # Apply Wick's theorem to fully contract H̄ into normal-ordered
+        # 0-, 1-, and 2-body components (discarding 3-body and higher).
+        # The result is a set of many-body equations: einsum expressions
+        # that evaluate each block (oo, ov, vo, vv, oovv, ...) of the
+        # dressed operators f̄ and v̄.  [Kutzelnigg & Mukherjee, JCP 107, 432]
         expr = w.WickTheorem().contract(w.rational(1), Hbar, 0, 4)
         mbeq = expr.to_manybody_equation("r")
 
@@ -394,11 +426,15 @@ class WickedDuccSolver(Algorithm):
             elif ndim == 4:
                 r2b[key] = (rv, ic, np.array(result))
 
-        # Assemble full-space fbar, vbar
+        # Assemble full-space dressed operators f̄_{pq} and v̄_{pqrs}.
+        # The 1-body blocks (oo, ov, vo, vv) form f̄.
         fbar = np.zeros((nso, nso))
         for k, (rv, ic, blk) in r1b.items():
             fbar[tuple(slices_map[c] for c in ic)] += blk
 
+        # The 2-body blocks are NOT yet antisymmetrized; wicked produces
+        # one representative ordering per block. Antisymmetrize:
+        # v̄_{pqrs} = r_{pqrs} - r_{qprs} - r_{pqsr} + r_{qpsr}
         vr = np.zeros((nso,) * 4)
         for k, (rv, ic, blk) in r2b.items():
             vr[tuple(slices_map[c] for c in ic)] += blk
@@ -409,18 +445,29 @@ class WickedDuccSolver(Algorithm):
             + vr.transpose(1, 0, 3, 2)
         )
 
-        # Restrict to active space → gamma → chi
+        # Restrict to active space → γ (Fermi-vacuum normal-ordered)
+        # γ₁[PQ] = f̄[P,Q]  restricted to active indices
+        # γ₂[PQRS] = v̄[P,Q,R,S]  restricted to active indices
         nact = len(active_so)
         gamma_1 = fbar[np.ix_(active_so, active_so)]
         gamma_2 = vbar[np.ix_(active_so, active_so, active_so, active_so)]
         aol = [i for i, g in enumerate(active_so) if g < nocc]
 
+        # Convert γ → χ (physical-vacuum normal-ordered).
+        # χ₁[PQ] = γ₁[PQ] - Σ_M γ₂[PM,QM]   (subtract active-occupied contraction)
+        # χ₂[PQRS] = γ₂[PQRS]                (unchanged)
+        # This re-normal-orders from the Fermi vacuum |Φ⟩ to the physical
+        # vacuum |0⟩, absorbing the active-occupied contractions into the
+        # 1-body term.  [Bauman et al., JCP 151, 014107, Eq. (30)-(31)]
         chi_1 = gamma_1 - np.einsum(
             "pmqm->pq", gamma_2[:, aol, :, :][:, :, :, aol]
         )
         chi_2 = gamma_2.copy()
 
-        # Physical-vacuum scalar
+        # Physical-vacuum scalar (core energy of the downfolded Hamiltonian).
+        # C = E₀(scalar from BCH) - Σ_M χ₁[MM] - ½ Σ_{MN} χ₂[MN,MN]
+        # This absorbs the active-occupied orbital energies into C so that
+        # E_total = E_CI(active) + C.  [Bauman et al., Eq. (32)]
         C = rs
         for m in aol:
             C -= chi_1[m, m]
