@@ -405,29 +405,6 @@ class Orbitals : public DataClass,
   bool has_inactive_space() const;
 
   /**
-   * @brief Number of active orbitals (per spin channel).
-   *
-   * Returns the active-space orbital count for the alpha channel (equal to the
-   * beta count for restricted/spin-balanced spaces). Falls back to the full
-   * molecular-orbital count when no active space is set. Robust to orbitals
-   * with or without a spin axis.
-   *
-   * @return Number of active orbitals.
-   */
-  virtual std::size_t num_active_orbitals() const;
-
-  /**
-   * @brief Number of inactive orbitals (per spin channel).
-   *
-   * Returns the inactive-space orbital count for the alpha channel (equal to
-   * the beta count for restricted/spin-balanced spaces), or zero when no
-   * inactive space is set. Robust to orbitals with or without a spin axis.
-   *
-   * @return Number of inactive orbitals.
-   */
-  virtual std::size_t num_inactive_orbitals() const;
-
-  /**
    * @brief Get alpha orbital coefficients
    * @return Reference to alpha coefficient matrix
    */

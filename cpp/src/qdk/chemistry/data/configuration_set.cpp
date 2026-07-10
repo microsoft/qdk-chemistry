@@ -63,7 +63,8 @@ size_t ConfigurationSet::num_modes() const {
   QDK_LOG_TRACE_ENTERING();
 
   if (_orbitals && _orbitals->has_active_space()) {
-    return _orbitals->num_active_orbitals();
+    return spin_channel_indices(_orbitals->active_indices(), axes::alpha())
+        .size();
   }
   if (_orbitals) {
     return _orbitals->num_modes();
@@ -166,10 +167,10 @@ void ConfigurationSet::_validate_configurations() const {
   // PR.  Keeping them out avoids baking Sz assumptions into the structural
   // validation layer.
   if (_orbitals && _orbitals->has_active_space()) {
-    size_t active_space_size = _orbitals->num_active_orbitals();
+    size_t active_space_size =
+        spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
 
     if (active_space_size != 0) {
-
       for (size_t i = 0; i < _configurations.size(); ++i) {
         const auto& config = _configurations[i];
         const std::string config_str = config.to_string();

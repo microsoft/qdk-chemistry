@@ -100,10 +100,12 @@ void bind_symmetry_blocked_index_set(py::module& m) {
   m.def(
       "spin_channel_indices",
       [](const std::shared_ptr<const SymmetryBlockedIndexSet>& index_set,
-         bool beta) { return spin_channel_indices(index_set, beta); },
-      py::arg("index_set"), py::arg("beta") = false,
+         const std::shared_ptr<const SpinValue>& channel) {
+        return spin_channel_indices(index_set, channel);
+      },
+      py::arg("index_set"), py::arg("channel"),
       "Indices for a single spin channel of a SymmetryBlockedIndexSet as a "
-      "flat list. For a spin axis the alpha or beta segment is returned per "
-      "'beta'; for a spin-free set the sole trivial-label segment serves both "
-      "channels. Returns an empty list when 'index_set' is None.");
+      "flat list. Pass the channel explicitly, e.g. axes.alpha() or "
+      "axes.beta(); for a spin-free set the sole trivial-label segment serves "
+      "every channel. Returns an empty list when 'index_set' is None.");
 }

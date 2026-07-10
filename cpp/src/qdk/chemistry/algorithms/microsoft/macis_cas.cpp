@@ -42,8 +42,10 @@ struct cas_helper {
 
     auto orbitals = hamiltonian.get_orbitals();
     const auto active_ai = orbitals->active_indices();
-    const auto active_indices = data::spin_channel_indices(active_ai, false);
-    const auto active_indices_beta = data::spin_channel_indices(active_ai, true);
+    const auto active_indices =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto active_indices_beta =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     // check that alpha and beta active space indices are the same
     if (active_indices != active_indices_beta) {
       throw std::runtime_error(
@@ -127,8 +129,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisCas::_run_impl(
         "Only restricted orbitals are supported.");
   }
   const auto active_ai = orbitals->active_indices();
-  const auto active_indices = data::spin_channel_indices(active_ai, false);
-  const auto active_indices_beta = data::spin_channel_indices(active_ai, true);
+  const auto active_indices =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  const auto active_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
   // check that alpha and beta active space indices are the same
   if (active_indices != active_indices_beta) {
     throw std::runtime_error(

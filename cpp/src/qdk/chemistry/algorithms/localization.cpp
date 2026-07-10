@@ -44,7 +44,7 @@ data::Configuration _active_configuration_for_orbitals(
 
   const auto active_index_set = orbitals->active_indices();
   const auto active_indices =
-      data::spin_channel_indices(active_index_set, /*beta=*/false);
+      data::spin_channel_indices(active_index_set, data::axes::alpha());
   if (active_indices.empty()) {
     return data::Configuration::from_spin_half_string("");
   }
@@ -160,9 +160,10 @@ std::unique_ptr<Localizer> make_pipek_mezey_localizer() {
   return std::make_unique<microsoft::PipekMezeyLocalizer>();
 }
 
-// MP2NaturalOrbitalLocalizer is deprecated (superseded by NaturalOrbitalLocalizer),
-// but this factory intentionally still provides it through the localizer registry.
-// Suppress the self-referential deprecation warning at this facade site only.
+// MP2NaturalOrbitalLocalizer is deprecated (superseded by
+// NaturalOrbitalLocalizer), but this factory intentionally still provides it
+// through the localizer registry. Suppress the self-referential deprecation
+// warning at this facade site only.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 std::unique_ptr<Localizer> make_mp2_natural_orbital_localizer() {

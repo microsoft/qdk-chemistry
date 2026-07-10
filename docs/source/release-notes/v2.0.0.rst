@@ -50,12 +50,14 @@ Coefficients and energies are returned as symmetry-blocked tensors. Select a
 spin channel with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel`, or use
 the :func:`~qdk_chemistry.data.symmetry.spin_channel_matrix` /
 :func:`~qdk_chemistry.data.symmetry.spin_channel_vector` /
-:func:`~qdk_chemistry.data.symmetry.spin_channel_indices` helpers, which are
-safe for restricted, unrestricted, and trivial (model) orbitals alike.
+:func:`~qdk_chemistry.data.symmetry.spin_channel_indices` helpers, passing the
+spin channel explicitly (``axes.alpha()`` or ``axes.beta()``). They are safe for
+restricted, unrestricted, and trivial (model) orbitals alike.
 
 .. code-block:: python
 
    from qdk_chemistry.data.symmetry import (
+       axes,
        spin_channel_matrix,
        spin_channel_vector,
        spin_channel_indices,
@@ -69,14 +71,13 @@ safe for restricted, unrestricted, and trivial (model) orbitals alike.
    # v2: symmetry-blocked tensors + per-channel helpers
    coefficients = orbitals.coefficients()          # SymmetryBlockedTensorRank2
    energies = orbitals.energies()                  # SymmetryBlockedTensorRank1
-   alpha_c = spin_channel_matrix(coefficients)             # alpha block
-   beta_c = spin_channel_matrix(coefficients, beta=True)   # beta block
-   alpha_e = spin_channel_vector(energies)
-   alpha_active = spin_channel_indices(orbitals.active_indices(), beta=False)
+   alpha_c = spin_channel_matrix(coefficients, axes.alpha())   # alpha block
+   beta_c = spin_channel_matrix(coefficients, axes.beta())     # beta block
+   alpha_e = spin_channel_vector(energies, axes.alpha())
+   alpha_active = spin_channel_indices(orbitals.active_indices(), axes.alpha())
 
-For the common case of counting active or inactive orbitals, use
-:meth:`~qdk_chemistry.data.Orbitals.num_active_orbitals` and
-:meth:`~qdk_chemistry.data.Orbitals.num_inactive_orbitals`:
+For the common case of counting active or inactive orbitals, take the length of
+the per-channel index list:
 
 .. code-block:: python
 
@@ -84,7 +85,7 @@ For the common case of counting active or inactive orbitals, use
    n_active = len(orbitals.get_active_space_indices()[0])
 
    # v2
-   n_active = orbitals.num_active_orbitals()
+   n_active = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
 
 
 Consolidated wavefunction containers

@@ -1029,8 +1029,8 @@ def test_sbt_native_constructor_accepts_active_indices():
         spin_index_set(4, [1, 2], [1, 2]),
         spin_index_set(4, [0], [0]),
     )
-    assert orb.num_active_orbitals() == 2
-    assert orb.num_inactive_orbitals() == 1
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 2
+    assert len(spin_channel_indices(orb.inactive_indices(), axes.alpha())) == 1
 
 
 def test_spin_channel_helpers_trivial_orbitals():
@@ -1039,12 +1039,12 @@ def test_spin_channel_helpers_trivial_orbitals():
     label = SymmetryLabel([])
     matrix = np.arange(9.0).reshape(3, 3)
     coeffs = SymmetryBlockedTensorRank2([trivial, trivial], [{label: 3}, {label: 3}], [((label, label), matrix)])
-    assert np.allclose(spin_channel_matrix(coeffs), matrix)
-    assert np.allclose(spin_channel_matrix(coeffs, beta=True), matrix)
+    assert np.allclose(spin_channel_matrix(coeffs, axes.alpha()), matrix)
+    assert np.allclose(spin_channel_matrix(coeffs, axes.beta()), matrix)
     vector = np.array([1.0, 2.0, 3.0])
     energies = SymmetryBlockedTensorRank1([trivial], [{label: 3}], [((label,), vector)])
-    assert np.allclose(spin_channel_vector(energies), vector)
-    assert np.allclose(spin_channel_vector(energies, beta=True), vector)
+    assert np.allclose(spin_channel_vector(energies, axes.alpha()), vector)
+    assert np.allclose(spin_channel_vector(energies, axes.beta()), vector)
 
 
 def test_explicit_empty_active_space_round_trips():
@@ -1055,16 +1055,16 @@ def test_explicit_empty_active_space_round_trips():
     """
     basis_set = create_test_basis_set(4, "empty-active-roundtrip")
     orb = Orbitals(np.eye(4), np.arange(4.0), None, basis_set, spin_index_set(4, [], []), spin_index_set(4, [], []))
-    assert orb.num_active_orbitals() == 0
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 0
     assert not orb.has_active_space()
 
-    assert Orbitals.from_json(orb.to_json()).num_active_orbitals() == 0
+    assert len(spin_channel_indices(Orbitals.from_json(orb.to_json()).active_indices(), axes.alpha())) == 0
 
     with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
     try:
         orb.to_json_file(json_filename)
-        assert Orbitals.from_json_file(json_filename).num_active_orbitals() == 0
+        assert len(spin_channel_indices(Orbitals.from_json_file(json_filename).active_indices(), axes.alpha())) == 0
     finally:
         Path(json_filename).unlink(missing_ok=True)
 
@@ -1072,7 +1072,7 @@ def test_explicit_empty_active_space_round_trips():
         hdf5_filename = tmp_hdf5.name
     try:
         orb.to_hdf5_file(hdf5_filename)
-        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 0
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 0
     finally:
         Path(hdf5_filename).unlink(missing_ok=True)
 
@@ -1080,13 +1080,13 @@ def test_explicit_empty_active_space_round_trips():
 def test_full_active_space_round_trip_unaffected():
     """A default (full) active space still round-trips through JSON and HDF5."""
     orb = Orbitals(np.eye(4), np.arange(4.0), None, create_test_basis_set(4, "full-active-roundtrip"))
-    assert orb.num_active_orbitals() == 4
-    assert Orbitals.from_json(orb.to_json()).num_active_orbitals() == 4
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 4
+    assert len(spin_channel_indices(Orbitals.from_json(orb.to_json()).active_indices(), axes.alpha())) == 4
     with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
     try:
         orb.to_hdf5_file(hdf5_filename)
-        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 4
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 4
     finally:
         Path(hdf5_filename).unlink(missing_ok=True)
 
@@ -1095,7 +1095,7 @@ def test_explicit_empty_active_space_index_set_non_null():
     """active_indices() stays a non-null empty set for an explicit-empty active space.
 
     Regression: constructing with a null inactive space, copying, or reloading
-    previously rebuilt active_indices() to None even though num_active_orbitals()
+    previously rebuilt active_indices() to None even though the active space
     was 0, so forwarding it into another Orbitals read as a full active space.
     """
     basis_set = create_test_basis_set(4, "empty-active-index-set")
@@ -1103,19 +1103,19 @@ def test_explicit_empty_active_space_index_set_non_null():
     for candidate in (orb, Orbitals(orb), Orbitals.from_json(orb.to_json())):
         active = candidate.active_indices()
         assert active is not None
-        assert spin_channel_indices(active, beta=False) == []
-        assert candidate.num_active_orbitals() == 0
+        assert spin_channel_indices(active, axes.alpha()) == []
+        assert len(spin_channel_indices(candidate.active_indices(), axes.alpha())) == 0
 
 
 def test_model_orbitals_explicit_empty_active_space_round_trips():
     """A ModelOrbitals explicit-empty active space survives JSON/HDF5 round-trips."""
     model = ModelOrbitals(spin_index_set(4, [], []))
-    assert model.num_active_orbitals() == 0
-    assert ModelOrbitals.from_json(model.to_json()).num_active_orbitals() == 0
+    assert len(spin_channel_indices(model.active_indices(), axes.alpha())) == 0
+    assert len(spin_channel_indices(ModelOrbitals.from_json(model.to_json()).active_indices(), axes.alpha())) == 0
     with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
     try:
         model.to_hdf5_file(hdf5_filename)
-        assert Orbitals.from_hdf5_file(hdf5_filename).num_active_orbitals() == 0
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 0
     finally:
         Path(hdf5_filename).unlink(missing_ok=True)

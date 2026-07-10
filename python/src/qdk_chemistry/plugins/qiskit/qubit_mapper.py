@@ -22,6 +22,7 @@ from qiskit_nature.second_q.mappers import (
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.symmetry import axes, spin_channel_indices
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
@@ -135,7 +136,7 @@ class QiskitQubitMapper(QubitMapper):
 
         h1_a, h1_b = hamiltonian.get_one_body_integrals()
         h2_aa, h2_ab, h2_bb = hamiltonian.get_two_body_integrals()
-        num_orbs = hamiltonian.get_orbitals().num_active_orbitals()
+        num_orbs = len(spin_channel_indices(hamiltonian.get_orbitals().active_indices(), axes.alpha()))
         is_restricted = hamiltonian.get_orbitals().is_restricted()
 
         if is_restricted:

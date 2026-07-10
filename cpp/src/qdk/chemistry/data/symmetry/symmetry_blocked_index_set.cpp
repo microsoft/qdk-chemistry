@@ -91,11 +91,12 @@ std::string SymmetryBlockedIndexSet::get_summary() const {
 }
 
 std::vector<std::size_t> spin_channel_indices(
-    const std::shared_ptr<const SymmetryBlockedIndexSet>& set, bool beta) {
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& set,
+    const std::shared_ptr<const SpinValue>& channel) {
   if (!set) return {};
   const auto sym = set->symmetries();
   const SymmetryLabel label = (sym && sym->has_axis(AxisName::Spin))
-                                  ? (beta ? axes::beta() : axes::alpha())
+                                  ? SymmetryLabel{channel}
                                   : SymmetryLabel{};
   if (!set->has(label)) return {};
   const auto s = set->indices(label);

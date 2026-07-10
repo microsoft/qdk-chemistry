@@ -38,6 +38,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.symmetry import (
+    axes,
     spin_channel_indices,
     spin_channel_matrix,
     spin_channel_vector,
@@ -62,8 +63,8 @@ def test_get_coefficients_warns_and_matches_v2():
     with pytest.warns(DeprecationWarning, match="get_coefficients"):
         alpha, beta = orb.get_coefficients()
     coeffs = orb.coefficients()
-    np.testing.assert_allclose(alpha, spin_channel_matrix(coeffs))
-    np.testing.assert_allclose(beta, spin_channel_matrix(coeffs, beta=True))
+    np.testing.assert_allclose(alpha, spin_channel_matrix(coeffs, axes.alpha()))
+    np.testing.assert_allclose(beta, spin_channel_matrix(coeffs, axes.beta()))
 
 
 def test_get_coefficients_alpha_beta_warn_and_match_v2():
@@ -74,8 +75,8 @@ def test_get_coefficients_alpha_beta_warn_and_match_v2():
     with pytest.warns(DeprecationWarning, match="get_coefficients_beta"):
         beta = orb.get_coefficients_beta()
     coeffs = orb.coefficients()
-    np.testing.assert_allclose(alpha, spin_channel_matrix(coeffs))
-    np.testing.assert_allclose(beta, spin_channel_matrix(coeffs, beta=True))
+    np.testing.assert_allclose(alpha, spin_channel_matrix(coeffs, axes.alpha()))
+    np.testing.assert_allclose(beta, spin_channel_matrix(coeffs, axes.beta()))
 
 
 def test_get_energies_warns_and_matches_v2():
@@ -84,8 +85,8 @@ def test_get_energies_warns_and_matches_v2():
     with pytest.warns(DeprecationWarning, match="get_energies"):
         alpha, beta = orb.get_energies()
     energies = orb.energies()
-    np.testing.assert_allclose(alpha, spin_channel_vector(energies))
-    np.testing.assert_allclose(beta, spin_channel_vector(energies, beta=True))
+    np.testing.assert_allclose(alpha, spin_channel_vector(energies, axes.alpha()))
+    np.testing.assert_allclose(beta, spin_channel_vector(energies, axes.beta()))
 
 
 def test_get_active_space_indices_warns_and_matches_v2():
@@ -94,9 +95,9 @@ def test_get_active_space_indices_warns_and_matches_v2():
     with pytest.warns(DeprecationWarning, match="get_active_space_indices"):
         alpha, beta = orb.get_active_space_indices()
     active = orb.active_indices()
-    assert list(alpha) == spin_channel_indices(active, beta=False)
-    assert list(beta) == spin_channel_indices(active, beta=True)
-    assert len(alpha) == orb.num_active_orbitals()
+    assert list(alpha) == spin_channel_indices(active, axes.alpha())
+    assert list(beta) == spin_channel_indices(active, axes.beta())
+    assert len(alpha) == len(spin_channel_indices(orb.active_indices(), axes.alpha()))
 
 
 def test_get_inactive_space_indices_warns_and_matches_v2():
@@ -105,9 +106,9 @@ def test_get_inactive_space_indices_warns_and_matches_v2():
     with pytest.warns(DeprecationWarning, match="get_inactive_space_indices"):
         alpha, beta = orb.get_inactive_space_indices()
     inactive = orb.inactive_indices()
-    assert list(alpha) == spin_channel_indices(inactive, beta=False)
-    assert list(beta) == spin_channel_indices(inactive, beta=True)
-    assert len(alpha) == orb.num_inactive_orbitals()
+    assert list(alpha) == spin_channel_indices(inactive, axes.alpha())
+    assert list(beta) == spin_channel_indices(inactive, axes.beta())
+    assert len(alpha) == len(spin_channel_indices(orb.inactive_indices(), axes.alpha()))
 
 
 @pytest.mark.parametrize(
@@ -198,13 +199,15 @@ def test_orbitals_restricted_index_tuple_ctor_warns_and_constructs():
     with pytest.warns(DeprecationWarning, match="coefficients, energies, ao_overlap"):
         orb = Orbitals(coeffs, energies, None, basis_set, (active, inactive))
     assert orb.is_restricted()
-    assert orb.num_active_orbitals() == len(active)
-    assert orb.num_inactive_orbitals() == len(inactive)
-    assert spin_channel_indices(orb.active_indices(), beta=False) == active
-    assert spin_channel_indices(orb.active_indices(), beta=True) == active
-    assert spin_channel_indices(orb.inactive_indices(), beta=False) == inactive
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == len(active)
+    assert len(spin_channel_indices(orb.inactive_indices(), axes.alpha())) == len(inactive)
+    assert spin_channel_indices(orb.active_indices(), axes.alpha()) == active
+    assert spin_channel_indices(orb.active_indices(), axes.beta()) == active
+    assert spin_channel_indices(orb.inactive_indices(), axes.alpha()) == inactive
     v2 = Orbitals(coeffs, energies, None, basis_set, spin_index_set(4, active, active))
-    assert orb.num_active_orbitals() == v2.num_active_orbitals()
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == len(
+        spin_channel_indices(v2.active_indices(), axes.alpha())
+    )
 
 
 def test_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
@@ -218,10 +221,10 @@ def test_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
             coeffs_a, coeffs_b, energies, energies, None, basis_set, (active_a, active_b, inactive_a, inactive_b)
         )
     assert orb.is_unrestricted()
-    assert spin_channel_indices(orb.active_indices(), beta=False) == active_a
-    assert spin_channel_indices(orb.active_indices(), beta=True) == active_b
-    assert spin_channel_indices(orb.inactive_indices(), beta=False) == inactive_a
-    assert spin_channel_indices(orb.inactive_indices(), beta=True) == inactive_b
+    assert spin_channel_indices(orb.active_indices(), axes.alpha()) == active_a
+    assert spin_channel_indices(orb.active_indices(), axes.beta()) == active_b
+    assert spin_channel_indices(orb.inactive_indices(), axes.alpha()) == inactive_a
+    assert spin_channel_indices(orb.inactive_indices(), axes.beta()) == inactive_b
 
 
 def test_orbitals_restricted_index_tuple_ctor_none_warns_and_constructs_full():
@@ -230,7 +233,7 @@ def test_orbitals_restricted_index_tuple_ctor_none_warns_and_constructs_full():
     with pytest.warns(DeprecationWarning, match="coefficients, energies, ao_overlap"):
         orb = Orbitals(np.eye(4), None, None, basis_set, indices=None)
     assert orb.is_restricted()
-    assert orb.num_active_orbitals() == 4
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 4
 
 
 def test_orbitals_unrestricted_index_tuple_ctor_none_warns_and_constructs_full():
@@ -239,7 +242,7 @@ def test_orbitals_unrestricted_index_tuple_ctor_none_warns_and_constructs_full()
     with pytest.warns(DeprecationWarning, match="coefficients_alpha, coefficients_beta"):
         orb = Orbitals(np.eye(4), np.eye(4) * 2.0, None, None, None, basis_set, indices=None)
     assert orb.is_unrestricted()
-    assert orb.num_active_orbitals() == 4
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 4
 
 
 @pytest.mark.parametrize("restricted", [True, False])
@@ -258,10 +261,10 @@ def test_model_orbitals_restricted_index_tuple_ctor_warns_and_constructs():
     with pytest.warns(DeprecationWarning, match="use the SymmetryBlockedIndexSet constructor"):
         model = ModelOrbitals(6, (active, inactive))
     assert model.is_restricted()
-    assert model.num_active_orbitals() == len(active)
-    assert model.num_inactive_orbitals() == len(inactive)
-    assert spin_channel_indices(model.active_indices(), beta=False) == active
-    assert spin_channel_indices(model.active_indices(), beta=True) == active
+    assert len(spin_channel_indices(model.active_indices(), axes.alpha())) == len(active)
+    assert len(spin_channel_indices(model.inactive_indices(), axes.alpha())) == len(inactive)
+    assert spin_channel_indices(model.active_indices(), axes.alpha()) == active
+    assert spin_channel_indices(model.active_indices(), axes.beta()) == active
 
 
 def test_model_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
@@ -270,7 +273,7 @@ def test_model_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
     with pytest.warns(DeprecationWarning, match="active_alpha, active_beta"):
         model = ModelOrbitals(5, (active_a, active_b, inactive_a, inactive_b))
     assert model.is_unrestricted()
-    assert spin_channel_indices(model.active_indices(), beta=False) == active_a
-    assert spin_channel_indices(model.active_indices(), beta=True) == active_b
-    assert spin_channel_indices(model.inactive_indices(), beta=False) == inactive_a
-    assert spin_channel_indices(model.inactive_indices(), beta=True) == inactive_b
+    assert spin_channel_indices(model.active_indices(), axes.alpha()) == active_a
+    assert spin_channel_indices(model.active_indices(), axes.beta()) == active_b
+    assert spin_channel_indices(model.inactive_indices(), axes.alpha()) == inactive_a
+    assert spin_channel_indices(model.inactive_indices(), axes.beta()) == inactive_b

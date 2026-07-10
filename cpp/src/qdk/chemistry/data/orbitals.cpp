@@ -30,8 +30,8 @@ namespace data {
 static std::pair<std::vector<size_t>, std::vector<size_t>>
 v1_indices_from_index_set(
     const std::shared_ptr<const SymmetryBlockedIndexSet>& index_set) {
-  return {spin_channel_indices(index_set, /*beta=*/false),
-          spin_channel_indices(index_set, /*beta=*/true)};
+  return {spin_channel_indices(index_set, axes::alpha()),
+          spin_channel_indices(index_set, axes::beta())};
 }
 
 // Build a symmetry-blocked index set from legacy (alpha, beta) index vectors.
@@ -856,16 +856,6 @@ bool Orbitals::has_inactive_space() const {
          !_inactive_space_indices.second.empty();
 }
 
-std::size_t Orbitals::num_active_orbitals() const {
-  QDK_LOG_TRACE_ENTERING();
-  return _active_space_indices.first.size();
-}
-
-std::size_t Orbitals::num_inactive_orbitals() const {
-  QDK_LOG_TRACE_ENTERING();
-  return _inactive_space_indices.first.size();
-}
-
 bool Orbitals::_is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if coefficients are set
@@ -1026,27 +1016,26 @@ std::string Orbitals::get_summary() const {
       "  Has active space: " + std::string(has_active_space() ? "Yes" : "No") +
       "\n";
   if (has_active_space()) {
-    summary += "  Active Orbitals: α=" +
-               std::to_string(spin_channel_indices(active_indices(),
-                                                   /*beta=*/false)
-                                  .size()) +
-               ", β=" +
-               std::to_string(
-                   spin_channel_indices(active_indices(), /*beta=*/true).size()) +
-               "\n";
+    summary +=
+        "  Active Orbitals: α=" +
+        std::to_string(
+            spin_channel_indices(active_indices(), axes::alpha()).size()) +
+        ", β=" +
+        std::to_string(
+            spin_channel_indices(active_indices(), axes::beta()).size()) +
+        "\n";
   }
   summary += "  Has inactive space: " +
              std::string(has_inactive_space() ? "Yes" : "No") + "\n";
   if (has_inactive_space()) {
-    summary += "  Inactive Orbitals: α=" +
-               std::to_string(spin_channel_indices(inactive_indices(),
-                                                   /*beta=*/false)
-                                  .size()) +
-               ", β=" +
-               std::to_string(spin_channel_indices(inactive_indices(),
-                                                   /*beta=*/true)
-                                  .size()) +
-               "\n";
+    summary +=
+        "  Inactive Orbitals: α=" +
+        std::to_string(
+            spin_channel_indices(inactive_indices(), axes::alpha()).size()) +
+        ", β=" +
+        std::to_string(
+            spin_channel_indices(inactive_indices(), axes::beta()).size()) +
+        "\n";
   }
   auto [virt_orbitals_alpha, virt_orbitals_beta] = get_virtual_space_indices();
   summary +=
@@ -1531,9 +1520,9 @@ nlohmann::json Orbitals::to_json() const {
     j["ao_overlap"] = matrix_to_json(*_ao_overlap);
   }
 
-  // Save active space indices. Emit them unconditionally (even when empty) so an
-  // explicitly empty active space (0 active orbitals) is distinguished from an
-  // absent one, which defaults to the full space on load.
+  // Save active space indices. Emit them unconditionally (even when empty) so
+  // an explicitly empty active space (0 active orbitals) is distinguished from
+  // an absent one, which defaults to the full space on load.
   j["active_space_indices"] = {{"alpha", _active_space_indices.first},
                                {"beta", _active_space_indices.second}};
 
@@ -2249,8 +2238,8 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
     restricted_dataset.write(&hb_is_restricted, H5::PredType::NATIVE_HBOOL);
 
-    // Save active space indices. save_vector_to_group omits empty vectors, so an
-    // explicitly empty active space (0 active orbitals) is recorded via the
+    // Save active space indices. save_vector_to_group omits empty vectors, so
+    // an explicitly empty active space (0 active orbitals) is recorded via the
     // active_space_is_empty marker below and distinguished from an absent one.
     save_vector_to_group(group, "active_space_indices_alpha",
                          _active_space_indices.first);
@@ -2342,8 +2331,8 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
 
     // Reconstruct via the symmetry-blocked index sets (or the full-active
     // constructor when no active indices were recorded). save_vector_to_group
-    // omits empty vectors, so an explicitly empty active space is flagged by the
-    // active_space_is_empty marker; treat it as a present-but-empty active
+    // omits empty vectors, so an explicitly empty active space is flagged by
+    // the active_space_is_empty marker; treat it as a present-but-empty active
     // space, distinct from an absent one which defaults to the full space.
     bool has_active =
         !active_indices_alpha.empty() || !active_indices_beta.empty();

@@ -32,7 +32,13 @@ from pyscf import lo
 from qdk_chemistry.algorithms import OrbitalLocalizer
 from qdk_chemistry.algorithms.orbital_localizer import new_aufbau_determinant_wavefunction
 from qdk_chemistry.data import Orbitals, Settings, Wavefunction
-from qdk_chemistry.data.symmetry import spin_channel_indices, spin_channel_matrix, spin_channel_vector, spin_index_set
+from qdk_chemistry.data.symmetry import (
+    axes,
+    spin_channel_indices,
+    spin_channel_matrix,
+    spin_channel_vector,
+    spin_index_set,
+)
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -196,11 +202,11 @@ class PyscfLocalizer(OrbitalLocalizer):
         has_active = orbitals.has_active_space()
         if has_active:
             active_idx = orbitals.active_indices()
-            active_alpha = spin_channel_indices(active_idx, beta=False)
-            active_beta = spin_channel_indices(active_idx, beta=True)
+            active_alpha = spin_channel_indices(active_idx, axes.alpha())
+            active_beta = spin_channel_indices(active_idx, axes.beta())
             inactive_idx = orbitals.inactive_indices()
-            inactive_alpha = spin_channel_indices(inactive_idx, beta=False)
-            inactive_beta = spin_channel_indices(inactive_idx, beta=True)
+            inactive_alpha = spin_channel_indices(inactive_idx, axes.alpha())
+            inactive_beta = spin_channel_indices(inactive_idx, axes.beta())
         else:
             active_alpha = active_beta = inactive_alpha = inactive_beta = []
 
@@ -210,7 +216,7 @@ class PyscfLocalizer(OrbitalLocalizer):
                 raise ValueError("For restricted orbitals, loc_indices_a and loc_indices_b must be identical")
 
             # Start with original coefficients
-            mo_coeffs = spin_channel_matrix(orbitals.coefficients())  # restricted: alpha coefficients
+            mo_coeffs = spin_channel_matrix(orbitals.coefficients(), axes.alpha())  # restricted: alpha coefficients
             mo_loc = mo_coeffs.copy()
 
             localized_mos = _do_loc(mo_coeffs, loc_indices_a)
@@ -220,7 +226,7 @@ class PyscfLocalizer(OrbitalLocalizer):
             nmo = mo_loc.shape[1]
             loc_orbitals = Orbitals(
                 coefficients=mo_loc,
-                energies=spin_channel_vector(orbitals.energies()) if orbitals.has_energies() else None,
+                energies=spin_channel_vector(orbitals.energies(), axes.alpha()) if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
                 active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha)) if has_active else None,
@@ -230,8 +236,8 @@ class PyscfLocalizer(OrbitalLocalizer):
             )
         else:
             # Unrestricted case - handle alpha and beta separately
-            mo_coeffs_alpha = spin_channel_matrix(orbitals.coefficients())
-            mo_coeffs_beta = spin_channel_matrix(orbitals.coefficients(), beta=True)
+            mo_coeffs_alpha = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+            mo_coeffs_beta = spin_channel_matrix(orbitals.coefficients(), axes.beta())
             mo_a = mo_coeffs_alpha.copy()
             mo_b = mo_coeffs_beta.copy()
 
@@ -245,8 +251,8 @@ class PyscfLocalizer(OrbitalLocalizer):
 
             nmo = mo_a.shape[1]
             if orbitals.has_energies():
-                energies_alpha = spin_channel_vector(orbitals.energies())
-                energies_beta = spin_channel_vector(orbitals.energies(), beta=True)
+                energies_alpha = spin_channel_vector(orbitals.energies(), axes.alpha())
+                energies_beta = spin_channel_vector(orbitals.energies(), axes.beta())
             else:
                 energies_alpha = energies_beta = None
             loc_orbitals = Orbitals(

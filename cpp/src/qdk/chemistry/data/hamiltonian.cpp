@@ -99,7 +99,8 @@ double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
     throw std::runtime_error("One-body integrals are not set");
   }
 
-  size_t norb = _orbitals->num_active_orbitals();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   if (i >= norb || j >= norb) {
     throw std::out_of_range("Orbital index out of range");
   }
@@ -215,8 +216,8 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
   if (!_orbitals || !_orbitals->has_active_space()) return;
 
   const auto active_ai = _orbitals->active_indices();
-  size_t n_active_alpha = spin_channel_indices(active_ai, /*beta=*/false).size();
-  size_t n_active_beta = spin_channel_indices(active_ai, /*beta=*/true).size();
+  size_t n_active_alpha = spin_channel_indices(active_ai, axes::alpha()).size();
+  size_t n_active_beta = spin_channel_indices(active_ai, axes::beta()).size();
 
   // Check one-body integrals dimensions match active space
   if (has_one_body_integrals()) {
@@ -326,9 +327,9 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     if (_orbitals->has_active_space()) {
       const auto active_ai = _orbitals->active_indices();
       size_t n_active_alpha =
-          spin_channel_indices(active_ai, /*beta=*/false).size();
+          spin_channel_indices(active_ai, axes::alpha()).size();
       size_t n_active_beta =
-          spin_channel_indices(active_ai, /*beta=*/true).size();
+          spin_channel_indices(active_ai, axes::beta()).size();
 
       if (n_active_alpha != n_active_beta) {
         throw std::invalid_argument(
@@ -422,7 +423,9 @@ std::string Hamiltonian::get_summary() const {
   QDK_LOG_TRACE_ENTERING();
   std::string summary = "Hamiltonian Summary:\n";
   size_t num_molecular_orbitals = get_orbitals()->get_num_molecular_orbitals();
-  size_t norb = get_orbitals()->num_active_orbitals();
+  size_t norb =
+      spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+          .size();
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";

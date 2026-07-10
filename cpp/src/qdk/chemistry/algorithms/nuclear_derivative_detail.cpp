@@ -145,7 +145,7 @@ std::shared_ptr<const data::SymmetryBlockedIndexSet> project_index_set_to(
   }
   const auto symmetries = target->coefficients()->symmetries()[1];
   const auto& extents = target->coefficients()->extents()[1];
-  const auto alpha = data::spin_channel_indices(source, /*beta=*/false);
+  const auto alpha = data::spin_channel_indices(source, data::axes::alpha());
   auto to_u32 = [](const std::vector<std::size_t>& v) {
     return std::vector<std::uint32_t>(v.begin(), v.end());
   };
@@ -153,7 +153,7 @@ std::shared_ptr<const data::SymmetryBlockedIndexSet> project_index_set_to(
   if (symmetries && symmetries->has_axis(data::AxisName::Spin)) {
     if (!alpha.empty()) indices.emplace(data::axes::alpha(), to_u32(alpha));
     if (!target->is_restricted()) {
-      const auto beta = data::spin_channel_indices(source, /*beta=*/true);
+      const auto beta = data::spin_channel_indices(source, data::axes::beta());
       if (!beta.empty()) indices.emplace(data::axes::beta(), to_u32(beta));
     }
   } else if (!alpha.empty()) {
@@ -215,8 +215,10 @@ ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
 
   if (!reference.wavefunction) {
     const auto active_ai = reference.orbitals->active_indices();
-    const auto active_a = data::spin_channel_indices(active_ai, /*beta=*/false);
-    const auto active_b = data::spin_channel_indices(active_ai, /*beta=*/true);
+    const auto active_a =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto active_b =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     if (active_a.size() != active_b.size()) {
       throw std::invalid_argument(
           "Reference orbital localization requires matching alpha and beta "
@@ -240,8 +242,8 @@ ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
   auto localizer = create_from_ref<LocalizerFactory>(
       settings.get<data::AlgorithmRef>("orbital_localizer"));
   const auto loc_ai = reference.orbitals->active_indices();
-  auto loc_indices_a = data::spin_channel_indices(loc_ai, /*beta=*/false);
-  auto loc_indices_b = data::spin_channel_indices(loc_ai, /*beta=*/true);
+  auto loc_indices_a = data::spin_channel_indices(loc_ai, data::axes::alpha());
+  auto loc_indices_b = data::spin_channel_indices(loc_ai, data::axes::beta());
   reference.wavefunction =
       localizer->run(reference.wavefunction, loc_indices_a, loc_indices_b);
   reference.orbitals = reference.wavefunction->get_orbitals();

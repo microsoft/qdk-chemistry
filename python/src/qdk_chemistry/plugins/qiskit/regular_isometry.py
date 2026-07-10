@@ -12,7 +12,7 @@ from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
-from qdk_chemistry.data.symmetry import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_channel_indices
 from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     MergeZBasisRotations,
     RemoveZBasisOnZeroState,
@@ -50,8 +50,8 @@ class RegularIsometryStatePreparation(StatePreparation):
         Logger.trace_entering()
         # Active Space Consistency Check
         active_indices = wavefunction.get_orbitals().active_indices()
-        alpha_indices = spin_channel_indices(active_indices, beta=False)
-        beta_indices = spin_channel_indices(active_indices, beta=True)
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
         if alpha_indices != beta_indices:
             raise ValueError(
                 f"Active space contains {len(alpha_indices)} alpha orbitals and "

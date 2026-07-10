@@ -38,7 +38,7 @@ import numpy as np
 import pyscf
 
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
-from qdk_chemistry.data.symmetry import spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import axes, spin_channel_indices, spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
@@ -456,12 +456,12 @@ def orbitals_to_scf(
 
     mol = basis_to_pyscf_mol(basis_set, charge=charge, multiplicity=multiplicity)
 
-    coeff_a = spin_channel_matrix(orbitals.coefficients())
-    coeff_b = spin_channel_matrix(orbitals.coefficients(), beta=True)
+    coeff_a = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+    coeff_b = spin_channel_matrix(orbitals.coefficients(), axes.beta())
     # Get energies if available, otherwise use zero arrays as placeholders
     if orbitals.has_energies():
-        energy_a = spin_channel_vector(orbitals.energies())
-        energy_b = spin_channel_vector(orbitals.energies(), beta=True)
+        energy_a = spin_channel_vector(orbitals.energies(), axes.alpha())
+        energy_b = spin_channel_vector(orbitals.energies(), axes.beta())
     else:
         # Energies not set (e.g., from rotated orbitals) - use zero arrays as placeholders
         num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
@@ -624,7 +624,10 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     # Consistency checks
     if np.any(alpha_occ != beta_occ):
         raise ValueError("Open-shell is not supported.")
-    if orbitals.has_active_space() and orbitals.num_active_orbitals() != orbitals.get_num_molecular_orbitals():
+    if (
+        orbitals.has_active_space()
+        and len(spin_channel_indices(orbitals.active_indices(), axes.alpha())) != orbitals.get_num_molecular_orbitals()
+    ):
         raise ValueError("Active space is not supported.")
 
     # Dummy molecule

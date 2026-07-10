@@ -12,6 +12,7 @@ representations, particularly for quantum circuit simulation and state preparati
 import numpy as np
 
 from qdk_chemistry import data
+from qdk_chemistry.data.symmetry import axes, spin_channel_indices
 
 __all__ = ["create_statevector_from_wavefunction"]
 
@@ -51,7 +52,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
 
     """
     orbitals = wavefunction.get_orbitals()
-    num_orbs = orbitals.num_active_orbitals()
+    num_orbs = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
     num_qubits = num_orbs * 2
     dim = 1 << num_qubits  # 2^num_qubits
 

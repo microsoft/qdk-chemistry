@@ -99,9 +99,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Get alpha and beta active space indices
   const auto active_ai = orbitals->active_indices();
   auto active_indices_alpha =
-      data::spin_channel_indices(active_ai, /*beta=*/false);
+      data::spin_channel_indices(active_ai, data::axes::alpha());
   auto active_indices_beta =
-      data::spin_channel_indices(active_ai, /*beta=*/true);
+      data::spin_channel_indices(active_ai, data::axes::beta());
 
   if (orbitals->is_restricted() && active_indices_alpha.empty()) {
     throw std::runtime_error("Need to specify an active space.");
@@ -288,9 +288,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Get inactive space indices for both alpha and beta
   const auto inactive_ai = orbitals->inactive_indices();
   auto inactive_indices_alpha =
-      data::spin_channel_indices(inactive_ai, /*beta=*/false);
+      data::spin_channel_indices(inactive_ai, data::axes::alpha());
   auto inactive_indices_beta =
-      data::spin_channel_indices(inactive_ai, /*beta=*/true);
+      data::spin_channel_indices(inactive_ai, data::axes::beta());
 
   // For restricted calculations, alpha and beta inactive spaces should be
   // identical

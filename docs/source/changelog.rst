@@ -84,9 +84,9 @@ tested facades over the new ``SymmetryBlocked`` storage, but now emit a
 - ``get_active_space_indices()`` / ``get_inactive_space_indices()`` →
   :meth:`~qdk_chemistry.data.Orbitals.active_indices` /
   :meth:`~qdk_chemistry.data.Orbitals.inactive_indices`
-  (each a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`), with
-  :meth:`~qdk_chemistry.data.Orbitals.num_active_orbitals` /
-  :meth:`~qdk_chemistry.data.Orbitals.num_inactive_orbitals` for sizes.
+  (each a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`); take the
+  length of a :func:`~qdk_chemistry.data.symmetry.spin_channel_indices` channel for
+  per-channel sizes.
 
 Importing a removed or renamed ``qdk_chemistry.data`` name (the wavefunction and
 unitary aliases above, as well as ``EncodingMismatchError`` and

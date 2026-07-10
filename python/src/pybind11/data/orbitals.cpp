@@ -793,30 +793,6 @@ Examples:
 
 )");
 
-  orbitals.def("num_active_orbitals", &Orbitals::num_active_orbitals,
-               R"(
-Number of active orbitals (per spin channel).
-
-Returns the active-space orbital count for the alpha channel (equal to the beta
-count for restricted/spin-balanced spaces), falling back to the full molecular
-orbital count when no active space is set.
-
-Returns:
-    int: Number of active orbitals.
-)");
-
-  orbitals.def("num_inactive_orbitals", &Orbitals::num_inactive_orbitals,
-               R"(
-Number of inactive orbitals (per spin channel).
-
-Returns the inactive-space orbital count for the alpha channel (equal to the
-beta count for restricted/spin-balanced spaces), or zero when no inactive space
-is set.
-
-Returns:
-    int: Number of inactive orbitals.
-)");
-
   // Serialization
   orbitals.def("to_file", orbitals_to_file_wrapper,
                R"(

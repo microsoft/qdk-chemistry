@@ -121,15 +121,15 @@ def spin_index_set(
     return SymmetryBlockedIndexSet(sym, extents, indices)
 
 
-def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, *, beta: bool = False):
+def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, channel: SpinValue):
     """Per-spin dense block of a rank-2 (coefficient-like) SymmetryBlockedTensor.
 
-    Returns the alpha or beta block per ``beta``; for a restricted (spin-equivalent)
-    tensor the alpha and beta blocks share storage, so both selections succeed.
+    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the
+    alpha and beta blocks share storage, so either channel selection succeeds.
 
     Args:
         coefficients: A rank-2 SymmetryBlockedTensor (e.g. orbital coefficients).
-        beta: Select the beta channel when True, otherwise alpha.
+        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.
 
     Returns:
         The requested spin channel's dense block as a NumPy array.
@@ -139,26 +139,26 @@ def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, *, beta: bool 
 
     def _slot_label(index: int) -> SymmetryLabel:
         spin_axis = index < len(slots) and slots[index].has_axis(AxisName.Spin)
-        return SymmetryLabel([axes.beta() if beta else axes.alpha()]) if spin_axis else SymmetryLabel([])
+        return SymmetryLabel([channel]) if spin_axis else SymmetryLabel([])
 
     return coefficients.block([_slot_label(0), _slot_label(1)])
 
 
-def spin_channel_vector(energies: SymmetryBlockedTensorRank1, *, beta: bool = False):
+def spin_channel_vector(energies: SymmetryBlockedTensorRank1, channel: SpinValue):
     """Per-spin dense block of a rank-1 (energy-like) SymmetryBlockedTensor.
 
-    Returns the alpha or beta block per ``beta``; for a restricted (spin-equivalent)
-    tensor the alpha and beta blocks share storage, so both selections succeed.
+    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the
+    alpha and beta blocks share storage, so either channel selection succeeds.
 
     Args:
         energies: A rank-1 SymmetryBlockedTensor (e.g. orbital energies).
-        beta: Select the beta channel when True, otherwise alpha.
+        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.
 
     Returns:
         The requested spin channel's dense block as a NumPy array.
 
     """
-    label = SymmetryLabel([axes.beta() if beta else axes.alpha()])
+    label = SymmetryLabel([channel])
     slots = energies.symmetries()
     if not (slots and slots[0].has_axis(AxisName.Spin)):
         label = SymmetryLabel([])

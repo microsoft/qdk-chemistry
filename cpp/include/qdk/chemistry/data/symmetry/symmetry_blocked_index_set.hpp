@@ -242,16 +242,18 @@ class SymmetryBlockedIndexSet
  * @brief Read one spin channel's stored indices from an index set.
  *
  * Returns the indices for a single spin channel as a flat zero-based vector.
- * For a set carrying a spin (@f$S_z@f$) axis the alpha or beta segment is
- * returned per @p beta; for a spin-free (trivial) set the single trivial-label
- * segment serves both channels. The result is empty when @p set is null or the
+ * For a set carrying a spin (@f$S_z@f$) axis the segment for @p channel is
+ * returned; for a spin-free (trivial) set the single trivial-label segment
+ * serves every channel. The result is empty when @p set is null or the
  * requested channel stores no indices.
  *
  * @param set The index set to read (may be null).
- * @param beta Select the beta channel when @c true, otherwise alpha.
+ * @param channel The spin channel to read, e.g. @c axes::alpha() or
+ *        @c axes::beta(). Ignored for spin-free (trivial) sets.
  * @return The channel's indices as a flat vector (empty if unavailable).
  */
 std::vector<std::size_t> spin_channel_indices(
-    const std::shared_ptr<const SymmetryBlockedIndexSet>& set, bool beta);
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& set,
+    const std::shared_ptr<const SpinValue>& channel);
 
 }  // namespace qdk::chemistry::data

@@ -57,14 +57,14 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
 
   const auto active_index_set = orbitals->active_indices();
   const auto active_indices_a =
-      data::spin_channel_indices(active_index_set, /*beta=*/false);
+      data::spin_channel_indices(active_index_set, data::axes::alpha());
   const auto active_indices_b =
-      data::spin_channel_indices(active_index_set, /*beta=*/true);
+      data::spin_channel_indices(active_index_set, data::axes::beta());
   const auto inactive_index_set = orbitals->inactive_indices();
   const auto inactive_indices_a =
-      data::spin_channel_indices(inactive_index_set, /*beta=*/false);
+      data::spin_channel_indices(inactive_index_set, data::axes::alpha());
   const auto inactive_indices_b =
-      data::spin_channel_indices(inactive_index_set, /*beta=*/true);
+      data::spin_channel_indices(inactive_index_set, data::axes::beta());
 
   if (active_indices_a != active_indices_b ||
       inactive_indices_a != inactive_indices_b) {
@@ -89,8 +89,8 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   const size_t num_active = active_indices_a.size();
   const auto& coeffs_alpha = orbitals->coefficients()->block(
       {data::axes::alpha(), data::axes::alpha()});
-  const auto& coeffs_beta = orbitals->coefficients()->block(
-      {data::axes::beta(), data::axes::beta()});
+  const auto& coeffs_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
 
   // Extract active alpha coefficients as the target spatial orbital basis.
   Eigen::MatrixXd selected_coeffs(coeffs_alpha.rows(), num_active);
