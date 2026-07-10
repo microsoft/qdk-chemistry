@@ -629,8 +629,7 @@ class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMet
         warnings.warn(
             "'QubitHamiltonian' has been renamed to 'QubitOperator' and is deprecated; it will be "
             "removed in a future release. Replace 'QubitHamiltonian' with 'QubitOperator' "
-            "(import it from 'qdk_chemistry.data'). The classes are fully compatible: 'isinstance' "
-            "checks against 'QubitHamiltonian' continue to match 'QubitOperator' instances.",
+            "(from qdk_chemistry.data import QubitOperator).",
             DeprecationWarning,
             stacklevel=2,
         )
