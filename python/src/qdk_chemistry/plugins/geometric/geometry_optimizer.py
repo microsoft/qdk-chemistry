@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
@@ -177,7 +179,11 @@ class GeometricOptimizer(GeometryOptimizer):
         params.update({"customengine": engine, "input": None})
 
         with TemporaryDirectory(prefix="qdk-chemistry-geometric-") as tmpdir:
-            result = run_optimizer(**params, prefix=f"{tmpdir}/qdk-chemistry", dirname=tmpdir)
+            prefix = Path(tmpdir) / "qdk-chemistry"
+            try:
+                result = run_optimizer(**params, prefix=str(prefix), dirname=tmpdir)
+            finally:
+                _close_geometric_log_handler(prefix.with_suffix(".log"))
 
         optimized_coordinates = _extract_coordinates(result, engine)
         optimized_structure = engine.structure_from_coordinates(optimized_coordinates)
@@ -206,6 +212,16 @@ class GeometricOptimizer(GeometryOptimizer):
             "convergence_drms": self._settings["convergence_displacement"],
             "verbose": self._settings["print_level"],
         }
+
+
+def _close_geometric_log_handler(log_path: Path) -> None:
+    """Close geomeTRIC's root file handler for a completed optimization."""
+    expected_path = log_path.resolve()
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename).resolve() == expected_path:
+            root_logger.removeHandler(handler)
+            handler.close()
 
 
 def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine) -> np.ndarray:

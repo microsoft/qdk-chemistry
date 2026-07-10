@@ -5,13 +5,18 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import logging
+
 import numpy as np
 import pytest
 
 pytest.importorskip("geometric", reason="geomeTRIC not available")
 
 from qdk_chemistry import algorithms, data
-from qdk_chemistry.plugins.geometric.geometry_optimizer import GEOMETRIC_OPTIMIZER_ALGORITHMS
+from qdk_chemistry.plugins.geometric.geometry_optimizer import (
+    GEOMETRIC_OPTIMIZER_ALGORITHMS,
+    _close_geometric_log_handler,
+)
 
 
 def _h2_structure():
@@ -60,6 +65,24 @@ def test_geometric_optimizer_settings():
     assert settings.get("convergence_energy") == pytest.approx(1.0e-6)
     assert settings.get("convergence_gradient") == pytest.approx(3.0e-4)
     assert settings.get("convergence_displacement") == pytest.approx(1.2e-3)
+
+
+def test_geometric_log_handler_is_closed_before_temp_directory_cleanup(tmp_path):
+    """Close the temporary geomeTRIC log so Windows can delete it."""
+    log_path = tmp_path / "qdk-chemistry.log"
+    handler = logging.FileHandler(log_path)
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+
+    try:
+        _close_geometric_log_handler(log_path)
+
+        assert handler not in root_logger.handlers
+        assert handler.stream is None
+        log_path.unlink()
+    finally:
+        root_logger.removeHandler(handler)
+        handler.close()
 
 
 def test_geometric_optimizer_smoke_run():
