@@ -29,7 +29,8 @@ BasisOrGuessType seed_to_scf_input(const NuclearDerivativeSeedType& seed,
 
 std::pair<unsigned int, unsigned int> active_electron_counts(
     const std::shared_ptr<data::Structure>& structure, int charge,
-    int spin_multiplicity, unsigned int n_inactive_orbitals);
+    int spin_multiplicity, const NuclearDerivativeSeedType& seed,
+    unsigned int n_inactive_orbitals);
 
 EnergyEvaluation evaluate_energy(const data::Settings& settings,
                                  std::shared_ptr<data::Structure> structure,

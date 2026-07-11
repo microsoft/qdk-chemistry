@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
@@ -105,7 +106,8 @@ BasisOrGuessType seed_to_scf_input(const NuclearDerivativeSeedType& seed,
 
 std::pair<unsigned int, unsigned int> active_electron_counts(
     const std::shared_ptr<data::Structure>& structure, int charge,
-    int spin_multiplicity, unsigned int n_inactive_orbitals) {
+    int spin_multiplicity, const NuclearDerivativeSeedType& seed,
+    unsigned int n_inactive_orbitals) {
   if (!structure) {
     throw std::invalid_argument("Structure must not be null");
   }
@@ -113,13 +115,43 @@ std::pair<unsigned int, unsigned int> active_electron_counts(
     throw std::invalid_argument("spin_multiplicity must be at least 1");
   }
 
+  std::shared_ptr<data::BasisSet> basis;
+  if (std::holds_alternative<std::string>(seed)) {
+    basis =
+        data::BasisSet::from_basis_name(std::get<std::string>(seed), structure);
+  } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(seed)) {
+    basis = std::get<std::shared_ptr<data::BasisSet>>(seed);
+  } else {
+    std::shared_ptr<data::Orbitals> orbitals;
+    if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(seed)) {
+      orbitals = std::get<std::shared_ptr<data::Orbitals>>(seed);
+    } else {
+      auto wavefunction = std::get<std::shared_ptr<data::Wavefunction>>(seed);
+      if (wavefunction) {
+        orbitals = wavefunction->get_orbitals();
+      }
+    }
+    if (!orbitals || !orbitals->get_basis_set()) {
+      throw std::invalid_argument(
+          "Orbital or wavefunction seed must include orbitals with a basis "
+          "set");
+    }
+    basis = orbitals->get_basis_set();
+  }
+  if (!basis) {
+    throw std::invalid_argument("Basis set seed must not be null");
+  }
+
+  const auto n_ecp_electrons =
+      std::accumulate(basis->get_ecp_electrons().begin(),
+                      basis->get_ecp_electrons().end(), int64_t{0});
   const auto total_electrons = static_cast<int64_t>(std::llround(
                                    structure->get_nuclear_charges().sum())) -
-                               charge;
+                               charge - n_ecp_electrons;
   const auto unpaired_electrons = spin_multiplicity - 1;
   if (total_electrons < 0) {
     throw std::invalid_argument(
-        "charge cannot exceed the total nuclear charge");
+        "charge and ECP electrons cannot exceed the total nuclear charge");
   }
   if (unpaired_electrons > total_electrons ||
       (total_electrons + unpaired_electrons) % 2 != 0) {

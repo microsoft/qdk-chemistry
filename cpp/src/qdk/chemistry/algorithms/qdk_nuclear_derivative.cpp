@@ -28,7 +28,7 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
     throw std::invalid_argument("Structure must not be null");
   }
   (void)detail::active_electron_counts(structure, charge, spin_multiplicity,
-                                       n_inactive_orbitals);
+                                       seed, n_inactive_orbitals);
   if (_settings->get<bool>("compute_hessian")) {
     throw std::invalid_argument(
         "The QDK analytic nuclear derivative calculator does not currently "
