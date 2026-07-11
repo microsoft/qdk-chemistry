@@ -12,10 +12,15 @@ import pytest
 
 pytest.importorskip("geometric", reason="geomeTRIC not available")
 
+from geometric.molecule import Molecule
+
 from qdk_chemistry import algorithms, data
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from qdk_chemistry.plugins.geometric.geometry_optimizer import (
     GEOMETRIC_OPTIMIZER_ALGORITHMS,
     _close_geometric_log_handler,
+    _extract_coordinates,
+    _QdkDerivativeEngine,
 )
 
 
@@ -85,8 +90,34 @@ def test_geometric_log_handler_is_closed_before_temp_directory_cleanup(tmp_path)
         handler.close()
 
 
+def test_geometric_engine_coordinates_are_bohr():
+    """Keep geomeTRIC engine coordinates in the QDK structure's Bohr units."""
+    structure = _h2_structure()
+    molecule = Molecule()
+    molecule.elem = ["H", "H"]
+    molecule.xyzs = [np.zeros((2, 3))]
+    engine = _QdkDerivativeEngine(structure, 0, 1, "sto-3g", 0, None, molecule)
+
+    displaced = np.asarray(structure.get_coordinates()) + 0.25
+    converted = engine.structure_from_coordinates(displaced)
+
+    np.testing.assert_allclose(converted.get_coordinates(), displaced)
+    np.testing.assert_allclose(engine.last_coordinates(), structure.get_coordinates())
+
+
+def test_geometric_result_coordinates_are_converted_to_bohr():
+    """Convert geomeTRIC result coordinates from Angstrom to Bohr."""
+    coordinates_bohr = np.asarray(_h2_structure().get_coordinates())
+    result = type("Result", (), {"xyzs": [coordinates_bohr * BOHR_TO_ANGSTROM]})()
+
+    converted = _extract_coordinates(result, None)
+
+    np.testing.assert_allclose(converted, coordinates_bohr)
+    assert pytest.approx(1.0) == ANGSTROM_TO_BOHR * BOHR_TO_ANGSTROM
+
+
 def test_geometric_optimizer_smoke_run():
-    """Run a small geometry optimization through the optional geomeTRIC backend."""
+    """Optimize H2 to its STO-3G HF equilibrium bond length."""
     optimizer = algorithms.create("geometry_optimizer", "geometric_geoopt_tric")
     optimizer.settings().set("max_iterations", 20)
     derivative_ref = data.AlgorithmRef("nuclear_derivative_calculator", "qdk_finite_difference")
@@ -98,5 +129,9 @@ def test_geometric_optimizer_smoke_run():
     assert np.isfinite(energy)
     assert structure.get_num_atoms() == 2
     assert structure.get_coordinates().shape == (2, 3)
+    bond_length_bohr = np.linalg.norm(np.diff(structure.get_coordinates(), axis=0))
+    bond_length_angstrom = bond_length_bohr * BOHR_TO_ANGSTROM
+    assert bond_length_bohr == pytest.approx(1.346, abs=0.02)
+    assert bond_length_angstrom == pytest.approx(0.712, abs=0.01)
     assert wavefunction is not None
     assert hessian is None

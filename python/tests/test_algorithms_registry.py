@@ -140,8 +140,8 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
-            if default_name not in registry.available(algorithm_type):
-                continue  # Optional plugin-backed default is not installed
+            if algorithm_type == "geometry_optimizer" and default_name not in registry.available(algorithm_type):
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             # Should be able to create the default algorithm

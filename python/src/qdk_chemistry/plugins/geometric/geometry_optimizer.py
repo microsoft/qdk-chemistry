@@ -16,6 +16,7 @@ import numpy as np
 from geometric.engine import Engine
 
 from qdk_chemistry.algorithms import GeometryOptimizer
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from qdk_chemistry.data import AlgorithmRef, NuclearHessian, Settings, Structure
 from qdk_chemistry.utils import Logger
 
@@ -161,7 +162,7 @@ class GeometricOptimizer(GeometryOptimizer):
 
         molecule = Molecule()
         molecule.elem = structure.get_atomic_symbols()
-        molecule.xyzs = [np.asarray(structure.get_coordinates(), dtype=float)]
+        molecule.xyzs = [np.asarray(structure.get_coordinates(), dtype=float) * BOHR_TO_ANGSTROM]
 
         derivative_calculator = self._create_nested("derivative_calculator")
         derivative_calculator.settings().set("compute_hessian", False)
@@ -225,16 +226,16 @@ def _close_geometric_log_handler(log_path: Path) -> None:
 
 
 def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine) -> np.ndarray:
-    """Extract final coordinates from geomeTRIC's return value."""
+    """Extract final coordinates from geomeTRIC in Bohr."""
     if isinstance(result, np.ndarray):
-        return result
+        return result * ANGSTROM_TO_BOHR
     if hasattr(result, "xyzs") and result.xyzs:
-        return np.asarray(result.xyzs[-1], dtype=float)
+        return np.asarray(result.xyzs[-1], dtype=float) * ANGSTROM_TO_BOHR
     if isinstance(result, dict):
         for key in ("coords", "coordinates", "xyz", "xyzs"):
             if key in result:
                 value = result[key]
                 if key == "xyzs" and value:
                     value = value[-1]
-                return np.asarray(value, dtype=float)
+                return np.asarray(value, dtype=float) * ANGSTROM_TO_BOHR
     return engine.last_coordinates()
