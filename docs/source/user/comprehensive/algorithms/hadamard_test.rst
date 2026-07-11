@@ -55,7 +55,7 @@ State preparation circuit
 
 UnitaryRepresentation
    A :class:`~qdk_chemistry.data.UnitaryRepresentation` describing the unitary to apply under control.
-   This is often generated from a qubit operator via :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
+   This is often generated from a qubit Hamiltonian via :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
 
 Shots
    A positive integer number of circuit executions used to estimate expectation values from counts.

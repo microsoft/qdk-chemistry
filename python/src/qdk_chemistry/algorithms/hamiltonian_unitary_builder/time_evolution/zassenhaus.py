@@ -142,7 +142,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         """Construct the unitary representation using Zassenhaus decomposition.
 
         Args:
-            qubit_hamiltonian: The qubit operator to be used in the construction.
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
@@ -237,7 +237,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         """Decompose a single Zassenhaus step into exponentiated Pauli terms.
 
         Args:
-            qubit_hamiltonian: The qubit operator to be decomposed.
+            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
             atol: Absolute tolerance for filtering small coefficients.
             order: Zassenhaus expansion order (if None, taken from settings).
@@ -249,7 +249,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         terms: list[ExponentiatedPauliTerm] = []
 
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
-            raise ValueError("Non-Hermitian operator: coefficients have nonzero imaginary parts.")
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
         # If all coefficients are below the tolerance, there is nothing to decompose.
         if not any(abs(complex(c).real) > atol for c in qubit_hamiltonian.coefficients):

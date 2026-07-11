@@ -77,7 +77,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit operator for which to estimate the phase.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

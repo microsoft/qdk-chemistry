@@ -52,13 +52,13 @@ def compute_evolution_time(
 ) -> float:
     """Compute an evolution time for iterative QPE to achieve a target energy precision.
 
-    Starts from a base time of pi / ||H|| (Schatten norm of Hamiltonian), or an optional initial_time_guess.
-    If solve_hamiltonian is True, obtains a reference energy from Hamiltonian via a sparse matrix solver
+    Starts from a base time of pi / ||H|| (Schatten norm of qubit Hamiltonian), or an optional initial_time_guess.
+    If solve_hamiltonian is True, obtains a reference energy from qubit Hamiltonian via a sparse matrix solver
     and refines the time to reduce phase discretization error given num_bits of precision.
     If False, returns the base time without refinement.
 
     Args:
-        qubit_hamiltonian: Qubit operator.
+        qubit_hamiltonian: Qubit Hamiltonian.
         num_bits: Number of precision bits used in iterative QPE.
         solve_hamiltonian: Whether to solve for a reference energy to refine the time. Defaults to True.
         target_energy_precision: Desired energy precision in Hartree. Defaults to 1e-3.

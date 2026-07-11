@@ -155,7 +155,7 @@ class Trotter(TimeEvolutionBuilder):
         """Construct the unitary representation using Trotter decomposition.
 
         Args:
-            qubit_hamiltonian: The qubit operator to be used in the construction.
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
@@ -186,7 +186,7 @@ class Trotter(TimeEvolutionBuilder):
         where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).
 
         Args:
-            qubit_hamiltonian: The qubit operator to be used in the construction.
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
             time: The total evolution time.
             power_repetitions: Number of times the full Trotter product is repeated
                 (used by the "repeat" power strategy). Defaults to 1.
@@ -264,7 +264,7 @@ class Trotter(TimeEvolutionBuilder):
         with this builder.
 
         Args:
-            qubit_hamiltonian: The qubit operator to be decomposed.
+            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
             atol: Absolute tolerance for filtering small coefficients.
 
@@ -275,7 +275,7 @@ class Trotter(TimeEvolutionBuilder):
         terms: list[ExponentiatedPauliTerm] = []
 
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
-            raise ValueError("Non-Hermitian operator: coefficients have nonzero imaginary parts.")
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
         # If all coefficients are below the tolerance, there is nothing to decompose.
         if not any(abs(complex(c).real) > atol for c in qubit_hamiltonian.coefficients):

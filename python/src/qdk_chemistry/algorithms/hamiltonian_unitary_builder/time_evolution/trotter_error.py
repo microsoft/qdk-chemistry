@@ -66,7 +66,7 @@ def trotter_steps_naive(
     coefficients, :math:`p` is the order of the Trotter-Suzuki product formula.
 
     Args:
-        hamiltonian: The qubit operator to simulate.
+        hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Trotter-Suzuki product formula.
@@ -135,7 +135,7 @@ def trotter_steps_commutator(
     terms commute.
 
     Args:
-        hamiltonian: The qubit operator to simulate.
+        hamiltonian: The qubit Hamiltonian to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Trotter-Suzuki product formula.

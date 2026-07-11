@@ -119,7 +119,7 @@ Native QDK/Chemistry implementation of expectation estimator. Supports various s
      - Quantum circuit that prepares the target quantum state
    * - ``qubit_hamiltonian``
      - QubitOperator
-     - Hamiltonian to measure
+     - Qubit operator to measure
    * - ``circuit_executor``
      - CircuitExecutor
      - Backend to execute the measurement circuits

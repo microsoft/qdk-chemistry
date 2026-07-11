@@ -87,7 +87,7 @@ class QpeCircuitBuilder(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit operator for which to build circuits.
+            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
 
         Returns:
             A list of quantum circuits for phase estimation.
@@ -105,7 +105,7 @@ class QpeCircuitBuilder(Algorithm):
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The qubit operator to evolve under.
+            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
             power: The power to which the unitary should be raised.
 
         Returns:

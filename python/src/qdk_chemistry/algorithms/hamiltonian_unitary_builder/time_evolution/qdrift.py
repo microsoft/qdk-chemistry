@@ -224,7 +224,7 @@ class QDrift(TimeEvolutionBuilder):
         3. For each sampled term j, applying :math:`e^{-i \cdot \text{sign}(h_j) \cdot \lambda t / N \cdot P_j}`
 
         Args:
-            qubit_hamiltonian: The qubit operator to be used in the construction.
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
@@ -237,7 +237,7 @@ class QDrift(TimeEvolutionBuilder):
         weight_threshold: float = self._settings.get("weight_threshold")
 
         if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
-            raise ValueError("Non-Hermitian operator: coefficients have nonzero imaginary parts.")
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
         # Build (label, real_coeff) pairs from the Hamiltonian, dropping
         # sub-threshold terms so λ and the sampling distribution match.

@@ -75,7 +75,7 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit operator for which to estimate eigenvalues.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

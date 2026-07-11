@@ -39,13 +39,13 @@ class HamiltonianUnitaryBuilder(Algorithm):
 
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation for the given QubitOperator.
+        """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit operator.
+            qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation for the given QubitOperator.
+            UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
 
         """
 
@@ -137,7 +137,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
 
         Args:
-            qubit_hamiltonian: The qubit operator.
+            qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
