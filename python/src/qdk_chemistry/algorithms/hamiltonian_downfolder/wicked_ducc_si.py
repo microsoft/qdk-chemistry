@@ -203,7 +203,10 @@ class WickedDuccSISolver(Algorithm):
         # PySCF RCCSD: t1[nocc, nvir], t2[nocc, nocc, nvir, nvir] (spatial, NOT antisymmetrized).
         t1_spatial = mycc.t1
         t2_spatial = mycc.t2
-        t2_asym = t2_spatial - t2_spatial.swapaxes(2, 3)  # antisymmetrize for same-spin
+        # Full antisymmetrization for same-spin: t2_aa[ijab] must be antisymmetric
+        # in BOTH (i,j) and (a,b). PySCF's spatial T2 is symmetric, not antisymmetric.
+        t2_asym = (t2_spatial - t2_spatial.swapaxes(0, 1)
+                   - t2_spatial.swapaxes(2, 3) + t2_spatial.transpose(1, 0, 3, 2))
 
         T = {
             "ov": t1_spatial.copy(),           # T1 αα
@@ -277,15 +280,22 @@ class WickedDuccSISolver(Algorithm):
             n_lower = sum(1 for c in key if c.islower())
             if n_lower == 4:  # αααα
                 vbar_aa[np.ix_(range(*_sl(key[0]).indices(nmo)), range(*_sl(key[1]).indices(nmo)),
-                               range(*_sl(key[2]).indices(nmo)), range(*_sl(key[3]).indices(nmo)))] = arr
+                               range(*_sl(key[2]).indices(nmo)), range(*_sl(key[3]).indices(nmo)))] += arr
             elif n_lower == 0:  # ββββ
                 vbar_bb[np.ix_(range(*_sl(key[0]).indices(nmo)), range(*_sl(key[1]).indices(nmo)),
-                               range(*_sl(key[2]).indices(nmo)), range(*_sl(key[3]).indices(nmo)))] = arr
+                               range(*_sl(key[2]).indices(nmo)), range(*_sl(key[3]).indices(nmo)))] += arr
             elif n_lower == 2:  # αβ mixed
-                # Indices: lowercase = α spatial, uppercase = β spatial
                 s = [_sl(c) for c in key]
                 vbar_ab[np.ix_(range(*s[0].indices(nmo)), range(*s[1].indices(nmo)),
-                               range(*s[2].indices(nmo)), range(*s[3].indices(nmo)))] = arr
+                               range(*s[2].indices(nmo)), range(*s[3].indices(nmo)))] += arr
+
+        # Same-spin: antisymmetrize full array to fill in missing block permutations.
+        # Wicked only produces a canonical subset of blocks (e.g., "ovov" but not "vovo").
+        # The full antisymmetric tensor: v[pqrs] = vr[pqrs] - vr[qprs] - vr[pqsr] + vr[qpsr]
+        vbar_aa = (vbar_aa - vbar_aa.transpose(1, 0, 2, 3)
+                   - vbar_aa.transpose(0, 1, 3, 2) + vbar_aa.transpose(1, 0, 3, 2))
+        vbar_bb = (vbar_bb - vbar_bb.transpose(1, 0, 2, 3)
+                   - vbar_bb.transpose(0, 1, 3, 2) + vbar_bb.transpose(1, 0, 3, 2))
 
         # Active spatial indices
         act = list(range(nocc_a - noa_act, nocc_a)) + [nocc_a + i for i in range(nva_act)]
