@@ -291,6 +291,20 @@ TEST(NuclearDerivativeCalculatorTest, NullStructureThrowsInvalidArgument) {
   }
 }
 
+TEST(NuclearDerivativeCalculatorTest, NullWavefunctionSeedThrowsSpecificError) {
+  for (const auto& calculator_name : {"qdk_finite_difference", "qdk"}) {
+    auto calculator =
+        NuclearDerivativeCalculatorFactory::create(calculator_name);
+    try {
+      calculator->run(testing::create_hydrogen_structure(), 0, 2,
+                      std::shared_ptr<Wavefunction>{}, 0);
+      FAIL() << calculator_name << " accepted a null wavefunction seed";
+    } catch (const std::invalid_argument& ex) {
+      EXPECT_STREQ(ex.what(), "Wavefunction seed must not be null");
+    }
+  }
+}
+
 TEST(NuclearDerivativeCalculatorTest, ExcludesEcpCoreElectrons) {
   auto structure = testing::create_agh_structure();
   auto [n_alpha, n_beta] =
@@ -302,12 +316,24 @@ TEST(NuclearDerivativeCalculatorTest, ExcludesEcpCoreElectrons) {
 }
 
 TEST(NuclearDerivativeCalculatorTest, RejectsTooManyInactiveOrbitals) {
-  for (const auto& calculator_name : {"qdk_finite_difference", "qdk"}) {
-    auto calculator =
-        NuclearDerivativeCalculatorFactory::create(calculator_name);
-    EXPECT_THROW(calculator->run(testing::create_hydrogen_structure(), 0, 2,
-                                 std::string("sto-3g"), 1),
-                 std::invalid_argument);
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
+  EXPECT_THROW(calculator->run(testing::create_hydrogen_structure(), 0, 2,
+                               std::string("sto-3g"), 1),
+               std::invalid_argument);
+}
+
+TEST(NuclearDerivativeCalculatorTest, QdkAnalyticRejectsInactiveOrbitals) {
+  auto calculator = NuclearDerivativeCalculatorFactory::create("qdk");
+  try {
+    calculator->run(testing::create_water_structure(), 0, 1,
+                    std::string("sto-3g"), 1);
+    FAIL() << "QDK analytic calculator accepted inactive orbitals";
+  } catch (const std::invalid_argument& ex) {
+    EXPECT_STREQ(
+        ex.what(),
+        "The QDK analytic nuclear derivative calculator does not use an "
+        "active space; n_inactive_orbitals must be 0");
   }
 }
 
