@@ -204,36 +204,46 @@ class WickedDuccSISolver(Algorithm):
         # ── 5. Wicked BCH ──
         fbar, vbar, E0_bch = self._wicked_bch_si(w, ducc_level, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b)
 
-        # ── 6. Assemble full-space, restrict to active, γ→χ ──
+        # ── 6. Extract active sub-blocks directly, γ→χ ──
+        # Instead of assembling full nmo⁴ arrays, extract the active sub-block
+        # from each wicked output block directly. Only O(nact⁴) memory needed.
         nact = noa_act + nva_act
+        act_o_idx = list(range(ncore_a, nocc_a))
+        act_v_idx = list(range(nva_act))
 
-        fbar_aa = np.zeros((nmo, nmo)); fbar_bb = np.zeros((nmo, nmo))
+        def _act(c):
+            """Active sub-indices within each block."""
+            return act_o_idx if c in ("o", "O") else act_v_idx
+
+        def _off(c):
+            """Offset in the nact-sized active array."""
+            return 0 if c in ("o", "O") else noa_act
+
+        # 1-body: extract active sub-blocks from fbar
+        g1_aa = np.zeros((nact, nact)); g1_bb = np.zeros((nact, nact))
         for key, arr in fbar.items():
+            sub = arr[np.ix_(_act(key[0]), _act(key[1]))]
+            r0, c0 = _off(key[0]), _off(key[1])
             if key.islower():
-                fbar_aa[sl_map[key[0]], sl_map[key[1]]] = arr
+                g1_aa[r0:r0+sub.shape[0], c0:c0+sub.shape[1]] = sub
             elif key.isupper():
-                fbar_bb[sl_map[key[0]], sl_map[key[1]]] = arr
+                g1_bb[r0:r0+sub.shape[0], c0:c0+sub.shape[1]] = sub
 
-        vbar_aa = np.zeros((nmo,)*4); vbar_bb = np.zeros((nmo,)*4); vbar_ab = np.zeros((nmo,)*4)
+        # 2-body: extract active sub-blocks into nact⁴ arrays
+        g2_aa_raw = np.zeros((nact,)*4); g2_bb_raw = np.zeros((nact,)*4)
+        g2_ab = np.zeros((nact,)*4)
         for key, arr in vbar.items():
             n_lower = sum(1 for c in key if c.islower())
-            s = [sl_map[c] for c in key]
-            idx = np.ix_(range(*s[0].indices(nmo)), range(*s[1].indices(nmo)),
-                         range(*s[2].indices(nmo)), range(*s[3].indices(nmo)))
-            if n_lower == 4:   vbar_aa[idx] += arr
-            elif n_lower == 0: vbar_bb[idx] += arr
-            elif n_lower == 2: vbar_ab[idx] += arr
+            sub = arr[np.ix_(_act(key[0]), _act(key[1]), _act(key[2]), _act(key[3]))]
+            o = [_off(c) for c in key]; s = sub.shape
+            sl = tuple(slice(o[i], o[i]+s[i]) for i in range(4))
+            if n_lower == 4:   g2_aa_raw[sl] += sub
+            elif n_lower == 0: g2_bb_raw[sl] += sub
+            elif n_lower == 2: g2_ab[sl] += sub
 
-        # Antisymmetrize same-spin (fills missing permutation blocks + corrects factors)
-        vbar_aa = vbar_aa - vbar_aa.transpose(1,0,2,3) - vbar_aa.transpose(0,1,3,2) + vbar_aa.transpose(1,0,3,2)
-        vbar_bb = vbar_bb - vbar_bb.transpose(1,0,2,3) - vbar_bb.transpose(0,1,3,2) + vbar_bb.transpose(1,0,3,2)
-
-        # Restrict to active
-        act = list(range(nocc_a - noa_act, nocc_a)) + [nocc_a + i for i in range(nva_act)]
-        g1_aa = fbar_aa[np.ix_(act, act)]; g1_bb = fbar_bb[np.ix_(act, act)]
-        g2_aa = vbar_aa[np.ix_(act, act, act, act)]
-        g2_bb = vbar_bb[np.ix_(act, act, act, act)]
-        g2_ab = vbar_ab[np.ix_(act, act, act, act)]
+        # Antisymmetrize same-spin at active size (nact⁴, not nmo⁴)
+        g2_aa = g2_aa_raw - g2_aa_raw.transpose(1,0,2,3) - g2_aa_raw.transpose(0,1,3,2) + g2_aa_raw.transpose(1,0,3,2)
+        g2_bb = g2_bb_raw - g2_bb_raw.transpose(1,0,2,3) - g2_bb_raw.transpose(0,1,3,2) + g2_bb_raw.transpose(1,0,3,2)
 
         # χ₁^αα = γ₁^αα - Σ_m γ₂^αα[pm,qm] - Σ_M γ₂^αβ[pM,qM]
         # χ₁^ββ = γ₁^ββ - Σ_M γ₂^ββ[pM,qM] - Σ_m γ₂^αβ[mp,mq]
@@ -251,12 +261,10 @@ class WickedDuccSISolver(Algorithm):
                 C -= 0.5 * g2_aa[m, n, m, n] + 0.5 * g2_bb[m, n, m, n] + g2_ab[m, n, m, n]
 
         # ── 7. Package Hamiltonian ──
-        # h1 = χ₁^αα;  h2_chemist = γ₂^αβ.swapaxes(1,2) (physicist→chemist)
         from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
 
         return Hamiltonian(CanonicalFourCenterHamiltonianContainer(
             chi1_aa, g2_ab.swapaxes(1, 2).ravel(), ModelOrbitals(nact), C, np.zeros((nact, nact))))
-
     @staticmethod
     def _wicked_bch_si(w, bch_order, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b):
         """Run spin-integrated wicked BCH. Returns (fbar_dict, vbar_dict, E0_scalar)."""
