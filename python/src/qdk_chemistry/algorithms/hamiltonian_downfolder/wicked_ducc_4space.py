@@ -270,13 +270,17 @@ class WickedDucc4SpaceSolver(Algorithm):
         occ_b = ["C", "O"]
         vir_b = ["V", "E"]
 
+        def _is_all_active(o_chars, v_chars):
+            """True if all occupied indices are active and all virtual are active."""
+            return all(c in ("o", "O") for c in o_chars) and all(c in ("v", "V") for c in v_chars)
+
         T = {}
 
         # ── T1 blocks (same-spin α and β) ──
+        # All-active T1 (o→v, O→V) is excluded from σ_ext — no dict entry needed.
         for v_sp in vir_a:
             for o_sp in occ_a:
-                # Skip all-active component (structurally zeroed)
-                if v_sp == "v" and o_sp == "o":
+                if _is_all_active([o_sp], [v_sp]):
                     continue
                 o_sl = sl[o_sp]
                 v_sl = slice(sl[v_sp].start - nocc_a, sl[v_sp].stop - nocc_a)
@@ -284,55 +288,48 @@ class WickedDucc4SpaceSolver(Algorithm):
                 T[o_sp + v_sp] = t1[o_sl, v_sl].copy()
         for v_sp in vir_b:
             for o_sp in occ_b:
-                if v_sp == "V" and o_sp == "O":
+                if _is_all_active([o_sp], [v_sp]):
                     continue
                 o_sl = sl[o_sp]
                 v_sl = slice(sl[v_sp].start - nocc_b, sl[v_sp].stop - nocc_b)
                 T[v_sp + o_sp] = t1[o_sl, v_sl].T.copy()
                 T[o_sp + v_sp] = t1[o_sl, v_sl].copy()
-        # All-active T1 = 0 (structural zero)
-        T["vo"] = np.zeros((sl["v"].stop - sl["v"].start, sl["o"].stop - sl["o"].start))
-        T["ov"] = np.zeros((sl["o"].stop - sl["o"].start, sl["v"].stop - sl["v"].start))
-        T["VO"] = np.zeros((sl["V"].stop - sl["V"].start, sl["O"].stop - sl["O"].start))
-        T["OV"] = np.zeros((sl["O"].stop - sl["O"].start, sl["V"].stop - sl["V"].start))
 
         # ── T2 same-spin blocks (αα and ββ) ──
+        # All-active T2 (oo→vv, OO→VV) is excluded from σ_ext.
         for o1 in occ_a:
             for o2 in occ_a:
                 for v1 in vir_a:
                     for v2 in vir_a:
+                        if _is_all_active([o1, o2], [v1, v2]):
+                            continue
                         o1_sl, o2_sl = sl[o1], sl[o2]
                         v1_sl = slice(sl[v1].start - nocc_a, sl[v1].stop - nocc_a)
                         v2_sl = slice(sl[v2].start - nocc_a, sl[v2].stop - nocc_a)
                         block = t2_asym[o1_sl, o2_sl, v1_sl, v2_sl]
-                        # All-active T2 = 0 (structural zero)
-                        if o1 == "o" and o2 == "o" and v1 == "v" and v2 == "v":
-                            block = np.zeros_like(block)
                         # "oovv"-type key (de-excitation): direct storage
                         T[o1 + o2 + v1 + v2] = block.copy()
                         T[o1.upper() + o2.upper() + v1.upper() + v2.upper()] = block.copy()
                         # "vvoo"-type key (excitation): t2_asym[o2, o1, ...] transposed
                         # See docstring above for why o2 comes BEFORE o1 here.
                         block_t = t2_asym[o2_sl, o1_sl, v1_sl, v2_sl]
-                        if o1 == "o" and o2 == "o" and v1 == "v" and v2 == "v":
-                            block_t = np.zeros_like(block_t)
                         T[v1 + v2 + o2 + o1] = block_t.transpose(2, 3, 0, 1).copy()
                         T[v1.upper() + v2.upper() + o2.upper() + o1.upper()] = (
                             block_t.transpose(2, 3, 0, 1).copy()
                         )
 
         # ── T2 cross-spin blocks (αβ) ──
+        # All-active αβ T2 (oO→vV) is excluded from σ_ext.
         for oa in occ_a:
             for ob in occ_b:
                 for va in vir_a:
                     for vb in vir_b:
+                        if _is_all_active([oa, ob], [va, vb]):
+                            continue
                         oa_sl, ob_sl = sl[oa], sl[ob]
                         va_sl = slice(sl[va].start - nocc_a, sl[va].stop - nocc_a)
                         vb_sl = slice(sl[vb].start - nocc_b, sl[vb].stop - nocc_b)
                         raw = t2[oa_sl, ob_sl, va_sl, vb_sl]
-                        # All-active αβ T2 = 0
-                        if oa == "o" and ob == "O" and va == "v" and vb == "V":
-                            raw = np.zeros_like(raw)
                         # "oOvV"-type (direct)
                         T[oa + ob + va + vb] = raw.copy()
                         # "VvOo"-type (full reverse)
@@ -368,28 +365,35 @@ class WickedDucc4SpaceSolver(Algorithm):
         occ_b = ["C", "O"]
         vir_b = ["V", "E"]
 
+        def _is_all_active(o_chars, v_chars):
+            return all(c in ("o", "O") for c in o_chars) and all(c in ("v", "V") for c in v_chars)
+
+        # T1: exclude all-active (o→v, O→V) — structurally zero in σ_ext
         t1_comps = []
         for v_sp in vir_a:
             for o_sp in occ_a:
-                if v_sp == "v" and o_sp == "o":
-                    t1_comps.append(f"{v_sp}+ {o_sp}")  # include as zero
-                else:
+                if not _is_all_active([o_sp], [v_sp]):
                     t1_comps.append(f"{v_sp}+ {o_sp}")
         for v_sp in vir_b:
             for o_sp in occ_b:
-                if v_sp == "V" and o_sp == "O":
-                    t1_comps.append(f"{v_sp}+ {o_sp}")
-                else:
+                if not _is_all_active([o_sp], [v_sp]):
                     t1_comps.append(f"{v_sp}+ {o_sp}")
 
+        # T2: exclude all-active (oo→vv, OO→VV, oO→vV)
         t2_aa = [
-            f"{a1}+ {a2}+ {i2} {i1}" for i1 in occ_a for i2 in occ_a for a1 in vir_a for a2 in vir_a
+            f"{a1}+ {a2}+ {i2} {i1}"
+            for i1 in occ_a for i2 in occ_a for a1 in vir_a for a2 in vir_a
+            if not _is_all_active([i1, i2], [a1, a2])
         ]
         t2_bb = [
-            f"{a1}+ {a2}+ {i2} {i1}" for i1 in occ_b for i2 in occ_b for a1 in vir_b for a2 in vir_b
+            f"{a1}+ {a2}+ {i2} {i1}"
+            for i1 in occ_b for i2 in occ_b for a1 in vir_b for a2 in vir_b
+            if not _is_all_active([i1, i2], [a1, a2])
         ]
         t2_ab = [
-            f"{ab}+ {aa}+ {ib} {ia}" for ia in occ_a for ib in occ_b for aa in vir_a for ab in vir_b
+            f"{ab}+ {aa}+ {ib} {ia}"
+            for ia in occ_a for ib in occ_b for aa in vir_a for ab in vir_b
+            if not _is_all_active([ia, ib], [aa, ab])
         ]
 
         all_T = t1_comps + t2_aa + t2_bb + t2_ab
@@ -445,7 +449,18 @@ class WickedDucc4SpaceSolver(Algorithm):
             def __getitem__(self, k):
                 return self.val
 
+        # Only evaluate output blocks needed for the active-space Hamiltonian:
+        # scalar (E0), active 1-body (oo, ov, vo, vv and β equivalents),
+        # and active 2-body (all combinations of o/v and O/V).
+        active_a = {"o", "v"}
+        active_b = {"O", "V"}
+
+        def _is_active_output(ic):
+            """True if all free indices belong to active sub-spaces."""
+            return all(c in active_a or c in active_b for c in ic)
+
         fbar, vbar, E0_bch = {}, {}, 0.0
+        n_skipped = 0
         for key, eqs in mbeq.items():
             if not eqs:
                 continue
@@ -453,6 +468,11 @@ class WickedDucc4SpaceSolver(Algorithm):
             fc = eqs[0].compile("einsum")
             rv = fc.split("+=")[0].strip()
             ic = rv[1:]
+            # Skip non-active output blocks — they don't contribute to the
+            # active-space dressed Hamiltonian.
+            if ndim > 0 and not _is_active_output(ic):
+                n_skipped += 1
+                continue
             shape = [dim[c] for c in ic]
             lines = ["def _e(E0,H,T):"]
             lines.append(
@@ -471,6 +491,7 @@ class WickedDucc4SpaceSolver(Algorithm):
             elif ndim == 4:
                 vbar[ic] = np.array(result)
 
+        logger.info("Skipped %d non-active output blocks", n_skipped)
         return fbar, vbar, E0_bch
 
     @staticmethod
