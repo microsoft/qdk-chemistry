@@ -125,11 +125,15 @@ std::pair<unsigned int, unsigned int> active_electron_counts(
     std::shared_ptr<data::Orbitals> orbitals;
     if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(seed)) {
       orbitals = std::get<std::shared_ptr<data::Orbitals>>(seed);
+      if (!orbitals) {
+        throw std::invalid_argument("Orbital seed must not be null");
+      }
     } else {
       auto wavefunction = std::get<std::shared_ptr<data::Wavefunction>>(seed);
-      if (wavefunction) {
-        orbitals = wavefunction->get_orbitals();
+      if (!wavefunction) {
+        throw std::invalid_argument("Wavefunction seed must not be null");
       }
+      orbitals = wavefunction->get_orbitals();
     }
     if (!orbitals || !orbitals->get_basis_set()) {
       throw std::invalid_argument(
@@ -362,9 +366,9 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
 
   if (algorithm_type == MultiConfigurationScfFactory::algorithm_type_name()) {
     validate_active_electron_count(n_active_alpha_electrons,
-                                   "n_active_alpha_electrons");
+                                   "Derived active alpha electron count");
     validate_active_electron_count(n_active_beta_electrons,
-                                   "n_active_beta_electrons");
+                                   "Derived active beta electron count");
     auto reference = reference_orbitals_for_mr_energy(
         settings, structure, charge, spin_multiplicity, seed,
         allow_wavefunction_seed, n_active_alpha_electrons,
@@ -378,9 +382,9 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
   if (algorithm_type ==
       MultiConfigurationCalculatorFactory::algorithm_type_name()) {
     validate_active_electron_count(n_active_alpha_electrons,
-                                   "n_active_alpha_electrons");
+                                   "Derived active alpha electron count");
     validate_active_electron_count(n_active_beta_electrons,
-                                   "n_active_beta_electrons");
+                                   "Derived active beta electron count");
     auto reference = reference_orbitals_for_mr_energy(
         settings, structure, charge, spin_multiplicity, seed,
         allow_wavefunction_seed, n_active_alpha_electrons,

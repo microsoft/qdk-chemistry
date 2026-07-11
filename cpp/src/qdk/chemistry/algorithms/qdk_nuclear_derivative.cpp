@@ -27,8 +27,6 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
   if (!structure) {
     throw std::invalid_argument("Structure must not be null");
   }
-  (void)detail::active_electron_counts(structure, charge, spin_multiplicity,
-                                       seed, n_inactive_orbitals);
   if (_settings->get<bool>("compute_hessian")) {
     throw std::invalid_argument(
         "The QDK analytic nuclear derivative calculator does not currently "
@@ -43,6 +41,13 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
         "The QDK analytic nuclear derivative calculator requires "
         "energy_calculator to reference scf_solver/qdk.");
   }
+  if (n_inactive_orbitals != 0) {
+    throw std::invalid_argument(
+        "The QDK analytic nuclear derivative calculator does not use an "
+        "active space; n_inactive_orbitals must be 0");
+  }
+  (void)detail::active_electron_counts(structure, charge, spin_multiplicity,
+                                       seed, n_inactive_orbitals);
 
   microsoft::ScfSolver solver;
   if (ref.get_settings()) {

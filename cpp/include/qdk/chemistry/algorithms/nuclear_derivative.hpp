@@ -126,7 +126,7 @@ class NuclearDerivativeCalculator
    * @param spin_multiplicity The spin multiplicity of the molecular system
    * @param seed The basis name, basis set, orbitals, or wavefunction seed
    * @param n_inactive_orbitals The number of doubly occupied orbitals excluded
-   * from the active space
+   * from multi-reference active spaces; ignored by SCF energy paths
    * \endcond
    *
    * @return Energy, gradients, optional Hessian, and optional wavefunction.
@@ -161,7 +161,8 @@ class NuclearDerivativeCalculator
    * @param spin_multiplicity The spin multiplicity of the molecular system
    * @param seed The basis name, basis set, orbitals, or wavefunction seed
    * @param n_inactive_orbitals The number of doubly occupied orbitals excluded
-   * from the active space
+   * from multi-reference active spaces; ignored by SCF energy paths unless an
+   * implementation documents a stricter requirement
    * @return Energy, gradients, optional Hessian, and optional wavefunction
    */
   virtual NuclearDerivativeResult _run_impl(
