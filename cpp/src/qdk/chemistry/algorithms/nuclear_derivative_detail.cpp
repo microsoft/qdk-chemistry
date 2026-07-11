@@ -4,6 +4,8 @@
 
 #include "nuclear_derivative_detail.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
@@ -99,6 +101,42 @@ BasisOrGuessType seed_to_scf_input(const NuclearDerivativeSeedType& seed,
         "derivatives");
   }
   return basis->get_name();
+}
+
+std::pair<unsigned int, unsigned int> active_electron_counts(
+    const std::shared_ptr<data::Structure>& structure, int charge,
+    int spin_multiplicity, unsigned int n_inactive_orbitals) {
+  if (!structure) {
+    throw std::invalid_argument("Structure must not be null");
+  }
+  if (spin_multiplicity < 1) {
+    throw std::invalid_argument("spin_multiplicity must be at least 1");
+  }
+
+  const auto total_electrons = static_cast<int64_t>(std::llround(
+                                   structure->get_nuclear_charges().sum())) -
+                               charge;
+  const auto unpaired_electrons = spin_multiplicity - 1;
+  if (total_electrons < 0) {
+    throw std::invalid_argument(
+        "charge cannot exceed the total nuclear charge");
+  }
+  if (unpaired_electrons > total_electrons ||
+      (total_electrons + unpaired_electrons) % 2 != 0) {
+    throw std::invalid_argument(
+        "charge and spin_multiplicity specify incompatible electron counts");
+  }
+
+  const auto n_alpha_electrons =
+      static_cast<unsigned int>((total_electrons + unpaired_electrons) / 2);
+  const auto n_beta_electrons =
+      static_cast<unsigned int>(total_electrons) - n_alpha_electrons;
+  if (n_inactive_orbitals > std::min(n_alpha_electrons, n_beta_electrons)) {
+    throw std::invalid_argument(
+        "n_inactive_orbitals cannot exceed either spin electron count");
+  }
+  return {n_alpha_electrons - n_inactive_orbitals,
+          n_beta_electrons - n_inactive_orbitals};
 }
 
 std::shared_ptr<data::Orbitals> seed_to_orbitals(

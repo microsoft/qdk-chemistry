@@ -103,7 +103,7 @@ class NuclearDerivativeSettings : public data::Settings {
 class NuclearDerivativeCalculator
     : public Algorithm<NuclearDerivativeCalculator, NuclearDerivativeResult,
                        std::shared_ptr<data::Structure>, int, int,
-                       NuclearDerivativeSeedType, unsigned int, unsigned int> {
+                       NuclearDerivativeSeedType, unsigned int> {
  public:
   /**
    * @brief Construct a calculator with nuclear derivative settings.
@@ -113,7 +113,24 @@ class NuclearDerivativeCalculator
   }
   virtual ~NuclearDerivativeCalculator() = default;
 
-  using Algorithm::run;
+  /**
+   * @brief Compute nuclear derivatives for a molecular structure.
+   *
+   * @param structure Molecular structure to evaluate.
+   * @param charge Total molecular charge.
+   * @param spin_multiplicity Spin multiplicity of the molecular system.
+   * @param seed Basis name, basis set, orbitals, or wavefunction seed.
+   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded from
+   * the active space.
+   * @return Energy, gradients, optional Hessian, and optional wavefunction.
+   */
+  NuclearDerivativeResult run(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, NuclearDerivativeSeedType seed,
+      unsigned int n_inactive_orbitals = 0) const override {
+    return Algorithm::run(structure, charge, spin_multiplicity, std::move(seed),
+                          n_inactive_orbitals);
+  }
 
   virtual std::string name() const = 0;
 
@@ -131,8 +148,7 @@ class NuclearDerivativeCalculator
   virtual NuclearDerivativeResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity, NuclearDerivativeSeedType seed,
-      unsigned int n_active_alpha_electrons,
-      unsigned int n_active_beta_electrons) const = 0;
+      unsigned int n_inactive_orbitals) const = 0;
 };
 
 /**

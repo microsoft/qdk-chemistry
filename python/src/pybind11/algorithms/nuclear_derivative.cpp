@@ -36,12 +36,11 @@ class NuclearDerivativeCalculatorBase
  protected:
   NuclearDerivativeResult _run_impl(
       std::shared_ptr<Structure> structure, int charge, int spin_multiplicity,
-      NuclearDerivativeSeedType seed, unsigned int n_active_alpha_electrons,
-      unsigned int n_active_beta_electrons) const override {
+      NuclearDerivativeSeedType seed,
+      unsigned int n_inactive_orbitals) const override {
     PYBIND11_OVERRIDE_PURE(NuclearDerivativeResult, NuclearDerivativeCalculator,
                            _run_impl, structure, charge, spin_multiplicity,
-                           seed, n_active_alpha_electrons,
-                           n_active_beta_electrons);
+                           seed, n_inactive_orbitals);
   }
 };
 
@@ -62,14 +61,12 @@ void bind_nuclear_derivative(py::module& m) {
       [](const NuclearDerivativeCalculator& self,
          std::shared_ptr<Structure> structure, int charge,
          int spin_multiplicity, NuclearDerivativeSeedType seed,
-         unsigned int n_active_alpha_electrons,
-         unsigned int n_active_beta_electrons) {
+         unsigned int n_inactive_orbitals) {
         return self.run(structure, charge, spin_multiplicity, seed,
-                        n_active_alpha_electrons, n_active_beta_electrons);
+                        n_inactive_orbitals);
       },
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("seed_or_basis"), py::arg("n_active_alpha_electrons"),
-      py::arg("n_active_beta_electrons"),
+      py::arg("seed_or_basis"), py::arg("n_inactive_orbitals") = 0,
       R"(
 Compute nuclear derivatives for a molecular structure.
 
@@ -78,8 +75,7 @@ Args:
     charge: Total molecular charge.
     spin_multiplicity: Spin multiplicity of the molecular system.
     seed_or_basis: Basis name, basis set, orbitals, or wavefunction seed.
-    n_active_alpha_electrons: Active-space alpha electron count for multi-reference energy paths.
-    n_active_beta_electrons: Active-space beta electron count for multi-reference energy paths.
+    n_inactive_orbitals: Number of doubly occupied orbitals excluded from the active space.
 
 Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.

@@ -27,6 +27,10 @@ std::shared_ptr<data::Structure> displace_structure(
 BasisOrGuessType seed_to_scf_input(const NuclearDerivativeSeedType& seed,
                                    bool allow_orbital_guess);
 
+std::pair<unsigned int, unsigned int> active_electron_counts(
+    const std::shared_ptr<data::Structure>& structure, int charge,
+    int spin_multiplicity, unsigned int n_inactive_orbitals);
+
 EnergyEvaluation evaluate_energy(const data::Settings& settings,
                                  std::shared_ptr<data::Structure> structure,
                                  int charge, int spin_multiplicity,

@@ -19,10 +19,7 @@ namespace qdk::chemistry::algorithms {
 NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge,
     int spin_multiplicity, NuclearDerivativeSeedType seed,
-    unsigned int n_active_alpha_electrons,
-    unsigned int n_active_beta_electrons) const {
-  (void)n_active_alpha_electrons;
-  (void)n_active_beta_electrons;
+    unsigned int n_inactive_orbitals) const {
   std::optional<utils::ScopedLogLevel> scoped_log_level;
   if (_settings->get<bool>("suppress_child_algorithm_logging")) {
     scoped_log_level.emplace(utils::LogLevel::error);
@@ -30,6 +27,8 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
   if (!structure) {
     throw std::invalid_argument("Structure must not be null");
   }
+  (void)detail::active_electron_counts(structure, charge, spin_multiplicity,
+                                       n_inactive_orbitals);
   if (_settings->get<bool>("compute_hessian")) {
     throw std::invalid_argument(
         "The QDK analytic nuclear derivative calculator does not currently "
