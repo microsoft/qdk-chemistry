@@ -115,4 +115,3 @@ def spin_index_set(
         beta_label: list(beta),
     }
     return SymmetryBlockedIndexSet(sym, extents, indices)
-

@@ -40,8 +40,14 @@ static std::shared_ptr<const SymmetryBlockedIndexSet> index_set_from_v1_indices(
     std::shared_ptr<const SymmetryProduct> symmetries,
     std::unordered_map<SymmetryLabel, std::size_t> extents,
     const std::vector<size_t>& alpha, const std::vector<size_t>& beta) {
+  // v1 accepted mode indices in any order; the v2 SymmetryBlockedIndexSet
+  // requires strictly increasing indices, so canonicalize by sorting.
+  // Duplicates and out-of-range indices are still rejected downstream (matching
+  // v1).
   auto to_u32 = [](const std::vector<size_t>& v) {
-    return std::vector<std::uint32_t>(v.begin(), v.end());
+    std::vector<std::uint32_t> out(v.begin(), v.end());
+    std::sort(out.begin(), out.end());
+    return out;
   };
 
   if (!symmetries) {

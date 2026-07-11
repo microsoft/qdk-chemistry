@@ -275,3 +275,17 @@ def test_model_orbitals_unrestricted_index_tuple_ctor_warns_and_constructs():
     assert spin_channel_indices(model.active_indices(), axes.beta()) == active_b
     assert spin_channel_indices(model.inactive_indices(), axes.alpha()) == inactive_a
     assert spin_channel_indices(model.inactive_indices(), axes.beta()) == inactive_b
+
+
+def test_v1_index_tuple_ctors_accept_unsorted_indices():
+    """v1 accepted unsorted mode indices; the deprecated facades canonicalize (sort) them."""
+    basis_set = create_test_basis_set(4, "dep-unsorted")
+    with pytest.warns(DeprecationWarning):  # noqa: PT030
+        orb = Orbitals(np.eye(4), None, None, basis_set, ([2, 1], [0, 3]))
+    assert spin_channel_indices(orb.active_indices(), axes.alpha()) == [1, 2]
+    assert spin_channel_indices(orb.inactive_indices(), axes.alpha()) == [0, 3]
+
+    with pytest.warns(DeprecationWarning):  # noqa: PT030
+        model = ModelOrbitals(6, ([3, 2], [0, 1, 5, 4]))
+    assert spin_channel_indices(model.active_indices(), axes.alpha()) == [2, 3]
+    assert spin_channel_indices(model.inactive_indices(), axes.alpha()) == [0, 1, 4, 5]
