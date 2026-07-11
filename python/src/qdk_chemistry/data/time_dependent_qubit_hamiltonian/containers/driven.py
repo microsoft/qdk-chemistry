@@ -27,8 +27,8 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
     drive function *f(t)*.
 
     Args:
-        base_hamiltonian: Time-independent qubit Hamiltonian.
-        drive_hamiltonian: Driven qubit Hamiltonian (modulated by *drive*).
+        base_hamiltonian: Time-independent qubit operator.
+        drive_hamiltonian: Driven qubit operator (modulated by *drive*).
         drive: Scalar function f(t) that modulates *drive_hamiltonian*.
 
     Raises:
@@ -57,7 +57,7 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
             t: The time at which to evaluate the Hamiltonian.
 
         Returns:
-            The qubit Hamiltonian at the given time.
+            The qubit operator at the given time.
 
         """
         return self._base_hamiltonian + self._drive(t) * self._drive_hamiltonian

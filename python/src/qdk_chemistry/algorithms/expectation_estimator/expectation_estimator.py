@@ -1,4 +1,4 @@
-"""QDK/Chemistry energy estimator abstractions and utilities."""
+"""QDK/Chemistry expectation estimator abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -31,12 +31,12 @@ class ExpectationEstimatorSettings(Settings):
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-            "Circuit executor used to run quantum circuits for energy estimation.",
+            "Circuit executor used to run quantum circuits for expectation-value estimation.",
         )
 
 
 class ExpectationEstimator(Algorithm):
-    """Abstract base class for energy estimator algorithms."""
+    """Abstract base class for expectation estimator algorithms."""
 
     def __init__(self):
         """Initialize the ExpectationEstimator."""

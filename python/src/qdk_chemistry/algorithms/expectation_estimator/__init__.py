@@ -1,7 +1,7 @@
-"""QDK/Chemistry energy estimation module.
+"""QDK/Chemistry expectation estimator module.
 
-This module provides quantum state preparation algorithms for preparing
-quantum states from classical wavefunctions.
+This module provides algorithms that estimate expectation values of qubit
+operators (observables) from measurement circuits.
 """
 
 # --------------------------------------------------------------------------------------------

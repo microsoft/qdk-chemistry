@@ -28,8 +28,8 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
     under the hood.
 
     Args:
-        h0: Time-independent qubit Hamiltonian.
-        h1: Time-dependent qubit Hamiltonian (modulated by *drive*).
+        h0: Time-independent qubit operator.
+        h1: Time-dependent qubit operator (modulated by *drive*).
         drive: Scalar function f(t) that modulates *h1*.
 
     Raises:
@@ -46,8 +46,8 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
         """Initialize a driven time-dependent qubit Hamiltonian.
 
         Args:
-            h0: Time-independent qubit Hamiltonian.
-            h1: Time-dependent qubit Hamiltonian (modulated by *drive*).
+            h0: Time-independent qubit operator.
+            h1: Time-dependent qubit operator (modulated by *drive*).
             drive: Scalar function f(t) that modulates *h1*.
 
         """

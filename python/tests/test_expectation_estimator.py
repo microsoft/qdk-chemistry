@@ -254,7 +254,7 @@ def test_measurement_data_to_json():
 
 
 def test_create_expectation_estimator_qdk():
-    """Test factory function for creating QDK energy estimator."""
+    """Test factory function for creating QDK expectation estimator."""
     estimator = create("expectation_estimator", "qdk")
     assert isinstance(estimator, QdkExpectationEstimator)
 
@@ -345,7 +345,7 @@ def test_is_identity_only(pauli_strings, expected):
 
 @pytest.mark.usefixtures("debug_logger")
 def test_estimator_pure_identity_hamiltonian(capfd):
-    """Test energy estimator with a Hamiltonian containing only identity terms."""
+    """Test expectation estimator with a Hamiltonian containing only identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
     circuit = Circuit(qasm=qasm)
     # Pure identity Hamiltonian: coefficient * I should give coefficient directly
@@ -382,7 +382,7 @@ def test_estimator_pure_identity_hamiltonian(capfd):
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_estimator_mixed_identity_and_pauli_terms():
-    """Test energy estimator with a Hamiltonian containing both identity and non-identity terms."""
+    """Test expectation estimator with a Hamiltonian containing both identity and non-identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n'
     circuit = Circuit(qasm=qasm)
     # Mixed Hamiltonian: identity term (coeff=2.0) + ZZ term (coeff=1.0)
@@ -412,7 +412,7 @@ def test_estimator_mixed_identity_and_pauli_terms():
 
 
 def test_estimator_multiple_identity_terms(wavefunction_4e4o):
-    """Test energy estimator with multiple identity terms having different coefficients."""
+    """Test expectation estimator with multiple identity terms having different coefficients."""
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     circuit = state_prep.run(wavefunction_4e4o)
     # Multiple identity terms: sum of coefficients should be the energy

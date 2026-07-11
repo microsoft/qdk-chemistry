@@ -98,12 +98,12 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
-QDK energy estimator
-~~~~~~~~~~~~~~~~~~~~
+QDK expectation estimator
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qdk"``
 
-Native QDK/Chemistry implementation of energy estimator. Supports various simulator backends and noise models for realistic quantum hardware simulation.
+Native QDK/Chemistry implementation of expectation estimator. Supports various simulator backends and noise models for realistic quantum hardware simulation.
 
 .. rubric:: Run parameters
 
@@ -119,7 +119,7 @@ Native QDK/Chemistry implementation of energy estimator. Supports various simula
      - Quantum circuit that prepares the target quantum state
    * - ``qubit_hamiltonian``
      - QubitOperator
-     - Qubit Hamiltonian to measure
+     - Hamiltonian to measure
    * - ``circuit_executor``
      - CircuitExecutor
      - Backend to execute the measurement circuits

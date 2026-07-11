@@ -1,4 +1,4 @@
-"""QDK/Chemistry energy estimator abstractions and utilities."""
+"""QDK/Chemistry expectation estimator abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
