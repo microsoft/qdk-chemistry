@@ -69,7 +69,7 @@ def zassenhaus_steps_naive(
         \right\rceil .
 
     Args:
-        hamiltonian: The qubit Hamiltonian to simulate.
+        hamiltonian: The qubit operator to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Zassenhaus formula.
@@ -137,7 +137,7 @@ def zassenhaus_steps_commutator(
         \epsilon \le \frac{\beta |t|^{p+1}}{N^p}.
 
     Args:
-        hamiltonian: The qubit Hamiltonian to simulate.
+        hamiltonian: The qubit operator to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         order: The order of the Zassenhaus formula.

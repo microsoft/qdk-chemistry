@@ -81,9 +81,9 @@ QubitOperator and term partitions
 ------------------------------------
 
 A :class:`~qdk_chemistry.data.QubitOperator` carries an optional :attr:`~qdk_chemistry.data.QubitOperator.term_partition` field describing how its Pauli terms are organised into algorithm-relevant subsets.
-The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` — so it serialises cheaply alongside the Hamiltonian.
+The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` — so it serialises cheaply alongside the operator.
 
-The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this Hamiltonian.
+The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this operator.
 Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitOperator.to_interleaved`) reset the partition to ``None`` on the new instance.
 
 Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/hamiltonian_unitary_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.

@@ -42,7 +42,7 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """Construct a UnitaryRepresentation for the given QubitOperator.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The qubit operator.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given QubitOperator.
@@ -137,7 +137,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The qubit operator.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.

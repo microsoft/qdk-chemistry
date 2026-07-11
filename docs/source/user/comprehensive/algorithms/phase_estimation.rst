@@ -82,7 +82,7 @@ Settings
 
 .. note::
 
-   The state preparation circuit and qubit Hamiltonian must be compatible — they should use the same qubit encoding and be derived from the same underlying system.
+   The state preparation circuit and qubit operator must be compatible — they should use the same qubit encoding and be derived from the same underlying system.
 
    The ``qpe_circuit_builder`` is configured with nested algorithm references for the unitary builder and controlled circuit mapper, as shown in the configuration examples below.
 
@@ -281,7 +281,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.QpeResult`: Output data class containing phase, energy, and alias information
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit operator
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit from :doc:`StatePreparation <state_preparation>`
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from :doc:`CircuitExecutor <circuit_executor>`

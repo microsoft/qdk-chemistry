@@ -63,11 +63,11 @@ class PhaseEstimation(Algorithm):
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
+        r"""Run the phase estimation algorithm with the given state preparation circuit and Hamiltonian.
 
         This method implements the quantum phase estimation procedure:
         1. The state preparation circuit initializes the system in the desired quantum state.
-        2. The unitary_builder constructs a unitary from the qubit Hamiltonian.
+        2. The unitary_builder constructs a unitary from the qubit operator.
         3. The circuit_mapper transforms the unitary into controlled-U operations,
            where the control qubits are ancilla qubits used for phase readout.
         4. The circuit_executor runs the resulting quantum circuits on the target backend.
@@ -75,7 +75,7 @@ class PhaseEstimation(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The qubit operator for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

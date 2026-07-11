@@ -182,7 +182,7 @@ def create_heisenberg_hamiltonian(
         include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
-        QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
+        QubitOperator: The Heisenberg model as a qubit operator; carries a ``LayeredPartition`` when grouped.
 
     """
     if not graph.is_symmetric:
@@ -257,7 +257,7 @@ def create_ising_hamiltonian(
         include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
-        QubitOperator: The Ising model as a qubit Hamiltonian.
+        QubitOperator: The Ising model as a qubit operator.
 
     """
     return create_heisenberg_hamiltonian(graph, jx=0.0, jy=0.0, jz=j, hx=h, include_term_groups=include_term_groups)

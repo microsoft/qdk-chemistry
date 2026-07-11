@@ -74,7 +74,7 @@ Parity Transformation :cite:`Seeley2012`
 
 QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
 See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
-QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit operators using natural mathematical notation.
 
 .. _qubit-mapper-highlights:
 

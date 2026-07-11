@@ -8,7 +8,7 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.algorithms.ExpectationEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitOperator` with respect to a given quantum circuit that loads a wavefunction onto qubits.
-It takes a Circuit object and a target qubit Hamiltonian and automatically generates the corresponding measurement circuits.
+It takes a Circuit object and a target qubit operator and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
 The algorithm supports:
@@ -133,7 +133,7 @@ Native QDK/Chemistry implementation of energy estimator. Supports various simula
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian from QubitMapper
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit operator from QubitMapper
 - :doc:`Wavefunction <../data/wavefunction>`: Source wavefunction for state preparation
 
 Further reading

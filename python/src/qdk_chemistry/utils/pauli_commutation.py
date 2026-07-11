@@ -60,8 +60,8 @@ def commutator(h_a: QubitOperator, h_b: QubitOperator) -> QubitOperator:
     every pair of Pauli terms and accumulate the result.
 
     Args:
-        h_a: First qubit Hamiltonian.
-        h_b: Second qubit Hamiltonian.
+        h_a: First qubit operator.
+        h_b: Second qubit operator.
 
     Returns:
         The commutator as a :class:`~qdk_chemistry.data.QubitOperator`.
@@ -333,7 +333,7 @@ def commutator_bound_first_order(
     error.
 
     Args:
-        hamiltonian: The qubit Hamiltonian whose terms to analyse.
+        hamiltonian: The qubit operator whose terms to analyse.
         weight_threshold: Absolute threshold below which coefficients are discarded.
 
     Returns:
@@ -360,7 +360,7 @@ def commutator_bound_second_order(
     r"""Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).
 
     Args:
-        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        hamiltonian: The qubit operator for which to compute the bound.
         weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
 
     Returns:
@@ -396,7 +396,7 @@ def commutator_bound_higher_order(
     r"""Compute the commutator bound term :math:`\alpha` for arbitrary-order Trotter errors.
 
     Args:
-        hamiltonian: The qubit Hamiltonian for which to compute the bound.
+        hamiltonian: The qubit operator for which to compute the bound.
         order: The order of the Trotter decomposition.
         weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.
 

@@ -183,7 +183,7 @@ class QubitMapper(Algorithm):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitOperator:
-        """Map a fermionic Hamiltonian to a qubit Hamiltonian.
+        """Map a fermionic Hamiltonian to a qubit operator.
 
         Delegates entirely to ``_run_impl``.  Each backend is
         responsible for handling tapering (if ``mapping.tapering`` is set).
@@ -208,7 +208,7 @@ class QubitMapper(Algorithm):
         the result with the mapping's final encoding name.
 
         Args:
-            qh: The untapered qubit Hamiltonian from the base mapping.
+            qh: The untapered qubit operator from the base mapping.
             mapping: The original mapping (with tapering metadata).
 
         Returns:

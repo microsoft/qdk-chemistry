@@ -1,7 +1,7 @@
 Qubit mapping
 =============
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit Hamiltonians suitable for quantum computation.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit operators suitable for quantum computation.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Hamiltonian <../data/hamiltonian>` instance as input and produces a :class:`~qdk_chemistry.data.QubitOperator` instance as output.
 This transformation is essential for executing quantum chemistry algorithms on quantum hardware.
 
@@ -10,7 +10,7 @@ Overview
 
 The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic Hamiltonians into qubit-operator representations composed of Pauli strings.
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
-The resulting qubit Hamiltonian is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
+The resulting qubit operator is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
 
 .. note::
 
@@ -22,7 +22,7 @@ The resulting qubit Hamiltonian is mathematically equivalent to the original fer
 Supported encodings
 ~~~~~~~~~~~~~~~~~~~
 
-Different encoding strategies produce mathematically equivalent qubit Hamiltonians but with different Pauli-string structures.
+Different encoding strategies produce mathematically equivalent qubit operators but with different Pauli-string structures.
 The choice of encoding can affect circuit depth and measurement requirements on quantum hardware.
 Not every implementation supports all encodings — see `Available implementations`_ for details.
 
@@ -88,7 +88,7 @@ MajoranaMapping
 
 .. note::
 
-   Different encoding strategies produce mathematically equivalent qubit Hamiltonians
+   Different encoding strategies produce mathematically equivalent qubit operators
    but with different Pauli-string structures. The choice of encoding can affect circuit
    depth and measurement requirements on quantum hardware.
    See `Supported encodings`_ above for descriptions.
@@ -313,6 +313,6 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/qubit_mapper.py>`_ script.
 - :doc:`StatePreparation <state_preparation>`: Prepare quantum circuits from wavefunctions
-- :doc:`ExpectationEstimator <expectation_estimator>`: Estimate energies using the qubit Hamiltonian
+- :doc:`ExpectationEstimator <expectation_estimator>`: Estimate energies using the qubit operator
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

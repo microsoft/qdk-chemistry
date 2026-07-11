@@ -1,6 +1,6 @@
-"""Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.
+"""Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit operators.
 
-This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians
+This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitOperators
 using different mapping strategies ("jordan-wigner", "bravyi-kitaev", and "parity").
 """
 # --------------------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ class QiskitQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitOperator:
-        """Build a qubit Hamiltonian via Qiskit Nature.
+        """Build a qubit operator via Qiskit Nature.
 
         Reads ``mapping.base_encoding`` to select a Qiskit Nature mapper
         class.  ``mapping.table`` is **not used** — the qubit operator

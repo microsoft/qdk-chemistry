@@ -77,7 +77,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
+            qubit_hamiltonian: The qubit operator for which to build the circuit.
 
         Returns:
             A single-element list containing the standard QPE circuit.

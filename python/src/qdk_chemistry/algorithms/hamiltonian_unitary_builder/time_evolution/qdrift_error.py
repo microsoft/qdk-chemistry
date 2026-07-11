@@ -49,7 +49,7 @@ def qdrift_samples_campbell(
     magnitudes exceed *weight_threshold*.
 
     Args:
-        hamiltonian: The qubit Hamiltonian to simulate.
+        hamiltonian: The qubit operator to simulate.
         time: The total evolution time *t*.
         target_accuracy: The target accuracy :math:`\epsilon > 0`.
         weight_threshold: Absolute threshold below which coefficients are discarded.

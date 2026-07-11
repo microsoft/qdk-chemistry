@@ -1,4 +1,4 @@
-"""OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.
+"""OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit operators.
 
 This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
 using different mapping strategies. The encoding is determined by the MajoranaMapping passed
@@ -102,7 +102,7 @@ class OpenFermionQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitOperator:
-        """Build a qubit Hamiltonian via OpenFermion.
+        """Build a qubit operator via OpenFermion.
 
         Reads ``mapping.base_encoding`` to select an OpenFermion transform
         function.  ``mapping.table`` is **not used** — the qubit operator
@@ -159,7 +159,7 @@ class OpenFermionQubitMapper(QubitMapper):
         """Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).
 
         Uses blocked spin-orbital ordering (α₀, α₁, …, β₀, β₁, …) so that
-        the resulting qubit Hamiltonian matches the QDK native mapper output.
+        the resulting qubit operator matches the QDK native mapper output.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
@@ -189,7 +189,7 @@ def _build_blocked_fermion_operator(hamiltonian: Hamiltonian) -> of.FermionOpera
     This differs from OpenFermion's native interleaved convention
     [α₀, β₀, α₁, β₁, …].  Building the operator in blocked order ensures
     that subsequent fermion-to-qubit transforms (JW, BK, BK-tree) produce
-    qubit Hamiltonians directly compatible with the QDK native mapper.
+    qubit operators directly compatible with the QDK native mapper.
 
     Args:
         hamiltonian: The QDK/Chemistry Hamiltonian.

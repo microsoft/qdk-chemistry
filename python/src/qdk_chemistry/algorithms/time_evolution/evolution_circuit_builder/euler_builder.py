@@ -162,7 +162,7 @@ class EulerEvolutionCircuitBuilder(EvolutionCircuitBuilder):
         """Create the time-evolution unitary for one step.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian for this time step.
+            qubit_hamiltonian: The qubit operator for this time step.
             time: Duration of the time step.
 
         Returns:

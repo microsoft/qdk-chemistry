@@ -1,7 +1,7 @@
 """QDK native qubit mapper using Majorana-level C++ building blocks.
 
 This module provides the QdkQubitMapper class for transforming electronic structure
-Hamiltonians to qubit Hamiltonians. The encoding is specified by a
+Hamiltonians to qubit operators. The encoding is specified by a
 :class:`~qdk_chemistry.data.MajoranaMapping` passed to ``run()``, making the
 mapper encoding-agnostic.
 """
@@ -131,7 +131,7 @@ class QdkQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitOperator:
-        """Transform a fermionic Hamiltonian to a qubit Hamiltonian (table-driven).
+        """Transform a fermionic Hamiltonian to a qubit operator (table-driven).
 
         This backend passes the C++ ``MajoranaMapping`` directly to the
         native mapper.  The ``base_encoding`` name
@@ -146,7 +146,7 @@ class QdkQubitMapper(QubitMapper):
             mapping: The Majorana-to-Pauli encoding (table is consumed directly by the C++ engine).
 
         Returns:
-            QubitOperator: The qubit Hamiltonian with Pauli strings and coefficients.
+            QubitOperator: The qubit operator with Pauli strings and coefficients.
 
         """
         Logger.trace_entering()

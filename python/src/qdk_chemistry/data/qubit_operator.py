@@ -1,8 +1,7 @@
 """QDK/Chemistry Qubit Operator module.
 
-This module provides the QubitOperator dataclass for electronic structure problems. It bridges fermionic Hamiltonians
-and quantum circuit construction or measurement workflows.
-
+This module provides the ``QubitOperator`` dataclass: a general operator on qubits expressed
+as a weighted sum of Pauli strings.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -67,12 +66,12 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
 
 
 class QubitOperator(DataClass):
-    """Data class for representing chemical electronic Hamiltonians in qubits.
+    """Data class representing an operator as a weighted sum of Pauli strings.
 
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
-        encoding (str | None): The fermion-to-qubit encoding used to create this Hamiltonian
+        encoding (str | None): The fermion-to-qubit encoding used to create this operator
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
         fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
             when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
@@ -82,7 +81,7 @@ class QubitOperator(DataClass):
             partitions, into parallelisable layers within each group).  Set by
             geometry-aware constructors and by ``term_grouper`` algorithms; reset
             to ``None`` by transformations that change the term ordering.
-        tapering (TaperingSpecification | None): If this Hamiltonian was produced by a
+        tapering (TaperingSpecification | None): If this operator was produced by a
             tapering-based encoding (e.g. SCBK), records the applied tapering
             for downstream consumers. ``None`` for untapered encodings.
 
@@ -167,7 +166,7 @@ class QubitOperator(DataClass):
 
     @property
     def num_qubits(self) -> int:
-        """Get the number of qubits in the Hamiltonian.
+        """Get the number of qubits in the operator.
 
         Returns:
             int: The number of qubits.
@@ -177,27 +176,27 @@ class QubitOperator(DataClass):
 
     @property
     def schatten_norm(self) -> float:
-        """Calculate the Schatten norm (L1 norm) of the Hamiltonian.
+        """Calculate the Schatten norm (L1 norm) of the operator.
 
         The Schatten norm is the sum of the absolute values of all coefficients
-        in the Hamiltonian. This quantity is commonly used in estimating parameters
+        in the operator. This quantity is commonly used in estimating parameters
         for quantum algorithms, most notably Quantum Phase Estimation (QPE).
 
         Returns:
-            float: The Schatten norm (L1 norm) of the Hamiltonian.
+            float: The Schatten norm (L1 norm) of the operator.
 
         """
         return float(np.sum(np.abs(self.coefficients)))
 
     def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
-        """Convert the qubit Hamiltonian to its full matrix representation.
+        """Convert the qubit operator to its full matrix representation.
 
         Args:
             sparse: If True, return a csr matrix.
                 Otherwise return a dense matrix. Defaults to False.
 
         Returns:
-            The Hamiltonian matrix (dense or sparse).
+            The operator matrix (dense or sparse).
 
         """
         if sparse:
@@ -207,7 +206,7 @@ class QubitOperator(DataClass):
     def equiv(self, other: QubitOperator, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitOperator.
 
-        Two QubitHamiltonians are equivalent if they contain the same Pauli
+        Two operators are equivalent if they contain the same Pauli
         terms with the same coefficients (within tolerance), regardless of
         term ordering.  Duplicate Pauli strings are summed before comparison.
 
@@ -216,7 +215,7 @@ class QubitOperator(DataClass):
             atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
 
         Returns:
-            ``True`` if the two QubitHamiltonians are mathematically equivalent.
+            ``True`` if the two operators are mathematically equivalent.
 
         Examples:
             >>> qh1 = QubitOperator(["XI", "ZZ"], np.array([0.5, 0.3]))
@@ -243,7 +242,7 @@ class QubitOperator(DataClass):
     def is_hermitian(self, tolerance: float = 1e-12) -> bool:
         """Check whether all coefficients are real within ``tolerance``.
 
-        A qubit Hamiltonian is Hermitian if and only if every coefficient in
+        A qubit operator is Hermitian if and only if every coefficient in
         its Pauli expansion is real.
 
         Args:
@@ -257,7 +256,7 @@ class QubitOperator(DataClass):
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
     def __add__(self, other: QubitOperator) -> QubitOperator:
-        """Return the sum of two qubit Hamiltonians.
+        """Return the sum of two qubit operators.
 
         Pauli strings and coefficients are concatenated.  The ``encoding``,
         ``fermion_mode_order``, and ``tapering`` metadata must match between
@@ -267,33 +266,29 @@ class QubitOperator(DataClass):
         offset).  Otherwise the result has no partition.
 
         Args:
-            other: The qubit Hamiltonian to add.
+            other: The qubit operator to add.
 
         Returns:
             A new ``QubitOperator`` with concatenated terms.
 
         Raises:
             TypeError: If *other* is not a ``QubitOperator``.
-            ValueError: If the two Hamiltonians have different qubit counts, encodings, or modes.
+            ValueError: If the two operators have different qubit counts, encodings, or modes.
 
         """
         if not isinstance(other, QubitOperator):
             raise TypeError(f"Cannot add QubitOperator with {type(other).__name__}.")
         if self.num_qubits != other.num_qubits:
-            raise ValueError(f"Cannot add Hamiltonians with {self.num_qubits} and {other.num_qubits} qubits.")
+            raise ValueError(f"Cannot add operators with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:
-            raise ValueError(
-                f"Cannot add Hamiltonians with different encodings: {self.encoding!r} vs {other.encoding!r}."
-            )
+            raise ValueError(f"Cannot add operators with different encodings: {self.encoding!r} vs {other.encoding!r}.")
         if self.fermion_mode_order != other.fermion_mode_order:
             raise ValueError(
-                f"Cannot add Hamiltonians with different fermion_mode_order: "
+                f"Cannot add operators with different fermion_mode_order: "
                 f"{self.fermion_mode_order!r} vs {other.fermion_mode_order!r}."
             )
         if self.tapering != other.tapering:
-            raise ValueError(
-                f"Cannot add Hamiltonians with different tapering: {self.tapering!r} vs {other.tapering!r}."
-            )
+            raise ValueError(f"Cannot add operators with different tapering: {self.tapering!r} vs {other.tapering!r}.")
 
         pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
         coefficients = np.concatenate([self.coefficients, other.coefficients])
@@ -312,7 +307,7 @@ class QubitOperator(DataClass):
         )
 
     def __mul__(self, scalar) -> QubitOperator:
-        """Return the Hamiltonian with all coefficients scaled by *scalar*.
+        """Return the operator with all coefficients scaled by *scalar*.
 
         The :attr:`term_partition` is preserved since term indices are unchanged.
 
@@ -335,7 +330,7 @@ class QubitOperator(DataClass):
         )
 
     def __rmul__(self, scalar: float) -> QubitOperator:
-        """Support ``scalar * hamiltonian``."""
+        """Support ``scalar * operator``."""
         return self.__mul__(scalar)
 
     def get_real_coefficients(
@@ -370,9 +365,8 @@ class QubitOperator(DataClass):
     def to_interleaved(self, n_spatial: int) -> QubitOperator:
         """Convert from blocked to interleaved spin-orbital ordering.
 
-        Converts a qubit Hamiltonian from blocked ordering (alpha orbitals first,
+        Converts a qubit operator from blocked ordering (alpha orbitals first,
         then beta orbitals) to interleaved ordering (alternating alpha/beta).
-
         Blocked ordering:    [α₀, α₁, ..., αₙ₋₁, β₀, β₁, ..., βₙ₋₁]
         Interleaved ordering: [α₀, β₀, α₁, β₁, ..., αₙ₋₁, βₙ₋₁]
 
@@ -389,7 +383,7 @@ class QubitOperator(DataClass):
         Examples:
             >>> # H2 with 2 spatial orbitals (4 qubits)
             >>> # Blocked: [α₀, α₁, β₀, β₁] -> Interleaved: [α₀, β₀, α₁, β₁]
-            >>> interleaved = blocked_hamiltonian.to_interleaved(n_spatial=2)
+            >>> interleaved = blocked_operator.to_interleaved(n_spatial=2)
 
         """
         Logger.trace_entering()
@@ -427,14 +421,14 @@ class QubitOperator(DataClass):
 
     # DataClass interface implementation
     def get_summary(self) -> str:
-        """Get a human-readable summary of the qubit Hamiltonian.
+        """Get a human-readable summary of the qubit operator.
 
         Returns:
-            str: Summary string describing the qubit Hamiltonian.
+            str: Summary string describing the qubit operator.
 
         """
         summary = (
-            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
+            f"Qubit Operator\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
         if self.encoding is not None:
             summary += f"  Encoding: {self.encoding}\n"
@@ -443,10 +437,10 @@ class QubitOperator(DataClass):
         return summary
 
     def to_json(self) -> dict[str, Any]:
-        """Convert the qubit Hamiltonian to a dictionary for JSON serialization.
+        """Convert the qubit operator to a dictionary for JSON serialization.
 
         Returns:
-            dict[str, Any]: Dictionary representation of the qubit Hamiltonian.
+            dict[str, Any]: Dictionary representation of the qubit operator.
 
         """
         # Serialize complex coefficients as {"real": [...], "imag": [...]}
@@ -470,10 +464,10 @@ class QubitOperator(DataClass):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the qubit Hamiltonian to an HDF5 group.
+        """Save the qubit operator to an HDF5 group.
 
         Args:
-            group (h5py.Group): HDF5 group or file to write the qubit Hamiltonian to.
+            group (h5py.Group): HDF5 group or file to write the qubit operator to.
 
         """
         self._add_hdf5_version(group)

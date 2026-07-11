@@ -158,7 +158,7 @@ Related classes
 ---------------
 
 - :doc:`PhaseEstimation <../algorithms/phase_estimation>`: Algorithm that produces ``QpeResult`` objects
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit operator
 - :class:`~qdk_chemistry.data.Wavefunction`: Source wavefunction for state preparation
 
 Further reading

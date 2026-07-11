@@ -356,7 +356,7 @@ Related classes
 
 - :doc:`data/lattice_graph` — Lattice topology defining site connectivity
 - :doc:`data/hamiltonian` — Hamiltonian data class produced by fermionic models
-- :class:`~qdk_chemistry.data.QubitOperator` — Qubit Hamiltonian produced by spin models
+- :class:`~qdk_chemistry.data.QubitOperator` — Qubit operator produced by spin models
 - :doc:`data/orbitals` — Full Orbitals class documentation
 
 Further reading

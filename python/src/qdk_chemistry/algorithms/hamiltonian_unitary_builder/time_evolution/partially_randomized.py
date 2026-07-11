@@ -220,7 +220,7 @@ class PartiallyRandomized(QDrift):
         3. Apply first- or second-order Trotter structure with qDRIFT for the H_R block
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            qubit_hamiltonian: The qubit operator to be used in the construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the
@@ -236,7 +236,7 @@ class PartiallyRandomized(QDrift):
         rng = np.random.default_rng(seed if seed >= 0 else None)
 
         if not qubit_hamiltonian.is_hermitian(tolerance=tolerance):
-            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
+            raise ValueError("Non-Hermitian operator: coefficients have nonzero imaginary parts.")
 
         # Get non-negligible real terms, sorted by descending weight
         real_terms = qubit_hamiltonian.get_real_coefficients(tolerance=tolerance, sort_by_magnitude=True)

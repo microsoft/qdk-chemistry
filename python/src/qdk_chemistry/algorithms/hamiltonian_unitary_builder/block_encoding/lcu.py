@@ -43,7 +43,7 @@ class LCUSettings(HamiltonianUnitaryBuilderSettings):
         """Initialize LCUSettings with default values.
 
         Attributes:
-            power: The power to which the Hamiltonian is raised.
+            power: The power to which the unitary is raised.
             quantum_walk: If True, wrap block encoding with quantum walk operator (use with QPE).
                 If False, use plain block encoding (use with Hadamard test).
             tolerance: Minimum L1 norm below which the LCU decomposition is numerically ill-defined.
@@ -76,7 +76,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
     ):
         r"""Initialize the LCU builder.
 
-        Given a qubit Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` expressed as a
+        Given a Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` expressed as a
         linear combination of Pauli strings :math:`P_j` with scalar coefficients
         :math:`\alpha_j`, this builder constructs an LCU representation that block-encodes
         :math:`H / \lambda`, where :math:`\lambda` is the L1 norm of the
@@ -104,11 +104,11 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """Construct the unitary representation using LCU block encoding.
 
         Computes normalized amplitudes, signs, and controlled operations from the
-        qubit Hamiltonian, then packages them into generalized Prepare/Select
-        dataclasses stored in an LCUContainer.
+        Hamiltonian, then packages them into generalized Prepare/Select dataclasses
+        stored in an LCUContainer.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            qubit_hamiltonian: The qubit operator to be used in the construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.
@@ -154,7 +154,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         trivial 0-mode wavefunction.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian whose coefficients define the amplitudes.
+            qubit_hamiltonian: The qubit operator whose coefficients define the amplitudes.
             num_prepare_ancillas: Number of qubits in the prepare ancillary register.
             tolerance: Minimum allowable L1 norm; raises if the norm is below
                 this threshold.
@@ -199,7 +199,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         and an array of sign phases extracted from the real coefficients.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian whose Pauli strings and coefficients
+            qubit_hamiltonian: The qubit operator whose Pauli strings and coefficients
                 define the controlled operations.
             num_prepare_ancillas: Number of qubits in the prepare ancillary register.
 
