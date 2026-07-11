@@ -12,6 +12,7 @@
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Structure
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 
 # Load para-benzyne structure from inline XYZ file
 structure = Structure.from_xyz("""\
@@ -116,7 +117,8 @@ sparse_isometry_circuit = state_prep.run(wfn_sparse)
 # Prepare qubit Hamiltonian
 from qdk_chemistry.data import MajoranaMapping
 
-active_alpha, active_beta = active_orbitals.get_active_space_indices()
+active_alpha = active_orbitals.active_indices().indices(SymmetryLabel([axes.alpha()]))
+active_beta = active_orbitals.active_indices().indices(SymmetryLabel([axes.beta()]))
 n_active_spin_orbitals = len(active_alpha) + len(active_beta)
 qubit_mapper = create("qubit_mapper", algorithm_name="qdk")
 qubit_hamiltonian = qubit_mapper.run(

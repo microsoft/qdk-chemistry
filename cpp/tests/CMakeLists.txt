@@ -41,6 +41,7 @@ target_compile_definitions(test_main PUBLIC TEST_RESOURCES_DIR="${PROJECT_SOURCE
 target_include_directories(test_main PUBLIC
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/tests>
   $<BUILD_INTERFACE:${QDK_SCF_TEST_DIR}>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
 )
 
 # Manage reference data for SCF tests
