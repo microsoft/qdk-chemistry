@@ -75,3 +75,13 @@ def load():
         register(lambda: WickedDuccSISolver())
     except ImportError:
         pass  # wicked not installed
+
+    # 4-space wicked DUCC (requires wicked library)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_4space import (
+            WickedDucc4SpaceSolver,
+        )
+
+        register(lambda: WickedDucc4SpaceSolver())
+    except ImportError:
+        pass  # wicked not installed

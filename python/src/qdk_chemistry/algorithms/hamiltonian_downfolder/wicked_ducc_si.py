@@ -39,11 +39,11 @@ def _require_wicked():
     if _wicked is None:
         try:
             import wicked
+
             _wicked = wicked
         except ImportError:
             raise ImportError(
-                "wicked is required for WickedDuccSISolver. "
-                "Install from https://github.com/fevangelista/wicked"
+                "wicked is required for WickedDuccSISolver. Install from https://github.com/fevangelista/wicked"
             )
     return _wicked
 
@@ -89,6 +89,7 @@ class WickedDuccSISolver(Algorithm):
 
         Returns:
             Downfolded active-space Hamiltonian (spatial, chemist).
+
         """
         w = _require_wicked()
         s = self.settings()
@@ -115,7 +116,14 @@ class WickedDuccSISolver(Algorithm):
 
         logger.info(
             "WickedDuccSISolver: nmo=%d, nocc=(%d,%d), active=(%d,%d,%d,%d), level=%d",
-            nmo, nocc_a, nocc_b, noa_act, nob_act, nva_act, nvb_act, ducc_level,
+            nmo,
+            nocc_a,
+            nocc_b,
+            noa_act,
+            nob_act,
+            nva_act,
+            nvb_act,
+            ducc_level,
         )
 
         # ── 2. Build Hamiltonian blocks in physicist notation ──
@@ -162,18 +170,22 @@ class WickedDuccSISolver(Algorithm):
                 for c3 in ["o", "v"]:
                     for c4 in ["o", "v"]:
                         H[c1 + c2 + c3 + c4] = V_asym[sl_map[c1], sl_map[c2], sl_map[c3], sl_map[c4]]
-                        H[c1.upper() + c2.upper() + c3.upper() + c4.upper()] = (
-                            V_asym[sl_map[c1.upper()], sl_map[c2.upper()],
-                                   sl_map[c3.upper()], sl_map[c4.upper()]])
-                        H[c1 + c2.upper() + c3 + c4.upper()] = (
-                            V[sl_map[c1], sl_map[c2.upper()], sl_map[c3], sl_map[c4.upper()]])
+                        H[c1.upper() + c2.upper() + c3.upper() + c4.upper()] = V_asym[
+                            sl_map[c1.upper()], sl_map[c2.upper()], sl_map[c3.upper()], sl_map[c4.upper()]
+                        ]
+                        H[c1 + c2.upper() + c3 + c4.upper()] = V[
+                            sl_map[c1], sl_map[c2.upper()], sl_map[c3], sl_map[c4.upper()]
+                        ]
 
         # ── 3. CCSD amplitudes ──
-        from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
         from pyscf import cc
 
-        alpha_occ = np.zeros(nmo); alpha_occ[:nocc_a] = 1.0
-        beta_occ = np.zeros(nmo); beta_occ[:nocc_b] = 1.0
+        from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
+
+        alpha_occ = np.zeros(nmo)
+        alpha_occ[:nocc_a] = 1.0
+        beta_occ = np.zeros(nmo)
+        beta_occ[:nocc_b] = 1.0
         mycc = cc.CCSD(hamiltonian_to_scf(hamiltonian, alpha_occ, beta_occ)).run()
         logger.info("CCSD energy: %.10f", mycc.e_tot)
 
@@ -181,21 +193,28 @@ class WickedDuccSISolver(Algorithm):
         # this automatically gives full antisymmetry in both pairs.
         t2_asym = mycc.t2 - mycc.t2.swapaxes(2, 3)
 
-        T = {"ov": mycc.t1.copy(), "OV": mycc.t1.copy(),
-             "oovv": t2_asym.copy(), "OOVV": t2_asym.copy(), "oOvV": mycc.t2.copy()}
+        T = {
+            "ov": mycc.t1.copy(),
+            "OV": mycc.t1.copy(),
+            "oovv": t2_asym.copy(),
+            "OOVV": t2_asym.copy(),
+            "oOvV": mycc.t2.copy(),
+        }
 
         # ── 4. Zero all-active T → σ_ext ──
         ncore_a, ncore_b = nocc_a - noa_act, nocc_b - nob_act
         act_oa, act_va = slice(ncore_a, nocc_a), slice(0, nva_act)
         act_ob, act_vb = slice(ncore_b, nocc_b), slice(0, nvb_act)
 
-        T["ov"][act_oa, act_va] = 0.0; T["OV"][act_ob, act_vb] = 0.0
+        T["ov"][act_oa, act_va] = 0.0
+        T["OV"][act_ob, act_vb] = 0.0
         T["oovv"][act_oa, act_oa, act_va, act_va] = 0.0
         T["OOVV"][act_ob, act_ob, act_vb, act_vb] = 0.0
         T["oOvV"][act_oa, act_ob, act_va, act_vb] = 0.0
 
         # Transposes AFTER zeroing
-        T["vo"] = T["ov"].T.copy(); T["VO"] = T["OV"].T.copy()
+        T["vo"] = T["ov"].T.copy()
+        T["VO"] = T["OV"].T.copy()
         T["vvoo"] = T["oovv"].transpose(2, 3, 0, 1).copy()
         T["VVOO"] = T["OOVV"].transpose(2, 3, 0, 1).copy()
         T["vVoO"] = T["oOvV"].transpose(2, 3, 0, 1).copy()
@@ -220,38 +239,60 @@ class WickedDuccSISolver(Algorithm):
             return 0 if c in ("o", "O") else noa_act
 
         # 1-body: extract active sub-blocks from fbar
-        g1_aa = np.zeros((nact, nact)); g1_bb = np.zeros((nact, nact))
+        g1_aa = np.zeros((nact, nact))
+        g1_bb = np.zeros((nact, nact))
         for key, arr in fbar.items():
             sub = arr[np.ix_(_act(key[0]), _act(key[1]))]
             r0, c0 = _off(key[0]), _off(key[1])
             if key.islower():
-                g1_aa[r0:r0+sub.shape[0], c0:c0+sub.shape[1]] = sub
+                g1_aa[r0 : r0 + sub.shape[0], c0 : c0 + sub.shape[1]] = sub
             elif key.isupper():
-                g1_bb[r0:r0+sub.shape[0], c0:c0+sub.shape[1]] = sub
+                g1_bb[r0 : r0 + sub.shape[0], c0 : c0 + sub.shape[1]] = sub
 
         # 2-body: extract active sub-blocks into nact⁴ arrays
-        g2_aa_raw = np.zeros((nact,)*4); g2_bb_raw = np.zeros((nact,)*4)
-        g2_ab = np.zeros((nact,)*4)
+        g2_aa_raw = np.zeros((nact,) * 4)
+        g2_bb_raw = np.zeros((nact,) * 4)
+        g2_ab = np.zeros((nact,) * 4)
         for key, arr in vbar.items():
             n_lower = sum(1 for c in key if c.islower())
             sub = arr[np.ix_(_act(key[0]), _act(key[1]), _act(key[2]), _act(key[3]))]
-            o = [_off(c) for c in key]; s = sub.shape
-            sl = tuple(slice(o[i], o[i]+s[i]) for i in range(4))
-            if n_lower == 4:   g2_aa_raw[sl] += sub
-            elif n_lower == 0: g2_bb_raw[sl] += sub
-            elif n_lower == 2: g2_ab[sl] += sub
+            o = [_off(c) for c in key]
+            s = sub.shape
+            sl = tuple(slice(o[i], o[i] + s[i]) for i in range(4))
+            if n_lower == 4:
+                g2_aa_raw[sl] += sub
+            elif n_lower == 0:
+                g2_bb_raw[sl] += sub
+            elif n_lower == 2:
+                g2_ab[sl] += sub
 
         # Antisymmetrize same-spin at active size (nact⁴, not nmo⁴)
-        g2_aa = g2_aa_raw - g2_aa_raw.transpose(1,0,2,3) - g2_aa_raw.transpose(0,1,3,2) + g2_aa_raw.transpose(1,0,3,2)
-        g2_bb = g2_bb_raw - g2_bb_raw.transpose(1,0,2,3) - g2_bb_raw.transpose(0,1,3,2) + g2_bb_raw.transpose(1,0,3,2)
+        g2_aa = (
+            g2_aa_raw
+            - g2_aa_raw.transpose(1, 0, 2, 3)
+            - g2_aa_raw.transpose(0, 1, 3, 2)
+            + g2_aa_raw.transpose(1, 0, 3, 2)
+        )
+        g2_bb = (
+            g2_bb_raw
+            - g2_bb_raw.transpose(1, 0, 2, 3)
+            - g2_bb_raw.transpose(0, 1, 3, 2)
+            + g2_bb_raw.transpose(1, 0, 3, 2)
+        )
 
         # χ₁^αα = γ₁^αα - Σ_m γ₂^αα[pm,qm] - Σ_M γ₂^αβ[pM,qM]
         # χ₁^ββ = γ₁^ββ - Σ_M γ₂^ββ[pM,qM] - Σ_m γ₂^αβ[mp,mq]
         aol = list(range(noa_act))
-        chi1_aa = g1_aa - np.einsum("pmqm->pq", g2_aa[:, aol, :, :][:, :, :, aol]) \
-                        - np.einsum("pmqm->pq", g2_ab[:, aol, :, :][:, :, :, aol])
-        chi1_bb = g1_bb - np.einsum("pmqm->pq", g2_bb[:, aol, :, :][:, :, :, aol]) \
-                        - np.einsum("mpmq->pq", g2_ab[np.ix_(aol, range(nact), aol, range(nact))])
+        chi1_aa = (
+            g1_aa
+            - np.einsum("pmqm->pq", g2_aa[:, aol, :, :][:, :, :, aol])
+            - np.einsum("pmqm->pq", g2_ab[:, aol, :, :][:, :, :, aol])
+        )
+        chi1_bb = (
+            g1_bb
+            - np.einsum("pmqm->pq", g2_bb[:, aol, :, :][:, :, :, aol])
+            - np.einsum("mpmq->pq", g2_ab[np.ix_(aol, range(nact), aol, range(nact))])
+        )
 
         # C = E₀ - Σ_m χ₁^αα[mm] - Σ_M χ₁^ββ[MM] - ½ΣΣ γ₂^αα - ½ΣΣ γ₂^ββ - ΣΣ γ₂^αβ
         C = E0_bch
@@ -263,28 +304,39 @@ class WickedDuccSISolver(Algorithm):
         # ── 7. Package Hamiltonian ──
         from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
 
-        return Hamiltonian(CanonicalFourCenterHamiltonianContainer(
-            chi1_aa, g2_ab.swapaxes(1, 2).ravel(), ModelOrbitals(nact), C, np.zeros((nact, nact))))
+        return Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                chi1_aa, g2_ab.swapaxes(1, 2).ravel(), ModelOrbitals(nact), C, np.zeros((nact, nact))
+            )
+        )
+
     @staticmethod
     def _wicked_bch_si(w, bch_order, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b):
         """Run spin-integrated wicked BCH. Returns (fbar_dict, vbar_dict, E0_scalar)."""
         w.reset_space()
-        w.add_space("o", "fermion", "occupied", list("ijklmn")[:max(nocc_a, 1)])
-        w.add_space("v", "fermion", "unoccupied", list("abcdef")[:max(nvir_a, 1)])
-        w.add_space("O", "fermion", "occupied", list("IJKLMN")[:max(nocc_b, 1)])
-        w.add_space("V", "fermion", "unoccupied", list("ABCDEF")[:max(nvir_b, 1)])
+        w.add_space("o", "fermion", "occupied", list("ijklmn")[: max(nocc_a, 1)])
+        w.add_space("v", "fermion", "unoccupied", list("abcdef")[: max(nvir_a, 1)])
+        w.add_space("O", "fermion", "occupied", list("IJKLMN")[: max(nocc_b, 1)])
+        w.add_space("V", "fermion", "unoccupied", list("ABCDEF")[: max(nvir_b, 1)])
 
         Top = w.op("T", ["v+ o", "V+ O", "v+ v+ o o", "V+ V+ O O", "V+ v+ O o"], unique=True)
         Hops = []
-        for i in itertools.product(["v+", "o+"], ["v", "o"]): Hops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V", "O"]): Hops.append(" ".join(i))
-        for i in itertools.product(["v+", "o+"], ["v+", "o+"], ["v", "o"], ["v", "o"]): Hops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V+", "O+"], ["V", "O"], ["V", "O"]): Hops.append(" ".join(i))
-        for i in itertools.product(["v+", "o+"], ["V+", "O+"], ["v", "o"], ["V", "O"]): Hops.append(" ".join(i))
+        for i in itertools.product(["v+", "o+"], ["v", "o"]):
+            Hops.append(" ".join(i))
+        for i in itertools.product(["V+", "O+"], ["V", "O"]):
+            Hops.append(" ".join(i))
+        for i in itertools.product(["v+", "o+"], ["v+", "o+"], ["v", "o"], ["v", "o"]):
+            Hops.append(" ".join(i))
+        for i in itertools.product(["V+", "O+"], ["V+", "O+"], ["V", "O"], ["V", "O"]):
+            Hops.append(" ".join(i))
+        for i in itertools.product(["v+", "o+"], ["V+", "O+"], ["v", "o"], ["V", "O"]):
+            Hops.append(" ".join(i))
         Hop = w.op("H", Hops, unique=True)
         Fops = []
-        for i in itertools.product(["v+", "o+"], ["v", "o"]): Fops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V", "O"]): Fops.append(" ".join(i))
+        for i in itertools.product(["v+", "o+"], ["v", "o"]):
+            Fops.append(" ".join(i))
+        for i in itertools.product(["V+", "O+"], ["V", "O"]):
+            Fops.append(" ".join(i))
         Fop = w.op("H", Fops, unique=True)
 
         sigma = w.op("T", ["v+ o", "V+ O", "v+ v+ o o", "V+ V+ O O", "V+ v+ O o"], unique=True)
@@ -307,28 +359,37 @@ class WickedDuccSISolver(Algorithm):
         mbeq = expr.to_manybody_equation("R")
 
         class _S:
-            def __init__(self, v): self.val = v
-            def __getitem__(self, k): return self.val
+            def __init__(self, v):
+                self.val = v
+
+            def __getitem__(self, k):
+                return self.val
 
         def _dim(c):
             return {"o": nocc_a, "v": nvir_a, "O": nocc_b, "V": nvir_b}[c]
 
         fbar, vbar, E0_bch = {}, {}, 0.0
         for key, eqs in mbeq.items():
-            if not eqs: continue
+            if not eqs:
+                continue
             ndim = len(key.replace("|", ""))
             fc = eqs[0].compile("einsum")
             rv = fc.split("+=")[0].strip()
             ic = rv[1:]
             shape = [_dim(c) for c in ic]
             lines = ["def _e(E0,H,T):"]
-            lines.append(f"    {rv}={'0.0' if ndim==0 else 'np.zeros(('+','.join(str(s) for s in shape)+'))'}")
-            for eq in eqs: lines.append(f"    {eq.compile('einsum')}")
+            lines.append(f"    {rv}={'0.0' if ndim == 0 else 'np.zeros((' + ','.join(str(s) for s in shape) + '))'}")
+            for eq in eqs:
+                lines.append(f"    {eq.compile('einsum')}")
             lines.append(f"    return {rv}")
-            ns = {}; exec("\n".join(lines), {"np": np}, ns)  # noqa: S102
+            ns = {}
+            exec("\n".join(lines), {"np": np}, ns)
             result = ns["_e"](_S(E0), H, T)
-            if ndim == 0: E0_bch = result
-            elif ndim == 2: fbar[ic] = np.array(result)
-            elif ndim == 4: vbar[ic] = np.array(result)
+            if ndim == 0:
+                E0_bch = result
+            elif ndim == 2:
+                fbar[ic] = np.array(result)
+            elif ndim == 4:
+                vbar[ic] = np.array(result)
 
         return fbar, vbar, E0_bch
