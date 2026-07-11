@@ -366,9 +366,13 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
 
   if (algorithm_type == MultiConfigurationScfFactory::algorithm_type_name()) {
     validate_active_electron_count(n_active_alpha_electrons,
-                                   "Derived active alpha electron count");
+                                   "Active alpha electron count derived from "
+                                   "charge, spin_multiplicity, and "
+                                   "n_inactive_orbitals");
     validate_active_electron_count(n_active_beta_electrons,
-                                   "Derived active beta electron count");
+                                   "Active beta electron count derived from "
+                                   "charge, spin_multiplicity, and "
+                                   "n_inactive_orbitals");
     auto reference = reference_orbitals_for_mr_energy(
         settings, structure, charge, spin_multiplicity, seed,
         allow_wavefunction_seed, n_active_alpha_electrons,
@@ -382,9 +386,13 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
   if (algorithm_type ==
       MultiConfigurationCalculatorFactory::algorithm_type_name()) {
     validate_active_electron_count(n_active_alpha_electrons,
-                                   "Derived active alpha electron count");
+                                   "Active alpha electron count derived from "
+                                   "charge, spin_multiplicity, and "
+                                   "n_inactive_orbitals");
     validate_active_electron_count(n_active_beta_electrons,
-                                   "Derived active beta electron count");
+                                   "Active beta electron count derived from "
+                                   "charge, spin_multiplicity, and "
+                                   "n_inactive_orbitals");
     auto reference = reference_orbitals_for_mr_energy(
         settings, structure, charge, spin_multiplicity, seed,
         allow_wavefunction_seed, n_active_alpha_electrons,
