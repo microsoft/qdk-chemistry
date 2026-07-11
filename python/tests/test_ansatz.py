@@ -22,6 +22,8 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -298,7 +300,16 @@ class TestAnsatzSerialization:
             orig_orbs = test_ansatz.get_orbitals()
             restored_orbs = ansatz_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_closed_shell_energy(self):
         """Test the energy evaluation for a restricted closed-shell system."""

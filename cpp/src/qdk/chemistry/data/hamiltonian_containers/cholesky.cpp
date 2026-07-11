@@ -13,6 +13,7 @@
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -127,7 +128,8 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
 void CholeskyHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
 
@@ -196,7 +198,8 @@ double CholeskyHamiltonianContainer::get_two_body_element(
     throw std::runtime_error("Two-body integrals are not set");
   }
 
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   if (i >= norb || j >= norb || k >= norb || l >= norb) {
     throw std::out_of_range("Orbital index out of range");
   }
@@ -313,9 +316,11 @@ static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
     return nullptr;
   }
   auto mo_sym = orbitals.symmetries();
-  auto active_indices = orbitals.get_active_space_indices();
-  std::size_t n_active_alpha = active_indices.first.size();
-  std::size_t n_active_beta = active_indices.second.size();
+  const auto active_ai = orbitals.active_indices();
+  std::size_t n_active_alpha =
+      spin_channel_indices(active_ai, axes::alpha()).size();
+  std::size_t n_active_beta =
+      spin_channel_indices(active_ai, axes::beta()).size();
   std::size_t naux = static_cast<std::size_t>(aa.cols());
 
   std::unordered_map<SymmetryLabel, std::size_t> mo_ext;
