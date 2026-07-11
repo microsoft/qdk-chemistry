@@ -29,7 +29,7 @@ NuclearDerivativeResult FiniteDifferenceNuclearDerivativeCalculator::_run_impl(
     throw std::invalid_argument("Structure must not be null");
   }
   const auto [n_active_alpha_electrons, n_active_beta_electrons] =
-      detail::active_electron_counts(structure, charge, spin_multiplicity,
+      detail::active_electron_counts(structure, charge, spin_multiplicity, seed,
                                      n_inactive_orbitals);
   const double step = _settings->get<double>("finite_difference_step");
   const bool compute_hessian = _settings->get<bool>("compute_hessian");

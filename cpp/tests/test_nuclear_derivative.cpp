@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/nuclear_derivative_detail.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
@@ -113,7 +114,7 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
   }
 
   return calculator->run(structure, charge, spin_multiplicity,
-                         std::string("sto-3g"));
+                         std::string("sto-3g"), 0);
 }
 
 void expect_qdk_analytic_gradient_matches_numeric(
@@ -250,7 +251,7 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
   calculator->settings().set("finite_difference_step", 1.0e-3);
 
   auto [energy, gradients, hessian, wavefunction] = calculator->run(
-      testing::create_water_structure(), 0, 1, std::string("sto-3g"));
+      testing::create_water_structure(), 0, 1, std::string("sto-3g"), 0);
 
   ASSERT_TRUE(std::isfinite(energy));
   EXPECT_LT(energy, 0.0);
@@ -282,12 +283,22 @@ TEST(NuclearDerivativeCalculatorTest, NullStructureThrowsInvalidArgument) {
     auto calculator =
         NuclearDerivativeCalculatorFactory::create(calculator_name);
     try {
-      calculator->run(nullptr, 0, 1, std::string("sto-3g"));
+      calculator->run(nullptr, 0, 1, std::string("sto-3g"), 0);
       FAIL() << calculator_name << " accepted a null structure";
     } catch (const std::invalid_argument& ex) {
       EXPECT_STREQ(ex.what(), "Structure must not be null");
     }
   }
+}
+
+TEST(NuclearDerivativeCalculatorTest, ExcludesEcpCoreElectrons) {
+  auto structure = testing::create_agh_structure();
+  auto [n_alpha, n_beta] =
+      qdk::chemistry::algorithms::detail::active_electron_counts(
+          structure, 0, 1, std::string("def2-svp"), 0);
+
+  EXPECT_EQ(n_alpha, 10);
+  EXPECT_EQ(n_beta, 10);
 }
 
 TEST(NuclearDerivativeCalculatorTest, RejectsTooManyInactiveOrbitals) {
@@ -381,7 +392,7 @@ TEST(NuclearDerivativeCalculatorTest,
   calculator->settings().set("finite_difference_step", 1.0e-2);
 
   auto [energy, gradients, hessian, result_wavefunction] =
-      calculator->run(structure, -1, 1, seed_orbitals);
+      calculator->run(structure, -1, 1, seed_orbitals, 0);
 
   EXPECT_TRUE(std::isfinite(energy));
   ASSERT_NE(gradients, nullptr);
