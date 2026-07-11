@@ -9,6 +9,7 @@
 #include <optional>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <utility>
 
 namespace qdk::chemistry::algorithms::detail {
 
