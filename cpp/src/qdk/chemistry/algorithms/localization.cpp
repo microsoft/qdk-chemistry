@@ -5,6 +5,7 @@
 #include <cmath>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/config.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>

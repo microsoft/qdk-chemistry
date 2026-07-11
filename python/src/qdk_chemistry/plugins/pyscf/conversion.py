@@ -38,7 +38,8 @@ import numpy as np
 import pyscf
 
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 

@@ -33,7 +33,8 @@ from pyscf.mcscf import avas
 
 from qdk_chemistry.algorithms import ActiveSpaceSelector
 from qdk_chemistry.data import Configuration, Orbitals, Settings, StateVectorContainer, Wavefunction
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices, spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 

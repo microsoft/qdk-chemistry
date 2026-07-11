@@ -37,7 +37,11 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import (
+    axes,
+    spin_index_set,
+)
 
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
@@ -242,17 +246,18 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
             )
         )
         # Create a new orbitals object with active space data
-        coeffs_data = orbitals.get_coefficients()
-        energies_data = orbitals.get_energies() if orbitals.get_energies() is not None else None
+        coefficients = orbitals.coefficients()
+        coeffs_alpha = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_beta = spin_channel_matrix(coefficients, axes.beta())
+        energies = orbitals.energies()
+        if energies is not None:
+            energies_alpha = spin_channel_vector(energies, axes.alpha())
+            energies_beta = spin_channel_vector(energies, axes.beta())
+        else:
+            energies_alpha = None
+            energies_beta = None
 
-        # Check if this is unrestricted (returns tuples) or restricted (returns single arrays)
-        if isinstance(coeffs_data, tuple):
-            # Unrestricted case - use alpha/beta constructor
-            coeffs_alpha, coeffs_beta = coeffs_data
-            if energies_data is not None:
-                energies_alpha, energies_beta = energies_data
-            else:
-                energies_alpha, energies_beta = None, None
+        if orbitals.is_unrestricted():
             nmo = coeffs_alpha.shape[1]
             new_orbitals = Orbitals(
                 coeffs_alpha,
@@ -265,11 +270,11 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
                 spin_index_set(nmo, [], [], equivalent=False),
             )
             return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
-        # Restricted case - use restricted constructor
-        nmo = coeffs_data[0].shape[1] if isinstance(coeffs_data, tuple) else coeffs_data.shape[1]
+
+        nmo = coeffs_alpha.shape[1]
         new_orbitals = Orbitals(
-            coeffs_data,
-            energies_data,
+            coeffs_alpha,
+            energies_alpha,
             None,
             orbitals.get_basis_set(),
             spin_index_set(nmo, indices, indices),
@@ -542,9 +547,7 @@ class TestAlgorithmClasses:
         active_orbitals = selected_wfn.get_orbitals()
         assert isinstance(active_orbitals, Orbitals)
         assert active_orbitals.has_active_space()
-        active_indices_pair = active_orbitals.get_active_space_indices()
-        # For restricted case (which we're using here), the first element has the indices
-        active_indices = active_indices_pair[0]  # alpha indices
+        active_indices = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
         assert len(active_indices) <= 4  # Should not exceed num_active_orbitals
         assert all(isinstance(idx, int) for idx in active_indices)
 

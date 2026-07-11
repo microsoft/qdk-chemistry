@@ -24,6 +24,8 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+
 // Schwarz screening
 #include "scf/src/eri/schwarz.h"
 

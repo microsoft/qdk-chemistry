@@ -7,6 +7,7 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <unordered_map>

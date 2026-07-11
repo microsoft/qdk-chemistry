@@ -21,8 +21,9 @@ from qiskit_nature.second_q.mappers import (
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.data._spin_channels import spin_channel_indices
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:

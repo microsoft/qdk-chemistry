@@ -9,7 +9,8 @@ import numpy as np
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Hamiltonian, StateVectorContainer, Wavefunction
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 
 __all__ = [

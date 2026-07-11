@@ -12,6 +12,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <utility>
@@ -43,12 +44,13 @@ class RecordingMultiConfigurationCalculator
       unsigned int n_beta) const override {
     auto orbitals = hamiltonian->get_orbitals();
     recorded_active_spaces.push_back(
-        orbitals->get_active_space_indices().first);
+        spin_channel_indices(orbitals->active_indices(), axes::alpha()));
     recorded_inactive_spaces.push_back(
-        orbitals->get_inactive_space_indices().first);
+        spin_channel_indices(orbitals->inactive_indices(), axes::alpha()));
 
     auto determinant = Configuration::canonical_hf_configuration(
-        n_alpha, n_beta, orbitals->get_active_space_indices().first.size());
+        n_alpha, n_beta,
+        spin_channel_indices(orbitals->active_indices(), axes::alpha()).size());
     auto container =
         std::make_unique<StateVectorContainer>(determinant, orbitals);
     return {0.0, std::make_shared<Wavefunction>(std::move(container))};

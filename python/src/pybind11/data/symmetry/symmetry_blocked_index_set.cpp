@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <string>
 #include <unordered_map>

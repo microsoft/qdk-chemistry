@@ -61,7 +61,8 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices, spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 

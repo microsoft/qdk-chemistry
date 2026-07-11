@@ -17,6 +17,8 @@
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+
 // QDK/Chemistry data::Hamiltonian headers
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>

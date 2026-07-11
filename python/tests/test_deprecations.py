@@ -37,11 +37,9 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import (
     axes,
-    spin_channel_indices,
-    spin_channel_matrix,
-    spin_channel_vector,
     spin_index_set,
 )
 

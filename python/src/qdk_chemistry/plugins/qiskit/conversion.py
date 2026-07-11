@@ -12,7 +12,8 @@ representations, particularly for quantum circuit simulation and state preparati
 import numpy as np
 
 from qdk_chemistry import data
-from qdk_chemistry.data.symmetry import axes, spin_channel_indices
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 
 __all__ = ["create_statevector_from_wavefunction"]
 

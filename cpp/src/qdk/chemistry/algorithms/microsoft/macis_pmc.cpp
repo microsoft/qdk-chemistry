@@ -11,6 +11,7 @@
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 

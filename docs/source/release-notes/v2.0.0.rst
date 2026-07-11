@@ -47,34 +47,30 @@ Migrating ``Orbitals`` accessors
 ================================
 
 Coefficients and energies are returned as symmetry-blocked tensors. Select a
-spin channel with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel`, or use
-the :func:`~qdk_chemistry.data.symmetry.spin_channel_matrix` /
-:func:`~qdk_chemistry.data.symmetry.spin_channel_vector` /
-:func:`~qdk_chemistry.data.symmetry.spin_channel_indices` helpers, passing the
-spin channel explicitly (``axes.alpha()`` or ``axes.beta()``). They are safe for
-restricted, unrestricted, and trivial (model) orbitals alike.
+spin channel with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel` and read
+the block (for tensors) or the stored indices (for index sets) directly.
 
 .. code-block:: python
 
-   from qdk_chemistry.data.symmetry import (
-       axes,
-       spin_channel_matrix,
-       spin_channel_vector,
-       spin_channel_indices,
-   )
+   from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 
    # v1 (deprecated): tuple of dense alpha/beta arrays
    alpha_c, beta_c = orbitals.get_coefficients()
    alpha_e, beta_e = orbitals.get_energies()
    alpha_active, beta_active = orbitals.get_active_space_indices()
 
-   # v2: symmetry-blocked tensors + per-channel helpers
+   # v2: symmetry-blocked tensors, selected per spin channel by SymmetryLabel
+   alpha = SymmetryLabel([axes.alpha()])
+   beta = SymmetryLabel([axes.beta()])
    coefficients = orbitals.coefficients()          # SymmetryBlockedTensorRank2
    energies = orbitals.energies()                  # SymmetryBlockedTensorRank1
-   alpha_c = spin_channel_matrix(coefficients, axes.alpha())   # alpha block
-   beta_c = spin_channel_matrix(coefficients, axes.beta())     # beta block
-   alpha_e = spin_channel_vector(energies, axes.alpha())
-   alpha_active = spin_channel_indices(orbitals.active_indices(), axes.alpha())
+   alpha_c = coefficients.block([alpha, alpha])    # alpha block
+   beta_c = coefficients.block([beta, beta])       # beta block
+   alpha_e = energies.block([alpha])
+   alpha_active = orbitals.active_indices().indices(alpha)
+
+For a model (symmetry-free) system the trivial label ``SymmetryLabel([])`` selects
+the single block instead of an alpha/beta label.
 
 For the common case of counting active or inactive orbitals, take the length of
 the per-channel index list:
@@ -85,7 +81,7 @@ the per-channel index list:
    n_active = len(orbitals.get_active_space_indices()[0])
 
    # v2
-   n_active = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
+   n_active = len(orbitals.active_indices().indices(SymmetryLabel([axes.alpha()])))
 
 
 Consolidated wavefunction containers

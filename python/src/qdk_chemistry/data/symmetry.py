@@ -58,7 +58,6 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryProduct,
     axes,
     axis_name_to_string,
-    spin_channel_indices,
 )
 
 __all__ = [
@@ -81,9 +80,6 @@ __all__ = [
     "SymmetryProduct",
     "axes",
     "axis_name_to_string",
-    "spin_channel_indices",
-    "spin_channel_matrix",
-    "spin_channel_vector",
     "spin_index_set",
 ]
 
@@ -120,46 +116,3 @@ def spin_index_set(
     }
     return SymmetryBlockedIndexSet(sym, extents, indices)
 
-
-def spin_channel_matrix(coefficients: SymmetryBlockedTensorRank2, channel: SpinValue):
-    """Per-spin dense block of a rank-2 (coefficient-like) SymmetryBlockedTensor.
-
-    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the
-    alpha and beta blocks share storage, so either channel selection succeeds.
-
-    Args:
-        coefficients: A rank-2 SymmetryBlockedTensor (e.g. orbital coefficients).
-        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.
-
-    Returns:
-        The requested spin channel's dense block as a NumPy array.
-
-    """
-    slots = coefficients.symmetries()
-
-    def _slot_label(index: int) -> SymmetryLabel:
-        spin_axis = index < len(slots) and slots[index].has_axis(AxisName.Spin)
-        return SymmetryLabel([channel]) if spin_axis else SymmetryLabel([])
-
-    return coefficients.block([_slot_label(0), _slot_label(1)])
-
-
-def spin_channel_vector(energies: SymmetryBlockedTensorRank1, channel: SpinValue):
-    """Per-spin dense block of a rank-1 (energy-like) SymmetryBlockedTensor.
-
-    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the
-    alpha and beta blocks share storage, so either channel selection succeeds.
-
-    Args:
-        energies: A rank-1 SymmetryBlockedTensor (e.g. orbital energies).
-        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.
-
-    Returns:
-        The requested spin channel's dense block as a NumPy array.
-
-    """
-    label = SymmetryLabel([channel])
-    slots = energies.symmetries()
-    if not (slots and slots[0].has_axis(AxisName.Spin)):
-        label = SymmetryLabel([])
-    return energies.block([label])

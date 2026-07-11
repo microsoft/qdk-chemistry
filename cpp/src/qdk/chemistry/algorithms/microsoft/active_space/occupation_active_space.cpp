@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 
