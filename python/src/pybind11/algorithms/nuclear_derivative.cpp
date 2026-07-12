@@ -75,7 +75,7 @@ Args:
     charge: Total molecular charge.
     spin_multiplicity: Spin multiplicity of the molecular system.
     seed_or_basis: Basis name, basis set, orbitals, or wavefunction seed.
-    n_inactive_orbitals: Number of doubly occupied orbitals excluded from multi-reference active spaces. SCF energy paths ignore this value unless an implementation documents a stricter requirement.
+    n_inactive_orbitals: Number of doubly occupied orbitals excluded from multi-reference active spaces. This value is validated against the electron count even when the selected energy path does not use an active space (e.g., SCF).
 
 Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.
