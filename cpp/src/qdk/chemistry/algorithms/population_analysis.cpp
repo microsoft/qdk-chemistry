@@ -144,15 +144,16 @@ std::unique_ptr<PopulationAnalyzer> make_qdk_population_analyzer() {
 }  // namespace
 
 std::vector<double> QdkPopulationAnalyzer::_run_impl(
-    PopulationAnalysisInput input) const {
-  const auto total_charge =
-      static_cast<double>(this->_settings->get<int64_t>("charge"));
+    PopulationAnalysisInput input, int charge, int spin_multiplicity,
+    unsigned int n_inactive_orbitals) const {
+  (void)spin_multiplicity;
+  (void)n_inactive_orbitals;
   return std::visit(
-      [total_charge](const auto& value) -> std::vector<double> {
+      [charge](const auto& value) -> std::vector<double> {
         using ValueType = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<ValueType,
                                      std::shared_ptr<data::Structure>>) {
-          return structure_only_population(value, total_charge);
+          return structure_only_population(value, static_cast<double>(charge));
         } else {
           return mulliken_population(value);
         }

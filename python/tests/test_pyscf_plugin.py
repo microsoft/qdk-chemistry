@@ -199,7 +199,7 @@ class TestPyscfPlugin:
         analyzer = algorithms.create("population_analyzer", "pyscf")
         analyzer.settings().set("basis_set", "sto-3g")
 
-        charges = analyzer.run(h2)
+        charges = analyzer.run(h2, charge=0, spin_multiplicity=1)
 
         assert len(charges) == 2
         np.testing.assert_allclose(charges, [0.0, 0.0], atol=1e-8)

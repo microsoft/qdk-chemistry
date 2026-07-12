@@ -26,9 +26,8 @@ def test_population_analyzer_factory_registered():
 def test_qdk_population_analyzer_structure_input():
     """The QDK analyzer accepts a structure input and returns one charge per atom."""
     analyzer = algorithms.create("population_analyzer", "qdk")
-    analyzer.settings().set("charge", 1)
 
-    charges = analyzer.run(_h2_structure())
+    charges = analyzer.run(_h2_structure(), charge=1, spin_multiplicity=1)
 
     assert len(charges) == 2
     np.testing.assert_allclose(charges, [0.5, 0.5])

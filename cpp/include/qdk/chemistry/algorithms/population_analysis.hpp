@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/settings.hpp>
@@ -36,12 +35,6 @@ class PopulationAnalysisSettings : public data::Settings {
     set_default("method", std::string("mulliken"),
                 "Population-analysis method used to assign per-center "
                 "populations.");
-    set_default("charge", static_cast<int64_t>(0),
-                "Total molecular charge used by structure-only population "
-                "analysis implementations.");
-    set_default("spin_multiplicity", static_cast<int64_t>(1),
-                "Spin multiplicity (2S+1) used by structure-only population "
-                "analysis implementations.");
   }
 };
 
@@ -51,7 +44,7 @@ class PopulationAnalysisSettings : public data::Settings {
  */
 class PopulationAnalyzer
     : public Algorithm<PopulationAnalyzer, std::vector<double>,
-                       PopulationAnalysisInput> {
+                       PopulationAnalysisInput, int, int, unsigned int> {
  public:
   /**
    * @brief Construct a population analyzer with shared settings.
@@ -61,6 +54,19 @@ class PopulationAnalyzer
   }
   virtual ~PopulationAnalyzer() = default;
 
+  /**
+   * @brief Compute per-center particle populations.
+   *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
+   * @param input Structure or wavefunction to analyze
+   * @param charge Total molecular charge
+   * @param spin_multiplicity Spin multiplicity of the molecular system
+   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
+   * from active-space treatments; full-population analyses ignore this value
+   * \endcond
+   *
+   * @return Per-center populations in center order.
+   */
   using Algorithm::run;
 
   virtual std::string name() const = 0;
@@ -73,9 +79,17 @@ class PopulationAnalyzer
  protected:
   /**
    * @brief Implementation hook for derived population analyzers.
+   *
+   * @param input Structure or wavefunction to analyze
+   * @param charge Total molecular charge
+   * @param spin_multiplicity Spin multiplicity of the molecular system
+   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
+   * from active-space treatments; full-population analyses ignore this value
+   * @return Per-center populations in center order
    */
   virtual std::vector<double> _run_impl(
-      PopulationAnalysisInput input) const = 0;
+      PopulationAnalysisInput input, int charge, int spin_multiplicity,
+      unsigned int n_inactive_orbitals) const = 0;
 };
 
 /**
@@ -121,7 +135,9 @@ class QdkPopulationAnalyzer : public PopulationAnalyzer {
   /**
    * @brief Compute per-center populations.
    */
-  std::vector<double> _run_impl(PopulationAnalysisInput input) const override;
+  std::vector<double> _run_impl(
+      PopulationAnalysisInput input, int charge, int spin_multiplicity,
+      unsigned int n_inactive_orbitals) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms

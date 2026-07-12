@@ -33,9 +33,8 @@ TEST(PopulationAnalyzerTest, FactoryRegistersQdkAnalyzer) {
 
 TEST(PopulationAnalyzerTest, QdkAnalyzerRunsOnStructureInput) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
-  analyzer->settings().set("charge", static_cast<int64_t>(1));
 
-  auto charges = analyzer->run(create_h2_structure());
+  auto charges = analyzer->run(create_h2_structure(), 1, 1, 0);
 
   ASSERT_EQ(charges.size(), 2);
   EXPECT_DOUBLE_EQ(charges[0], 0.5);

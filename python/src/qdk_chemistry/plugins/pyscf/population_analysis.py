@@ -25,8 +25,6 @@ class PyscfPopulationAnalysisSettings(Settings):
         super().__init__()
         self._set_default("method", "string", "mulliken", "Population-analysis method", ["mulliken"])
         self._set_default("basis_set", "string", "def2-svp", "Basis set used for structure inputs")
-        self._set_default("charge", "int", 0, "Total molecular charge")
-        self._set_default("spin_multiplicity", "int", 1, "Spin multiplicity (2S+1)")
         self._set_default("scf_method", "string", "hf", "SCF electronic-structure method")
         self._set_default("scf_type", "string", "auto", "SCF reference type", ["auto", "restricted", "unrestricted"])
         self._set_default("convergence_threshold", "double", 1e-7, "SCF convergence threshold")
@@ -43,9 +41,16 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         super().__init__()
         self._settings = PyscfPopulationAnalysisSettings()
 
-    def _run_impl(self, input_data: Structure | Wavefunction) -> list[float]:
+    def _run_impl(
+        self,
+        input_data: Structure | Wavefunction,
+        charge: int,
+        spin_multiplicity: int,
+        n_inactive_orbitals: int,
+    ) -> list[float]:
         """Compute partial charges using PySCF Mulliken population analysis."""
         Logger.trace_entering()
+        del n_inactive_orbitals
         method = self._settings.get("method").lower()
         if method != "mulliken":
             raise ValueError(f"Unsupported PySCF population-analysis method: {method}")
@@ -54,8 +59,8 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
             solver = self._create_scf_solver()
             _, wavefunction = solver.run(
                 input_data,
-                self._settings.get("charge"),
-                self._settings.get("spin_multiplicity"),
+                charge,
+                spin_multiplicity,
                 self._settings.get("basis_set"),
             )
             return self._charges_from_wavefunction(wavefunction)

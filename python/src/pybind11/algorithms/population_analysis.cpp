@@ -29,9 +29,12 @@ class PopulationAnalyzerBase : public PopulationAnalyzer,
   }
 
  protected:
-  std::vector<double> _run_impl(PopulationAnalysisInput input) const override {
+  std::vector<double> _run_impl(
+      PopulationAnalysisInput input, int charge, int spin_multiplicity,
+      unsigned int n_inactive_orbitals) const override {
     PYBIND11_OVERRIDE_PURE(std::vector<double>, PopulationAnalyzer, _run_impl,
-                           input);
+                           input, charge, spin_multiplicity,
+                           n_inactive_orbitals);
   }
 };
 
@@ -48,15 +51,21 @@ void bind_population_analysis(py::module& m) {
   analyzer.def(py::init<>(), R"(Create a population analyzer.)");
   analyzer.def(
       "run",
-      [](const PopulationAnalyzer& self, PopulationAnalysisInput input) {
-        return self.run(input);
+      [](const PopulationAnalyzer& self, PopulationAnalysisInput input,
+         int charge, int spin_multiplicity, unsigned int n_inactive_orbitals) {
+        return self.run(input, charge, spin_multiplicity, n_inactive_orbitals);
       },
-      py::arg("input"),
+      py::arg("input"), py::arg("charge"), py::arg("spin_multiplicity"),
+      py::arg("n_inactive_orbitals") = 0,
       R"(
 Compute per-center populations.
 
 Args:
     input: Structure or Wavefunction to analyze.
+    charge: Total molecular charge.
+    spin_multiplicity: Spin multiplicity of the molecular system.
+    n_inactive_orbitals: Number of doubly occupied orbitals excluded from active-
+space treatments. Full-population analyses ignore this value.
 
 Returns:
     list[float]: Per-center populations in center order.
