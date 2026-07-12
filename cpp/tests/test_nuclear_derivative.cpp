@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/nuclear_derivative_detail.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
@@ -115,7 +116,7 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
   }
 
   return calculator->run(structure, charge, spin_multiplicity,
-                         std::string("sto-3g"), 0, 0);
+                         std::string("sto-3g"), 0);
 }
 
 void expect_qdk_analytic_gradient_matches_numeric(
@@ -252,7 +253,7 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
   calculator->settings().set("finite_difference_step", 1.0e-3);
 
   auto [energy, gradients, hessian, wavefunction] = calculator->run(
-      testing::create_water_structure(), 0, 1, std::string("sto-3g"), 0, 0);
+      testing::create_water_structure(), 0, 1, std::string("sto-3g"), 0);
 
   ASSERT_TRUE(std::isfinite(energy));
   EXPECT_LT(energy, 0.0);
@@ -284,11 +285,57 @@ TEST(NuclearDerivativeCalculatorTest, NullStructureThrowsInvalidArgument) {
     auto calculator =
         NuclearDerivativeCalculatorFactory::create(calculator_name);
     try {
-      calculator->run(nullptr, 0, 1, std::string("sto-3g"), 0, 0);
+      calculator->run(nullptr, 0, 1, std::string("sto-3g"), 0);
       FAIL() << calculator_name << " accepted a null structure";
     } catch (const std::invalid_argument& ex) {
       EXPECT_STREQ(ex.what(), "Structure must not be null");
     }
+  }
+}
+
+TEST(NuclearDerivativeCalculatorTest, NullWavefunctionSeedThrowsSpecificError) {
+  for (const auto& calculator_name : {"qdk_finite_difference", "qdk"}) {
+    auto calculator =
+        NuclearDerivativeCalculatorFactory::create(calculator_name);
+    try {
+      calculator->run(testing::create_hydrogen_structure(), 0, 2,
+                      std::shared_ptr<Wavefunction>{}, 0);
+      FAIL() << calculator_name << " accepted a null wavefunction seed";
+    } catch (const std::invalid_argument& ex) {
+      EXPECT_STREQ(ex.what(), "Wavefunction seed must not be null");
+    }
+  }
+}
+
+TEST(NuclearDerivativeCalculatorTest, ExcludesEcpCoreElectrons) {
+  auto structure = testing::create_agh_structure();
+  auto [n_alpha, n_beta] =
+      qdk::chemistry::algorithms::detail::active_electron_counts(
+          structure, 0, 1, std::string("def2-svp"), 0);
+
+  EXPECT_EQ(n_alpha, 10);
+  EXPECT_EQ(n_beta, 10);
+}
+
+TEST(NuclearDerivativeCalculatorTest, RejectsTooManyInactiveOrbitals) {
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
+  EXPECT_THROW(calculator->run(testing::create_hydrogen_structure(), 0, 2,
+                               std::string("sto-3g"), 1),
+               std::invalid_argument);
+}
+
+TEST(NuclearDerivativeCalculatorTest, QdkAnalyticRejectsInactiveOrbitals) {
+  auto calculator = NuclearDerivativeCalculatorFactory::create("qdk");
+  try {
+    calculator->run(testing::create_water_structure(), 0, 1,
+                    std::string("sto-3g"), 1);
+    FAIL() << "QDK analytic calculator accepted inactive orbitals";
+  } catch (const std::invalid_argument& ex) {
+    EXPECT_STREQ(
+        ex.what(),
+        "The QDK analytic nuclear derivative calculator does not use an "
+        "active space; n_inactive_orbitals must be 0");
   }
 }
 
@@ -319,7 +366,7 @@ TEST(NuclearDerivativeCalculatorTest,
   calculator->settings().set("finite_difference_step", 1.0e-2);
 
   auto [energy, gradients, hessian, result_wavefunction] =
-      calculator->run(structure, 0, 1, seed_orbitals, 1, 1);
+      calculator->run(structure, 0, 1, seed_orbitals, 4);
 
   EXPECT_TRUE(std::isfinite(energy));
   ASSERT_NE(gradients, nullptr);
@@ -355,7 +402,7 @@ TEST(NuclearDerivativeCalculatorTest,
 
   auto structure = testing::create_hydrogen_structure();
   auto scf_solver = ScfSolverFactory::create();
-  auto [_, wavefunction] = scf_solver->run(structure, 0, 2, "sto-3g");
+  auto [_, wavefunction] = scf_solver->run(structure, -1, 1, "sto-3g");
   auto seed_orbitals =
       testing::with_active_space(wavefunction->get_orbitals(),
                                  std::vector<size_t>{0}, std::vector<size_t>{});
@@ -373,7 +420,7 @@ TEST(NuclearDerivativeCalculatorTest,
   calculator->settings().set("finite_difference_step", 1.0e-2);
 
   auto [energy, gradients, hessian, result_wavefunction] =
-      calculator->run(structure, 0, 2, seed_orbitals, 1, 1);
+      calculator->run(structure, -1, 1, seed_orbitals, 0);
 
   EXPECT_TRUE(std::isfinite(energy));
   ASSERT_NE(gradients, nullptr);
