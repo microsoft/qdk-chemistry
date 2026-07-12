@@ -12,6 +12,8 @@
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <utility>
@@ -202,6 +204,41 @@ std::shared_ptr<data::Orbitals> seed_to_orbitals(
   return orbitals;
 }
 
+namespace {
+// Project a source active/inactive index set onto the symmetry and mode extents
+// of the target orbitals' coefficient tensor. This keeps the index set
+// structurally compatible with the target (e.g. a restricted target aliases the
+// beta channel from alpha), avoiding mixed restricted/unrestricted index sets
+// that would fail SymmetryBlockedIndexSet validation on serialization. A null
+// source (absent space) projects to null; a non-null but empty source projects
+// to an explicitly empty (0-orbital) set.
+std::shared_ptr<const data::SymmetryBlockedIndexSet> project_index_set_to(
+    const std::shared_ptr<const data::Orbitals>& target,
+    const std::shared_ptr<const data::SymmetryBlockedIndexSet>& source) {
+  if (!source) {
+    return nullptr;
+  }
+  const auto symmetries = target->coefficients()->symmetries()[1];
+  const auto& extents = target->coefficients()->extents()[1];
+  const auto alpha = data::spin_channel_indices(source, data::axes::alpha());
+  auto to_u32 = [](const std::vector<std::size_t>& v) {
+    return std::vector<std::uint32_t>(v.begin(), v.end());
+  };
+  std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>> indices;
+  if (symmetries && symmetries->has_axis(data::AxisName::Spin)) {
+    if (!alpha.empty()) indices.emplace(data::axes::alpha(), to_u32(alpha));
+    if (!target->is_restricted()) {
+      const auto beta = data::spin_channel_indices(source, data::axes::beta());
+      if (!beta.empty()) indices.emplace(data::axes::beta(), to_u32(beta));
+    }
+  } else if (!alpha.empty()) {
+    indices.emplace(data::SymmetryLabel{}, to_u32(alpha));
+  }
+  return std::make_shared<const data::SymmetryBlockedIndexSet>(
+      symmetries, extents, std::move(indices));
+}
+}  // namespace
+
 std::shared_ptr<data::Orbitals> copy_active_space_metadata(
     const std::shared_ptr<data::Orbitals>& orbitals,
     const std::shared_ptr<data::Orbitals>& metadata_source) {
@@ -209,43 +246,20 @@ std::shared_ptr<data::Orbitals> copy_active_space_metadata(
     return orbitals;
   }
 
-  const auto& [active_a, active_b] =
-      metadata_source->get_active_space_indices();
-  const auto& [inactive_a, inactive_b] =
-      metadata_source->get_inactive_space_indices();
   std::optional<Eigen::MatrixXd> ao_overlap;
   if (orbitals->has_overlap_matrix()) {
     ao_overlap = orbitals->get_overlap_matrix();
   }
-  std::shared_ptr<data::BasisSet> basis_set = orbitals->get_basis_set();
 
-  if (orbitals->is_restricted()) {
-    std::optional<Eigen::VectorXd> energies;
-    if (orbitals->has_energies()) {
-      energies = orbitals->get_energies().first;
-    }
-    return std::make_shared<data::Orbitals>(
-        orbitals->get_coefficients().first, energies, ao_overlap, basis_set,
-        std::make_tuple(
-            std::vector<size_t>(active_a.begin(), active_a.end()),
-            std::vector<size_t>(inactive_a.begin(), inactive_a.end())));
-  }
-
-  std::optional<Eigen::VectorXd> energies_a;
-  std::optional<Eigen::VectorXd> energies_b;
-  if (orbitals->has_energies()) {
-    auto [source_energies_a, source_energies_b] = orbitals->get_energies();
-    energies_a = source_energies_a;
-    energies_b = source_energies_b;
-  }
+  // Copy coefficients/energies from orbitals and the active/inactive index sets
+  // from metadata_source, projecting the latter onto the target symmetry so the
+  // result stays a structurally valid restricted/unrestricted Orbitals.
   return std::make_shared<data::Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_coefficients().second,
-      energies_a, energies_b, ao_overlap, basis_set,
-      std::make_tuple(
-          std::vector<size_t>(active_a.begin(), active_a.end()),
-          std::vector<size_t>(active_b.begin(), active_b.end()),
-          std::vector<size_t>(inactive_a.begin(), inactive_a.end()),
-          std::vector<size_t>(inactive_b.begin(), inactive_b.end())));
+      orbitals->coefficients(),
+      orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
+      orbitals->get_basis_set(),
+      project_index_set_to(orbitals, metadata_source->active_indices()),
+      project_index_set_to(orbitals, metadata_source->inactive_indices()));
 }
 
 template <typename Factory>
@@ -275,8 +289,11 @@ ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
   }
 
   if (!reference.wavefunction) {
-    const auto& [active_a, active_b] =
-        reference.orbitals->get_active_space_indices();
+    const auto active_ai = reference.orbitals->active_indices();
+    const auto active_a =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto active_b =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     if (active_a.size() != active_b.size()) {
       throw std::invalid_argument(
           "Reference orbital localization requires matching alpha and beta "
@@ -299,8 +316,9 @@ ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
 
   auto localizer = create_from_ref<LocalizerFactory>(
       settings.get<data::AlgorithmRef>("orbital_localizer"));
-  auto [loc_indices_a, loc_indices_b] =
-      reference.orbitals->get_active_space_indices();
+  const auto loc_ai = reference.orbitals->active_indices();
+  auto loc_indices_a = data::spin_channel_indices(loc_ai, data::axes::alpha());
+  auto loc_indices_b = data::spin_channel_indices(loc_ai, data::axes::beta());
   reference.wavefunction =
       localizer->run(reference.wavefunction, loc_indices_a, loc_indices_b);
   reference.orbitals = reference.wavefunction->get_orbitals();

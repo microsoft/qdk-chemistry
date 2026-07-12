@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <string>
 #include <unordered_map>
@@ -96,4 +97,16 @@ void bind_symmetry_blocked_index_set(py::module& m) {
                 to_string_path(filename));
           },
           py::arg("filename"));
+
+  m.def(
+      "spin_channel_indices",
+      [](const std::shared_ptr<const SymmetryBlockedIndexSet>& index_set,
+         const std::shared_ptr<const SpinValue>& channel) {
+        return spin_channel_indices(index_set, channel);
+      },
+      py::arg("index_set"), py::arg("channel"),
+      "Indices for a single spin channel of a SymmetryBlockedIndexSet as a "
+      "flat list. Pass the channel explicitly, e.g. axes.alpha() or "
+      "axes.beta(); for a spin-free set the sole trivial-label segment serves "
+      "every channel. Returns an empty list when 'index_set' is None.");
 }
