@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -77,7 +78,10 @@ TEST_F(OrbitalsTest, CoefficientManagement) {
   EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(coeffs.rows(), alpha_coeffs.rows());
   EXPECT_EQ(coeffs.cols(), alpha_coeffs.cols());
 
@@ -101,7 +105,8 @@ TEST_F(OrbitalsTest, EnergyManagement) {
   auto basis_set = testing::create_random_basis_set(3);
   Orbitals orb(coeffs, energies, std::nullopt, basis_set);
 
-  const auto& [alpha_energies, beta_energies] = orb.get_energies();
+  const auto& alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb.energies()->block({axes::beta()});
   EXPECT_EQ(energies.size(), alpha_energies.size());
   EXPECT_EQ(energies.size(), beta_energies.size());
 
@@ -168,10 +173,14 @@ TEST_F(OrbitalsTest, SizeAndDimensionQueries) {
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   // Test matrix dimensions
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(n_basis, alpha_coeffs.rows());
   EXPECT_EQ(n_orbitals, alpha_coeffs.cols());
-  const auto& [alpha_energies, beta_energies] = orb.get_energies();
+  const auto& alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb.energies()->block({axes::beta()});
   EXPECT_EQ(n_orbitals, alpha_energies.size());
 }
 
@@ -274,14 +283,22 @@ TEST_F(OrbitalsTest, JSONSerialization) {
             orb_json->get_num_molecular_orbitals());
 
   // Check coefficients are preserved
-  auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
-  auto [json_coeffs_a, json_coeffs_b] = orb_json->get_coefficients();
+  const auto& orig_coeffs_a =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& orig_coeffs_b =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& json_coeffs_a =
+      orb_json->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& json_coeffs_b =
+      orb_json->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(json_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(json_coeffs_b, testing::json_tolerance));
 
   // Check energies are preserved
-  auto [orig_energies_a, orig_energies_b] = orb.get_energies();
-  auto [json_energies_a, json_energies_b] = orb_json->get_energies();
+  const auto& orig_energies_a = orb.energies()->block({axes::alpha()});
+  const auto& orig_energies_b = orb.energies()->block({axes::beta()});
+  const auto& json_energies_a = orb_json->energies()->block({axes::alpha()});
+  const auto& json_energies_b = orb_json->energies()->block({axes::beta()});
   EXPECT_TRUE(
       orig_energies_a.isApprox(json_energies_a, testing::json_tolerance));
   EXPECT_TRUE(
@@ -335,8 +352,10 @@ TEST_F(OrbitalsTest, UnrestrictedCalculations) {
   EXPECT_FALSE(orb.is_restricted());
 
   // Test coefficient retrieval
-  const auto& [retrieved_alpha_coeffs, retrieved_beta_coeffs] =
-      orb.get_coefficients();
+  const auto& retrieved_alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& retrieved_beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   for (int i = 0; i < n_basis; ++i) {
     for (int j = 0; j < n_orbitals; ++j) {
       EXPECT_NEAR(alpha_coeffs(i, j), retrieved_alpha_coeffs(i, j),
@@ -347,8 +366,8 @@ TEST_F(OrbitalsTest, UnrestrictedCalculations) {
   }
 
   // Test energy retrieval
-  const auto& [retrieved_alpha_energies, retrieved_beta_energies] =
-      orb.get_energies();
+  const auto& retrieved_alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& retrieved_beta_energies = orb.energies()->block({axes::beta()});
   for (int i = 0; i < n_orbitals; ++i) {
     EXPECT_NEAR(alpha_energies(i), retrieved_alpha_energies(i),
                 testing::numerical_zero_tolerance);
@@ -412,7 +431,7 @@ TEST_F(OrbitalsTest, ErrorHandling) {
   Orbitals orb(coeffs, std::nullopt, std::nullopt, error_basis);
 
   // Test accessing missing data throws exceptions
-  EXPECT_THROW(orb.get_energies(), std::runtime_error);
+  EXPECT_THROW(orb.energies()->block({axes::alpha()}), std::runtime_error);
   EXPECT_THROW(orb.get_overlap_matrix(), std::runtime_error);
 
   // Test invalid file operations - these might need to be instance methods
@@ -445,8 +464,14 @@ TEST_F(OrbitalsTest, FileIOGeneric) {
             orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
-  auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
-  auto [json_coeffs_a, json_coeffs_b] = orb_json->get_coefficients();
+  const auto& orig_coeffs_a =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& orig_coeffs_b =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& json_coeffs_a =
+      orb_json->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& json_coeffs_b =
+      orb_json->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(json_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(json_coeffs_b, testing::json_tolerance));
 
@@ -460,7 +485,10 @@ TEST_F(OrbitalsTest, FileIOGeneric) {
             orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
-  auto [hdf5_coeffs_a, hdf5_coeffs_b] = orb_hdf5->get_coefficients();
+  const auto& hdf5_coeffs_a =
+      orb_hdf5->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& hdf5_coeffs_b =
+      orb_hdf5->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(hdf5_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(hdf5_coeffs_b, testing::json_tolerance));
 
@@ -493,13 +521,21 @@ TEST_F(OrbitalsTest, FileIOSpecific) {
             orb.get_num_molecular_orbitals());
 
   // Check all data is preserved
-  auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
-  auto [hdf5_coeffs_a, hdf5_coeffs_b] = orb_hdf5->get_coefficients();
+  const auto& orig_coeffs_a =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& orig_coeffs_b =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& hdf5_coeffs_a =
+      orb_hdf5->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& hdf5_coeffs_b =
+      orb_hdf5->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(hdf5_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(hdf5_coeffs_b, testing::json_tolerance));
 
-  auto [orig_energies_a, orig_energies_b] = orb.get_energies();
-  auto [hdf5_energies_a, hdf5_energies_b] = orb_hdf5->get_energies();
+  const auto& orig_energies_a = orb.energies()->block({axes::alpha()});
+  const auto& orig_energies_b = orb.energies()->block({axes::beta()});
+  const auto& hdf5_energies_a = orb_hdf5->energies()->block({axes::alpha()});
+  const auto& hdf5_energies_b = orb_hdf5->energies()->block({axes::beta()});
   EXPECT_TRUE(
       orig_energies_a.isApprox(hdf5_energies_a, testing::json_tolerance));
   EXPECT_TRUE(
@@ -518,7 +554,10 @@ TEST_F(OrbitalsTest, FileIOSpecific) {
             orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
-  auto [json_coeffs_a, json_coeffs_b] = orb_json->get_coefficients();
+  const auto& json_coeffs_a =
+      orb_json->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& json_coeffs_b =
+      orb_json->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(json_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(json_coeffs_b, testing::json_tolerance));
 }
@@ -565,7 +604,9 @@ TEST_F(OrbitalsTest, ActiveSpaceManagement) {
 
   // Check active space indices are correctly stored
   // For restricted case, both alpha and beta indices should match input
-  auto [alpha_indices, beta_indices] = orb.get_active_space_indices();
+  auto alpha_indices =
+      spin_channel_indices(orb.active_indices(), axes::alpha());
+  auto beta_indices = spin_channel_indices(orb.active_indices(), axes::beta());
   EXPECT_EQ(active_indices, alpha_indices);
   EXPECT_EQ(active_indices, beta_indices);
 }
@@ -589,8 +630,10 @@ TEST_F(OrbitalsTest, InactiveSpaceManagement) {
 
   // Check inactive space indices are correctly stored
   // For restricted case, both alpha and beta indices should match input
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      orb.get_inactive_space_indices();
+  auto alpha_inactive_indices =
+      spin_channel_indices(orb.inactive_indices(), axes::alpha());
+  auto beta_inactive_indices =
+      spin_channel_indices(orb.inactive_indices(), axes::beta());
   EXPECT_EQ(inactive_indices, alpha_inactive_indices);
   EXPECT_EQ(inactive_indices, beta_inactive_indices);
 }
@@ -614,8 +657,10 @@ TEST_F(OrbitalsTest, ActiveSpaceSerialization) {
 
   // Check active space data is preserved
   EXPECT_TRUE(orb_json->has_active_space());
-  auto [json_alpha_indices, json_beta_indices] =
-      orb_json->get_active_space_indices();
+  auto json_alpha_indices =
+      spin_channel_indices(orb_json->active_indices(), axes::alpha());
+  auto json_beta_indices =
+      spin_channel_indices(orb_json->active_indices(), axes::beta());
   EXPECT_EQ(active_indices, json_alpha_indices);
   EXPECT_EQ(active_indices, json_beta_indices);
 
@@ -625,8 +670,10 @@ TEST_F(OrbitalsTest, ActiveSpaceSerialization) {
 
   // Check active space data is preserved
   EXPECT_TRUE(orb_hdf5->has_active_space());
-  auto [hdf5_alpha_indices, hdf5_beta_indices] =
-      orb_hdf5->get_active_space_indices();
+  auto hdf5_alpha_indices =
+      spin_channel_indices(orb_hdf5->active_indices(), axes::alpha());
+  auto hdf5_beta_indices =
+      spin_channel_indices(orb_hdf5->active_indices(), axes::beta());
   EXPECT_EQ(active_indices, hdf5_alpha_indices);
   EXPECT_EQ(active_indices, hdf5_beta_indices);
 }
@@ -658,8 +705,10 @@ TEST_F(OrbitalsTest, UnrestrictedActiveSpaceSerialization) {
 
   // Verify active space data
   EXPECT_TRUE(orb_json->has_active_space());
-  auto [json_alpha_indices, json_beta_indices] =
-      orb_json->get_active_space_indices();
+  auto json_alpha_indices =
+      spin_channel_indices(orb_json->active_indices(), axes::alpha());
+  auto json_beta_indices =
+      spin_channel_indices(orb_json->active_indices(), axes::beta());
   EXPECT_EQ(alpha_active_indices, json_alpha_indices);
   EXPECT_EQ(beta_active_indices, json_beta_indices);
 
@@ -669,8 +718,10 @@ TEST_F(OrbitalsTest, UnrestrictedActiveSpaceSerialization) {
 
   // Verify active space data
   EXPECT_TRUE(orb_hdf5->has_active_space());
-  auto [hdf5_alpha_indices, hdf5_beta_indices] =
-      orb_hdf5->get_active_space_indices();
+  auto hdf5_alpha_indices =
+      spin_channel_indices(orb_hdf5->active_indices(), axes::alpha());
+  auto hdf5_beta_indices =
+      spin_channel_indices(orb_hdf5->active_indices(), axes::beta());
   EXPECT_EQ(alpha_active_indices, hdf5_alpha_indices);
   EXPECT_EQ(beta_active_indices, hdf5_beta_indices);
 }
@@ -692,8 +743,10 @@ TEST_F(OrbitalsTest, CopyConstructorWithActiveSpace) {
 
   // Verify active space data is copied
   EXPECT_TRUE(orb_copy.has_active_space());
-  auto [copy_alpha_indices, copy_beta_indices] =
-      orb_copy.get_active_space_indices();
+  auto copy_alpha_indices =
+      spin_channel_indices(orb_copy.active_indices(), axes::alpha());
+  auto copy_beta_indices =
+      spin_channel_indices(orb_copy.active_indices(), axes::beta());
   EXPECT_EQ(active_indices, copy_alpha_indices);
   EXPECT_EQ(active_indices, copy_beta_indices);
 
@@ -702,8 +755,10 @@ TEST_F(OrbitalsTest, CopyConstructorWithActiveSpace) {
 
   // Verify active space data is copied via assignment
   EXPECT_TRUE(orb_assigned.has_active_space());
-  auto [assigned_alpha_indices, assigned_beta_indices] =
-      orb_assigned.get_active_space_indices();
+  auto assigned_alpha_indices =
+      spin_channel_indices(orb_assigned.active_indices(), axes::alpha());
+  auto assigned_beta_indices =
+      spin_channel_indices(orb_assigned.active_indices(), axes::beta());
   EXPECT_EQ(active_indices, assigned_alpha_indices);
   EXPECT_EQ(active_indices, assigned_beta_indices);
 }
@@ -743,14 +798,22 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
             orb.get_num_molecular_orbitals());
 
   // Check coefficients
-  auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
-  auto [json_coeffs_a, json_coeffs_b] = orb_json->get_coefficients();
+  const auto& orig_coeffs_a =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& orig_coeffs_b =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& json_coeffs_a =
+      orb_json->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& json_coeffs_b =
+      orb_json->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(json_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(json_coeffs_b, testing::json_tolerance));
 
   // Check energies
-  auto [orig_energies_a, orig_energies_b] = orb.get_energies();
-  auto [json_energies_a, json_energies_b] = orb_json->get_energies();
+  const auto& orig_energies_a = orb.energies()->block({axes::alpha()});
+  const auto& orig_energies_b = orb.energies()->block({axes::beta()});
+  const auto& json_energies_a = orb_json->energies()->block({axes::alpha()});
+  const auto& json_energies_b = orb_json->energies()->block({axes::beta()});
   EXPECT_TRUE(
       orig_energies_a.isApprox(json_energies_a, testing::json_tolerance));
   EXPECT_TRUE(
@@ -770,12 +833,16 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
             orb.get_num_molecular_orbitals());
 
   // Check coefficients
-  auto [hdf5_coeffs_a, hdf5_coeffs_b] = orb_hdf5->get_coefficients();
+  const auto& hdf5_coeffs_a =
+      orb_hdf5->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& hdf5_coeffs_b =
+      orb_hdf5->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(orig_coeffs_a.isApprox(hdf5_coeffs_a, testing::json_tolerance));
   EXPECT_TRUE(orig_coeffs_b.isApprox(hdf5_coeffs_b, testing::json_tolerance));
 
   // Check energies
-  auto [hdf5_energies_a, hdf5_energies_b] = orb_hdf5->get_energies();
+  const auto& hdf5_energies_a = orb_hdf5->energies()->block({axes::alpha()});
+  const auto& hdf5_energies_b = orb_hdf5->energies()->block({axes::beta()});
   EXPECT_TRUE(
       orig_energies_a.isApprox(hdf5_energies_a, testing::json_tolerance));
   EXPECT_TRUE(

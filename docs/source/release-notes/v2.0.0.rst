@@ -1,0 +1,204 @@
+.. _release-v2.0.0:
+
+==========================
+What's New in Version 2.0
+==========================
+
+Version 2.0 reworks the core data structures around a single symmetry-blocked
+storage model, consolidates the wavefunction containers, and standardizes the
+fermion-to-qubit mapping workflow. The redesign keeps the v1 surface working
+wherever a faithful facade was possible, so most code continues to run; this
+guide covers the cases that need changes and the new APIs that replace them.
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+
+Symmetry-blocked storage
+========================
+
+Orbital coefficients and energies, Hamiltonian integrals, and index sets are now
+backed by symmetry-blocked containers
+(:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2`,
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1`, and
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`). A single storage
+model carries spin (and, in general, other single-particle symmetries) explicitly
+per block, so restricted and unrestricted data share one representation and the
+same accessors.
+
+The v1 dense accessors on :class:`~qdk_chemistry.data.Orbitals` remain available
+as tested facades over this storage, but now emit a ``DeprecationWarning``.
+
+.. note::
+
+   On-disk files are affected. The serialization version for orbitals,
+   Hamiltonian containers, and the
+   :class:`~qdk_chemistry.data.StateVectorContainer` wavefunction container was
+   bumped to ``0.2.0`` (the :class:`~qdk_chemistry.data.AmplitudeContainer`
+   remains ``0.1.0``). Direct loading rejects files written by earlier releases;
+   upgrade them in place with the shipped converter (``python -m
+   qdk_chemistry.migrate old.h5 new.h5``; see :doc:`../user/migrating-data-files`)
+   or re-generate them. Backward-compatible direct loading is planned for a
+   future release.
+
+
+Migrating ``Orbitals`` accessors
+================================
+
+Coefficients and energies are returned as symmetry-blocked tensors. Select a
+spin channel with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel` and read
+the block (for tensors) or the stored indices (for index sets) directly.
+
+.. code-block:: python
+
+   from qdk_chemistry.data.symmetry import SymmetryLabel, axes
+
+   # v1 (deprecated): tuple of dense alpha/beta arrays
+   alpha_c, beta_c = orbitals.get_coefficients()
+   alpha_e, beta_e = orbitals.get_energies()
+   alpha_active, beta_active = orbitals.get_active_space_indices()
+
+   # v2: symmetry-blocked tensors, selected per spin channel by SymmetryLabel
+   alpha = SymmetryLabel([axes.alpha()])
+   beta = SymmetryLabel([axes.beta()])
+   coefficients = orbitals.coefficients()          # SymmetryBlockedTensorRank2
+   energies = orbitals.energies()                  # SymmetryBlockedTensorRank1
+   alpha_c = coefficients.block([alpha, alpha])    # alpha block
+   beta_c = coefficients.block([beta, beta])       # beta block
+   alpha_e = energies.block([alpha])
+   alpha_active = orbitals.active_indices().indices(alpha)
+
+For a model (symmetry-free) system the trivial label ``SymmetryLabel([])`` selects
+the single block instead of an alpha/beta label.
+
+For the common case of counting active or inactive orbitals, take the length of
+the per-channel index list:
+
+.. code-block:: python
+
+   # v1 (deprecated)
+   n_active = len(orbitals.get_active_space_indices()[0])
+
+   # v2
+   n_active = len(orbitals.active_indices().indices(SymmetryLabel([axes.alpha()])))
+
+
+Consolidated wavefunction containers
+====================================
+
+The five v1 wavefunction containers were merged into two. The single-determinant,
+complete-active-space, and selected-configuration-interaction containers are now
+:class:`~qdk_chemistry.data.StateVectorContainer`, and the Møller-Plesset and
+coupled-cluster containers are now :class:`~qdk_chemistry.data.AmplitudeContainer`.
+
+The removed names remain importable as deprecated aliases:
+
+.. code-block:: python
+
+   # v1 (deprecated alias, emits DeprecationWarning)
+   from qdk_chemistry.data import CasWavefunctionContainer
+
+   # v2
+   from qdk_chemistry.data import StateVectorContainer
+
+:meth:`~qdk_chemistry.data.Wavefunction.get_container_type` now returns
+``"state_vector"`` or ``"amplitude"`` instead of the former ``"sd"`` / ``"cas"`` /
+``"sci"`` / ``"mp2"`` / ``"cc"`` strings.
+
+
+Two-particle RDM spin ordering (action required)
+================================================
+
+.. warning::
+
+   This is a silent change: the same accessor returns differently ordered data.
+
+The spin-resolved two-particle RDM accessor
+``get_active_two_rdm_spin_dependent()`` now returns its blocks as
+``(aaaa, aabb, bbbb)`` (previously ``(aabb, aaaa, bbbb)``), and the ``aabb``
+block is now stored in *alpha-alpha-beta-beta* index order (previously
+*alpha-beta-alpha-beta*). The :class:`~qdk_chemistry.data.Wavefunction`
+constructor takes the blocks in the same new order. Update any positional
+unpacking:
+
+.. code-block:: python
+
+   # v1
+   aabb, aaaa, bbbb = wavefunction.get_active_two_rdm_spin_dependent()
+
+   # v2
+   aaaa, aabb, bbbb = wavefunction.get_active_two_rdm_spin_dependent()
+
+
+Configuration factories
+========================
+
+The string and bitset constructors were replaced by explicit factory methods:
+
+.. code-block:: python
+
+   from qdk_chemistry.data import Configuration
+
+   # v1
+   # config = Configuration("2020")
+
+   # v2
+   config = Configuration.from_spin_half_string("2020")
+
+
+Fermion-to-qubit mapping
+========================
+
+The qubit mapper no longer takes an ``encoding`` string. Build a
+:class:`~qdk_chemistry.data.MajoranaMapping` and pass it to ``run()``:
+
+.. code-block:: python
+
+   # v1
+   # mapper = create("qubit_mapper", "qdk")  # configured via encoding="jordan-wigner"
+   # qubit_hamiltonian = mapper.run(hamiltonian)
+
+   # v2
+   mapper = create("qubit_mapper", "qdk")
+   qubit_hamiltonian = mapper.run(hamiltonian, mapping)
+
+The standalone ``EncodingMismatchError`` and ``validate_encoding_compatibility``
+helpers were removed in favor of this mapping-centric flow; importing them still
+works but emits a ``DeprecationWarning``.
+
+
+Unitary representation rename
+=============================
+
+The ``TimeEvolutionUnitary`` family was renamed to the ``Unitary`` family:
+``TimeEvolutionUnitary`` → :class:`~qdk_chemistry.data.UnitaryRepresentation`,
+and ``TimeEvolutionUnitaryContainer`` → :class:`~qdk_chemistry.data.UnitaryContainer`.
+The old names remain importable as deprecated aliases.
+
+
+C++ API changes
+===============
+
+These changes affect the C++ library directly (Python users are insulated by the
+bindings above):
+
+- The FCIDUMP writer is now ``Hamiltonian::to_fcidump_file(...)``; the previous
+  ``_to_fcidump_file`` member was removed and ``HamiltonianContainer::to_fcidump_file``
+  became a concrete virtual.
+- The Cholesky Hamiltonian container now derives from ``HamiltonianContainer``
+  (no longer from the four-center container) and its dense constructor takes
+  three-center integrals plus optional AO Cholesky vectors.
+- ``ModelOrbitals(size_t, bool)`` was replaced by
+  ``ModelOrbitals(size_t, SymmetryProduct)`` and a
+  ``SymmetryBlockedIndexSet``-based constructor.
+
+
+Deprecation policy
+==================
+
+Deprecated v1 accessors and import names continue to work in this release and
+are covered by tests; they emit a ``DeprecationWarning`` to flag the migration
+path. Treat them as transitional: they are scheduled for removal in a future
+major release. To surface them in your own test suite, run Python with
+``-W error::DeprecationWarning`` or add a ``filterwarnings`` rule.
