@@ -6,45 +6,213 @@ What's New in Version 2.0
 
 Version 2.0 reworks the core data structures around a single symmetry-blocked
 storage model, consolidates the wavefunction containers, and standardizes the
-fermion-to-qubit mapping workflow. The redesign keeps the v1 surface working
-wherever a faithful facade was possible, so most code continues to run; this
-guide covers the cases that need changes and the new APIs that replace them.
+fermion-to-qubit mapping workflow. Building on those foundations, it adds nuclear
+gradients and Hessians, more robust SCF convergence, and a broader set of
+quantum-simulation primitives.
+
+Most v1 code keeps working through tested facades and deprecated aliases; the
+:ref:`Breaking changes and migration <v2-breaking-changes>` section covers the
+cases that need changes and the new APIs that replace them.
 
 .. contents:: On this page
    :local:
    :depth: 1
 
 
-Symmetry-blocked storage
+Highlights
+==========
+
+- **Symmetry-blocked storage.** Orbital coefficients and energies, Hamiltonian integrals, and index sets share one symmetry-blocked representation, so restricted and unrestricted data use the same accessors.
+- **Consolidated wavefunction containers.** The five v1 containers collapse into :class:`~qdk_chemistry.data.StateVectorContainer` and :class:`~qdk_chemistry.data.AmplitudeContainer`.
+- **Nuclear gradients and Hessians.** A new nuclear-derivative algorithm returns energies, gradients, and optionally a Hessian and the converged wavefunction.
+- **More robust SCF.** A stabilized SCF solver follows internal and external instabilities to a stable reference, and :term:`ROHF` gains geometric direct minimization.
+- **New simulation primitives.** Block-encoding / :term:`LCU` qubitization, the Hadamard test, Zassenhaus product formulas, and real-time dynamics for driven Hamiltonians join the existing Trotter-Suzuki builders.
+- **Fermion-to-qubit mapping as data.** Encodings are carried by :class:`~qdk_chemistry.data.MajoranaMapping`, including a Verstraete-Cirac local encoding.
+- **Explicit term grouping and expectation estimation.** Pauli grouping is now an opt-in ``term_grouper`` step, and the estimator generalizes to any :class:`~qdk_chemistry.data.QubitOperator`.
+
+
+Symmetry-Blocked Storage
 ========================
 
 Orbital coefficients and energies, Hamiltonian integrals, and index sets are now
 backed by symmetry-blocked containers
 (:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2`,
 :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1`, and
-:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`). A single storage
-model carries spin (and, in general, other single-particle symmetries) explicitly
-per block, so restricted and unrestricted data share one representation and the
-same accessors.
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`). Each block
+carries its spin (and, in general, other single-particle symmetries) explicitly,
+so one representation serves both restricted and unrestricted data.
 
 The v1 dense accessors on :class:`~qdk_chemistry.data.Orbitals` remain available
-as tested facades over this storage, but now emit a ``DeprecationWarning``.
+as tested facades over this storage, but now emit a ``DeprecationWarning``. See
+:ref:`Migrating Orbitals accessors <v2-migrating-orbitals>` for the replacement
+API.
 
-.. note::
 
-   On-disk files are affected. The serialization version for orbitals,
-   Hamiltonian containers, and the
-   :class:`~qdk_chemistry.data.StateVectorContainer` wavefunction container was
-   bumped to ``0.2.0`` (the :class:`~qdk_chemistry.data.AmplitudeContainer`
-   remains ``0.1.0``). Direct loading rejects files written by earlier releases;
-   upgrade them in place with the shipped converter (``python -m
-   qdk_chemistry.migrate old.h5 new.h5``; see :doc:`../user/migrating-data-files`)
-   or re-generate them. Backward-compatible direct loading is planned for a
-   future release.
+Consolidated Wavefunction Containers
+====================================
 
+The five v1 wavefunction containers were merged into two. The single-determinant,
+complete-active-space, and selected-configuration-interaction containers are now
+:class:`~qdk_chemistry.data.StateVectorContainer`, and the Møller-Plesset and
+coupled-cluster containers are now :class:`~qdk_chemistry.data.AmplitudeContainer`.
+A wavefunction now records the physical *sector* it describes, so containers of
+the same type are distinguished by their contents rather than by their class.
+
+The removed names remain importable as deprecated aliases, and
+:meth:`~qdk_chemistry.data.Wavefunction.get_container_type` now returns
+``"state_vector"`` or ``"amplitude"`` instead of the former ``"sd"`` / ``"cas"`` /
+``"sci"`` / ``"mp2"`` / ``"cc"`` strings. See
+:ref:`Consolidated container names <v2-container-rename>` for the mapping.
+
+
+Nuclear Gradients and Hessians
+==============================
+
+A new ``nuclear_derivative_calculator`` algorithm computes nuclear derivatives of
+the electronic energy directly from a :class:`~qdk_chemistry.data.Structure`.
+Two variants are available: an analytic ``qdk`` path built on the internal
+:term:`SCF` gradients, and a ``qdk_finite_difference`` path that evaluates
+central differences and can additionally assemble a Hessian.
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-nuclear-derivatives
+   :end-before: # end-cell-nuclear-derivatives
+
+The call returns the energy, the nuclear gradients, and optionally a Hessian and
+the converged wavefunction.
+
+
+Stabilized SCF and ROHF Direct Minimization
+============================================
+
+A stabilized :term:`SCF` solver wraps an inner solver and a stability checker:
+after convergence it tests the wavefunction for internal and external
+instabilities, rotates the orbitals along any instability direction, and re-runs
+until the reference is stable or an iteration limit is reached.
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-stabilized-scf
+   :end-before: # end-cell-stabilized-scf
+
+Its behavior is controlled through settings (which stability checks to run, the
+iteration limit, and how to follow an external instability).
+
+The :term:`QDK` :term:`SCF` backend also gains geometric direct minimization
+(:term:`GDM`), including a :term:`DIIS`-to-GDM hybrid path, for
+:term:`ROHF` references that are difficult to converge with :term:`DIIS` alone.
+
+
+New Simulation Primitives
+=========================
+
+Several new primitives complement the existing Trotter-Suzuki time-evolution
+builders.
+
+**Block encoding / LCU.** A linear-combination-of-unitaries (:term:`LCU`) builder
+produces a PREPARE-SELECT block encoding of a Hermitian
+:class:`~qdk_chemistry.data.QubitOperator`, and can wrap it as a qubitization walk
+operator for phase estimation:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-lcu
+   :end-before: # end-cell-lcu
+
+**Hadamard test.** The ``hadamard_test`` algorithm (``create("hadamard_test", "qdk")``)
+maps a target :class:`~qdk_chemistry.data.UnitaryRepresentation` into a controlled
+circuit and returns the measurement data for an overlap or expectation value.
+
+**Zassenhaus product formulas.** A Zassenhaus builder expands the time-evolution
+operator with higher-order commutator corrections; the step count is set with
+``num_divisions`` or selected from a ``target_accuracy``:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-zassenhaus
+   :end-before: # end-cell-zassenhaus
+
+**Real-time dynamics.** Driven, time-dependent Hamiltonians
+(:class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`) can be evolved with the
+Euler evolution-circuit builder (``evolution_circuit_builder`` / ``euler``) and a
+first-order Magnus propagator (``propagator`` / ``magnus``); a companion
+``hamiltonian_simulation`` / ``euler_integrator`` measures observables on the
+evolved state. See
+`examples/time_evolve_and_measure.ipynb
+<https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/time_evolve_and_measure.ipynb>`_
+and `examples/estimation_ising_2d.ipynb
+<https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/estimation_ising_2d.ipynb>`_.
+
+
+Fermion-to-Qubit Mapping as Data
+================================
+
+Fermion-to-qubit encodings are now first-class data. A
+:class:`~qdk_chemistry.data.MajoranaMapping` describes how fermionic Majorana
+operators map to Pauli strings, and is passed to the qubit mapper at ``run()``
+time instead of selecting an encoding by string:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-majorana-mapping
+   :end-before: # end-cell-majorana-mapping
+
+Built-in constructors cover Jordan-Wigner, Bravyi-Kitaev, Bravyi-Kitaev tree,
+parity, and symmetry-conserving Bravyi-Kitaev encodings, plus a new
+**Verstraete-Cirac** local encoding built from a
+:class:`~qdk_chemistry.data.LatticeGraph` for lattice models. The
+:term:`QDK` mapper dispatches to specialized native paths for sparse
+(lattice-model) and Cholesky-factorized Hamiltonians, avoiding dense four-center
+expansion without changing results. See
+:ref:`Fermion-to-qubit mapping <v2-qubit-mapping>` for the migration from the v1
+encoding-string workflow.
+
+
+Term Grouping and Expectation Estimation
+========================================
+
+Pauli-term grouping is now an explicit ``term_grouper`` algorithm rather than an
+implicit step inside the estimator. A grouper attaches a
+:class:`~qdk_chemistry.data.TermPartition` (a
+:class:`~qdk_chemistry.data.FlatPartition` or
+:class:`~qdk_chemistry.data.LayeredPartition`) to a
+:class:`~qdk_chemistry.data.QubitOperator` for downstream consumers:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_0.py
+   :language: python
+   :start-after: # start-cell-term-grouper
+   :end-before: # end-cell-term-grouper
+
+Built-in variants are ``qubit_wise_commuting``, ``commuting``, and ``identity``
+(one term per group); a NetworkX plugin adds graph-coloring variants. The
+:class:`~qdk_chemistry.algorithms.ExpectationEstimator` (registry key
+``"expectation_estimator"``) estimates the expectation value of any
+:class:`~qdk_chemistry.data.QubitOperator` from the grouping it is given;
+pre-group its input to recover the grouping v1 applied automatically.
+
+
+Other Improvements
+==================
+
+- **Composable phase estimation.** Standard and iterative :term:`QPE` split into a reusable circuit builder and executor, composed via nested algorithm references; the builder can also generate circuits on its own for resource estimation (``create("qpe_circuit_builder", "qdk_iterative")``). See `examples/qpe_stretched_n2.ipynb <https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/qpe_stretched_n2.ipynb>`_.
+- **Natural-orbital localizer.** ``orbital_localizer`` / ``qdk_natural_orbitals`` diagonalizes the active-space one-particle :term:`RDM` to produce occupation-ordered natural orbitals.
+- **Cholesky MO integrals persisted.** Cholesky Hamiltonians now serialize their :term:`MO` three-center integrals, so factorized Hamiltonians round-trip without expanding to dense tensors.
+- **Declarative algorithm nesting.** An algorithm can hold sub-algorithms as declarative ``(type, variant, settings)`` references in its :class:`~qdk_chemistry.data.Settings`, resolved by the factory at run time.
+- **Dense solver path for MACIS CAS.** Complete-active-space calculations can use a dense eigensolver in addition to the iterative path.
+- **Double-d-shell valence selection.** Automated valence active-space selection can optionally include the double-d-shell orbitals important for transition-metal chemistry.
+- **Qubit loss and richer noise profiles.** The QDK sparse-state simulator accepts per-gate noise configuration, and :class:`~qdk_chemistry.data.QuantumErrorProfile` adds a qubit-loss error type.
+
+
+.. _v2-breaking-changes:
+
+Breaking Changes and Migration
+==============================
+
+.. _v2-migrating-orbitals:
 
 Migrating ``Orbitals`` accessors
-================================
+--------------------------------
 
 Coefficients and energies are returned as symmetry-blocked tensors. Select a
 spin channel with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel` and read
@@ -70,10 +238,8 @@ the block (for tensors) or the stored indices (for index sets) directly.
    alpha_active = orbitals.active_indices().indices(alpha)
 
 For a model (symmetry-free) system the trivial label ``SymmetryLabel([])`` selects
-the single block instead of an alpha/beta label.
-
-For the common case of counting active or inactive orbitals, take the length of
-the per-channel index list:
+the single block instead of an alpha/beta label. For the common case of counting
+active or inactive orbitals, take the length of the per-channel index list:
 
 .. code-block:: python
 
@@ -84,15 +250,12 @@ the per-channel index list:
    n_active = len(orbitals.active_indices().indices(SymmetryLabel([axes.alpha()])))
 
 
-Consolidated wavefunction containers
-====================================
+.. _v2-container-rename:
 
-The five v1 wavefunction containers were merged into two. The single-determinant,
-complete-active-space, and selected-configuration-interaction containers are now
-:class:`~qdk_chemistry.data.StateVectorContainer`, and the Møller-Plesset and
-coupled-cluster containers are now :class:`~qdk_chemistry.data.AmplitudeContainer`.
+Consolidated container names
+----------------------------
 
-The removed names remain importable as deprecated aliases:
+The removed container names remain importable as deprecated aliases:
 
 .. code-block:: python
 
@@ -102,13 +265,15 @@ The removed names remain importable as deprecated aliases:
    # v2
    from qdk_chemistry.data import StateVectorContainer
 
-:meth:`~qdk_chemistry.data.Wavefunction.get_container_type` now returns
-``"state_vector"`` or ``"amplitude"`` instead of the former ``"sd"`` / ``"cas"`` /
-``"sci"`` / ``"mp2"`` / ``"cc"`` strings.
+``SlaterDeterminantContainer``, ``CasWavefunctionContainer``, and
+``SciWavefunctionContainer`` map to
+:class:`~qdk_chemistry.data.StateVectorContainer`; ``MP2Container`` and
+``CoupledClusterContainer`` map to
+:class:`~qdk_chemistry.data.AmplitudeContainer`.
 
 
 Two-particle RDM spin ordering (action required)
-================================================
+------------------------------------------------
 
 .. warning::
 
@@ -132,7 +297,7 @@ unpacking:
 
 
 Configuration factories
-========================
+-----------------------
 
 The string and bitset constructors were replaced by explicit factory methods:
 
@@ -146,9 +311,15 @@ The string and bitset constructors were replaced by explicit factory methods:
    # v2
    config = Configuration.from_spin_half_string("2020")
 
+The Python factories are
+:meth:`~qdk_chemistry.data.Configuration.from_spin_half_string` and
+:meth:`~qdk_chemistry.data.Configuration.from_bitstring`.
+
+
+.. _v2-qubit-mapping:
 
 Fermion-to-qubit mapping
-========================
+------------------------
 
 The qubit mapper no longer takes an ``encoding`` string. Build a
 :class:`~qdk_chemistry.data.MajoranaMapping` and pass it to ``run()``:
@@ -157,48 +328,94 @@ The qubit mapper no longer takes an ``encoding`` string. Build a
 
    # v1
    # mapper = create("qubit_mapper", "qdk")  # configured via encoding="jordan-wigner"
-   # qubit_hamiltonian = mapper.run(hamiltonian)
+   # qubit_operator = mapper.run(hamiltonian)
 
    # v2
+   mapping = MajoranaMapping.jordan_wigner(num_modes)
    mapper = create("qubit_mapper", "qdk")
-   qubit_hamiltonian = mapper.run(hamiltonian, mapping)
+   qubit_operator = mapper.run(hamiltonian, mapping)
 
 The standalone ``EncodingMismatchError`` and ``validate_encoding_compatibility``
 helpers were removed in favor of this mapping-centric flow; importing them still
 works but emits a ``DeprecationWarning``.
 
 
-Unitary representation rename
-=============================
+.. _v2-renames:
 
-The ``TimeEvolutionUnitary`` family was renamed to the ``Unitary`` family:
-``TimeEvolutionUnitary`` → :class:`~qdk_chemistry.data.UnitaryRepresentation`,
-and ``TimeEvolutionUnitaryContainer`` → :class:`~qdk_chemistry.data.UnitaryContainer`.
-The old names remain importable as deprecated aliases.
+Renamed classes and keys
+------------------------
+
+The following names changed. The former names remain importable or usable as
+deprecated aliases that emit a ``DeprecationWarning``:
+
+- ``QubitHamiltonian`` → :class:`~qdk_chemistry.data.QubitOperator`. The class now
+  represents any weighted sum of Pauli strings, not only molecular Hamiltonians.
+- ``EnergyEstimator`` / ``QdkEnergyEstimator`` →
+  :class:`~qdk_chemistry.algorithms.ExpectationEstimator` /
+  ``QdkExpectationEstimator``, and the ``"energy_estimator"`` registry key →
+  ``"expectation_estimator"``.
+- The ``TimeEvolutionUnitary`` family →
+  :class:`~qdk_chemistry.data.UnitaryRepresentation` and
+  :class:`~qdk_chemistry.data.UnitaryContainer`.
+
+
+Serialization format
+--------------------
+
+.. note::
+
+   Orbitals, Hamiltonian containers, wavefunction (state-vector) data, and unitary
+   representations changed serialization version and no longer load directly from
+   files written by earlier releases; other schemas are unaffected. Upgrade an
+   affected file with the shipped converter
+   (``python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5``; see
+   :doc:`../user/migrating-data-files`) or re-generate it.
 
 
 C++ API changes
-===============
+---------------
 
-These changes affect the C++ library directly (Python users are insulated by the
-bindings above):
+These changes affect the C++ library directly; Python users are insulated by the
+bindings above.
 
-- The FCIDUMP writer is now ``Hamiltonian::to_fcidump_file(...)``; the previous
-  ``_to_fcidump_file`` member was removed and ``HamiltonianContainer::to_fcidump_file``
-  became a concrete virtual.
+- The redundant private ``Hamiltonian::_to_fcidump_file`` was removed (the public
+  ``Hamiltonian::to_fcidump_file(...)`` remains), and
+  ``HamiltonianContainer::to_fcidump_file`` became a concrete virtual.
 - The Cholesky Hamiltonian container now derives from ``HamiltonianContainer``
   (no longer from the four-center container) and its dense constructor takes
   three-center integrals plus optional AO Cholesky vectors.
-- ``ModelOrbitals(size_t, bool)`` was replaced by
-  ``ModelOrbitals(size_t, SymmetryProduct)`` and a
+- ``ModelOrbitals(size_t, bool)`` was replaced by a
+  ``std::shared_ptr<const SymmetryProduct>``-based constructor and a
   ``SymmetryBlockedIndexSet``-based constructor.
+- The ``NuclearDerivativeCalculator`` run signature takes a single
+  ``n_inactive_orbitals`` argument in place of the earlier active-electron pair.
 
 
-Deprecation policy
+Deprecation Policy
 ==================
 
-Deprecated v1 accessors and import names continue to work in this release and
-are covered by tests; they emit a ``DeprecationWarning`` to flag the migration
-path. Treat them as transitional: they are scheduled for removal in a future
-major release. To surface them in your own test suite, run Python with
-``-W error::DeprecationWarning`` or add a ``filterwarnings`` rule.
+Deprecated v1 accessors and import aliases continue to work in this release and are
+covered by tests; using them emits a ``DeprecationWarning`` (for renamed classes
+such as ``QubitHamiltonian``, on construction) to flag the migration path.
+They are transitional and scheduled for removal in a future release.
+
+
+Bug Fixes
+=========
+
+- Fixed an ``int32`` overflow in two-body integral and RDM indexing for large
+  active spaces.
+- Added missing effective-core-potential (:term:`ECP`) contributions in the
+  affected integral path.
+- Fixed a bug in the :term:`SCF` stability checker, and a separate
+  :term:`ROHF` stability-check bug in the solver.
+
+
+Infrastructure and Packaging
+============================
+
+- **Windows support.** Native builds with MSVC / clang-cl via vcpkg, plus Windows CI coverage.
+- **Algorithm result caching.** Passing ``cache=`` to ``run()`` content-addresses a run and returns a stored result on a hit (``FolderCache``, ``TieredCache``; ``force_rerun=True`` bypasses), enabling checkpoint/restart-style reuse across a pipeline.
+- **Data-file migration tool.** ``python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5`` (and ``qdk_chemistry.migrate.convert_file``) upgrade serialized files across serialization versions and between JSON and HDF5.
+- **Updated backend compatibility.** Support for newer ``qdk`` (Q# 1.29+) API migrations and newer PyQIR versions.
+- **Release examples bundle.** The release pipeline packages the ``examples/`` directory as a downloadable archive.
