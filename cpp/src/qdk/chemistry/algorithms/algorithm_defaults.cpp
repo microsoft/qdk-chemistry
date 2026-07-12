@@ -9,6 +9,7 @@
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
+#include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -17,7 +18,7 @@
 
 namespace qdk::chemistry::algorithms {
 
-namespace {
+namespace detail {
 
 /// Try to create an algorithm via @p Factory and return a copy of its settings.
 /// Returns nullptr if the name is not found.
@@ -27,7 +28,7 @@ std::shared_ptr<data::Settings> try_factory(const std::string& name) {
   return std::make_shared<data::Settings>(algo->settings());
 }
 
-}  // namespace
+}  // namespace detail
 
 namespace detail {
 
@@ -43,6 +44,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(ProjectedMultiConfigurationCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(DynamicalCorrelationCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationScfFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
 

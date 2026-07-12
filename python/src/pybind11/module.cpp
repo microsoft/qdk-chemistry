@@ -23,6 +23,8 @@ void bind_configuration_set(py::module& m);
 void bind_localizer(py::module& m);
 void bind_stability(py::module& m);
 void bind_stability_result(py::module& m);
+void bind_nuclear_gradients(py::module& m);
+void bind_nuclear_hessian(py::module& m);
 void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
@@ -31,6 +33,7 @@ void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
+void bind_nuclear_derivative(py::module& m);
 void bind_population_analysis(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
@@ -84,6 +87,8 @@ PYBIND11_MODULE(_core, m) {
   bind_wavefunction(data);
   bind_ansatz(data);
   bind_stability_result(data);
+  bind_nuclear_gradients(data);
+  bind_nuclear_hessian(data);
   bind_pauli_operator(data);
   bind_majorana_mapping(
       data);  // Depends on SparsePauliWord from pauli_operator
@@ -94,6 +99,7 @@ PYBIND11_MODULE(_core, m) {
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
+  bind_nuclear_derivative(algorithms);
   bind_population_analysis(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -63,8 +64,8 @@ size_t ConfigurationSet::num_modes() const {
   QDK_LOG_TRACE_ENTERING();
 
   if (_orbitals && _orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
-    return alpha_active.size();
+    return spin_channel_indices(_orbitals->active_indices(), axes::alpha())
+        .size();
   }
   if (_orbitals) {
     return _orbitals->num_modes();
@@ -167,12 +168,10 @@ void ConfigurationSet::_validate_configurations() const {
   // PR.  Keeping them out avoids baking Sz assumptions into the structural
   // validation layer.
   if (_orbitals && _orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
-    const auto& active_indices = alpha_active;
+    size_t active_space_size =
+        spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
 
-    if (!active_indices.empty()) {
-      size_t active_space_size = active_indices.size();
-
+    if (active_space_size != 0) {
       for (size_t i = 0; i < _configurations.size(); ++i) {
         const auto& config = _configurations[i];
         const std::string config_str = config.to_string();
