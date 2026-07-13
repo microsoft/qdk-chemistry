@@ -17,7 +17,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_pair_param,
     to_site_param,
 )
-from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitHamiltonian
+from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -32,13 +32,13 @@ __all__ = [
 ]
 
 
-def _pauli_expr_to_qubit_hamiltonian(expr, num_qubits: int) -> QubitHamiltonian:
-    """Convert a simplified PauliOperator expression to a QubitHamiltonian."""
+def _pauli_expr_to_qubit_hamiltonian(expr, num_qubits: int) -> QubitOperator:
+    """Convert a simplified PauliOperator expression to a QubitOperator."""
     simplified = expr.simplify()
     terms = simplified.to_canonical_terms(num_qubits)
     pauli_strings = [t[1][::-1] for t in terms]
     coefficients = np.array([complex(t[0]) for t in terms])
-    return QubitHamiltonian(pauli_strings, coefficients)
+    return QubitOperator(pauli_strings, coefficients)
 
 
 def _build_geometry_grouped_hamiltonian(
@@ -47,7 +47,7 @@ def _build_geometry_grouped_hamiltonian(
     couplings: list[tuple[str, np.ndarray | float]],
     fields: list[tuple[str, np.ndarray | float]],
     coloring: dict[tuple[int, int], int] | None = None,
-) -> QubitHamiltonian:
+) -> QubitOperator:
     r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
 
     This helper exists separately from the ungrouped construction path
@@ -62,7 +62,7 @@ def _build_geometry_grouped_hamiltonian(
     have disjoint support), then by two-body coupling type (one group
     per ``XX``/``YY``/``ZZ`` block, each split into layers by edge
     color).  Term indices in
-    :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` align with the
+    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` align with the
     indices stored in the returned :class:`LayeredPartition`.
 
     Args:
@@ -72,7 +72,7 @@ def _build_geometry_grouped_hamiltonian(
         coloring: Optional edge coloring ``{(i, j): color}`` (``i < j``). Reads ``graph.edge_coloring`` when ``None``.
 
     Returns:
-        QubitHamiltonian: The assembled Hamiltonian carrying a ``LayeredPartition``
+        QubitOperator: The assembled Hamiltonian carrying a ``LayeredPartition``
         with ``strategy=\"geometry_coloring\"``.
 
     """
@@ -128,13 +128,13 @@ def _build_geometry_grouped_hamiltonian(
 
     if not pauli_strings:
         # Empty Hamiltonian: emit a single all-identity term with zero coefficient
-        # so the resulting QubitHamiltonian remains constructible.
+        # so the resulting QubitOperator remains constructible.
         pauli_strings = ["I" * n]
         coefficients = [0.0 + 0.0j]
         groups_layers = [((0,),)]
 
     partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers))
-    return QubitHamiltonian(
+    return QubitOperator(
         pauli_strings=pauli_strings,
         coefficients=np.array(coefficients),
         term_partition=partition,
@@ -151,7 +151,7 @@ def create_heisenberg_hamiltonian(
     hz: np.ndarray | float = 0.0,
     *,
     include_term_groups: bool = True,
-) -> QubitHamiltonian:
+) -> QubitOperator:
     r"""Create the anisotropic Heisenberg model Hamiltonian on a lattice.
 
     .. math::
@@ -182,7 +182,7 @@ def create_heisenberg_hamiltonian(
         include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
-        QubitHamiltonian: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
+        QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
 
     """
     if not graph.is_symmetric:
@@ -240,7 +240,7 @@ def create_ising_hamiltonian(
     h: np.ndarray | float = 0.0,
     *,
     include_term_groups: bool = True,
-) -> QubitHamiltonian:
+) -> QubitOperator:
     r"""Create the Ising model Hamiltonian on a lattice.
 
     .. math::
@@ -257,7 +257,7 @@ def create_ising_hamiltonian(
         include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
-        QubitHamiltonian: The Ising model as a qubit Hamiltonian.
+        QubitOperator: The Ising model as a qubit Hamiltonian.
 
     """
     return create_heisenberg_hamiltonian(graph, jx=0.0, jy=0.0, jz=j, hx=h, include_term_groups=include_term_groups)

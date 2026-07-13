@@ -9,7 +9,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from qdk_chemistry._core._algorithms import davidson_solver
-from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data import QubitOperator
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -53,7 +53,7 @@ def test_davidson_solver_matrix():
 
 def test_davidson_solver_model_hamiltonian():
     """Test Davidson solver on a model Hamiltonian."""
-    heisenberg_model = QubitHamiltonian(pauli_strings=["XX", "YY", "ZZ"], coefficients=[1.0, 1.0, 1.0])
+    heisenberg_model = QubitOperator(pauli_strings=["XX", "YY", "ZZ"], coefficients=[1.0, 1.0, 1.0])
     csr_matrix = heisenberg_model.to_matrix(sparse=True).real.copy()
 
     eigval, eigvec = davidson_solver(csr_matrix)
