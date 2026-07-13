@@ -13,6 +13,7 @@ caching and linear-time evaluation of the commutator DAG.
 
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
@@ -265,6 +266,26 @@ def _plan_expr(
     return _clean(dict(out))
 
 
+# Cache the symbolic plan. Since the commutator plan depends on the specific leaf labels
+# and the target order (not on coefficients or time), caching avoids redundant DAG builds
+# for calls with the same leaf identifiers and order.
+@functools.lru_cache(maxsize=128)
+def _cached_zassenhaus_commutator_plan(
+    leaves: tuple[Hashable, ...],
+    max_order: int,
+) -> tuple[dict[int, PlanExpr], CommutatorPlan]:
+    exponents = zassenhaus_exponents(leaves, max_order=max_order)
+    plan: CommutatorPlan = {}
+    planned_exponents: dict[int, PlanExpr] = {}
+    primitive_leaves = set(leaves)
+    term_nodes: dict[Term, CommutatorNode] = {}
+
+    for order, expr in exponents.items():
+        planned_exponents[order] = _plan_expr(expr, plan, primitive_leaves, term_nodes)
+
+    return planned_exponents, plan
+
+
 def zassenhaus_commutator_plan(
     leaves: Sequence[Hashable],
     max_order: int = 5,
@@ -278,13 +299,9 @@ def zassenhaus_commutator_plan(
     valid evaluation order.
     """
     leaf_tuple = _normalize_leaves(leaves)
-    exponents = zassenhaus_exponents(leaf_tuple, max_order=max_order)
-    plan: CommutatorPlan = {}
-    planned_exponents: dict[int, PlanExpr] = {}
-    primitive_leaves = set(leaf_tuple)
-    term_nodes: dict[Term, CommutatorNode] = {}
+    cached_exponents, cached_plan = _cached_zassenhaus_commutator_plan(leaf_tuple, max_order)
 
-    for order, expr in exponents.items():
-        planned_exponents[order] = _plan_expr(expr, plan, primitive_leaves, term_nodes)
-
-    return planned_exponents, plan
+    # Return fresh copies to prevent caller mutation from corrupting the cached objects
+    exponents_copy = {k: dict(v) for k, v in cached_exponents.items()}
+    plan_copy = dict(cached_plan)
+    return exponents_copy, plan_copy

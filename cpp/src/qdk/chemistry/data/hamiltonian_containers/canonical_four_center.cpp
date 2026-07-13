@@ -8,6 +8,7 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -121,7 +122,8 @@ double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
     throw std::runtime_error("Two-body integrals are not set");
   }
 
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   if (i >= norb || j >= norb || k >= norb || l >= norb) {
     throw std::out_of_range("Orbital index out of range");
   }
@@ -146,7 +148,8 @@ double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
 size_t CanonicalFourCenterHamiltonianContainer::get_two_body_index(
     size_t i, size_t j, size_t k, size_t l) const {
   QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
 }
 

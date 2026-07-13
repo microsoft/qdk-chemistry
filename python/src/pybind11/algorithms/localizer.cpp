@@ -237,7 +237,12 @@ Initializes a Pipek-Mezey localizer with default settings.
 
 )");
 
-  // Bind concrete microsoft::MP2NaturalOrbitalLocalizer implementation
+  // Bind concrete microsoft::MP2NaturalOrbitalLocalizer implementation.
+  // This intentionally exposes the deprecated MP2 localizer as a Python facade
+  // (it warns at runtime via warn_if_deprecated_algorithm), so suppress the
+  // compile-time deprecation warning for naming the deprecated class here.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   py::class_<microsoft::MP2NaturalOrbitalLocalizer, Localizer,
              py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
 QDK MP2 natural orbital transformer.
@@ -288,6 +293,7 @@ Default constructor.
 Initializes an MP2 natural orbital transformer with default settings.
 
 )");
+#pragma GCC diagnostic pop
 
   // Bind concrete microsoft::NaturalOrbitalLocalizer implementation
   py::class_<microsoft::NaturalOrbitalLocalizer, Localizer, py::smart_holder>(
