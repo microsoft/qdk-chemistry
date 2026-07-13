@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
 from qdk.openqasm import circuit as openqasm_circuit
@@ -165,7 +165,9 @@ class Circuit(DataClass):
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return openqasm_compile(
+                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
+            )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 

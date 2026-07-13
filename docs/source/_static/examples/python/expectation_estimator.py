@@ -1,4 +1,4 @@
-"""Energy estimator usage examples."""
+"""Expectation estimator usage examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,17 +13,17 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 
-# Create energy estimator using Qsharp simulator as backend
-qdk_estimator = create("energy_estimator", "qdk")
+# Create expectation estimator using Qsharp simulator as backend
+qdk_estimator = create("expectation_estimator", "qdk")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-qdk
-# Define a simple quantum circuit in QASM and a qubit Hamiltonian
+# Define a simple quantum circuit in QASM and a qubit operator
 circuit = Circuit(
     qasm="""
     include "stdgates.inc";
@@ -33,11 +33,11 @@ circuit = Circuit(
     cx q[0], q[1];
     """
 )
-qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
+qubit_hamiltonian = QubitOperator(["ZZ"], np.array([1.0]))
 
-# Run energy estimation using Qsharp simulator without noise
+# Run expectation estimation using Qsharp simulator without noise
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
 )
@@ -49,7 +49,7 @@ print(
     f"{energy_expectation_results.energy_expectation_value}"
 )
 
-# Create energy estimator using Qsharp simulator with depolarizing noise
+# Create expectation estimator using Qsharp simulator with depolarizing noise
 noise_model = QuantumErrorProfile(
     name="noise model",
     description="Noise model for QDK full state simulator",
@@ -61,7 +61,7 @@ noise_model = QuantumErrorProfile(
     },
 )
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef(
         "circuit_executor", "qdk_full_state_simulator", type="cpu"
@@ -74,7 +74,7 @@ energy_expectation_results, measurement_data = qdk_estimator.run(
     noise_model=noise_model,
 )
 print(
-    "Energy expectation value from QDK Simulator with depolarizing noise: "
+    "Expectation value from QDK Simulator with depolarizing noise: "
     f"{energy_expectation_results.energy_expectation_value}"
 )
 # end-cell-qdk
@@ -82,9 +82,9 @@ print(
 
 ################################################################################
 # start-cell-qiskit
-# Run energy estimation using Qiskit Aer simulator without noise
+# Run expectation estimation using Qiskit Aer simulator without noise
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
 )
@@ -95,7 +95,7 @@ print(
     f"Energy expectation value from Qiskit Aer Simulator: {energy_expectation_results.energy_expectation_value}"
 )
 
-# Create energy estimator using Qiskit Aer simulator with noise model
+# Create expectation estimator using Qiskit Aer simulator with noise model
 
 noise_model = QuantumErrorProfile(
     name="noise model",
@@ -107,7 +107,7 @@ noise_model = QuantumErrorProfile(
     },
 )
 qdk_estimator = create(
-    "energy_estimator",
+    "expectation_estimator",
     "qdk",
     circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
 )
@@ -118,7 +118,7 @@ energy_expectation_results, measurement_data = qdk_estimator.run(
     noise_model=noise_model,
 )
 print(
-    "Energy expectation value from Qiskit Aer Simulator with noise: "
+    "Expectation value from Qiskit Aer Simulator with noise: "
     f"{energy_expectation_results.energy_expectation_value}"
 )
 # end-cell-qiskit
@@ -128,7 +128,7 @@ print(
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("energy_estimator"))
+print(registry.available("expectation_estimator"))
 # ['qdk']
 print(registry.available("circuit_executor"))
 # ['qdk_full_state_simulator', 'qdk_sparse_state_simulator', 'qiskit_aer_simulator']

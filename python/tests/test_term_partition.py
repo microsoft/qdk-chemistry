@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
     FlatPartition,
     LatticeGraph,
     LayeredPartition,
-    QubitHamiltonian,
+    QubitOperator,
     TermPartition,
 )
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
@@ -81,32 +81,32 @@ class TestLayeredPartition:
 
 
 # ---------------------------------------------------------------------------
-# QubitHamiltonian.term_partition property
+# QubitOperator.term_partition property
 # ---------------------------------------------------------------------------
 
 
 class TestQubitHamiltonianTermPartition:
     def test_default_is_none(self):
         """Default is none."""
-        qh = QubitHamiltonian(["XX", "ZZ"], np.array([0.1, 0.2]))
+        qh = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]))
         assert qh.term_partition is None
 
     def test_round_trip_flat(self):
         """Round trip flat."""
         partition = FlatPartition(strategy="commuting", groups=[[0], [1]])
-        qh = QubitHamiltonian(["XX", "ZZ"], np.array([0.1, 0.2]), term_partition=partition)
+        qh = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]), term_partition=partition)
         assert qh.term_partition is partition
 
     def test_round_trip_layered(self):
         """Round trip layered."""
         partition = LayeredPartition(strategy="geometry_coloring", groups=[[[0, 1]]])
-        qh = QubitHamiltonian(["XX", "ZZ"], np.array([0.1, 0.2]), term_partition=partition)
+        qh = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]), term_partition=partition)
         assert qh.term_partition is partition
 
     def test_to_interleaved_resets_partition(self):
         """To interleaved resets partition."""
         partition = FlatPartition(strategy="commuting", groups=[[0, 1, 2, 3]])
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XXII", "YYII", "IIZZ", "IIXX"],
             np.array([0.1, 0.2, 0.3, 0.4]),
             term_partition=partition,
@@ -134,7 +134,7 @@ class TestTermGrouperRegistry:
     @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity"])
     def test_returns_new_hamiltonian_with_partition(self, strategy):
         """Returns new hamiltonian with partition."""
-        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
         grouper = registry.create("term_grouper", strategy)
         out = grouper.run(qh)
         assert out is not qh
@@ -143,7 +143,7 @@ class TestTermGrouperRegistry:
 
     def test_partition_indices_cover_all_terms_exactly_once(self):
         """Partition indices cover all terms exactly once."""
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII"],
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
         )
@@ -155,7 +155,7 @@ class TestTermGrouperRegistry:
 
     def test_identity_strategy_one_term_per_group(self):
         """Identity strategy one term per group."""
-        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
         out = registry.create("term_grouper", "identity").run(qh)
         assert out.term_partition.num_groups == len(qh.pauli_strings)
         assert all(len(g) == 1 for g in out.term_partition.groups)
@@ -164,14 +164,14 @@ class TestTermGrouperRegistry:
         # XX and YY commute (XY * YX = -ZZ * -ZZ = ZZ^2 = I; and YX * XY = ZZ),
         # ZZ commutes with both.  So all three should land in the same group.
         """Commuting groups globally commute."""
-        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 1.0]))
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 1.0]))
         out = registry.create("term_grouper", "commuting").run(qh)
         assert out.term_partition.num_groups == 1
 
     def test_qwc_separates_paulis_that_only_globally_commute(self):
         # XX and YY are NOT qubit-wise commuting, even though they globally commute.
         """Qwc separates paulis that only globally commute."""
-        qh = QubitHamiltonian(["XX", "YY"], np.array([1.0, 1.0]))
+        qh = QubitOperator(["XX", "YY"], np.array([1.0, 1.0]))
         out = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
         assert out.term_partition.num_groups == 2
 
@@ -195,8 +195,8 @@ class TestNxTermGroupers:
 
     @pytest.mark.parametrize("strategy", NX_STRATEGIES)
     def test_returns_new_hamiltonian_with_flat_partition(self, strategy):
-        """Grouper returns a new QubitHamiltonian with a FlatPartition."""
-        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
+        """Grouper returns a new QubitOperator with a FlatPartition."""
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
         grouper = registry.create("term_grouper", strategy)
         out = grouper.run(qh)
         assert out is not qh
@@ -206,7 +206,7 @@ class TestNxTermGroupers:
     @pytest.mark.parametrize("strategy", NX_STRATEGIES)
     def test_partition_indices_cover_all_terms_exactly_once(self, strategy):
         """Every term index appears exactly once across all partition groups."""
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII"],
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
         )
@@ -217,7 +217,7 @@ class TestNxTermGroupers:
 
     def test_nx_commuting_groups_all_commute(self):
         """Every pair of terms within an nx_commuting group globally commutes."""
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII", "XXII", "YYII"],
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]),
         )
@@ -230,7 +230,7 @@ class TestNxTermGroupers:
 
     def test_nx_qwc_groups_are_qubit_wise_commuting(self):
         """Every pair of terms within an nx_qubit_wise_commuting group is qubit-wise commuting."""
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII", "XXII", "YYII"],
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]),
         )
@@ -243,19 +243,19 @@ class TestNxTermGroupers:
 
     def test_nx_commuting_merges_globally_commuting_terms(self):
         """XX and YY globally commute and should be in the same nx_commuting group."""
-        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 1.0]))
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 1.0]))
         out = registry.create("term_grouper", "nx_commuting").run(qh)
         assert out.term_partition.num_groups == 1
 
     def test_nx_qwc_separates_globally_only_commuting_terms(self):
         """XX and YY globally commute but are NOT qubit-wise commuting — they must be separated."""
-        qh = QubitHamiltonian(["XX", "YY"], np.array([1.0, 1.0]))
+        qh = QubitOperator(["XX", "YY"], np.array([1.0, 1.0]))
         out = registry.create("term_grouper", "nx_qubit_wise_commuting").run(qh)
         assert out.term_partition.num_groups == 2
 
     def test_preserves_coefficients_and_metadata(self):
         """Grouper preserves coefficients, encoding, and fermion_mode_order."""
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             ["XX", "ZZ"],
             np.array([0.1, 0.2]),
             encoding="jordan-wigner",
@@ -268,7 +268,7 @@ class TestNxTermGroupers:
 
     def test_empty_hamiltonian(self):
         """Grouper handles a single-term Hamiltonian without error."""
-        qh = QubitHamiltonian(["X"], np.array([1.0]))
+        qh = QubitOperator(["X"], np.array([1.0]))
         out = registry.create("term_grouper", "nx_commuting").run(qh)
         assert isinstance(out.term_partition, FlatPartition)
         assert out.term_partition.num_groups == 1
@@ -342,7 +342,7 @@ class TestTrotterConsumesTermPartition:
     def test_trotter_runs_without_partition(self):
         # Falls back to treating each term as its own group.
         """Trotter runs without partition."""
-        ham = QubitHamiltonian(["XXII", "IXXI", "IIXX", "ZIII"], np.array([1.0, 1.0, 1.0, 0.5]))
+        ham = QubitOperator(["XXII", "IXXI", "IIXX", "ZIII"], np.array([1.0, 1.0, 1.0, 0.5]))
         assert ham.term_partition is None
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
         trotter.settings().update({"time": 0.5})
@@ -385,7 +385,7 @@ class TestTrotterConsumesTermPartition:
 
 
 # ---------------------------------------------------------------------------
-# QubitHamiltonian round-trips term_partition through JSON / HDF5
+# QubitOperator round-trips term_partition through JSON / HDF5
 # ---------------------------------------------------------------------------
 
 
@@ -411,28 +411,28 @@ class TestTermPartitionSerialisation:
     def test_qubit_hamiltonian_json_round_trip_preserves_partition(self):
         """Qubit hamiltonian json round trip preserves partition."""
         partition = FlatPartition(strategy="commuting", groups=[[0, 1], [2]])
-        ham = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
-        restored = QubitHamiltonian.from_json(ham.to_json())
+        ham = QubitOperator(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
+        restored = QubitOperator.from_json(ham.to_json())
         assert isinstance(restored.term_partition, FlatPartition)
         assert restored.term_partition == partition
 
     def test_qubit_hamiltonian_json_round_trip_with_no_partition(self):
         """Qubit hamiltonian json round trip with no partition."""
-        ham = QubitHamiltonian(["XX", "ZZ"], np.array([0.1, 0.2]))
-        restored = QubitHamiltonian.from_json(ham.to_json())
+        ham = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]))
+        restored = QubitOperator.from_json(ham.to_json())
         assert restored.term_partition is None
 
     def test_qubit_hamiltonian_hdf5_round_trip_preserves_partition(self, tmp_path):
         """Qubit hamiltonian hdf5 round trip preserves partition."""
         h5py = pytest.importorskip("h5py")
         partition = LayeredPartition(strategy="geometry_coloring", groups=[[[0], [1]], [[2]]])
-        ham = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
+        ham = QubitOperator(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
 
         path = tmp_path / "ham.h5"
         with h5py.File(path, "w") as f:
             ham.to_hdf5(f)
         with h5py.File(path, "r") as f:
-            restored = QubitHamiltonian.from_hdf5(f)
+            restored = QubitOperator.from_hdf5(f)
 
         assert isinstance(restored.term_partition, LayeredPartition)
         assert restored.term_partition == partition

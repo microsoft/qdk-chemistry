@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitIterativeQpeCircuitBuilder", "QiskitStandardQpeCircuitBuilder"]
@@ -74,13 +74,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
 
         Returns:
             A list containing a single standard QPE circuit.
@@ -94,13 +94,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def build_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> Circuit:
         """Build the standard QPE circuit using Qiskit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
 
         Returns:
             The constructed QPE quantum circuit.
@@ -166,7 +166,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         control_qubit: int,
         target_qubits: list,
         *,
@@ -176,7 +176,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             circuit: The quantum circuit to modify.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
@@ -244,7 +244,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits using Qiskit.
 
@@ -255,7 +255,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The qubit operator for which to build circuits.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -293,7 +293,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         iteration: int,
         total_iterations: int,
@@ -303,7 +303,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
