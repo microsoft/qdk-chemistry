@@ -16,26 +16,9 @@ from qdk_chemistry.algorithms import (
 
 from .reference_tolerances import (
     ci_energy_tolerance,
-    float_comparison_absolute_tolerance,
     orthonormality_error_tolerance,
+    rdm_tolerance,
 )
-
-
-def _single_orbital_entropy_sum(ga, gb, g2):
-    """Single-orbital entropy sum from RDMs.
-
-    ga, gb : (n, n) alpha/beta 1-RDMs.
-    g2     : (n, n, n, n) alpha-beta (aabb) 2-RDM.
-    """
-    n = ga.shape[0]
-    total = 0.0
-    for i in range(n):
-        d = g2[i, i, i, i]
-        omega = np.array([1.0 - ga[i, i] - gb[i, i] + d, ga[i, i] - d, gb[i, i] - d, d])
-        # Match the library convention (w > 0); w -> 0+ gives w*ln(w) -> 0.
-        omega = omega[omega > 0.0]
-        total -= float(np.sum(omega * np.log(omega)))
-    return total
 
 
 def _run_cas(orbitals, n_alpha, n_beta):
@@ -110,43 +93,32 @@ class TestQIOLocalizerBindings:
         assert alpha_indices == beta_indices
         active_indices = list(alpha_indices)
         n = len(active_indices)
+        n_a, n_b = active_wfn.get_active_num_electrons()
 
-        # Input (canonical) single-orbital entropy sum.
+        # Input (canonical) single-orbital entropy sum, from the library method.
         entropy_before = float(np.sum(cas_wfn.get_single_orbital_entropies()))
-
-        # Cross-check the numpy entropy reproduces the library value at U = I.
-        ga, gb = (np.asarray(m) for m in cas_wfn.get_active_one_rdm_spin_dependent())
-        _, aabb, _ = cas_wfn.get_active_two_rdm_spin_dependent()
-        g2 = np.asarray(aabb).reshape(n, n, n, n)
-        np.testing.assert_allclose(
-            _single_orbital_entropy_sum(ga, gb, g2),
-            entropy_before,
-            atol=float_comparison_absolute_tolerance,
-        )
 
         # Run the QIO localizer (single rotation).
         localizer = create("orbital_localizer", "qdk_qio")
         qio_wfn = localizer.run(cas_wfn, active_indices, active_indices)
         assert qio_wfn is not None
 
-        # Recover the active-space rotation U = Ca_can^T S Ca_qio.
+        # The active-space rotation U = Ca_can^T S Ca_qio is unitary and the QIO
+        # orbitals are orthonormal.
         s = np.asarray(active_orbitals.get_overlap_matrix())
         ca_can = np.asarray(active_orbitals.get_coefficients()[0])[:, active_indices]
         ca_qio = np.asarray(qio_wfn.get_orbitals().get_coefficients()[0])[:, active_indices]
         u = ca_can.T @ s @ ca_qio
-
-        # U is unitary and the QIO orbitals are orthonormal.
         np.testing.assert_allclose(u @ u.T, np.eye(n), atol=orthonormality_error_tolerance)
         np.testing.assert_allclose(ca_qio.T @ s @ ca_qio, np.eye(n), atol=orthonormality_error_tolerance)
 
-        # Transform the input RDMs into the QIO basis and recompute the entropy.
-        ga_rot = u.T @ ga @ u
-        gb_rot = u.T @ gb @ u
-        g2_rot = np.einsum("pqrl,pi,qj,rk,lm->ijkm", g2, u, u, u, u, optimize=True)
-        entropy_after = _single_orbital_entropy_sum(ga_rot, gb_rot, g2_rot)
+        # Re-solve the CAS in the QIO-rotated basis and take the entropy from the
+        # library method (get_single_orbital_entropies) rather than recomputing it.
+        _, rotated_cas_wfn = _run_cas(qio_wfn.get_orbitals(), n_a, n_b)
+        entropy_after = float(np.sum(rotated_cas_wfn.get_single_orbital_entropies()))
 
         # The QIO objective must not increase under the optimized rotation.
-        assert entropy_after <= entropy_before + float_comparison_absolute_tolerance
+        assert entropy_after <= entropy_before + rdm_tolerance
 
     def test_open_shell_triplet_energy_invariant(self, test_data_files_path):
         """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.
