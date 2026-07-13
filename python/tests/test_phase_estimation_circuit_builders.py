@@ -23,7 +23,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -34,7 +34,7 @@ class CircuitBuilderProblem:
     """Container describing a reproducible circuit builder test scenario."""
 
     label: str
-    hamiltonian: QubitHamiltonian
+    hamiltonian: QubitOperator
     state_prep: Circuit
     evolution_time: float
     num_bits: int
@@ -44,7 +44,7 @@ class CircuitBuilderProblem:
 @pytest.fixture
 def two_qubit_circuit_problem() -> CircuitBuilderProblem:
     """Return the two-qubit circuit builder test scenario."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_vector = [0.6, 0.0, 0.0, 0.8]
     state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
     factories = QsharpFactoryData(
@@ -65,7 +65,7 @@ def two_qubit_circuit_problem() -> CircuitBuilderProblem:
 @pytest.fixture
 def four_qubit_circuit_problem() -> CircuitBuilderProblem:
     """Return the four-qubit circuit builder test scenario."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
@@ -215,7 +215,7 @@ class TestIterativeQpeCircuitBuilder:
 
     def test_raises_error_for_qasm_only_state_prep(self) -> None:
         """Validate that passing a QASM-only state prep (no Q# op) raises RuntimeError."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
         qasm_str = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nry(1.2870) q[0];\ncx q[0], q[1];\n'
         state_prep = Circuit(qasm=qasm_str)
 
@@ -339,7 +339,7 @@ class TestStandardQpeCircuitBuilder:
 
     def test_raises_error_for_qasm_only_state_prep(self) -> None:
         """Validate that passing a QASM-only state prep (no Q# op) raises RuntimeError."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
         qasm_str = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nry(1.2870) q[0];\ncx q[0], q[1];\n'
         state_prep = Circuit(qasm=qasm_str)
 

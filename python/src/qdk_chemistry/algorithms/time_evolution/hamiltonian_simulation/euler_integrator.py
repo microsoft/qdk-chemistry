@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         EnergyExpectationResult,
         MeasurementData,
         QuantumErrorProfile,
-        QubitHamiltonian,
+        QubitOperator,
         TimeDependentQubitHamiltonian,
     )
 
@@ -66,7 +66,7 @@ class EulerIntegrator(HamiltonianSimulation):
     def _run_impl(
         self,
         hamiltonian: TimeDependentQubitHamiltonian,
-        observables: list[QubitHamiltonian],
+        observables: list[QubitOperator],
         state_prep: Circuit,
         shots: int = 1000,
         *,
