@@ -75,7 +75,7 @@ class QIOLocalizerSettings : public data::Settings {
  * Schilling (arXiv:2309.01676). The single-orbital entropy S(rho_i) is built
  * from the four orbital occupation eigenvalues {1 - n_a - n_b + D, n_a - D, n_b
  * - D, D} where D = Gamma_{i ibar i ibar} is the alpha-beta (aabb) two-particle
- * RDM diagonal. This is the same Boguslawski & Tecmer (2015) convention used by
+ * RDM diagonal. This is the same convention used by
  * Wavefunction::get_single_orbital_entropies.
  *
  * The objective is minimized with the paper's gradient-free Jacobi-sweep

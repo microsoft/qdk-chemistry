@@ -22,7 +22,7 @@ from .reference_tolerances import (
 
 
 def _single_orbital_entropy_sum(ga, gb, g2):
-    """Boguslawski & Tecmer (2015) single-orbital entropy sum from RDMs.
+    """Single-orbital entropy sum from RDMs.
 
     ga, gb : (n, n) alpha/beta 1-RDMs.
     g2     : (n, n, n, n) alpha-beta (aabb) 2-RDM.

@@ -22,9 +22,8 @@ namespace detail {
 /**
  * @brief Single-orbital (von Neumann) entropy from orbital occupations.
  *
- * Uses the four occupation eigenvalues of Boguslawski & Tecmer (2015),
- * doi:10.1002/qua.24832: {1 - na - nb + d, na - d, nb - d, d}. Only
- * strictly-positive eigenvalues contribute (w -> 0+ gives w*ln(w) -> 0),
+ * Uses the four occupation eigenvalues {1 - na - nb + d, na - d, nb - d, d}.
+ * Only strictly-positive eigenvalues contribute (w -> 0+ gives w*ln(w) -> 0),
  * matching WavefunctionContainer::get_single_orbital_entropies (w > 0).
  *
  * @param occ_alpha Alpha occupation gamma_{ii} of the orbital.
