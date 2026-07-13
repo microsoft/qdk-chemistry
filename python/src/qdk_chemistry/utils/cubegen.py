@@ -29,8 +29,6 @@ def generate_cubefiles_from_orbitals(
     grid_size: tuple = (40, 40, 40),
     margin: float = 3.0,
     label_maker: Callable[[int], str] | None = None,
-    charge: int | None = None,
-    multiplicity: int | None = None,
 ) -> list[str] | dict[str, str]:
     """Generate volumetric cube data for molecular orbitals.
 
@@ -50,12 +48,6 @@ def generate_cubefiles_from_orbitals(
 
             If None, a default labeling scheme is used.
 
-        charge: Total molecular charge. Must be provided together with ``multiplicity``.
-        multiplicity: Spin multiplicity (2S + 1). Must be provided together with ``charge``.
-
-            If both ``charge`` and ``multiplicity`` are None, a neutral singlet is attempted first,
-            followed by a neutral doublet if PySCF rejects the singlet.
-
     Returns:
         list[str] | dict[str, str]: Paths or contents of the generated cube files.
 
@@ -66,22 +58,10 @@ def generate_cubefiles_from_orbitals(
         output_folder.mkdir(parents=True, exist_ok=True)
 
     basis_set = orbitals.get_basis_set()
-    if (charge is None) != (multiplicity is None):
-        raise ValueError("charge and multiplicity must either both be provided or both be None")
-    if charge is None:
-        try:
-            mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1)
-            mult_str = "singlet"
-        except RuntimeError:
-            mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=2)
-            mult_str = "doublet"
-        Logger.warn(
-            f"Charge and spin multiplicity were not provided; using neutral {mult_str} for cube-file generation. "
-            "For different behavior, call generate_cubefiles_from_orbitals with charge and multiplicity."
-        )
-    else:
-        assert multiplicity is not None
-        mol = basis_to_pyscf_mol(basis_set, charge=charge, multiplicity=multiplicity)
+    try:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1)
+    except RuntimeError:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=2)
     nmo = orbitals.get_num_molecular_orbitals()
     mo_range = range(nmo)
     nx, ny, nz = grid_size
