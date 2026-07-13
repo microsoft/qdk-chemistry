@@ -278,11 +278,12 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
             best_theta = theta;
           }
         }
-        // Clamp the fine-scan window to the documented domain [0, pi) so the
-        // refined angle never leaves the intended periodic range.
+        // Clamp the fine-scan window to the documented half-open domain
+        // [0, pi): the upper bound is the largest double strictly below pi, so
+        // no sample ever reaches pi (equivalent to 0 for this rotation).
         const double theta_lo = std::max(0.0, best_theta - coarse_angle_step);
-        const double theta_hi =
-            std::min(std::numbers::pi, best_theta + coarse_angle_step);
+        const double theta_hi = std::min(std::nextafter(std::numbers::pi, 0.0),
+                                         best_theta + coarse_angle_step);
         for (int k = 0; k < fine_samples; ++k) {
           const double theta =
               theta_lo +
