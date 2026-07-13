@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <numbers>
 #include <optional>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <variant>
@@ -364,8 +366,11 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
         "orbitals.");
   }
 
-  const auto& [active_indices_a, active_indices_b] =
-      orbitals->get_active_space_indices();
+  const auto active_index_set = orbitals->active_indices();
+  const auto active_indices_a =
+      data::spin_channel_indices(active_index_set, data::axes::alpha());
+  const auto active_indices_b =
+      data::spin_channel_indices(active_index_set, data::axes::beta());
   if (loc_indices_a != active_indices_a || loc_indices_b != active_indices_b) {
     throw std::invalid_argument(
         "QIOLocalizer requires loc_indices_a and loc_indices_b to match the "
@@ -445,7 +450,8 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
       coarse_angle_step, fine_samples, improvement_tolerance);
 
   // Apply the rotation to the active orbital columns (alpha == beta basis).
-  const Eigen::MatrixXd& coeffs_alpha = orbitals->get_coefficients_alpha();
+  const auto& coeffs_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
   Eigen::MatrixXd selected_coeffs(coeffs_alpha.rows(),
                                   static_cast<Eigen::Index>(n));
   for (std::size_t i = 0; i < n; ++i) {

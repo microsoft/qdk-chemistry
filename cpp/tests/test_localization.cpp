@@ -1718,8 +1718,10 @@ TEST_F(LocalizationTest, QIO) {
   ASSERT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
   ASSERT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
 
-  const auto& [active_indices_a, active_indices_b] =
-      active_orbitals->get_active_space_indices();
+  const auto active_indices_a =
+      spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
+  const auto active_indices_b =
+      spin_channel_indices(active_orbitals->active_indices(), axes::beta());
   EXPECT_EQ(active_indices_b, active_indices_a);
   std::vector<size_t> active_indices(active_indices_a.begin(),
                                      active_indices_a.end());
@@ -1740,8 +1742,10 @@ TEST_F(LocalizationTest, QIO) {
           qio_wfn_ptr));
 
   auto& qio_orbitals = *qio_wfn_ptr->get_orbitals();
-  const auto& Ca_can = active_orbitals->get_coefficients().first;
-  const auto& Ca_qio = qio_orbitals.get_coefficients().first;
+  const auto& Ca_can =
+      active_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& Ca_qio =
+      qio_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
   // QIO preserves the AO and MO dimensions.
   EXPECT_EQ(Ca_qio.rows(), Ca_can.rows());
   EXPECT_EQ(Ca_qio.cols(), Ca_can.cols());
@@ -1864,8 +1868,10 @@ TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {
   EXPECT_TRUE(
       qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
           result));
-  const auto& original_alpha = wfn->get_orbitals()->get_coefficients_alpha();
-  const auto& result_alpha = result->get_orbitals()->get_coefficients_alpha();
+  const auto& original_alpha = wfn->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& result_alpha = result->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
   EXPECT_NEAR(0.0, (result_alpha - original_alpha).norm(),
               testing::numerical_zero_tolerance);
 }
