@@ -60,7 +60,7 @@ def test_generate_cubefiles_uses_explicit_charge_and_multiplicity(capfd):
     assert "Charge and spin multiplicity were not provided" not in captured.out
 
 
-@pytest.mark.parametrize("charge, multiplicity", [(0, None), (None, 1)])
+@pytest.mark.parametrize(("charge", "multiplicity"), [(0, None), (None, 1)])
 def test_generate_cubefiles_rejects_incomplete_charge_and_multiplicity(charge, multiplicity):
     with pytest.raises(ValueError, match="charge and multiplicity must either both be provided or both be None"):
         generate_cubefiles_from_orbitals(_no_orbitals(), indices=[], charge=charge, multiplicity=multiplicity)
