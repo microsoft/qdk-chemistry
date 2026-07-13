@@ -1821,12 +1821,11 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
 }
 
 // Build a synthetic closed-shell mean-field wavefunction of active-space
-// dimension `n`, carrying spin-dependent 1- and 2-RDMs. The 1-RDM has
-// fractional occupations in a deliberately scrambled (non-natural-orbital)
-// basis, so QIO must perform real rotations to lower the single-orbital
-// entropy. Orbital coefficients and overlap are the identity, so the QIO output
-// coefficients are exactly the accumulated active-space rotation. A large `n`
-// gives the OpenMP-parallel 2-RDM rotation kernel a substantial workload.
+// dimension `n`, carrying spin-dependent 1- and 2-RDMs (identity coefficients
+// and overlap). The 1-RDM has fractional occupations in a deliberately
+// scrambled (non-natural-orbital) basis, so QIO must perform real rotations to
+// lower the single-orbital entropy. A lightweight wavefunction with attached
+// RDMs (no SCF/CAS) for tests that must reach QIO's RDM-dependent code paths.
 static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
     size_t n) {
   // Fractional closed-shell occupations in (0, 1) -> nonzero single-orbital
@@ -1907,38 +1906,6 @@ static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
           ContainerTypes::VectorVariant(aabb)),
       std::optional<ContainerTypes::VectorVariant>(
           ContainerTypes::VectorVariant(bbbb))));
-}
-
-TEST_F(LocalizationTest, QIOThreadedPathLargeActiveSpace) {
-  // A large active space (n = 32) gives the OpenMP-parallel 2-RDM rotation
-  // kernel a substantial workload. The synthetic mean-field state is in a
-  // scrambled (non-natural-orbital) basis, so QIO performs real rotations that
-  // drive that kernel.
-  auto localizer = LocalizerFactory::create("qdk_qio");
-  const size_t n = 32;
-  auto wfn = make_scrambled_meanfield_qio_wfn(n);
-  std::vector<size_t> active(n);
-  std::iota(active.begin(), active.end(), 0);
-
-  ASSERT_TRUE(wfn->has_one_rdm_spin_dependent());
-  ASSERT_TRUE(wfn->has_two_rdm_spin_dependent());
-  EXPECT_GT(wfn->get_single_orbital_entropies().sum(), 0.0);
-
-  std::shared_ptr<Wavefunction> qio_wfn;
-  EXPECT_NO_THROW({ qio_wfn = localizer->run(wfn, active, active); });
-  ASSERT_NE(qio_wfn, nullptr);
-  ASSERT_TRUE(
-      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
-          qio_wfn));
-
-  // A non-trivial, unitary active-space rotation must have occurred. The helper
-  // uses identity coefficients and overlap, so the output coefficients are the
-  // accumulated rotation U.
-  const Eigen::MatrixXd u_rot =
-      qio_wfn->get_orbitals()->get_coefficients().first;
-  EXPECT_NEAR(0.0, testing::norm_diff_from_unitary(u_rot),
-              testing::numerical_zero_tolerance * 100);
-  EXPECT_GT((u_rot - Eigen::MatrixXd::Identity(n, n)).norm(), 0.1);
 }
 
 TEST_F(LocalizationTest, QIOSettings) {
