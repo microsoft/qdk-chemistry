@@ -225,7 +225,7 @@ def _close_geometric_log_handler(log_path: Path) -> None:
             handler.close()
 
 
-def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine) -> np.ndarray:
+def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine | None) -> np.ndarray:
     """Extract final coordinates from geomeTRIC in Bohr."""
     if isinstance(result, np.ndarray):
         return result * ANGSTROM_TO_BOHR
@@ -238,4 +238,6 @@ def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine) -> np.ndarra
                 if key == "xyzs" and value:
                     value = value[-1]
                 return np.asarray(value, dtype=float) * ANGSTROM_TO_BOHR
+    if engine is None:
+        raise ValueError("geomeTRIC result did not contain final coordinates, and no engine was provided")
     return engine.last_coordinates()
