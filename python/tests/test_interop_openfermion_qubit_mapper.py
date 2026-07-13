@@ -59,7 +59,7 @@ def _num_spin_orbitals(hamiltonian: Hamiltonian) -> int:
 
 
 def _assert_pauli_ops_equal(actual: QubitOperator, expected: QubitOperator) -> None:
-    """Assert two QubitHamiltonians have identical Pauli terms and coefficients."""
+    """Assert two QubitOperators have identical Pauli terms and coefficients."""
     assert actual.equiv(expected, atol=float_comparison_absolute_tolerance), (
         f"Pauli operators differ.\n  actual:   {actual.pauli_strings}\n  expected: {expected.pauli_strings}"
     )
