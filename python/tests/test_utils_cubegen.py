@@ -24,7 +24,7 @@ if PYSCF_AVAILABLE:
     from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 
-def _diatomic_orbitals(symbols: tuple[str, str], bond_length: float, multiplicity: int) -> Orbitals:
+def _diatomic_orbitals(symbols: tuple[str, str], bond_length: float, multiplicity: int):
     coordinates = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, bond_length]])
     structure = Structure(list(symbols), coordinates)
     mol = gto.M(
@@ -37,11 +37,11 @@ def _diatomic_orbitals(symbols: tuple[str, str], bond_length: float, multiplicit
     return Orbitals(np.eye(mol.nao_nr()), None, None, basis_set)
 
 
-def _o2_orbitals() -> Orbitals:
+def _o2_orbitals():
     return _diatomic_orbitals(("O", "O"), bond_length=2.282, multiplicity=3)
 
 
-def _no_orbitals() -> Orbitals:
+def _no_orbitals():
     return _diatomic_orbitals(("N", "O"), bond_length=2.175, multiplicity=2)
 
 
