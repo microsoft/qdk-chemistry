@@ -1,8 +1,8 @@
-"""Term-grouper algorithms for :class:`~qdk_chemistry.data.QubitHamiltonian`.
+"""Term-grouper algorithms for :class:`~qdk_chemistry.data.QubitOperator`.
 
-A *term grouper* takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and
+A *term grouper* takes a :class:`~qdk_chemistry.data.QubitOperator` and
 returns a new one with a populated
-:attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` that downstream
+:attr:`~qdk_chemistry.data.QubitOperator.term_partition` that downstream
 algorithms can exploit.
 
 Example:

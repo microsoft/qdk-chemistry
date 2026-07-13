@@ -138,7 +138,7 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/state_preparation.py>`_ script.
-- :doc:`EnergyEstimator <energy_estimator>`: Estimate the energy of prepared states
+- :doc:`ExpectationEstimator <expectation_estimator>`: Estimate the energy of prepared states
 - :doc:`QubitMapper <qubit_mapper>`: Map Hamiltonians to qubit operators
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

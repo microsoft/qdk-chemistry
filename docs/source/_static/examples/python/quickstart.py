@@ -135,7 +135,7 @@ print(
 ################################################################################
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and the qubit Hamiltonian
-estimator = create("energy_estimator", algorithm_name="qdk")
+estimator = create("expectation_estimator", algorithm_name="qdk")
 estimator.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
