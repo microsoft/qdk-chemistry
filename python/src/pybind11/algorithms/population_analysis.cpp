@@ -64,8 +64,7 @@ Args:
     input: Structure or Wavefunction to analyze.
     charge: Total molecular charge.
     spin_multiplicity: Spin multiplicity of the molecular system.
-    n_inactive_orbitals: Number of doubly occupied orbitals excluded from active-
-space treatments. Full-population analyses ignore this value.
+    n_inactive_orbitals: Number of doubly occupied orbitals excluded from active-space treatments. Full-population analyses ignore this value.
 
 Returns:
     list[float]: Per-center populations in center order.

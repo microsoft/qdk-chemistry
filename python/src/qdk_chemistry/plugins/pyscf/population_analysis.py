@@ -96,7 +96,7 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         mean_field.verbose = 0
         density = mean_field.make_rdm1()
         _, charges = mean_field.mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp())
-        return [float(charge) for charge in charges]
+        return [float(chg) for chg in charges]
 
     def name(self) -> str:
         """Return the analyzer name."""

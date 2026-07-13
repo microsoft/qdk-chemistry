@@ -661,7 +661,6 @@ def _register_cpp_factories():
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
-    register_factory(NuclearDerivativeCalculatorFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)
