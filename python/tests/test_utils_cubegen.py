@@ -5,12 +5,23 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-from pyscf import gto
+import pytest
 
-import qdk_chemistry.utils.cubegen as cubegen_utils
-from qdk_chemistry.data import Orbitals, Structure
-from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol, pyscf_mol_to_qdk_basis
-from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
+try:
+    import pyscf  # noqa: F401
+    from pyscf import gto
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
+pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+
+if PYSCF_AVAILABLE:
+    import qdk_chemistry.utils.cubegen as cubegen_utils
+    from qdk_chemistry.data import Orbitals, Structure
+    from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol, pyscf_mol_to_qdk_basis
+    from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 
 def _diatomic_orbitals(symbols: tuple[str, str], bond_length: float, multiplicity: int) -> Orbitals:
@@ -34,28 +45,30 @@ def _no_orbitals() -> Orbitals:
     return _diatomic_orbitals(("N", "O"), bond_length=2.175, multiplicity=2)
 
 
-def test_generate_cubefiles_singlet():
-    orbitals = _o2_orbitals()
-    assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+class TestCubegen:
+    """Tests for cube file generation utilities."""
 
+    def test_generate_cubefiles_singlet(self):
+        orbitals = _o2_orbitals()
+        assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
 
-def test_generate_cubefiles_doublet():
-    orbitals = _no_orbitals()
-    assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
+    def test_generate_cubefiles_doublet(self):
+        orbitals = _no_orbitals()
+        assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
 
+    def test_generate_cubefiles_are_identical_for_singlet_and_triplet(self, monkeypatch):
+        orbitals = _o2_orbitals()
+        basis_set = orbitals.get_basis_set()
+        molecules = iter(
+            [
+                basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1),
+                basis_to_pyscf_mol(basis_set, charge=0, multiplicity=3),
+            ]
+        )
+        monkeypatch.setattr(cubegen_utils, "basis_to_pyscf_mol", lambda *_args, **_kwargs: next(molecules))
 
-def test_generate_cubefiles_are_identical_for_singlet_and_triplet(monkeypatch):
-    orbitals = _o2_orbitals()
-    basis_set = orbitals.get_basis_set()
-    molecules = iter(
-        [
-            basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1),
-            basis_to_pyscf_mol(basis_set, charge=0, multiplicity=3),
-        ]
-    )
-    monkeypatch.setattr(cubegen_utils, "basis_to_pyscf_mol", lambda *_args, **_kwargs: next(molecules))
+        singlet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
+        triplet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
 
-    singlet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
-    triplet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
-
-    assert singlet_cubes == triplet_cubes
+        assert singlet_cubes == triplet_cubes
