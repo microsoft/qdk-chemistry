@@ -16,8 +16,8 @@ from qdk_chemistry.algorithms import (
 
 from .reference_tolerances import (
     ci_energy_tolerance,
+    entropy_tol,
     orthonormality_error_tolerance,
-    rdm_tolerance,
 )
 
 
@@ -108,9 +108,9 @@ class TestQIOLocalizerBindings:
         s = np.asarray(active_orbitals.get_overlap_matrix())
         ca_can = np.asarray(active_orbitals.get_coefficients()[0])[:, active_indices]
         ca_qio = np.asarray(qio_wfn.get_orbitals().get_coefficients()[0])[:, active_indices]
-        u = ca_can.T @ s @ ca_qio
-        np.testing.assert_allclose(u @ u.T, np.eye(n), atol=orthonormality_error_tolerance)
-        np.testing.assert_allclose(ca_qio.T @ s @ ca_qio, np.eye(n), atol=orthonormality_error_tolerance)
+        u = ca_can.conj().T @ s @ ca_qio
+        np.testing.assert_allclose(u @ u.conj().T, np.eye(n), atol=orthonormality_error_tolerance)
+        np.testing.assert_allclose(ca_qio.conj().T @ s @ ca_qio, np.eye(n), atol=orthonormality_error_tolerance)
 
         # Re-solve the CAS in the QIO-rotated basis and take the entropy from the
         # library method (get_single_orbital_entropies) rather than recomputing it.
@@ -118,7 +118,7 @@ class TestQIOLocalizerBindings:
         entropy_after = float(np.sum(rotated_cas_wfn.get_single_orbital_entropies()))
 
         # The QIO objective must not increase under the optimized rotation.
-        assert entropy_after <= entropy_before + rdm_tolerance
+        assert entropy_after <= entropy_before + entropy_tol
 
     def test_open_shell_triplet_energy_invariant(self, test_data_files_path):
         """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.

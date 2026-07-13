@@ -1932,6 +1932,12 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
 // RDMs (no SCF/CAS) for tests that must reach QIO's RDM-dependent code paths.
 static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
     size_t n) {
+  // Requires n >= 2: the occupation ramp divides by (n - 1) and the 2-config
+  // determinant strings below index n / 2 - 1.
+  if (n < 2) {
+    throw std::invalid_argument(
+        "make_scrambled_meanfield_qio_wfn requires n >= 2");
+  }
   // Fractional closed-shell occupations in (0, 1) -> nonzero single-orbital
   // entropy, rotated by one layer of disjoint Givens rotations into a scrambled
   // basis (QIO undoes it in a few sweeps, so the test stays fast).

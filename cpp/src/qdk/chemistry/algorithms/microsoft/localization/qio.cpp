@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -277,8 +278,11 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
             best_theta = theta;
           }
         }
-        const double theta_lo = best_theta - coarse_angle_step;
-        const double theta_hi = best_theta + coarse_angle_step;
+        // Clamp the fine-scan window to the documented domain [0, pi) so the
+        // refined angle never leaves the intended periodic range.
+        const double theta_lo = std::max(0.0, best_theta - coarse_angle_step);
+        const double theta_hi =
+            std::min(std::numbers::pi, best_theta + coarse_angle_step);
         for (int k = 0; k < fine_samples; ++k) {
           const double theta =
               theta_lo +

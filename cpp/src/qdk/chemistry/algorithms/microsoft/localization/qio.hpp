@@ -8,6 +8,7 @@
 #include <numbers>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <string>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
