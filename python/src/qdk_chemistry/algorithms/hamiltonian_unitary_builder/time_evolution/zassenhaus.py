@@ -31,7 +31,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenh
 )
 from qdk_chemistry.data import (
     AlgorithmRef,
-    QubitHamiltonian,
+    QubitOperator,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -138,7 +138,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         if term_grouper is not None:
             self._settings.set("term_grouper", term_grouper)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Zassenhaus decomposition.
 
         Args:
@@ -188,9 +188,7 @@ class Zassenhaus(TimeEvolutionBuilder):
 
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, *, order: int | None = None
-    ) -> int:
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float, *, order: int | None = None) -> int:
         """Determine the number of Zassenhaus divisions to use.
 
         When both *num_divisions* and *target_accuracy* are provided, the
@@ -230,7 +228,7 @@ class Zassenhaus(TimeEvolutionBuilder):
 
     def _decompose_zassenhaus_step(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         time: float,
         *,
         atol: float = 1e-12,
@@ -293,7 +291,7 @@ class Zassenhaus(TimeEvolutionBuilder):
 
     def _decompose_zassenhaus_corrections(
         self,
-        grouped_hamiltonians: list[list[QubitHamiltonian]],
+        grouped_hamiltonians: list[list[QubitOperator]],
         *,
         order: int,
         time: float,
@@ -305,7 +303,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         planned_exponents, plan = zassenhaus_commutator_plan(leaves, max_order=order)
 
         leaf_sequences: dict[PlanTerm, tuple[int, ...]] = {}
-        commutator_cache: dict[tuple[PlanTerm, tuple[int, ...]], QubitHamiltonian] = {}
+        commutator_cache: dict[tuple[PlanTerm, tuple[int, ...]], QubitOperator] = {}
 
         def leaf_sequence(ref: PlanTerm) -> tuple[int, ...]:
             if ref in leaf_sequences:
@@ -322,7 +320,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             leaf_sequences[ref] = sequence
             return sequence
 
-        def evaluate(ref: PlanTerm, choices: tuple[int, ...]) -> QubitHamiltonian:
+        def evaluate(ref: PlanTerm, choices: tuple[int, ...]) -> QubitOperator:
             if ref in plan:
                 key = (ref, choices)
                 if key not in commutator_cache:
@@ -347,7 +345,7 @@ class Zassenhaus(TimeEvolutionBuilder):
                     if all_commute:
                         num_qubits = max(h_left.num_qubits, h_right.num_qubits)
                         # Avoid the expensive commutator calculation if all terms commute
-                        commutator_cache[key] = QubitHamiltonian(
+                        commutator_cache[key] = QubitOperator(
                             pauli_strings=["I" * num_qubits],
                             coefficients=np.array([0.0], dtype=complex),
                         )
@@ -430,7 +428,7 @@ class Zassenhaus(TimeEvolutionBuilder):
                     return False
         return True
 
-    def _terms_to_hamiltonian(self, terms: list[ExponentiatedPauliTerm]) -> QubitHamiltonian:
+    def _terms_to_hamiltonian(self, terms: list[ExponentiatedPauliTerm]) -> QubitOperator:
         """Convert exponentiated Pauli terms to a Hamiltonian with matching angles."""
         num_qubits = 1 + max((qubit for term in terms for qubit in term.pauli_term), default=0)
         labels = []
@@ -438,7 +436,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         for term in terms:
             labels.append(pauli_map_to_label(term.pauli_term, num_qubits))
             coefficients.append(term.angle)
-        return QubitHamiltonian(pauli_strings=labels, coefficients=np.asarray(coefficients, dtype=complex))
+        return QubitOperator(pauli_strings=labels, coefficients=np.asarray(coefficients, dtype=complex))
 
     def _optimize_pauli_sequence(
         self,

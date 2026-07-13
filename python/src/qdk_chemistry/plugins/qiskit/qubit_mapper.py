@@ -1,6 +1,6 @@
-"""Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.
+"""Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit operators.
 
-This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians
+This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitOperators
 using different mapping strategies ("jordan-wigner", "bravyi-kitaev", and "parity").
 """
 # --------------------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ from qiskit_nature.second_q.mappers import (
 )
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.data import Hamiltonian, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_indices
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.symmetry import axes
@@ -48,7 +48,7 @@ class QiskitQubitMapperSettings(QubitMapperSettings):
 
 
 class QiskitQubitMapper(QubitMapper):
-    """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
+    """Map an electronic structure Hamiltonian to a QubitOperator using Qiskit.
 
     This is a **third-party** backend: it reads
     ``mapping.base_encoding`` to select the corresponding Qiskit Nature
@@ -102,8 +102,8 @@ class QiskitQubitMapper(QubitMapper):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-    ) -> QubitHamiltonian:
-        """Build a qubit Hamiltonian via Qiskit Nature.
+    ) -> QubitOperator:
+        """Build a qubit operator via Qiskit Nature.
 
         Reads ``mapping.base_encoding`` to select a Qiskit Nature mapper
         class.  ``mapping.table`` is **not used** — the qubit operator
@@ -118,7 +118,7 @@ class QiskitQubitMapper(QubitMapper):
             mapping: Encoding selector — only ``base_encoding`` is read.
 
         Returns:
-            QubitHamiltonian: An instance of the QubitHamiltonian.
+            QubitOperator: An instance of the QubitOperator.
 
         Raises:
             NotImplementedError: If ``mapping.base_encoding`` is not a supported Qiskit encoding.
@@ -160,7 +160,7 @@ class QiskitQubitMapper(QubitMapper):
         fermionic_op = electronic_hamiltonian.second_q_op()
         qubit_mapper = _SUPPORTED_ENCODINGS[encoding_name]()
         qubit_op = qubit_mapper.map(fermionic_op)
-        qh = QubitHamiltonian(
+        qh = QubitOperator(
             pauli_strings=qubit_op.paulis.to_labels(),
             coefficients=qubit_op.coeffs,
             encoding=encoding_name,

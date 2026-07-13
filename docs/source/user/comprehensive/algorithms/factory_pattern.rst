@@ -65,8 +65,8 @@ In Python, algorithm instantiation is managed through a centralized registry mod
    * - :doc:`StabilityChecker <../algorithms/stability_checker>`
      - ``"stability_checker"``
      - ``StabilityCheckerFactory``
-   * - :doc:`EnergyEstimator <../algorithms/energy_estimator>`
-     - ``"energy_estimator"``
+   * - :doc:`ExpectationEstimator <../algorithms/expectation_estimator>`
+     - ``"expectation_estimator"``
      - Python only
    * - :doc:`StatePreparation <../algorithms/state_preparation>`
      - ``"state_prep"``

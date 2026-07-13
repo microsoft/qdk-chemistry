@@ -14,7 +14,7 @@ from qdk_chemistry.data import (
     EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
     TimeDependentQubitHamiltonian,
 )
@@ -43,7 +43,7 @@ class HamiltonianSimulationSettings(Settings):
         self._set_default(
             "observable_estimator",
             "algorithm_ref",
-            AlgorithmRef("energy_estimator", "qdk"),
+            AlgorithmRef("expectation_estimator", "qdk"),
             "Estimator used to compute observable expectation values.",
         )
 
@@ -64,7 +64,7 @@ class HamiltonianSimulation(Algorithm):
     def _run_impl(
         self,
         hamiltonian: TimeDependentQubitHamiltonian,
-        observables: list[QubitHamiltonian],
+        observables: list[QubitOperator],
         state_prep: Circuit,
         shots: int = 1000,
         *,
@@ -123,15 +123,15 @@ class HamiltonianSimulation(Algorithm):
     def _measure_observable(
         self,
         circuit: Circuit,
-        observable: QubitHamiltonian,
+        observable: QubitOperator,
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
-        energy_estimator = self._create_nested("observable_estimator")
+        expectation_estimator = self._create_nested("observable_estimator")
         # Propagate this algorithm's circuit_executor setting to the energy estimator
-        energy_estimator.settings().set("circuit_executor", self._settings.get("circuit_executor"))
-        energy_result, measurement_data = energy_estimator.run(
+        expectation_estimator.settings().set("circuit_executor", self._settings.get("circuit_executor"))
+        energy_result, measurement_data = expectation_estimator.run(
             circuit,
             observable,
             total_shots=shots,
