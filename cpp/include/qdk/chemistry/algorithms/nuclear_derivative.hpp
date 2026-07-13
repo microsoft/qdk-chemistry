@@ -165,7 +165,8 @@ class NuclearDerivativeCalculator
    * @param n_inactive_orbitals The number of doubly occupied orbitals excluded
    * from multi-reference active spaces. This value is validated against the
 <<<<<<< HEAD
-   * electron count even when the selected energy path does not use an active space
+   * electron count even when the selected energy path does not use an active
+space
 =======
    * electron count even when the selected energy path does not use an active
    * space
