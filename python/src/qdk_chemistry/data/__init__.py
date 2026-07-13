@@ -64,6 +64,7 @@ Exposed exceptions are:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
@@ -200,3 +201,53 @@ __all__ = [
     "WavefunctionType",
     "get_current_ciaaw_version",
 ]
+
+
+# v1 names removed or renamed in v2.0, kept as deprecated aliases to their v2
+# replacement. The constructor signatures of the v2 replacements may differ from
+# the v1 classes; see the v1 -> v2 migration guide for details. These names are
+# intentionally omitted from ``__all__`` so ``import *`` does not pull them in.
+_DEPRECATED_ALIASES = {
+    "SlaterDeterminantContainer": "StateVectorContainer",
+    "CasWavefunctionContainer": "StateVectorContainer",
+    "SciWavefunctionContainer": "StateVectorContainer",
+    "MP2Container": "AmplitudeContainer",
+    "CoupledClusterContainer": "AmplitudeContainer",
+    "TimeEvolutionUnitary": "UnitaryRepresentation",
+    "TimeEvolutionUnitaryContainer": "UnitaryContainer",
+}
+
+
+def __getattr__(name: str):
+    """Resolve deprecated v1 data-class names removed or renamed in v2.0.
+
+    Args:
+        name: Attribute name requested from the ``qdk_chemistry.data`` module.
+
+    Returns:
+        The v2 replacement object for a deprecated v1 name.
+
+    Raises:
+        AttributeError: If the name is not a known deprecated alias.
+
+    """
+    if name in _DEPRECATED_ALIASES:
+        replacement_name = _DEPRECATED_ALIASES[name]
+        warnings.warn(
+            f"'qdk_chemistry.data.{name}' is deprecated and will be removed in a future release; "
+            f"use '{replacement_name}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[replacement_name]
+    if name in ("EncodingMismatchError", "validate_encoding_compatibility"):
+        warnings.warn(
+            f"'qdk_chemistry.data.{name}' is deprecated and will be removed in a future release; "
+            "use the MajoranaMapping fermion-to-qubit workflow instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from qdk_chemistry.data import encoding_validation  # noqa: PLC0415
+
+        return getattr(encoding_validation, name)
+    raise AttributeError(f"module 'qdk_chemistry.data' has no attribute '{name}'")

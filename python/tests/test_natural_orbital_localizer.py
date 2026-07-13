@@ -17,6 +17,8 @@ from qdk_chemistry.data import (
     Orbitals,
     Structure,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 
@@ -60,7 +62,8 @@ class TestNaturalOrbitalLocalizerBindings:
         _, rks_wfn = rks.run(structure, 0, 1, "cc-pvdz")
 
         orbs = rks_wfn.get_orbitals()
-        c_a, c_b = orbs.get_coefficients()
+        coefficients = orbs.coefficients()
+        c_a, c_b = spin_channel_matrix(coefficients, axes.alpha()), spin_channel_matrix(coefficients, axes.beta())
         c_a, c_b = c_a.copy(), c_b.copy()
         n_occ = rks_wfn.get_total_num_electrons()[0]
         ho, lu = n_occ - 1, n_occ  # HOMO, LUMO

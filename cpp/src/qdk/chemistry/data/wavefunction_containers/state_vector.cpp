@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -54,12 +55,10 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
   // Configurations only represent the active space, not the full orbital space
   // (inactive and virtual orbitals are not included).
   const std::string config_str = det.to_string();
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;
+  const size_t active_space_size =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha()).size();
 
-  if (!active_indices.empty()) {
-    size_t active_space_size = active_indices.size();
-
+  if (active_space_size != 0) {
     if (det.get_orbital_capacity() < active_space_size) {
       throw std::invalid_argument(
           "StateVectorContainer: configuration has orbital capacity " +
@@ -345,19 +344,21 @@ StateVectorContainer::total_num_particles() const {
     throw std::runtime_error("No determinants available");
   }
   if (dets[0].bits_per_mode() != 2) {
-    // Generic (non-spin-½): aggregate count, no spin decomposition.
-    // Use only one channel of inactive indices — for spinless bases
-    // v1_indices_from_index_set duplicates the trivial-label indices into
-    // both alpha and beta, so summing both would double-count.
+    // Generic (non-spin-½): aggregate count, no spin decomposition. Use a
+    // single inactive channel; spin_channel_indices reads the alpha (or, for
+    // spin-free bases, the sole trivial) channel.
     std::size_t active = dets[0].total_occupation();
-    auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
-    return _make_particle_count(active + alpha_inactive.size(), 0);
+    return _make_particle_count(
+        active + spin_channel_indices(get_orbitals()->inactive_indices(),
+                                      axes::alpha())
+                     .size(),
+        0);
   }
   auto [n_alpha, n_beta] = dets[0].get_n_electrons();
-  auto [alpha_inactive, beta_inactive] =
-      get_orbitals()->get_inactive_space_indices();
-  return _make_particle_count(n_alpha + alpha_inactive.size(),
-                              n_beta + beta_inactive.size());
+  const auto inactive = get_orbitals()->inactive_indices();
+  return _make_particle_count(
+      n_alpha + spin_channel_indices(inactive, axes::alpha()).size(),
+      n_beta + spin_channel_indices(inactive, axes::beta()).size());
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
@@ -454,8 +455,9 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    auto [active_alpha, active_beta] =
-        get_orbitals()->get_active_space_indices();
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
     if ((!active_alpha.empty() || !active_beta.empty()) &&
         active_alpha != active_beta) {
       throw std::runtime_error(
@@ -505,8 +507,9 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    auto [active_alpha, active_beta] =
-        get_orbitals()->get_active_space_indices();
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
     if ((!active_alpha.empty() || !active_beta.empty()) &&
         active_alpha != active_beta) {
       throw std::runtime_error(
@@ -572,8 +575,9 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_one_rdm_spin_traced && !_active_one_rdm) {
-    auto [active_alpha, active_beta] =
-        get_orbitals()->get_active_space_indices();
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
     if ((!active_alpha.empty() || !active_beta.empty()) &&
         active_alpha != active_beta) {
       throw std::runtime_error(
@@ -605,8 +609,9 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_two_rdm_spin_traced && !_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    auto [active_alpha, active_beta] =
-        get_orbitals()->get_active_space_indices();
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
     if ((!active_alpha.empty() || !active_beta.empty()) &&
         active_alpha != active_beta) {
       throw std::runtime_error(
@@ -663,8 +668,9 @@ Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   if (_is_single_determinant() && !_entropies.single_orbital) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
-    auto [active_alpha, active_beta] =
-        get_orbitals()->get_active_space_indices();
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
     if ((!active_alpha.empty() || !active_beta.empty()) &&
         active_alpha != active_beta) {
       throw std::runtime_error(
@@ -672,7 +678,8 @@ Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
           "beta active space indices");
     }
     size_t num_active_orbitals =
-        get_orbitals()->get_active_space_indices().first.size();
+        spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+            .size();
     return Eigen::VectorXd::Zero(num_active_orbitals);
   }
   return WavefunctionContainer::get_single_orbital_entropies();
@@ -693,8 +700,8 @@ StateVectorContainer::_active_occupations_pair() const {
     throw std::runtime_error("No determinants available");
   }
 
-  auto [alpha_active_indices, beta_active_indices] =
-      get_orbitals()->get_active_space_indices();
+  const auto alpha_active_indices =
+      spin_channel_indices(get_orbitals()->active_indices(), axes::alpha());
 
   if (alpha_active_indices.empty()) {
     if (_is_single_determinant()) {
@@ -829,8 +836,11 @@ StateVectorContainer::_total_occupations_pair() const {
   // would double-count after _make_orbital_occupations sums them.
   auto sym = get_orbitals()->symmetries();
   bool has_spin = sym && sym->has_axis(AxisName::Spin);
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      get_orbitals()->get_inactive_space_indices();
+  const auto inactive_ai = get_orbitals()->inactive_indices();
+  const auto alpha_inactive_indices =
+      spin_channel_indices(inactive_ai, axes::alpha());
+  const auto beta_inactive_indices =
+      spin_channel_indices(inactive_ai, axes::beta());
   for (size_t inactive_idx : alpha_inactive_indices) {
     if (inactive_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(inactive_idx) = 1.0;
@@ -850,8 +860,11 @@ StateVectorContainer::_total_occupations_pair() const {
   }
 
   auto [alpha_active_occs, beta_active_occs] = _active_occupations_pair();
-  auto [alpha_active_indices, beta_active_indices] =
-      get_orbitals()->get_active_space_indices();
+  const auto active_ai = get_orbitals()->active_indices();
+  const auto alpha_active_indices =
+      spin_channel_indices(active_ai, axes::alpha());
+  const auto beta_active_indices =
+      spin_channel_indices(active_ai, axes::beta());
 
   for (size_t active_idx = 0;
        active_idx < alpha_active_indices.size() &&

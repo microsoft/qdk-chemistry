@@ -155,6 +155,11 @@ target_include_directories(chemistry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+# Internal (non-installed) headers under src/ are available to the library's own
+# translation units via <qdk/chemistry/...>, but are not part of the public API.
+target_include_directories(chemistry PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
 target_link_libraries(chemistry PUBLIC
     Eigen3::Eigen
     ${HDF5_CXX_LIBRARIES}
