@@ -32,10 +32,13 @@ See :doc:`../data/qpe_result` for details on the result data class.
 
 .. note::
 
-   In v2, the v1 ``"iterative"`` variant is ``"qdk_iterative"``. The
-   ``num_bits``, unitary-builder, evolution-time, and controlled-mapper settings
-   now belong to the nested ``qpe_circuit_builder`` algorithm reference, while
-   the executor remains a phase-estimation setting.
+   In v2, the v1 ``"iterative"`` variant is ``"qdk_iterative"``. The v1
+   ``"qiskit_standard"`` variant is now composed from ``"qdk_standard"``, a
+   ``"qiskit_standard"`` QPE circuit builder, and a Qiskit circuit executor.
+   The ``num_bits``, unitary-builder, evolution-time, and controlled-mapper
+   settings now belong to the nested ``qpe_circuit_builder`` algorithm reference;
+   the executor is configured through the phase-estimation ``circuit_executor``
+   setting.
 
 .. _qpe-workflow:
 

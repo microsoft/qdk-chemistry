@@ -151,4 +151,5 @@ def test_deprecated_time_evolution_type_key_warns_and_resolves(old_type, new_typ
     with pytest.warns(DeprecationWarning, match=old_type):
         old = algorithms.create(old_type, algorithm_name)
     new = algorithms.create(new_type, algorithm_name)
+    assert old.type_name() == new_type
     assert old.name() == new.name()
