@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -19,10 +20,6 @@ namespace qdk::chemistry::data {
 using MatrixVariant = ContainerTypes::MatrixVariant;
 using VectorVariant = ContainerTypes::VectorVariant;
 using ScalarVariant = ContainerTypes::ScalarVariant;
-
-// Serialization version of the deleted single-determinant ("sd") container,
-// retained so legacy "sd" files round-trip through StateVectorContainer.
-static constexpr const char* LEGACY_SD_SERIALIZATION_VERSION = "0.1.0";
 
 // ---------------------------------------------------------------------------
 // Constructors
@@ -58,12 +55,10 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
   // Configurations only represent the active space, not the full orbital space
   // (inactive and virtual orbitals are not included).
   const std::string config_str = det.to_string();
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;
+  const size_t active_space_size =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha()).size();
 
-  if (!active_indices.empty()) {
-    size_t active_space_size = active_indices.size();
-
+  if (active_space_size != 0) {
     if (det.get_orbital_capacity() < active_space_size) {
       throw std::invalid_argument(
           "StateVectorContainer: configuration has orbital capacity " +
@@ -349,19 +344,21 @@ StateVectorContainer::total_num_particles() const {
     throw std::runtime_error("No determinants available");
   }
   if (dets[0].bits_per_mode() != 2) {
-    // Generic (non-spin-½): aggregate count, no spin decomposition.
-    // Use only one channel of inactive indices — for spinless bases
-    // v1_indices_from_index_set duplicates the trivial-label indices into
-    // both alpha and beta, so summing both would double-count.
+    // Generic (non-spin-½): aggregate count, no spin decomposition. Use a
+    // single inactive channel; spin_channel_indices reads the alpha (or, for
+    // spin-free bases, the sole trivial) channel.
     std::size_t active = dets[0].total_occupation();
-    auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
-    return _make_particle_count(active + alpha_inactive.size(), 0);
+    return _make_particle_count(
+        active + spin_channel_indices(get_orbitals()->inactive_indices(),
+                                      axes::alpha())
+                     .size(),
+        0);
   }
   auto [n_alpha, n_beta] = dets[0].get_n_electrons();
-  auto [alpha_inactive, beta_inactive] =
-      get_orbitals()->get_inactive_space_indices();
-  return _make_particle_count(n_alpha + alpha_inactive.size(),
-                              n_beta + beta_inactive.size());
+  const auto inactive = get_orbitals()->inactive_indices();
+  return _make_particle_count(
+      n_alpha + spin_channel_indices(inactive, axes::alpha()).size(),
+      n_beta + spin_channel_indices(inactive, axes::beta()).size());
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
@@ -458,24 +455,27 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin dependent 1-RDMs not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
           "Mismatched sizes in active orbital occupations for alpha and beta");
     }
-    size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
+    size_t n_orbs = alpha_occupations.size();
     Eigen::MatrixXd tmp_one_rdm_aa = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
     Eigen::MatrixXd tmp_one_rdm_bb = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
 
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm_aa(i, i) = 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm_bb(i, i) = 1.0;
     }
 
@@ -507,11 +507,14 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
           "compute spin-resolved RDMs.");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin dependent 2-RDMs not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
@@ -572,19 +575,26 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_one_rdm_spin_traced && !_active_one_rdm) {
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin traced 1-RDM not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
+    if (alpha_occupations.size() != beta_occupations.size()) {
+      throw std::runtime_error(
+          "Mismatched sizes in active orbital occupations for alpha and beta");
+    }
+    size_t n_orbs = alpha_occupations.size();
     Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(alpha_occupations.size()); ++i) {
       if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(beta_occupations.size()); ++i) {
       if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
     }
     _one_rdm_spin_traced =
@@ -599,11 +609,14 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_two_rdm_spin_traced && !_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Spin-traced 2-RDM not implemented for different alpha and beta "
-          "active space sizes");
+          "active space indices");
     }
     if (alpha_occupations.size() != beta_occupations.size()) {
       throw std::runtime_error(
@@ -655,14 +668,18 @@ Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   if (_is_single_determinant() && !_entropies.single_orbital) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
-    if (get_orbitals()->get_active_space_indices().first.size() !=
-        get_orbitals()->get_active_space_indices().second.size()) {
+    const auto active_ai = get_orbitals()->active_indices();
+    const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
+    const auto active_beta = spin_channel_indices(active_ai, axes::beta());
+    if ((!active_alpha.empty() || !active_beta.empty()) &&
+        active_alpha != active_beta) {
       throw std::runtime_error(
           "Single orbital entropies not implemented for different alpha and "
-          "beta active space sizes");
+          "beta active space indices");
     }
     size_t num_active_orbitals =
-        get_orbitals()->get_active_space_indices().first.size();
+        spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+            .size();
     return Eigen::VectorXd::Zero(num_active_orbitals);
   }
   return WavefunctionContainer::get_single_orbital_entropies();
@@ -683,8 +700,8 @@ StateVectorContainer::_active_occupations_pair() const {
     throw std::runtime_error("No determinants available");
   }
 
-  auto [alpha_active_indices, beta_active_indices] =
-      get_orbitals()->get_active_space_indices();
+  const auto alpha_active_indices =
+      spin_channel_indices(get_orbitals()->active_indices(), axes::alpha());
 
   if (alpha_active_indices.empty()) {
     if (_is_single_determinant()) {
@@ -819,8 +836,11 @@ StateVectorContainer::_total_occupations_pair() const {
   // would double-count after _make_orbital_occupations sums them.
   auto sym = get_orbitals()->symmetries();
   bool has_spin = sym && sym->has_axis(AxisName::Spin);
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      get_orbitals()->get_inactive_space_indices();
+  const auto inactive_ai = get_orbitals()->inactive_indices();
+  const auto alpha_inactive_indices =
+      spin_channel_indices(inactive_ai, axes::alpha());
+  const auto beta_inactive_indices =
+      spin_channel_indices(inactive_ai, axes::beta());
   for (size_t inactive_idx : alpha_inactive_indices) {
     if (inactive_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(inactive_idx) = 1.0;
@@ -840,19 +860,24 @@ StateVectorContainer::_total_occupations_pair() const {
   }
 
   auto [alpha_active_occs, beta_active_occs] = _active_occupations_pair();
-  auto [alpha_active_indices, beta_active_indices] =
-      get_orbitals()->get_active_space_indices();
+  const auto active_ai = get_orbitals()->active_indices();
+  const auto alpha_active_indices =
+      spin_channel_indices(active_ai, axes::alpha());
+  const auto beta_active_indices =
+      spin_channel_indices(active_ai, axes::beta());
 
-  for (size_t active_idx = 0; active_idx < alpha_active_indices.size() &&
-                              active_idx < alpha_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < alpha_active_indices.size() &&
+       active_idx < static_cast<size_t>(alpha_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = alpha_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
       alpha_occupations(orbital_idx) = alpha_active_occs(active_idx);
     }
   }
-  for (size_t active_idx = 0; active_idx < beta_active_indices.size() &&
-                              active_idx < beta_active_occs.size();
+  for (size_t active_idx = 0;
+       active_idx < beta_active_indices.size() &&
+       active_idx < static_cast<size_t>(beta_active_occs.size());
        ++active_idx) {
     size_t orbital_idx = beta_active_indices[active_idx];
     if (orbital_idx < static_cast<size_t>(num_orbitals)) {
@@ -939,40 +964,9 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_json(
     if (!j.contains("container_type")) {
       throw std::runtime_error("JSON missing required 'container_type' field");
     }
-    std::string container_type = j["container_type"];
 
-    // Legacy single-determinant ("sd") format stored orbitals + determinant.
-    if (container_type == "sd") {
-      if (!j.contains("version")) {
-        throw std::runtime_error("Invalid JSON: missing version field");
-      }
-      validate_serialization_version(LEGACY_SD_SERIALIZATION_VERSION,
-                                     j["version"]);
-
-      if (!j.contains("orbitals")) {
-        throw std::runtime_error("JSON missing required 'orbitals' field");
-      }
-      auto orbitals = Orbitals::from_json(j["orbitals"]);
-
-      WavefunctionType type = WavefunctionType::SelfDual;
-      if (j.contains("wavefunction_type")) {
-        std::string type_str = j["wavefunction_type"];
-        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                         : WavefunctionType::NotSelfDual;
-      }
-
-      if (!j.contains("determinant")) {
-        throw std::runtime_error("JSON missing required 'determinant' field");
-      }
-      Configuration determinant = Configuration::from_json(j["determinant"]);
-
-      // Legacy "sd" files predate sectors; migrate as electronic.
-      return std::make_unique<StateVectorContainer>(
-          determinant, orbitals, Wavefunction::DEFAULT_SECTOR, type);
-    }
-
-    // Current "state_vector" format and legacy "cas"/"sci" formats share the
-    // coefficient + configuration-set + RDM layout handled by the base loader.
+    // Only the current "state_vector" schema is accepted. Files written by an
+    // older release must be migrated with python -m qdk_chemistry.migrate.
     return WavefunctionContainer::from_json(j);
   } catch (const std::exception& e) {
     throw std::runtime_error(
@@ -986,52 +980,12 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_hdf5(
   QDK_LOG_TRACE_ENTERING();
 
   try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
     if (!group.attrExists("container_type")) {
       throw std::runtime_error("HDF5 group missing 'container_type' attribute");
     }
-    H5::Attribute type_attr = group.openAttribute("container_type");
-    std::string container_type;
-    type_attr.read(string_type, container_type);
 
-    // Legacy single-determinant ("sd") format stored orbitals + determinant.
-    if (container_type == "sd") {
-      H5::Attribute version_attr = group.openAttribute("version");
-      std::string version;
-      version_attr.read(string_type, version);
-      validate_serialization_version(LEGACY_SD_SERIALIZATION_VERSION, version);
-
-      if (!group.nameExists("orbitals")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'orbitals' subgroup");
-      }
-      H5::Group orbitals_group = group.openGroup("orbitals");
-      auto orbitals = Orbitals::from_hdf5(orbitals_group);
-
-      WavefunctionType type = WavefunctionType::SelfDual;
-      if (group.attrExists("wavefunction_type")) {
-        H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-        std::string type_str;
-        wf_type_attr.read(string_type, type_str);
-        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                         : WavefunctionType::NotSelfDual;
-      }
-
-      if (!group.nameExists("determinant")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'determinant' dataset");
-      }
-      H5::Group det_group = group.openGroup("determinant");
-      Configuration determinant = Configuration::from_hdf5(det_group);
-      det_group.close();
-
-      // Legacy "sd" files predate sectors; migrate as electronic.
-      return std::make_unique<StateVectorContainer>(
-          determinant, orbitals, Wavefunction::DEFAULT_SECTOR, type);
-    }
-
-    // Current "state_vector" format and legacy "cas"/"sci" formats share the
-    // coefficient + configuration-set + RDM layout handled by the base loader.
+    // Only the current "state_vector" schema is accepted. Files written by an
+    // older release must be migrated with python -m qdk_chemistry.migrate.
     return WavefunctionContainer::from_hdf5(group);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));

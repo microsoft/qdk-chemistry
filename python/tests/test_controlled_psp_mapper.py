@@ -11,7 +11,7 @@ from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import Circuit, QubitHamiltonian
+from qdk_chemistry.data import Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -24,7 +24,7 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 
 def _build_unitary_rep(pauli_strings, coefficients, *, quantum_walk=False):
     """Helper: build UnitaryRepresentation from Pauli strings and coefficients."""
-    hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+    hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
     builder = LCUBuilder(quantum_walk=quantum_walk)
     return builder.run(hamiltonian)
 
@@ -97,7 +97,6 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(unitary_rep)
 
-    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
@@ -126,7 +125,7 @@ class TestPrepareSelectMapper:
         textbook 1-qubit examples to a molecular-inspired 2-qubit benchmark.
         """
         coefficients = np.array(coefficients)
-        hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+        hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
         num_target = hamiltonian.num_qubits
 
         unitary_rep = _build_unitary_rep(pauli_strings, coefficients)
@@ -146,7 +145,6 @@ class TestPrepareSelectMapper:
             h_over_lam, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         ), f"Block encoding identity failed for: {description}"
 
-    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_quantum_walk_eigenvalues(self):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.

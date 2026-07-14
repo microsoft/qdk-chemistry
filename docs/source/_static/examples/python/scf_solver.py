@@ -27,9 +27,15 @@ scf_solver.settings().set("method", "hf")
 ################################################################################
 
 ################################################################################
+# docs:xyz ../data/h2.structure.xyz
 # start-cell-run
-# Load structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+# Load structure from inline XYZ file
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Run scf
 E_scf, wfn = scf_solver.run(
@@ -60,7 +66,9 @@ E_scf3, wfn3 = scf_solver.run(
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
+print(
+    registry.available("scf_solver")
+)  # ['qdk', 'qdk_stabilized', 'pyscf', 'pyscf_stabilized', ...]
 # end-cell-list-implementations
 ################################################################################
 

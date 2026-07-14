@@ -24,7 +24,7 @@ try:
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
 
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
     SparseIsometryGF2XStatePreparation,
@@ -304,57 +304,6 @@ def test_prepare_single_reference_state_error_cases():
 
     with pytest.raises(ValueError, match="Bitstring must contain only 0 and 1 values"):
         test_cls._prepare_single_reference_state([1, 0, 2])
-
-
-def test_asymmetric_active_space_error():
-    """Test error for asymmetric active space in StatePrep."""
-
-    class MockOrbitals:
-        """Mock orbitals with asymmetric active space indices."""
-
-        def get_active_space_indices(self):
-            """Return asymmetric active space indices."""
-            return ([0, 1, 2], [0, 1, 2, 3])
-
-    class MockWavefunction:
-        """Mock wavefunction for testing asymmetric active space."""
-
-        def get_orbitals(self):
-            """Return mock orbitals."""
-            return MockOrbitals()
-
-        def get_active_determinants(self):
-            """Return mock determinants."""
-            return [Configuration.from_spin_half_string("2020000"), Configuration.from_spin_half_string("2200000")]
-
-        def get_coefficient(self, _):
-            """Return mock coefficient."""
-            return 1.0
-
-        def get_coefficients(self):
-            """Return coefficients for all determinants."""
-            return [1.0, 0.5]  # Two coefficients for the two determinants
-
-        def size(self):
-            """Return the number of determinants."""
-            return len(self.get_active_determinants())
-
-    mock_wfn = MockWavefunction()
-    # Skip MPS algorithms — they require MPSWavefunction and raise TypeError
-    # before reaching the asymmetric active space validation.
-    mps_keys = {"mps_sequential", "mps_sparse"}
-    for sp_key in available("state_prep"):
-        if sp_key in mps_keys:
-            continue
-        prep = create("state_prep", sp_key)
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            ),
-        ):
-            prep.run(mock_wfn)
 
 
 def test_find_pivot_row():

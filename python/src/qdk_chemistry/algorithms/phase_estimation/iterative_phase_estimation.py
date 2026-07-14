@@ -17,10 +17,9 @@ import numpy as np
 
 from qdk_chemistry.data import (
     Circuit,
-    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -70,7 +69,7 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -78,8 +77,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
-                for which to estimate the phase.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -113,8 +111,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             circuit_builder.settings().update("phase_correction", phase_feedback)
             circuit_builder.settings().update("num_iteration", iteration)
             iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
-                state_preparation=state_preparation,
-                qubit_hamiltonian=qubit_hamiltonian,
+                state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
             )
             iteration_circuit = iteration_circuits[0]
             Logger.info(f"Iteration {iteration + 1} / {num_bits}: circuit generated.")

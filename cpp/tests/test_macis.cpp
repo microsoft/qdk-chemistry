@@ -30,7 +30,7 @@ inline static constexpr size_t max_solver_iterations = 200;
 inline static constexpr size_t ntdets_max_small = 10;
 
 ///@brief Large wfn size for tests requiring more growth
-inline static constexpr size_t ntdets_max_large = 50;
+inline static constexpr size_t ntdets_max_large = 400;
 
 ///@brief Minimum wfn size
 inline static constexpr size_t ntdets_min = 1;
@@ -45,7 +45,7 @@ inline static constexpr double rv_prune_tol = 1e-8;
 inline static constexpr double h_el_tol = 1e-8;
 
 ///@brief Growth factor for determinant space
-inline static constexpr size_t grow_factor = 2;
+inline static constexpr double grow_factor = 2.0;
 
 ///@brief Turn off refinement
 inline static constexpr size_t refine_off = 0;
@@ -155,13 +155,18 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
 
   // Set minimal ASCI settings for fast execution
   auto& settings = calculator->settings();
-  // Use larger number to avoid growth issues
+  // Allow enough determinants for convergence in this small active space
   settings.set("ntdets_max", macis_params::ntdets_max_large);
   settings.set("ntdets_min", macis_params::ntdets_min);
-  // Disable refinement for speed
-  settings.set("max_refine_iter", macis_params::refine_off);
-  // Smaller growth factor
+  // Enable refinement so ASCI converges
+  settings.set("max_refine_iter", macis_params::refine_on);
+  // Growth factor
   settings.set("grow_factor", macis_params::grow_factor);
+  // Use triplet constraints (less restrictive for this small active space)
+  settings.set("constraint_level", 0);
+  // Loosen pruning to discover the full CI space for this small system
+  settings.set("search_matel_tol", 1e-14);
+  settings.set("rv_prune_tol", 1e-14);
   // Use fixed core selection strategy for deterministic growth
   settings.set("core_selection_strategy", "fixed");
 
@@ -178,9 +183,61 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   EXPECT_LE(wavefunction.size(),
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
-  // Energy should be reasonable (above HF but below exact)
-  EXPECT_NEAR(energy, -75.945264376786554,
-              macis_params::energy_tol);  // Should be negative for bound system
+  // Energy should be close to FCI for this small active space.
+  // ASCI with refinement converges to within ~1e-4 Eh of FCI;
+  // tighter agreement requires the full C(6,3)^2 = 400 determinant space.
+  EXPECT_NEAR(energy, -75.945290197648532, macis_params::energy_tol);
+}
+
+TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
+  auto previous_level = Logger::get_global_level();
+
+  struct LoggerLevelGuard {
+    LogLevel previous_level;
+
+    ~LoggerLevelGuard() { Logger::set_global_level(previous_level); }
+  } logger_level_guard{previous_level};
+
+  Logger::set_global_level(LogLevel::trace);
+
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto& settings = calculator->settings();
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
+  settings.set("grow_factor", macis_params::grow_factor);
+  settings.set("max_refine_iter", static_cast<size_t>(1));
+  settings.set("core_selection_strategy", "fixed");
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // One refinement iteration is enough to instantiate the standalone refine
+  // logger, but convergence is not guaranteed for this numerical setup.
+  try {
+    auto [energy, wavefunction_ptr] = calculator->run(hamiltonian, 3, 3);
+
+    EXPECT_TRUE(std::isfinite(energy));
+    ASSERT_NE(wavefunction_ptr, nullptr);
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("did not converge"),
+              std::string::npos);
+  }
+
+  auto grow_logger = spdlog::get("asci_grow");
+  ASSERT_NE(grow_logger, nullptr);
+  EXPECT_EQ(grow_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(grow_logger->flush_level(), spdlog::level::trace);
+
+  auto search_logger = spdlog::get("asci_search");
+  ASSERT_NE(search_logger, nullptr);
+  EXPECT_EQ(search_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(search_logger->flush_level(), spdlog::level::trace);
+
+  auto refine_logger = spdlog::get("asci_refine");
+  ASSERT_NE(refine_logger, nullptr);
+  EXPECT_EQ(refine_logger->level(), spdlog::level::trace);
+  EXPECT_EQ(refine_logger->flush_level(), spdlog::level::trace);
 }
 
 TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
@@ -457,8 +514,12 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
 
   // Get the coefficients and other data from SCF result
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Create unrestricted orbitals with different active electron counts (3
   // alpha, 1 beta)
@@ -501,8 +562,12 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
 
   // Get the coefficients and other data from SCF result
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Set different active spaces for alpha and beta to exercise merge logic
   std::vector<size_t> alpha_indices = {1, 2, 3};
@@ -1291,8 +1356,12 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
   const auto& calc_name = GetParam();
 
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Perturb beta coefficients and energies to ensure truly unrestricted
   auto beta_coeffs_mod = beta_coeffs;

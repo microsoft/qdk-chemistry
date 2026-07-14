@@ -13,6 +13,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import ClassVar
 
 from qdk_chemistry.plugins.qiskit import (
@@ -48,7 +49,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
                   requires_openfermion, is_slow)
 
     """
-    content = example_file.read_text()
+    content = example_file.read_text(encoding="utf-8")
 
     requires_pyscf = False
     requires_qiskit = False
@@ -125,8 +126,8 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    # Energy estimator examples run circuit simulations and are slow
-    if 'create("energy_estimator"' in content or "create('energy_estimator'" in content:
+    # Expectation estimator examples run circuit simulations and are slow
+    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
     return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
@@ -150,18 +151,21 @@ class TestExampleScripts(unittest.TestCase):
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
-        result = subprocess.run(
-            [sys.executable, str(example_file)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=360,
-            cwd=example_file.parent,
-        )
+        with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            result = subprocess.run(
+                [sys.executable, str(example_file)],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=360,
+                cwd=tmpdir,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
 
-        assert result.returncode == 0, (
-            f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
+            assert result.returncode == 0, (
+                f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
 
 
 # Dynamically create test methods for each example file

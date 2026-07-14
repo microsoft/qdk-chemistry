@@ -24,7 +24,7 @@ from qdk_chemistry.utils.zassenhaus_generation import zassenhaus_commutator_plan
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import QubitOperator
     from qdk_chemistry.utils.zassenhaus_generation import PlanExpr, PlanTerm
 
 __all__: list[str] = [
@@ -36,7 +36,7 @@ __all__: list[str] = [
 
 
 def zassenhaus_steps_naive(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     time: float,
     target_accuracy: float,
     *,
@@ -115,7 +115,7 @@ def zassenhaus_steps_naive(
 
 
 def zassenhaus_steps_commutator(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     time: float,
     target_accuracy: float,
     *,
@@ -204,19 +204,19 @@ def _combine_hamiltonian_terms(
     *,
     num_qubits: int,
     weight_threshold: float,
-) -> QubitHamiltonian:
-    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+) -> QubitOperator:
+    from qdk_chemistry.data import QubitOperator  # noqa: PLC0415
 
     filtered = [(label, coeff) for label, coeff in terms.items() if abs(coeff) > weight_threshold]
     if not filtered:
-        return QubitHamiltonian(["I" * num_qubits], np.array([0.0], dtype=complex))
+        return QubitOperator(["I" * num_qubits], np.array([0.0], dtype=complex))
 
     labels, coefficients = zip(*filtered, strict=True)
-    return QubitHamiltonian(list(labels), np.asarray(coefficients, dtype=complex))
+    return QubitOperator(list(labels), np.asarray(coefficients, dtype=complex))
 
 
 def zassenhaus_omitted_commutator_norm(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     *,
     order: int,
     weight_threshold: float,
@@ -240,15 +240,14 @@ def zassenhaus_omitted_commutator_norm(
     if not exponent:
         return 0.0
 
-    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+    from qdk_chemistry.data import QubitOperator  # noqa: PLC0415
 
-    leaf_hamiltonians: dict[int, QubitHamiltonian] = {
-        idx: QubitHamiltonian([label], np.asarray([coeff], dtype=complex))
-        for idx, (label, coeff) in enumerate(real_terms)
+    leaf_hamiltonians: dict[int, QubitOperator] = {
+        idx: QubitOperator([label], np.asarray([coeff], dtype=complex)) for idx, (label, coeff) in enumerate(real_terms)
     }
-    cache: dict[PlanTerm, QubitHamiltonian] = {}
+    cache: dict[PlanTerm, QubitOperator] = {}
 
-    def evaluate(ref: PlanTerm) -> QubitHamiltonian:
+    def evaluate(ref: PlanTerm) -> QubitOperator:
         if isinstance(ref, int):
             return leaf_hamiltonians[ref]
 

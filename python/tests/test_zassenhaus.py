@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 from collections.abc import Hashable
 from fractions import Fraction
 
@@ -23,7 +24,7 @@ from qdk_chemistry.data import (
     FlatPartition,
     MajoranaMapping,
     PauliProductFormulaContainer,
-    QubitHamiltonian,
+    QubitOperator,
     Structure,
     UnitaryRepresentation,
 )
@@ -41,12 +42,15 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
 
 class TestZassenhausGeneration:
     """Tests for symbolic Zassenhaus generation utilities."""
 
     @staticmethod
     def _expand_plan_term(ref: PlanTerm, plan: CommutatorPlan) -> Hashable | tuple:
+        """Recursively expand a plan term into its nested commutator tuple representation."""
         if ref not in plan:
             return ref
         left, right = plan[ref]
@@ -57,10 +61,12 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _expand_plan_expr(expr: PlanExpr, plan: CommutatorPlan) -> dict:
+        """Expand all terms in a plan expression to their nested commutator tuple representations."""
         return {TestZassenhausGeneration._expand_plan_term(ref, plan): coeff for ref, coeff in expr.items()}
 
     @staticmethod
     def _assert_plan_is_dependency_ordered(plan: CommutatorPlan, leaves: tuple[Hashable, ...]) -> None:
+        """Assert that every node in the plan only depends on previously computed nodes."""
         available: set[PlanTerm] = set(leaves)
         for node, (left, right) in plan.items():
             assert left in available
@@ -69,10 +75,12 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _commutator(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        """Return the matrix commutator [left, right] = left @ right - right @ left."""
         return left @ right - right @ left
 
     @staticmethod
     def _evaluate_matrix_plan_term(ref: PlanTerm, plan: CommutatorPlan, leaves: tuple[np.ndarray, ...]) -> np.ndarray:
+        """Recursively evaluate a plan term as nested matrix commutators over the given leaf matrices."""
         if ref not in plan:
             return leaves[ref]
         left, right = plan[ref]
@@ -83,6 +91,7 @@ class TestZassenhausGeneration:
 
     @staticmethod
     def _zassenhaus_matrix_product(leaves: tuple[np.ndarray, ...], *, order: int, time: float) -> np.ndarray:
+        """Compute the Zassenhaus product formula matrix for the given leaf generators up to the specified order."""
         planned_exponents, plan = zassenhaus_commutator_plan(tuple(range(len(leaves))), max_order=order)
         product = np.eye(leaves[0].shape[0], dtype=complex)
         for leaf in leaves:
@@ -147,7 +156,8 @@ class TestZassenhausStepEstimation:
     """Consolidated tests for Zassenhaus steps estimation under naive and commutator bounds."""
 
     @staticmethod
-    def _first_order_product_formula_error(hamiltonian: QubitHamiltonian, *, time: float, steps: int) -> float:
+    def _first_order_product_formula_error(hamiltonian: QubitOperator, *, time: float, steps: int) -> float:
+        """Return the operator-norm error of the first-order Lie-Trotter product formula."""
         step_unitary = np.eye(2**hamiltonian.num_qubits, dtype=complex)
         for label, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
             p_matrix = pauli_to_dense_matrix([label], np.asarray([complex(coeff).real], dtype=complex))
@@ -158,14 +168,14 @@ class TestZassenhausStepEstimation:
 
     def test_zassenhaus_steps_bounds(self):
         """Verify naive and commutator-aware bounds at different orders and inputs."""
-        h = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        h = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         assert zassenhaus_steps_naive(h, 1.0, 0.1, order=1) == 40
         assert zassenhaus_steps_naive(h, 1.0, 0.1, order=2) == 13
 
         custom_exponents = {2: {"custom": Fraction(3, 2)}}
         assert zassenhaus_steps_naive(h, 1.0, 0.1, order=1, commutator_exponents=custom_exponents) == 120
 
-        h_single = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
+        h_single = QubitOperator(pauli_strings=["X"], coefficients=[1.0])
         assert zassenhaus_steps_naive(h_single, 1.0, 0.1, order=1) == 1
 
         # Invalid input checking
@@ -173,18 +183,16 @@ class TestZassenhausStepEstimation:
             zassenhaus_steps_naive(h, 1.0, 0.1, order=2, commutator_exponents={2: {}})
 
         # Commutator-aware bounds
-        h_anticommuting = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        h_anticommuting = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         assert zassenhaus_steps_commutator(h_anticommuting, 1.0, 0.1, order=1) == 10
 
         # Commuting terms are exact
-        h_commuting = QubitHamiltonian(pauli_strings=["ZI", "IZ", "ZZ"], coefficients=[0.5, -0.25, 0.125])
+        h_commuting = QubitOperator(pauli_strings=["ZI", "IZ", "ZZ"], coefficients=[0.5, -0.25, 0.125])
         assert zassenhaus_steps_commutator(h_commuting, 4.0, 1e-6, order=1) == 1
         assert zassenhaus_steps_commutator(h_commuting, 4.0, 1e-6, order=2) == 1
 
         # Commutator-aware is tighter than naive
-        h_dense = QubitHamiltonian(
-            pauli_strings=["XI", "ZI", "IX", "IZ", "ZZ"], coefficients=[0.7, -0.2, 0.5, 0.3, -0.4]
-        )
+        h_dense = QubitOperator(pauli_strings=["XI", "ZI", "IX", "IZ", "ZZ"], coefficients=[0.7, -0.2, 0.5, 0.3, -0.4])
         assert zassenhaus_steps_commutator(h_dense, 1.0, 0.01, order=2) < zassenhaus_steps_naive(
             h_dense, 1.0, 0.01, order=2
         )
@@ -199,32 +207,40 @@ class TestZassenhausTimeEvolution:
 
     @staticmethod
     def _pauli_label_from_map(pauli_term: dict[int, str], num_qubits: int) -> str:
+        """Convert a qubit-index-to-Pauli dict to a full Pauli string in big-endian order."""
         return "".join(pauli_term.get(i, "I") for i in reversed(range(num_qubits)))
 
     @staticmethod
     def _pauli_label_from_qubit_ops(num_qubits: int, qubit_ops: dict[int, str]) -> str:
+        """Build a Pauli string of length num_qubits from a mapping of qubit index to Pauli operator."""
         chars = ["I"] * num_qubits
         for qubit, pauli in qubit_ops.items():
             chars[num_qubits - qubit - 1] = pauli
         return "".join(chars)
 
     @staticmethod
-    def _zassenhaus_unitary_matrix(hamiltonian: QubitHamiltonian, *, order: int, time: float) -> np.ndarray:
+    def _zassenhaus_unitary_matrix(hamiltonian: QubitOperator, *, order: int, time: float) -> np.ndarray:
+        """Build the Zassenhaus approximate unitary matrix for the given Hamiltonian, order, and time."""
         builder = Zassenhaus(num_divisions=1, order=order, time=time)
         container = builder.run(hamiltonian).get_container()
 
-        step_unitary = np.eye(2**hamiltonian.num_qubits, dtype=complex)
+        identity = np.eye(2**hamiltonian.num_qubits, dtype=complex)
+        step_unitary = identity
         for term in container.step_terms:
             pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
                 term.pauli_term, num_qubits=hamiltonian.num_qubits
             )
             pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
-            step_unitary = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ step_unitary
+            cos_val = np.cos(term.angle)
+            sin_val = np.sin(term.angle)
+            rotation_matrix = cos_val * identity - 1j * sin_val * pauli_matrix
+            step_unitary = rotation_matrix @ step_unitary
 
         return np.linalg.matrix_power(step_unitary, container.step_reps)
 
     @staticmethod
-    def _fit_zassenhaus_error_slope(hamiltonian: QubitHamiltonian, *, order: int) -> float:
+    def _fit_zassenhaus_error_slope(hamiltonian: QubitOperator, *, order: int) -> float:
+        """Fit the log-log slope of the Zassenhaus operator-norm error as a function of time."""
         times = np.logspace(-3, -1, 5)
         ham_mat = hamiltonian.to_matrix()
         errors = np.array(
@@ -242,16 +258,20 @@ class TestZassenhausTimeEvolution:
         return float(np.polyfit(np.log(times[resolved]), np.log(errors[resolved]), deg=1)[0])
 
     @staticmethod
-    def _open_heisenberg_chain_4_site() -> QubitHamiltonian:
+    def _open_heisenberg_chain_4_site() -> QubitOperator:
+        """Return the open-boundary Heisenberg XXX chain Hamiltonian on 4 sites."""
         labels = [
             TestZassenhausTimeEvolution._pauli_label_from_qubit_ops(4, {site: pauli, site + 1: pauli})
             for site in range(3)
             for pauli in ("X", "Y", "Z")
         ]
-        return QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
+        h = QubitOperator(pauli_strings=labels, coefficients=[1.0] * len(labels))
+        grouper = create("term_grouper", "commuting")
+        return grouper.run(h)
 
     @staticmethod
-    def _h2_sto3g_jordan_wigner_hamiltonian() -> QubitHamiltonian:
+    def _h2_sto3g_jordan_wigner_hamiltonian() -> QubitOperator:
+        """Return the H2/STO-3G active-space Hamiltonian mapped via Jordan-Wigner."""
         structure = Structure(
             np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float),
             ["H", "H"],
@@ -273,10 +293,12 @@ class TestZassenhausTimeEvolution:
         constructor = create("hamiltonian_constructor")
         active_hamiltonian = constructor.run(active_orbitals)
         n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
-        return create("qubit_mapper", "qdk").run(
+        h = create("qubit_mapper", "qdk").run(
             active_hamiltonian,
             MajoranaMapping.jordan_wigner(n_spin_orbitals),
         )
+        grouper = create("term_grouper", "commuting")
+        return grouper.run(h)
 
     def test_zassenhaus_builder_and_decomposition(self):
         """Test metadata, registry creation, settings, decomposition, filtering, and evolution examples."""
@@ -293,7 +315,7 @@ class TestZassenhausTimeEvolution:
         assert builder_registry.settings().get("time") == 0.2
         assert builder_registry.settings().get("weight_threshold") == 1e-10
 
-        hamiltonian = QubitHamiltonian(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
+        hamiltonian = QubitOperator(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
         rep = create("hamiltonian_unitary_builder", "zassenhaus", order=2, num_divisions=4, time=0.2).run(hamiltonian)
         assert isinstance(rep, UnitaryRepresentation)
         container = rep.get_container()
@@ -303,7 +325,7 @@ class TestZassenhausTimeEvolution:
         assert len(container.step_terms) > 0
 
         # Basic decomposition at order=1 (no corrections)
-        ham_single = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        ham_single = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         terms = builder._decompose_zassenhaus_step(ham_single, time=2.0, order=1)
         assert len(terms) == 2
         assert terms[0].pauli_term == {0: "X"}
@@ -312,18 +334,18 @@ class TestZassenhausTimeEvolution:
         assert np.isclose(terms[1].angle, 1.0)
 
         # Filtering small coefficients
-        ham_filter = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1e-15, 1.0])
+        ham_filter = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1e-15, 1.0])
         terms_filtered = builder._decompose_zassenhaus_step(ham_filter, time=1.0, atol=1e-12)
         assert len(terms_filtered) == 1
         assert terms_filtered[0].pauli_term == {0: "Z"}
 
         # Non-Hermitian rejection
-        ham_non_hermitian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0 + 1.0j])
+        ham_non_hermitian = QubitOperator(pauli_strings=["X"], coefficients=[1.0 + 1.0j])
         with pytest.raises(ValueError, match="Non-Hermitian"):
             builder._decompose_zassenhaus_step(ham_non_hermitian, time=1.0)
 
         # Multi-step angles and reps
-        ham_two = QubitHamiltonian(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
+        ham_two = QubitOperator(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
         builder_steps = Zassenhaus(num_divisions=4, order=2, time=0.2)
         container_steps = builder_steps.run(ham_two).get_container()
         assert container_steps.step_reps == 4
@@ -341,7 +363,7 @@ class TestZassenhausTimeEvolution:
         assert np.isclose(abs(sorted_terms[2].angle), 0.1, atol=1e-12)
 
         # Order 1 & 2 X-Z simulation comparison against scipy expm
-        ham_sim = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.5, 0.5])
+        ham_sim = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.5, 0.5])
         t_sim = 0.1
 
         # Order 1 comparison
@@ -371,7 +393,7 @@ class TestZassenhausTimeEvolution:
             Zassenhaus(order=-1).run(ham_two)
 
         # Commuting groups partitioning
-        ham_partitioned = QubitHamiltonian(
+        ham_partitioned = QubitOperator(
             pauli_strings=["XI", "IX", "ZZ", "YY"],
             coefficients=[0.7, -0.2, 0.3, 0.11],
             term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
@@ -381,7 +403,7 @@ class TestZassenhausTimeEvolution:
 
     def test_zassenhaus_custom_term_grouper(self):
         """Verify that a custom term grouper is correctly applied to correction terms."""
-        h = QubitHamiltonian(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
+        h = QubitOperator(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
         # Default term grouper should work
         builder_default = Zassenhaus(order=2, time=0.2)
         container_default = builder_default.run(h).get_container()
@@ -426,7 +448,7 @@ class TestZassenhausTimeEvolution:
         assert len(optimized_cancel) == 1
         assert optimized_cancel[0].pauli_term == {1: "Z"}
 
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "IX", "ZZ", "YY"],
             coefficients=[0.7, -0.2, 0.3, 0.11],
             term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
@@ -437,6 +459,7 @@ class TestZassenhausTimeEvolution:
         assert len(container_opt.step_terms) < len(raw_terms)
 
         def terms_to_unitary(step_terms):
+            """Convert a sequence of ExponentiatedPauliTerms to a unitary matrix."""
             u = np.eye(2**hamiltonian.num_qubits, dtype=complex)
             for t in step_terms:
                 pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
@@ -451,26 +474,26 @@ class TestZassenhausTimeEvolution:
 
         assert np.allclose(u_opt, u_raw, atol=1e-12)
 
-    @pytest.mark.slow
     def test_zassenhaus_operator_norm_error_scaling(self):
         """Check empirical operator-norm error scaling slopes match order + 1 to within 0.1."""
         cases = [
-            (self._open_heisenberg_chain_4_site, 2),
-            (self._open_heisenberg_chain_4_site, 3),
-            (self._open_heisenberg_chain_4_site, 4),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 2),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 3),
-            (self._h2_sto3g_jordan_wigner_hamiltonian, 4),
+            (self._open_heisenberg_chain_4_site(), (2, 3, 4)),
+            (self._h2_sto3g_jordan_wigner_hamiltonian(), (2, 3, 4)),
         ]
-        for factory, order in cases:
-            slope = self._fit_zassenhaus_error_slope(factory(), order=order)
-            assert np.isclose(slope, order + 1, atol=0.1)
+        for hamiltonian, orders in cases:
+            for order in orders:
+                slope = self._fit_zassenhaus_error_slope(hamiltonian, order=order)
+                assert np.isclose(slope, order + 1, atol=0.1)
 
 
 class TestZassenhausPhaseEstimation:
     """End-to-end H2/STO-3G IQPE tests using Zassenhaus evolution."""
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_zassenhaus_h2_ground_state(self) -> None:
         """Estimate the H2/STO-3G ground-state energy with QDK IQPE and Zassenhaus evolution."""
         Logger.set_global_level("error")

@@ -14,7 +14,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   include( FetchContent )
   FetchContent_Declare( linalg-cmake-modules
     GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
-    GIT_TAG        main
+    GIT_TAG        222364df5e7639f371bf2f37ceb0f476301101a1
   )
   FetchContent_GetProperties( linalg-cmake-modules )
   if( NOT linalg-cmake-modules_POPULATED )
@@ -77,6 +77,7 @@ if( SPARSEXX_ENABLE_RANGES_V3 )
   FetchContent_Declare(
     range_v3_download
     GIT_REPOSITORY https://github.com/ericniebler/range-v3.git
+    GIT_TAG        108f93c279c8f9cec175dac361084983d0176e99
   )
   FetchContent_GetProperties(range_v3_download)
   if(NOT range_v3_download_POPULATED)
@@ -94,7 +95,7 @@ target_compile_features( sparsexx PUBLIC cxx_std_20 )
 if( TARGET MPI::MPI_CXX )
   target_link_libraries( sparsexx PUBLIC MPI::MPI_CXX  )
 endif()
-if( TARGET OpenMP::OpenMP_CXX )
+if( SPARSEXX_ENABLE_OPENMP AND TARGET OpenMP::OpenMP_CXX )
   target_link_libraries( sparsexx PUBLIC OpenMP::OpenMP_CXX )
 endif()
 target_link_libraries     ( sparsexx PUBLIC ${SPARSEXX_EXTERNAL_LIBRARIES} )

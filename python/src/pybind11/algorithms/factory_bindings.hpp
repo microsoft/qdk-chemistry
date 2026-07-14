@@ -9,11 +9,56 @@
 #include <pybind11/stl.h>
 
 #include <memory>
+#include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <string>
 
 namespace py = pybind11;
 
 namespace qdk::chemistry::python {
+
+template <typename AlgorithmType>
+void warn_if_deprecated_algorithm(const AlgorithmType& algorithm,
+                                  Py_ssize_t stack_level = 2) {
+  if (const auto message =
+          qdk::chemistry::algorithms::detail::DeprecationAccess::message(
+              algorithm)) {
+    if (PyErr_WarnEx(PyExc_DeprecationWarning, message->c_str(), stack_level) <
+        0) {
+      throw py::error_already_set();
+    }
+  }
+}
+
+/**
+ * @brief Add _create_nested() to any pybind11 algorithm class binding.
+ *
+ * This delegates to the Python-side ``create_from_ref`` helper so that
+ * both pure-Python and C++-backed algorithm classes share the same
+ * implementation.
+ *
+ * Call this after creating the py::class_ for every algorithm type.
+ */
+template <typename PyClassType>
+void bind_create_nested(PyClassType& cls) {
+  cls.def(
+      "_create_nested",
+      [](py::object self, const std::string& key) -> py::object {
+        py::module_ base = py::module_::import("qdk_chemistry.algorithms.base");
+        py::object create_from_ref = base.attr("create_from_ref");
+        py::object settings = self.attr("settings")();
+        return create_from_ref(settings, key);
+      },
+      py::arg("setting_key"),
+      R"(
+Instantiate a nested algorithm from an AlgorithmRef stored in settings.
+
+Args:
+    setting_key (str): Settings key that holds an AlgorithmRef value.
+
+Returns:
+    Algorithm: A fully configured algorithm instance.
+)");
+}
 
 /**
  * @brief Add _create_nested() to any pybind11 algorithm class binding.
@@ -94,8 +139,17 @@ See Also:
 )");
 
   // Bind create static method
-  factory.def_static("create", &FactoryType::create, py::arg("name") = "",
-                     R"(
+  factory.def_static(
+      "create",
+      [](const std::string& name) -> std::unique_ptr<AlgorithmType> {
+        auto instance = FactoryType::create(name);
+        if (!instance) {
+          throw std::runtime_error("Factory returned nullptr");
+        }
+        warn_if_deprecated_algorithm(*instance);
+        return instance;
+      },
+      py::arg("name") = "", R"(
 Create an algorithm instance by name.
 
 If no name is provided or the name is empty, returns the default implementation.

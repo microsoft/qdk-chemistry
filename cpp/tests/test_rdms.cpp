@@ -13,6 +13,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
@@ -775,8 +776,9 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   EXPECT_TRUE(wavefunction->has_two_rdm_spin_traced());
 
   // get rdm and other wavefunction properties
-  int norb =
-      wavefunction->get_orbitals()->get_active_space_indices().first.size();
+  int norb = spin_channel_indices(
+                 wavefunction->get_orbitals()->active_indices(), axes::alpha())
+                 .size();
   auto [alpha_elec, beta_elec] = wavefunction->get_active_num_electrons();
   auto rdm1 = wavefunction->get_active_one_rdm_spin_traced();
   auto [aa, bb] = wavefunction->get_active_one_rdm_spin_dependent();

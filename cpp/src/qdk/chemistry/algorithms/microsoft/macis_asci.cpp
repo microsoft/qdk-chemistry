@@ -7,10 +7,13 @@
 #include <macis/asci/determinant_search.hpp>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
+#include <macis/hamiltonian_generator/dynamic_bit_masking.hpp>
+#include <macis/hamiltonian_generator/residue_arrays.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/mcscf/cas.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -23,6 +26,10 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @brief Helper struct for CASCI calculation dispatch
  */
 struct asci_helper {
+  /// Maximum total electron count for which the residue arrays algorithm is
+  /// feasible.  Beyond this limit the O(n_e^2) per-determinant memory cost
+  /// becomes prohibitive and the code falls back to sorted_double_loop.
+  static constexpr size_t residual_array_electron_num_limit = 60;
   using return_type = std::pair<double, data::Wavefunction>;
 
   /**
@@ -41,11 +48,16 @@ struct asci_helper {
     QDK_LOG_TRACE_ENTERING();
 
     using wfn_type = macis::wfn_t<N>;
-    using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
+    using sdl_gen_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
+    using ra_gen_t = macis::ResidueArrayHamiltonianGenerator<wfn_type>;
+    using dbm_gen_t = macis::DynamicBitMaskHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    const auto& [active_indices, active_indices_beta] =
-        orbitals->get_active_space_indices();
+    const auto active_ai = orbitals->active_indices();
+    const auto active_indices =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto active_indices_beta =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     // check that alpha and beta active space indices are the same
     if (active_indices != active_indices_beta) {
       throw std::runtime_error(
@@ -70,19 +82,45 @@ struct asci_helper {
         asci_settings.ntdets_min, asci_settings.max_refine_iter,
         asci_settings.grow_factor, asci_settings.rv_prune_tol);
 
+    macis::matrix_span<double> T_span(const_cast<double*>(T_a.data()),
+                                      num_molecular_orbitals,
+                                      num_molecular_orbitals);
+    macis::rank4_span<double> V_span(
+        const_cast<double*>(V_aaaa.data()), num_molecular_orbitals,
+        num_molecular_orbitals, num_molecular_orbitals, num_molecular_orbitals);
+
+    // Select Hamiltonian generator based on hamiltonian_build_algorithm
+    QDK_LOGGER().debug("Constructing MACIS Hamiltonian generator.");
+    std::unique_ptr<macis::HamiltonianGenerator<wfn_type>> ham_gen_ptr;
+    const auto& algo = asci_settings.hamiltonian_build_algorithm;
+    if (algo == "residue_arrays") {
+      // Guard: residue arrays require O(n_e^2) residues per det and become
+      // infeasible for large active spaces.  Fall back to SDL with a warning.
+      const size_t total_elec = nalpha + nbeta;
+      if (total_elec > residual_array_electron_num_limit) {
+        QDK_LOGGER().warn(
+            "residue_arrays infeasible with {} electrons (O(n_e^2) memory). "
+            "Falling back to sorted_double_loop.",
+            total_elec);
+        ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
+      } else {
+        ham_gen_ptr = std::make_unique<ra_gen_t>(T_span, V_span);
+      }
+    } else if (algo == "dynamic_bit_masking") {
+      auto p = std::make_unique<dbm_gen_t>(T_span, V_span);
+      const auto num_masks =
+          settings_.get<size_t>("dynamic_bit_masking_num_masks");
+      if (num_masks > 0) p->set_num_masks(num_masks);
+      ham_gen_ptr = std::move(p);
+    } else {
+      ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
+    }
+    auto& ham_gen = *ham_gen_ptr;
+    QDK_LOGGER().debug("MACIS Hamiltonian generator constructed.");
+
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
-
-    QDK_LOGGER().debug("Constructing MACIS Hamiltonian generator.");
-    generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T_a.data()),
-                            num_molecular_orbitals, num_molecular_orbitals),
-                        macis::rank4_span<double>(
-                            const_cast<double*>(V_aaaa.data()),
-                            num_molecular_orbitals, num_molecular_orbitals,
-                            num_molecular_orbitals, num_molecular_orbitals));
-    QDK_LOGGER().debug("MACIS Hamiltonian generator constructed.");
 
     size_t fci_dimension =
         qdk::chemistry::utils::microsoft::binomial_coefficient(
@@ -93,15 +131,29 @@ struct asci_helper {
     QDK_LOGGER().debug("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
 
     if (asci_settings.ntdets_max > fci_dimension) {
-      QDK_LOGGER().info(
+      QDK_LOGGER().debug(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
-      E_casci = macis::CASRDMFunctor<generator_t>::rdms(
-          mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-          nbeta, const_cast<double*>(T_a.data()),
-          const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      // Dispatch FCI with the same generator type as the ASCI path
+      if (algo == "residue_arrays" &&
+          (nalpha + nbeta) <= residual_array_electron_num_limit) {
+        E_casci = macis::CASRDMFunctor<ra_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      } else if (algo == "dynamic_bit_masking") {
+        E_casci = macis::CASRDMFunctor<dbm_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      } else {
+        E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      }
       // Generate determinant basis for RDM calculation
-      dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
+      dets = macis::generate_hilbert_space<typename sdl_gen_t::full_det_t>(
           num_molecular_orbitals, nalpha, nbeta);
     } else {
       // HF Guess
@@ -160,8 +212,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisAsci::_run_impl(
         "MacisAsci does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
-  const auto& [active_indices, active_indices_beta] =
-      orbitals->get_active_space_indices();
+  const auto active_ai = orbitals->active_indices();
+  const auto active_indices =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  const auto active_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
   // check that alpha and beta active space indices are the same
   if (active_indices != active_indices_beta) {
     throw std::runtime_error(

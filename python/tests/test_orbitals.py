@@ -9,12 +9,21 @@ import contextlib
 import pickle
 import re
 import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.data import ModelOrbitals, Orbitals
-from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import (
+    SymmetryBlockedTensorRank1,
+    SymmetryBlockedTensorRank2,
+    SymmetryLabel,
+    SymmetryProduct,
+    axes,
+    spin_index_set,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -31,8 +40,12 @@ def test_orbitals_construction():
     orb2 = Orbitals(orb)
 
     # Get coefficients and check they match
-    alpha, beta = orb.get_coefficients()
-    alpha2, beta2 = orb2.get_coefficients()
+    coefficients = orb.coefficients()
+    alpha = spin_channel_matrix(coefficients, axes.alpha())
+    beta = spin_channel_matrix(coefficients, axes.beta())
+    coefficients = orb2.coefficients()
+    alpha2 = spin_channel_matrix(coefficients, axes.alpha())
+    beta2 = spin_channel_matrix(coefficients, axes.beta())
 
     assert np.allclose(
         alpha, alpha2, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -46,7 +59,9 @@ def test_coefficient_management():
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     basis_set = create_test_basis_set(3, "test-coeff-restricted")
     orb = Orbitals(coeffs, None, None, basis_set)
-    alpha, beta = orb.get_coefficients()
+    coefficients = orb.coefficients()
+    alpha = spin_channel_matrix(coefficients, axes.alpha())
+    beta = spin_channel_matrix(coefficients, axes.beta())
 
     assert np.allclose(
         coeffs, alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -60,7 +75,9 @@ def test_coefficient_management():
     basis_set_unres = create_test_basis_set(3, "test-coeff-unrestricted")
     orb_unres = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set_unres)
 
-    alpha, beta = orb_unres.get_coefficients()
+    coefficients = orb_unres.coefficients()
+    alpha = spin_channel_matrix(coefficients, axes.alpha())
+    beta = spin_channel_matrix(coefficients, axes.beta())
     assert np.allclose(
         coeffs_alpha, alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -78,7 +95,9 @@ def test_energy_management():
     basis_set = create_test_basis_set(3, "test-energy-restricted")
     orb = Orbitals(coeffs, energies, None, basis_set)
 
-    alpha, beta = orb.get_energies()
+    orbital_energies = orb.energies()
+    alpha = spin_channel_vector(orbital_energies, axes.alpha())
+    beta = spin_channel_vector(orbital_energies, axes.beta())
     assert np.allclose(
         energies, alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -94,7 +113,9 @@ def test_energy_management():
     basis_set_unres = create_test_basis_set(3, "test-energy-unrestricted")
 
     orb_unres = Orbitals(coeffs_alpha, coeffs_beta, alpha_energies, beta_energies, None, basis_set_unres)
-    alpha, beta = orb_unres.get_energies()
+    energies = orb_unres.energies()
+    alpha = spin_channel_vector(energies, axes.alpha())
+    beta = spin_channel_vector(energies, axes.beta())
 
     assert np.allclose(
         alpha_energies, alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -193,8 +214,12 @@ def test_json_serialization():
     json_data = orb_out.to_json()
     orb_in = Orbitals.from_json(json_data)
 
-    coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
-    coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
+    coefficients = orb_out.coefficients()
+    coeffs_out_a = spin_channel_matrix(coefficients, axes.alpha())
+    coeffs_out_b = spin_channel_matrix(coefficients, axes.beta())
+    coefficients = orb_in.coefficients()
+    coeffs_in_a = spin_channel_matrix(coefficients, axes.alpha())
+    coeffs_in_b = spin_channel_matrix(coefficients, axes.beta())
     assert np.allclose(
         coeffs_out_a, coeffs_in_a, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -203,13 +228,17 @@ def test_json_serialization():
     )
 
     # Test file-based serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp:
         filename = tmp.name
+
+    try:
         orb_out.to_json_file(filename)
 
         orb_file = Orbitals.from_json_file(filename)
 
-        coeffs_file_a, coeffs_file_b = orb_file.get_coefficients()
+        coefficients = orb_file.coefficients()
+        coeffs_file_a = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_file_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             coeffs_out_a,
             coeffs_file_a,
@@ -222,6 +251,8 @@ def test_json_serialization():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_hdf5_serialization():
@@ -232,29 +263,36 @@ def test_hdf5_serialization():
     basis_set = create_test_basis_set(3, "test-hdf5-serialization")
     orb_out = Orbitals(coeffs, energies, overlap, basis_set)
 
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp:
+        filename = tmp.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp:
-            filename = tmp.name
-            orb_out.to_hdf5_file(filename)
+        orb_out.to_hdf5_file(filename)
 
-            orb_in = Orbitals.from_hdf5_file(filename)
+        orb_in = Orbitals.from_hdf5_file(filename)
 
-            coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
-            coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
-            assert np.allclose(
-                coeffs_out_a,
-                coeffs_in_a,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                coeffs_out_b,
-                coeffs_in_b,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
+        coefficients = orb_out.coefficients()
+        coeffs_out_a = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_out_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb_in.coefficients()
+        coeffs_in_a = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_in_b = spin_channel_matrix(coefficients, axes.beta())
+        assert np.allclose(
+            coeffs_out_a,
+            coeffs_in_a,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            coeffs_out_b,
+            coeffs_in_b,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_complete_orbitals_workflow():
@@ -269,14 +307,20 @@ def test_complete_orbitals_workflow():
     assert orb.get_num_molecular_orbitals() == 2
     assert orb.is_restricted()
 
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
         orb2 = Orbitals.from_json_file(json_filename)
         assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
         assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        new_coeffs_a, new_coeffs_b = orb2.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb2.coefficients()
+        new_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        new_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             new_coeffs_a,
@@ -289,6 +333,8 @@ def test_complete_orbitals_workflow():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_generic():
@@ -300,9 +346,10 @@ def test_orbitals_file_io_generic():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test JSON file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using generic method
         orb.to_file(json_filename, "json")
 
@@ -314,8 +361,12 @@ def test_orbitals_file_io_generic():
         assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        new_coeffs_a, new_coeffs_b = orb2.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb2.coefficients()
+        new_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        new_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             new_coeffs_a,
@@ -328,11 +379,14 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using generic method
         orb.to_file(hdf5_filename, "hdf5")
 
@@ -344,8 +398,12 @@ def test_orbitals_file_io_generic():
         assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        new_coeffs_a, new_coeffs_b = orb3.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb3.coefficients()
+        new_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        new_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             new_coeffs_a,
@@ -358,6 +416,8 @@ def test_orbitals_file_io_generic():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test unsupported file type
     with pytest.raises(RuntimeError, match="Unsupported file type"):
@@ -376,9 +436,10 @@ def test_orbitals_hdf5_specific():
     orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test HDF5 file I/O methods
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using new method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -390,8 +451,12 @@ def test_orbitals_hdf5_specific():
         assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        new_coeffs_a, new_coeffs_b = orb2.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb2.coefficients()
+        new_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        new_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             new_coeffs_a,
@@ -406,8 +471,12 @@ def test_orbitals_hdf5_specific():
         )
 
         # Check energies
-        orig_energies_a, orig_energies_b = orb.get_energies()
-        new_energies_a, new_energies_b = orb2.get_energies()
+        energies = orb.energies()
+        orig_energies_a = spin_channel_vector(energies, axes.alpha())
+        orig_energies_b = spin_channel_vector(energies, axes.beta())
+        energies = orb2.energies()
+        new_energies_a = spin_channel_vector(energies, axes.alpha())
+        new_energies_b = spin_channel_vector(energies, axes.beta())
         assert np.allclose(
             orig_energies_a,
             new_energies_a,
@@ -428,11 +497,14 @@ def test_orbitals_hdf5_specific():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O methods work correctly
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using method
         orb.to_hdf5_file(hdf5_filename)
 
@@ -442,6 +514,8 @@ def test_orbitals_hdf5_specific():
         # Check equality
         assert orb3.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
         assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_orbitals_file_io_validation():
@@ -492,9 +566,10 @@ def test_orbitals_file_io_round_trip():
     )
 
     # Test JSON round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save and reload
         orb.to_json_file(json_filename)
         orb_json = Orbitals.from_json_file(json_filename)
@@ -504,8 +579,12 @@ def test_orbitals_file_io_round_trip():
         assert orb_json.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        json_coeffs_a, json_coeffs_b = orb_json.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb_json.coefficients()
+        json_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        json_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             json_coeffs_a,
@@ -520,8 +599,12 @@ def test_orbitals_file_io_round_trip():
         )
 
         # Check energies
-        orig_energies_a, orig_energies_b = orb.get_energies()
-        json_energies_a, json_energies_b = orb_json.get_energies()
+        energies = orb.energies()
+        orig_energies_a = spin_channel_vector(energies, axes.alpha())
+        orig_energies_b = spin_channel_vector(energies, axes.beta())
+        energies = orb_json.energies()
+        json_energies_a = spin_channel_vector(energies, axes.alpha())
+        json_energies_b = spin_channel_vector(energies, axes.beta())
         assert np.allclose(
             orig_energies_a,
             json_energies_a,
@@ -542,11 +625,14 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 round-trip
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save and reload
         orb.to_hdf5_file(hdf5_filename)
         orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
@@ -556,8 +642,12 @@ def test_orbitals_file_io_round_trip():
         assert orb_hdf5.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
-        orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
-        hdf5_coeffs_a, hdf5_coeffs_b = orb_hdf5.get_coefficients()
+        coefficients = orb.coefficients()
+        orig_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        orig_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
+        coefficients = orb_hdf5.coefficients()
+        hdf5_coeffs_a = spin_channel_matrix(coefficients, axes.alpha())
+        hdf5_coeffs_b = spin_channel_matrix(coefficients, axes.beta())
         assert np.allclose(
             orig_coeffs_a,
             hdf5_coeffs_a,
@@ -572,8 +662,12 @@ def test_orbitals_file_io_round_trip():
         )
 
         # Check energies
-        orig_energies_a, orig_energies_b = orb.get_energies()
-        hdf5_energies_a, hdf5_energies_b = orb_hdf5.get_energies()
+        energies = orb.energies()
+        orig_energies_a = spin_channel_vector(energies, axes.alpha())
+        orig_energies_b = spin_channel_vector(energies, axes.beta())
+        energies = orb_hdf5.energies()
+        hdf5_energies_a = spin_channel_vector(energies, axes.alpha())
+        hdf5_energies_b = spin_channel_vector(energies, axes.beta())
         assert np.allclose(
             orig_energies_a,
             hdf5_energies_a,
@@ -594,6 +688,8 @@ def test_orbitals_file_io_round_trip():
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_management():
@@ -613,7 +709,9 @@ def test_active_space_management():
     )
 
     assert orb.has_active_space()
-    alpha_indices, beta_indices = orb.get_active_space_indices()
+    orbital_active_indices = orb.active_indices()
+    alpha_indices = spin_channel_indices(orbital_active_indices, axes.alpha())
+    beta_indices = spin_channel_indices(orbital_active_indices, axes.beta())
     assert np.array_equal(alpha_indices, active_indices)
     assert np.array_equal(beta_indices, active_indices)
 
@@ -634,7 +732,9 @@ def test_inactive_space_management():
         coeffs, None, None, basis_set, spin_index_set(4, [], []), spin_index_set(4, inactive_indices, inactive_indices)
     )
 
-    alpha_indices, beta_indices = orb.get_inactive_space_indices()
+    orbital_inactive_indices = orb.inactive_indices()
+    alpha_indices = spin_channel_indices(orbital_inactive_indices, axes.alpha())
+    beta_indices = spin_channel_indices(orbital_inactive_indices, axes.beta())
     assert np.array_equal(alpha_indices, inactive_indices)
     assert np.array_equal(beta_indices, inactive_indices)
 
@@ -657,7 +757,9 @@ def test_active_space_unrestricted():
         spin_index_set(3, [], [], equivalent=False),
     )
 
-    retrieved_alpha, retrieved_beta = orb.get_active_space_indices()
+    active_index_set = orb.active_indices()
+    retrieved_alpha = spin_channel_indices(active_index_set, axes.alpha())
+    retrieved_beta = spin_channel_indices(active_index_set, axes.beta())
     assert np.array_equal(retrieved_alpha, alpha_active)
     assert np.array_equal(retrieved_beta, beta_active)
 
@@ -672,8 +774,10 @@ def test_active_space_serialization():
     )
 
     # Test JSON serialization
-    with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
+
+    try:
         orb.to_json_file(json_filename)
 
         # Load into a new object
@@ -683,29 +787,38 @@ def test_active_space_serialization():
         assert orb_json.has_active_space()
 
         # Verify active space indices
-        json_alpha, json_beta = orb_json.get_active_space_indices()
+        active_index_set = orb_json.active_indices()
+        json_alpha = spin_channel_indices(active_index_set, axes.alpha())
+        json_beta = spin_channel_indices(active_index_set, axes.beta())
         assert np.array_equal(json_alpha, active_indices)
         assert np.array_equal(json_beta, active_indices)
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 serialization
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
-            hdf5_filename = tmp_hdf5.name
-            orb.to_hdf5_file(hdf5_filename)
+        orb.to_hdf5_file(hdf5_filename)
 
-            # Load into a new object
-            orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
+        # Load into a new object
+        orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
 
-            # Check that active space was preserved
-            assert orb_hdf5.has_active_space()
+        # Check that active space was preserved
+        assert orb_hdf5.has_active_space()
 
-            # Verify active space indices
-            hdf5_alpha, hdf5_beta = orb_hdf5.get_active_space_indices()
-            assert np.array_equal(hdf5_alpha, active_indices)
-            assert np.array_equal(hdf5_beta, active_indices)
+        # Verify active space indices
+        active_index_set = orb_hdf5.active_indices()
+        hdf5_alpha = spin_channel_indices(active_index_set, axes.alpha())
+        hdf5_beta = spin_channel_indices(active_index_set, axes.beta())
+        assert np.array_equal(hdf5_alpha, active_indices)
+        assert np.array_equal(hdf5_beta, active_indices)
 
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_active_space_copy_assign():
@@ -718,8 +831,12 @@ def test_active_space_copy_assign():
     orb_copy = Orbitals(orb)
     assert orb_copy.has_active_space()
 
-    copy_alpha, copy_beta = orb_copy.get_active_space_indices()
-    orig_alpha, orig_beta = orb.get_active_space_indices()
+    copy_active_indices = orb_copy.active_indices()
+    copy_alpha = spin_channel_indices(copy_active_indices, axes.alpha())
+    copy_beta = spin_channel_indices(copy_active_indices, axes.beta())
+    orig_active_indices = orb.active_indices()
+    orig_alpha = spin_channel_indices(orig_active_indices, axes.alpha())
+    orig_beta = spin_channel_indices(orig_active_indices, axes.beta())
     assert np.array_equal(copy_alpha, orig_alpha)
     assert np.array_equal(copy_beta, orig_beta)
 
@@ -730,7 +847,9 @@ def test_active_space_validation():
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-active-space-validation")
     orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(3, [0, 1], [0, 1]), spin_index_set(3, [], []))
-    alpha_indices, beta_indices = orb.get_active_space_indices()
+    active_index_set = orb.active_indices()
+    alpha_indices = spin_channel_indices(active_index_set, axes.alpha())
+    beta_indices = spin_channel_indices(active_index_set, axes.beta())
     assert np.array_equal(alpha_indices, [0, 1])
     assert np.array_equal(beta_indices, [0, 1])
 
@@ -806,8 +925,12 @@ def test_orbitals_pickling_and_repr():
     assert unpickled.is_restricted() == original.is_restricted()
 
     # Check coefficients are preserved
-    orig_alpha, orig_beta = original.get_coefficients()
-    unpick_alpha, unpick_beta = unpickled.get_coefficients()
+    coefficients = original.coefficients()
+    orig_alpha = spin_channel_matrix(coefficients, axes.alpha())
+    orig_beta = spin_channel_matrix(coefficients, axes.beta())
+    coefficients = unpickled.coefficients()
+    unpick_alpha = spin_channel_matrix(coefficients, axes.alpha())
+    unpick_beta = spin_channel_matrix(coefficients, axes.beta())
     assert np.allclose(
         orig_alpha, unpick_alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -817,8 +940,12 @@ def test_orbitals_pickling_and_repr():
 
     # Check energies are preserved
     if original.has_energies():
-        orig_e_alpha, orig_e_beta = original.get_energies()
-        unpick_e_alpha, unpick_e_beta = unpickled.get_energies()
+        energies = original.energies()
+        orig_e_alpha = spin_channel_vector(energies, axes.alpha())
+        orig_e_beta = spin_channel_vector(energies, axes.beta())
+        energies = unpickled.energies()
+        unpick_e_alpha = spin_channel_vector(energies, axes.alpha())
+        unpick_e_beta = spin_channel_vector(energies, axes.beta())
         assert np.allclose(
             orig_e_alpha,
             unpick_e_alpha,
@@ -900,10 +1027,10 @@ def test_orbitals_unrestricted_pickling():
     assert not unpickled.is_restricted()
 
     # Check alpha and beta coefficients separately
-    orig_alpha = original.get_coefficients_alpha()
-    orig_beta = original.get_coefficients_beta()
-    unpick_alpha = unpickled.get_coefficients_alpha()
-    unpick_beta = unpickled.get_coefficients_beta()
+    orig_alpha = spin_channel_matrix(original.coefficients(), axes.alpha())
+    orig_beta = spin_channel_matrix(original.coefficients(), axes.beta())
+    unpick_alpha = spin_channel_matrix(unpickled.coefficients(), axes.alpha())
+    unpick_beta = spin_channel_matrix(unpickled.coefficients(), axes.beta())
 
     assert np.allclose(
         orig_alpha, unpick_alpha, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -915,14 +1042,14 @@ def test_orbitals_unrestricted_pickling():
     # Check alpha and beta energies separately
     if original.has_energies():
         assert np.allclose(
-            original.get_energies_alpha(),
-            unpickled.get_energies_alpha(),
+            spin_channel_vector(original.energies(), axes.alpha()),
+            spin_channel_vector(unpickled.energies(), axes.alpha()),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
         assert np.allclose(
-            original.get_energies_beta(),
-            unpickled.get_energies_beta(),
+            spin_channel_vector(original.energies(), axes.beta()),
+            spin_channel_vector(unpickled.energies(), axes.beta()),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
@@ -966,3 +1093,109 @@ def test_orbitals_data_type_name():
     """Test that Orbitals has the correct _data_type_name class attribute."""
     assert hasattr(Orbitals, "_data_type_name")
     assert Orbitals._data_type_name == "orbitals"
+
+
+def test_sbt_native_constructor_accepts_active_indices():
+    """The symmetry-blocked-tensor Orbitals constructor accepts active/inactive index sets."""
+    coeffs = np.eye(4)
+    energies = np.arange(4.0)
+    basis_set = create_test_basis_set(4, "sbt-native-active")
+    seed = Orbitals(coeffs, energies, None, basis_set)
+    orb = Orbitals(
+        seed.coefficients(),
+        seed.energies(),
+        None,
+        basis_set,
+        spin_index_set(4, [1, 2], [1, 2]),
+        spin_index_set(4, [0], [0]),
+    )
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 2
+    assert len(spin_channel_indices(orb.inactive_indices(), axes.alpha())) == 1
+
+
+def test_spin_channel_helpers_trivial_orbitals():
+    """spin_channel_matrix/vector return the sole block for spin-free (trivial) tensors."""
+    trivial = SymmetryProduct([])
+    label = SymmetryLabel([])
+    matrix = np.arange(9.0).reshape(3, 3)
+    coeffs = SymmetryBlockedTensorRank2([trivial, trivial], [{label: 3}, {label: 3}], [((label, label), matrix)])
+    assert np.allclose(spin_channel_matrix(coeffs, axes.alpha()), matrix)
+    assert np.allclose(spin_channel_matrix(coeffs, axes.beta()), matrix)
+    vector = np.array([1.0, 2.0, 3.0])
+    energies = SymmetryBlockedTensorRank1([trivial], [{label: 3}], [((label,), vector)])
+    assert np.allclose(spin_channel_vector(energies, axes.alpha()), vector)
+    assert np.allclose(spin_channel_vector(energies, axes.beta()), vector)
+
+
+def test_explicit_empty_active_space_round_trips():
+    """An explicitly empty active space (0 orbitals) survives JSON/HDF5 round-trips.
+
+    Regression: an empty active space previously reloaded as the full space because
+    it was indistinguishable from an absent one.
+    """
+    basis_set = create_test_basis_set(4, "empty-active-roundtrip")
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, basis_set, spin_index_set(4, [], []), spin_index_set(4, [], []))
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 0
+    assert not orb.has_active_space()
+
+    assert len(spin_channel_indices(Orbitals.from_json(orb.to_json()).active_indices(), axes.alpha())) == 0
+
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.json", delete=False) as tmp_json:
+        json_filename = tmp_json.name
+    try:
+        orb.to_json_file(json_filename)
+        assert len(spin_channel_indices(Orbitals.from_json_file(json_filename).active_indices(), axes.alpha())) == 0
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
+
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        orb.to_hdf5_file(hdf5_filename)
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 0
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
+
+
+def test_full_active_space_round_trip_unaffected():
+    """A default (full) active space still round-trips through JSON and HDF5."""
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, create_test_basis_set(4, "full-active-roundtrip"))
+    assert len(spin_channel_indices(orb.active_indices(), axes.alpha())) == 4
+    assert len(spin_channel_indices(Orbitals.from_json(orb.to_json()).active_indices(), axes.alpha())) == 4
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        orb.to_hdf5_file(hdf5_filename)
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 4
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
+
+
+def test_explicit_empty_active_space_index_set_non_null():
+    """active_indices() stays a non-null empty set for an explicit-empty active space.
+
+    Regression: constructing with a null inactive space, copying, or reloading
+    previously rebuilt active_indices() to None even though the active space
+    was 0, so forwarding it into another Orbitals read as a full active space.
+    """
+    basis_set = create_test_basis_set(4, "empty-active-index-set")
+    orb = Orbitals(np.eye(4), np.arange(4.0), None, basis_set, spin_index_set(4, [], []), None)
+    for candidate in (orb, Orbitals(orb), Orbitals.from_json(orb.to_json())):
+        active = candidate.active_indices()
+        assert active is not None
+        assert spin_channel_indices(active, axes.alpha()) == []
+        assert len(spin_channel_indices(candidate.active_indices(), axes.alpha())) == 0
+
+
+def test_model_orbitals_explicit_empty_active_space_round_trips():
+    """A ModelOrbitals explicit-empty active space survives JSON/HDF5 round-trips."""
+    model = ModelOrbitals(spin_index_set(4, [], []))
+    assert len(spin_channel_indices(model.active_indices(), axes.alpha())) == 0
+    assert len(spin_channel_indices(ModelOrbitals.from_json(model.to_json()).active_indices(), axes.alpha())) == 0
+    with tempfile.NamedTemporaryFile(suffix=".orbitals.h5", delete=False) as tmp_hdf5:
+        hdf5_filename = tmp_hdf5.name
+    try:
+        model.to_hdf5_file(hdf5_filename)
+        assert len(spin_channel_indices(Orbitals.from_hdf5_file(hdf5_filename).active_indices(), axes.alpha())) == 0
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)

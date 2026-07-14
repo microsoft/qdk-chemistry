@@ -17,7 +17,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QpeResult,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -37,7 +37,7 @@ class PhaseEstimationProblem:
     """Container describing a reproducible phase estimation benchmark."""
 
     label: str
-    hamiltonian: QubitHamiltonian
+    hamiltonian: QubitOperator
     state_prep: Circuit
     evolution_time: float
     num_bits: int
@@ -51,7 +51,7 @@ class PhaseEstimationProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep_params = {
         "rowMap": [1, 0],
         "stateVector": [0.6, 0.0, 0.0, 0.8],
@@ -81,7 +81,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
@@ -194,10 +194,7 @@ _builder_params = [
     pytest.param(
         "qiskit_standard",
         id="qiskit_standard",
-        marks=[
-            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile"),
-        ],
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
     ),
 ]
 
@@ -261,9 +258,7 @@ def test_standard_phase_estimation_four_qubit(
         pytest.param(
             "qiskit_standard",
             id="qiskit_standard",
-            marks=[
-                pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            ],
+            marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
         ),
     ],
 )

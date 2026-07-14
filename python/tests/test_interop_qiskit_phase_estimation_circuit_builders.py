@@ -15,7 +15,7 @@ import pytest
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -35,7 +35,7 @@ class CircuitBuilderProblem:
     """Container describing a reproducible circuit builder test scenario."""
 
     label: str
-    hamiltonian: QubitHamiltonian
+    hamiltonian: QubitOperator
     state_prep: Circuit
     evolution_time: float
     num_bits: int
@@ -45,7 +45,7 @@ class CircuitBuilderProblem:
 @pytest.fixture
 def two_qubit_circuit_problem() -> CircuitBuilderProblem:
     """Return the two-qubit circuit builder test scenario with QASM state prep."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     # Prepare state |psi> ~ 0.6|00> + 0.8|11> using Ry + CNOT
     qc = QuantumCircuit(2)
     qc.ry(1.2870, 0)  # arccos(0.6)*2
@@ -65,7 +65,7 @@ def two_qubit_circuit_problem() -> CircuitBuilderProblem:
 @pytest.fixture
 def four_qubit_circuit_problem() -> CircuitBuilderProblem:
     """Return the four-qubit circuit builder test scenario with QASM state prep."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     # Prepare a simple 4-qubit state
     qc = QuantumCircuit(4)
     qc.x(3)
@@ -157,10 +157,9 @@ class TestQiskitStandardQpeCircuitBuilder:
 class TestQiskitIterativeQpeCircuitBuilder:
     """Tests for the Qiskit iterative phase estimation circuit builder."""
 
-    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
     def test_power_calculation(self) -> None:
         """Test that the power calculation is correct for different iterations."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+        hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
         state_prep = QuantumCircuit(1)
         state_prep.h(0)
         state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))

@@ -11,12 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import (
-    AlgorithmRef,
-    Circuit,
-    FactorizedHamiltonianContainer,
-    QubitHamiltonian,
-)
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -82,7 +77,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -93,8 +88,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
-                for which to build circuits.
+            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -131,7 +125,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator,
         *,
         iteration: int,
         total_iterations: int,
@@ -141,7 +135,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The Hamiltonian (QubitHamiltonian or FactorizedHamiltonianContainer).
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
@@ -152,21 +146,13 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         num_system_qubits = qubit_hamiltonian.num_qubits
-
         power = 2 ** (total_iterations - iteration - 1)
 
-        ctrl_unitary_circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
-            qubit_hamiltonian, power
-        )
+        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation,
-                ctrl_unitary_circuit,
-                phase_correction,
-                num_system_qubits,
-                num_ancilla_qubits,
-                ancilla_prep_op,
+                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits, num_ancilla_qubits
             )
 
         raise RuntimeError(
@@ -181,7 +167,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         phase_correction: float,
         num_system_qubits: int,
         num_ancilla_qubits: int = 0,
-        ancilla_prep_op: Circuit | None = None,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
@@ -191,7 +176,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             phase_correction: Feedback phase angle to apply before controlled unitary.
             num_system_qubits: Number of system qubits.
             num_ancilla_qubits: Number of ancilla qubits within the unitary (0 for Trotter).
-            ancilla_prep_op: Q# callable to initialize block-encoding ancillas.
 
         Returns:
             A Circuit object representing the IQPE iteration.
@@ -199,8 +183,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
-        if ancilla_prep_op is None:
-            ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": ctrl_unitary_op,
@@ -208,7 +190,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
-            "ancillaPrep": ancilla_prep_op,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

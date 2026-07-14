@@ -21,12 +21,7 @@ from .base import UnitaryContainer
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
 
-__all__ = [
-    "BlockEncodingContainer",
-    "ControlledOperation",
-    "LCUContainer",
-    "Select",
-]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select"]
 
 
 class BlockEncodingContainer(UnitaryContainer):

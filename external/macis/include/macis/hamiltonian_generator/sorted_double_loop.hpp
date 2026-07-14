@@ -8,6 +8,8 @@
  */
 
 #pragma once
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
@@ -93,13 +95,13 @@ class SortedDoubleLoopHamiltonianGenerator
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
-    auto world_rank = comm_rank(MPI_COMM_WORLD);
+    [[maybe_unused]] auto world_rank = comm_rank(MPI_COMM_WORLD);
 #else
-    auto world_rank = 0;
+    [[maybe_unused]] auto world_rank = 0;
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -111,7 +113,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -119,7 +121,7 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
@@ -130,7 +132,7 @@ class SortedDoubleLoopHamiltonianGenerator
     // 1. First pass - Count non-zero matrix elements per row
     // 2. Second pass - Compute and fill the CSR matrix directly
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
     // First pass: Count non-zeros per row to allocate CSR structure
     std::vector<index_t> row_nnz(nbra_dets, 0);
@@ -423,18 +425,27 @@ class SortedDoubleLoopHamiltonianGenerator
     auto thresh_en = std::chrono::high_resolution_clock::now();
 
     // Print timing information if needed
-    auto duration_setup =
+    [[maybe_unused]] auto duration_setup =
         std::chrono::duration<double>(count_st - setup_st).count();
-    auto duration_compute =
+    [[maybe_unused]] auto duration_compute =
         std::chrono::duration<double>(count_en - count_st).count();
-    auto duration_alloc =
+    [[maybe_unused]] auto duration_alloc =
         std::chrono::duration<double>(alloc_en - alloc_st).count();
-    auto duration_fill =
+    [[maybe_unused]] auto duration_fill =
         std::chrono::duration<double>(fill_en - fill_st).count();
-    auto duration_sort =
+    [[maybe_unused]] auto duration_sort =
         std::chrono::duration<double>(sort_en - sort_st).count();
-    auto duration_thresh =
+    [[maybe_unused]] auto duration_thresh =
         std::chrono::duration<double>(thresh_en - thresh_st).count();
+
+    auto h_logger = spdlog::get("h_build");
+    if (h_logger) {
+      h_logger->info(
+          "  H_BUILD: setup={:.2e}s count={:.2e}s alloc={:.2e}s "
+          "fill={:.2e}s sort={:.2e}s thresh={:.2e}s",
+          duration_setup, duration_compute, duration_alloc, duration_fill,
+          duration_sort, duration_thresh);
+    }
 
     return csr_mat;
   }
@@ -517,7 +528,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -529,7 +540,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -537,14 +548,14 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -624,6 +635,10 @@ class SortedDoubleLoopHamiltonianGenerator
     using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
+    auto rdm_logger = spdlog::get("rdm");
+    if (rdm_logger)
+      rdm_logger->info("  RDM_SD(SDL): starting  ndets={}", nbra_dets);
+    auto rdm_wall_st = std::chrono::high_resolution_clock::now();
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
@@ -635,7 +650,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #endif /* MACIS_ENABLE_MPI */
 
     // Get unique alpha strings
-    auto setup_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
     auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
     auto unique_alpha_ket =
         is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
@@ -647,7 +662,7 @@ class SortedDoubleLoopHamiltonianGenerator
     std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
     std::transform_exclusive_scan(
         unique_alpha_bra.begin(), unique_alpha_bra.end(),
-        unique_alpha_bra_idx.begin(), 0ul, std::plus<size_t>{},
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
         [](auto& x) { return x.second; });
     std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
     if (is_symm) {
@@ -655,14 +670,14 @@ class SortedDoubleLoopHamiltonianGenerator
     } else {
       std::transform_exclusive_scan(
           unique_alpha_ket.begin(), unique_alpha_ket.end(),
-          unique_alpha_ket_idx.begin(), 0ul, std::plus<size_t>{},
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
           [](auto& x) { return x.second; });
     }
 
     unique_alpha_bra_idx.back() = nbra_dets;
     unique_alpha_ket_idx.back() = nket_dets;
 
-    auto count_st = std::chrono::high_resolution_clock::now();
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
 
 #pragma omp parallel
     {
@@ -729,6 +744,162 @@ class SortedDoubleLoopHamiltonianGenerator
         }
       }
     }
+    auto rdm_wall_en = std::chrono::high_resolution_clock::now();
+    if (rdm_logger)
+      rdm_logger->info(
+          "  RDM_SD(SDL): {:.2e}s  ndets={} unique_alpha={}",
+          std::chrono::duration<double>(rdm_wall_en - rdm_wall_st).count(),
+          nbra_dets, nuniq_bra);
+  }
+
+  void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
+                      full_det_iterator ket_begin, full_det_iterator ket_end,
+                      double* C, std::vector<double>& single_orbital_entropies,
+                      matrix_span_t s2_entropy,
+                      matrix_span_t mutual_information) override {
+    using wfn_traits = wavefunction_traits<WfnType>;
+    using spin_wfn_type = typename wfn_traits::spin_wfn_type;
+    using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
+    const size_t nbra_dets = std::distance(bra_begin, bra_end);
+    const size_t nket_dets = std::distance(ket_begin, ket_end);
+    auto ent_logger = spdlog::get("rdm");
+    if (ent_logger)
+      ent_logger->info("  ENTROPY(SDL): starting  ndets={}", nbra_dets);
+    auto ent_wall_st = std::chrono::high_resolution_clock::now();
+
+    const bool need_s2 =
+        s2_entropy.data_handle() || mutual_information.data_handle();
+
+    OrbitalRDMIntermediates entropy_intermediates(
+        single_orbital_entropies.size(), need_s2);
+
+    const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
+#ifdef MACIS_ENABLE_MPI
+    if (comm_size(MPI_COMM_WORLD) > 1) {
+      throw std::runtime_error(
+          "SortedDoubleLoopHamiltonianGenerator::form_entropies "
+          "does not support MPI with more than one rank");
+    }
+#endif /* MACIS_ENABLE_MPI */
+
+    // Get unique alpha strings
+    [[maybe_unused]] auto setup_st = std::chrono::high_resolution_clock::now();
+    auto unique_alpha_bra = get_unique_alpha(bra_begin, bra_end);
+    auto unique_alpha_ket =
+        is_symm ? unique_alpha_bra : get_unique_alpha(ket_begin, ket_end);
+
+    const size_t nuniq_bra = unique_alpha_bra.size();
+    const size_t nuniq_ket = unique_alpha_ket.size();
+
+    // Compute offsets
+    std::vector<size_t> unique_alpha_bra_idx(nuniq_bra + 1);
+    std::transform_exclusive_scan(
+        unique_alpha_bra.begin(), unique_alpha_bra.end(),
+        unique_alpha_bra_idx.begin(), size_t{0}, std::plus<size_t>{},
+        [](auto& x) { return x.second; });
+    std::vector<size_t> unique_alpha_ket_idx(nuniq_ket + 1);
+    if (is_symm) {
+      unique_alpha_ket_idx = unique_alpha_bra_idx;
+    } else {
+      std::transform_exclusive_scan(
+          unique_alpha_ket.begin(), unique_alpha_ket.end(),
+          unique_alpha_ket_idx.begin(), size_t{0}, std::plus<size_t>{},
+          [](auto& x) { return x.second; });
+    }
+
+    unique_alpha_bra_idx.back() = nbra_dets;
+    unique_alpha_ket_idx.back() = nket_dets;
+
+    [[maybe_unused]] auto count_st = std::chrono::high_resolution_clock::now();
+
+#pragma omp parallel
+    {
+      std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+
+#pragma omp for schedule(dynamic)
+      for (size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
+        if (!unique_alpha_bra[ia_bra].first.any()) continue;
+
+        // Extract alpha bra
+        const auto bra_alpha = unique_alpha_bra[ia_bra].first;
+        const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
+        const size_t beta_en_bra = unique_alpha_bra_idx[ia_bra + 1];
+
+        const auto ket_lower = is_symm ? ia_bra : 0;
+        for (size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket) {
+          if (!unique_alpha_ket[ia_ket].first.any()) continue;
+
+          // Extract alpha ket
+          const auto ket_alpha = unique_alpha_ket[ia_ket].first;
+
+          // Compute alpha excitation
+          const auto ex_alpha = bra_alpha ^ ket_alpha;
+          const auto ex_alpha_count = spin_wfn_traits::count(ex_alpha);
+
+          // Early exit if excitation level too high
+          if (ex_alpha_count > (need_s2 ? 2 : 0)) continue;
+
+          const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
+          const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
+
+          // Get occupied alpha indices
+          spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
+
+          // Loop over betas
+          for (size_t ibra = beta_st_bra; ibra < beta_en_bra; ++ibra) {
+            const auto bra_beta = wfn_traits::beta_string(*(bra_begin + ibra));
+
+            // Get occupied beta indices
+            spin_wfn_traits::state_to_occ(bra_beta, bra_occ_beta);
+
+            for (size_t iket = beta_st_ket; iket < beta_en_ket; ++iket) {
+              if (is_symm && (iket < ibra)) continue;
+
+              const auto ket_beta =
+                  wfn_traits::beta_string(*(ket_begin + iket));
+              const auto ex_beta = bra_beta ^ ket_beta;
+              const auto ex_beta_count = spin_wfn_traits::count(ex_beta);
+
+              // Skip if total excitation level too high
+              if (ex_beta_count > (need_s2 ? 2 : 0)) continue;
+
+              const double val = C[ibra] * C[iket];
+
+              // Compute intermediates
+              if (std::abs(val) > 1e-16) {
+                eval_ordm_intermediates(
+                    bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
+                    bra_occ_alpha, bra_occ_beta, val, entropy_intermediates);
+              }
+            }
+          }
+        }
+      }
+    }
+    // Finalize entropy calculations
+    build_s1_entropy(entropy_intermediates, single_orbital_entropies);
+
+    if (need_s2) {
+      const size_t norb = single_orbital_entropies.size();
+      // Use caller's buffer if provided, otherwise allocate internally
+      std::vector<double> s2_local;
+      matrix_span<double> s2_span = s2_entropy;
+      if (!s2_entropy.data_handle()) {
+        s2_local.resize(norb * norb, 0.0);
+        s2_span = matrix_span<double>(s2_local.data(), norb, norb);
+      }
+      build_s2_entropy(entropy_intermediates, s2_span);
+      if (mutual_information.data_handle()) {
+        build_mutual_information(single_orbital_entropies, s2_span,
+                                 mutual_information);
+      }
+    }
+    auto ent_wall_en = std::chrono::high_resolution_clock::now();
+    if (ent_logger)
+      ent_logger->info(
+          "  ENTROPY(SDL): {:.2e}s  ndets={}",
+          std::chrono::duration<double>(ent_wall_en - ent_wall_st).count(),
+          nbra_dets);
   }
 
   void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,

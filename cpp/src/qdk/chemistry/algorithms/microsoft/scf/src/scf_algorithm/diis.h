@@ -8,6 +8,7 @@
 #include <qdk/chemistry/scf/core/types.h>
 
 #include <memory>
+#include <utility>
 
 namespace qdk::chemistry::scf {
 
@@ -114,17 +115,12 @@ class DIIS : public SCFAlgorithm {
   double current_diis_error() const;
 
   /**
-   * @brief Select the density view used for the current iteration
+   * @brief Select the density/fock views used for the current iteration
    */
-  RowMajorMatrix& select_working_density(SCFImpl& scf_impl);
-  /**
-   * @brief Select the Fock matrix view used for the current iteration
-   */
-  const RowMajorMatrix& select_working_fock(const SCFImpl& scf_impl);
+  std::pair<RowMajorMatrix&, const RowMajorMatrix&> select_working_matrices(
+      SCFImpl& scf_impl);
 
   std::unique_ptr<impl::DIIS> diis_impl_;  ///< Pulay DIIS core implementation
-  RowMajorMatrix rohf_effective_fock_;     ///< Cached ROHF effective Fock (AO)
-  RowMajorMatrix rohf_total_density_;  ///< Cached ROHF total density (P_a+P_b)
 };
 
 }  // namespace qdk::chemistry::scf

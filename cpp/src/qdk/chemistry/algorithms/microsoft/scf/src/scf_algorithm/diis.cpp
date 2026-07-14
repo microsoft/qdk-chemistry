@@ -6,13 +6,11 @@
 
 #include <qdk/chemistry/scf/config.h>
 
-#include <cstdint>
 #include <deque>
 #include <lapack.hh>
 #include <limits>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
-#include <vector>
 
 #include "../scf/scf_impl.h"
 #include "util/macros.h"
@@ -447,8 +445,7 @@ void DIIS::iterate(SCFImpl& scf_impl) {
 
   // Decide which Fock/density view to feed into Pulay: RHF/UHF use the direct
   // SCFImpl matrices, while ROHF works on the cached total-density view.
-  RowMajorMatrix& working_density = select_working_density(scf_impl);
-  const RowMajorMatrix& working_fock = select_working_fock(scf_impl);
+  auto [working_density, working_fock] = select_working_matrices(scf_impl);
 
   auto& C = scf_impl.orbitals_matrix();
   const auto& S = scf_impl.overlap();
@@ -490,77 +487,21 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   }
 }
 
-void DIIS::update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                                 bool unrestricted, int nelec_alpha,
-                                 int nelec_beta) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    impl::update_rohf_density_matrix(P, C, nelec_alpha, nelec_beta);
-    return;
-  }
-  SCFAlgorithm::update_density_matrix(P, C, unrestricted, nelec_alpha,
-                                      nelec_beta);
-}
-
-void DIIS::build_rohf_f_p_matrix(const RowMajorMatrix& F,
-                                 const RowMajorMatrix& C,
-                                 const RowMajorMatrix& P, int nelec_alpha,
-                                 int nelec_beta) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
-    throw std::logic_error("ROHF matrix build requested for non-ROHF run");
-  }
-  impl::build_rohf_f_p_matrix(F, C, P, nelec_alpha, nelec_beta,
-                              rohf_effective_fock_, rohf_total_density_);
-}
-
-const RowMajorMatrix& DIIS::get_rohf_fock_matrix() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (rohf_effective_fock_.size() == 0) {
-    throw std::logic_error("ROHF cache not initialized");
-  }
-  return rohf_effective_fock_;
-}
-
-const RowMajorMatrix& DIIS::get_rohf_density_matrix() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (rohf_total_density_.size() == 0) {
-    throw std::logic_error("ROHF cache not initialized");
-  }
-  return rohf_total_density_;
-}
-
-RowMajorMatrix& DIIS::rohf_density_matrix() {
-  QDK_LOG_TRACE_ENTERING();
-  if (rohf_total_density_.size() == 0) {
-    throw std::logic_error("ROHF cache not initialized");
-  }
-  return rohf_total_density_;
-}
-
 double DIIS::current_diis_error() const {
   QDK_LOG_TRACE_ENTERING();
   return diis_impl_->get_diis_error();
 }
 
-RowMajorMatrix& DIIS::select_working_density(SCFImpl& scf_impl) {
+std::pair<RowMajorMatrix&, const RowMajorMatrix&> DIIS::select_working_matrices(
+    SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    // The ROHF helper is refreshed inside SCFAlgorithm::check_convergence(),
-    // so by the time iterate() is invoked the total density view is already
-    // up to date.
-    (void)scf_impl;  // kept for symmetry with the unrestricted branch
-    return rohf_density_matrix();
+    // Cache is populated by check_convergence() for pure DIIS, or by
+    // DIIS_GDM::iterate via set_rohf_convergence_cache() for composite use.
+    return {rohf_convergence_density_matrix(),
+            get_rohf_convergence_fock_matrix()};
   }
-  return scf_impl.density_matrix();
-}
-
-const RowMajorMatrix& DIIS::select_working_fock(const SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    return get_rohf_fock_matrix();
-  }
-  return scf_impl.get_fock_matrix();
+  return {scf_impl.density_matrix(), scf_impl.get_fock_matrix()};
 }
 
 }  // namespace qdk::chemistry::scf

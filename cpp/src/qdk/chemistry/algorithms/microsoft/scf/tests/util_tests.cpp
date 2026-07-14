@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/util/cache.h>
 #include <qdk/chemistry/scf/util/class_registry.h>
+#include <qdk/chemistry/scf/util/gauxc_util.h>
 #include <qdk/chemistry/scf/util/singleton.h>
 
 #include <Eigen/Dense>
@@ -466,17 +467,45 @@ TEST(ClassRegistryTest, PrimitiveKey) {
 }
 
 //==============================================================================
+// GAUXCInput Hash Tests
+//==============================================================================
+
+// Regression guard: the GAUXC registry is keyed on GAUXCInput, so the
+// functional name and spin treatment must contribute to the hash. Otherwise
+// two calculations that share grid settings but differ only in functional (or
+// spin) alias to the same cached GAUXC instance, silently reusing the wrong
+// functional.
+TEST(GauxcInputHashTest, FunctionalAndSpinArePartOfKey) {
+  std::hash<GAUXCInput> hasher;
+
+  GAUXCInput base;
+  base.xc_name = "pbe";
+  base.unrestricted = true;
+
+  GAUXCInput different_functional = base;
+  different_functional.xc_name = "m06-2x";
+  EXPECT_NE(hasher(base), hasher(different_functional));
+
+  GAUXCInput different_spin = base;
+  different_spin.unrestricted = false;
+  EXPECT_NE(hasher(base), hasher(different_spin));
+
+  GAUXCInput identical = base;
+  EXPECT_EQ(hasher(base), hasher(identical));
+}
+
+//==============================================================================
 // Atom Guess Tests
 //==============================================================================
 
 TEST(AtomGuessTest, BasisSetMap) {
   // Test that the map correctly identifies equivalent basis sets
   auto mol = std::make_shared<Molecule>();
-  mol->atomic_nums = {1};
+  mol->atomic_nums = {3};
   mol->n_atoms = 1;
-  mol->atomic_charges = {1};
-  mol->total_nuclear_charge = 1;
-  mol->n_electrons = 1;
+  mol->atomic_charges = {3};
+  mol->total_nuclear_charge = 3;
+  mol->n_electrons = 3;
   mol->coords = {{0.0, 0.0, 0.0}};
 
   // Create two identical basis sets
@@ -485,10 +514,12 @@ TEST(AtomGuessTest, BasisSetMap) {
   auto basis2 =
       BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
 
-  // Create same basis set in different shell order
+  // Create same basis set with reversed shell order via JSON round-trip.
+  // Lithium STO-3G has 3 shells, so reversing produces a different ordering
+  // that the BasisEqChecker should reject.
   auto basis_json = basis1->to_json();
-  // Reverse the shells
-  std::reverse(basis_json["shells"].begin(), basis_json["shells"].end());
+  std::reverse(basis_json["electron_shells"].begin(),
+               basis_json["electron_shells"].end());
   auto basis3 = BasisSet::from_serialized_json(mol, basis_json);
 
   // Create a different basis set (different basis name)
@@ -518,7 +549,7 @@ TEST(AtomGuessTest, BasisSetMap) {
   EXPECT_NE(it2, basis_map.end());
   EXPECT_TRUE(it2->second.isApprox(RowMajorMatrix::Identity(
       basis2->num_atomic_orbitals, basis2->num_atomic_orbitals)));
-  // Retrieve using basis3 (should not be found)
+  // Retrieve using basis3 (should not be found — shells are reversed)
   auto it3 = basis_map.find(*basis3);
   EXPECT_EQ(it3, basis_map.end());
   // Retrieve using basis4 (should not be found)

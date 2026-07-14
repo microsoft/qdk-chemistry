@@ -9,34 +9,30 @@ from pathlib import Path
 import qdk
 from qdk import qsharp
 
-__all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
+__all__ = ["QSHARP_UTILS"]
 
-_PROJECT_ROOT = str(Path(__file__).parent)
-
-_initialized = False
-
-
-def _ensure_session():
-    """Ensure the Q# interpreter is initialized with the unified project."""
-    global _initialized
-    if _initialized:
-        try:
-            _ = qdk.code.QDKChemistry.Utils.StatePreparation
-            return
-        except AttributeError:
-            _initialized = False  # stale — interpreter was reset externally
-    qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
-    _initialized = True
+_QS_FILES = [
+    Path(__file__).parent / "StatePreparation.qs",
+    Path(__file__).parent / "CircuitComposition.qs",
+    Path(__file__).parent / "IterativePhaseEstimation.qs",
+    Path(__file__).parent / "StandardPhaseEstimation.qs",
+    Path(__file__).parent / "ControlledPauliExp.qs",
+    Path(__file__).parent / "HadamardTest.qs",
+    Path(__file__).parent / "PauliExp.qs",
+    Path(__file__).parent / "MeasurementBasis.qs",
+    Path(__file__).parent / "PrepSelPrep.qs",
+    Path(__file__).parent / "Select.qs",
+]
 
 
 def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded).
-
-    Initializes the global Q# interpreter with the unified project on first call.
-    All Q# code (SOSSA, MPS, state prep, etc.) shares a single context.
-    """
-    _ensure_session()
-    return qdk.code.QDKChemistry.Utils
+    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
+    try:
+        return qdk.code.QDKChemistry.Utils
+    except AttributeError:
+        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
+        qsharp.eval(code)
+        return qdk.code.QDKChemistry.Utils
 
 
 class _QSharpUtilsProxy:
@@ -49,10 +45,8 @@ class _QSharpUtilsProxy:
             name: The name of the attribute being accessed on the Q# utilities namespace.
 
         """
-        _ensure_session()
-        if name in ("MPSSequential", "MPSSparse", "GivensDecomposition", "QroamStatePrep"):
-            return getattr(qdk.code, name)
-        return getattr(qdk.code.QDKChemistry.Utils, name)
+        utils = get_qsharp_utils()
+        return getattr(utils, name)
 
 
 QSHARP_UTILS = _QSharpUtilsProxy()
