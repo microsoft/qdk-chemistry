@@ -7,104 +7,32 @@ For detailed release notes with code examples and feature walkthroughs, see the 
 Version 2.0.0
 =============
 
-Work in progress
+See :ref:`release-v2.0.0` for full details and migration guidance.
 
-Breaking changes
------------------
+- Symmetry-blocked storage unifying restricted and unrestricted orbital, integral, and index data
+- Consolidated wavefunction containers (``StateVectorContainer``, ``AmplitudeContainer``)
+- Nuclear gradients and finite-difference Hessians
+- Stabilized SCF and ROHF geometric direct minimization
+- Block-encoding/LCU qubitization, Hadamard test, and Zassenhaus product formulas
+- Real-time dynamics for driven, time-dependent Hamiltonians
+- Fermion-to-qubit mapping carried as data (``MajoranaMapping``), including a Verstraete-Cirac encoding
+- Explicit Pauli term grouping and generalized expectation estimation
+- Composable standard and iterative phase-estimation circuit builders
+- QDK Quantum Resource Estimator integration for generated circuits (``Circuit.estimate`` / ``get_qre_application``)
+- Algorithm result caching and data-file migration tooling
+- Windows build support with CI
 
-- ``QdkEnergyEstimator`` no longer auto-groups terms by qubit-wise commutativity.
-  Pre-group with ``create("term_grouper", "qubit_wise_commuting")`` to restore
-  the previous behavior.
+Breaking changes:
 
-- The on-disk serialization format for :class:`~qdk_chemistry.data.Orbitals`,
-  :class:`~qdk_chemistry.data.ModelOrbitals`, :class:`~qdk_chemistry.data.Hamiltonian` containers, and
-  the :class:`~qdk_chemistry.data.StateVectorContainer` wavefunction container was bumped from
-  ``0.1.0`` to ``0.2.0`` to reflect the switch to ``SymmetryBlockedTensor``-backed storage
-  (:class:`~qdk_chemistry.data.AmplitudeContainer` is unchanged at ``0.1.0``). Direct loading
-  rejects files written by earlier versions; upgrade them in place with the shipped converter
-  (``python -m qdk_chemistry.migrate old.h5 new.h5``; see :doc:`user/migrating-data-files`) or
-  re-generate them. Backward-compatible direct loading of ``0.1.0`` files is planned for a future
-  release.
-
-- Wavefunction containers were consolidated. The single-determinant,
-  complete-active-space, and selected-configuration-interaction containers are
-  now a single :class:`~qdk_chemistry.data.StateVectorContainer`, and the
-  Møller-Plesset and coupled-cluster containers are now a single
-  :class:`~qdk_chemistry.data.AmplitudeContainer`. The former Python names
-  (``SlaterDeterminantContainer``, ``CasWavefunctionContainer``,
-  ``SciWavefunctionContainer``, ``MP2Container``, ``CoupledClusterContainer``)
-  remain importable as deprecated aliases (see :ref:`Deprecations <v2-deprecations>`).
-  Accordingly, :meth:`~qdk_chemistry.data.Wavefunction.get_container_type`
-  now returns ``"state_vector"`` or ``"amplitude"`` (was ``"sd"`` / ``"cas"`` /
-  ``"sci"`` / ``"mp2"`` / ``"cc"``).
-
-- **Silent semantic change:** the spin-resolved two-particle RDM accessor
-  ``get_active_two_rdm_spin_dependent()`` now returns the blocks in the order
-  ``(aaaa, aabb, bbbb)`` (was ``(aabb, aaaa, bbbb)``), and the ``aabb`` block is
-  now defined in *alpha-alpha-beta-beta* index order (was
-  *alpha-beta-alpha-beta*). Code that unpacks this tuple positionally will read
-  silently incorrect data until updated.
-
-- :class:`~qdk_chemistry.data.Configuration` string and bitset constructors were
-  replaced by explicit factories:
-  :meth:`~qdk_chemistry.data.Configuration.from_spin_half_string`,
-  :meth:`~qdk_chemistry.data.Configuration.from_bitstring`, and
-  ``from_spin_half_bitset``.
-
-- The qubit mapper no longer accepts an ``encoding`` string. Construct a
-  :class:`~qdk_chemistry.data.MajoranaMapping` and pass it to ``run()``
-  (``mapper.run(hamiltonian, mapping)``) instead of
-  ``QdkQubitMapper(encoding="jordan-wigner")``.
-
-- The ``TimeEvolutionUnitary`` family was renamed to the ``Unitary`` family
-  (:class:`~qdk_chemistry.data.UnitaryRepresentation`,
-  :class:`~qdk_chemistry.data.UnitaryContainer`); the old names remain importable
-  as deprecated aliases.
-
-- C++ only: the FCIDUMP writer (``Hamiltonian::to_fcidump_file``), the Cholesky
-  container's base class and dense constructor, and the
-  ``ModelOrbitals(size_t, bool)`` constructor changed. See
-  :ref:`What's New in Version 2.0 <release-v2.0.0>` for details.
-
-.. _v2-deprecations:
-
-Deprecations
-------------
-
-The v1 :class:`~qdk_chemistry.data.Orbitals` data accessors are retained as
-tested facades over the new ``SymmetryBlocked`` storage, but now emit a
-``DeprecationWarning``. Migrate to the v2 accessors:
-
-- ``get_coefficients()`` / ``get_coefficients_alpha()`` /
-  ``get_coefficients_beta()`` → :meth:`~qdk_chemistry.data.Orbitals.coefficients`
-  (a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2`).
-- ``get_energies()`` / ``get_energies_alpha()`` / ``get_energies_beta()`` →
-  :meth:`~qdk_chemistry.data.Orbitals.energies`
-  (a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1`).
-- ``get_active_space_indices()`` / ``get_inactive_space_indices()`` →
-  :meth:`~qdk_chemistry.data.Orbitals.active_indices` /
-  :meth:`~qdk_chemistry.data.Orbitals.inactive_indices`
-  (each a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`); read a
-  channel's stored indices with ``indices(SymmetryLabel([axes.alpha()]))``.
-
-Importing a removed or renamed ``qdk_chemistry.data`` name (the wavefunction and
-unitary aliases above, as well as ``EncodingMismatchError`` and
-``validate_encoding_compatibility``) resolves to its v2 replacement and emits a
-``DeprecationWarning``. See :ref:`What's New in Version 2.0 <release-v2.0.0>` for
-a complete migration guide.
-
-Deprecations
-------------
-
-- The ``QubitHamiltonian`` data class has been renamed to
-  :class:`~qdk_chemistry.data.QubitOperator`. ``QubitHamiltonian`` remains
-  available as a deprecated alias that emits a ``DeprecationWarning``.
-
-- The ``EnergyEstimator`` base algorithm class has been renamed to
-  :class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
-  ``"energy_estimator"`` registry type key to ``"expectation_estimator"``. The
-  old name and key remain available as deprecated aliases that emit a
-  ``DeprecationWarning``.
+- Wavefunction containers consolidated from five classes into two: ``SlaterDeterminantContainer``, ``CasWavefunctionContainer``, and ``SciWavefunctionContainer`` (structurally identical apart from a type tag) merge into ``StateVectorContainer``, distinguished by a stored sector; ``MP2Container`` and ``CoupledClusterContainer`` merge into ``AmplitudeContainer``, distinguished by an ``AmplitudeType`` tag. ``Wavefunction.get_container_type()`` now returns ``"state_vector"`` / ``"amplitude"`` (old names remain as deprecated aliases)
+- Serialization schema bumped from ``0.1.0`` to ``0.2.0`` for the ``Orbitals`` / ``ModelOrbitals``, ``CanonicalFourCenterHamiltonianContainer`` / ``SparseHamiltonianContainer`` / ``CholeskyHamiltonianContainer``, ``Wavefunction`` / ``StateVectorContainer``, and ``UnitaryRepresentation`` data classes; ``AmplitudeContainer`` and the top-level ``Hamiltonian`` are unchanged. Upgrade affected files with ``python -m qdk_chemistry.migrate``
+- Expectation estimator no longer auto-groups terms
+- Qubit mapper takes a ``MajoranaMapping`` instead of an ``encoding`` string
+- Silent semantic change: the ``Wavefunction`` accessor ``get_active_two_rdm_spin_dependent()`` now returns blocks as ``(aaaa, aabb, bbbb)`` (was ``(aabb, aaaa, bbbb)``), with the ``aabb`` block in alpha-alpha-beta-beta index order (was alpha-beta-alpha-beta), to match the two-electron integral block order in ``Hamiltonian``; the ``Wavefunction`` constructor takes the same new order. Positional unpacking reads incorrect data until updated
+- ``Configuration`` string and bitset constructors replaced by explicit factories
+- Renames (deprecated aliases retained): ``QubitHamiltonian`` to ``QubitOperator``, ``EnergyEstimator`` to ``ExpectationEstimator``, ``TimeEvolutionUnitary`` to ``UnitaryRepresentation``, and ``TimeEvolutionUnitaryContainer`` to ``UnitaryContainer``
+- v1 ``Orbitals`` dense accessors deprecated in favor of the symmetry-blocked accessors
+- C++ only: FCIDUMP writer, Cholesky container, and ``ModelOrbitals`` constructor changes
 
 Version 1.1.0
 =============
