@@ -30,16 +30,6 @@ Standard QFT-based Quantum Phase Estimation
 Both implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
 See :doc:`../data/qpe_result` for details on the result data class.
 
-.. note::
-
-   In v2, the v1 ``"iterative"`` variant is ``"qdk_iterative"``. The v1
-   ``"qiskit_standard"`` variant is now composed from ``"qdk_standard"``, a
-   ``"qiskit_standard"`` QPE circuit builder, and a Qiskit circuit executor.
-   The ``num_bits``, unitary-builder, evolution-time, and controlled-mapper
-   settings now belong to the nested ``qpe_circuit_builder`` algorithm reference;
-   the executor is configured through the phase-estimation ``circuit_executor``
-   setting.
-
 .. _qpe-workflow:
 
 Typical workflow

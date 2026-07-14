@@ -59,9 +59,6 @@ void Configuration::_set_orbital(size_t pos, OccupationState value) {
 
 // ---- Constructors ----------------------------------------------------------
 
-Configuration::Configuration(const std::string& str)
-    : Configuration(from_spin_half_string(str)) {}
-
 // ---- Named factories -------------------------------------------------------
 
 Configuration Configuration::from_spin_half_string(const std::string& str) {

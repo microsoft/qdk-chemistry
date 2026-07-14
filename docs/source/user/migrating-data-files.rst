@@ -4,10 +4,11 @@ Migrating data files between serialization versions
 Each QDK/Chemistry data class versions its on-disk serialization schema
 independently. A deserializer (:meth:`~qdk_chemistry.data.Orbitals.from_file`,
 :meth:`~qdk_chemistry.data.Hamiltonian.from_file`,
-:meth:`~qdk_chemistry.data.Wavefunction.from_file`, and their ``from_json`` /
-``from_hdf5`` counterparts) accepts **only** the serialization version the
-installed library was built against. Loading a file written against an older
-version of that class's schema raises an error that points back here.
+:meth:`~qdk_chemistry.data.Wavefunction.from_file`,
+:meth:`~qdk_chemistry.data.QpeResult.from_file`, and their ``from_json`` /
+``from_hdf5`` counterparts) accepts **only** the serialization version the installed
+library was built against. Loading a file written against an older version of that
+class's schema raises an error that points back here.
 
 The ``qdk_chemistry.migrate`` converter upgrades such a file to the serialization
 version the installed library accepts. It migrates each data class point-for-point
@@ -25,7 +26,7 @@ single file:
    python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the
+(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 The input and output formats may differ, so the same command also converts between
 JSON and HDF5:
@@ -66,6 +67,8 @@ registered make the following changes:
   amplitude container.
 - :class:`~qdk_chemistry.data.Ansatz` — the embedded Hamiltonian and
   Wavefunction are each migrated through their own serialization-version chains.
+- :class:`~qdk_chemistry.data.QpeResult` — the result fields are preserved while
+   the obsolete evolution-time field is removed.
 
 Data classes whose serialization schema has not changed (for example
 :class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.BasisSet`, and
@@ -73,10 +76,10 @@ the remaining qubit-level classes) load directly without conversion.
 
 .. note::
 
-   The converter does not support v1 :class:`~qdk_chemistry.data.QpeResult` or
-   ``TimeEvolutionUnitary`` files; regenerate these objects with v2. In
-   particular, v1 unitary files do not contain the scale required by the current
-   :class:`~qdk_chemistry.data.UnitaryRepresentation` schema.
+   The converter does not support v1 ``TimeEvolutionUnitary`` files because they
+   do not contain the scale required by the current
+   :class:`~qdk_chemistry.data.UnitaryRepresentation` schema; regenerate these
+   objects with v2.
 
 Cholesky Hamiltonians
 ---------------------

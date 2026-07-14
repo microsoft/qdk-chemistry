@@ -25,29 +25,6 @@ class ConfigurationTest : public ::testing::Test {
   // Empty test fixture - we'll create configurations directly in each test
 };
 
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-TEST_F(ConfigurationTest, DeprecatedConstructorsForwardToFactories) {
-  Configuration from_string("2du0");
-  std::bitset<8> occupations("01010011");
-  Configuration from_bitset(occupations, 4);
-
-  EXPECT_EQ(from_string, Configuration::from_spin_half_string("2du0"));
-  EXPECT_EQ(from_bitset, Configuration::from_spin_half_bitset(occupations, 4));
-}
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#elif defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-
 // Test construction from string
 TEST_F(ConfigurationTest, ConstructFromString) {
   // Test that construction works with valid strings
