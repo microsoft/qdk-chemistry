@@ -11,6 +11,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,
@@ -59,7 +60,7 @@ class PhaseEstimation(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: QubitOperator | FactorizedHamiltonianContainer,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -67,7 +68,7 @@ class PhaseEstimation(Algorithm):
 
         This method implements the quantum phase estimation procedure:
         1. The state preparation circuit initializes the system in the desired quantum state.
-        2. The unitary_builder constructs a unitary from the qubit Hamiltonian.
+        2. The unitary_builder constructs a unitary from the Hamiltonian.
         3. The circuit_mapper transforms the unitary into controlled-U operations,
            where the control qubits are ancilla qubits used for phase readout.
         4. The circuit_executor runs the resulting quantum circuits on the target backend.
@@ -75,7 +76,8 @@ class PhaseEstimation(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The qubit Hamiltonian or FactorizedHamiltonianContainer
+                for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

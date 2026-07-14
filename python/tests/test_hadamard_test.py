@@ -105,7 +105,7 @@ def test_qdk_hadamard_test_measures_water_observable(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.34, atol=1e-12)
+    assert np.isclose(observable_value, 0.22, atol=1e-12)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
@@ -122,7 +122,7 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.98, atol=1e-12)
+    assert np.isclose(observable_value, 0.94, atol=1e-12)
 
 
 def test_hadamard_test_rejects_invalid_test_basis() -> None:

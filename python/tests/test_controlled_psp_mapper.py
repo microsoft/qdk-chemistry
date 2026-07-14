@@ -118,7 +118,7 @@ class TestPrepareSelectMapper:
         ],
         ids=["1q_mixed_sign", "2q_molecular", "4q_ising"],
     )
-    def test_block_encoding_identity(self, pauli_strings, coefficients, description):
+    def test_block_encoding_identity(self, pauli_strings, coefficients, description, initialize_qsharp_base_profile):
         r"""Verify the block encoding identity <0|_anc B[H] |0>_anc = H/\lambda.
 
         Parametrized over several Hamiltonians of increasing complexity, from
@@ -146,7 +146,7 @@ class TestPrepareSelectMapper:
         ), f"Block encoding identity failed for: {description}"
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_quantum_walk_eigenvalues(self):
+    def test_quantum_walk_eigenvalues(self, initialize_qsharp_base_profile):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.
 
         For H = \alpha_1*X + \alpha_2*Z on 1 qubit with \lambda = |\alpha_1| + |\alpha_2|,

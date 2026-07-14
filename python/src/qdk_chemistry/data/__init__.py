@@ -156,6 +156,7 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "FactorizedHamiltonianContainer",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",
