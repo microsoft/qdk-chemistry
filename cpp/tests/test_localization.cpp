@@ -1693,14 +1693,15 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
 }
 
 static void expect_qio_entropy_helper_matches_wavefunction(
-    const std::shared_ptr<Wavefunction>& wavefunction) {
-  ASSERT_TRUE(wavefunction->has_one_rdm_spin_dependent());
-  ASSERT_TRUE(wavefunction->has_two_rdm_spin_dependent());
+    const Wavefunction& wavefunction, std::size_t expected_alpha_electrons,
+    std::size_t expected_beta_electrons) {
+  ASSERT_TRUE(wavefunction.has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wavefunction.has_two_rdm_spin_dependent());
 
   const auto* active_one_rdm = std::get_if<SymmetryBlockedTensor<2, double>>(
-      &wavefunction->active_one_rdm());
+      &wavefunction.active_one_rdm());
   const auto* active_two_rdm = std::get_if<SymmetryBlockedTensor<4, double>>(
-      &wavefunction->active_two_rdm());
+      &wavefunction.active_two_rdm());
   ASSERT_NE(active_one_rdm, nullptr);
   ASSERT_NE(active_two_rdm, nullptr);
 
@@ -1708,11 +1709,26 @@ static void expect_qio_entropy_helper_matches_wavefunction(
   const auto& rdm_beta = active_one_rdm->block({axes::beta(), axes::beta()});
   const auto& rdm_aabb = active_two_rdm->block(
       {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
-  const Eigen::VectorXd expected = wavefunction->get_single_orbital_entropies();
+  const Eigen::VectorXd expected = wavefunction.get_single_orbital_entropies();
 
+  ASSERT_GT(expected.size(), 0);
   ASSERT_EQ(rdm_alpha.rows(), expected.size());
+  ASSERT_EQ(rdm_alpha.cols(), expected.size());
   ASSERT_EQ(rdm_beta.rows(), expected.size());
+  ASSERT_EQ(rdm_beta.cols(), expected.size());
   const std::size_t dim = static_cast<std::size_t>(expected.size());
+  ASSERT_EQ(static_cast<std::size_t>(rdm_aabb.size()), dim * dim * dim * dim);
+  EXPECT_NEAR(rdm_alpha.trace(), static_cast<double>(expected_alpha_electrons),
+              testing::wf_tolerance);
+  EXPECT_NEAR(rdm_beta.trace(), static_cast<double>(expected_beta_electrons),
+              testing::wf_tolerance);
+  if (expected_alpha_electrons == expected_beta_electrons) {
+    EXPECT_NEAR((rdm_alpha - rdm_beta).norm(), 0.0, testing::wf_tolerance);
+  } else {
+    EXPECT_GT((rdm_alpha - rdm_beta).norm(), testing::wf_tolerance);
+  }
+  EXPECT_GT(expected.maxCoeff(), 0.0);
+
   for (std::size_t orbital = 0; orbital < dim; ++orbital) {
     const auto index = static_cast<Eigen::Index>(orbital);
     const auto diagonal_index = static_cast<Eigen::Index>(
@@ -1721,9 +1737,103 @@ static void expect_qio_entropy_helper_matches_wavefunction(
         qdk::chemistry::algorithms::microsoft::detail::single_orbital_entropy(
             rdm_alpha(index, index), rdm_beta(index, index),
             rdm_aabb(diagonal_index));
-    EXPECT_NEAR(actual, expected(index), testing::wf_tolerance)
-        << "orbital " << orbital;
+    EXPECT_DOUBLE_EQ(actual, expected(index)) << "orbital " << orbital;
   }
+}
+
+struct QIOEntropyTestWavefunction {
+  std::shared_ptr<Wavefunction> wavefunction;
+  std::size_t alpha_electrons;
+  std::size_t beta_electrons;
+};
+
+static QIOEntropyTestWavefunction make_qio_entropy_test_wavefunction(
+    const std::shared_ptr<Structure>& structure, int charge, int multiplicity) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_HF, wfn_HF] =
+      scf_solver->run(structure, charge, multiplicity, "sto-3g");
+  (void)E_HF;
+
+  const std::size_t num_orbitals =
+      wfn_HF->get_orbitals()->get_num_molecular_orbitals();
+  std::vector<std::size_t> active_indices(num_orbitals);
+  std::iota(active_indices.begin(), active_indices.end(), 0);
+  auto active_orbitals = testing::with_active_space(
+      wfn_HF->get_orbitals(), active_indices, std::vector<std::size_t>{});
+
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  const auto [total_alpha, total_beta] = wfn_HF->get_total_num_electrons();
+  const auto alpha_electrons =
+      static_cast<std::size_t>(std::llround(total_alpha));
+  const auto beta_electrons =
+      static_cast<std::size_t>(std::llround(total_beta));
+  auto [E_cas, wavefunction] =
+      mc_calc->run(hamiltonian_cas, alpha_electrons, beta_electrons);
+  (void)E_cas;
+
+  return {wavefunction, alpha_electrons, beta_electrons};
+}
+
+TEST_F(LocalizationTest, QIOSingleOrbitalEntropyIncludesTinyPositiveWeight) {
+  constexpr std::size_t dim = 2;
+  constexpr double tiny_weight = 1e-15;
+  Eigen::MatrixXd rdm_alpha = Eigen::MatrixXd::Zero(dim, dim);
+  Eigen::MatrixXd rdm_beta = Eigen::MatrixXd::Zero(dim, dim);
+  rdm_alpha.diagonal() << tiny_weight, 1.0 - tiny_weight;
+  rdm_beta = rdm_alpha;
+
+  Eigen::VectorXd rdm_aabb = Eigen::VectorXd::Zero(dim * dim * dim * dim);
+  const auto diagonal_index = [](std::size_t orbital) {
+    return static_cast<Eigen::Index>(
+        ((orbital * dim + orbital) * dim + orbital) * dim + orbital);
+  };
+  rdm_aabb(diagonal_index(0)) = tiny_weight;
+  rdm_aabb(diagonal_index(1)) = 1.0 - tiny_weight;
+  const Eigen::VectorXd same_spin = Eigen::VectorXd::Zero(rdm_aabb.size());
+
+  Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(dim, dim);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(dim, dim);
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap),
+      testing::create_random_basis_set(dim, "test"),
+      std::make_tuple(std::vector<std::size_t>({0, 1}),
+                      std::vector<std::size_t>{}));
+  Eigen::VectorXd ci_coefficients(2);
+  ci_coefficients << std::sqrt(tiny_weight), std::sqrt(1.0 - tiny_weight);
+  std::vector<Configuration> determinants{
+      Configuration::from_spin_half_string("20"),
+      Configuration::from_spin_half_string("02")};
+  auto wavefunction =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coefficients), determinants,
+          orbitals, std::nullopt,
+          std::make_optional<ContainerTypes::MatrixVariant>(rdm_alpha),
+          std::make_optional<ContainerTypes::MatrixVariant>(rdm_beta),
+          std::nullopt,
+          std::make_optional<ContainerTypes::VectorVariant>(same_spin),
+          std::make_optional<ContainerTypes::VectorVariant>(rdm_aabb),
+          std::make_optional<ContainerTypes::VectorVariant>(same_spin)));
+
+  expect_qio_entropy_helper_matches_wavefunction(*wavefunction, 1, 1);
+}
+
+TEST_F(LocalizationTest,
+       QIOSingleOrbitalEntropyMatchesClosedShellWavefunction) {
+  const auto test_wavefunction =
+      make_qio_entropy_test_wavefunction(testing::create_lih_structure(), 0, 1);
+  ASSERT_EQ(test_wavefunction.alpha_electrons,
+            test_wavefunction.beta_electrons);
+  ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
+  expect_qio_entropy_helper_matches_wavefunction(
+      *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
+      test_wavefunction.beta_electrons);
 }
 
 TEST_F(LocalizationTest, QIO) {
@@ -1754,10 +1864,6 @@ TEST_F(LocalizationTest, QIO) {
 
   ASSERT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
   ASSERT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
-  const auto [closed_shell_alpha, closed_shell_beta] =
-      active_space_wfn->get_active_num_electrons();
-  ASSERT_EQ(closed_shell_alpha, closed_shell_beta);
-  expect_qio_entropy_helper_matches_wavefunction(wfn_cas);
 
   const auto active_indices_a =
       spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
@@ -1825,36 +1931,14 @@ TEST_F(LocalizationTest, QIO) {
 }
 
 TEST_F(LocalizationTest, QIOSingleOrbitalEntropyMatchesOpenShellWavefunction) {
-  auto oh = testing::create_oh_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("enable_gdm", false);
-  scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("scf_type", "restricted");
-  auto [E_HF, wfn_HF] = scf_solver->run(oh, 0, 2, "sto-3g");
-  (void)E_HF;
-  ASSERT_TRUE(wfn_HF->get_orbitals()->is_restricted());
-
-  const std::size_t num_orbitals =
-      wfn_HF->get_orbitals()->get_num_molecular_orbitals();
-  std::vector<std::size_t> active_indices(num_orbitals);
-  std::iota(active_indices.begin(), active_indices.end(), 0);
-  auto active_orbitals =
-      testing::with_active_space(wfn_HF->get_orbitals(), active_indices, {});
-
-  auto hamil_ctor = HamiltonianConstructorFactory::create();
-  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
-  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
-  mc_calc->settings().set("calculate_one_rdm", true);
-  mc_calc->settings().set("calculate_two_rdm", true);
-  const auto [total_alpha, total_beta] = wfn_HF->get_total_num_electrons();
-  const auto active_alpha = static_cast<std::size_t>(std::llround(total_alpha));
-  const auto active_beta = static_cast<std::size_t>(std::llround(total_beta));
-  ASSERT_NE(active_alpha, active_beta);
-  auto [E_cas, wfn_cas] =
-      mc_calc->run(hamiltonian_cas, active_alpha, active_beta);
-  (void)E_cas;
-
-  expect_qio_entropy_helper_matches_wavefunction(wfn_cas);
+  const auto test_wavefunction =
+      make_qio_entropy_test_wavefunction(testing::create_oh_structure(), 0, 2);
+  ASSERT_NE(test_wavefunction.alpha_electrons,
+            test_wavefunction.beta_electrons);
+  ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
+  expect_qio_entropy_helper_matches_wavefunction(
+      *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
+      test_wavefunction.beta_electrons);
 }
 
 TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
