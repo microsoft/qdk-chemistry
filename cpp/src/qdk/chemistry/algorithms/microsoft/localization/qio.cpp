@@ -12,6 +12,7 @@
 #include <optional>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
@@ -400,34 +401,39 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
 
   const std::size_t n = active_indices_a.size();
 
-  // Extract the active alpha/beta 1-RDM and the alpha-beta (aabb) 2-RDM block.
-  auto [rdm_aa_variant, rdm_bb_variant] =
-      wavefunction->get_active_one_rdm_spin_dependent();
-  auto [rdm_aaaa_variant, rdm_aabb_variant, rdm_bbbb_variant] =
-      wavefunction->get_active_two_rdm_spin_dependent();
-  (void)rdm_aaaa_variant;  // QIO only needs the alpha-beta (aabb) block.
-  (void)rdm_bbbb_variant;
-
-  const auto* rdm_aa = std::get_if<Eigen::MatrixXd>(&rdm_aa_variant);
-  const auto* rdm_bb = std::get_if<Eigen::MatrixXd>(&rdm_bb_variant);
-  const auto* rdm_aabb = std::get_if<Eigen::VectorXd>(&rdm_aabb_variant);
-  if (!rdm_aa || !rdm_bb || !rdm_aabb) {
+  // Borrow the three required blocks directly, then make one mutable working
+  // copy of each. The legacy by-value accessors would also copy the unused
+  // aaaa and bbbb 2-RDM blocks before these working copies are made.
+  const auto* active_one_rdm =
+      std::get_if<data::SymmetryBlockedTensor<2, double>>(
+          &wavefunction->active_one_rdm());
+  const auto* active_two_rdm =
+      std::get_if<data::SymmetryBlockedTensor<4, double>>(
+          &wavefunction->active_two_rdm());
+  if (!active_one_rdm || !active_two_rdm) {
     throw std::invalid_argument(
         "QIOLocalizer requires real-valued active RDMs.");
   }
-  if (static_cast<std::size_t>(rdm_aa->rows()) != n ||
-      static_cast<std::size_t>(rdm_aa->cols()) != n ||
-      static_cast<std::size_t>(rdm_bb->rows()) != n ||
-      static_cast<std::size_t>(rdm_bb->cols()) != n ||
-      static_cast<std::size_t>(rdm_aabb->size()) != n * n * n * n) {
+  const auto& rdm_aa =
+      active_one_rdm->block({data::axes::alpha(), data::axes::alpha()});
+  const auto& rdm_bb =
+      active_one_rdm->block({data::axes::beta(), data::axes::beta()});
+  const auto& rdm_aabb =
+      active_two_rdm->block({data::axes::alpha(), data::axes::alpha(),
+                             data::axes::beta(), data::axes::beta()});
+  if (static_cast<std::size_t>(rdm_aa.rows()) != n ||
+      static_cast<std::size_t>(rdm_aa.cols()) != n ||
+      static_cast<std::size_t>(rdm_bb.rows()) != n ||
+      static_cast<std::size_t>(rdm_bb.cols()) != n ||
+      static_cast<std::size_t>(rdm_aabb.size()) != n * n * n * n) {
     throw std::invalid_argument(
         "Active RDM dimensions do not match the active-space size.");
   }
 
-  Eigen::MatrixXd rdm_alpha = *rdm_aa;
-  Eigen::MatrixXd rdm_beta = *rdm_bb;
-  std::vector<double> rdm_aabb_flat(rdm_aabb->data(),
-                                    rdm_aabb->data() + rdm_aabb->size());
+  Eigen::MatrixXd rdm_alpha = rdm_aa;
+  Eigen::MatrixXd rdm_beta = rdm_bb;
+  std::vector<double> rdm_aabb_flat(rdm_aabb.data(),
+                                    rdm_aabb.data() + rdm_aabb.size());
 
   // Minimize the single-orbital entropy sum -> accumulated rotation U.
   const auto max_cycles =

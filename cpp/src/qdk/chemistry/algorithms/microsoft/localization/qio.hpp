@@ -12,6 +12,13 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+namespace detail {
+
+double single_orbital_entropy(double occ_alpha, double occ_beta,
+                              double double_occ);
+
+}  // namespace detail
+
 /**
  * @class QIOLocalizerSettings
  * @brief Tunable Jacobi-sweep controls for the QIO localizer.

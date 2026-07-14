@@ -13,6 +13,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
+#include <qdk/chemistry/algorithms/microsoft/localization/qio.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -1691,6 +1692,40 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
       std::invalid_argument);
 }
 
+static void expect_qio_entropy_helper_matches_wavefunction(
+    const std::shared_ptr<Wavefunction>& wavefunction) {
+  ASSERT_TRUE(wavefunction->has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wavefunction->has_two_rdm_spin_dependent());
+
+  const auto* active_one_rdm = std::get_if<SymmetryBlockedTensor<2, double>>(
+      &wavefunction->active_one_rdm());
+  const auto* active_two_rdm = std::get_if<SymmetryBlockedTensor<4, double>>(
+      &wavefunction->active_two_rdm());
+  ASSERT_NE(active_one_rdm, nullptr);
+  ASSERT_NE(active_two_rdm, nullptr);
+
+  const auto& rdm_alpha = active_one_rdm->block({axes::alpha(), axes::alpha()});
+  const auto& rdm_beta = active_one_rdm->block({axes::beta(), axes::beta()});
+  const auto& rdm_aabb = active_two_rdm->block(
+      {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd expected = wavefunction->get_single_orbital_entropies();
+
+  ASSERT_EQ(rdm_alpha.rows(), expected.size());
+  ASSERT_EQ(rdm_beta.rows(), expected.size());
+  const std::size_t dim = static_cast<std::size_t>(expected.size());
+  for (std::size_t orbital = 0; orbital < dim; ++orbital) {
+    const auto index = static_cast<Eigen::Index>(orbital);
+    const auto diagonal_index = static_cast<Eigen::Index>(
+        ((orbital * dim + orbital) * dim + orbital) * dim + orbital);
+    const double actual =
+        qdk::chemistry::algorithms::microsoft::detail::single_orbital_entropy(
+            rdm_alpha(index, index), rdm_beta(index, index),
+            rdm_aabb(diagonal_index));
+    EXPECT_NEAR(actual, expected(index), testing::wf_tolerance)
+        << "orbital " << orbital;
+  }
+}
+
 TEST_F(LocalizationTest, QIO) {
   auto localizer = LocalizerFactory::create("qdk_qio");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
@@ -1719,6 +1754,10 @@ TEST_F(LocalizationTest, QIO) {
 
   ASSERT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
   ASSERT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
+  const auto [closed_shell_alpha, closed_shell_beta] =
+      active_space_wfn->get_active_num_electrons();
+  ASSERT_EQ(closed_shell_alpha, closed_shell_beta);
+  expect_qio_entropy_helper_matches_wavefunction(wfn_cas);
 
   const auto active_indices_a =
       spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
@@ -1783,6 +1822,39 @@ TEST_F(LocalizationTest, QIO) {
   const auto [nelec_a, nelec_b] = wfn_cas->get_active_num_electrons();
   EXPECT_NEAR(static_cast<double>(nelec_a + nelec_b), output_rdm->trace(),
               1e-8);
+}
+
+TEST_F(LocalizationTest, QIOSingleOrbitalEntropyMatchesOpenShellWavefunction) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_HF, wfn_HF] = scf_solver->run(oh, 0, 2, "sto-3g");
+  (void)E_HF;
+  ASSERT_TRUE(wfn_HF->get_orbitals()->is_restricted());
+
+  const std::size_t num_orbitals =
+      wfn_HF->get_orbitals()->get_num_molecular_orbitals();
+  std::vector<std::size_t> active_indices(num_orbitals);
+  std::iota(active_indices.begin(), active_indices.end(), 0);
+  auto active_orbitals =
+      testing::with_active_space(wfn_HF->get_orbitals(), active_indices, {});
+
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  const auto [total_alpha, total_beta] = wfn_HF->get_total_num_electrons();
+  const auto active_alpha = static_cast<std::size_t>(std::llround(total_alpha));
+  const auto active_beta = static_cast<std::size_t>(std::llround(total_beta));
+  ASSERT_NE(active_alpha, active_beta);
+  auto [E_cas, wfn_cas] =
+      mc_calc->run(hamiltonian_cas, active_alpha, active_beta);
+  (void)E_cas;
+
+  expect_qio_entropy_helper_matches_wavefunction(wfn_cas);
 }
 
 TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
