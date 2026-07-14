@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     Orbitals,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -402,7 +403,16 @@ class TestHamiltonian:
             orig_orbs = h.get_orbitals()
             restored_orbs = h_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_hamiltonian_construction(self):
         """Test restricted Hamiltonian construction and properties."""
@@ -591,12 +601,16 @@ class TestHamiltonian:
         assert h_unrestricted.is_unrestricted()
 
         # Verify active space information is accessible
-        alpha_indices, beta_indices = model_orbitals_restricted.get_active_space_indices()
+        active_indices = model_orbitals_restricted.active_indices()
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
         assert len(alpha_indices) == 4  # All orbitals active by default
         assert len(beta_indices) == 4
         assert alpha_indices == beta_indices
 
-        alpha_indices_unres, beta_indices_unres = model_orbitals_unrestricted.get_active_space_indices()
+        active_indices_unres = model_orbitals_unrestricted.active_indices()
+        alpha_indices_unres = spin_channel_indices(active_indices_unres, axes.alpha())
+        beta_indices_unres = spin_channel_indices(active_indices_unres, axes.beta())
         assert len(alpha_indices_unres) == 4  # All orbitals active by default
         assert len(beta_indices_unres) == 4
 
@@ -929,7 +943,16 @@ class TestCholeskyHamiltonian:
             orig_orbs = h.get_orbitals()
             restored_orbs = h_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_hamiltonian_construction(self):
         """Test restricted Cholesky Hamiltonian construction and properties."""

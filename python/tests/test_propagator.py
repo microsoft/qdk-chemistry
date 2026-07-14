@@ -13,11 +13,11 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.propagator import MagnusPropagator
-from qdk_chemistry.data import DrivenQubitHamiltonian, QubitHamiltonian
+from qdk_chemistry.data import DrivenQubitHamiltonian, QubitOperator
 
 
-def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitHamiltonian:
-    return QubitHamiltonian(labels, np.array(weights))
+def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitOperator:
+    return QubitOperator(labels, np.array(weights))
 
 
 class TestTimeAveragedPropagatorDriven:
@@ -71,7 +71,7 @@ class TestTimeAveragedPropagatorDriven:
         result = propagator.run(td, 0.0, 2.0 * math.pi)
 
         # f_avg should be ~0 → only H0 terms remain
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
+        def _to_dict(h: QubitOperator) -> dict[str, complex]:
             return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
 
         expected_dict = _to_dict(h0)

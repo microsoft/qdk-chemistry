@@ -23,16 +23,14 @@ from qdk_chemistry.algorithms.active_space_selector import (
 )
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
-from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
-from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
-    EffectiveHamiltonianConstructor,
-    QdkCtF12HamiltonianConstructor,
-)
-from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
-from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
+from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
+from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
+    EffectiveHamiltonianConstructor,
     HamiltonianConstructor,
+    QdkCtF12HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
@@ -42,6 +40,11 @@ from qdk_chemistry.algorithms.multi_configuration_calculator import (
     QdkMacisCas,
 )
 from qdk_chemistry.algorithms.multi_configuration_scf import MultiConfigurationScf
+from qdk_chemistry.algorithms.nuclear_derivative import (
+    FiniteDifferenceNuclearDerivativeCalculator,
+    NuclearDerivativeCalculator,
+    QdkNuclearDerivativeCalculator,
+)
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
@@ -57,7 +60,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
-from qdk_chemistry.algorithms.scf_solver import QdkCtF12ScfSolver, QdkScfSolver, ScfSolver
+from qdk_chemistry.algorithms.scf_solver import QdkCtF12ScfSolver, QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -70,12 +73,14 @@ __all__ = [
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
-    "EnergyEstimator",
+    "ExpectationEstimator",
+    "FiniteDifferenceNuclearDerivativeCalculator",
     "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
+    "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
     "PhaseEstimation",
     "ProjectedMultiConfigurationCalculator",
@@ -83,18 +88,21 @@ __all__ = [
     "QdkAutocasEosActiveSpaceSelector",
     "QdkCtF12HamiltonianConstructor",
     "QdkCtF12ScfSolver",
-    "QdkEnergyEstimator",
+    "QdkExpectationEstimator",
     "QdkHamiltonianConstructor",
+    "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
     "QdkNaturalOrbitalLocalizer",
+    "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
+    "QdkStabilizedScfSolver",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QpeCircuitBuilder",
@@ -126,6 +134,13 @@ _REGISTRY_EXPORTS = frozenset(
     }
 )
 
+# Deprecated public names mapped to their replacements. Accessing an alias emits a
+# DeprecationWarning but returns the new class object, so existing code keeps working.
+_DEPRECATED_ALIASES = {
+    "EnergyEstimator": "ExpectationEstimator",
+    "QdkEnergyEstimator": "QdkExpectationEstimator",
+}
+
 _registry_module: ModuleType | None = None
 
 if TYPE_CHECKING:  # pragma: no cover - typing-only imports
@@ -154,12 +169,23 @@ def __getattr__(name: str) -> Any:
         attr = getattr(_load_registry(), name)
         globals()[name] = attr  # cache for subsequent lookups
         return attr
+    target = _DEPRECATED_ALIASES.get(name)
+    if target is not None:
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            f"'qdk_chemistry.algorithms.{name}' is deprecated and will be removed in a "
+            f"future release; use 'qdk_chemistry.algorithms.{target}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[target]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__() -> list[str]:
     """Ensure dir() lists lazily resolved registry helpers."""
-    return sorted(set(globals()) | _REGISTRY_EXPORTS)
+    return sorted(set(globals()) | _REGISTRY_EXPORTS | set(_DEPRECATED_ALIASES))
 
 
 if TELEMETRY_ENABLED:

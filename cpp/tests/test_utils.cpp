@@ -410,9 +410,10 @@ TEST_F(OrbitalRotationTest, IdentityRotationTest) {
       rotate_orbitals(test_orbitals_restricted, rotation_vector,
                       num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
 
-  const auto& original_coeffs =
-      test_orbitals_restricted->get_coefficients_alpha();
-  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+  const auto& original_coeffs = test_orbitals_restricted->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& rotated_coeffs =
+      rotated_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
 
   // With zero rotation, coefficients should be the same
   EXPECT_TRUE(original_coeffs.isApprox(rotated_coeffs,
@@ -435,9 +436,10 @@ TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
                       num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
 
   const auto& S = test_orbitals_restricted->get_overlap_matrix();
-  const auto& original_coeffs =
-      test_orbitals_restricted->get_coefficients_alpha();
-  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+  const auto& original_coeffs = test_orbitals_restricted->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& rotated_coeffs =
+      rotated_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
 
   // Compute the transformation matrix U = C_original^T * S * C_rotated
   Eigen::MatrixXd U = original_coeffs.transpose() * S * rotated_coeffs;

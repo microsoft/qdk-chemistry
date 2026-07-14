@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
@@ -99,7 +100,8 @@ double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
     throw std::runtime_error("One-body integrals are not set");
   }
 
-  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   if (i >= norb || j >= norb) {
     throw std::out_of_range("Orbital index out of range");
   }
@@ -214,9 +216,9 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_orbitals || !_orbitals->has_active_space()) return;
 
-  auto active_indices = _orbitals->get_active_space_indices();
-  size_t n_active_alpha = active_indices.first.size();
-  size_t n_active_beta = active_indices.second.size();
+  const auto active_ai = _orbitals->active_indices();
+  size_t n_active_alpha = spin_channel_indices(active_ai, axes::alpha()).size();
+  size_t n_active_beta = spin_channel_indices(active_ai, axes::beta()).size();
 
   // Check one-body integrals dimensions match active space
   if (has_one_body_integrals()) {
@@ -324,9 +326,11 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
   size_t num_molecular_orbitals;
   if (has_orbitals()) {
     if (_orbitals->has_active_space()) {
-      auto active_indices = _orbitals->get_active_space_indices();
-      size_t n_active_alpha = active_indices.first.size();
-      size_t n_active_beta = active_indices.second.size();
+      const auto active_ai = _orbitals->active_indices();
+      size_t n_active_alpha =
+          spin_channel_indices(active_ai, axes::alpha()).size();
+      size_t n_active_beta =
+          spin_channel_indices(active_ai, axes::beta()).size();
 
       if (n_active_alpha != n_active_beta) {
         throw std::invalid_argument(
@@ -420,7 +424,9 @@ std::string Hamiltonian::get_summary() const {
   QDK_LOG_TRACE_ENTERING();
   std::string summary = "Hamiltonian Summary:\n";
   size_t num_molecular_orbitals = get_orbitals()->get_num_molecular_orbitals();
-  size_t norb = get_orbitals()->get_active_space_indices().first.size();
+  size_t norb =
+      spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+          .size();
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";

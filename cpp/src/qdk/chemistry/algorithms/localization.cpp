@@ -5,6 +5,8 @@
 #include <cmath>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/config.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -41,8 +43,9 @@ data::Configuration _active_configuration_for_orbitals(
     return total_configuration;
   }
 
-  const auto active_space_indices = orbitals->get_active_space_indices();
-  const auto& active_indices = active_space_indices.first;
+  const auto active_index_set = orbitals->active_indices();
+  const auto active_indices =
+      data::spin_channel_indices(active_index_set, data::axes::alpha());
   if (active_indices.empty()) {
     return data::Configuration::from_spin_half_string("");
   }
@@ -158,11 +161,18 @@ std::unique_ptr<Localizer> make_pipek_mezey_localizer() {
   return std::make_unique<microsoft::PipekMezeyLocalizer>();
 }
 
+// MP2NaturalOrbitalLocalizer is deprecated (superseded by
+// NaturalOrbitalLocalizer), but this factory intentionally still provides it
+// through the localizer registry. Suppress the self-referential deprecation
+// warning at this facade site only.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 std::unique_ptr<Localizer> make_mp2_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::MP2NaturalOrbitalLocalizer>();
 }
+#pragma GCC diagnostic pop
 
 std::unique_ptr<Localizer> make_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();

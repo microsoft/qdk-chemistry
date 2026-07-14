@@ -13,6 +13,7 @@
 #include <macis/mcscf/cas.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -52,8 +53,11 @@ struct asci_helper {
     using dbm_gen_t = macis::DynamicBitMaskHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    const auto& [active_indices, active_indices_beta] =
-        orbitals->get_active_space_indices();
+    const auto active_ai = orbitals->active_indices();
+    const auto active_indices =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto active_indices_beta =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     // check that alpha and beta active space indices are the same
     if (active_indices != active_indices_beta) {
       throw std::runtime_error(
@@ -208,8 +212,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisAsci::_run_impl(
         "MacisAsci does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
-  const auto& [active_indices, active_indices_beta] =
-      orbitals->get_active_space_indices();
+  const auto active_ai = orbitals->active_indices();
+  const auto active_indices =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  const auto active_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
   // check that alpha and beta active space indices are the same
   if (active_indices != active_indices_beta) {
     throw std::runtime_error(

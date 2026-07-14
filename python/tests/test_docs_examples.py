@@ -126,8 +126,8 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    # Energy estimator examples run circuit simulations and are slow
-    if 'create("energy_estimator"' in content or "create('energy_estimator'" in content:
+    # Expectation estimator examples run circuit simulations and are slow
+    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
     return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow

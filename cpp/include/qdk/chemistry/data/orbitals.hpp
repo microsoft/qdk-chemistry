@@ -85,6 +85,9 @@ class Orbitals : public DataClass,
    * @param indices (active, inactive) indices; @c std::nullopt selects the full
    *        active space.
    */
+  [[deprecated(
+      "Deprecated in v2.0; use the SymmetryBlockedIndexSet constructor "
+      "instead.")]]
   Orbitals(
       const Eigen::MatrixXd& coefficients,
       const std::optional<Eigen::VectorXd>& energies,
@@ -133,6 +136,9 @@ class Orbitals : public DataClass,
    * @param indices (active_alpha, active_beta, inactive_alpha, inactive_beta)
    *        indices; @c std::nullopt selects the full active space.
    */
+  [[deprecated(
+      "Deprecated in v2.0; use the SymmetryBlockedIndexSet constructor "
+      "instead.")]]
   Orbitals(
       const Eigen::MatrixXd& coefficients_alpha,
       const Eigen::MatrixXd& coefficients_beta,
@@ -225,6 +231,9 @@ class Orbitals : public DataClass,
    * @return Pair of references to (alpha, beta) coefficient matrices
    * @throws std::runtime_error if coefficients are not set
    */
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   virtual std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_coefficients() const;
 
@@ -233,6 +242,8 @@ class Orbitals : public DataClass,
    * @return Pair of references to (alpha, beta) energy vectors
    * @throws std::runtime_error if energies are not set
    */
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   virtual std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
   get_energies() const;
 
@@ -246,6 +257,9 @@ class Orbitals : public DataClass,
    * @brief Get active space information
    * @return Pair of (alpha, beta) active space indices
    */
+  [[deprecated(
+      "Deprecated in v2.0; use active_indices() (SymmetryBlockedIndexSet) "
+      "instead.")]]
   virtual std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_active_space_indices() const;
 
@@ -253,6 +267,9 @@ class Orbitals : public DataClass,
    * @brief Get inactive space information
    * @return Pair of (alpha, beta) inactive space indices
    */
+  [[deprecated(
+      "Deprecated in v2.0; use inactive_indices() (SymmetryBlockedIndexSet) "
+      "instead.")]]
   std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_inactive_space_indices() const;
 
@@ -391,24 +408,34 @@ class Orbitals : public DataClass,
    * @brief Get alpha orbital coefficients
    * @return Reference to alpha coefficient matrix
    */
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_alpha() const;
 
   /**
    * @brief Get beta orbital coefficients
    * @return Reference to beta coefficient matrix
    */
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_beta() const;
 
   /**
    * @brief Get alpha orbital energies
    * @return Reference to alpha energy vector
    */
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   virtual const Eigen::VectorXd& get_energies_alpha() const;
 
   /**
    * @brief Get beta orbital energies
    * @return Reference to beta energy vector
    */
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   virtual const Eigen::VectorXd& get_energies_beta() const;
 
   /**
@@ -791,6 +818,9 @@ class ModelOrbitals : public Orbitals {
    * @param basis_size Number of single-particle modes.
    * @param indices (active, inactive) mode-index tuple.
    */
+  [[deprecated(
+      "Deprecated in v2.0; use the SymmetryBlockedIndexSet constructor "
+      "instead.")]]
   ModelOrbitals(
       size_t basis_size,
       const std::tuple<std::vector<size_t>, std::vector<size_t>>& indices);
@@ -808,6 +838,9 @@ class ModelOrbitals : public Orbitals {
    * @param indices (active_alpha, active_beta, inactive_alpha, inactive_beta)
    *        mode-index tuple.
    */
+  [[deprecated(
+      "Deprecated in v2.0; use the SymmetryBlockedIndexSet constructor "
+      "instead.")]]
   ModelOrbitals(
       size_t basis_size,
       const std::tuple<std::vector<size_t>, std::vector<size_t>,
@@ -820,14 +853,29 @@ class ModelOrbitals : public Orbitals {
   virtual ~ModelOrbitals() = default;
 
   // Override methods that should throw errors for model systems
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&> get_coefficients()
       const override;
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&> get_energies()
       const override;
   std::shared_ptr<BasisSet> get_basis_set() const override;
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   const Eigen::MatrixXd& get_coefficients_alpha() const override;
+  [[deprecated(
+      "Deprecated in v2.0; use coefficients() (SymmetryBlockedTensor) "
+      "instead.")]]
   const Eigen::MatrixXd& get_coefficients_beta() const override;
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   const Eigen::VectorXd& get_energies_alpha() const override;
+  [[deprecated(
+      "Deprecated in v2.0; use energies() (SymmetryBlockedTensor) instead.")]]
   const Eigen::VectorXd& get_energies_beta() const override;
   const Eigen::MatrixXd& get_overlap_matrix() const override;
 

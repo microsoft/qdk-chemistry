@@ -25,7 +25,7 @@ from qdk_chemistry.data import (
     Circuit,
     DrivenQubitHamiltonian,
     FlatPartition,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
@@ -89,8 +89,8 @@ def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
 def test_euler_integrator_eigenvalue_remains_constant() -> None:
     """Run an example EulerIntegrator workflow."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])
-    h0 = QubitHamiltonian(["ZZ"], np.array([0.0]), term_partition=partition)
-    h1 = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    h0 = QubitOperator(["ZZ"], np.array([0.0]), term_partition=partition)
+    h1 = QubitOperator(["ZZ"], np.array([1.0]), term_partition=partition)
 
     def square_wave(t: float) -> float:
         """Alternates +1/-1 based on which time step we are in."""
@@ -98,7 +98,7 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
         return 1.0 if step % 2 == 0 else -1.0
 
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=square_wave)
-    observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    observable = QubitOperator(["ZZ"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
@@ -130,10 +130,10 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
 def test_euler_integrator_with_device_backend() -> None:
     """Run EulerIntegrator with a device_backend_name string."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])
-    h0 = QubitHamiltonian(["ZZ"], np.array([0.0]), term_partition=partition)
-    h1 = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    h0 = QubitOperator(["ZZ"], np.array([0.0]), term_partition=partition)
+    h1 = QubitOperator(["ZZ"], np.array([1.0]), term_partition=partition)
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=_constant_drive)
-    observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    observable = QubitOperator(["ZZ"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
@@ -167,9 +167,9 @@ def test_euler_integrator_with_device_backend() -> None:
 class TestEulerIntegratorValidation:
     """Tests for EulerIntegrator input validation."""
 
-    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitHamiltonian:
+    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitOperator:
         labels = ["Z" + "I" * (num_qubits - 1)]
-        return QubitHamiltonian(labels, np.array([1.0]))
+        return QubitOperator(labels, np.array([1.0]))
 
     def _dummy_state_prep(self) -> Circuit:
         return identity_state_prep(num_qubits=2)
@@ -297,10 +297,10 @@ def _run_smooth_drive_test(
 
     Uses a non-commuting Hamiltonian so ⟨Z⟩ depends on the evolution time.
     """
-    h0 = QubitHamiltonian(["I"], np.array([0.0]))
-    h1 = QubitHamiltonian(["X"], np.array([1.0]))
+    h0 = QubitOperator(["I"], np.array([0.0]))
+    h1 = QubitOperator(["X"], np.array([1.0]))
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=drive)
-    observable = QubitHamiltonian(["Z"], np.array([1.0]))
+    observable = QubitOperator(["Z"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
@@ -365,10 +365,10 @@ def test_euler_integrator_non_commuting_observable() -> None:
     exact ⟨Z⟩ = cos(2t).  At t = π/4, ⟨Z⟩ = 0.  This catches bugs where
     the evolution time is wrong (e.g., doubled → ⟨Z⟩ = -1).
     """
-    h0 = QubitHamiltonian(["I"], np.array([0.0]))
-    h1 = QubitHamiltonian(["X"], np.array([1.0]))
+    h0 = QubitOperator(["I"], np.array([0.0]))
+    h1 = QubitOperator(["X"], np.array([1.0]))
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=_constant_drive)
-    observable = QubitHamiltonian(["Z"], np.array([1.0]))
+    observable = QubitOperator(["Z"], np.array([1.0]))
 
     total_time = np.pi / 4
     dt = total_time  # single step — constant drive, so one step is exact

@@ -14,7 +14,7 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 std::string sparse_to_dense_le(const SparsePauliWord& word,
                                std::size_t num_qubits) {
@@ -59,7 +59,11 @@ void expect_real_term(
   EXPECT_NEAR(it->second.imag(), 0.0, 1e-12);
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
+using test_support::collect_terms;
+using test_support::expect_real_term;
 
 TEST(MajoranaMapEngineTest, MapsOneBodyUnrestrictedJordanWignerHamiltonian) {
   auto mapping = MajoranaMapping::jordan_wigner(2);

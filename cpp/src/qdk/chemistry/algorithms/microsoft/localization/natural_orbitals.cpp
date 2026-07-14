@@ -6,6 +6,8 @@
 
 #include <Eigen/Eigenvalues>
 #include <algorithm>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <variant>
@@ -54,10 +56,16 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
         "orbitals.");
   }
 
-  const auto& [active_indices_a, active_indices_b] =
-      orbitals->get_active_space_indices();
-  const auto& [inactive_indices_a, inactive_indices_b] =
-      orbitals->get_inactive_space_indices();
+  const auto active_index_set = orbitals->active_indices();
+  const auto active_indices_a =
+      data::spin_channel_indices(active_index_set, data::axes::alpha());
+  const auto active_indices_b =
+      data::spin_channel_indices(active_index_set, data::axes::beta());
+  const auto inactive_index_set = orbitals->inactive_indices();
+  const auto inactive_indices_a =
+      data::spin_channel_indices(inactive_index_set, data::axes::alpha());
+  const auto inactive_indices_b =
+      data::spin_channel_indices(inactive_index_set, data::axes::beta());
 
   if (active_indices_a != active_indices_b ||
       inactive_indices_a != inactive_indices_b) {
@@ -80,7 +88,10 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   }
 
   const size_t num_active = active_indices_a.size();
-  const auto& [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  const auto& coeffs_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& coeffs_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
 
   // Extract active alpha coefficients as the target spatial orbital basis.
   Eigen::MatrixXd selected_coeffs(coeffs_alpha.rows(), num_active);
