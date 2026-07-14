@@ -2,13 +2,12 @@ Migrating data files between serialization versions
 ===================================================
 
 Each QDK/Chemistry data class versions its on-disk serialization schema
-independently. A deserializer (:meth:`~qdk_chemistry.data.Orbitals.from_file`,
-:meth:`~qdk_chemistry.data.Hamiltonian.from_file`,
-:meth:`~qdk_chemistry.data.Wavefunction.from_file`,
-:meth:`~qdk_chemistry.data.QpeResult.from_file`, and their ``from_json`` /
-``from_hdf5`` counterparts) accepts **only** the serialization version the installed
-library was built against. Loading a file written against an older version of that
-class's schema raises an error that points back here.
+independently. Deserializers for :class:`~qdk_chemistry.data.Orbitals`,
+:class:`~qdk_chemistry.data.Hamiltonian`,
+:class:`~qdk_chemistry.data.Wavefunction`, and
+:class:`~qdk_chemistry.data.QpeResult` accept **only** the serialization version
+the installed library was built against. Loading a file written against an older
+version of that class's schema raises an error that points back here.
 
 The ``qdk_chemistry.migrate`` converter upgrades such a file to the serialization
 version the installed library accepts. It migrates each data class point-for-point
