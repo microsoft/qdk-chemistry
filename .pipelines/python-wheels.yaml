@@ -70,6 +70,10 @@ parameters:
   type: string
   default: None
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
+- name: releaseBuild
+  type: boolean
+  default: true
+  displayName: Emit clean release version (strip +local dev suffix)
 - name: runSlowTests
   type: boolean
   default: true
@@ -79,6 +83,11 @@ variables:
 - group: QdkChemistry
 - name: ComponentDetection.MaxDetectionThreads
   value: '16'
+# Controls the version provider (python/_dev_version.py). When true, wheels get the
+# bare release version; when false, a +local suffix is appended for dev builds.
+# PyPI/ESRP reject local versions, so keep this true for any published release.
+- name: QDK_CHEMISTRY_RELEASE_BUILD
+  value: '${{ parameters.releaseBuild }}'
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:

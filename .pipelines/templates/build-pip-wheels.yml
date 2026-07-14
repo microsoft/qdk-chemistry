@@ -94,6 +94,7 @@ steps:
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
+        -e QDK_CHEMISTRY_RELEASE_BUILD \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
@@ -122,6 +123,7 @@ steps:
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
+        -e QDK_CHEMISTRY_RELEASE_BUILD \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
