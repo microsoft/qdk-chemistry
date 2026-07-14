@@ -62,10 +62,6 @@ parameters:
   - 3.13
   - 3.14
   displayName: Python versions
-- name: publishInternalFeed
-  type: boolean
-  default: false
-  displayName: Publish to Internal Feed
 - name: publishEsrp
   type: boolean
   default: false
@@ -283,23 +279,6 @@ extends:
             - script: |
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               displayName: Fix wheel directory ownership
-
-          - task: TwineAuthenticate@1
-            inputs:
-              artifactFeed: $(artifactProject)/$(artifactFeed)
-            displayName: Authenticate to internal feed
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
-
-          - script: |
-              cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              # --break-system-packages: the Linux x86_64 host image (Ubuntu 24.04) ships a
-              # PEP 668 EXTERNALLY-MANAGED system Python, which refuses a bare `pip install`.
-              # The flag lets pip fall back to a per-user install (as it already does on the
-              # other agents) and is an accepted no-op where the marker is absent.
-              python3 -m pip install --break-system-packages twine
-              python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
           # Publishing debug symbols is not supported for macOS
           - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
