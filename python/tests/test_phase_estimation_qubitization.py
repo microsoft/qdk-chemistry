@@ -27,13 +27,7 @@ _builder_params = [
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=[
-            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            pytest.mark.xfail(
-                reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile",
-                raises=Exception,
-            ),
-        ],
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
     ),
 ]
 
@@ -147,7 +141,11 @@ class TestQPEWithQubitization:
         )
 
     @pytest.mark.parametrize("builder_name", _builder_params)
-    def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian):
+    def test_iterative_qpe_with_qubitization_h2(
+        self,
+        builder_name: str,
+        h2_hamiltonian: QubitHamiltonian,
+    ):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 
         Uses the full H2/STO-3G qubit Hamiltonian (15 Pauli terms, 4 qubits)
@@ -224,10 +222,7 @@ class TestQPEWithQubitization:
         assert np.isclose(result.raw_energy, reference_energy, atol=0.02)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-    @pytest.mark.xfail(
-        reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile",
-        raises=Exception,
-    )
+    @pytest.mark.usefixtures("initialize_qsharp_base_profile")
     def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)

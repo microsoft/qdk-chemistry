@@ -32,7 +32,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.StatePreparation.PreparePureStateD;
     import Std.TableLookup.Select;
     import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
     import Std.ResourceEstimation.RepeatEstimates;
     import Std.ResourceEstimation.SingleVariant;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
@@ -426,9 +428,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
         power : Int,
+        computeQubitPercentage : Double,
     ) : Unit {
         let numSpinQubits = 2; // spinReg = [spinDQ, spinSF]
         let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits + numPhaseGradientQubits;
+        let totalQubits = 1 + numSystemQubits + totalAncilla;
+        if computeQubitPercentage > 0.0 {
+            let computeCapacity = Ceiling(computeQubitPercentage * IntAsDouble(totalQubits) / 100.0);
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
 
         use control = Qubit();
         use allQubits = Qubit[numSystemQubits + totalAncilla];
@@ -466,9 +474,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
         numQueries : Int,
+        computeQubitPercentage : Double,
     ) : Unit {
         let numSpinQubits = 2;
         let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits + numPhaseGradientQubits;
+        let totalQubits = 1 + numSystemQubits + totalAncilla;
+        if computeQubitPercentage > 0.0 {
+            let computeCapacity = Ceiling(computeQubitPercentage * IntAsDouble(totalQubits) / 100.0);
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
 
         use control = Qubit[1];
         use allQubits = Qubit[numSystemQubits + totalAncilla];

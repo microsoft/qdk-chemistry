@@ -209,6 +209,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
             "ancillaPrep": ancilla_prep_op,
+            "computeQubitPercentage": self.settings().get("compute_qubit_percentage"),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

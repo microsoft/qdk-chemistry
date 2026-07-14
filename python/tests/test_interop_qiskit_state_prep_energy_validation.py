@@ -185,12 +185,11 @@ def get_bitstring(circuit: Circuit) -> str:
     return next(iter(counts.keys()))
 
 
-@pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
 @pytest.mark.parametrize(
     "bitstring",
     [[1, 0, 1, 0], [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 1, 0, 0, 1], [1], [0]],
 )
-def test_single_reference_state_basic(bitstring):
+def test_single_reference_state_basic(bitstring, initialize_qsharp_base_profile):
     """Test basic single reference state preparation with various bitstrings."""
     test_cls = SparseIsometryGF2XStatePreparation()
     circuit = test_cls._prepare_single_reference_state(bitstring)

@@ -92,7 +92,7 @@ class TestOuterPrep:
         appears at dump index bit_reverse(k). We account for this by building
         expected in LE-address space.
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
 
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
@@ -129,7 +129,7 @@ class TestOuterPrep:
         We check that the marginal probabilities on the index register match
         p(l) = |c_l| / Σ|c_j|.
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
 
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
@@ -174,7 +174,7 @@ class TestInnerPrep:
         match:
             P(b|l) ≈ |c_{l,b}|² / Σ_j |c_{l,j}|²
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
 
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         controlled_unitary = _build_controlled_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
@@ -274,6 +274,7 @@ class TestSOSSAMapper:
         assert mapper.select_needs_phase_gradient is True
         assert mapper.settings().get("rotation_bit_precision") == 10
         assert mapper.settings().get("coefficient_bit_precision") == 10
+        assert mapper.settings().get("compute_qubit_percentage") == 0.0
 
     def test_rejects_non_sossa_container(self):
         """Verify SOSSAMapper raises ValueError for non-SOSSAContainer containers."""
@@ -382,6 +383,24 @@ class TestSOSSAMapper:
         params = circuit._qsharp_factory.parameter
         assert params["power"] == 5
 
+    def test_compute_qubit_percentage_passes_to_qsharp(self):
+        """Test that the compute-qubit percentage passes through to the Q# entry point."""
+        controlled_unitary = _build_controlled_unitary()
+        mapper = SOSSAMapper()
+        mapper.settings().set("compute_qubit_percentage", 20.0)
+
+        circuit = mapper.run(controlled_unitary)
+
+        assert circuit._qsharp_factory.parameter["computeQubitPercentage"] == 20.0
+
+    @pytest.mark.parametrize("percentage", [-1.0, 101.0])
+    def test_compute_qubit_percentage_rejects_out_of_range_values(self, percentage: float):
+        """Test that the compute-qubit percentage remains within 0-100."""
+        mapper = SOSSAMapper()
+
+        with pytest.raises(ValueError, match="out of allowed range"):
+            mapper.settings().set("compute_qubit_percentage", percentage)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SELECT fidelity tests
@@ -405,7 +424,7 @@ class TestSelectFullFidelity:
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_givens_fidelity(self, N):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
 
         rng = np.random.default_rng(42 + N)
         dq_angles = []
@@ -475,7 +494,7 @@ class TestSOSSAWalkLogicalCounts:
     )
     def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify numQubits matches the paper formula bounds."""
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIFLA)
+        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
 
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,

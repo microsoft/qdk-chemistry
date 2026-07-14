@@ -5,6 +5,11 @@
 namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
     import Std.Arrays.Subarray;
+    import Std.Convert.IntAsDouble;
+    import Std.Core.Length;
+    import Std.Math.Ceiling;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
 
     /// A struct to hold parameters for iterative Quantum Phase Estimation (IQPE).
     /// - `statePrep`: A function to prepare the initial quantum state.
@@ -73,7 +78,13 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         systems : Int[],
         numAncillaQubits : Int,
         ancillaPrep : Qubit[] => Unit is Adj,
+        computeQubitPercentage : Double,
     ) : Result[] {
+        let totalQubits = 1 + Length(systems) + numAncillaQubits;
+        if computeQubitPercentage > 0.0 {
+            let computeCapacity = Ceiling(computeQubitPercentage * IntAsDouble(totalQubits) / 100.0);
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
             repControlledUnitary = repControlledUnitary,

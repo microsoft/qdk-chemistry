@@ -27,7 +27,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_helpers import create_random_factorized_hamiltonian
@@ -289,12 +289,6 @@ class TestSOSSABuilder:
 class TestOuterPrepareQSharp:
     """Test the Q# OuterPrepare sub-operations via dump_machine."""
 
-    @pytest.fixture(autouse=True)
-    def _reinit_qsharp(self):
-        """Re-initialize Q# interpreter for each test."""
-        qsharp.init()
-        _ = QSHARP_UTILS.SOSSAWalk
-
     def test_pure_state_preparation(self):
         """Test MakeOuterPreparePureState produces the correct statevector.
 
@@ -331,12 +325,6 @@ class TestOuterPrepareQSharp:
 
 class TestInnerPrepareQSharp:
     """Test the Q# InnerPrepare sub-operations via dump_machine."""
-
-    @pytest.fixture(autouse=True)
-    def _reinit_qsharp(self):
-        """Re-initialize Q# interpreter for each test."""
-        qsharp.init()
-        _ = QSHARP_UTILS.SOSSAWalk
 
     def test_direct_inner_prepare_conditioned_on_xo(self):
         """Test InnerPrepareDirect: for a fixed x_o, inner register gets correct state.

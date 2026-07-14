@@ -243,10 +243,7 @@ _builder_params = [
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=[
-            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile"),
-        ],
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
     ),
 ]
 

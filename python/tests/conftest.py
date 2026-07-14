@@ -43,6 +43,37 @@ from qdk_chemistry.data import (
 
 from .test_helpers import create_test_orbitals
 
+
+@pytest.fixture
+def initialize_qsharp_base_profile():
+    """Initialize Q# interpreter with Base target profile for Qiskit-compatible QIR."""
+    from qdk._native import TargetProfile  # noqa: PLC0415
+
+    from qdk_chemistry.utils.qsharp import get_qsharp_utils  # noqa: PLC0415
+
+    get_qsharp_utils(target_profile=TargetProfile.Base)
+    yield
+    get_qsharp_utils(target_profile=TargetProfile.Adaptive_RIF)
+
+
+@pytest.fixture(autouse=True)
+def initialize_qsharp_profile_for_qiskit_builder(request: pytest.FixtureRequest):
+    """Use Base profile before fixtures create callables for parametrized Qiskit builders."""
+    callspec = getattr(request.node, "callspec", None)
+    builder_name = callspec.params.get("builder_name", "") if callspec is not None else ""
+    if not builder_name.startswith("qiskit_"):
+        yield
+        return
+
+    from qdk._native import TargetProfile  # noqa: PLC0415
+
+    from qdk_chemistry.utils.qsharp import get_qsharp_utils  # noqa: PLC0415
+
+    get_qsharp_utils(target_profile=TargetProfile.Base)
+    yield
+    get_qsharp_utils(target_profile=TargetProfile.Adaptive_RIF)
+
+
 # Dynamically add the build directory to Python path
 # This ensures the _core module can be found regardless of platform
 current_dir = Path(__file__).parent

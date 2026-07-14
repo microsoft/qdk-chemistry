@@ -157,8 +157,7 @@ class TestQiskitStandardQpeCircuitBuilder:
 class TestQiskitIterativeQpeCircuitBuilder:
     """Tests for the Qiskit iterative phase estimation circuit builder."""
 
-    @pytest.mark.xfail(reason="QIR-to-Qiskit converter does not support Adaptive_RIFLA profile")
-    def test_power_calculation(self) -> None:
+    def test_power_calculation(self, initialize_qsharp_base_profile) -> None:
         """Test that the power calculation is correct for different iterations."""
         hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
         state_prep = QuantumCircuit(1)
