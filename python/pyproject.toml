@@ -110,6 +110,7 @@ test = [
   "rdkit",
   "requests>=2.33.0"
 ]
+azure-quantum = ["azure-identity", "azure-quantum"]
 
 [project.urls]
 Documentation = "https://microsoft.github.io/qdk-chemistry"

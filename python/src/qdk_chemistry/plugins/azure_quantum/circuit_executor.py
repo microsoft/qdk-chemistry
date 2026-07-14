@@ -22,27 +22,35 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = ["AzureQuantumEmulator", "AzureQuantumEmulatorSettings"]
 
 
-def _process_raw_results(raw_results: dict, total_shots: int) -> dict[str, int]:
-    """Convert emulator probability results to integer bitstring counts.
+def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, int]]:
+    """Convert emulator histogram results to integer bitstring counts.
 
-    The emulator returns ``{'[0,1,0]': 0.45, '[1,0,1]': 0.55}`` (probabilities).
-    This converts to integer counts based on total_shots.
+    Uses the ``microsoft.quantum-results.v2`` histogram format returned by
+    ``job.get_results_histogram()``, which maps a label to
+    ``{'outcome': [...], 'count': n}``. Each ``outcome`` list holds per-qubit
+    values of ``0``, ``1``, or ``'-'`` (a lost qubit). Shots with at least one
+    lost qubit are separated into a loss dictionary, with ``'-'`` rendered as
+    ``'L'`` to match the loss-bitstring convention.
 
     Args:
-        raw_results: Raw measurement results from the emulator.
-        total_shots: Total number of shots used for the measurement.
+        raw_results: Histogram results from ``job.get_results_histogram()``.
 
     Returns:
-        A dict mapping bitstring labels to integer counts.
+        A ``(bitstring_counts, loss_bitstrings)`` tuple of label-to-count dicts; the latter is empty absent qubit loss.
 
     """
     counts: dict[str, int] = {}
-    for key, prob in raw_results.items():
-        clean_key = key.strip("[]").replace(",", "").replace(" ", "")
-        count = round(prob * total_shots)
-        if count > 0:
-            counts[clean_key] = count
-    return counts
+    loss: dict[str, int] = {}
+    for entry in raw_results.values():
+        outcome = entry["outcome"]
+        count = entry["count"]
+        if "-" in outcome:
+            key = "".join("L" if bit == "-" else str(bit) for bit in outcome)
+            loss[key] = loss.get(key, 0) + count
+        else:
+            key = "".join(str(bit) for bit in outcome)
+            counts[key] = counts.get(key, 0) + count
+    return counts, loss
 
 
 class AzureQuantumEmulatorSettings(Settings):
@@ -172,11 +180,8 @@ class AzureQuantumEmulator(CircuitExecutor):
             "simulationType": self._settings.get("simulation_type"),
             "enableNoise": self._settings.get("enable_noise"),
             "emulateTiming": self._settings.get("emulate_timing"),
+            "seed": self._settings.get("seed"),
         }
-
-        seed = self._settings.get("seed")
-        if seed >= 0:
-            emulation_settings["seed"] = seed
 
         command_timings = {}
         if self._settings.get("m_reset_z_us") >= 0:
@@ -192,26 +197,27 @@ class AzureQuantumEmulator(CircuitExecutor):
 
         job = target.submit(
             name=f"qdk-chemistry-{self.name()}",
+            shots=shots,
             input_data=qir_string,
             input_data_format="qir.v1",
-            output_data_format="microsoft.quantum-results.v1",
+            output_data_format="microsoft.quantum-results.v2",
             input_params={
-                "shots": shots,
                 "emulationSettings": emulation_settings,
             },
         )
         Logger.debug(f"Job submitted: {job.id}")
 
         timeout = self._settings.get("timeout_secs")
-        raw_results = job.get_results(timeout_secs=timeout)
+        raw_results = job.get_results_histogram(timeout_secs=timeout)
         Logger.debug(f"Job completed: {raw_results}")
 
-        bitstring_counts = _process_raw_results(raw_results, shots)
+        bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
+            loss_bitstrings=loss_bitstrings or None,
         )
 
     def name(self) -> str:
