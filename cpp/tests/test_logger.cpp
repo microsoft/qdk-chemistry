@@ -88,6 +88,42 @@ TEST_F(LoggerTest, GlobalLevelControl) {
   EXPECT_NO_THROW({ QDK_LOGGER().critical("This should be suppressed"); });
 }
 
+TEST_F(LoggerTest, ConditionalGlobalLevelRestoreOnlyRestoresExpectedLevel) {
+  Logger::set_global_level(LogLevel::error);
+
+  EXPECT_TRUE(Logger::restore_global_level_if_unchanged(LogLevel::error,
+                                                        LogLevel::trace));
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::trace);
+
+  Logger::set_global_level(LogLevel::critical);
+
+  EXPECT_FALSE(Logger::restore_global_level_if_unchanged(LogLevel::error,
+                                                         LogLevel::trace));
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::critical);
+}
+
+TEST_F(LoggerTest, ScopedLogLevelRestoresPreviousLevel) {
+  Logger::set_global_level(LogLevel::trace);
+
+  {
+    const ScopedLogLevel scoped_level(LogLevel::error);
+    EXPECT_EQ(Logger::get_global_level(), LogLevel::error);
+  }
+
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::trace);
+}
+
+TEST_F(LoggerTest, ScopedLogLevelDoesNotOverwriteExternalLevelChange) {
+  Logger::set_global_level(LogLevel::trace);
+
+  {
+    const ScopedLogLevel scoped_level(LogLevel::error);
+    Logger::set_global_level(LogLevel::critical);
+  }
+
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::critical);
+}
+
 TEST_F(LoggerTest, FormattedLogging) {
   EXPECT_NO_THROW({
     QDK_LOGGER().info("Testing formatted message: value = {}", 42);

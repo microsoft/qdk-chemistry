@@ -15,7 +15,7 @@ from scipy.sparse.linalg import eigsh
 
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitHamiltonian
+from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
 
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
@@ -467,7 +467,7 @@ class TestVerstraeteCiracSpectral:
         stabs = []
         for coeff, word in vc_mapping.stabilizers:
             label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
-            qh_stab = QubitHamiltonian([label], np.array([coeff]))
+            qh_stab = QubitOperator([label], np.array([coeff]))
             stabs.append(qh_stab.to_matrix(sparse=True))
 
         # Project and filter out any unphysical states (out-of-codespace)

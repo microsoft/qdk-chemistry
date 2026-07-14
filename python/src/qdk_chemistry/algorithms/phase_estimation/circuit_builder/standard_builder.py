@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     FactorizedHamiltonianContainer,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -73,7 +73,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 

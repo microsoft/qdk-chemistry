@@ -227,6 +227,35 @@ __cleanup_registered: bool = False
 
 __factories: list[AlgorithmFactory] = []
 
+# Deprecated algorithm-type keys mapped to their current names. Accessing a
+# deprecated key still works but emits a DeprecationWarning.
+_DEPRECATED_TYPE_ALIASES: dict[str, str] = {
+    "energy_estimator": "expectation_estimator",
+}
+
+
+def _resolve_algorithm_type(algorithm_type: str) -> str:
+    """Map a deprecated algorithm-type key to its current name.
+
+    Args:
+        algorithm_type (str): The requested algorithm type key.
+
+    Returns:
+        str: The resolved algorithm type key. A deprecated key is mapped to its replacement and
+            triggers a ``DeprecationWarning``; any other value passes through unchanged.
+
+    """
+    new_type = _DEPRECATED_TYPE_ALIASES.get(algorithm_type)
+    if new_type is not None:
+        warnings.warn(
+            f"Algorithm type '{algorithm_type}' is deprecated and will be removed in a "
+            f"future release; use '{new_type}' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return new_type
+    return algorithm_type
+
 
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
@@ -274,6 +303,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
     for factory in __factories:
@@ -342,6 +372,7 @@ def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 1
         >>> registry.print_settings("scf_solver", "pyscf", characters=100)
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -401,6 +432,7 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
         force_restricted: bool = False  # Force restricted calculation
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -511,6 +543,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.available()
         return result
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.available()
@@ -552,6 +585,7 @@ def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.default_algorithm_name()
         return result
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.default_algorithm_name()
@@ -647,6 +681,7 @@ def _register_cpp_factories():
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
+        NuclearDerivativeCalculatorFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
@@ -657,6 +692,7 @@ def _register_cpp_factories():
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
+    register_factory(NuclearDerivativeCalculatorFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)
@@ -667,7 +703,7 @@ def _register_python_factories():
     """Register all built-in Python algorithm factories.
 
     This internal initialization function registers all the Python-implemented
-    algorithm factories. This includes factories for energy estimators, phase estimation algorithms,
+    algorithm factories. This includes factories for expectation estimators, phase estimation algorithms,
     qubit Hamiltonian solvers, qubit mappers, time evolution algorithms, and state preparation algorithms
     that are implemented in Python.
 
@@ -679,7 +715,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledCircuitMapperFactory,
     )
-    from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.expectation_estimator import ExpectationEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
         HadamardTestCircuitBuilderFactory,
@@ -699,7 +735,7 @@ def _register_python_factories():
         HamiltonianSimulationFactory,
     )
 
-    register_factory(EnergyEstimatorFactory())
+    register_factory(ExpectationEstimatorFactory())
     register_factory(CircuitMapperFactory())
     register_factory(HamiltonianSimulationFactory())
     register_factory(EvolutionCircuitBuilderFactory())
@@ -760,7 +796,7 @@ def _register_python_algorithms():
     """Register all built-in Python algorithm instances.
 
     This internal initialization function registers specific Python-implemented
-    algorithm instances as built-in algorithms. This includes the default QDK energy estimator,
+    algorithm instances as built-in algorithms. This includes the default QDK expectation estimator,
     phase estimation algorithms, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.
 
     This function is automatically called during module import and should not
@@ -776,7 +812,7 @@ def _register_python_algorithms():
         ControlledPSPMapper,
         SOSSAMapper,
     )
-    from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
         QdkHadamardTestCircuitBuilder,
     )
@@ -824,7 +860,7 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
-    register(lambda: QdkEnergyEstimator())
+    register(lambda: QdkExpectationEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())

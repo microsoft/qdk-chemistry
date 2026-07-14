@@ -12,7 +12,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     FactorizedHamiltonianContainer,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
 )
 
@@ -89,7 +89,7 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator | FactorizedHamiltonianContainer,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
@@ -105,7 +105,7 @@ class QpeCircuitBuilder(Algorithm):
 
     def _create_controlled_circuit(
         self,
-        qubit_hamiltonian: QubitHamiltonian | FactorizedHamiltonianContainer,
+        qubit_hamiltonian: QubitOperator | FactorizedHamiltonianContainer,
         power: int,
     ) -> tuple[Circuit, int, Circuit | None]:
         r"""Create the controlled circuit for the given Hamiltonian and power.

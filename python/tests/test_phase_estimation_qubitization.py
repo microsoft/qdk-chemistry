@@ -11,7 +11,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -44,7 +44,7 @@ def _qubitization_circuit_builder_ref(num_bits: int = 4, builder: str = "qdk_ite
 
 
 @pytest.fixture
-def h2_hamiltonian() -> QubitHamiltonian:
+def h2_hamiltonian() -> QubitOperator:
     # H2 / STO-3G qubit Hamiltonian (Jordan-Wigner, 4 qubits, 15 terms)
     h2_pauli_strings = [
         "ZIZI",
@@ -82,7 +82,7 @@ def h2_hamiltonian() -> QubitHamiltonian:
             0.04104867,
         ]
     )
-    return QubitHamiltonian(
+    return QubitOperator(
         pauli_strings=h2_pauli_strings,
         coefficients=h2_coefficients,
     )
@@ -100,7 +100,7 @@ class TestQPEWithQubitization:
         exactly representable with 4 bits.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["ZI", "IZ"],
             coefficients=np.array([coeff, coeff]),
         )
@@ -299,7 +299,7 @@ class TestQPEWithQubitization:
         exactly representable with 4 bits.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["ZI", "IZ"],
             coefficients=np.array([coeff, coeff]),
         )
@@ -411,7 +411,7 @@ class TestQPEWithQubitization:
         lambda = pi/2, cos(2*pi*phi) = 1, phi = 0.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([coeff, coeff]),
         )
@@ -459,7 +459,7 @@ class TestQPEWithQubitization:
         Tests sign encoding in the PREPARE oracle.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([-coeff, coeff]),
         )
@@ -506,7 +506,7 @@ class TestQPEWithQubitization:
         lambda = 3*pi/4, cos(2*pi*phi) = -1, phi = 0.5.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["ZII", "IZI", "IIZ"],
             coefficients=np.array([coeff, coeff, coeff]),
         )
@@ -557,7 +557,7 @@ class TestQPEWithQubitization:
         lambda = pi/2, cos(2*pi*phi) = 1, phi = 0.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "IZ"],
             coefficients=np.array([coeff, coeff]),
         )

@@ -1,7 +1,7 @@
-"""QDK/Chemistry energy estimation module.
+"""QDK/Chemistry expectation estimator module.
 
-This module provides quantum state preparation algorithms for preparing
-quantum states from classical wavefunctions.
+This module provides algorithms that estimate expectation values of qubit
+operators (observables) from measurement circuits.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -9,6 +9,6 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .energy_estimator import EnergyEstimatorFactory
+from .expectation_estimator import ExpectationEstimatorFactory
 
-__all__ = ["EnergyEstimatorFactory"]
+__all__ = ["ExpectationEstimatorFactory"]

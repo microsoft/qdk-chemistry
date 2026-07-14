@@ -248,12 +248,18 @@ void validate_serialization_version(const std::string& expected_version,
   auto [found_major, found_minor, found_patch] =
       parse_version_string(found_version);
 
+  // Files written by an older qdk-chemistry release must be migrated with the
+  // standalone converter; the data classes only deserialize the current schema.
+  const std::string migration_hint =
+      " If this file was written by an older qdk-chemistry release, migrate it "
+      "with: python -m qdk_chemistry.migrate <old_file> <new_file>.";
+
   // Major version must match exactly
   if (expected_major != found_major) {
     throw std::runtime_error(
         "Serialization version major mismatch. Expected: " + expected_version +
         ", Found: " + found_version +
-        ". Major version differences are not compatible.");
+        ". Major version differences are not compatible." + migration_hint);
   }
 
   // Minor version must match exactly
@@ -261,7 +267,7 @@ void validate_serialization_version(const std::string& expected_version,
     throw std::runtime_error(
         "Serialization version minor mismatch. Expected: " + expected_version +
         ", Found: " + found_version +
-        ". Minor version differences are not compatible.");
+        ". Minor version differences are not compatible." + migration_hint);
   }
 
   // Patch version differences are allowed (backward compatibility)
