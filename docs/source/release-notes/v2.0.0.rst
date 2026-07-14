@@ -5,10 +5,12 @@ What's New in Version 2.0
 ==========================
 
 Version 2.0 reworks the core data structures around a single symmetry-blocked
-storage model, consolidates the wavefunction containers, and standardizes the
-fermion-to-qubit mapping workflow. Building on those foundations, it adds nuclear
-gradients and Hessians, more robust SCF convergence, and a broader set of
-quantum-simulation primitives.
+storage model (see :ref:`v2-symmetry-blocked`), consolidates the wavefunction
+containers, and standardizes the fermion-to-qubit mapping workflow. Building on
+those foundations, it adds nuclear gradients and Hessians, more robust SCF
+convergence, and a broader set of quantum-simulation primitives: block-encoding /
+:term:`LCU` qubitization, real-time dynamics for time-dependent Hamiltonians, and
+direct integration with the QDK Quantum Resource Estimator.
 
 Most v1 code keeps working through tested facades and deprecated aliases; the
 :ref:`Breaking changes and migration <v2-breaking-changes>` section covers the
@@ -22,17 +24,20 @@ cases that need changes and the new APIs that replace them.
 Highlights
 ==========
 
-- **Symmetry-blocked storage.** Orbital coefficients and energies, Hamiltonian integrals, and index sets share one symmetry-blocked representation, so restricted and unrestricted data use the same accessors.
+- **Symmetry-blocked storage.** Orbital coefficients and energies, Hamiltonian integrals, and index sets share one symmetry-blocked representation, so restricted and unrestricted data use the same accessors (discussed in :ref:`v2-symmetry-blocked`).
 - **Consolidated wavefunction containers.** The five v1 containers collapse into :class:`~qdk_chemistry.data.StateVectorContainer` and :class:`~qdk_chemistry.data.AmplitudeContainer`.
 - **Nuclear gradients and Hessians.** A new nuclear-derivative algorithm returns energies, gradients, and optionally a Hessian and the converged wavefunction.
 - **More robust SCF.** A stabilized SCF solver follows internal and external instabilities to a stable reference, and :term:`ROHF` gains geometric direct minimization.
 - **New simulation primitives.** Block-encoding / :term:`LCU` qubitization, the Hadamard test, Zassenhaus product formulas, and real-time dynamics for driven Hamiltonians join the existing Trotter-Suzuki builders.
 - **Fermion-to-qubit mapping as data.** Encodings are carried by :class:`~qdk_chemistry.data.MajoranaMapping`, including a Verstraete-Cirac local encoding.
 - **Explicit term grouping and expectation estimation.** Pauli grouping is now an opt-in ``term_grouper`` step, and the estimator generalizes to any :class:`~qdk_chemistry.data.QubitOperator`.
+- **Resource estimation integration.** Generated circuits hand off directly to the QDK Quantum Resource Estimator via ``Circuit.estimate()`` and ``Circuit.get_qre_application()`` (see :ref:`v2-resource-estimation`).
 
 
-Symmetry-Blocked Storage
-========================
+.. _v2-symmetry-blocked:
+
+The Symmetry-Blocked Data Model
+===============================
 
 Orbital coefficients and energies, Hamiltonian integrals, and index sets are now
 backed by symmetry-blocked containers
@@ -40,7 +45,8 @@ backed by symmetry-blocked containers
 :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1`, and
 :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`). Each block
 carries its spin (and, in general, other single-particle symmetries) explicitly,
-so one representation serves both restricted and unrestricted data.
+so one representation serves both restricted and unrestricted data, and a spin
+channel is selected with a :class:`~qdk_chemistry.data.symmetry.SymmetryLabel`.
 
 The v1 dense accessors on :class:`~qdk_chemistry.data.Orbitals` remain available
 as tested facades over this storage, but now emit a ``DeprecationWarning``. See
@@ -52,11 +58,15 @@ Consolidated Wavefunction Containers
 ====================================
 
 The five v1 wavefunction containers were merged into two. The single-determinant,
-complete-active-space, and selected-configuration-interaction containers are now
-:class:`~qdk_chemistry.data.StateVectorContainer`, and the Møller-Plesset and
-coupled-cluster containers are now :class:`~qdk_chemistry.data.AmplitudeContainer`.
-A wavefunction now records the physical *sector* it describes, so containers of
-the same type are distinguished by their contents rather than by their class.
+complete-active-space, and selected-configuration-interaction containers were
+structurally identical apart from a type tag, and are now the single
+:class:`~qdk_chemistry.data.StateVectorContainer`, which stores a coefficient
+vector over a set of determinants and records the physical *sector* it describes.
+The Møller-Plesset and coupled-cluster containers are now the single
+:class:`~qdk_chemistry.data.AmplitudeContainer`, which carries an ``AmplitudeType``
+tag (``moller_plesset`` or ``coupled_cluster``) recording how its amplitudes
+should be interpreted. Containers of the same type are therefore distinguished by
+their stored contents rather than by their class.
 
 The removed names remain importable as deprecated aliases, and
 :meth:`~qdk_chemistry.data.Wavefunction.get_container_type` now returns
@@ -192,6 +202,29 @@ Built-in variants are ``qubit_wise_commuting``, ``commuting``, and ``identity``
 pre-group its input to recover the grouping v1 applied automatically.
 
 
+.. _v2-resource-estimation:
+
+Resource Estimation
+===================
+
+Circuits produced by the circuit builders integrate directly with the QDK
+Quantum Resource Estimator. A :class:`~qdk_chemistry.data.Circuit` exposes
+``estimate()``, which runs the estimator and returns an ``EstimatorResult``, and
+``get_qre_application()``, which wraps the circuit as a ``qdk.qre`` application
+(Q#, OpenQASM, or QIR) for use with ``qdk.qre.estimate()`` and custom hardware and
+factory models. Resource estimation is enabled by the optional ``qre`` extra:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[qre]'
+
+Circuits from any of the circuit builders can be estimated this way. See
+`examples/estimation_ising_2d.ipynb
+<https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/estimation_ising_2d.ipynb>`_
+for an end-to-end dynamics resource-estimation walkthrough, including the impact
+of lattice-aware term grouping on fault-tolerant cost.
+
+
 Other Improvements
 ==================
 
@@ -272,6 +305,8 @@ The removed container names remain importable as deprecated aliases:
 :class:`~qdk_chemistry.data.AmplitudeContainer`.
 
 
+.. _v2-two-rdm-ordering:
+
 Two-particle RDM spin ordering (action required)
 ------------------------------------------------
 
@@ -279,13 +314,16 @@ Two-particle RDM spin ordering (action required)
 
    This is a silent change: the same accessor returns differently ordered data.
 
-The spin-resolved two-particle RDM accessor
-``get_active_two_rdm_spin_dependent()`` now returns its blocks as
+The :class:`~qdk_chemistry.data.Wavefunction` spin-resolved two-particle RDM
+accessor ``get_active_two_rdm_spin_dependent()`` now returns its blocks as
 ``(aaaa, aabb, bbbb)`` (previously ``(aabb, aaaa, bbbb)``), and the ``aabb``
 block is now stored in *alpha-alpha-beta-beta* index order (previously
-*alpha-beta-alpha-beta*). The :class:`~qdk_chemistry.data.Wavefunction`
-constructor takes the blocks in the same new order. Update any positional
-unpacking:
+*alpha-beta-alpha-beta*). This reorders the blocks to match the two-electron
+integral block order used throughout :class:`~qdk_chemistry.data.Hamiltonian`
+(also ``(aaaa, aabb, bbbb)`` in alpha-alpha-beta-beta index order), so integrals
+and RDMs now share one spin-block convention. The
+:class:`~qdk_chemistry.data.Wavefunction` constructor takes the blocks in the same
+new order. Update any positional unpacking:
 
 .. code-block:: python
 
@@ -354,8 +392,8 @@ deprecated aliases that emit a ``DeprecationWarning``:
   :class:`~qdk_chemistry.algorithms.ExpectationEstimator` /
   ``QdkExpectationEstimator``, and the ``"energy_estimator"`` registry key →
   ``"expectation_estimator"``.
-- The ``TimeEvolutionUnitary`` family →
-  :class:`~qdk_chemistry.data.UnitaryRepresentation` and
+- ``TimeEvolutionUnitary`` → :class:`~qdk_chemistry.data.UnitaryRepresentation`,
+  and ``TimeEvolutionUnitaryContainer`` →
   :class:`~qdk_chemistry.data.UnitaryContainer`.
 
 
@@ -364,10 +402,19 @@ Serialization format
 
 .. note::
 
-   Orbitals, Hamiltonian containers, wavefunction (state-vector) data, and unitary
-   representations changed serialization version and no longer load directly from
-   files written by earlier releases; other schemas are unaffected. Upgrade an
-   affected file with the shipped converter
+   The following on-disk schemas were bumped from ``0.1.0`` to ``0.2.0``:
+   :class:`~qdk_chemistry.data.Orbitals` (and
+   :class:`~qdk_chemistry.data.ModelOrbitals`); the
+   :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`,
+   :class:`~qdk_chemistry.data.SparseHamiltonianContainer`, and
+   :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` Hamiltonian
+   containers; :class:`~qdk_chemistry.data.Wavefunction` together with its
+   :class:`~qdk_chemistry.data.StateVectorContainer`; and
+   :class:`~qdk_chemistry.data.UnitaryRepresentation`. The
+   :class:`~qdk_chemistry.data.AmplitudeContainer` wavefunction container, the
+   top-level :class:`~qdk_chemistry.data.Hamiltonian`, and all other schemas are
+   unchanged at ``0.1.0``. An affected file no longer loads directly from data
+   written by an earlier release; upgrade it with the shipped converter
    (``python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5``; see
    :doc:`../user/migrating-data-files`) or re-generate it.
 

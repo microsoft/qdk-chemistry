@@ -18,18 +18,19 @@ See :ref:`release-v2.0.0` for full details and migration guidance.
 - Fermion-to-qubit mapping carried as data (``MajoranaMapping``), including a Verstraete-Cirac encoding
 - Explicit Pauli term grouping and generalized expectation estimation
 - Composable standard and iterative phase-estimation circuit builders
+- QDK Quantum Resource Estimator integration for generated circuits (``Circuit.estimate`` / ``get_qre_application``)
 - Algorithm result caching and data-file migration tooling
 - Windows build support with CI
 
 Breaking changes:
 
-- Wavefunction containers consolidated; ``get_container_type()`` now returns ``"state_vector"`` / ``"amplitude"``
-- Serialization version bumped for orbitals, Hamiltonian containers, wavefunction, and unitary schemas
+- Wavefunction containers consolidated from five classes into two: ``SlaterDeterminantContainer``, ``CasWavefunctionContainer``, and ``SciWavefunctionContainer`` (structurally identical apart from a type tag) merge into ``StateVectorContainer``, distinguished by a stored sector; ``MP2Container`` and ``CoupledClusterContainer`` merge into ``AmplitudeContainer``, distinguished by an ``AmplitudeType`` tag. ``Wavefunction.get_container_type()`` now returns ``"state_vector"`` / ``"amplitude"`` (old names remain as deprecated aliases)
+- Serialization schema bumped from ``0.1.0`` to ``0.2.0`` for the ``Orbitals`` / ``ModelOrbitals``, ``CanonicalFourCenterHamiltonianContainer`` / ``SparseHamiltonianContainer`` / ``CholeskyHamiltonianContainer``, ``Wavefunction`` / ``StateVectorContainer``, and ``UnitaryRepresentation`` data classes; ``AmplitudeContainer`` and the top-level ``Hamiltonian`` are unchanged. Upgrade affected files with ``python -m qdk_chemistry.migrate``
 - Expectation estimator no longer auto-groups terms
 - Qubit mapper takes a ``MajoranaMapping`` instead of an ``encoding`` string
-- ``get_active_two_rdm_spin_dependent()`` block order changed silently
+- Silent semantic change: the ``Wavefunction`` accessor ``get_active_two_rdm_spin_dependent()`` now returns blocks as ``(aaaa, aabb, bbbb)`` (was ``(aabb, aaaa, bbbb)``), with the ``aabb`` block in alpha-alpha-beta-beta index order (was alpha-beta-alpha-beta), to match the two-electron integral block order in ``Hamiltonian``; the ``Wavefunction`` constructor takes the same new order. Positional unpacking reads incorrect data until updated
 - ``Configuration`` string and bitset constructors replaced by explicit factories
-- Renames (deprecated aliases retained): ``QubitHamiltonian`` to ``QubitOperator``, ``EnergyEstimator`` to ``ExpectationEstimator``, the ``TimeEvolutionUnitary`` to ``Unitary`` family
+- Renames (deprecated aliases retained): ``QubitHamiltonian`` to ``QubitOperator``, ``EnergyEstimator`` to ``ExpectationEstimator``, ``TimeEvolutionUnitary`` to ``UnitaryRepresentation``, and ``TimeEvolutionUnitaryContainer`` to ``UnitaryContainer``
 - v1 ``Orbitals`` dense accessors deprecated in favor of the symmetry-blocked accessors
 - C++ only: FCIDUMP writer, Cholesky container, and ``ModelOrbitals`` constructor changes
 
