@@ -278,6 +278,9 @@ extends:
           - ${{ if ne(target.os, 'windows') }}:
             - script: |
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+                if [ -d "$(System.DefaultWorkingDirectory)/python/debug_symbols" ]; then
+                  sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/debug_symbols
+                fi
               displayName: Fix wheel directory ownership
 
           # Publishing debug symbols is not supported for macOS
