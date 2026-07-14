@@ -5,8 +5,9 @@ These tests guard the backward-compatibility shims added when
 ``EnergyEstimator`` was renamed to
 :class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
 ``"energy_estimator"`` algorithm-type key was renamed to
-``"expectation_estimator"``. The old names must keep working while emitting a
-``DeprecationWarning`` so downstream users are not broken immediately.
+``"expectation_estimator"``, and the v1 time-evolution type keys were renamed.
+The old names must keep working while emitting a ``DeprecationWarning`` so
+downstream users are not broken immediately.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -136,3 +137,18 @@ class TestEnergyEstimatorDeprecation:
         with pytest.warns(DeprecationWarning, match="energy_estimator"):
             old = algorithms.show_default("energy_estimator")
         assert old == algorithms.show_default("expectation_estimator")
+
+
+@pytest.mark.parametrize(
+    ("old_type", "new_type", "algorithm_name"),
+    [
+        ("controlled_evolution_circuit_mapper", "controlled_circuit_mapper", "pauli_sequence"),
+        ("time_evolution_builder", "hamiltonian_unitary_builder", "trotter"),
+    ],
+)
+def test_deprecated_time_evolution_type_key_warns_and_resolves(old_type, new_type, algorithm_name):
+    """A v1 type key creates the corresponding v2 implementation with a warning."""
+    with pytest.warns(DeprecationWarning, match=old_type):
+        old = algorithms.create(old_type, algorithm_name)
+    new = algorithms.create(new_type, algorithm_name)
+    assert old.name() == new.name()

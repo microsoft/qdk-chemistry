@@ -69,7 +69,14 @@ registered make the following changes:
 
 Data classes whose serialization schema has not changed (for example
 :class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.BasisSet`, and
-the qubit-level classes) load directly without conversion.
+the remaining qubit-level classes) load directly without conversion.
+
+.. note::
+
+   The converter does not support v1 :class:`~qdk_chemistry.data.QpeResult` or
+   ``TimeEvolutionUnitary`` files; regenerate these objects with v2. In
+   particular, v1 unitary files do not contain the scale required by the current
+   :class:`~qdk_chemistry.data.UnitaryRepresentation` schema.
 
 Cholesky Hamiltonians
 ---------------------

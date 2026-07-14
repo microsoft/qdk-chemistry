@@ -239,9 +239,9 @@ Example::
     #           e^{fields·t/2}
     # where same-layer ZZ terms (e.g. Z₀Z₁ and Z₂Z₃) have disjoint
     # qubit support and are exponentiated independently within one step.
-    trotter = registry.create("time_evolution_builder", "trotter")
-    trotter.settings().update({"order": 2, "num_divisions": 1})
-    evolution = trotter.run(hamiltonian, time=1.0)
+      trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+      trotter.settings().update({"order": 2, "num_divisions": 1, "time": 1.0})
+      evolution = trotter.run(hamiltonian)
     container = evolution.get_container()
 
     # The grouped schedule uses 11 exponentiated terms per step,

@@ -36,6 +36,22 @@ class Configuration : public DataClass {
    */
   Configuration() = default;
 
+  /**
+   * @brief Construct from a spin-½ string representation.
+   * @deprecated Use from_spin_half_string().
+   */
+  [[deprecated("Use Configuration::from_spin_half_string() instead.")]]
+  Configuration(const std::string& str);
+
+  /**
+   * @brief Construct from an alpha/beta bitset.
+   * @deprecated Use from_spin_half_bitset().
+   */
+  template <size_t N>
+  [[deprecated("Use Configuration::from_spin_half_bitset() instead.")]]
+  Configuration(const std::bitset<N>& orbs, size_t num_orbitals)
+      : Configuration(from_spin_half_bitset(orbs, num_orbitals)) {}
+
   // ---- Factories ----------------------------------------------------------
 
   /**
