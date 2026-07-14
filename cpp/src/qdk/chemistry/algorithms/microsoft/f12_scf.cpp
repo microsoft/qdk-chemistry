@@ -73,8 +73,7 @@ CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   auto relaxed_reference =
       std::make_shared<data::Wavefunction>(std::move(container));
 
-  const double total_energy =
-      dressed.e_f12hf + structure->calculate_nuclear_repulsion_energy();
+    const double total_energy = e_hf + (dressed.e_f12hf - dressed.e_hf);
   return {total_energy, relaxed_reference};
 }
 

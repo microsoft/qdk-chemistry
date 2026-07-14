@@ -8,6 +8,8 @@
 #include <Eigen/Dense>
 #include <cstddef>
 #include <cstdint>
+#include <iomanip>
+#include <iostream>
 #include <libint2.hpp>
 #include <memory>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
@@ -26,6 +28,7 @@
 #include "qdk/chemistry/algorithms/microsoft/ctf12_f12.hpp"
 #include "qdk/chemistry/algorithms/microsoft/ctf12_support.hpp"
 #include "test_config.h"
+#include "ut_common.hpp"
 
 using namespace qdk::chemistry;
 namespace ctf12 = qdk::chemistry::algorithms::microsoft::ctf12;
@@ -179,4 +182,50 @@ void run_neon_f12_scf_module_mp2(const std::string& obs_name,
 
 TEST(CtF12EffectiveHamiltonian, NeonAugCcPvdzScfModuleMp2) {
   run_neon_f12_scf_module_mp2("aug-cc-pvdz", "aug-cc-pvdz-optri", 1e-12);
+}
+
+TEST(CtF12ScfSolver, N2AugCcPvdzEnergyUsesCanonicalTotalPlusF12Correction) {
+    scf::QDKChemistryConfig::set_resources_dir(TEST_RESOURCES_DIR);
+    ::libint2::initialize();
+
+    constexpr double gamma = 1.0;
+    constexpr std::int64_t frozen_core = 2;
+    const std::string obs_name = "aug-cc-pvdz";
+    const std::string cabs_name = "aug-cc-pvdz-optri";
+
+    auto structure = testing::create_stretched_n2_structure(1.2);
+    ASSERT_GT(structure->calculate_nuclear_repulsion_energy(), 0.0);
+
+    auto scf_solver = algorithms::ScfSolverFactory::create("qdk");
+    const auto [e_hf, reference] = scf_solver->run(structure, 0, 1, obs_name);
+
+    const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
+            *reference, gamma, cabs_name, static_cast<std::size_t>(frozen_core));
+        const double f12_correction = ctf12::f12_hf_scf_energy(input);
+        const double expected_total = e_hf + f12_correction;
+
+    auto f12_scf = algorithms::ScfSolverFactory::create("qdk_ct_f12");
+    f12_scf->settings().set("gamma", gamma);
+    f12_scf->settings().set("frozen_core", frozen_core);
+    f12_scf->settings().set("cabs_basis", cabs_name);
+    const auto [actual_total, relaxed_reference] =
+            f12_scf->run(structure, 0, 1, obs_name);
+
+        std::cout << std::setprecision(16)
+              << "N2 " << obs_name << " HF total energy: " << e_hf << '\n'
+              << "N2 " << obs_name
+              << " F12-HF total energy: " << actual_total << '\n'
+              << "N2 " << obs_name
+              << " F12-HF correction: " << f12_correction << '\n';
+
+    EXPECT_NEAR(actual_total, expected_total, 1e-8)
+            << "N2 F12-SCF total energy should be canonical total plus the "
+             "self-consistent F12-HF correction\n"
+            << "HF total energy: " << e_hf << '\n'
+            << "F12-HF total energy: " << actual_total << '\n'
+            << "Expected F12-HF total energy: " << expected_total << '\n'
+            << "F12-HF correction: " << f12_correction;
+    ASSERT_NE(relaxed_reference, nullptr);
+
+    ::libint2::finalize();
 }
