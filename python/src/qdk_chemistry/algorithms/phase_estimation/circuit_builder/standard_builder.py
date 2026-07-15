@@ -11,7 +11,7 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -68,7 +68,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -96,13 +96,15 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
+        num_ancilla_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            ctrl_unitary_circuits.append(self._create_controlled_circuit(qubit_hamiltonian, power=power))
+            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits
+                state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits, num_ancilla_qubits
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
@@ -118,6 +120,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         controlled_unitary_circuits: list[Circuit],
         num_bits: int,
         num_system_qubits: int,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
@@ -127,6 +130,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 Q# operations for controlled-U^(2^k).
             num_bits: Number of ancilla qubits (phase bits).
             num_system_qubits: Number of system qubits.
+            num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).
 
         Returns:
             A Circuit object representing the standard QPE circuit.
@@ -139,11 +143,12 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
             "statePrep": state_prep_op,
-            "controlledEvolutions": ctrl_unitary_ops,
+            "controlledUnitary": ctrl_unitary_ops,
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
+            "numAncillaQubits": num_ancilla_qubits,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

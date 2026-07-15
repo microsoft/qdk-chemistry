@@ -20,6 +20,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <sstream>
@@ -636,49 +637,53 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
       },
       std::runtime_error);
 
-  // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(
-      ({
-        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> alpha_active_indices{};  // Empty alpha
-        std::vector<size_t> beta_active_indices{0, 1};
-        std::vector<size_t> alpha_inactive_indices{};
-        std::vector<size_t> beta_inactive_indices{2};
-        // Create unrestricted orbitals with only beta active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-            basis_set,
-            testing::unrestricted_index_set(
-                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
-            testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                            alpha_inactive_indices,
-                                            beta_inactive_indices));
-        hc->run(orbitals);
-      }),
-      std::runtime_error);
+  // Test that unrestricted orbitals throw when alpha is empty.
+  // GCC statement expressions ({...}) are not supported by MSVC, so we use
+  // a named lambda invoked inside the macro to avoid unprotected commas.
+  {
+    auto throw_empty_alpha = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{};  // Empty alpha
+      std::vector<size_t> beta_active_indices{0, 1};
+      std::vector<size_t> alpha_inactive_indices{};
+      std::vector<size_t> beta_inactive_indices{2};
+      // Create unrestricted orbitals with only beta active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_alpha(), std::runtime_error);
+  }
 
   // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(
-      ({
-        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-        std::vector<size_t> alpha_active_indices{0, 1};
-        std::vector<size_t> beta_active_indices{};  // Empty beta
-        std::vector<size_t> alpha_inactive_indices{2};
-        std::vector<size_t> beta_inactive_indices{};
-        // Create unrestricted orbitals with only alpha active space
-        auto orbitals = std::make_shared<Orbitals>(
-            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-            basis_set,
-            testing::unrestricted_index_set(
-                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
-            testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                            alpha_inactive_indices,
-                                            beta_inactive_indices));
-        hc->run(orbitals);
-      }),
-      std::runtime_error);
+  {
+    auto throw_empty_beta = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{0, 1};
+      std::vector<size_t> beta_active_indices{};  // Empty beta
+      std::vector<size_t> alpha_inactive_indices{2};
+      std::vector<size_t> beta_inactive_indices{};
+      // Create unrestricted orbitals with only alpha active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_beta(), std::runtime_error);
+  }
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
@@ -1416,29 +1421,32 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
   std::string filename = "test.sparse.hamiltonian.fcidump";
   EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
 
-  std::ifstream file(filename);
-  EXPECT_TRUE(file.is_open());
+  // Scope the stream so it closes before remove() (Windows file lock).
+  {
+    std::ifstream file(filename);
+    EXPECT_TRUE(file.is_open());
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string fcidump_content = buffer.str();
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string fcidump_content = buffer.str();
 
-  // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
-  // (1,1,1,1)), one-body lower triangle in column-major order, then core
-  // energy.
-  const std::string reference_fcidump_contents =
-      "&FCI NORB=2, NELEC=2, MS2=0,\n"
-      "ORBSYM=1,1,\n"
-      "ISYM=1,\n"
-      "&END\n"
-      "      2.0000000000000000e+00    1    1    1    1\n"
-      "      3.0000000000000000e+00    2    2    2    2\n"
-      "      1.0000000000000000e+00    1    1    0    0\n"
-      "      5.0000000000000000e-01    2    1    0    0\n"
-      "      1.0000000000000000e+00    2    2    0    0\n"
-      "      1.5000000000000000e+00    0    0    0    0\n";
+    // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
+    // (1,1,1,1)), one-body lower triangle in column-major order, then core
+    // energy.
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      3.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0\n";
 
-  EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+    EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+  }
 
   std::filesystem::remove(filename);
 }
@@ -1787,13 +1795,15 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
                                    1);
   });
 
-  // Verify file was created and has correct NORB (should be 2, not 3)
-  std::ifstream file("test_active_space.hamiltonian.fcidump");
-  EXPECT_TRUE(file.is_open());
+  // Verify file was created and has correct NORB (should be 2, not 3).
+  {
+    std::ifstream file("test_active_space.hamiltonian.fcidump");
+    EXPECT_TRUE(file.is_open());
 
-  std::string first_line;
-  std::getline(file, first_line);
-  EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+    std::string first_line;
+    std::getline(file, first_line);
+    EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+  }
 
   // Clean up
   std::filesystem::remove("test_active_space.hamiltonian.fcidump");
@@ -1887,8 +1897,14 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   // Create unrestricted orbitals from restricted ones
   // Get restricted coefficients and energies
-  auto [rhf_coeffs_alpha, rhf_coeffs_beta] = rhf_orbitals->get_coefficients();
-  auto [rhf_energies_alpha, rhf_energies_beta] = rhf_orbitals->get_energies();
+  const auto& rhf_coeffs_alpha =
+      rhf_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& rhf_coeffs_beta =
+      rhf_orbitals->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& rhf_energies_alpha =
+      rhf_orbitals->energies()->block({axes::alpha()});
+  const auto& rhf_energies_beta =
+      rhf_orbitals->energies()->block({axes::beta()});
 
   // For closed shell: alpha = beta coefficients and energies
   // Create unrestricted orbitals with same alpha/beta data but force
@@ -1899,7 +1915,10 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   // Set active space if it exists in original orbitals
   if (rhf_orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = rhf_orbitals->get_active_space_indices();
+    auto alpha_active =
+        spin_channel_indices(rhf_orbitals->active_indices(), axes::alpha());
+    auto beta_active =
+        spin_channel_indices(rhf_orbitals->active_indices(), axes::beta());
     unrestricted_orbitals->set_active_space(alpha_active, beta_active);
   }
 
@@ -1988,8 +2007,10 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Verify aabb == bbaa symmetry
   // Get active space size to determine integral tensor dimensions
   size_t active_space_size;
-  auto [alpha_active, beta_active] =
-      unrestricted_orbitals->get_active_space_indices();
+  auto alpha_active = spin_channel_indices(
+      unrestricted_orbitals->active_indices(), axes::alpha());
+  auto beta_active = spin_channel_indices(
+      unrestricted_orbitals->active_indices(), axes::beta());
   active_space_size = alpha_active.size();
 
   // Test aabb[i,j,k,l] == aabb[k,l,i,j] (particle exchange symmetry)
@@ -2044,7 +2065,10 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
       uhf_hamiltonian->get_two_body_integrals();
 
   // Get active space size
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  auto alpha_active =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
+  auto beta_active =
+      spin_channel_indices(orbitals->active_indices(), axes::beta());
   size_t active_space_size = alpha_active.size();
 
   auto get_index = [active_space_size](size_t i, size_t j, size_t k,
@@ -2325,8 +2349,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
   auto orbitals_scf = wavefunction->get_orbitals();
 
   // Create new Orbitals with active space
-  auto coeffs = orbitals_scf->get_coefficients();
-  auto energies = orbitals_scf->get_energies();
+  auto coeffs = orbitals_scf->coefficients();
+  auto energies = orbitals_scf->energies();
   auto overlap = orbitals_scf->get_overlap_matrix();
   auto basis = orbitals_scf->get_basis_set();
 
@@ -2435,8 +2459,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
     std::vector<size_t> inactive_alpha = {0, 1, 4};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_energies().first,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->energies()->block({axes::alpha()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
         testing::restricted_index_set(
             full_orbitals->get_num_molecular_orbitals(), active_alpha),
@@ -2505,8 +2529,8 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   auto orbitals_scf = wavefunction->get_orbitals();
 
   // Create new Orbitals with active space
-  auto coeffs = orbitals_scf->get_coefficients();
-  auto energies = orbitals_scf->get_energies();
+  auto coeffs = orbitals_scf->coefficients();
+  auto energies = orbitals_scf->energies();
   auto overlap = orbitals_scf->get_overlap_matrix();
   auto basis = orbitals_scf->get_basis_set();
 
@@ -2558,10 +2582,10 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     std::vector<size_t> active_beta = {2, 3, 4, 5, 6, 7, 8, 9};
     std::vector<size_t> inactive_beta = {0, 1};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_coefficients().second,
-        full_orbitals->get_energies().first,
-        full_orbitals->get_energies().second,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->coefficients()->block({axes::beta(), axes::beta()}),
+        full_orbitals->energies()->block({axes::alpha()}),
+        full_orbitals->energies()->block({axes::beta()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
         testing::unrestricted_index_set(
             full_orbitals->get_num_molecular_orbitals(), active_alpha,
@@ -2624,10 +2648,10 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     std::vector<size_t> active_beta = {2, 3, 5, 6, 7, 9};
     std::vector<size_t> inactive_beta = {0, 1, 4};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_coefficients().second,
-        full_orbitals->get_energies().first,
-        full_orbitals->get_energies().second,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->coefficients()->block({axes::beta(), axes::beta()}),
+        full_orbitals->energies()->block({axes::alpha()}),
+        full_orbitals->energies()->block({axes::beta()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
         testing::unrestricted_index_set(
             full_orbitals->get_num_molecular_orbitals(), active_alpha,

@@ -1,4 +1,4 @@
-"""Tests for EulerIntegrator state-preparation composition."""
+"""Tests for EulerIntegrator and EulerEvolutionCircuitBuilder."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,18 +13,19 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-import qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base as hamiltonian_sim_base
+import qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder as euler_builder_module
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import EulerEvolutionCircuitBuilder
 from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     DrivenQubitHamiltonian,
     FlatPartition,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
@@ -36,12 +37,12 @@ def _constant_drive(_t: float) -> float:
 
 def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pytest.MonkeyPatch) -> None:
     """The helper should compose state preparation and evolution through Q# operations."""
-    algo = EulerIntegrator()
+    builder = EulerEvolutionCircuitBuilder()
     state_prep_op = object()
     evolution_op = object()
 
     monkeypatch.setattr(
-        hamiltonian_sim_base,
+        euler_builder_module,
         "QSHARP_UTILS",
         SimpleNamespace(
             CircuitComposition=SimpleNamespace(
@@ -62,7 +63,7 @@ def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pyte
         encoding="jordan-wigner",
     )
 
-    combined = algo._prepend_state_prep_circuit(state_prep, evolution, num_qubits=1)
+    combined = builder._prepend_state_prep(state_prep, evolution, num_qubits=1)
 
     assert combined._qsharp_factory is not None
     assert combined._qsharp_factory.program == "sequential-circuit"
@@ -77,19 +78,19 @@ def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pyte
 
 def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
     """The helper should fail fast when either circuit lacks a Q# operation handle."""
-    algo = EulerIntegrator()
+    builder = EulerEvolutionCircuitBuilder()
     state_prep = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\nh q[0];\n")
     evolution = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\nx q[0];\n")
 
     with pytest.raises(RuntimeError, match="requires Q# operations"):
-        algo._prepend_state_prep_circuit(state_prep, evolution, num_qubits=1)
+        builder._prepend_state_prep(state_prep, evolution, num_qubits=1)
 
 
 def test_euler_integrator_eigenvalue_remains_constant() -> None:
     """Run an example EulerIntegrator workflow."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])
-    h0 = QubitHamiltonian(["ZZ"], np.array([0.0]), term_partition=partition)
-    h1 = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    h0 = QubitOperator(["ZZ"], np.array([0.0]), term_partition=partition)
+    h1 = QubitOperator(["ZZ"], np.array([1.0]), term_partition=partition)
 
     def square_wave(t: float) -> float:
         """Alternates +1/-1 based on which time step we are in."""
@@ -97,19 +98,23 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
         return 1.0 if step % 2 == 0 else -1.0
 
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=square_wave)
-    observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    observable = QubitOperator(["ZZ"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
-        "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=100, order=1),
+        "evolution_circuit_builder",
+        AlgorithmRef(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=100, order=1),
+            total_time=100.0,
+            dt=1.0,
+        ),
     )
     algo.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
-    algo.settings().set("total_time", 100.0)
-    algo.settings().set("dt", 1.0)
 
     state_prep = identity_state_prep(num_qubits=2)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep, shots=1024)
@@ -125,22 +130,26 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
 def test_euler_integrator_with_device_backend() -> None:
     """Run EulerIntegrator with a device_backend_name string."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])
-    h0 = QubitHamiltonian(["ZZ"], np.array([0.0]), term_partition=partition)
-    h1 = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    h0 = QubitOperator(["ZZ"], np.array([0.0]), term_partition=partition)
+    h1 = QubitOperator(["ZZ"], np.array([1.0]), term_partition=partition)
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=_constant_drive)
-    observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    observable = QubitOperator(["ZZ"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
-        "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
+        "evolution_circuit_builder",
+        AlgorithmRef(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
+            total_time=1.0,
+            dt=1.0,
+        ),
     )
     algo.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qiskit_aer_simulator", device_backend_name="fake_manila"),
     )
-    algo.settings().set("total_time", 1.0)
-    algo.settings().set("dt", 1.0)
 
     state_prep = identity_state_prep(num_qubits=2)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep, shots=1024)
@@ -158,9 +167,9 @@ def test_euler_integrator_with_device_backend() -> None:
 class TestEulerIntegratorValidation:
     """Tests for EulerIntegrator input validation."""
 
-    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitHamiltonian:
+    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitOperator:
         labels = ["Z" + "I" * (num_qubits - 1)]
-        return QubitHamiltonian(labels, np.array([1.0]))
+        return QubitOperator(labels, np.array([1.0]))
 
     def _dummy_state_prep(self) -> Circuit:
         return identity_state_prep(num_qubits=2)
@@ -174,80 +183,100 @@ class TestEulerIntegratorValidation:
         with pytest.raises(ValueError, match="same number of qubits"):
             algo.run(td, observables=[obs3], state_prep=self._dummy_state_prep())
 
-    def test_get_circuit_before_run_raises(self):
-        """get_circuit() before run() should raise ValueError."""
-        algo = EulerIntegrator()
-        with pytest.raises(ValueError, match="No evolution circuit"):
-            algo.get_circuit()
-
     def test_dt_exceeds_total_time_raises(self):
         """Dt > total_time should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
-        algo = EulerIntegrator()
-        algo.settings().set(
+        builder = EulerEvolutionCircuitBuilder()
+        builder.settings().set(
             "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
         )
-        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
-        algo.settings().set("total_time", 1.0)
-        algo.settings().set("dt", 2.0)
-        with pytest.raises(ValueError, match="must match not exceed"):
-            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+        builder.settings().set("total_time", 1.0)
+        builder.settings().set("dt", 2.0)
+        with pytest.raises(ValueError, match="must not exceed"):
+            builder.run(td, self._dummy_state_prep())
 
     def test_dt_zero_raises(self):
         """Dt = 0 should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
-        algo = EulerIntegrator()
-        algo.settings().set(
+        builder = EulerEvolutionCircuitBuilder()
+        builder.settings().set(
             "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
         )
-        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
-        algo.settings().set("total_time", 1.0)
-        algo.settings().set("dt", 0.0)
+        builder.settings().set("total_time", 1.0)
+        builder.settings().set("dt", 0.0)
         with pytest.raises(ValueError, match="must be nonzero"):
-            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+            builder.run(td, self._dummy_state_prep())
 
     def test_dt_negative_raises(self):
         """Dt with opposite sign to total_time should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
-        algo = EulerIntegrator()
-        algo.settings().set(
+        builder = EulerEvolutionCircuitBuilder()
+        builder.settings().set(
             "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
         )
-        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
-        algo.settings().set("total_time", 1.0)
-        algo.settings().set("dt", -0.5)
+        builder.settings().set("total_time", 1.0)
+        builder.settings().set("dt", -0.5)
         with pytest.raises(ValueError, match="must match the sign"):
-            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+            builder.run(td, self._dummy_state_prep())
 
     def test_total_time_zero_raises(self):
         """total_time = 0 should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
-        algo = EulerIntegrator()
-        algo.settings().set(
+        builder = EulerEvolutionCircuitBuilder()
+        builder.settings().set(
             "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
         )
-        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
-        algo.settings().set("total_time", 0.0)
-        algo.settings().set("dt", 0.1)
+        builder.settings().set("total_time", 0.0)
+        builder.settings().set("dt", 0.1)
         with pytest.raises(ValueError, match="total_time must be nonzero"):
-            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+            builder.run(td, self._dummy_state_prep())
 
-    def test_propagator_setting_via_create_kwargs(self):
-        """Propagator AlgorithmRef should be configurable through create() kwargs."""
+    def test_can_create_via_registry(self):
+        """Test that EulerEvolutionCircuitBuilder can be created via the algorithm registry."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
-        algo = registry.create(
-            "hamiltonian_simulation",
-            "euler_integrator",
-            propagator=AlgorithmRef("propagator", "magnus", order=2),
+        builder = registry.create("evolution_circuit_builder", "euler")
+        assert builder.name() == "euler"
+
+    def test_can_create_with_settings(self):
+        """Test that EulerEvolutionCircuitBuilder can be created with custom settings."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        builder = registry.create(
+            "evolution_circuit_builder",
+            "euler",
+            total_time=2.0,
+            dt=0.5,
         )
-        ref = algo.settings().get("propagator")
-        assert ref.algorithm_type == "propagator"
-        assert ref.algorithm_name == "magnus"
+        assert builder.settings().get("total_time") == 2.0
+        assert builder.settings().get("dt") == 0.5
+
+    def test_builder_run_produces_valid_circuit(self):
+        """Standalone builder.run() produces a Circuit suitable for QRE."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        num_qubits = 2
+        h = self._make_hamiltonian(num_qubits=num_qubits)
+        td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
+
+        builder = registry.create(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=2, order=1),
+            total_time=1.0,
+            dt=1.0,
+        )
+        circuit = builder.run(td, identity_state_prep(num_qubits=num_qubits))
+
+        assert circuit.get_qir() is not None
+        app = circuit.get_qre_application()  # the advertised use case must not throw
+        assert app is not None
+        # Combined circuit should operate on the correct number of qubits
+        assert f'"required_num_qubits"="{num_qubits}"' in str(circuit.get_qir())
 
 
 # ---------------------------------------------------------------------------
@@ -268,22 +297,28 @@ def _run_smooth_drive_test(
 
     Uses a non-commuting Hamiltonian so ⟨Z⟩ depends on the evolution time.
     """
-    h0 = QubitHamiltonian(["I"], np.array([0.0]))
-    h1 = QubitHamiltonian(["X"], np.array([1.0]))
+    h0 = QubitOperator(["I"], np.array([0.0]))
+    h1 = QubitOperator(["X"], np.array([1.0]))
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=drive)
-    observable = QubitHamiltonian(["Z"], np.array([1.0]))
+    observable = QubitOperator(["Z"], np.array([1.0]))
 
     algo = EulerIntegrator()
     algo.settings().set(
-        "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=num_divisions, order=1),
+        "evolution_circuit_builder",
+        AlgorithmRef(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder", "trotter", num_divisions=num_divisions, order=1
+            ),
+            total_time=total_time,
+            dt=dt,
+        ),
     )
     algo.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
-    algo.settings().set("total_time", total_time)
-    algo.settings().set("dt", dt)
 
     state_prep = identity_state_prep(num_qubits=1)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep, shots=10000)
@@ -330,25 +365,29 @@ def test_euler_integrator_non_commuting_observable() -> None:
     exact ⟨Z⟩ = cos(2t).  At t = π/4, ⟨Z⟩ = 0.  This catches bugs where
     the evolution time is wrong (e.g., doubled → ⟨Z⟩ = -1).
     """
-    h0 = QubitHamiltonian(["I"], np.array([0.0]))
-    h1 = QubitHamiltonian(["X"], np.array([1.0]))
+    h0 = QubitOperator(["I"], np.array([0.0]))
+    h1 = QubitOperator(["X"], np.array([1.0]))
     td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=_constant_drive)
-    observable = QubitHamiltonian(["Z"], np.array([1.0]))
+    observable = QubitOperator(["Z"], np.array([1.0]))
 
     total_time = np.pi / 4
     dt = total_time  # single step — constant drive, so one step is exact
 
     algo = EulerIntegrator()
     algo.settings().set(
-        "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
+        "evolution_circuit_builder",
+        AlgorithmRef(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
+            total_time=total_time,
+            dt=dt,
+        ),
     )
     algo.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
-    algo.settings().set("total_time", total_time)
-    algo.settings().set("dt", dt)
 
     state_prep = identity_state_prep(num_qubits=1)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep, shots=10000)

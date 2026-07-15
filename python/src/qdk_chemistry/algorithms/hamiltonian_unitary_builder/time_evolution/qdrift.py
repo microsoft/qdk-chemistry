@@ -26,7 +26,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import (
     qdrift_samples_campbell,
 )
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -214,7 +214,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Construct the unitary representation using qDRIFT randomized sampling.
 
         The qDRIFT method approximates :math:`e^{-iHt}` by:
@@ -264,6 +264,7 @@ class QDrift(TimeEvolutionBuilder):
                 step_terms=terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
+                scale=time,
             )
         )
 
@@ -271,7 +272,7 @@ class QDrift(TimeEvolutionBuilder):
     # qDRIFT sampling and duplicate-term fusion helpers
     # ------------------------------------------------------------------
 
-    def _resolve_num_samples(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+    def _resolve_num_samples(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of qDRIFT samples to use.
 
         When both *num_samples* and *target_accuracy* are provided, the

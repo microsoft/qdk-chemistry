@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitIterativeQpeCircuitBuilder", "QiskitStandardQpeCircuitBuilder"]
@@ -74,13 +74,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
 
         Returns:
             A list containing a single standard QPE circuit.
@@ -94,13 +94,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def build_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> Circuit:
         """Build the standard QPE circuit using Qiskit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
 
         Returns:
             The constructed QPE quantum circuit.
@@ -110,39 +110,55 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits = self._settings.get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
-        ancilla = QuantumRegister(num_bits, "ancilla")
-        system = QuantumRegister(qubit_hamiltonian.num_qubits, "system")
+
+        # Determine unitary ancilla qubit count from the compiled controlled-circuit.
+        # The compiled Qiskit circuit may have additional decomposition ancillas
+        # beyond the logical count (e.g., for multi-controlled gate synthesis).
+        num_system = qubit_hamiltonian.num_qubits
+        probe_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
+        num_unitary_ancilla = probe_circuit.get_qiskit_circuit().num_qubits - 1 - num_system
+
+        phase = QuantumRegister(num_bits, "phase")
+        system = QuantumRegister(num_system, "system")
+        registers = [phase, system]
+        if num_unitary_ancilla > 0:
+            unitary_ancilla = QuantumRegister(num_unitary_ancilla, "unitary_ancilla")
+            registers.append(unitary_ancilla)
+        else:
+            unitary_ancilla = None
         classical = ClassicalRegister(num_bits, "c")
-        qc = QuantumCircuit(ancilla, system, classical)
+        registers.append(classical)
+        qc = QuantumCircuit(*registers)
 
         Logger.debug(f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurements.")
         state_prep = state_preparation.get_qiskit_circuit()
-        if state_prep.num_qubits != qubit_hamiltonian.num_qubits:
+        if state_prep.num_qubits != num_system:
             raise ValueError(
                 "state_preparation must prepare the same number of system qubits as the Hamiltonian "
-                f"(expected {qubit_hamiltonian.num_qubits}, received {state_prep.num_qubits}).",
+                f"(expected {num_system}, received {state_prep.num_qubits}).",
             )
 
         qc.compose(state_prep, qubits=system, inplace=True)
 
         for idx in range(num_bits):
-            qc.h(ancilla[idx])
+            qc.h(phase[idx])
 
-        for ancilla_idx in range(num_bits):
-            power = 2**ancilla_idx
+        target_qubits = list(system) + (list(unitary_ancilla) if unitary_ancilla else [])
+        for phase_idx in range(num_bits):
+            power = 2**phase_idx
             self._append_controlled_unitary(
                 circuit=qc,
                 qubit_hamiltonian=qubit_hamiltonian,
-                control_qubit=ancilla[ancilla_idx],
-                target_qubits=system,
+                control_qubit=phase[phase_idx],
+                target_qubits=target_qubits,
                 power=power,
             )
 
         inverse_qft = synth_qft_full(
             num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True, name="Inverse QFT"
         )
-        qc.compose(inverse_qft.to_gate(), qubits=ancilla, inplace=True)
-        qc.measure(ancilla, classical)
+        qc.compose(inverse_qft.to_gate(), qubits=phase, inplace=True)
+        qc.measure(phase, classical)
         Logger.debug(f"Completed standard QPE circuit with {qc.num_qubits} qubits.")
 
         return Circuit(qasm3.dumps(qc))
@@ -150,7 +166,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         control_qubit: int,
         target_qubits: list,
         *,
@@ -160,13 +176,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             circuit: The quantum circuit to modify.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
 
         """
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
         cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
@@ -228,7 +244,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits using Qiskit.
 
@@ -239,7 +255,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The qubit operator for which to build circuits.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -277,7 +293,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         iteration: int,
         total_iterations: int,
@@ -287,7 +303,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The qubit operator for which to estimate the phase.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
@@ -298,7 +314,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
             return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
@@ -323,13 +339,24 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
         ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
+        num_system = state_prep_qc.num_qubits
+        num_unitary_ancilla = ctrl_unitary_qc.num_qubits - 1 - num_system
+
+        phase = QuantumRegister(1, "phase")
+        system_target = QuantumRegister(num_system, "system")
+        registers = [phase, system_target]
+        if num_unitary_ancilla > 0:
+            unitary_ancilla = QuantumRegister(num_unitary_ancilla, "unitary_ancilla")
+            registers.append(unitary_ancilla)
+        else:
+            unitary_ancilla = None
         classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
+        registers.append(classical)
+        circuit = QuantumCircuit(*registers)
+
         circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
+        control = phase[0]
+        target_qubits = list(system_target) + (list(unitary_ancilla) if unitary_ancilla else [])
         circuit.h(control)
 
         # Apply phase correction if provided

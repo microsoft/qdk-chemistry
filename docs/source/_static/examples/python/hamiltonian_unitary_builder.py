@@ -92,6 +92,59 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered time evolution builder implementations
 implementations = registry.available("hamiltonian_unitary_builder")
-print(implementations)  # e.g. ['trotter', 'qdrift', 'partially_randomized']
+print(implementations)  # e.g. ['trotter', 'qdrift', 'partially_randomized', 'lcu']
 # end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-configure-lcu
+from qdk_chemistry.algorithms import create
+
+# Create an LCU block encoding builder
+lcu = create("hamiltonian_unitary_builder", "lcu")
+
+# Configure for qubitization (quantum walk operator)
+lcu.settings().set("quantum_walk", True)
+lcu.settings().set("power", 1)
+# end-cell-configure-lcu
+################################################################################
+
+################################################################################
+# start-cell-run-lcu
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
+
+# 1. Setup molecule
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+symbols = ["H", "H"]
+structure = Structure(coords, symbols=symbols)
+
+# 2. SCF
+scf_solver = create("scf_solver")
+E_scf, wfn_scf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
+
+# 3. Hamiltonian construction
+hamiltonian_constructor = create("hamiltonian_constructor")
+hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
+
+# 4. Qubit mapping
+from qdk_chemistry.data import MajoranaMapping
+
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_mapper = create("qubit_mapper")
+qubit_ham = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
+
+# 5. Build LCU block encoding with quantum walk
+lcu = create("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
+unitary = lcu.run(qubit_ham)
+
+print(f"Container type: {unitary.get_container_type()}")
+print(f"Number of qubits: {unitary.get_num_qubits()}")
+print(unitary.get_summary())
+# end-cell-run-lcu
 ################################################################################

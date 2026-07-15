@@ -12,6 +12,8 @@ representations, particularly for quantum circuit simulation and state preparati
 import numpy as np
 
 from qdk_chemistry import data
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 
 __all__ = ["create_statevector_from_wavefunction"]
 
@@ -51,9 +53,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
 
     """
     orbitals = wavefunction.get_orbitals()
-    indices, _ = orbitals.get_active_space_indices()
-
-    num_orbs = len(indices)
+    num_orbs = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
     num_qubits = num_orbs * 2
     dim = 1 << num_qubits  # 2^num_qubits
 
@@ -69,7 +69,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     # Fill statevector
     for i, det in enumerate(determinants):
         # Convert configuration to statevector index
-        index = _configuration_to_statevector_index(det, num_orbs)
+        index = _configuration_to_statevector_index(det, num_qubits)
         statevector[index] = coeffs_array[i]
 
     # Normalize if requested
@@ -81,7 +81,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     return statevector
 
 
-def _configuration_to_statevector_index(configuration: data.Configuration, num_orbitals: int) -> int:
+def _configuration_to_statevector_index(configuration: data.Configuration, n_bits: int) -> int:
     """Convert a Configuration to its corresponding integer index in the statevector array.
 
     This function maps an electronic configuration (orbital occupation pattern) to
@@ -112,31 +112,22 @@ def _configuration_to_statevector_index(configuration: data.Configuration, num_o
         configuration (Configuration): The electronic configuration to convert. This object
             encodes the occupation of each orbital (unoccupied, alpha, beta,
             or doubly occupied).
-        num_orbitals (int): Number of spatial orbitals to use from the configuration.
-            This allows extracting a subset for active space calculations.
+        n_bits (int): Number of bits to read from the configuration
+            (num_modes * bits_per_mode).
 
     Returns:
-        int: The statevector index (0 to 2^(2*num_orbitals) - 1) corresponding
-            to this configuration in the computational basis.
-
-    Raises:
-        RuntimeError: If num_orbitals exceeds the configuration's capacity.
+        int: The statevector index corresponding to this configuration in the
+            computational basis.
 
     """
-    # Get binary strings for alpha and beta
-    alpha_str, beta_str = configuration.to_binary_strings(num_orbitals)
+    # Get bit vector: [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]
+    bits = configuration.to_bits(n_bits)
 
     index = 0
 
-    # Process alpha electrons (lower bits)
     # Little-endian: bit i corresponds to qubit i
-    for i, bit in enumerate(alpha_str):
-        if bit == "1":
+    for i, bit in enumerate(bits):
+        if bit:
             index |= 1 << i
-
-    # Process beta electrons (upper bits, offset by num_orbitals)
-    for i, bit in enumerate(beta_str):
-        if bit == "1":
-            index |= 1 << (num_orbitals + i)
 
     return index

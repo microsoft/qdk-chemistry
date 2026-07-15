@@ -17,11 +17,10 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QpeResult,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.phase import energy_from_phase
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -38,7 +37,7 @@ class PhaseEstimationProblem:
     """Container describing a reproducible phase estimation benchmark."""
 
     label: str
-    hamiltonian: QubitHamiltonian
+    hamiltonian: QubitOperator
     state_prep: Circuit
     evolution_time: float
     num_bits: int
@@ -52,7 +51,7 @@ class PhaseEstimationProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep_params = {
         "rowMap": [1, 0],
         "stateVector": [0.6, 0.0, 0.0, 0.8],
@@ -82,7 +81,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
@@ -177,7 +176,12 @@ def _resolve_phase_ambiguity(
 
     """
     phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = [energy_from_phase(candidate, evolution_time=evolution_time) for candidate in phase_fraction_candidates]
+    energies = []
+    for candidate in phase_fraction_candidates:
+        angle = (candidate % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        energies.append(angle / evolution_time)
 
     # Select candidate closest to expected energy
     index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))

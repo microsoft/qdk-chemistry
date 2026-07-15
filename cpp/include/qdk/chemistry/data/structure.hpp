@@ -117,12 +117,12 @@ class Structure : public DataClass,
   /**
    * @brief Copy assignment operator
    */
-  Structure& operator=(const Structure& other) = default;
+  Structure& operator=(const Structure&) = delete;
 
   /**
    * @brief Move assignment operator
    */
-  Structure& operator=(Structure&& other) noexcept = default;
+  Structure& operator=(Structure&&) = delete;
 
   /**
    * @brief Destructor

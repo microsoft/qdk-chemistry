@@ -2,17 +2,17 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitOperator` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
-QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
-These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
+QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
+
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -29,8 +29,8 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
-QubitHamiltonian
-   A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
+QubitOperator
+   A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder
@@ -204,7 +204,7 @@ When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 
 Consuming term partitions
 -------------------------
 
-When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the Trotter builder consumes it directly:
+When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
 * :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
@@ -267,12 +267,103 @@ Example::
     #   exp(-i * +0.2500 * XIII)
 
 
+.. _block-encoding-builder:
+
+Block encoding
+~~~~~~~~~~~~~~
+
+Block encoding is a technique for embedding a non-unitary operator (such as :math:`H / \lambda`) into a larger unitary circuit.
+Given an :math:`n`-qubit Hamiltonian :math:`H`, a block encoding uses :math:`a` ancilla qubits to construct a unitary :math:`U` such that:
+
+.. math::
+
+   (\langle 0|^{\otimes a} \otimes I)\, U\, (|0\rangle^{\otimes a} \otimes I) = \frac{H}{\lambda}
+
+where :math:`\lambda \geq \|H\|` is a normalization factor (typically the L1 norm of the coefficients).
+The Hamiltonian is encoded in the top-left block of the larger unitary — hence the name "block encoding."
+
+Block encodings are the foundation for quantum algorithms such as qubitization, QSVT, and quantum linear system solvers.
+QDK/Chemistry currently provides the **LCU** (Linear Combination of Unitaries) method for constructing block encodings.
+
+.. _lcu-builder:
+
+LCU (Linear Combination of Unitaries)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. rubric:: Factory name: ``"lcu"``
+
+The LCU builder constructs a block encoding of :math:`H / \lambda` using the PREPARE–SELECT pattern :cite:`Childs2012`.
+For a Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` with :math:`\lambda = \sum_j |\alpha_j|`:
+
+**PREPARE oracle**
+
+Prepares an ancilla register in the state :math:`|\psi\rangle = \sum_j \sqrt{|\alpha_j| / \lambda}\, |j\rangle` using :math:`\lceil \log_2 L \rceil` qubits.
+
+**SELECT oracle**
+
+Applies the corresponding Pauli string controlled on the ancilla index:
+
+.. math::
+
+   \text{SELECT} = \sum_{j=0}^{L-1} |j\rangle\langle j| \otimes P_j
+
+with sign corrections absorbed into a phase vector.
+
+**Block encoding circuit**
+
+The composite circuit :math:`\text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}` realizes the block encoding:
+
+.. math::
+
+   (\langle 0| \otimes I)\, \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}\, (|0\rangle \otimes I) = \frac{H}{\lambda}
+
+**Quantum walk operator**
+
+When ``quantum_walk=True``, the builder wraps the block encoding with a reflection to form the qubitization walk operator:
+
+.. math::
+
+   W = (2|0\rangle\langle 0| - I) \cdot \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}
+
+The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :math:`E_k` are the eigenvalues of :math:`H`.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``power``
+     - int
+     - The power to which the walk operator is raised. Default is 1.
+   * - ``quantum_walk``
+     - bool
+     - If ``True``, wrap the block encoding with a reflection to form the qubitization walk operator. If ``False``, produce the plain block encoding. Default is ``False``.
+   * - ``tolerance``
+     - float
+     - Minimum L1 norm below which the decomposition is considered ill-defined. Default is 1e-12.
+
+.. rubric:: Example
+
+::
+
+    from qdk_chemistry.algorithms import registry
+
+    lcu = registry.create("hamiltonian_unitary_builder", "lcu")
+    lcu.settings().update({"quantum_walk": True})
+    unitary = lcu.run(qubit_hamiltonian)
+
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
+
+
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or linear combinations of unitaries
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
-- :doc:`PhaseEstimation <phase_estimation>`: One consumer of time-evolution unitaries
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading
 ---------------

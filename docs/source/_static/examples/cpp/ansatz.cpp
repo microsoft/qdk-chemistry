@@ -4,6 +4,7 @@
 
 // Ansatz usage examples.
 // --------------------------------------------------------------------------------------------
+// docs:xyz ../data/h2.structure.xyz
 // start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
@@ -12,8 +13,12 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
 int main() {
-  // Load H2 structure from XYZ file
-  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
+  // Load H2 structure from inline XYZ file
+  auto structure = Structure::from_xyz(R"(2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+)");
 
   // SCF
   auto scf_solver = ScfSolverFactory::create();

@@ -13,7 +13,7 @@ from scipy.linalg import expm
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift, QDriftSettings
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -78,7 +78,7 @@ class TestQDriftConstruction:
 
     def test_returns_unitary_representation(self):
         """Test that run returns a UnitaryRepresentation."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(num_samples=10, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
 
@@ -88,7 +88,7 @@ class TestQDriftConstruction:
 
     def test_correct_number_of_samples(self):
         """Test that the container has at most num_samples terms (fewer after merging)."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
         builder = QDrift(num_samples=num_samples, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
@@ -100,7 +100,7 @@ class TestQDriftConstruction:
 
     def test_exact_sample_count_without_merging(self):
         """Disabling merge_duplicate_terms gives exactly num_samples terms."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
         builder = QDrift(num_samples=num_samples, seed=42, merge_duplicate_terms=False, time=0.1)
         unitary = builder.run(hamiltonian)
@@ -109,7 +109,7 @@ class TestQDriftConstruction:
 
     def test_reproducible_with_seed(self):
         """Test that results are reproducible when using a seed."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Y", "Z"], coefficients=[1.0, 0.5, 0.25])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Y", "Z"], coefficients=[1.0, 0.5, 0.25])
 
         builder1 = QDrift(num_samples=20, seed=12345, time=0.1)
         builder2 = QDrift(num_samples=20, seed=12345, time=0.1)
@@ -127,7 +127,7 @@ class TestQDriftConstruction:
 
     def test_different_seeds_produce_different_results(self):
         """Test that different seeds produce different sampling."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.25, 0.1, 0.05],
         )
@@ -151,7 +151,7 @@ class TestQDriftSampling:
     def test_samples_proportional_to_weights(self):
         """Test that terms are sampled approximately proportional to |h_j|."""
         # Create a Hamiltonian with unequal weights
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z"],
             coefficients=[0.9, 0.1],  # X should be sampled ~90% of the time
         )
@@ -183,7 +183,7 @@ class TestQDriftSampling:
 
     def test_angle_calculation(self):
         """Test that the total rotation angle equals λ·t after merging."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[0.6, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[0.6, 0.4])
         time = 0.5
         num_samples = 10
 
@@ -207,7 +207,7 @@ class TestQDriftEdgeCases:
 
     def test_tiny_coefficients_still_sampled(self):
         """Test that even very small coefficients are included (no filtering)."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-10])
+        hamiltonian = QubitOperator(pauli_strings=["X"], coefficients=[1e-10])
         builder = QDrift(num_samples=10, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
 
@@ -218,7 +218,7 @@ class TestQDriftEdgeCases:
 
     def test_single_term_hamiltonian(self):
         """Test QDrift with a single-term Hamiltonian."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
+        hamiltonian = QubitOperator(pauli_strings=["X"], coefficients=[1.0])
         num_samples = 20
         time = 0.1
         builder = QDrift(num_samples=num_samples, seed=42, time=time)
@@ -239,7 +239,7 @@ class TestQDriftEdgeCases:
 
     def test_rejects_non_hermitian_hamiltonian(self):
         """Test that non-Hermitian Hamiltonians raise an error."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X"],
             coefficients=[1.0 + 0.5j],
         )
@@ -249,7 +249,7 @@ class TestQDriftEdgeCases:
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled correctly."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z"],
             coefficients=[-1.0, 0.5],
         )
@@ -279,7 +279,7 @@ class TestQDriftEdgeCases:
 
     def test_multi_qubit_hamiltonian(self):
         """Test QDrift with multi-qubit Pauli strings."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "IZ", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.2],
         )
@@ -293,7 +293,7 @@ class TestQDriftEdgeCases:
 
     def test_num_qubits_preserved_four_qubits(self):
         """Verify the output preserves the correct number of qubits for larger systems."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XXII", "IIZZ", "IYIY"],
             coefficients=[0.3, 0.3, 0.4],
         )
@@ -396,7 +396,7 @@ class TestQDriftTargetAccuracy:
     def test_auto_num_samples_matches_campbell_bound(self):
         """N is auto-computed as ceil(2 lambda^2 t^2 / eps) when target_accuracy is set."""
         coeffs = [1.0, 0.5, 0.25]
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Y", "Z"], coefficients=coeffs)
+        hamiltonian = QubitOperator(pauli_strings=["X", "Y", "Z"], coefficients=coeffs)
         lam = sum(abs(c) for c in coeffs)
         t = 0.4
         eps = 1e-2
@@ -408,7 +408,7 @@ class TestQDriftTargetAccuracy:
 
     def test_manual_num_samples_acts_as_floor(self):
         """num_samples wins when larger than the auto-computed value."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         # Loose target -> auto N is tiny; manual floor dominates.
         builder = QDrift(num_samples=500, target_accuracy=10.0, seed=42, time=0.1, merge_duplicate_terms=False)
         unitary = builder.run(hamiltonian)
@@ -416,14 +416,14 @@ class TestQDriftTargetAccuracy:
 
     def test_target_accuracy_zero_preserves_manual(self):
         """target_accuracy=0.0 disables auto-N (regression)."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(num_samples=37, target_accuracy=0.0, seed=42, time=0.1, merge_duplicate_terms=False)
         unitary = builder.run(hamiltonian)
         assert len(unitary.get_container().step_terms) == 37
 
     def test_weight_threshold_filters_small_terms(self):
         """Sub-threshold coefficients are dropped before sampling."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Y", "Z"], coefficients=[1.0, 1e-15, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Y", "Z"], coefficients=[1.0, 1e-15, 0.5])
         builder = QDrift(num_samples=200, seed=42, time=0.1, weight_threshold=1e-12)
         unitary = builder.run(hamiltonian)
         # The Y term should never appear in any sample.
@@ -546,7 +546,7 @@ class TestQDriftAccuracyBound:
 
     def test_accuracy_bound_1q(self):
         """1-qubit X + 0.5 Z: averaged-channel error stays within 10·ε."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         eps = 0.05
         t = 0.5
         seeds = list(range(40))
@@ -557,7 +557,7 @@ class TestQDriftAccuracyBound:
 
     def test_accuracy_bound_2q(self):
         """2-qubit TFIM-style ZZ + 0.6 XI + 0.6 IX: averaged-channel error within 10·ε."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XI", "IX"], coefficients=[1.0, 0.6, 0.6])
+        hamiltonian = QubitOperator(pauli_strings=["ZZ", "XI", "IX"], coefficients=[1.0, 0.6, 0.6])
         eps = 0.05
         t = 0.3
         seeds = list(range(40))
@@ -568,7 +568,7 @@ class TestQDriftAccuracyBound:
 
     def test_error_scales_with_epsilon(self):
         """Tightening ε reduces the averaged-channel error (Campbell scaling)."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         t = 0.5
         seeds = list(range(40))
         err_loose = _qdrift_channel_error(hamiltonian, eps=0.1, t=t, seeds=seeds)
@@ -592,7 +592,7 @@ class TestQDriftStrictAccuracyBound:
 
     def test_state_trace_within_eps_1q(self):
         """1-qubit X + 0.5 Z: state trace distance ≤ ε."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         eps = 0.05
         t = 0.5
         err = _qdrift_state_trace_error(hamiltonian, eps=eps, t=t, seeds=self.SEEDS)
@@ -600,8 +600,35 @@ class TestQDriftStrictAccuracyBound:
 
     def test_state_trace_within_eps_2q(self):
         """2-qubit ZZ + 0.6 XI + 0.6 IX: state trace distance ≤ ε."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XI", "IX"], coefficients=[1.0, 0.6, 0.6])
+        hamiltonian = QubitOperator(pauli_strings=["ZZ", "XI", "IX"], coefficients=[1.0, 0.6, 0.6])
         eps = 0.05
         t = 0.3
         err = _qdrift_state_trace_error(hamiltonian, eps=eps, t=t, seeds=self.SEEDS)
         assert err <= eps, f"State trace distance {err:.4e} exceeds ε = {eps:.4e}"
+
+
+class TestQDriftScale:
+    """Tests that the qDRIFT builder sets scale correctly on the container."""
+
+    def test_scale_equals_time(self):
+        """Container scale should equal the evolution time passed to qDRIFT."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        t = 0.8
+        builder = QDrift(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert container.scale == t
+
+    def test_eigenvalue_from_phase_roundtrip(self):
+        """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
+        t = 1.5
+        energy = 0.3
+        phi = (energy * t / (2 * np.pi)) % 1.0
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = QDrift(time=t)
+        container = builder.run(hamiltonian).get_container()
+        assert np.isclose(
+            container.eigenvalue_from_phase(phi),
+            energy,
+            rtol=1e-10,
+            atol=1e-12,
+        )

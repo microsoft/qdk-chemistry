@@ -5,15 +5,24 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, ModelOrbitals
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data.symmetry import (
+    SymmetryLabel,
+    axes,
+    spin_index_set,
+)
 
 ################################################################################
+# docs:xyz ../data/h2.structure.xyz
 # start-cell-create
-# Load H2 molecule from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+# Load H2 molecule from inline XYZ file
+structure = Structure.from_xyz("""\
+2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+""")
 
 # Obtain orbitals from a SCF calculation
 scf_solver = create("scf_solver")
@@ -47,13 +56,22 @@ model_orbitals = ModelOrbitals(active_indices, inactive_indices)
 
 ################################################################################
 # start-cell-access
-# Access orbital coefficients (alpha, beta)
-coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
+# Select a spin channel with a SymmetryLabel, then read the symmetry-blocked block
+alpha = SymmetryLabel([axes.alpha()])
+beta = SymmetryLabel([axes.beta()])
 
-# Access orbital energies
-energies_alpha, energies_beta = orbitals.get_energies()
-# Get active space indices
-active_indices_alpha, active_indices_beta = orbitals.get_active_space_indices()
+# Access orbital coefficients per spin channel
+coefficients = orbitals.coefficients()
+coeffs_alpha = coefficients.block([alpha, alpha])
+coeffs_beta = coefficients.block([beta, beta])
+
+# Access orbital energies per spin channel
+energies = orbitals.energies()
+energies_alpha = energies.block([alpha])
+energies_beta = energies.block([beta])
+# Get active space indices per spin channel
+active_indices_alpha = orbitals.active_indices().indices(alpha)
+active_indices_beta = orbitals.active_indices().indices(beta)
 
 # Access atomic orbital overlap matrix
 ao_overlap = orbitals.get_overlap_matrix()

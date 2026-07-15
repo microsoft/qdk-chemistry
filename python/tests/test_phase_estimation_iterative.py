@@ -18,16 +18,10 @@ from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.phase import (
-    accumulated_phase_from_bits,
-    energy_from_phase,
-    iterative_phase_feedback_update,
-    phase_fraction_from_feedback,
-)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -44,7 +38,7 @@ class PhaseEstimationProblem:
     """Container describing a reproducible phase estimation benchmark."""
 
     label: str
-    hamiltonian: QubitHamiltonian
+    hamiltonian: QubitOperator
     state_prep: Circuit
     evolution_time: float
     num_bits: int
@@ -58,7 +52,7 @@ class PhaseEstimationProblem:
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_vector = [0.6, 0.0, 0.0, 0.8]
     state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
     factories = QsharpFactoryData(
@@ -83,7 +77,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the four-qubit benchmark used in documentation."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_vector = np.zeros(2**4, dtype=float)
     state_vector[int("1000", 2)] = 0.8
     state_vector[int("0111", 2)] = -0.6
@@ -189,7 +183,7 @@ def _run_iterative_with_parameters(
     """
     assert len(pauli_strings) == len(coefficients)
 
-    hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+    hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
     num_qubits = int(np.log2(len(state_vector)))
 
     state_prep_params = {
@@ -231,7 +225,12 @@ def _resolve_phase_ambiguity(
 
     """
     phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = [energy_from_phase(candidate, evolution_time=evolution_time) for candidate in phase_fraction_candidates]
+    energies = []
+    for candidate in phase_fraction_candidates:
+        angle = (candidate % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        energies.append(angle / evolution_time)
 
     # Select candidate closest to expected energy
     index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))
@@ -438,52 +437,6 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
-
-
-def test_update_phase_feedback_with_bit_zero() -> None:
-    """Test phase feedback update when measured bit is 0."""
-    current_phase = np.pi / 4
-    new_phase = iterative_phase_feedback_update(current_phase, 0)
-
-    # When bit is 0, phase should be halved
-    assert np.isclose(new_phase, current_phase / 2, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_zero() -> None:
-    """Test phase fraction calculation from zero feedback."""
-    phase_fraction = phase_fraction_from_feedback(0.0)
-    assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_in_valid_range() -> None:
-    """Test phase fraction calculation from feedback in valid range."""
-    feedback = np.pi / 2
-    phase_fraction = phase_fraction_from_feedback(feedback)
-
-    # Should be in range [0, 1)
-    assert 0.0 <= phase_fraction < 1.0
-
-
-def test_phase_feedback_from_bits_empty() -> None:
-    """Test phase feedback calculation from empty bit sequence."""
-    phase_feedback = accumulated_phase_from_bits([])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_single_zero() -> None:
-    """Test phase feedback calculation from single zero bit."""
-    phase_feedback = accumulated_phase_from_bits([0])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_multiple() -> None:
-    """Test phase feedback calculation from multiple bits."""
-    bits = [1, 0, 1, 1]
-    phase_feedback = accumulated_phase_from_bits(bits)
-
-    # Verify it's equivalent to accumulated phase
-    expected = accumulated_phase_from_bits(bits)
-    assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
 
 
 def test_iterative_qpe_initialization() -> None:

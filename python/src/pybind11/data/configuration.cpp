@@ -112,7 +112,7 @@ Examples:
 
 )");
 
-  bind_getter_as_property(configuration, "num_modes", &Configuration::num_modes,
+  bind_getter_as_property(configuration, "capacity", &Configuration::capacity,
                           R"(
 Number of single-particle modes in the configuration.
 
@@ -120,7 +120,7 @@ Returns:
     int: Number of modes.
 
 Examples:
-    >>> qdk_chemistry.Configuration.from_bitstring("1010").num_modes
+    >>> qdk_chemistry.Configuration.from_bitstring("1010").capacity
     8
 
 )");
@@ -154,7 +154,7 @@ Returns:
     int: Packed state value (range 0 to 2^bits_per_mode - 1).
 
 Raises:
-    IndexError: If idx >= num_modes.
+    IndexError: If idx >= capacity.
 
 Examples:
     >>> config = qdk_chemistry.Configuration.from_bitstring("101")
@@ -304,6 +304,82 @@ Returns:
     str: String representation of the Configuration as a orbital occupation string
 
 )");
+
+  configuration.def(
+      "to_bits",
+      [](const Configuration &self, size_t n_bits) -> py::list {
+        const auto &packed = self.packed_data();
+        uint8_t bpm = self.bits_per_mode();
+        if ((n_bits % bpm) != 0) {
+          throw py::value_error(
+              "n_bits must be a multiple of bits_per_mode().");
+        }
+        size_t modes_per_byte = 8 / bpm;
+        size_t n_modes = n_bits / bpm;
+
+        py::list result;
+        if (bpm == 1) {
+          for (size_t i = 0; i < n_bits; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = i % modes_per_byte;
+            uint8_t val = (byte_idx < packed.size())
+                              ? (packed[byte_idx] >> bit_offset) & 1
+                              : 0;
+            result.append(static_cast<int>(val));
+          }
+        } else {
+          // bpm == 2: alpha block then beta block (Jordan-Wigner)
+          // First half: alpha occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // ALPHA=1, DOUBLY=3 have bit 0 set
+            result.append(static_cast<int>(state & 1));
+          }
+          // Second half: beta occupations
+          for (size_t i = 0; i < n_modes; ++i) {
+            size_t byte_idx = i / modes_per_byte;
+            size_t bit_offset = (i % modes_per_byte) * bpm;
+            uint8_t state = (byte_idx < packed.size())
+                                ? (packed[byte_idx] >> bit_offset) & 0x3
+                                : 0;
+            // BETA=2, DOUBLY=3 have bit 1 set
+            result.append(static_cast<int>((state >> 1) & 1));
+          }
+        }
+        return result;
+      },
+      R"(
+Return a flat list of 0/1 bit values representing the configuration.
+
+Args:
+    n_bits (int): Number of output bits. For bits_per_mode == 1 this equals
+        the number of modes to read; for bits_per_mode == 2 it equals
+        2 * (number of modes to read). Obtain the true mode count from the
+        owning container (e.g. ``configuration_set.capacity``) and compute
+        ``n_bits = capacity * bits_per_mode``.
+
+For bits_per_mode == 1: returns a list of length n_bits.
+For bits_per_mode == 2 (spin-½): returns a list of length n_bits with
+the first half being alpha occupations and the second half beta
+occupations (Jordan-Wigner ordering).
+
+Returns:
+    list[int]: List of 0s and 1s of length n_bits.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("10110")
+    >>> config.to_bits(5)
+    [1, 0, 1, 1, 0]
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("2u0d")
+    >>> config.to_bits(8)
+    [1, 1, 0, 0, 1, 0, 0, 1]
+
+)",
+      py::arg("n_bits"));
   // Data type name class attribute
   configuration.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(Configuration);

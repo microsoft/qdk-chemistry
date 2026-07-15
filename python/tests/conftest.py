@@ -6,13 +6,24 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import sys
 
 # Disable telemetry before any qdk_chemistry imports.
 # Uses setdefault so an explicit env override is still respected.
 os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
 
+# Force UTF-8 stdout/stderr (Windows cp1252 breaks circuit diagrams).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore
+
+# Non-interactive backend; must precede any matplotlib.pyplot import.
+import matplotlib
+
+matplotlib.use("Agg")
+
 import platform as plt
-import sys
 import tempfile
 from pathlib import Path
 
@@ -110,7 +121,7 @@ def test_data_files_path():
 
 @pytest.fixture
 def hamiltonian_4e4o(test_data_files_path):
-    """Fixture to create the Qubit Hamiltonian for 4e4o ethylene 2det problem."""
+    """Fixture to create the qubit operator for 4e4o ethylene 2det problem."""
     mapper = create("qubit_mapper", "qdk")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "ethylene_4e4o_2det.hamiltonian.json")
     n_spatial = classical_hamiltonian.get_one_body_integrals()[0].shape[0]
@@ -120,7 +131,7 @@ def hamiltonian_4e4o(test_data_files_path):
 
 @pytest.fixture
 def hamiltonian_10e6o(test_data_files_path):
-    """Fixture to create the Qubit Hamiltonian for 10e6o f2 problem."""
+    """Fixture to create the qubit operator for 10e6o f2 problem."""
     mapper = create("qubit_mapper", "qdk")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "f2_10e6o.hamiltonian.json")
     n_spatial = classical_hamiltonian.get_one_body_integrals()[0].shape[0]

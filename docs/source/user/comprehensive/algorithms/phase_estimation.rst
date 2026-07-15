@@ -2,15 +2,20 @@ Phase estimation
 ================
 
 The :class:`~qdk_chemistry.algorithms.PhaseEstimation` algorithm in QDK/Chemistry extracts eigenvalues from a quantum state by measuring the phase accumulated under repeated application of a unitary operator.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.QubitHamiltonian` (from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`), a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` (which encapsulates the unitary builder and controlled circuit mapper), and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.QubitOperator` (from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`), a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` (which encapsulates the unitary builder and controlled circuit mapper), and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
 
 Overview
 --------
 
 Quantum Phase Estimation (:term:`QPE`) is one of the foundational quantum algorithms for chemistry.
-Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has significant overlap with an eigenstate of :math:`U`, :term:`QPE` measures the eigenphase :math:`\phi` such that :math:`U|\psi\rangle = e^{2\pi i \phi}|\psi\rangle`.
-For chemistry applications the unitary is typically the Hamiltonian time-evolution operator :math:`U = e^{-iHt}`, in which case the energy eigenvalue is recovered as :math:`E = 2\pi\phi / t`.
-However, the algorithm itself is agnostic to how the unitary is constructed — any operator whose eigenvalues encode the quantity of interest can be used.
+Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has significant overlap with an eigenstate of :math:`U`, :term:`QPE` measures the eigenphase :math:`\varphi` such that :math:`U|\psi\rangle = e^{2\pi i \varphi}|\psi\rangle`.
+
+QDK/Chemistry supports two types of unitaries for QPE:
+
+- **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = \theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
+- **Qubitization** — The walk operator :math:`W` constructed via :ref:`LCU block encoding <lcu-builder>`. Energy is recovered as :math:`E = \lambda \cos(\theta)` where :math:`\lambda` is the L1 norm of the Hamiltonian.
+
+The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
 QDK/Chemistry provides two :term:`QPE` approaches, each suited to different hardware constraints:
 
@@ -36,10 +41,10 @@ The most common path starts from a molecular system:
 1. Prepare a reference :class:`~qdk_chemistry.data.Wavefunction` from a :doc:`multi-configuration calculation <mc_calculator>`
 2. Generate a state-preparation :class:`~qdk_chemistry.data.Circuit` using :doc:`StatePreparation <state_preparation>`
 3. Map the molecular :class:`~qdk_chemistry.data.Hamiltonian` to qubit operators using :doc:`QubitMapper <qubit_mapper>`
-4. Choose a method for constructing the target unitary (currently, QDK/Chemistry provides :doc:`time-evolution builders <hamiltonian_unitary_builder>` for Hamiltonian simulation)
+4. Choose a method for constructing the target unitary — either :ref:`Trotter time-evolution <trotter-builder>` or :ref:`LCU block encoding <lcu-builder>` (qubitization)
 5. Run phase estimation to obtain the energy eigenvalue
 
-Alternatively, phase estimation can be used with :doc:`model Hamiltonians <../model_hamiltonians>` (e.g., Hubbard, Heisenberg, or Ising spin models) or with a user-supplied :class:`~qdk_chemistry.data.Circuit` and :class:`~qdk_chemistry.data.QubitHamiltonian` directly — the full molecular-structure pipeline is not required.
+Alternatively, phase estimation can be used with :doc:`model Hamiltonians <../model_hamiltonians>` (e.g., Hubbard, Heisenberg, or Ising spin models) or with a user-supplied :class:`~qdk_chemistry.data.Circuit` and :class:`~qdk_chemistry.data.QubitOperator` directly — the full molecular-structure pipeline is not required.
 
 
 Using the PhaseEstimation
@@ -60,8 +65,8 @@ State preparation circuit
    A :class:`~qdk_chemistry.data.Circuit` that prepares the target quantum state on the system register.
    This is typically generated by the :doc:`StatePreparation <state_preparation>` algorithm from a :class:`~qdk_chemistry.data.Wavefunction`, but can also be any user-constructed circuit (e.g., a custom initial state for a :doc:`model Hamiltonian <../model_hamiltonians>`).
 
-QubitHamiltonian
-   A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
+QubitOperator
+   A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly by the user.
 
 Settings
@@ -177,7 +182,8 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_bits`` — Number of phase bits to extract
-- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}`
+- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}` (Trotter)
+- ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
 
 
@@ -218,22 +224,55 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_bits`` — Number of ancilla qubits (phase register size)
-- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}`
+- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}` (Trotter)
+- ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``qft_do_swaps`` — Whether to include swap gates in the inverse QFT (Qiskit only)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
 
 
-Phase aliasing and energy resolution
--------------------------------------
+Phase-to-energy extraction
+---------------------------
 
-Because phase estimation measures a phase :math:`\phi \in [0, 1)`, the reconstructed energy :math:`E = 2\pi\phi / t` is only unique modulo :math:`2\pi / t`.
-This means several energy values — called *aliases* — can produce the same measured phase.
+The method for converting a measured phase :math:`\varphi \in [0, 1)` to energy depends on the type of unitary used.
 
-QDK/Chemistry handles this automatically in the :class:`~qdk_chemistry.data.QpeResult` data class:
+Time evolution (Trotter)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``branching`` contains the full list of alias energy candidates :math:`E + k \cdot 2\pi/t` for :math:`k \in \{-2, -1, 0, 1, 2\}` by default
-- If a ``reference_energy`` is provided (e.g., the :term:`CASCI` energy), the alias closest to the reference is selected as ``resolved_energy``
-- ``canonical_phase_fraction`` and ``canonical_phase_angle`` reflect the alias-resolved phase
+When QPE acts on :math:`U = e^{-iHt}`, the phase angle :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]` and energy is:
+
+.. math::
+
+   E = \frac{\theta}{t}
+
+Aliasing can be resolved by enumerating candidates :math:`E_{\mathrm{raw}} + k \cdot 2\pi/t` and selecting the one closest to a reference energy (e.g., :term:`CASCI`).
+
+.. tab:: Python API (Time evolution configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-iqpe
+      :end-before: # end-cell-configure-iqpe
+
+Qubitization (LCU block encoding)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :math:`e^{\pm i \arccos(E/\lambda)}` and energy is recovered as:
+
+.. math::
+
+   E = \lambda \cos(\theta)
+
+where :math:`\lambda = \sum_j |\alpha_j|` is the L1 norm of the Hamiltonian coefficients.
+
+To use qubitization QPE, the :ref:`LCU builder <lcu-builder>` must be configured with ``quantum_walk=True``.
+This wraps the raw block encoding in a quantum walk operator :math:`W = (2|0\rangle\langle 0| - I) \cdot B[H]`, which is required for the :math:`\arccos` eigenvalue-phase relationship.
+
+.. tab:: Python API (Qubitization configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-qubitization
+      :end-before: # end-cell-configure-qubitization
 
 See :doc:`../data/qpe_result` for the full data class documentation.
 
@@ -242,7 +281,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.QpeResult`: Output data class containing phase, energy, and alias information
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit from :doc:`StatePreparation <state_preparation>`
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from :doc:`CircuitExecutor <circuit_executor>`

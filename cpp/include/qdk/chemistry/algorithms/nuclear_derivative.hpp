@@ -1,0 +1,203 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+#pragma once
+#include <memory>
+#include <optional>
+#include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/nuclear_gradients.hpp>
+#include <qdk/chemistry/data/nuclear_hessian.hpp>
+#include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
+
+namespace qdk::chemistry::algorithms {
+
+/**
+ * @brief Initial basis-set name, basis, orbitals, or wavefunction seed for a
+ * derivative run.
+ *
+ * A string seed is interpreted as the basis-set name, such as "sto-3g", to use
+ * for SCF calculations.
+ */
+using NuclearDerivativeSeedType =
+    std::variant<std::shared_ptr<data::Orbitals>,
+                 std::shared_ptr<data::BasisSet>,
+                 std::shared_ptr<data::Wavefunction>, std::string>;
+
+/**
+ * @brief Energy, gradients, optional Hessian, and optional wavefunction.
+ */
+using NuclearDerivativeResult =
+    std::tuple<double, std::shared_ptr<data::NuclearGradients>,
+               std::optional<std::shared_ptr<data::NuclearHessian>>,
+               std::optional<std::shared_ptr<data::Wavefunction>>>;
+
+/**
+ * @class NuclearDerivativeSettings
+ * @brief Settings for nuclear derivative calculations.
+ */
+class NuclearDerivativeSettings : public data::Settings {
+ public:
+  /**
+   * @brief Construct settings with shared nuclear derivative defaults.
+   */
+  NuclearDerivativeSettings() {
+    set_default(
+        "energy_calculator", data::AlgorithmRef("scf_solver", "qdk"),
+        "Algorithm used for each energy evaluation. Use an scf_solver for "
+        "direct SCF finite differences, a multi_configuration_scf solver for "
+        "MCSCF energies, or a multi_configuration_calculator such as CASCI or "
+        "ASCI for Hamiltonian-based multi-reference energies.");
+    allow_algorithm_ref_type_change("energy_calculator");
+    set_default(
+        "orbital_solver", data::AlgorithmRef("scf_solver", "qdk"),
+        "SCF solver used to generate reference orbitals for multi-reference "
+        "energy paths. This setting is ignored for direct SCF energy paths and "
+        "is skipped when the derivative input seed already provides usable "
+        "orbitals for the current geometry.");
+    set_default("hamiltonian_constructor",
+                data::AlgorithmRef("hamiltonian_constructor", "qdk"),
+                "Hamiltonian constructor used when energy_calculator is a "
+                "multi_configuration_calculator. It builds the active-space "
+                "Hamiltonian from the reference orbitals before the energy "
+                "calculation.");
+    set_default("compute_hessian", false,
+                "Whether to compute a nuclear Hessian in addition to energy "
+                "and gradients.");
+    set_default(
+        "suppress_child_algorithm_logging", true,
+        "Whether to temporarily raise the process-global log level to error "
+        "while nuclear derivative calculators run child energy evaluations. "
+        "Set false to preserve the current logger verbosity during those "
+        "sub-runs.");
+    set_default(
+        "localize_reference_orbitals", false,
+        "Whether to localize reference orbitals before multi-reference energy "
+        "evaluations. Localization is applied only to MR energy paths and uses "
+        "the current active-space orbital indices as the localization subset.");
+    set_default(
+        "orbital_localizer",
+        data::AlgorithmRef("orbital_localizer", "qdk_pipek_mezey"),
+        "Orbital localizer used when localize_reference_orbitals is true. The "
+        "localizer runs after reference orbitals are obtained and active-space "
+        "metadata from the seed has been reapplied.");
+  }
+};
+
+/**
+ * @class NuclearDerivativeCalculator
+ * @brief Base class for nuclear derivative algorithms.
+ *
+ * Implementations compute a total energy and nuclear gradients for a molecular
+ * structure. Hessians are returned when requested by settings, and a
+ * wavefunction is returned when the selected energy path naturally produces
+ * one.
+ */
+class NuclearDerivativeCalculator
+    : public Algorithm<NuclearDerivativeCalculator, NuclearDerivativeResult,
+                       std::shared_ptr<data::Structure>, int, int,
+                       NuclearDerivativeSeedType, unsigned int> {
+ public:
+  /**
+   * @brief Construct a calculator with nuclear derivative settings.
+   */
+  NuclearDerivativeCalculator() {
+    _settings = std::make_unique<NuclearDerivativeSettings>();
+  }
+  virtual ~NuclearDerivativeCalculator() = default;
+
+  /**
+   * @brief Compute nuclear derivatives for a molecular structure.
+   *
+   * This method is auto-generated by the Algorithm base class and
+   * automatically locks settings before execution, then delegates to
+   * _run_impl().
+   *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
+   * @param structure The molecular structure to evaluate
+   * @param charge The total molecular charge
+   * @param spin_multiplicity The spin multiplicity of the molecular system
+   * @param seed The basis name, basis set, orbitals, or wavefunction seed
+   * @param n_inactive_orbitals The number of doubly occupied orbitals excluded
+   * from multi-reference active spaces. This value is validated against the
+   * electron count even when the selected energy path does not use an active
+   * space.
+   * \endcond
+   *
+   * @return Energy, gradients, optional Hessian, and optional wavefunction.
+   *
+   * @throws std::invalid_argument If the molecular charge, spin multiplicity,
+   * electron count, or inactive-orbital count is inconsistent
+   * @throws qdk::chemistry::data::SettingsAreLocked If attempting to modify
+   * settings after run() is called
+   *
+   * @note Settings are automatically locked when this method is called and
+   * cannot be modified during or after execution.
+   */
+  using Algorithm::run;
+
+  virtual std::string name() const = 0;
+
+  /**
+   * @brief Return the factory type name for nuclear derivative calculators.
+   */
+  std::string type_name() const final {
+    return "nuclear_derivative_calculator";
+  }
+
+ protected:
+  /**
+   * @brief Implementation hook for derived nuclear derivative calculators.
+   *
+   * This method is called by run() after settings have been locked.
+   *
+   * @param structure The molecular structure to evaluate
+   * @param charge The total molecular charge
+   * @param spin_multiplicity The spin multiplicity of the molecular system
+   * @param seed The basis name, basis set, orbitals, or wavefunction seed
+   * @param n_inactive_orbitals The number of doubly occupied orbitals excluded
+   * from multi-reference active spaces. This value is validated against the
+   * electron count even when the selected energy path does not use an active
+   * space
+   * @return Energy, gradients, optional Hessian, and optional wavefunction
+   */
+  virtual NuclearDerivativeResult _run_impl(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, NuclearDerivativeSeedType seed,
+      unsigned int n_inactive_orbitals) const = 0;
+};
+
+/**
+ * @brief Factory for nuclear derivative calculator implementations.
+ */
+struct NuclearDerivativeCalculatorFactory
+    : public AlgorithmFactory<NuclearDerivativeCalculator,
+                              NuclearDerivativeCalculatorFactory> {
+  /**
+   * @brief Return the algorithm type name managed by this factory.
+   */
+  static std::string algorithm_type_name() {
+    return "nuclear_derivative_calculator";
+  }
+
+  /**
+   * @brief Register built-in nuclear derivative calculator implementations.
+   */
+  static void register_default_instances();
+
+  /**
+   * @brief Return the default nuclear derivative implementation name.
+   */
+  static std::string default_algorithm_name() {
+    return "qdk_finite_difference";
+  }
+};
+
+}  // namespace qdk::chemistry::algorithms

@@ -28,9 +28,15 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
+  // docs:xyz ../data/water.structure.xyz
   // start-cell-localize
-  // Load H2O molecule from XYZ file
-  auto structure = Structure::from_xyz_file("../data/water.structure.xyz");
+  // Load H2O molecule from inline XYZ file
+  auto structure = Structure::from_xyz(R"(3
+Water molecule
+O    0.000000    0.000000    0.000000
+H    0.758602    0.000000    0.504284
+H   -0.758602    0.000000    0.504284
+)");
 
   // Obtain orbitals from SCF calculation
   auto scf_solver = ScfSolverFactory::create();
