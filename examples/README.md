@@ -54,7 +54,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
-- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating qunatum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 
 ## Companion datasets and assets
