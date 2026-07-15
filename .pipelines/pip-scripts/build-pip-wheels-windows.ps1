@@ -72,8 +72,8 @@ try {
 # scikit-build-core builds the full C++ library; pre-installed deps (vcpkg
 # packages + libint2/ecpint/gauxc) are found via CMAKE_PREFIX_PATH.
 Write-Host "=== python -m build --wheel ==="
-# Default to a clean release version (python/_dev_version.py) when run standalone.
-if (-not $env:QDK_CHEMISTRY_RELEASE_BUILD) { $env:QDK_CHEMISTRY_RELEASE_BUILD = '1' }
+# Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
+if (-not $env:QDK_CHEMISTRY_RELEASE_BUILD) { $env:QDK_CHEMISTRY_RELEASE_BUILD = '0' }
 $prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\x64-windows-static-md"
 $buildArgs = @(
     'run', '-n', 'buildenv',
