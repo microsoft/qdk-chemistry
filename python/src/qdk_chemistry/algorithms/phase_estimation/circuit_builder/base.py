@@ -47,13 +47,6 @@ class QpeCircuitBuilderSettings(Settings):
             "algorithm_ref",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
-        self._set_default(
-            "compute_qubit_percentage",
-            "double",
-            0.0,
-            "Percentage of compute qubits in the memory-compute layout (0 = disabled).",
-            limit=(0.0, 100.0),
-        )
 
 
 class QpeCircuitBuilder(Algorithm):

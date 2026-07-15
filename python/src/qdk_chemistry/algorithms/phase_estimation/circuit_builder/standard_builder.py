@@ -192,7 +192,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillas": num_ancilla_qubits,
             "ancillaPrep": ancilla_prep_op,
-            "computeQubitPercentage": self.settings().get("compute_qubit_percentage"),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
@@ -243,7 +242,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillas": num_ancilla_qubits,
             "ancillaPrep": ancilla_prep_op,
-            "computeQubitPercentage": self.settings().get("compute_qubit_percentage"),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

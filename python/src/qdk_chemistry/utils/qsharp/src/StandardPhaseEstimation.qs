@@ -6,12 +6,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
-    import Std.Convert.IntAsDouble;
-    import Std.Math.Ceiling;
     import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.EndEstimateCaching;
-    import Std.ResourceEstimation.LeastRecentlyUsed;
     import Std.ResourceEstimation.RepeatEstimates;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
@@ -105,13 +101,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         phaseQubitPrep : Qubit[] => Unit,
         numAncillas : Int,
         ancillaPrep : Qubit[] => Unit is Adj,
-        computeQubitPercentage : Double,
     ) : Result[] {
-        let totalQubits = numBits + Length(systems) + numAncillas;
-        if computeQubitPercentage > 0.0 {
-            let computeCapacity = Ceiling(computeQubitPercentage * IntAsDouble(totalQubits) / 100.0);
-            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
-        }
         return RunStandardQPE(new StandardPhaseEstimationParams {
             statePrep = statePrep,
             controlledEvolutions = controlledEvolutions,
@@ -151,13 +141,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         phaseQubitPrep : Qubit[] => Unit,
         numAncillas : Int,
         ancillaPrep : Qubit[] => Unit is Adj,
-        computeQubitPercentage : Double,
     ) : Result[] {
         let totalQubits = numBits + Length(systems) + numAncillas;
-        if computeQubitPercentage > 0.0 {
-            let computeCapacity = Ceiling(computeQubitPercentage * IntAsDouble(totalQubits) / 100.0);
-            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
-        }
         use qs = Qubit[totalQubits];
         let phaseAncillas = Subarray(ancillas, qs);
         let systemQubits = Subarray(systems, qs);

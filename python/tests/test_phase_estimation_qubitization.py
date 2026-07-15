@@ -144,7 +144,7 @@ class TestQPEWithQubitization:
     def test_iterative_qpe_with_qubitization_h2(
         self,
         builder_name: str,
-        h2_hamiltonian: QubitHamiltonian,
+        h2_hamiltonian: QubitOperator,
     ):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 

@@ -141,7 +141,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The Hamiltonian (QubitHamiltonian or FactorizedHamiltonianContainer).
+            qubit_hamiltonian: The Hamiltonian (QubitOperator or FactorizedHamiltonianContainer).
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
@@ -209,7 +209,6 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
             "ancillaPrep": ancilla_prep_op,
-            "computeQubitPercentage": self.settings().get("compute_qubit_percentage"),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

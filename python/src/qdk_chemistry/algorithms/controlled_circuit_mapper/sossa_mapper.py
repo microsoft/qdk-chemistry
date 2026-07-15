@@ -57,13 +57,6 @@ class SOSSAMapperSettings(ControlledCircuitMapperSettings):
             10,
             "Number of bits for alias sampling coefficient precision.",
         )
-        self._set_default(
-            "compute_qubit_percentage",
-            "double",
-            0.0,
-            "Percentage of compute qubits in the memory-compute layout (0 = disabled).",
-            limit=(0.0, 100.0),
-        )
 
 
 class SOSSAMapper(ControlledCircuitMapper):
@@ -318,7 +311,6 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numReflectInner": regs["num_reflect_inner"],
             "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],
             "power": power,
-            "computeQubitPercentage": self._settings.get("compute_qubit_percentage"),
         }
 
         qsharp_factory = QsharpFactoryData(
@@ -405,7 +397,6 @@ class SOSSAMapper(ControlledCircuitMapper):
             "numReflectInner": regs["num_reflect_inner"],
             "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],
             "numQueries": num_queries,
-            "computeQubitPercentage": self._settings.get("compute_qubit_percentage"),
         }
 
         return Circuit(
