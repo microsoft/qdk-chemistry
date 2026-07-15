@@ -66,7 +66,7 @@ registered make the following changes:
   amplitude container.
 - :class:`~qdk_chemistry.data.Ansatz` — the embedded Hamiltonian and
   Wavefunction are each migrated through their own serialization-version chains.
-- :class:`~qdk_chemistry.data.QpeResult` - the result fields are preserved while
+- :class:`~qdk_chemistry.data.QpeResult` — the result fields are preserved while
   the obsolete evolution-time field is removed.
 
 Data classes whose serialization schema has not changed (for example
