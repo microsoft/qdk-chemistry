@@ -87,7 +87,7 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     settings:
-      networkIsolationPolicy: Preferred,CFSClean,CFSClean2,CFSClean3,GitHub
+      networkIsolationPolicy: Good,CFSClean,CFSClean2,CFSClean3,GitHub,AzureStorage
     sdl:
       autobaseline:
         enableForGitHub: true
