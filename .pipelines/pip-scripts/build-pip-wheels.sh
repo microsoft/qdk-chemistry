@@ -15,17 +15,16 @@ export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
 
-    # CFS compliance: redirect public Ubuntu archive to the Azure-internal mirror
-    # so apt-get does not connect to archive.ubuntu.com (blocked by CFSClean3).
-    # Ubuntu 24.04 uses DEB822 format; fall back to legacy sources.list on older images.
-    if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
-        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
-            /etc/apt/sources.list.d/ubuntu.sources
-    fi
-    if [ -f /etc/apt/sources.list ]; then
-        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
-            /etc/apt/sources.list
-    fi
+    # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    _cfs_apt_redirect() {
+        sed -i \
+            -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.archive.ubuntu.com/ubuntu|g' \
+            "$1"
+    }
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && _cfs_apt_redirect /etc/apt/sources.list.d/ubuntu.sources
+    [ -f /etc/apt/sources.list ]                  && _cfs_apt_redirect /etc/apt/sources.list
 
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
@@ -35,7 +34,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     apt-get install -y -q libc-bin
 
     # Update and install dependencies.
-    # cmake 3.28.3 is available directly from Ubuntu 24.04 apt; no manual download needed.
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
