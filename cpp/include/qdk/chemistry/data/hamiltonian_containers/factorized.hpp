@@ -24,8 +24,8 @@ namespace qdk::chemistry::data {
  *   h2_{pqrs} ≈ Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
  *                        (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
  *
- * along with an identity weight matrix WB[R,C], optional BLISS
- * core energy shift, and other metadata for the SOS form.
+ * along with an identity weight matrix, optional BLISS
+ * core energy shift, and other metadata for the sum of square form.
  *
  * This container is always restricted (uses spin-free integrals).
  *
