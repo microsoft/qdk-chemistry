@@ -10,14 +10,13 @@ import re
 import subprocess
 from pathlib import Path
 
-# Env var set by the official release/wheel pipeline to force a clean, publishable
-# version. PEP 440 local versions (e.g. "2.0.0+local") are rejected by PyPI/ESRP.
+# Set by the release pipeline to force a clean, publishable version (no +local).
 _RELEASE_BUILD_ENV = "QDK_CHEMISTRY_RELEASE_BUILD"
 _FALSEY = frozenset({"", "0", "false", "no", "off"})
 
 
 def _is_release_build() -> bool:
-    """Whether this is an official pipeline build that must emit a clean version (no +local)."""
+    """Whether to emit a clean version (no +local)."""
     return os.environ.get(_RELEASE_BUILD_ENV, "").strip().lower() not in _FALSEY
 
 
@@ -31,7 +30,7 @@ def dynamic_metadata(field, settings):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         return version
 
-    # Official pipeline builds publish the bare release version; never tag it +local.
+    # Release builds publish the bare version; never tag it +local.
     if _is_release_build():
         return version
 

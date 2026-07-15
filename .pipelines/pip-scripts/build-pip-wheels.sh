@@ -12,9 +12,7 @@ BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
 MAC_BUILD=${10:-OFF}
 
-# Version-provider toggle (python/_dev_version.py). The release pipeline sets this
-# (via the `releaseBuild` parameter) to emit a clean, publishable version. A false-y
-# value appends a PEP 440 +local suffix. Default to a clean build when run standalone.
+# Default to a clean release version (python/_dev_version.py) when run standalone.
 export QDK_CHEMISTRY_RELEASE_BUILD="${QDK_CHEMISTRY_RELEASE_BUILD:-1}"
 
 export CFLAGS="-fPIC -Os"
