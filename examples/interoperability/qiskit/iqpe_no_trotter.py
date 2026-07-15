@@ -120,7 +120,6 @@ def run_iterative_exact_qpe(
 
     Args:
         state_prep_circuit: Trial-state preparation circuit.
-        qubit_hamiltonian: Qubit Hamiltonian describing the system.
         pauli_operator: Sparse Pauli operator describing the Hamiltonian.
         precision: Number of IQPE iterations to perform.
         evolution_time: Evolution time ``t`` used for a single application of ``U``.

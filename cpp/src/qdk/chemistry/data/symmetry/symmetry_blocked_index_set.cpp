@@ -5,6 +5,7 @@
 #include <H5Cpp.h>
 
 #include <fstream>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -88,6 +89,19 @@ std::string SymmetryBlockedIndexSet::get_summary() const {
   std::ostringstream oss;
   oss << "SymmetryBlockedIndexSet(labels=" << _blocks.size() << ")";
   return oss.str();
+}
+
+std::vector<std::size_t> spin_channel_indices(
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& set,
+    const std::shared_ptr<const SpinValue>& channel) {
+  if (!set) return {};
+  const auto sym = set->symmetries();
+  const SymmetryLabel label = (sym && sym->has_axis(AxisName::Spin))
+                                  ? SymmetryLabel{channel}
+                                  : SymmetryLabel{};
+  if (!set->has(label)) return {};
+  const auto s = set->indices(label);
+  return std::vector<std::size_t>(s.begin(), s.end());
 }
 
 nlohmann::json SymmetryBlockedIndexSet::to_json() const {

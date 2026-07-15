@@ -13,7 +13,7 @@ approximates the average interaction during that interval.
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, TimeDependentQubitHamiltonian
+from qdk_chemistry.data import QubitOperator, TimeDependentQubitHamiltonian
 
 __all__: list[str] = ["Propagator", "PropagatorFactory"]
 
@@ -23,7 +23,7 @@ class Propagator(Algorithm):
 
     A propagator maps a time-dependent Hamiltonian and a time interval
     :math:`[t_1, t_2]` to an effective time-independent
-    :class:`~qdk_chemistry.data.QubitHamiltonian`:
+    :class:`~qdk_chemistry.data.QubitOperator`:
 
     .. math::
 
@@ -48,7 +48,7 @@ class Propagator(Algorithm):
         hamiltonian: TimeDependentQubitHamiltonian,
         t_start: float,
         t_end: float,
-    ) -> QubitHamiltonian:
+    ) -> QubitOperator:
         """Evaluate the effective Hamiltonian over a time interval.
 
         Args:

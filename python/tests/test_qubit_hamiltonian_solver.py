@@ -9,14 +9,14 @@ import numpy as np
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver
-from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data import QubitOperator
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 def test_dense_matrix_solver_for_small_system():
     """Test dense matrix solver for small qubit systems."""
-    qubit_hamiltonian = QubitHamiltonian(["ZZ", "XX"], [1.0, 0.5])
+    qubit_hamiltonian = QubitOperator(["ZZ", "XX"], [1.0, 0.5])
     q_solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
     assert isinstance(q_solver, DenseMatrixSolver)
 
@@ -31,9 +31,7 @@ def test_dense_matrix_solver_for_small_system():
 def test_sparse_matrix_solver():
     """Test sparse matrix solver."""
     # Create a 4-qubit Hamiltonian
-    qubit_hamiltonian = QubitHamiltonian(
-        ["ZZII", "YYII", "XXII", "IIZZ", "IIYY", "IIXX"], [1.0, 0.5, 0.5, 1.0, 0.5, 0.5]
-    )
+    qubit_hamiltonian = QubitOperator(["ZZII", "YYII", "XXII", "IIZZ", "IIYY", "IIXX"], [1.0, 0.5, 0.5, 1.0, 0.5, 0.5])
     q_solver = create("qubit_hamiltonian_solver", "qdk_sparse_matrix_solver")
     assert isinstance(q_solver, SparseMatrixSolver)
     assert np.isclose(

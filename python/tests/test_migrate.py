@@ -21,6 +21,8 @@ import pytest
 
 from qdk_chemistry import migrate
 from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.migrate import _orbitals, _wavefunction
 
 RNG = np.random.default_rng(20240101)
@@ -151,8 +153,8 @@ def test_orbitals_restricted(tmp_path, fmt):
 
     migrate.convert_file(src, dst)
     orb = Orbitals.from_file(str(dst), fmt)
-    alpha_coeff, _ = orb.get_coefficients()
-    alpha_energies, _ = orb.get_energies()
+    alpha_coeff = spin_channel_matrix(orb.coefficients(), axes.alpha())
+    alpha_energies = spin_channel_vector(orb.energies(), axes.alpha())
     assert np.allclose(alpha_coeff, coeff)
     assert np.allclose(alpha_energies, energies)
     assert orb.is_restricted()
@@ -172,7 +174,9 @@ def test_orbitals_unrestricted(tmp_path, fmt):
             _write_old_orbitals_h5(handle, nao, nmo, False, (ca, cb))
     migrate.convert_file(src, dst)
     orb = Orbitals.from_file(str(dst), fmt)
-    x, y = orb.get_coefficients()
+    coefficients = orb.coefficients()
+    x = spin_channel_matrix(coefficients, axes.alpha())
+    y = spin_channel_matrix(coefficients, axes.beta())
     assert not orb.is_restricted()
     assert np.allclose(x, ca)
     assert np.allclose(y, cb)
@@ -612,7 +616,7 @@ def test_real_orbitals_with_basis_set(tmp_path, out_fmt):
     orb = Orbitals.from_file(str(dst), out_fmt)
     assert orb.has_basis_set()
     assert orb.get_num_molecular_orbitals() == 2
-    coeff = np.asarray(orb.get_coefficients()[0])
+    coeff = np.asarray(spin_channel_matrix(orb.coefficients(), axes.alpha()))
     assert abs(coeff[0, 0] - -0.5488422751996661) < 1e-9
     assert abs(coeff[0, 1] - 1.2124519189832008) < 1e-9
 

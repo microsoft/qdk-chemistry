@@ -14,7 +14,7 @@ from .base import TimeDependentQubitHamiltonianContainer
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+    from qdk_chemistry.data.qubit_operator import QubitOperator
 
 __all__: list[str] = ["DrivenContainer"]
 
@@ -27,8 +27,8 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
     drive function *f(t)*.
 
     Args:
-        base_hamiltonian: Time-independent qubit Hamiltonian.
-        drive_hamiltonian: Driven qubit Hamiltonian (modulated by *drive*).
+        base_hamiltonian: Time-independent qubit operator.
+        drive_hamiltonian: Driven qubit operator (modulated by *drive*).
         drive: Scalar function f(t) that modulates *drive_hamiltonian*.
 
     Raises:
@@ -38,8 +38,8 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
 
     def __init__(
         self,
-        base_hamiltonian: QubitHamiltonian,
-        drive_hamiltonian: QubitHamiltonian,
+        base_hamiltonian: QubitOperator,
+        drive_hamiltonian: QubitOperator,
         drive: Callable[[float], float],
     ) -> None:
         """Initialize the driven container."""
@@ -50,25 +50,25 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
         self._drive_hamiltonian = drive_hamiltonian
         self._drive = drive
 
-    def evaluate(self, t: float) -> QubitHamiltonian:
+    def evaluate(self, t: float) -> QubitOperator:
         """Return H0 + f(t) * H1 at time *t*.
 
         Args:
             t: The time at which to evaluate the Hamiltonian.
 
         Returns:
-            The qubit Hamiltonian at the given time.
+            The qubit operator at the given time.
 
         """
         return self._base_hamiltonian + self._drive(t) * self._drive_hamiltonian
 
     @property
-    def base_hamiltonian(self) -> QubitHamiltonian:
+    def base_hamiltonian(self) -> QubitOperator:
         """The time-independent Hamiltonian."""
         return self._base_hamiltonian
 
     @property
-    def drive_hamiltonian(self) -> QubitHamiltonian:
+    def drive_hamiltonian(self) -> QubitOperator:
         """The driven Hamiltonian (modulated by the drive)."""
         return self._drive_hamiltonian
 

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
@@ -360,9 +361,55 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
-  // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
+  auto water = testing::create_water_structure();
+
+  auto direct_solver = ScfSolverFactory::create();
+  direct_solver->settings().set("method", "cam-b3lyp");
+  direct_solver->settings().set("eri_method", "direct");
+  auto [direct_energy, direct_wavefunction] =
+      direct_solver->run(water, 0, 1, "sto-3g");
+
+  auto incore_solver = ScfSolverFactory::create();
+  incore_solver->settings().set("method", "cam-b3lyp");
+  incore_solver->settings().set("eri_method", "incore");
+  auto [incore_energy, incore_wavefunction] =
+      incore_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(std::isfinite(direct_energy));
+  EXPECT_TRUE(std::isfinite(incore_energy));
+  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(direct_energy, incore_energy,
+              2.0 * testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectEnergy) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -75.27665598860905, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
+  auto lithium = testing::create_li_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(energy, -7.3499880727469851, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
@@ -832,8 +879,12 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   EXPECT_EQ(shells2.size(), shells1.size());
 
   // Verify the basis set structure can be used to create valid orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals1->get_coefficients();
-  auto [energies_alpha, energies_beta] = orbitals1->get_energies();
+  const auto& coeff_alpha =
+      orbitals1->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals1->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& energies_alpha = orbitals1->energies()->block({axes::alpha()});
+  const auto& energies_beta = orbitals1->energies()->block({axes::beta()});
   auto overlap = orbitals1->get_overlap_matrix();
 
   // Create orbitals with the deserialized basis set - this validates
@@ -915,7 +966,10 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // Verify the orbital count is consistent with valence electrons
   // With 20 valence electrons and restricted calculation, we expect 10 occupied
   // orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals->get_coefficients();
+  const auto& coeff_alpha =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_atomic_orbitals());
 }
 
