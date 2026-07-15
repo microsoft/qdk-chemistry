@@ -16,6 +16,18 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
+    # CFS compliance: redirect public Ubuntu archive to the Azure-internal mirror
+    # so apt-get does not connect to archive.ubuntu.com (blocked by CFSClean3).
+    # Ubuntu 24.04 uses DEB822 format; fall back to legacy sources.list on older images.
+    if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list.d/ubuntu.sources
+    fi
+    if [ -f /etc/apt/sources.list ]; then
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list
+    fi
+
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*

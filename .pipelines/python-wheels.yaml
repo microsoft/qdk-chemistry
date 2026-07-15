@@ -86,6 +86,8 @@ variables:
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
+    settings:
+      networkIsolationPolicy: Permissive,CFSClean,CFSClean2,CFSClean3
     sdl:
       autobaseline:
         enableForGitHub: true

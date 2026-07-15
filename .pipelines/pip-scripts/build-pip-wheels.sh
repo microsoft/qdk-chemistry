@@ -6,15 +6,27 @@ PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
 BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
-CMAKE_VERSION=${6:-3.28.3}
-HDF5_VERSION=${7:-1.13.0}
-BLIS_VERSION=${8:-2.0}
-LIBFLAME_VERSION=${9:-5.2.0}
-MAC_BUILD=${10:-OFF}
+HDF5_VERSION=${6:-1.13.0}
+BLIS_VERSION=${7:-2.0}
+LIBFLAME_VERSION=${8:-5.2.0}
+MAC_BUILD=${9:-OFF}
 
 export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
+
+    # CFS compliance: redirect public Ubuntu archive to the Azure-internal mirror
+    # so apt-get does not connect to archive.ubuntu.com (blocked by CFSClean3).
+    # Ubuntu 24.04 uses DEB822 format; fall back to legacy sources.list on older images.
+    if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list.d/ubuntu.sources
+    fi
+    if [ -f /etc/apt/sources.list ]; then
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list
+    fi
+
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
@@ -22,11 +34,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     apt-get update -q
     apt-get install -y -q libc-bin
 
-    # Update and install dependencies
+    # Update and install dependencies.
+    # cmake 3.28.3 is available directly from Ubuntu 24.04 apt; no manual download needed.
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
         build-essential \
+        cmake \
         curl \
         gcc g++ \
         git \
@@ -60,20 +74,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         wget \
         xz-utils \
         zlib1g-dev
-
-    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    rm cmake-${CMAKE_VERSION}.tar.gz
-    cd cmake-${CMAKE_VERSION}
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make --silent -j$(nproc)
-    make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}
     cmake --version
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
