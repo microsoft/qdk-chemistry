@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Available functionals and basis sets &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Available functionals and basis sets &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -66,6 +66,7 @@
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -350,8 +351,8 @@
 </section>
 <section id="available-dft-functionals">
 <h2>Available DFT functionals<a class="headerlink" href="#available-dft-functionals" title="Link to this heading"></a></h2>
-<p>The default <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> implementation in QDK/Chemistry uses gauxc <span id="id2">[<a class="reference internal" href="../../references.html#id12" title="Alessio Petrone, David B. Williams–Young, Shichao Sun, Torin F. Stetina, and Xiaosong Li. An efficient implementation of two-component relativistic density functional theory with torque-free auxiliary variables. The European Physical Journal B, 91(169):169, 2018. doi:10.1140/epjb/e2018-90170-1.">PWYS+18</a>]</span>
-and thus also libxc <span id="id3">[<a class="reference internal" href="../../references.html#id11" title="Susi Lehtola, Conrad Steigemann, Micael J. T. Oliveira, and Miguel A. L. Marques. Recent developments in Libxc — a comprehensive library of functionals for density functional theory. SoftwareX, 7:1-5, 2018. doi:10.1016/j.softx.2017.11.002.">LSOM18</a>]</span> for the evaluation of <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> functionals.
+<p>The default <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> implementation in QDK/Chemistry uses gauxc <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id12" title="Alessio Petrone, David B. Williams–Young, Shichao Sun, Torin F. Stetina, and Xiaosong Li. An efficient implementation of two-component relativistic density functional theory with torque-free auxiliary variables. The European Physical Journal B, 91(169):169, 2018. doi:10.1140/epjb/e2018-90170-1.">PWYS+18</a>]</span>
+and thus also libxc <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../references.html#id11" title="Susi Lehtola, Conrad Steigemann, Micael J. T. Oliveira, and Miguel A. L. Marques. Recent developments in Libxc — a comprehensive library of functionals for density functional theory. SoftwareX, 7:1-5, 2018. doi:10.1016/j.softx.2017.11.002.">LSOM18</a>]</span> for the evaluation of <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> functionals.
 The following keywords are supported for the corresponding functionals:</p>
 <table class="hlist"><tr><td><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">hf</span></code></p></li>

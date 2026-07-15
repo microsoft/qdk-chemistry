@@ -1,0 +1,18 @@
+qdk\_chemistry.algorithms.controlled\_circuit\_mapper package
+=============================================================
+
+.. automodule:: qdk_chemistry.algorithms.controlled_circuit_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.controlled_circuit_mapper.base
+   qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper
+   qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper

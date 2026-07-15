@@ -1,0 +1,8 @@
+qdk\_chemistry.data.term\_partition module
+==========================================
+
+.. automodule:: qdk_chemistry.data.term_partition
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

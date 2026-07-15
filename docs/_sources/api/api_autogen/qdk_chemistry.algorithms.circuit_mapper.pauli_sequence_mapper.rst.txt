@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.circuit\_mapper.pauli\_sequence\_mapper module
+========================================================================
+
+.. automodule:: qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

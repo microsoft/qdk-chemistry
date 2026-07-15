@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Symmetries &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Symmetries &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -63,6 +63,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Symmetries</a><ul>
@@ -76,6 +77,7 @@
 <li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -84,6 +86,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -131,7 +134,7 @@ As a core <a class="reference internal" href="../design/index.html"><span class=
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Many quantum algorithms can reduce circuit depth, qubit count, or classical post-processing cost when the symmetries of the target quantum state are known in advance.
-The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> class encapsulates this symmetry information so that it can be passed to any algorithm that exploits it, such as the <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-scbk"><span class="std std-ref">symmetry-conserving Bravyi-Kitaev</span></a> qubit mapping.</p>
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> class encapsulates this symmetry information so that it can be passed to encoding factories like <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev" title="qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev"><code class="xref py py-meth docutils literal notranslate"><span class="pre">symmetry_conserving_bravyi_kitaev()</span></code></a> for <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-scbk"><span class="std std-ref">symmetry-conserving Bravyi-Kitaev</span></a> qubit tapering.</p>
 <section id="conserved-quantum-numbers">
 <h3>Conserved quantum numbers<a class="headerlink" href="#conserved-quantum-numbers" title="Link to this heading"></a></h3>
 <p>From the alpha and beta electron counts, several derived quantities are available as read-only properties.</p>
@@ -203,13 +206,14 @@ The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.d
 <li><p><a class="reference internal" href="wavefunction.html"><span class="doc">Wavefunction</span></a>: Source of active-space electron counts via <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries.from_wavefunction" title="qdk_chemistry.data.Symmetries.from_wavefunction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_wavefunction()</span></code></a></p></li>
 <li><p><a class="reference internal" href="ansatz.html"><span class="doc">Ansatz</span></a>: Combined Hamiltonian + Wavefunction container, used with <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries.from_ansatz" title="qdk_chemistry.data.Symmetries.from_ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_ansatz()</span></code></a></p></li>
 <li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input to qubit mapping algorithms</p></li>
-<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Output of qubit mapping algorithms</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>: Output of qubit mapping algorithms</p></li>
 </ul>
 </section>
 <section id="further-reading">
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Fermion-to-qubit mapping algorithms that consume <code class="docutils literal notranslate"><span class="pre">Symmetries</span></code></p></li>
+<li><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Fermion-to-qubit mapping algorithms</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev" title="qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev"><code class="xref py py-meth docutils literal notranslate"><span class="pre">symmetry_conserving_bravyi_kitaev()</span></code></a>: Encoding factory that consumes <code class="docutils literal notranslate"><span class="pre">Symmetries</span></code></p></li>
 <li><p><a class="reference internal" href="../design/index.html"><span class="doc">Design principles</span></a>: Data class design principles in QDK/Chemistry</p></li>
 </ul>
 </section>

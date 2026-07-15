@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.nuclear\_derivative module
+====================================================
+
+.. automodule:: qdk_chemistry.algorithms.nuclear_derivative
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

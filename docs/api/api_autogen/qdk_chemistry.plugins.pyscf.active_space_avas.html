@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.active_space_avas module &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.active_space_avas module &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -138,7 +139,7 @@ automatically constructs molecular active spaces from atomic valence orbitals.</
 <p>This class exposes AVAS active space selection using the PySCF library.</p>
 <p>The details of the AVAS method can be found in the following publication:</p>
 <blockquote>
-<div><p>Sayfutyarova et al. (2017) doi:10.1021/acs.jctc.7b00128. <span id="id1">[<a class="reference internal" href="../../references.html#id5" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span></p>
+<div><p>Sayfutyarova et al. (2017) doi:10.1021/acs.jctc.7b00128. <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id5" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span></p>
 </div></blockquote>
 <p class="rubric">Example</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">avas</span> <span class="o">=</span> <span class="n">PyscfAVAS</span><span class="p">()</span>
@@ -177,10 +178,23 @@ interface for setting and getting options.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.ao_labels">
 <span class="sig-name descname"><span class="pre">ao_labels</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.ao_labels" title="Link to this definition"></a></dt>
-<dd><p>The atomic orbital labels to be included in the active space (default = None).</p>
+<dd><p>The atomic orbital labels to be included in the active space (default = []).
+Supports indexed atom labels (e.g., <code class="docutils literal notranslate"><span class="pre">[&quot;C1</span> <span class="pre">2pz&quot;,</span> <span class="pre">&quot;C2</span> <span class="pre">2pz&quot;]</span></code>) for selecting specific atoms.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.threshold">
+<span class="sig-name descname"><span class="pre">threshold</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.threshold" title="Link to this definition"></a></dt>
+<dd><p>Eigenvalue threshold for including orbitals in the active space (default = 0.2).
+Orbitals with AVAS projection eigenvalues above this threshold are included.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 </dd></dl>

@@ -1,0 +1,25 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder package
+===============================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.base

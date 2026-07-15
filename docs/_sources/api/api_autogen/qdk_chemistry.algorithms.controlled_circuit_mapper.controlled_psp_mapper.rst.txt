@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.controlled\_circuit\_mapper.controlled\_psp\_mapper module
+====================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

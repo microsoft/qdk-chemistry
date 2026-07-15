@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.noise_models &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.data.noise_models &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -99,17 +100,22 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">TypedDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp._simulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseConfig</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ruamel.yaml</span><span class="w"> </span><span class="kn">import</span> <span class="n">YAML</span>
 
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk.simulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseConfig</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qsharp._simulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseConfig</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_hash_float</span><span class="p">,</span> <span class="n">_hash_str</span><span class="p">,</span> <span class="n">_hash_uint</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
 
-<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;GateErrorDef&quot;</span><span class="p">,</span> <span class="s2">&quot;SupportedErrorTypes&quot;</span><span class="p">,</span> <span class="s2">&quot;SupportedGate&quot;</span><span class="p">]</span>
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SupportedErrorTypes&quot;</span><span class="p">,</span> <span class="s2">&quot;SupportedGate&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="SupportedGate">
@@ -117,53 +123,22 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">SupportedGate</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;An enumeration of quantum gate types with case-insensitive string lookup.</span>
 
-<span class="sd">    Gate types gathered from Qiskit</span>
-<span class="sd">    https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1</span>
+<span class="sd">    Gate types gathered from QDK QIR instructions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">BARRIER</span> <span class="o">=</span> <span class="s2">&quot;barrier&quot;</span>
     <span class="n">CCX</span> <span class="o">=</span> <span class="s2">&quot;ccx&quot;</span>
-    <span class="n">CCZ</span> <span class="o">=</span> <span class="s2">&quot;ccz&quot;</span>
-    <span class="n">CH</span> <span class="o">=</span> <span class="s2">&quot;ch&quot;</span>
-    <span class="n">CP</span> <span class="o">=</span> <span class="s2">&quot;cp&quot;</span>
-    <span class="n">CRX</span> <span class="o">=</span> <span class="s2">&quot;crx&quot;</span>
-    <span class="n">CRY</span> <span class="o">=</span> <span class="s2">&quot;cry&quot;</span>
-    <span class="n">CRZ</span> <span class="o">=</span> <span class="s2">&quot;crz&quot;</span>
-    <span class="n">CS</span> <span class="o">=</span> <span class="s2">&quot;cs&quot;</span>
-    <span class="n">CSDG</span> <span class="o">=</span> <span class="s2">&quot;csdg&quot;</span>
-    <span class="n">CSWAP</span> <span class="o">=</span> <span class="s2">&quot;cswap&quot;</span>
-    <span class="n">CSX</span> <span class="o">=</span> <span class="s2">&quot;csx&quot;</span>
-    <span class="n">CU</span> <span class="o">=</span> <span class="s2">&quot;cu&quot;</span>
     <span class="n">CX</span> <span class="o">=</span> <span class="s2">&quot;cx&quot;</span>
     <span class="n">CY</span> <span class="o">=</span> <span class="s2">&quot;cy&quot;</span>
     <span class="n">CZ</span> <span class="o">=</span> <span class="s2">&quot;cz&quot;</span>
-    <span class="n">DCX</span> <span class="o">=</span> <span class="s2">&quot;dcx&quot;</span>
-    <span class="n">DELAY</span> <span class="o">=</span> <span class="s2">&quot;delay&quot;</span>
-    <span class="n">ECR</span> <span class="o">=</span> <span class="s2">&quot;ecr&quot;</span>
     <span class="n">H</span> <span class="o">=</span> <span class="s2">&quot;h&quot;</span>
     <span class="n">ID</span> <span class="o">=</span> <span class="s2">&quot;id&quot;</span>
-    <span class="n">INITIALIZE</span> <span class="o">=</span> <span class="s2">&quot;initialize&quot;</span>
-    <span class="n">ISWAP</span> <span class="o">=</span> <span class="s2">&quot;iswap&quot;</span>
-    <span class="n">MCP</span> <span class="o">=</span> <span class="s2">&quot;mcp&quot;</span>
-    <span class="n">MCRX</span> <span class="o">=</span> <span class="s2">&quot;mcrx&quot;</span>
-    <span class="n">MCRY</span> <span class="o">=</span> <span class="s2">&quot;mcry&quot;</span>
-    <span class="n">MCRZ</span> <span class="o">=</span> <span class="s2">&quot;mcrz&quot;</span>
-    <span class="n">MCX</span> <span class="o">=</span> <span class="s2">&quot;mcx&quot;</span>
     <span class="n">MEASURE</span> <span class="o">=</span> <span class="s2">&quot;measure&quot;</span>
-    <span class="n">MS</span> <span class="o">=</span> <span class="s2">&quot;ms&quot;</span>
-    <span class="n">P</span> <span class="o">=</span> <span class="s2">&quot;p&quot;</span>
-    <span class="n">PAULI</span> <span class="o">=</span> <span class="s2">&quot;pauli&quot;</span>
-    <span class="n">R</span> <span class="o">=</span> <span class="s2">&quot;r&quot;</span>
-    <span class="n">RCCCX</span> <span class="o">=</span> <span class="s2">&quot;rcccx&quot;</span>
-    <span class="n">RCCX</span> <span class="o">=</span> <span class="s2">&quot;rccx&quot;</span>
     <span class="n">RESET</span> <span class="o">=</span> <span class="s2">&quot;reset&quot;</span>
-    <span class="n">RV</span> <span class="o">=</span> <span class="s2">&quot;rv&quot;</span>
     <span class="n">RX</span> <span class="o">=</span> <span class="s2">&quot;rx&quot;</span>
     <span class="n">RXX</span> <span class="o">=</span> <span class="s2">&quot;rxx&quot;</span>
     <span class="n">RY</span> <span class="o">=</span> <span class="s2">&quot;ry&quot;</span>
     <span class="n">RYY</span> <span class="o">=</span> <span class="s2">&quot;ryy&quot;</span>
     <span class="n">RZ</span> <span class="o">=</span> <span class="s2">&quot;rz&quot;</span>
-    <span class="n">RZX</span> <span class="o">=</span> <span class="s2">&quot;rzx&quot;</span>
     <span class="n">RZZ</span> <span class="o">=</span> <span class="s2">&quot;rzz&quot;</span>
     <span class="n">S</span> <span class="o">=</span> <span class="s2">&quot;s&quot;</span>
     <span class="n">SDG</span> <span class="o">=</span> <span class="s2">&quot;sdg&quot;</span>
@@ -172,8 +147,6 @@
     <span class="n">SXDG</span> <span class="o">=</span> <span class="s2">&quot;sxdg&quot;</span>
     <span class="n">T</span> <span class="o">=</span> <span class="s2">&quot;t&quot;</span>
     <span class="n">TDG</span> <span class="o">=</span> <span class="s2">&quot;tdg&quot;</span>
-    <span class="n">U</span> <span class="o">=</span> <span class="s2">&quot;u&quot;</span>
-    <span class="n">UNITARY</span> <span class="o">=</span> <span class="s2">&quot;unitary&quot;</span>
     <span class="n">X</span> <span class="o">=</span> <span class="s2">&quot;x&quot;</span>
     <span class="n">Y</span> <span class="o">=</span> <span class="s2">&quot;y&quot;</span>
     <span class="n">Z</span> <span class="o">=</span> <span class="s2">&quot;z&quot;</span>
@@ -185,7 +158,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a Gate enum value from its string representation.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            gate_str (str): String representation of the gate (case-insensitive).</span>
+<span class="sd">            gate_str: String representation of the gate (case-insensitive).</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            SupportedGate: The corresponding SupportedGate enum value.</span>
@@ -204,28 +177,45 @@
 
 
 
+<span class="n">ONE_QUBIT_SUPPORTED_GATES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">H</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">ID</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RX</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RY</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RZ</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">S</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">SDG</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">SX</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">SXDG</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">T</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">TDG</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">X</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">Y</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">Z</span><span class="p">,</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">TWO_QUBIT_SUPPORTED_GATES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">CX</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">CY</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">CZ</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">SWAP</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RXX</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RYY</span><span class="p">,</span>
+        <span class="n">SupportedGate</span><span class="o">.</span><span class="n">RZZ</span><span class="p">,</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">THREE_QUBIT_SUPPORTED_GATES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">([</span><span class="n">SupportedGate</span><span class="o">.</span><span class="n">CCX</span><span class="p">])</span>
+
+
 <div class="viewcode-block" id="SupportedErrorTypes">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.noise_models.html#qdk_chemistry.data.noise_models.SupportedErrorTypes">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SupportedErrorTypes</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Supported error types for quantum gates with case-insensitive string lookup.&quot;&quot;&quot;</span>
 
-    <span class="n">DEPOLARIZING_ERROR</span> <span class="o">=</span> <span class="s2">&quot;depolarizing_error&quot;</span></div>
-
-
-
-<div class="viewcode-block" id="GateErrorDef">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.noise_models.html#qdk_chemistry.data.noise_models.GateErrorDef">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">GateErrorDef</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Typed dictionary for error definitions.&quot;&quot;&quot;</span>
-
-    <span class="nb">type</span><span class="p">:</span> <span class="n">SupportedErrorTypes</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Error type.&quot;&quot;&quot;</span>
-
-    <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Error rate.&quot;&quot;&quot;</span>
-
-    <span class="n">num_qubits</span><span class="p">:</span> <span class="nb">int</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Number of qubits the gate acts on.&quot;&quot;&quot;</span></div>
+    <span class="n">DEPOLARIZING_ERROR</span> <span class="o">=</span> <span class="s2">&quot;depolarizing_error&quot;</span>
+    <span class="n">QUBIT_LOSS</span> <span class="o">=</span> <span class="s2">&quot;qubit_loss&quot;</span></div>
 
 
 
@@ -233,13 +223,6 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing a quantum error profile containing information about quantum gates and error properties.</span>
 
 <span class="sd">    This class provides functionalities to define, load, and save quantum error profiles.</span>
-
-<span class="sd">    Attributes:</span>
-<span class="sd">        name (str): Name of the quantum error profile.</span>
-<span class="sd">        description (str): Description of what the error profile represents.</span>
-<span class="sd">        errors (dict[SupportedGate, GateErrorDef]): Dictionary mapping gate names to their error properties.</span>
-<span class="sd">        one_qubit_gates (list[str]): List of gate names that operate on a single qubit.</span>
-<span class="sd">        two_qubit_gates (list[str]): List of gate names that operate on two qubits.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -256,64 +239,79 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedErrorTypes</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize a QuantumErrorProfile.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            name (str | None): Name of the quantum error profile.</span>
-<span class="sd">            description (str | None): Description of what the error profile represents.</span>
-<span class="sd">            errors (dict | None): Dictionary mapping supported gate names to their error definitions.</span>
+<span class="sd">            name: Name of the quantum error profile.</span>
+<span class="sd">            description: Description of what the error profile represents.</span>
+<span class="sd">            errors: Dictionary mapping gate names to their error properties.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;No description provided&quot;</span> <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">description</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedErrorTypes</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">three_qubit_gates</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">errors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="c1"># Check types</span>
-            <span class="k">for</span> <span class="n">gate_key</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">gate_key</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="n">gate</span> <span class="o">=</span> <span class="n">gate_key</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">gate_key</span><span class="p">,</span> <span class="n">SupportedGate</span><span class="p">)</span> <span class="k">else</span> <span class="n">SupportedGate</span><span class="p">(</span><span class="n">gate_key</span><span class="p">)</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span> <span class="n">SupportedErrorTypes</span><span class="p">):</span>
-                        <span class="n">error_type</span> <span class="o">=</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="n">error_type</span> <span class="o">=</span> <span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected &#39;rate&#39; to be a float, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;rate&#39;</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Expected &#39;num_qubits&#39; to be an int, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;num_qubits&#39;</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
-                        <span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">gate</span><span class="p">]</span> <span class="o">=</span> <span class="n">GateErrorDef</span><span class="p">(</span>
-                        <span class="nb">type</span><span class="o">=</span><span class="n">error_type</span><span class="p">,</span>
-                        <span class="n">rate</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span>
-                        <span class="n">num_qubits</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span>
+                <span class="k">if</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">ONE_QUBIT_SUPPORTED_GATES</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">TWO_QUBIT_SUPPORTED_GATES</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">THREE_QUBIT_SUPPORTED_GATES</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">three_qubit_gates</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+                <span class="n">validated_rates</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedErrorTypes</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">error_type_key</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">error_type_key</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_type_key</span><span class="p">,</span> <span class="n">SupportedErrorTypes</span><span class="p">)</span>
+                        <span class="k">else</span> <span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">error_type_key</span><span class="p">)</span>
                     <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">gate</span><span class="p">]</span> <span class="o">=</span> <span class="n">error_dict</span>
-
-        <span class="c1"># Initialize one_qubit_gates and two_qubit_gates based on errors</span>
-        <span class="n">one_qubit_gates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">two_qubit_gates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="n">one_qubit_gates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">))</span>
-            <span class="k">elif</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-                <span class="n">two_qubit_gates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">))</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported number of qubits: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;num_qubits&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">one_qubit_gates</span><span class="p">))</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">two_qubit_gates</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rate</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected rate to be a float, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">rate</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">validated_rates</span><span class="p">[</span><span class="n">error_type</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">rate</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">gate</span><span class="p">]</span> <span class="o">=</span> <span class="n">validated_rates</span>
 
         <span class="c1"># Make instance immutable after construction (handled by base class)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_hash_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Feed identifying data into the hasher.&quot;&quot;&quot;</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="s2">&quot;quantum_error_profile&quot;</span><span class="p">)</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">)</span>
+
+        <span class="c1"># Hash errors dict in sorted order</span>
+        <span class="n">_hash_uint</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">gate_key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
+            <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate_key</span><span class="p">))</span>
+            <span class="n">error_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">gate_key</span><span class="p">]</span>
+            <span class="n">_hash_uint</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">error_dict</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">error_type</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">error_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
+                <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">error_type</span><span class="p">))</span>
+                <span class="n">_hash_float</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">error_dict</span><span class="p">[</span><span class="n">error_type</span><span class="p">])</span>
+
+        <span class="c1"># These sets are derived from `errors`, but include them deterministically</span>
+        <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">gates</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">&quot;one_qubit_gates&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;two_qubit_gates&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">&quot;three_qubit_gates&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">three_qubit_gates</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+            <span class="n">_hash_uint</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">gates</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">gates</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
+                <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">g</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check equality between two QuantumErrorProfile instances.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            other (object): Object to compare with.</span>
+<span class="sd">            other: Object to compare with.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            bool: True if equal, False otherwise.</span>
@@ -321,13 +319,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">QuantumErrorProfile</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
-        <span class="k">return</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">name</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">description</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">errors</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">one_qubit_gates</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">two_qubit_gates</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">name</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">description</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">errors</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Make QuantumErrorProfile hashable.</span>
@@ -336,11 +328,11 @@
 <span class="sd">            int: Hash value.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Convert mutable dict to immutable tuple of items for hashing</span>
-        <span class="n">errors_tuple</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
-        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span>
-            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">,</span> <span class="n">errors_tuple</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="p">))</span>
+        <span class="c1"># Convert mutable nested dict to immutable tuple for hashing</span>
+        <span class="n">errors_tuple</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">et</span><span class="p">),</span> <span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">et</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">v</span><span class="o">.</span><span class="n">items</span><span class="p">())))</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">,</span> <span class="n">errors_tuple</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_gates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
@@ -350,13 +342,17 @@
 <span class="sd">            list[str]: List of basis gates in noise model.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">gate</span> <span class="k">for</span> <span class="n">gate</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span> <span class="k">if</span> <span class="n">gate</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_gates_exclusion</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">gate</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">|</span> <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span> <span class="o">|</span> <span class="bp">self</span><span class="o">.</span><span class="n">three_qubit_gates</span>
+            <span class="k">if</span> <span class="n">gate</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_gates_exclusion</span>
+        <span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_yaml_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">yaml_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save quantum error profile to YAML file.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            yaml_file (str | pathlib.Path): Path to save YAML file.</span>
+<span class="sd">            yaml_file: Path to save YAML file.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">yaml</span> <span class="o">=</span> <span class="n">YAML</span><span class="p">()</span>
@@ -366,7 +362,7 @@
         <span class="c1"># Convert to serializable dict</span>
         <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
 
-        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
             <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
@@ -374,7 +370,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load quantum error profile from YAML file.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            yaml_file (str | pathlib.Path): Path to YAML file.</span>
+<span class="sd">            yaml_file: Path to YAML file.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            QuantumErrorProfile: Loaded profile.</span>
@@ -384,7 +380,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">yaml_file</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
 
-        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
             <span class="n">data</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
@@ -414,11 +410,10 @@
             <span class="sa">f</span><span class="s2">&quot;  description: </span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
             <span class="s2">&quot;  errors:&quot;</span><span class="p">,</span>
         <span class="p">]</span>
-        <span class="k">for</span> <span class="n">gate_str</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">gate_str</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    gate: </span><span class="si">{</span><span class="n">gate_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    type: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    rate: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;rate&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    num_qubits: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;num_qubits&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">error_type</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">rate</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -434,12 +429,10 @@
             <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{},</span>
         <span class="p">}</span>
 
-        <span class="c1"># Convert enum keys and values to strings in the errors dictionary</span>
-        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_def</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="c1"># Convert enum keys to strings in the errors dictionary</span>
+        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">gate_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
-            <span class="n">error_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">error_def</span><span class="p">)</span>
-            <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">][</span><span class="n">gate_str</span><span class="p">]</span> <span class="o">=</span> <span class="n">error_dict</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">][</span><span class="n">gate_str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">error_type</span><span class="p">):</span> <span class="n">rate</span> <span class="k">for</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_json_version</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
@@ -447,7 +440,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the QuantumErrorProfile to an HDF5 group.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            group (h5py.Group): HDF5 group or file to write the quantum error profile to.</span>
+<span class="sd">            group: HDF5 group or file to write the quantum error profile to.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
@@ -462,7 +455,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a QuantumErrorProfile from a JSON dictionary.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            json_data (dict[str, Any]): Dictionary containing the serialized data.</span>
+<span class="sd">            json_data: Dictionary containing the serialized data.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            QuantumErrorProfile: New instance of the QuantumErrorProfile.</span>
@@ -475,16 +468,12 @@
 
         <span class="n">name</span> <span class="o">=</span> <span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
         <span class="n">description</span> <span class="o">=</span> <span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;description&quot;</span><span class="p">)</span>
-        <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedErrorTypes</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="n">json_errors</span> <span class="o">=</span> <span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;errors&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">json_errors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="n">json_errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="n">errors</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">(</span><span class="n">gate</span><span class="p">)]</span> <span class="o">=</span> <span class="n">GateErrorDef</span><span class="p">(</span>
-                    <span class="nb">type</span><span class="o">=</span><span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]),</span>
-                    <span class="n">rate</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span>
-                    <span class="n">num_qubits</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span>
-                <span class="p">)</span>
+            <span class="k">for</span> <span class="n">gate_str</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="n">json_errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">errors</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">(</span><span class="n">gate_str</span><span class="p">)]</span> <span class="o">=</span> <span class="p">{</span><span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">et</span><span class="p">):</span> <span class="n">rate</span> <span class="k">for</span> <span class="n">et</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="n">errors</span><span class="p">)</span>
 
@@ -493,7 +482,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a QuantumErrorProfile from an HDF5 group.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            group (h5py.Group): HDF5 group or file to read data from.</span>
+<span class="sd">            group: HDF5 group or file to read data from.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            QuantumErrorProfile: New instance of the QuantumErrorProfile.</span>
@@ -518,25 +507,28 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">noise</span> <span class="o">=</span> <span class="n">NoiseConfig</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_def</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">gate_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">error_def</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">DEPOLARIZING_ERROR</span><span class="p">:</span>
-                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="n">gate_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-                <span class="k">if</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sdg&quot;</span><span class="p">:</span>
-                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;s_adj&quot;</span>
-                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;tdg&quot;</span><span class="p">:</span>
-                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;t_adj&quot;</span>
-                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sxdg&quot;</span><span class="p">:</span>
-                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;sx_adj&quot;</span>
-                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;measure&quot;</span><span class="p">:</span>
-                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;mresetz&quot;</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="nb">getattr</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">gate_name_qdk</span><span class="p">)</span><span class="o">.</span><span class="n">set_depolarizing</span><span class="p">(</span><span class="n">error_def</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">])</span>
-                <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-                    <span class="c1"># Warn and skip unsupported gates</span>
-                    <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gate </span><span class="si">{</span><span class="n">gate_name</span><span class="si">}</span><span class="s2"> not supported in QDK noise config; skipping.&quot;</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error type </span><span class="si">{</span><span class="n">error_def</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> is not currently supported.&quot;</span><span class="p">)</span>
+            <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="n">gate_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sdg&quot;</span><span class="p">:</span>
+                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;s_adj&quot;</span>
+            <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;tdg&quot;</span><span class="p">:</span>
+                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;t_adj&quot;</span>
+            <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sxdg&quot;</span><span class="p">:</span>
+                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;sx_adj&quot;</span>
+            <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;measure&quot;</span><span class="p">:</span>
+                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;mresetz&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">gate_config</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">gate_name_qdk</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gate </span><span class="si">{</span><span class="n">gate_name</span><span class="si">}</span><span class="s2"> is not supported in QDK noise config.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+            <span class="k">for</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">error_type</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">DEPOLARIZING_ERROR</span><span class="p">:</span>
+                    <span class="n">gate_config</span><span class="o">.</span><span class="n">set_depolarizing</span><span class="p">(</span><span class="n">rate</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">error_type</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">QUBIT_LOSS</span><span class="p">:</span>
+                    <span class="n">gate_config</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="n">rate</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error type </span><span class="si">{</span><span class="n">error_type</span><span class="si">}</span><span class="s2"> is not currently supported.&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">noise</span>
 </pre></div>
 

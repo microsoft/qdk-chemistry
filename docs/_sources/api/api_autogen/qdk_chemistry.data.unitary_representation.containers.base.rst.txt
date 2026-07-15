@@ -1,0 +1,8 @@
+qdk\_chemistry.data.unitary\_representation.containers.base module
+==================================================================
+
+.. automodule:: qdk_chemistry.data.unitary_representation.containers.base
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

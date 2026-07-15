@@ -1,0 +1,8 @@
+qdk\_chemistry.data.symmetry module
+===================================
+
+.. automodule:: qdk_chemistry.data.symmetry
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

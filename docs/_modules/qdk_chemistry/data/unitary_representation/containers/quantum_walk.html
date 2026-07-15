@@ -1,0 +1,400 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.unitary_representation.containers.quantum_walk &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.unitary_representation.containers.quantum_walk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.data.unitary_representation.containers.quantum_walk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry quantum walk operator container module.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_hash_float</span><span class="p">,</span> <span class="n">_hash_int</span><span class="p">,</span> <span class="n">_hash_str</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitaryContainer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.block_encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">BlockEncodingContainer</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LCUWalkContainer&quot;</span><span class="p">,</span> <span class="s2">&quot;QuantumWalkContainer&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="QuantumWalkContainer">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuantumWalkContainer</span><span class="p">(</span><span class="n">UnitaryContainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Abstract base class for quantum walk operator containers.</span>
+
+<span class="sd">    A quantum walk operator is defined as:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        W = (2|0\rangle\langle 0| - I) \cdot B[H]</span>
+
+<span class="sd">    where :math:`B[H]` is a block encoding of the Hamiltonian. The eigenvalues</span>
+<span class="sd">    of :math:`W` are :math:`e^{\pm i \arccos(E_k / \lambda)}`, enabling</span>
+<span class="sd">    eigenvalue extraction via quantum phase estimation.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Class attribute for filename validation</span>
+    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;quantum_walk_container&quot;</span>
+
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+
+<div class="viewcode-block" id="QuantumWalkContainer.eigenvalue_from_phase">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">eigenvalue_from_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase_fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Recover a Hamiltonian eigenvalue from a quantum-walk phase.</span>
+
+<span class="sd">        For a walk operator whose eigenvalues are</span>
+<span class="sd">        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE measures</span>
+<span class="sd">        :math:`\varphi = \arccos(E_k / \lambda) / (2\pi)`.  Inverting gives:</span>
+
+<span class="sd">        .. math::</span>
+
+<span class="sd">            E_k = \lambda \cos(2\pi\varphi)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: The corresponding Hamiltonian eigenvalue.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">phase_fraction</span> <span class="o">%</span> <span class="mf">1.0</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">phi</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="QuantumWalkContainer.power">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.power">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">power</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of times to apply the walk operator.&quot;&quot;&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LCUWalkContainer">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LCUWalkContainer</span><span class="p">(</span><span class="n">QuantumWalkContainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Quantum walk operator wrapping an LCU block encoding.</span>
+
+<span class="sd">    Represents:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        W^k = \left[(2|0\rangle\langle 0| - I) \cdot</span>
+<span class="sd">        \text{PREPARE}^\dagger \cdot \text{SELECT} \cdot \text{PREPARE}\right]^k</span>
+
+<span class="sd">    This container stores a reference to the underlying</span>
+<span class="sd">    :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer`</span>
+<span class="sd">    and exposes all block-encoding data through it.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Class attribute for filename validation</span>
+    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;lcu_walk_container&quot;</span>
+
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+
+<div class="viewcode-block" id="LCUWalkContainer.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">block_encoding</span><span class="p">:</span> <span class="n">BlockEncodingContainer</span><span class="p">,</span> <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize an LCUWalkContainer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            block_encoding: The block encoding container to wrap with a reflection.</span>
+<span class="sd">            power: Number of times to apply the walk operator (for :math:`W^k` in QPE).</span>
+<span class="sd">            scale: The 1-norm used for eigenvalue-phase conversion.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span> <span class="o">=</span> <span class="n">block_encoding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_power</span> <span class="o">=</span> <span class="n">power</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.block_encoding">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.block_encoding">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">block_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BlockEncodingContainer</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the underlying block encoding container.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The LCU block encoding that this walk operator wraps.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.power">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.power">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">power</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of times to apply the walk operator.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The power value.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_power</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.num_qubits">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.num_qubits">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_qubits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Total number of qubits (same as the block encoding).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The combined qubit count.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span><span class="o">.</span><span class="n">num_qubits</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.type">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.type">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the type of the unitary container.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The type string ``&quot;lcu_walk&quot;``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;lcu_walk&quot;</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.to_json">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.to_json">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the LCUWalkContainer to a JSON-serializable dictionary.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: Dictionary representation including container type, power,</span>
+<span class="sd">                and nested block encoding.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="s2">&quot;power&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">power</span><span class="p">,</span>
+            <span class="s2">&quot;scale&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span>
+            <span class="s2">&quot;block_encoding&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_json_version</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.to_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.to_hdf5">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the LCUWalkContainer to an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to write container data to.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_hdf5_version</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;container_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;power&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">power</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;scale&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
+        <span class="n">be_group</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;block_encoding&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="n">be_group</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.from_json">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.from_json">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;LCUWalkContainer&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an LCUWalkContainer from a JSON dictionary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            json_data: Dictionary containing the serialized data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            LCUWalkContainer: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.block_encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">LCUContainer</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_json_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">json_data</span><span class="p">)</span>
+        <span class="n">block_encoding</span> <span class="o">=</span> <span class="n">LCUContainer</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;block_encoding&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">block_encoding</span><span class="o">=</span><span class="n">block_encoding</span><span class="p">,</span>
+            <span class="n">power</span><span class="o">=</span><span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">scale</span><span class="o">=</span><span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;scale&quot;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.from_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.from_hdf5">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;LCUWalkContainer&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load an LCUWalkContainer from an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to read container data from.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            LCUWalkContainer: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.block_encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">LCUContainer</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">block_encoding</span> <span class="o">=</span> <span class="n">LCUContainer</span><span class="o">.</span><span class="n">from_hdf5</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;block_encoding&quot;</span><span class="p">])</span>
+        <span class="n">power</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;power&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">block_encoding</span><span class="o">=</span><span class="n">block_encoding</span><span class="p">,</span>
+            <span class="n">power</span><span class="o">=</span><span class="n">power</span><span class="p">,</span>
+            <span class="n">scale</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;scale&quot;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUWalkContainer.get_summary">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.get_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a human-readable summary of the walk operator container.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Multi-line summary describing the walk operator and its block encoding.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">be_summary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
+        <span class="n">indented</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;    &quot;</span> <span class="o">+</span> <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">be_summary</span><span class="o">.</span><span class="n">splitlines</span><span class="p">())</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;LCU Walk Operator Container:</span><span class="se">\n</span><span class="s2">  Power: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">power</span><span class="si">}</span><span class="se">\n</span><span class="s2">  Block Encoding:</span><span class="se">\n</span><span class="si">{</span><span class="n">indented</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_hash_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Feed identifying data into the hasher.&quot;&quot;&quot;</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="s2">&quot;lcu_walk_container&quot;</span><span class="p">)</span>
+        <span class="n">_hash_int</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_power</span><span class="p">)</span>
+        <span class="n">_hash_float</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">)</span>
+        <span class="c1"># Delegate to block encoding&#39;s content_hash</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_encoding</span><span class="o">.</span><span class="n">content_hash</span><span class="p">(</span><span class="n">truncate_chars</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

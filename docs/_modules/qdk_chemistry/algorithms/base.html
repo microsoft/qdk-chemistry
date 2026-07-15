@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.base &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.base &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -101,10 +102,15 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 
 
 <div class="viewcode-block" id="Algorithm">
@@ -209,6 +215,27 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_impl</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Algorithm.hash">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.hash">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a deterministic content hash for a run with these inputs.</span>
+
+<span class="sd">        Same signature as ``run()`` but returns a hex hash string instead</span>
+<span class="sd">        of executing. Identical inputs produce identical hashes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            args: The arguments that would be passed to run().</span>
+<span class="sd">            kwargs: The keyword arguments that would be passed to run().</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: 16-character hex content hash.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_content_hash</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="k">return</span> <span class="n">run_content_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="Algorithm.settings">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.settings">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Settings</span><span class="p">:</span>
@@ -220,6 +247,25 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_nested</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate a nested algorithm from an AlgorithmRef in settings.</span>
+
+<span class="sd">        Reads the ``AlgorithmRef`` stored at *setting_key*, creates the</span>
+<span class="sd">        corresponding algorithm via the registry, and applies any nested</span>
+<span class="sd">        settings overrides.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            setting_key: Settings key that holds an ``AlgorithmRef`` value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Algorithm: A fully configured algorithm instance.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If the algorithm type or name cannot be found.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">create_from_ref</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Algorithm.type_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.type_name">[docs]</a>
@@ -281,6 +327,36 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">()]</span></div>
 </div>
+
+
+
+<div class="viewcode-block" id="create_from_ref">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.create_from_ref">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_from_ref</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Instantiate a nested algorithm from an AlgorithmRef stored in a Settings object.</span>
+
+<span class="sd">    This is a standalone helper usable by both pure-Python algorithms</span>
+<span class="sd">    (via ``Algorithm._create_nested``) and C++-backed algorithms that</span>
+<span class="sd">    don&#39;t inherit the Python ``Algorithm`` base class.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        settings: A ``Settings`` object containing the ``AlgorithmRef``.</span>
+<span class="sd">        setting_key: Settings key that holds an ``AlgorithmRef`` value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Algorithm: A fully configured algorithm instance.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the algorithm type or name cannot be found.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">ref</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">setting_key</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">ref</span><span class="o">.</span><span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">ref</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">ref</span><span class="o">.</span><span class="n">settings</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">ref</span><span class="o">.</span><span class="n">algorithm_type</span><span class="p">,</span> <span class="n">ref</span><span class="o">.</span><span class="n">algorithm_name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">ref</span><span class="o">.</span><span class="n">algorithm_type</span><span class="p">,</span> <span class="n">ref</span><span class="o">.</span><span class="n">algorithm_name</span><span class="p">)</span></div>
 
 
 

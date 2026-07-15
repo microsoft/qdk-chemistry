@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.phase\_estimation.circuit\_builder.standard\_builder module
+=====================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

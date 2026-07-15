@@ -1,0 +1,284 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.migrate &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.migrate</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.migrate</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Migrate serialized data files across serialization-schema versions.</span>
+
+<span class="sd">Each qdk-chemistry data class versions its serialization schema independently, and</span>
+<span class="sd">its deserializer accepts only the version the installed library was built against.</span>
+<span class="sd">Loading a file written against an older version of that class&#39;s schema raises an</span>
+<span class="sd">error; use this module to upgrade such a file to the version the library accepts.</span>
+
+<span class="sd">Command line::</span>
+
+<span class="sd">    python -m qdk_chemistry.migrate OLD_FILE NEW_FILE</span>
+
+<span class="sd">Python::</span>
+
+<span class="sd">    from qdk_chemistry import migrate</span>
+<span class="sd">    migrate.convert_file(&quot;old.hamiltonian.json&quot;, &quot;new.hamiltonian.h5&quot;)</span>
+
+<span class="sd">The data type is taken from the ``name.type.ext`` filename convention</span>
+<span class="sd">(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the</span>
+<span class="sd">serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).</span>
+<span class="sd">Input and output formats may differ.</span>
+
+<span class="sd">Migration is keyed point-by-point on each data class&#39;s serialization version, not</span>
+<span class="sd">on a library release: every migratable type exposes a ``STEPS`` table mapping a</span>
+<span class="sd">source version to a ``(next_version, transform)`` pair, and the chain is followed</span>
+<span class="sd">until it reaches the version the installed library accepts. To support a future</span>
+<span class="sd">serialization-version bump for a data class, register the next step in that type&#39;s</span>
+<span class="sd">``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated</span>
+<span class="sd">document is validated against the live deserializer, so a missing step fails loudly.</span>
+
+<span class="sd">This module lives outside the data classes so that no legacy-schema knowledge</span>
+<span class="sd">leaks into the core serialization.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Wavefunction</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ansatz</span><span class="p">,</span> <span class="n">_hamiltonian</span><span class="p">,</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_wavefunction</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;MigrationError&quot;</span><span class="p">,</span> <span class="s2">&quot;convert_file&quot;</span><span class="p">]</span>
+
+<span class="n">_PathLike</span> <span class="o">=</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span>
+
+
+<div class="viewcode-block" id="MigrationError">
+<a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.migrate.html#qdk_chemistry.migrate.MigrationError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MigrationError</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when a file cannot be migrated to the current serialization version.&quot;&quot;&quot;</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolves_to_same_file</span><span class="p">(</span><span class="n">src</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">dst</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if ``src`` and ``dst`` point at the same file on disk.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dst</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">src</span><span class="o">.</span><span class="n">samefile</span><span class="p">(</span><span class="n">dst</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">src</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="o">==</span> <span class="n">dst</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">src</span> <span class="o">==</span> <span class="n">dst</span>
+
+
+<span class="n">_MODULES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="p">,</span>
+    <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">_hamiltonian</span><span class="p">,</span>
+    <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">_wavefunction</span><span class="p">,</span>
+    <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">_ansatz</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">_CLASSES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">,</span>
+    <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
+    <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
+    <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">Ansatz</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="convert_file">
+<a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.migrate.html#qdk_chemistry.migrate.convert_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_file</span><span class="p">(</span><span class="n">src</span><span class="p">:</span> <span class="n">_PathLike</span><span class="p">,</span> <span class="n">dst</span><span class="p">:</span> <span class="n">_PathLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Migrate a single data file to the serialization version the library accepts.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        src: Path to the file to read (format inferred from its extension).</span>
+<span class="sd">        dst: Path to write the migrated file (format inferred from its extension).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The ``dst`` path as a :class:`pathlib.Path`.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        MigrationError: If the data type/format cannot be determined, the source and</span>
+<span class="sd">            destination are the same file, the file is already at the current</span>
+<span class="sd">            serialization version, or the migration fails.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">src_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+    <span class="n">dst_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">dst</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">_resolves_to_same_file</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Refusing to migrate &#39;</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">&#39; in place: the source and destination resolve to &quot;</span>
+            <span class="s2">&quot;the same file. Choose a different output path so the original is not overwritten.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data_type</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">detect_type</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span>
+        <span class="n">src_format</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">detect_format</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span>
+        <span class="n">dst_format</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">detect_format</span><span class="p">(</span><span class="n">dst_path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+
+    <span class="n">module</span> <span class="o">=</span> <span class="n">_MODULES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">old_doc</span> <span class="o">=</span> <span class="n">_read_old</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">data_type</span><span class="p">,</span> <span class="n">src_path</span><span class="p">,</span> <span class="n">src_format</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span>
+            <span class="c1"># An Ansatz has no version step of its own; it delegates to each</span>
+            <span class="c1"># embedded payload&#39;s serialization-version chain.</span>
+            <span class="n">new_json</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">old_doc</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">new_json</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">old_doc</span><span class="p">,</span> <span class="n">data_type</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">NotImplementedError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to migrate &#39;</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">_CLASSES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_json</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The installed qdk-chemistry rejected the migrated </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">). If the &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> serialization schema changed, register the next step in </span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.STEPS.&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">_io</span><span class="o">.</span><span class="n">write_object</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">,</span> <span class="n">dst_format</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write &#39;</span><span class="si">{</span><span class="n">dst_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">return</span> <span class="n">dst_path</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_old</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">src_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy file into a normalized old-doc for ``data_type``.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">src_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

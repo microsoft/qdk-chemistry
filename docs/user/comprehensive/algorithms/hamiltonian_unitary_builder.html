@@ -1,0 +1,555 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hamiltonian Unitary Builder &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Controlled circuit mapper" href="circuit_mapper.html" />
+    <link rel="prev" title="Evolution circuit builder" href="evolution_circuit_builder.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Hamiltonian Unitary Builder</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-the-hamiltonianunitarybuilder">Using the HamiltonianUnitaryBuilder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#consuming-term-partitions">Consuming term partitions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
+      <li class="breadcrumb-item active">Hamiltonian Unitary Builder</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/algorithms/hamiltonian_unitary_builder.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="hamiltonian-unitary-builder">
+<h1>Hamiltonian Unitary Builder<a class="headerlink" href="#hamiltonian-unitary-builder" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder" title="qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a> algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary <span class="math notranslate nohighlight">\(U(t) = e^{-iHt}\)</span> or block-encoded unitary <span class="math notranslate nohighlight">\(U = \frac{H}{\|H\|}\)</span>.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> and produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> as output.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary <span class="math notranslate nohighlight">\(U(t) = e^{-iHt}\)</span> or block encoding unitary <span class="math notranslate nohighlight">\(U = \frac{H}{\|H\|}\)</span> — is a central subroutine in many quantum algorithms.
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder" title="qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a> provides a unified interface for methods that construct this operator from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>.</p>
+<p>QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.</p>
+<p>The resulting <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> objects wrap either a <code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code> (Trotter) or an <code class="docutils literal notranslate"><span class="pre">LCUContainer</span></code> (block encoding).</p>
+</section>
+<section id="using-the-hamiltonianunitarybuilder">
+<h2>Using the HamiltonianUnitaryBuilder<a class="headerlink" href="#using-the-hamiltonianunitarybuilder" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This algorithm is currently available only in the Python API.</p>
+</div>
+<p>This section demonstrates how to create, configure, and run a Hamiltonian unitary builder.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., <a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a>).</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder" title="qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a> requires the following inputs:</p>
+<dl class="simple">
+<dt>QubitOperator</dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> containing the Pauli-string representation of the Hamiltonian.
+This can be obtained from the <a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a> algorithm, constructed from a <a class="reference internal" href="../model_hamiltonians.html"><span class="doc">model Hamiltonian</span></a>, or built directly.</p>
+</dd>
+</dl>
+<p class="rubric">Creating a builder</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+
+<span class="c1"># Create a time evolution builder</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Configuring settings</p>
+<p>Settings vary by implementation.
+See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure a second-order Trotter builder with automatic step count</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">)</span>
+<span class="n">trotter</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">trotter</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">,</span> <span class="mf">1e-3</span><span class="p">)</span>
+<span class="n">trotter</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">,</span> <span class="s2">&quot;commutator&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Running the builder</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="c1"># 1. Setup molecule</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
+
+<span class="c1"># 2. SCF</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># 3. Hamiltonian construction</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
+
+<span class="c1"># 4. Qubit mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+
+<span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">)</span>
+<span class="n">qubit_ham</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># 5. Build time evolution unitary</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">evolution</span> <span class="o">=</span> <span class="n">trotter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_ham</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Container type: </span><span class="si">{</span><span class="n">evolution</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of qubits: </span><span class="si">{</span><span class="n">evolution</span><span class="o">.</span><span class="n">get_num_qubits</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">evolution</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder" title="qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a> provides a unified interface for Hamiltonian simulation methods.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="c1"># List all registered time evolution builder implementations</span>
+<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">implementations</span><span class="p">)</span>  <span class="c1"># e.g. [&#39;trotter&#39;, &#39;qdrift&#39;, &#39;partially_randomized&#39;, &#39;lcu&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="trotter-suzuki-product-formulas">
+<span id="trotter-builder"></span><h3>Trotter-Suzuki product formulas<a class="headerlink" href="#trotter-suzuki-product-formulas" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;trotter&quot;</span></code></p>
+<p>The Trotter-Suzuki decomposition approximates the time-evolution operator as a product of individual Pauli exponentials.
+For a Hamiltonian <span class="math notranslate nohighlight">\(H = \sum_j \alpha_j P_j\)</span>:</p>
+<p><strong>First-order Trotter</strong> (<span class="math notranslate nohighlight">\(p = 1\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[e^{-iHt} \approx \left[\prod_j e^{-i\alpha_j P_j t / N}\right]^N\]</div>
+<p><strong>Second-order Trotter</strong> (Strang splitting, <span class="math notranslate nohighlight">\(p = 2\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[e^{-iHt} \approx \left[\prod_{j=1}^{L-1} e^{-i\alpha_j P_j t / 2N} \cdot e^{-i\alpha_L P_L t / N} \cdot \prod_{j=L-1}^{1} e^{-i\alpha_j P_j t / 2N}\right]^N\]</div>
+<p><strong>Higher even orders</strong> are constructed via the recursive Suzuki composition <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id59" title="Masuo Suzuki. General theory of higher-order decomposition of exponential operators and symplectic integrators. Physics Letters A, 165(5–6):387–395, 1992. doi:10.1016/0375-9601(92)90335-J.">Suz92</a>]</span>:</p>
+<div class="math notranslate nohighlight">
+\[S_{2k}(t) = S_{2k-2}(u_k t)^2 \, S_{2k-2}\!\bigl((1-4u_k) t\bigr) \, S_{2k-2}(u_k t)^2\]</div>
+<p>where <span class="math notranslate nohighlight">\(u_k = 1/(4 - 4^{1/(2k-1)})\)</span>.</p>
+<p>The number of Trotter steps <span class="math notranslate nohighlight">\(N\)</span> can be specified directly (<code class="docutils literal notranslate"><span class="pre">num_divisions</span></code>) or computed automatically from a <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> using one of two error bounds:</p>
+<dl class="simple">
+<dt>Commutator bound (default)</dt><dd><p>A tighter bound <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id58" title="Andrew M. Childs, Yuan Su, Minh C. Tran, Nathan Wiebe, and Shuchen Zhu. Theory of Trotter error with commutator scaling. Physical Review X, 11(1):011020, 2021. URL: https://arxiv.org/abs/1912.08854, doi:10.1103/PhysRevX.11.011020.">CST+21</a>]</span> based on nested commutators:
+<span class="math notranslate nohighlight">\(N = \lceil \frac{t^{2}}{2\epsilon} \sum_{j&lt;k}\lVert[\alpha_jP_j,\alpha_kP_k]\rVert \rceil\)</span></p>
+</dd>
+<dt>Naive bound</dt><dd><p>A looser triangle-inequality bound:
+<span class="math notranslate nohighlight">\(N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil\)</span></p>
+</dd>
+</dl>
+<p>When both <code class="docutils literal notranslate"><span class="pre">num_divisions</span></code> and <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> are specified, the builder uses whichever requires more Trotter steps.</p>
+<p class="rubric">Settings</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">order</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Target approximation error <span class="math notranslate nohighlight">\(\epsilon\)</span>. When set to 0.0 (default), automatic step-count estimation is disabled.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_divisions</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Explicit number of Trotter steps <span class="math notranslate nohighlight">\(N\)</span>. When set to 0 (default), determined from <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">error_bound</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Error bound strategy: <code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> (default, tighter) or <code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code> (simpler).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weight_threshold</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="zassenhaus-product-formulas">
+<span id="zassenhaus-builder"></span><h3>Zassenhaus product formulas<a class="headerlink" href="#zassenhaus-product-formulas" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;zassenhaus&quot;</span></code></p>
+<p>The Zassenhaus decomposition approximates the time-evolution operator by recursively generating commutator correction terms.
+For a Hamiltonian <span class="math notranslate nohighlight">\(H = \sum_j \alpha_j P_j\)</span>, the first-order approximation is the Trotter product, and higher-order approximations introduce explicit product-formula factors for lower-order commutator corrections:</p>
+<p><strong>First-order Zassenhaus</strong> (<span class="math notranslate nohighlight">\(p = 1\)</span>):
+Matches the first-order Trotter product formula.</p>
+<p><strong>Second-order Zassenhaus</strong> (<span class="math notranslate nohighlight">\(p = 2\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[e^{-iHt} \approx \left[ \prod_{j &gt; k} e^{-\frac{1}{2} [H_j, H_k] t^2} \cdot \prod_j e^{-i H_j t} \right]^N\]</div>
+<p><strong>Higher orders</strong> (up to <span class="math notranslate nohighlight">\(p = 4\)</span>) recursively construct explicit nested-commutator terms. Unlike Trotter-Suzuki formulas where step count is used to reduce commutator errors, the Zassenhaus builder computes low-order corrections explicitly.</p>
+<p>The number of divisions can be specified directly (<code class="docutils literal notranslate"><span class="pre">num_divisions</span></code>) or computed automatically from a <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> using one of two bounds:</p>
+<dl class="simple">
+<dt>Commutator bound (default)</dt><dd><p>A tighter bound based on nested commutators of the first omitted exponent:
+<span class="math notranslate nohighlight">\(N = \lceil \frac{\|C_{p+1}(-iH_1, \dots, -iH_m)\|^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil\)</span></p>
+</dd>
+<dt>Naive bound</dt><dd><p>A looser bound using the absolute coefficient sum of the first omitted exponent and the 1-norm of the Hamiltonian:
+<span class="math notranslate nohighlight">\(N = \lceil \frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p} t^{1+1/p}}{\epsilon^{1/p}} \rceil\)</span></p>
+</dd>
+</dl>
+<p>When <code class="docutils literal notranslate"><span class="pre">order</span></code> is set to <code class="docutils literal notranslate"><span class="pre">0</span></code> (auto), the builder dynamically sweeps orders 2, 3, and 4 to select the order that minimizes the total gate count (product of step reps and step terms) for the target accuracy.</p>
+<p class="rubric">Settings</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">order</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Zassenhaus order (0 for auto, or 1 to 4). Default is 0.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Target approximation error <span class="math notranslate nohighlight">\(\epsilon\)</span>. When set to 0.0 (default), automatic step-count estimation is disabled.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_divisions</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Explicit number of Zassenhaus steps <span class="math notranslate nohighlight">\(N\)</span>. When set to 0 (default), determined from <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">error_bound</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Error bound strategy: <code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> (default, tighter) or <code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code> (simpler).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">weight_threshold</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="consuming-term-partitions">
+<h2>Consuming term partitions<a class="headerlink" href="#consuming-term-partitions" title="Link to this heading"></a></h2>
+<p>When the input <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> carries a populated <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.term_partition" title="qdk_chemistry.data.QubitOperator.term_partition"><code class="xref py py-attr docutils literal notranslate"><span class="pre">term_partition</span></code></a>, the Trotter builder consumes it directly:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LayeredPartition" title="qdk_chemistry.data.LayeredPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">LayeredPartition</span></code></a> (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.FlatPartition" title="qdk_chemistry.data.FlatPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlatPartition</span></code></a> (group → index) is interpreted as a layered partition with one layer per group.</p></li>
+</ul>
+<p>In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
+This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">term_partition</span> <span class="pre">is</span> <span class="pre">None</span></code> each Pauli term is exponentiated as its own group.
+Pre-populate the partition using the <a class="reference internal" href="index.html#algorithms-term-grouper"><span class="std std-ref">term_grouper algorithm</span></a> or one of the <a class="reference internal" href="../model_hamiltonians.html#model-term-partition"><span class="std std-ref">spin model Hamiltonian builders</span></a> to enable group-aware scheduling.</p>
+<p>For lattice models, the edge coloring stored on <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a> feeds directly into the partition: edges of the same color have disjoint qubit supports and form a single parallelisable layer.
+The <a class="reference internal" href="../model_hamiltonians.html#model-term-partition"><span class="std std-ref">model Hamiltonian builders</span></a> consume this coloring automatically, so no manual geometry handling is required.</p>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatticeGraph</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.model_hamiltonians</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_ising_hamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="c1"># 4-site open Ising chain: H = Σ Z_i Z_{i+1} + 0.5 Σ X_i</span>
+<span class="n">graph</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_ising_hamiltonian</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">j</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1"># The edge coloring partitions ZZ terms into two layers by color:</span>
+<span class="c1">#   group 0 (field):  1 layer  → [X₀, X₁, X₂, X₃]</span>
+<span class="c1">#   group 1 (ZZ):     2 layers → [{Z₀Z₁, Z₂Z₃}, {Z₁Z₂}]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">term_partition</span><span class="p">)</span>
+<span class="c1"># LayeredPartition(strategy=&#39;geometry_coloring&#39;, num_groups=2)</span>
+
+<span class="c1"># Second-order Trotter with 1 division produces the Strang splitting:</span>
+<span class="c1">#   S₂(t) = e^{fields·t/2}  e^{ZZ_layer0·t}  e^{ZZ_layer1·t}</span>
+<span class="c1">#           e^{fields·t/2}</span>
+<span class="c1"># where same-layer ZZ terms (e.g. Z₀Z₁ and Z₂Z₃) have disjoint</span>
+<span class="c1"># qubit support and are exponentiated independently within one step.</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;time_evolution_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">)</span>
+<span class="n">trotter</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;order&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;num_divisions&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>
+<span class="n">evolution</span> <span class="o">=</span> <span class="n">trotter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="n">container</span> <span class="o">=</span> <span class="n">evolution</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+
+<span class="c1"># The grouped schedule uses 11 exponentiated terms per step,</span>
+<span class="c1"># vs. 13 for the ungrouped fallback — a 15% reduction that</span>
+<span class="c1"># compounds at higher Suzuki orders.</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">)</span><span class="si">}</span><span class="s2"> terms per Trotter step&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">:</span>
+    <span class="n">label</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;I&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">4</span>
+    <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  exp(-i * </span><span class="si">{</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="si">:</span><span class="s2">+.4f</span><span class="si">}</span><span class="s2"> * </span><span class="si">{</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">label</span><span class="p">))</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<span class="c1"># Output:</span>
+<span class="c1">#   exp(-i * +0.2500 * IIIX)</span>
+<span class="c1">#   exp(-i * +0.2500 * IIXI)</span>
+<span class="c1">#   exp(-i * +0.2500 * IXII)</span>
+<span class="c1">#   exp(-i * +0.2500 * XIII)</span>
+<span class="c1">#   exp(-i * +1.0000 * IIZZ)</span>
+<span class="c1">#   exp(-i * +1.0000 * ZZII)</span>
+<span class="c1">#   exp(-i * +1.0000 * IZZI)</span>
+<span class="c1">#   exp(-i * +0.2500 * IIIX)</span>
+<span class="c1">#   exp(-i * +0.2500 * IIXI)</span>
+<span class="c1">#   exp(-i * +0.2500 * IXII)</span>
+<span class="c1">#   exp(-i * +0.2500 * XIII)</span>
+</pre></div>
+</div>
+<section id="block-encoding">
+<span id="block-encoding-builder"></span><h3>Block encoding<a class="headerlink" href="#block-encoding" title="Link to this heading"></a></h3>
+<p>Block encoding is a technique for embedding a non-unitary operator (such as <span class="math notranslate nohighlight">\(H / \lambda\)</span>) into a larger unitary circuit.
+Given an <span class="math notranslate nohighlight">\(n\)</span>-qubit Hamiltonian <span class="math notranslate nohighlight">\(H\)</span>, a block encoding uses <span class="math notranslate nohighlight">\(a\)</span> ancilla qubits to construct a unitary <span class="math notranslate nohighlight">\(U\)</span> such that:</p>
+<div class="math notranslate nohighlight">
+\[(\langle 0|^{\otimes a} \otimes I)\, U\, (|0\rangle^{\otimes a} \otimes I) = \frac{H}{\lambda}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\lambda \geq \|H\|\)</span> is a normalization factor (typically the L1 norm of the coefficients).
+The Hamiltonian is encoded in the top-left block of the larger unitary — hence the name “block encoding.”</p>
+<p>Block encodings are the foundation for quantum algorithms such as qubitization, QSVT, and quantum linear system solvers.
+QDK/Chemistry currently provides the <strong>LCU</strong> (Linear Combination of Unitaries) method for constructing block encodings.</p>
+<section id="lcu-linear-combination-of-unitaries">
+<span id="lcu-builder"></span><h4>LCU (Linear Combination of Unitaries)<a class="headerlink" href="#lcu-linear-combination-of-unitaries" title="Link to this heading"></a></h4>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;lcu&quot;</span></code></p>
+<p>The LCU builder constructs a block encoding of <span class="math notranslate nohighlight">\(H / \lambda\)</span> using the PREPARE–SELECT pattern <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id64" title="Andrew M. Childs and Nathan Wiebe. Hamiltonian simulation using linear combinations of unitary operations. Quantum Info. Comput., 12(11-12):901-924, nov 2012.">CW12</a>]</span>.
+For a Hamiltonian <span class="math notranslate nohighlight">\(H = \sum_{j=1}^{L} \alpha_j P_j\)</span> with <span class="math notranslate nohighlight">\(\lambda = \sum_j |\alpha_j|\)</span>:</p>
+<p><strong>PREPARE oracle</strong></p>
+<p>Prepares an ancilla register in the state <span class="math notranslate nohighlight">\(|\psi\rangle = \sum_j \sqrt{|\alpha_j| / \lambda}\, |j\rangle\)</span> using <span class="math notranslate nohighlight">\(\lceil \log_2 L \rceil\)</span> qubits.</p>
+<p><strong>SELECT oracle</strong></p>
+<p>Applies the corresponding Pauli string controlled on the ancilla index:</p>
+<div class="math notranslate nohighlight">
+\[\text{SELECT} = \sum_{j=0}^{L-1} |j\rangle\langle j| \otimes P_j\]</div>
+<p>with sign corrections absorbed into a phase vector.</p>
+<p><strong>Block encoding circuit</strong></p>
+<p>The composite circuit <span class="math notranslate nohighlight">\(\text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}\)</span> realizes the block encoding:</p>
+<div class="math notranslate nohighlight">
+\[(\langle 0| \otimes I)\, \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}\, (|0\rangle \otimes I) = \frac{H}{\lambda}\]</div>
+<p><strong>Quantum walk operator</strong></p>
+<p>When <code class="docutils literal notranslate"><span class="pre">quantum_walk=True</span></code>, the builder wraps the block encoding with a reflection to form the qubitization walk operator:</p>
+<div class="math notranslate nohighlight">
+\[W = (2|0\rangle\langle 0| - I) \cdot \text{PREP}^\dagger \cdot \text{SEL} \cdot \text{PREP}\]</div>
+<p>The walk operator has eigenvalues <span class="math notranslate nohighlight">\(e^{\pm i \arccos(E_k/\lambda)}\)</span> where <span class="math notranslate nohighlight">\(E_k\)</span> are the eigenvalues of <span class="math notranslate nohighlight">\(H\)</span>.</p>
+<p class="rubric">Settings</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">power</span></code></p></td>
+<td><p>int</p></td>
+<td><p>The power to which the walk operator is raised. Default is 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">quantum_walk</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, wrap the block encoding with a reflection to form the qubitization walk operator. If <code class="docutils literal notranslate"><span class="pre">False</span></code>, produce the plain block encoding. Default is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tolerance</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Minimum L1 norm below which the decomposition is considered ill-defined. Default is 1e-12.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Example</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="n">lcu</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">)</span>
+<span class="n">lcu</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;quantum_walk&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">lcu</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The resulting <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> wraps an <code class="docutils literal notranslate"><span class="pre">LCUContainer</span></code> containing the Prepare and Select oracles.</p>
+</section>
+</section>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a>: Output data class wrapping the exponentiated Pauli terms or LCU container</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>: Input qubit Hamiltonian</p></li>
+<li><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a>: Consumer of the hamiltonian unitary</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/hamiltonian_unitary_builder.py">Python</a> script.</p></li>
+<li><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a>: Quantum phase estimation algorithms</p></li>
+<li><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Map fermionic Hamiltonians to qubit operators</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="evolution_circuit_builder.html" class="btn btn-neutral float-left" title="Evolution circuit builder" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="circuit_mapper.html" class="btn btn-neutral float-right" title="Controlled circuit mapper" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+qdk\_chemistry.data.unitary\_representation package
+===================================================
+
+.. automodule:: qdk_chemistry.data.unitary_representation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.unitary_representation.containers
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.unitary_representation.base

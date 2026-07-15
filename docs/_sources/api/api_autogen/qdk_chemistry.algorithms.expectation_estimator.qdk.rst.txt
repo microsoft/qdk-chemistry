@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.expectation\_estimator.qdk module
+===========================================================
+
+.. automodule:: qdk_chemistry.algorithms.expectation_estimator.qdk
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Changelog &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Changelog &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=fc837d61"></script>
+      <script src="_static/documentation_options.js?v=51b770b3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -64,6 +65,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="release-notes/index.html">Release Notes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#version-2-0-0">Version 2.0.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-1-1-0">Version 1.1.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-1-0-2">Version 1.0.2</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-1-0-1">Version 1.0.1</a></li>
@@ -101,6 +103,36 @@
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading"></a></h1>
 <p>For detailed release notes with code examples and feature walkthroughs, see the <a class="reference internal" href="release-notes/index.html"><span class="doc">Release Notes</span></a> section.</p>
+<section id="version-2-0-0">
+<h2>Version 2.0.0<a class="headerlink" href="#version-2-0-0" title="Link to this heading"></a></h2>
+<p>See <a class="reference internal" href="release-notes/v2.0.0.html#release-v2-0-0"><span class="std std-ref">What’s New in Version 2.0</span></a> for full details and migration guidance.</p>
+<ul class="simple">
+<li><p>Symmetry-blocked storage unifying restricted and unrestricted orbital, integral, and index data</p></li>
+<li><p>Consolidated wavefunction containers (<code class="docutils literal notranslate"><span class="pre">StateVectorContainer</span></code>, <code class="docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code>)</p></li>
+<li><p>Nuclear gradients and finite-difference Hessians</p></li>
+<li><p>Stabilized SCF and ROHF geometric direct minimization</p></li>
+<li><p>Block-encoding/LCU qubitization, Hadamard test, and Zassenhaus product formulas</p></li>
+<li><p>Real-time dynamics for driven, time-dependent Hamiltonians</p></li>
+<li><p>Fermion-to-qubit mapping carried as data (<code class="docutils literal notranslate"><span class="pre">MajoranaMapping</span></code>), including a Verstraete-Cirac encoding</p></li>
+<li><p>Explicit Pauli term grouping and generalized expectation estimation</p></li>
+<li><p>Composable standard and iterative phase-estimation circuit builders</p></li>
+<li><p>QDK Quantum Resource Estimator integration for generated circuits (<code class="docutils literal notranslate"><span class="pre">Circuit.estimate</span></code> / <code class="docutils literal notranslate"><span class="pre">get_qre_application</span></code>)</p></li>
+<li><p>Algorithm result caching and data-file migration tooling</p></li>
+<li><p>Windows build support with CI</p></li>
+</ul>
+<p>Breaking changes:</p>
+<ul class="simple">
+<li><p>Wavefunction containers consolidated from five classes into two: <code class="docutils literal notranslate"><span class="pre">SlaterDeterminantContainer</span></code>, <code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code>, and <code class="docutils literal notranslate"><span class="pre">SciWavefunctionContainer</span></code> (structurally identical apart from a type tag) merge into <code class="docutils literal notranslate"><span class="pre">StateVectorContainer</span></code>, distinguished by a stored sector; <code class="docutils literal notranslate"><span class="pre">MP2Container</span></code> and <code class="docutils literal notranslate"><span class="pre">CoupledClusterContainer</span></code> merge into <code class="docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code>, distinguished by an <code class="docutils literal notranslate"><span class="pre">AmplitudeType</span></code> tag. <code class="docutils literal notranslate"><span class="pre">Wavefunction.get_container_type()</span></code> now returns <code class="docutils literal notranslate"><span class="pre">&quot;state_vector&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;amplitude&quot;</span></code> (old names remain as deprecated aliases)</p></li>
+<li><p>Serialization schema bumped from <code class="docutils literal notranslate"><span class="pre">0.1.0</span></code> to <code class="docutils literal notranslate"><span class="pre">0.2.0</span></code> for the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code>, <code class="docutils literal notranslate"><span class="pre">CanonicalFourCenterHamiltonianContainer</span></code> / <code class="docutils literal notranslate"><span class="pre">SparseHamiltonianContainer</span></code> / <code class="docutils literal notranslate"><span class="pre">CholeskyHamiltonianContainer</span></code>, <code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">StateVectorContainer</span></code>, and <code class="docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code> data classes; <code class="docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code> and the top-level <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> are unchanged. Upgrade affected files with <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">qdk_chemistry.migrate</span></code></p></li>
+<li><p>Expectation estimator no longer auto-groups terms</p></li>
+<li><p>Qubit mapper takes a <code class="docutils literal notranslate"><span class="pre">MajoranaMapping</span></code> instead of an <code class="docutils literal notranslate"><span class="pre">encoding</span></code> string</p></li>
+<li><p>Silent semantic change: the <code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code> accessor <code class="docutils literal notranslate"><span class="pre">get_active_two_rdm_spin_dependent()</span></code> now returns blocks as <code class="docutils literal notranslate"><span class="pre">(aaaa,</span> <span class="pre">aabb,</span> <span class="pre">bbbb)</span></code> (was <code class="docutils literal notranslate"><span class="pre">(aabb,</span> <span class="pre">aaaa,</span> <span class="pre">bbbb)</span></code>), with the <code class="docutils literal notranslate"><span class="pre">aabb</span></code> block in alpha-alpha-beta-beta index order (was alpha-beta-alpha-beta), to match the two-electron integral block order in <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code>; the <code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code> constructor takes the same new order. Positional unpacking reads incorrect data until updated</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Configuration</span></code> string and bitset constructors replaced by explicit factories</p></li>
+<li><p>Renames (deprecated aliases retained): <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> to <code class="docutils literal notranslate"><span class="pre">QubitOperator</span></code>, <code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code> to <code class="docutils literal notranslate"><span class="pre">ExpectationEstimator</span></code>, <code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitary</span></code> to <code class="docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code>, and <code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitaryContainer</span></code> to <code class="docutils literal notranslate"><span class="pre">UnitaryContainer</span></code></p></li>
+<li><p>v1 <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> dense accessors deprecated in favor of the symmetry-blocked accessors</p></li>
+<li><p>C++ only: FCIDUMP writer, Cholesky container, and <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> constructor changes</p></li>
+</ul>
+</section>
 <section id="version-1-1-0">
 <h2>Version 1.1.0<a class="headerlink" href="#version-1-1-0" title="Link to this heading"></a></h2>
 <p>See <a class="reference internal" href="release-notes/v1.1.0.html#release-v1-1-0"><span class="std std-ref">What’s New in Version 1.1</span></a> for full details.</p>

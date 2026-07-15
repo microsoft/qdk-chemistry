@@ -1,0 +1,362 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.migrate._hamiltonian &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../migrate.html">qdk_chemistry.migrate</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.migrate._hamiltonian</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.migrate._hamiltonian</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Migrate the ``Hamiltonian`` serialization schema to the current version.</span>
+
+<span class="sd">The Hamiltonian envelope (``{version, container}``) is schema-stable; only the</span>
+<span class="sd">container payload changed (dense integral arrays -&gt; ``SymmetryBlockedTensor``).</span>
+
+<span class="sd">Two distinct ``cholesky`` container layouts both serialize at container version</span>
+<span class="sd">``0.1.0`` and are told apart by which integrals they carry:</span>
+
+<span class="sd">- The released (1.1.0) container derived from the four-center container and stored</span>
+<span class="sd">  the full dense four-center two-body tensor (keys ``aaaa``/``aabb``/``bbbb``),</span>
+<span class="sd">  never the MO three-center vectors. It is migrated to a ``canonical_four_center``</span>
+<span class="sd">  container, dropping the now-unused AO Cholesky vectors.</span>
+<span class="sd">- The later container stored the MO three-center vectors directly (key ``aa``/</span>
+<span class="sd">  ``bb``, or the ``three_center_integrals_aa`` HDF5 dataset). Those vectors are the</span>
+<span class="sd">  current Cholesky data model, so the container is preserved as ``cholesky`` with</span>
+<span class="sd">  the vectors re-expressed as a ``SymmetryBlockedTensor``.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_sbt</span><span class="p">,</span> <span class="n">_sparse</span>
+
+<span class="n">HAMILTONIAN_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+<span class="n">CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+<span class="n">OLD_CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+
+<span class="n">_FOUR_CENTER</span> <span class="o">=</span> <span class="s2">&quot;canonical_four_center&quot;</span>
+<span class="n">_CHOLESKY</span> <span class="o">=</span> <span class="s2">&quot;cholesky&quot;</span>
+
+
+<div class="viewcode-block" id="from_json_doc">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_json_doc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_json_doc</span><span class="p">(</span><span class="n">doc</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a parsed legacy Hamiltonian JSON object into a container old-doc.&quot;&quot;&quot;</span>
+    <span class="n">container</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;container&quot;</span><span class="p">]</span>
+    <span class="n">container_type</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;container_type&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">container_type</span> <span class="o">==</span> <span class="s2">&quot;sparse&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_sparse</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">container_type</span> <span class="o">==</span> <span class="n">_CHOLESKY</span> <span class="ow">and</span> <span class="s2">&quot;three_center_integrals&quot;</span> <span class="ow">in</span> <span class="n">container</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_cholesky_from_json</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_four_center_from_json</span><span class="p">(</span><span class="n">container</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="from_hdf5_file">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_hdf5_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a legacy Hamiltonian HDF5 file into a container old-doc.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="from_hdf5_group">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_hdf5_group">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a legacy Hamiltonian HDF5 group (with a ``container`` subgroup).&quot;&quot;&quot;</span>
+    <span class="n">container</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;container&quot;</span><span class="p">]</span>
+    <span class="n">container_type</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;container_type&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">container_type</span> <span class="o">==</span> <span class="s2">&quot;sparse&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_sparse</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">container_type</span> <span class="o">==</span> <span class="n">_CHOLESKY</span> <span class="ow">and</span> <span class="s2">&quot;three_center_integrals_aa&quot;</span> <span class="ow">in</span> <span class="n">container</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_cholesky_from_hdf5</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_four_center_from_hdf5</span><span class="p">(</span><span class="n">container</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="to_new_json">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.to_new_json">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated Hamiltonian JSON object from a normalized container old-doc.&quot;&quot;&quot;</span>
+    <span class="n">container_type</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;container_type&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">container_type</span> <span class="o">==</span> <span class="s2">&quot;sparse&quot;</span><span class="p">:</span>
+        <span class="n">container</span> <span class="o">=</span> <span class="n">_sparse</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">container_type</span> <span class="o">==</span> <span class="n">_CHOLESKY</span><span class="p">:</span>
+        <span class="n">container</span> <span class="o">=</span> <span class="n">_cholesky_to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">container</span> <span class="o">=</span> <span class="n">_four_center_to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">HAMILTONIAN_VERSION</span><span class="p">,</span> <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="n">container</span><span class="p">}</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_four_center_from_json</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read four-center / Cholesky container fields from old JSON.&quot;&quot;&quot;</span>
+    <span class="n">two_body</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;two_body_integrals&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_FOUR_CENTER</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_restricted&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_alpha&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_alpha&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_beta&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_beta&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;two_body_aaaa&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">two_body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;aaaa&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;two_body_aabb&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">two_body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;aabb&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;two_body_bbbb&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">two_body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bbbb&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;fock_alpha&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inactive_fock_matrix_alpha&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;fock_beta&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inactive_fock_matrix_beta&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_four_center_from_hdf5</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read four-center / Cholesky container fields from old HDF5.&quot;&quot;&quot;</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_FOUR_CENTER</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;is_restricted&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_alpha&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;one_body_integrals_alpha&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;one_body_beta&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;one_body_integrals_beta&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;two_body_aaaa&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_vector</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;two_body_integrals_aaaa&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;two_body_aabb&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_vector</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;two_body_integrals_aabb&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;two_body_bbbb&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_vector</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;two_body_integrals_bbbb&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;fock_alpha&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;inactive_fock_matrix_alpha&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;fock_beta&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;inactive_fock_matrix_beta&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_four_center_to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated four-center container JSON from an old-doc.&quot;&quot;&quot;</span>
+    <span class="n">restricted</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;is_restricted&quot;</span><span class="p">]</span>
+    <span class="n">container</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">CONTAINER_VERSION</span><span class="p">,</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_FOUR_CENTER</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;core_energy&quot;</span><span class="p">]),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="n">restricted</span><span class="p">,</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_alpha&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_beta&quot;</span><span class="p">)</span>
+        <span class="n">container</span><span class="p">[</span><span class="s2">&quot;one_body_integrals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;one_body_alpha&quot;</span><span class="p">],</span> <span class="n">beta</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;two_body_aaaa&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">restricted</span><span class="p">:</span>
+            <span class="n">container</span><span class="p">[</span><span class="s2">&quot;two_body_integrals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank4_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;two_body_aaaa&quot;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">container</span><span class="p">[</span><span class="s2">&quot;two_body_integrals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank4_dict</span><span class="p">(</span>
+                <span class="n">old</span><span class="p">[</span><span class="s2">&quot;two_body_aaaa&quot;</span><span class="p">],</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;two_body_aabb&quot;</span><span class="p">],</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;two_body_bbbb&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fock_alpha&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fock_beta&quot;</span><span class="p">)</span>
+        <span class="n">container</span><span class="p">[</span><span class="s2">&quot;inactive_fock_matrix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;fock_alpha&quot;</span><span class="p">],</span> <span class="n">beta</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">container</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_opt_array</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return ``value`` as a float64 array, or None when absent.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cholesky_from_json</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a genuine (three-center) Cholesky container from old JSON.&quot;&quot;&quot;</span>
+    <span class="n">three_center</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;three_center_integrals&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_CHOLESKY</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_restricted&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_alpha&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_alpha&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_beta&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_beta&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;three_center_aa&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">three_center</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;aa&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;three_center_bb&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">three_center</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bb&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;fock_alpha&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inactive_fock_matrix_alpha&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;fock_beta&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;inactive_fock_matrix_beta&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">:</span> <span class="n">_opt_array</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cholesky_from_hdf5</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a genuine (three-center) Cholesky container from old HDF5.&quot;&quot;&quot;</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_CHOLESKY</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;is_restricted&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)),</span>
+        <span class="s2">&quot;one_body_alpha&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;one_body_integrals_alpha&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;one_body_beta&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;one_body_integrals_beta&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;three_center_aa&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;three_center_integrals_aa&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;three_center_bb&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;three_center_integrals_bb&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;fock_alpha&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;inactive_fock_matrix_alpha&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;fock_beta&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;inactive_fock_matrix_beta&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cholesky_to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated Cholesky container JSON from an old-doc.&quot;&quot;&quot;</span>
+    <span class="n">restricted</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;is_restricted&quot;</span><span class="p">]</span>
+    <span class="n">container</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">CONTAINER_VERSION</span><span class="p">,</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">_CHOLESKY</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;core_energy&quot;</span><span class="p">]),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="n">restricted</span><span class="p">,</span>
+        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
+    <span class="p">}</span>
+
+    <span class="n">beta</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_beta&quot;</span><span class="p">)</span>
+    <span class="n">container</span><span class="p">[</span><span class="s2">&quot;one_body_integrals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;one_body_alpha&quot;</span><span class="p">],</span> <span class="n">beta</span><span class="p">)</span>
+
+    <span class="n">beta</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;three_center_bb&quot;</span><span class="p">)</span>
+    <span class="n">container</span><span class="p">[</span><span class="s2">&quot;three_center_integrals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank3_three_center_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;three_center_aa&quot;</span><span class="p">],</span> <span class="n">beta</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fock_alpha&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">restricted</span> <span class="k">else</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fock_beta&quot;</span><span class="p">)</span>
+        <span class="n">container</span><span class="p">[</span><span class="s2">&quot;inactive_fock_matrix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;fock_alpha&quot;</span><span class="p">],</span> <span class="n">beta</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">container</span><span class="p">[</span><span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;ao_cholesky_vectors&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">container</span>
+
+
+<span class="c1"># The Hamiltonian envelope version is unchanged; the chain is keyed on the</span>
+<span class="c1"># container&#39;s serialization version (the legacy cholesky/sparse/four-center</span>
+<span class="c1"># containers all serialized version 0.1.0).</span>
+<span class="n">STEPS</span> <span class="o">=</span> <span class="p">{</span><span class="n">OLD_CONTAINER_VERSION</span><span class="p">:</span> <span class="p">(</span><span class="n">CONTAINER_VERSION</span><span class="p">,</span> <span class="n">to_new_json</span><span class="p">)}</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

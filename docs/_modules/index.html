@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview: module code &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Overview: module code &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -92,30 +93,73 @@
 <ul><li><a href="qdk_chemistry/algorithms/base.html">qdk_chemistry.algorithms.base</a></li>
 <li><a href="qdk_chemistry/algorithms/circuit_executor/base.html">qdk_chemistry.algorithms.circuit_executor.base</a></li>
 <li><a href="qdk_chemistry/algorithms/circuit_executor/qdk.html">qdk_chemistry.algorithms.circuit_executor.qdk</a></li>
-<li><a href="qdk_chemistry/algorithms/energy_estimator/energy_estimator.html">qdk_chemistry.algorithms.energy_estimator.energy_estimator</a></li>
-<li><a href="qdk_chemistry/algorithms/energy_estimator/qdk.html">qdk_chemistry.algorithms.energy_estimator.qdk</a></li>
+<li><a href="qdk_chemistry/algorithms/circuit_mapper/base.html">qdk_chemistry.algorithms.circuit_mapper.base</a></li>
+<li><a href="qdk_chemistry/algorithms/circuit_mapper/pauli_sequence_mapper.html">qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper</a></li>
+<li><a href="qdk_chemistry/algorithms/controlled_circuit_mapper/base.html">qdk_chemistry.algorithms.controlled_circuit_mapper.base</a></li>
+<li><a href="qdk_chemistry/algorithms/controlled_circuit_mapper/controlled_pauli_sequence_mapper.html">qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper</a></li>
+<li><a href="qdk_chemistry/algorithms/controlled_circuit_mapper/controlled_psp_mapper.html">qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper</a></li>
+<li><a href="qdk_chemistry/algorithms/expectation_estimator/expectation_estimator.html">qdk_chemistry.algorithms.expectation_estimator.expectation_estimator</a></li>
+<li><a href="qdk_chemistry/algorithms/expectation_estimator/qdk.html">qdk_chemistry.algorithms.expectation_estimator.qdk</a></li>
+<li><a href="qdk_chemistry/algorithms/hadamard_test/circuit_builder/base.html">qdk_chemistry.algorithms.hadamard_test.circuit_builder.base</a></li>
+<li><a href="qdk_chemistry/algorithms/hadamard_test/circuit_builder/qdk_builder.html">qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder</a></li>
+<li><a href="qdk_chemistry/algorithms/hadamard_test/hadamard_test.html">qdk_chemistry.algorithms.hadamard_test.hadamard_test</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/base.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.base</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/block_encoding/lcu.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/partially_randomized.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/qdrift.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/qdrift_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/trotter.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/trotter_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus</a></li>
+<li><a href="qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error</a></li>
+<li><a href="qdk_chemistry/algorithms/hashing.html">qdk_chemistry.algorithms.hashing</a></li>
 <li><a href="qdk_chemistry/algorithms/phase_estimation/base.html">qdk_chemistry.algorithms.phase_estimation.base</a></li>
+<li><a href="qdk_chemistry/algorithms/phase_estimation/circuit_builder/base.html">qdk_chemistry.algorithms.phase_estimation.circuit_builder.base</a></li>
+<li><a href="qdk_chemistry/algorithms/phase_estimation/circuit_builder/iterative_builder.html">qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder</a></li>
+<li><a href="qdk_chemistry/algorithms/phase_estimation/circuit_builder/standard_builder.html">qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder</a></li>
 <li><a href="qdk_chemistry/algorithms/phase_estimation/iterative_phase_estimation.html">qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation</a></li>
+<li><a href="qdk_chemistry/algorithms/phase_estimation/standard_phase_estimation.html">qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation</a></li>
+<li><a href="qdk_chemistry/algorithms/propagator/base.html">qdk_chemistry.algorithms.propagator.base</a></li>
+<li><a href="qdk_chemistry/algorithms/propagator/magnus_propagator.html">qdk_chemistry.algorithms.propagator.magnus_propagator</a></li>
 <li><a href="qdk_chemistry/algorithms/qubit_hamiltonian_solver.html">qdk_chemistry.algorithms.qubit_hamiltonian_solver</a></li>
 <li><a href="qdk_chemistry/algorithms/qubit_mapper/qdk_qubit_mapper.html">qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper</a></li>
 <li><a href="qdk_chemistry/algorithms/registry.html">qdk_chemistry.algorithms.registry</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/builder/base.html">qdk_chemistry.algorithms.time_evolution.builder.base</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/builder/partially_randomized.html">qdk_chemistry.algorithms.time_evolution.builder.partially_randomized</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/builder/qdrift.html">qdk_chemistry.algorithms.time_evolution.builder.qdrift</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/builder/trotter.html">qdk_chemistry.algorithms.time_evolution.builder.trotter</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/builder/trotter_error.html">qdk_chemistry.algorithms.time_evolution.builder.trotter_error</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/controlled_circuit_mapper/base.html">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base</a></li>
-<li><a href="qdk_chemistry/algorithms/time_evolution/controlled_circuit_mapper/pauli_sequence_mapper.html">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper</a></li>
+<li><a href="qdk_chemistry/algorithms/state_preparation/dense_pure_state.html">qdk_chemistry.algorithms.state_preparation.dense_pure_state</a></li>
+<li><a href="qdk_chemistry/algorithms/state_preparation/identity.html">qdk_chemistry.algorithms.state_preparation.identity</a></li>
+<li><a href="qdk_chemistry/algorithms/term_grouper/base.html">qdk_chemistry.algorithms.term_grouper.base</a></li>
+<li><a href="qdk_chemistry/algorithms/term_grouper/commuting.html">qdk_chemistry.algorithms.term_grouper.commuting</a></li>
+<li><a href="qdk_chemistry/algorithms/term_grouper/identity.html">qdk_chemistry.algorithms.term_grouper.identity</a></li>
+<li><a href="qdk_chemistry/algorithms/time_evolution/evolution_circuit_builder/base.html">qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base</a></li>
+<li><a href="qdk_chemistry/algorithms/time_evolution/evolution_circuit_builder/euler_builder.html">qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder</a></li>
+<li><a href="qdk_chemistry/algorithms/time_evolution/hamiltonian_simulation/base.html">qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base</a></li>
+<li><a href="qdk_chemistry/algorithms/time_evolution/hamiltonian_simulation/euler_integrator.html">qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator</a></li>
 <li><a href="qdk_chemistry/constants.html">qdk_chemistry.constants</a></li>
+<li><a href="qdk_chemistry/data/_spin_channels.html">qdk_chemistry.data._spin_channels</a></li>
 <li><a href="qdk_chemistry/data/circuit.html">qdk_chemistry.data.circuit</a></li>
 <li><a href="qdk_chemistry/data/encoding_validation.html">qdk_chemistry.data.encoding_validation</a></li>
 <li><a href="qdk_chemistry/data/enums/fermion_mode_order.html">qdk_chemistry.data.enums.fermion_mode_order</a></li>
 <li><a href="qdk_chemistry/data/noise_models.html">qdk_chemistry.data.noise_models</a></li>
 <li><a href="qdk_chemistry/data/symmetries.html">qdk_chemistry.data.symmetries</a></li>
-<li><a href="qdk_chemistry/data/time_evolution/containers/base.html">qdk_chemistry.data.time_evolution.containers.base</a></li>
-<li><a href="qdk_chemistry/data/time_evolution/containers/pauli_product_formula.html">qdk_chemistry.data.time_evolution.containers.pauli_product_formula</a></li>
-<li><a href="qdk_chemistry/data/time_evolution/controlled_time_evolution.html">qdk_chemistry.data.time_evolution.controlled_time_evolution</a></li>
-<li><a href="qdk_chemistry/plugins/openfermion.html">qdk_chemistry.plugins.openfermion</a></li>
+<li><a href="qdk_chemistry/data/symmetry.html">qdk_chemistry.data.symmetry</a></li>
+<li><a href="qdk_chemistry/data/term_partition.html">qdk_chemistry.data.term_partition</a></li>
+<li><a href="qdk_chemistry/data/time_dependent_qubit_hamiltonian/base.html">qdk_chemistry.data.time_dependent_qubit_hamiltonian.base</a></li>
+<li><a href="qdk_chemistry/data/time_dependent_qubit_hamiltonian/containers/driven.html">qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven</a></li>
+<li><a href="qdk_chemistry/data/unitary_representation/containers/base.html">qdk_chemistry.data.unitary_representation.containers.base</a></li>
+<li><a href="qdk_chemistry/data/unitary_representation/containers/block_encoding.html">qdk_chemistry.data.unitary_representation.containers.block_encoding</a></li>
+<li><a href="qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html">qdk_chemistry.data.unitary_representation.containers.pauli_product_formula</a></li>
+<li><a href="qdk_chemistry/data/unitary_representation/containers/quantum_walk.html">qdk_chemistry.data.unitary_representation.containers.quantum_walk</a></li>
+<li><a href="qdk_chemistry/migrate.html">qdk_chemistry.migrate</a></li>
+<ul><li><a href="qdk_chemistry/migrate/__main__.html">qdk_chemistry.migrate.__main__</a></li>
+<li><a href="qdk_chemistry/migrate/_ansatz.html">qdk_chemistry.migrate._ansatz</a></li>
+<li><a href="qdk_chemistry/migrate/_hamiltonian.html">qdk_chemistry.migrate._hamiltonian</a></li>
+<li><a href="qdk_chemistry/migrate/_io.html">qdk_chemistry.migrate._io</a></li>
+<li><a href="qdk_chemistry/migrate/_orbitals.html">qdk_chemistry.migrate._orbitals</a></li>
+<li><a href="qdk_chemistry/migrate/_sbt.html">qdk_chemistry.migrate._sbt</a></li>
+<li><a href="qdk_chemistry/migrate/_sparse.html">qdk_chemistry.migrate._sparse</a></li>
+<li><a href="qdk_chemistry/migrate/_wavefunction.html">qdk_chemistry.migrate._wavefunction</a></li>
+</ul><li><a href="qdk_chemistry/plugins/networkx.html">qdk_chemistry.plugins.networkx</a></li>
+<ul><li><a href="qdk_chemistry/plugins/networkx/term_grouper.html">qdk_chemistry.plugins.networkx.term_grouper</a></li>
+</ul><li><a href="qdk_chemistry/plugins/openfermion.html">qdk_chemistry.plugins.openfermion</a></li>
 <ul><li><a href="qdk_chemistry/plugins/openfermion/conversion.html">qdk_chemistry.plugins.openfermion.conversion</a></li>
 <li><a href="qdk_chemistry/plugins/openfermion/qubit_mapper.html">qdk_chemistry.plugins.openfermion.qubit_mapper</a></li>
 </ul><li><a href="qdk_chemistry/plugins/pyscf.html">qdk_chemistry.plugins.pyscf</a></li>
@@ -133,18 +177,23 @@
 <li><a href="qdk_chemistry/plugins/qiskit/_interop/transpiler.html">qdk_chemistry.plugins.qiskit._interop.transpiler</a></li>
 <li><a href="qdk_chemistry/plugins/qiskit/circuit_executor.html">qdk_chemistry.plugins.qiskit.circuit_executor</a></li>
 <li><a href="qdk_chemistry/plugins/qiskit/conversion.html">qdk_chemistry.plugins.qiskit.conversion</a></li>
+<li><a href="qdk_chemistry/plugins/qiskit/phase_estimation_circuit_builder.html">qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder</a></li>
 <li><a href="qdk_chemistry/plugins/qiskit/qubit_mapper.html">qdk_chemistry.plugins.qiskit.qubit_mapper</a></li>
 <li><a href="qdk_chemistry/plugins/qiskit/regular_isometry.html">qdk_chemistry.plugins.qiskit.regular_isometry</a></li>
-<li><a href="qdk_chemistry/plugins/qiskit/standard_phase_estimation.html">qdk_chemistry.plugins.qiskit.standard_phase_estimation</a></li>
-</ul><li><a href="qdk_chemistry/utils/cubegen.html">qdk_chemistry.utils.cubegen</a></li>
+</ul><li><a href="qdk_chemistry/remote/cache.html">qdk_chemistry.remote.cache</a></li>
+<ul><li><a href="qdk_chemistry/remote/cache/base.html">qdk_chemistry.remote.cache.base</a></li>
+<li><a href="qdk_chemistry/remote/cache/folder.html">qdk_chemistry.remote.cache.folder</a></li>
+<li><a href="qdk_chemistry/remote/cache/tiered.html">qdk_chemistry.remote.cache.tiered</a></li>
+</ul><li><a href="qdk_chemistry/remote/job.html">qdk_chemistry.remote.job</a></li>
+<li><a href="qdk_chemistry/utils/cubegen.html">qdk_chemistry.utils.cubegen</a></li>
 <li><a href="qdk_chemistry/utils/enum.html">qdk_chemistry.utils.enum</a></li>
 <li><a href="qdk_chemistry/utils/model_hamiltonians.html">qdk_chemistry.utils.model_hamiltonians</a></li>
 <li><a href="qdk_chemistry/utils/pauli_commutation.html">qdk_chemistry.utils.pauli_commutation</a></li>
 <li><a href="qdk_chemistry/utils/pauli_matrix.html">qdk_chemistry.utils.pauli_matrix</a></li>
-<li><a href="qdk_chemistry/utils/phase.html">qdk_chemistry.utils.phase</a></li>
 <li><a href="qdk_chemistry/utils/telemetry.html">qdk_chemistry.utils.telemetry</a></li>
 <li><a href="qdk_chemistry/utils/telemetry_events.html">qdk_chemistry.utils.telemetry_events</a></li>
 <li><a href="qdk_chemistry/utils/wavefunction.html">qdk_chemistry.utils.wavefunction</a></li>
+<li><a href="qdk_chemistry/utils/zassenhaus_generation.html">qdk_chemistry.utils.zassenhaus_generation</a></li>
 </ul>
 
            </div>

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.scf_solver module &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.scf_solver module &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -122,6 +123,7 @@ used within the QDK/Chemistry framework for electronic structure calculations.</
 <ul class="simple">
 <li><p><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings" title="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfScfSettings</span></code></a>: Configuration class for SCF calculation parameters</p></li>
 <li><p><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver" title="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfScfSolver</span></code></a>: Main solver class that performs HF and DFT calculations</p></li>
+<li><p><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver" title="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfStabilizedScfSolver</span></code></a>: Solver that uses PySCF’s stability workflow to rerun unstable SCF solutions</p></li>
 <li><p>Registration utilities to integrate the solver with QDK/Chemistry’s plugin system</p></li>
 </ul>
 <p>The solver handles automatic conversion between QDK/Chemistry molecular structures and PySCF
@@ -217,6 +219,43 @@ PyscfScfSettings : Settings configuration for PySCF calculations</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver.name">
 <span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfScfSolver.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver.name" title="Link to this definition"></a></dt>
 <dd><p>Return the name of the SCF solver.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.scf_solver.</span></span><span class="sig-name descname"><span class="pre">PyscfStabilizedScfSettings</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfStabilizedScfSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings" title="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfScfSettings</span></code></a></p>
+<p>Settings for PySCF’s automated stable-SCF workflow.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfStabilizedScfSettings.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize stabilized SCF settings.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.pyscf.scf_solver.</span></span><span class="sig-name descname"><span class="pre">PyscfStabilizedScfSolver</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfStabilizedScfSolver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver" title="qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">PyscfScfSolver</span></code></a></p>
+<p>PySCF SCF solver that reruns unstable references with PySCF’s stability routine.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfStabilizedScfSolver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the PySCF stabilized SCF solver with default settings.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/scf_solver.html#PyscfStabilizedScfSolver.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the stabilized SCF solver.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>

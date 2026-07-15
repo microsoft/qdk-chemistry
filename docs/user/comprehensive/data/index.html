@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Data classes &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Data classes &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -62,6 +62,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -69,6 +70,11 @@
 <li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qubitoperator-and-term-partitions">QubitOperator and term partitions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flatpartition">FlatPartition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#layeredpartition">LayeredPartition</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -77,6 +83,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -133,6 +140,7 @@ Each of the links below leads to a detailed description of the data class, inclu
 <li class="toctree-l1"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l1"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l1"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l1"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l1"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l1"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -177,7 +185,7 @@ Each of the links below leads to a detailed description of the data class, inclu
 <td><p>Electronic state (orbitals + <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> coefficients)</p></td>
 <td><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">QubitOperator</span></code></p></td>
 <td><p>Pauli operator representation</p></td>
 <td><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
 </tr>
@@ -189,20 +197,48 @@ Each of the links below leads to a detailed description of the data class, inclu
 <td><p>Lattice topology for model Hamiltonians</p></td>
 <td><p>Factory methods, User input</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pauli_operator.html"><span class="doc">PauliOperator</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="majorana_mapping.html"><span class="doc">MajoranaMapping</span></a></p></td>
+<td><p>Fermion-to-qubit encoding (Majorana-to-Pauli table)</p></td>
+<td><p>Factory methods, User input</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="pauli_operator.html"><span class="doc">PauliOperator</span></a></p></td>
 <td><p>Pauli operator expressions with arithmetic</p></td>
 <td><p>User construction</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="qpe_result.html"><span class="doc">QpeResult</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="qpe_result.html"><span class="doc">QpeResult</span></a></p></td>
 <td><p>Phase estimation results (phase, energy, aliases)</p></td>
 <td><p><a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation</span></a></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="circuit.html"><span class="doc">Circuit</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="circuit.html"><span class="doc">Circuit</span></a></p></td>
 <td><p>Quantum circuit (OpenQASM, Q#, QIR, Qiskit)</p></td>
 <td><p><a class="reference internal" href="../algorithms/state_preparation.html"><span class="doc">StatePreparation</span></a>, User input</p></td>
 </tr>
 </tbody>
 </table>
+</section>
+<section id="qubitoperator-and-term-partitions">
+<h2>QubitOperator and term partitions<a class="headerlink" href="#qubitoperator-and-term-partitions" title="Link to this heading"></a></h2>
+<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> carries an optional <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.term_partition" title="qdk_chemistry.data.QubitOperator.term_partition"><code class="xref py py-attr docutils literal notranslate"><span class="pre">term_partition</span></code></a> field describing how its Pauli terms are organised into algorithm-relevant subsets.
+The partition is index-based — it stores indices into <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.pauli_strings" title="qdk_chemistry.data.QubitOperator.pauli_strings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pauli_strings</span></code></a> — so it serialises cheaply alongside the operator.</p>
+<p>The partition is <em>optional</em> metadata — <code class="docutils literal notranslate"><span class="pre">term_partition</span> <span class="pre">is</span> <span class="pre">None</span></code> means the partition has not been computed for this operator.
+Transformations that change term ordering or qubit support (for example <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.to_interleaved" title="qdk_chemistry.data.QubitOperator.to_interleaved"><code class="xref py py-meth docutils literal notranslate"><span class="pre">to_interleaved()</span></code></a>) reset the partition to <code class="docutils literal notranslate"><span class="pre">None</span></code> on the new instance.</p>
+<p>Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the <a class="reference internal" href="../algorithms/hamiltonian_unitary_builder.html"><span class="doc">Trotter time-evolution builder</span></a> reads <code class="docutils literal notranslate"><span class="pre">term_partition</span></code> and uses it for schedule-level Suzuki recursion and reduction.</p>
+<section id="flatpartition">
+<h3>FlatPartition<a class="headerlink" href="#flatpartition" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.FlatPartition" title="qdk_chemistry.data.FlatPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlatPartition</span></code></a> stores a single-level grouping: each group is a tuple of term indices.
+It is suitable for algorithms that only need to know which terms belong together, such as qubit-wise commuting measurement grouping in <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkExpectationEstimator" title="qdk_chemistry.algorithms.QdkExpectationEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QdkExpectationEstimator</span></code></a>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">groups</span></code> field is a tuple of tuples: <code class="docutils literal notranslate"><span class="pre">((idx0,</span> <span class="pre">idx1,</span> <span class="pre">...),</span> <span class="pre">(idx2,</span> <span class="pre">...),</span> <span class="pre">...)</span></code>.
+Each inner tuple lists the indices of terms in <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.pauli_strings" title="qdk_chemistry.data.QubitOperator.pauli_strings"><code class="xref py py-attr docutils literal notranslate"><span class="pre">pauli_strings</span></code></a> that belong to that group.</p>
+</section>
+<section id="layeredpartition">
+<h3>LayeredPartition<a class="headerlink" href="#layeredpartition" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LayeredPartition" title="qdk_chemistry.data.LayeredPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">LayeredPartition</span></code></a> stores a two-level hierarchy: groups contain parallelisable layers, and each layer contains term indices.
+It is suitable for Trotter-style decompositions where the outer level controls Strang/Suzuki splitting order and each inner layer groups operators with disjoint qubit supports that can be applied simultaneously.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">groups</span></code> field is a nested tuple: <code class="docutils literal notranslate"><span class="pre">(((idx0,</span> <span class="pre">idx1),</span> <span class="pre">(idx2,)),</span> <span class="pre">...)</span></code>.
+The outer level is groups, the middle level is layers within a group, and the innermost level is term indices.</p>
+<p>Both classes carry a <code class="docutils literal notranslate"><span class="pre">strategy</span></code> label (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;geometry_coloring&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;qubit_wise_commuting&quot;</span></code>) identifying how the partition was produced.
+They serialise as part of <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> in both JSON and HDF5 formats.</p>
+</section>
 </section>
 </section>
 

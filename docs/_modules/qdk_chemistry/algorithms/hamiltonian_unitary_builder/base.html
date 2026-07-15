@@ -1,0 +1,409 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.base &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.hamiltonian_unitary_builder.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.hamiltonian_unitary_builder.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Hamiltonian unitary builder abstractions.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">abstractmethod</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">FlatPartition</span><span class="p">,</span>
+    <span class="n">LayeredPartition</span><span class="p">,</span>
+    <span class="n">QubitOperator</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+    <span class="n">TermPartition</span><span class="p">,</span>
+    <span class="n">UnitaryRepresentation</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExponentiatedPauliTerm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;HamiltonianUnitaryBuilder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;HamiltonianUnitaryBuilderFactory&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;HamiltonianUnitaryBuilderSettings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;TimeEvolutionBuilder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;TimeEvolutionSettings&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilder">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianUnitaryBuilder</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilder.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilder.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the HamiltonianUnitaryBuilder.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UnitaryRepresentation</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a UnitaryRepresentation for the given Hamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate a Pauli label to a mapping ``qubit -&gt; {X, Y, Z}``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            label: Pauli string label in little-endian ordering.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dictionary assigning each non-identity qubit index to its Pauli axis.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">char</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">label</span><span class="p">)):</span>  <span class="c1"># reversed: right-most char -&gt; qubit 0</span>
+            <span class="k">if</span> <span class="n">char</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span><span class="p">:</span>
+                <span class="n">mapping</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">char</span>
+        <span class="k">return</span> <span class="n">mapping</span></div>
+
+
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilderSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilderSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianUnitaryBuilderSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base settings for Hamiltonian unitary builders.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilderSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilderSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize HamiltonianUnitaryBuilderSettings with default values.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            power: The exponent to which the unitary is raised.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;The power to raise the unitary to.&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TimeEvolutionSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeEvolutionSettings</span><span class="p">(</span><span class="n">HamiltonianUnitaryBuilderSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base settings for time evolution builders.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TimeEvolutionSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize TimeEvolutionSettings with default values.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            time: The evolution time.</span>
+<span class="sd">            power_strategy: The strategy to construct :math:`U^{\\text{power}}`:</span>
+
+<span class="sd">                * ``&quot;rescale&quot;``: produce a single step with effective time :math:`t \\cdot \\text{power}`.</span>
+<span class="sd">                * ``&quot;repeat&quot;``: repeat the base :math:`U(t)` ``power`` times.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;The evolution time.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;power_strategy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;The strategy to construct U^power: &#39;rescale&#39; multiplies evolution time by power; &quot;</span>
+            <span class="s2">&quot;&#39;repeat&#39; repeats the base U power times.&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;rescale&quot;</span><span class="p">,</span> <span class="s2">&quot;repeat&quot;</span><span class="p">],</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TimeEvolutionBuilder">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionBuilder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TimeEvolutionBuilder</span><span class="p">(</span><span class="n">HamiltonianUnitaryBuilder</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for time evolution Builders in QDK/Chemistry algorithms.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TimeEvolutionBuilder.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionBuilder.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the TimeEvolutionBuilder.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_power</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve the power setting into effective time scale and power repetitions.</span>
+
+<span class="sd">        Based on the ``power`` and ``power_strategy`` settings, returns:</span>
+<span class="sd">        - For ``&quot;rescale&quot;``: (time * power, 1) — scales the evolution time.</span>
+<span class="sd">        - For ``&quot;repeat&quot;``: (time, power) — repeats the base circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple (effective_time, power_repetitions).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)</span>
+        <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">)</span>
+        <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power_strategy&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;rescale&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">time</span> <span class="o">*</span> <span class="n">power</span><span class="p">,</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">time</span><span class="p">,</span> <span class="n">power</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UnitaryRepresentation</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_group_terms</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">QubitOperator</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Group Hamiltonian terms for decomposition.&quot;&quot;&quot;</span>
+        <span class="n">partition</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">term_partition</span>
+        <span class="k">if</span> <span class="n">partition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s2">: consuming QubitOperator.term_partition &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(strategy=</span><span class="si">{</span><span class="n">partition</span><span class="o">.</span><span class="n">strategy</span><span class="si">!r}</span><span class="s2">, num_groups=</span><span class="si">{</span><span class="n">partition</span><span class="o">.</span><span class="n">num_groups</span><span class="si">}</span><span class="s2">).&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_groups_from_partition</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">partition</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span><span class="si">}</span><span class="s2">: no term_partition present; treating each Pauli term as its own group.&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="p">[</span>
+                <span class="n">QubitOperator</span><span class="p">(</span>
+                    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="n">label</span><span class="p">],</span>
+                    <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="n">coeff</span><span class="p">],</span>
+                    <span class="n">encoding</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+                    <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">fermion_mode_order</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">]</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_groups_from_partition</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span>
+        <span class="n">partition</span><span class="p">:</span> <span class="n">TermPartition</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">QubitOperator</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Materialise a :class:`TermPartition` into sub-groups.&quot;&quot;&quot;</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">coefficients</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">encoding</span>
+        <span class="n">fmo</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">fermion_mode_order</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_make</span><span class="p">(</span><span class="n">indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">(</span>
+                <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">],</span>
+                <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]),</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+                <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">fmo</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">LayeredPartition</span><span class="p">):</span>
+            <span class="n">layered_groups</span> <span class="o">=</span> <span class="n">partition</span><span class="o">.</span><span class="n">groups</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">FlatPartition</span><span class="p">):</span>
+            <span class="n">layered_groups</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">((</span><span class="n">g</span><span class="p">,)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">partition</span><span class="o">.</span><span class="n">groups</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unsupported TermPartition subtype: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">partition</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;Expected FlatPartition or LayeredPartition.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">groups</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">QubitOperator</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="n">_make</span><span class="p">(</span><span class="n">layer</span><span class="p">)</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">group_layers</span> <span class="k">if</span> <span class="n">layer</span><span class="p">]</span> <span class="k">for</span> <span class="n">group_layers</span> <span class="ow">in</span> <span class="n">layered_groups</span>
+        <span class="p">]</span>
+
+        <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">groups</span> <span class="k">if</span> <span class="n">g</span><span class="p">]</span>
+        <span class="n">groups</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="nb">len</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">groups</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_exponentiate_commuting</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">group</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span>
+        <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Exponentiate a group of commuting Pauli terms.</span>
+
+<span class="sd">        Each term :math:`P_j` with coefficient :math:`c_j` is converted to</span>
+<span class="sd">        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the</span>
+<span class="sd">        group commute, the product of rotations equals the exponential of</span>
+<span class="sd">        the sum regardless of ordering.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: The group of commuting Hamiltonian terms to exponentiate.</span>
+<span class="sd">            time: The evolution time used to compute rotation angles</span>
+<span class="sd">                (:math:`\theta_j = c_j \cdot t`).</span>
+<span class="sd">            atol: Absolute tolerance for filtering small coefficients.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A flat list of ExponentiatedPauliTerm.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">atol</span><span class="p">):</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span>
+            <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">terms</span></div>
+
+
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilderFactory">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilderFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianUnitaryBuilderFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class for creating HamiltonianUnitaryBuilder instances.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilderFactory.algorithm_type_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilderFactory.algorithm_type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return hamiltonian_unitary_builder as the algorithm type name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span></div>
+
+
+<div class="viewcode-block" id="HamiltonianUnitaryBuilderFactory.default_algorithm_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.HamiltonianUnitaryBuilderFactory.default_algorithm_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return Trotter as the default algorithm name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;trotter&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

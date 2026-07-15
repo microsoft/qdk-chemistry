@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QpeResult &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>QpeResult &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -63,6 +63,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -79,6 +80,7 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -87,6 +89,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -133,13 +136,22 @@
 It encapsulates the measured phase, reconstructed energy, alias candidates, and measurement metadata, providing a complete record of a <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> experiment.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Quantum phase estimation measures a phase fraction <span class="math notranslate nohighlight">\(\phi \in [0, 1)\)</span> that encodes an eigenvalue <span class="math notranslate nohighlight">\(E\)</span> of the target Hamiltonian.
-The relationship between phase and energy depends on the evolution time <span class="math notranslate nohighlight">\(t\)</span>:</p>
+<p>Quantum phase estimation measures a phase fraction <span class="math notranslate nohighlight">\(\varphi \in [0, 1)\)</span> that encodes an eigenvalue <span class="math notranslate nohighlight">\(E\)</span> of the target Hamiltonian.
+The relationship between the measured phase and energy depends on the type of unitary being phase-estimated.</p>
+<p>QDK/Chemistry uses a unified factory method <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult.from_phase_fraction" title="qdk_chemistry.data.QpeResult.from_phase_fraction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_phase_fraction()</span></code></a> that accepts a callable <code class="docutils literal notranslate"><span class="pre">eigenvalue_from_phase</span></code>
+mapping the measured phase to the Hamiltonian eigenvalue. Each unitary container provides this mapping as an instance method.</p>
+<p><strong>Time evolution</strong></p>
+<p>When QPE acts on <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span>, the eigenvalues are <span class="math notranslate nohighlight">\(e^{-iEt}\)</span> and the energy is recovered via
+<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase"><code class="xref py py-meth docutils literal notranslate"><span class="pre">eigenvalue_from_phase()</span></code></a>:</p>
 <div class="math notranslate nohighlight">
-\[E = \frac{2\pi\phi}{t}\]</div>
-<p>However, because the phase is periodic, the measured <span class="math notranslate nohighlight">\(\phi\)</span> is only unique modulo <span class="math notranslate nohighlight">\(2\pi / t\)</span>.
-This means multiple energy values — called <em>aliases</em> — can produce the same measured phase.
-The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> class handles this ambiguity automatically by computing all alias candidates and optionally resolving to the physically correct energy using a reference value.</p>
+\[E = \frac{2\pi\varphi'}{t}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\varphi' \in (-1/2, 1/2]\)</span> is the measured phase fraction wrapped from <span class="math notranslate nohighlight">\([0, 1)\)</span> into <span class="math notranslate nohighlight">\((-1/2, 1/2]\)</span>.</p>
+<p><strong>Qubitization</strong></p>
+<p>When QPE acts on the qubitization walk operator <span class="math notranslate nohighlight">\(W\)</span>, the eigenvalues are <span class="math notranslate nohighlight">\(e^{\pm i \arccos(E/\lambda)}\)</span> and the energy is recovered via
+<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase" title="qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase"><code class="xref py py-meth docutils literal notranslate"><span class="pre">eigenvalue_from_phase()</span></code></a>:</p>
+<div class="math notranslate nohighlight">
+\[E = \lambda \cos(2\pi\varphi)\]</div>
+<p>where <span class="math notranslate nohighlight">\(\lambda = \sum_j |\alpha_j|\)</span> is the 1-norm of the Hamiltonian coefficients.</p>
 <p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> is the output of the <a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation</span></a> algorithm and supports full <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> to JSON and HDF5 formats.
 For details on how different <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> implementations (<a class="reference internal" href="../algorithms/phase_estimation.html#iqpe-algorithm"><span class="std std-ref">IQPE</span></a>, <a class="reference internal" href="../algorithms/phase_estimation.html#standard-qpe-algorithm"><span class="std std-ref">standard QFT-based</span></a>) populate this result, see the <a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation algorithm documentation</span></a>.</p>
 </section>
@@ -163,47 +175,43 @@ For details on how different <a class="reference internal" href="../../../glossa
 <td><p>str</p></td>
 <td><p>Algorithm identifier (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;iterative&quot;</span></code> for <a class="reference internal" href="../algorithms/phase_estimation.html#iqpe-algorithm"><span class="std std-ref">IQPE</span></a> or <code class="docutils literal notranslate"><span class="pre">&quot;qiskit_standard&quot;</span></code> for <a class="reference internal" href="../algorithms/phase_estimation.html#standard-qpe-algorithm"><span class="std std-ref">standard QPE</span></a>).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">evolution_time</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Time parameter <span class="math notranslate nohighlight">\(t\)</span> used in the evolution <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span>.</p></td>
+<td><p>Raw measured phase <span class="math notranslate nohighlight">\(\varphi \in [0, 1)\)</span>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">phase_angle</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Raw measured phase <span class="math notranslate nohighlight">\(\phi \in [0, 1)\)</span>.</p></td>
+<td><p>Raw phase angle in radians: <span class="math notranslate nohighlight">\(2\pi\varphi\)</span>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">phase_angle</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_fraction</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Raw phase angle in radians: <span class="math notranslate nohighlight">\(2\pi\phi\)</span>.</p></td>
+<td><p>Alias-resolved phase fraction. Equals <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code> when no alias resolution is performed (e.g., qubitization).</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_fraction</span></code></p></td>
-<td><p>float</p></td>
-<td><p>Alias-resolved phase fraction. Equals <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code> when no alias resolution is performed.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_angle</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_angle</span></code></p></td>
 <td><p>float</p></td>
 <td><p>Alias-resolved phase angle in radians.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">raw_energy</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">raw_energy</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Energy computed directly from the raw phase: <span class="math notranslate nohighlight">\(E = 2\pi\phi / t\)</span>.</p></td>
+<td><p>Energy computed from the measured phase via the container’s <code class="docutils literal notranslate"><span class="pre">eigenvalue_from_phase</span></code> method.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">branching</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">branching</span></code></p></td>
 <td><p>tuple[float, …]</p></td>
-<td><p>All alias energy candidates <span class="math notranslate nohighlight">\(E + k \cdot 2\pi/t\)</span> for a range of integer shifts <span class="math notranslate nohighlight">\(k\)</span>.</p></td>
+<td><p>Energy candidates. For the unified <code class="docutils literal notranslate"><span class="pre">from_phase_fraction</span></code> factory, this is a single-element tuple containing <code class="docutils literal notranslate"><span class="pre">raw_energy</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">resolved_energy</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolved_energy</span></code></p></td>
 <td><p>float | None</p></td>
-<td><p>The alias candidate closest to the reference energy, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no reference was provided.</p></td>
+<td><p>Reserved for alias resolution (currently <code class="docutils literal notranslate"><span class="pre">None</span></code> when using <code class="docutils literal notranslate"><span class="pre">from_phase_fraction</span></code>).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bits_msb_first</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bits_msb_first</span></code></p></td>
 <td><p>tuple[int, …] | None</p></td>
 <td><p>Measured phase bits ordered from most significant to least significant. Available for <a class="reference internal" href="../algorithms/phase_estimation.html#iqpe-algorithm"><span class="std std-ref">IQPE</span></a>; may be <code class="docutils literal notranslate"><span class="pre">None</span></code> for other methods.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bitstring_msb_first</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bitstring_msb_first</span></code></p></td>
 <td><p>str | None</p></td>
 <td><p>Binary string representation of the measured phase (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;0110110010&quot;</span></code>).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code></p></td>
 <td><p>dict | None</p></td>
 <td><p>Caller-defined metadata for provenance tracking (e.g., molecule name, basis set, reference energy).</p></td>
 </tr>
@@ -212,86 +220,92 @@ For details on how different <a class="reference internal" href="../../../glossa
 </section>
 <section id="alias-resolution">
 <span id="qpe-alias-resolution"></span><h2>Alias resolution<a class="headerlink" href="#alias-resolution" title="Link to this heading"></a></h2>
-<p>Phase estimation measures a phase <span class="math notranslate nohighlight">\(\phi \in [0, 1)\)</span>, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
+<p>Alias resolution is relevant for <strong>time-evolution-based QPE</strong> (Trotter) where the phase is periodic.
+It is not needed for qubitization because the cosine mapping is injective over the measurable range.</p>
+<p>Phase estimation measures a phase <span class="math notranslate nohighlight">\(\varphi \in [0, 1)\)</span>, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
 Different energy values that differ by integer multiples of <span class="math notranslate nohighlight">\(2\pi / t\)</span> all map to the same phase.</p>
-<p>The alias resolution algorithm works as follows:</p>
-<ol class="arabic simple">
-<li><p>Compute the raw energy: <span class="math notranslate nohighlight">\(E_{\text{raw}} = 2\pi\phi / t\)</span> where the angle is mapped to <span class="math notranslate nohighlight">\((-\pi, \pi]\)</span></p></li>
-<li><p>Enumerate alias candidates: <span class="math notranslate nohighlight">\(E_k = E_{\text{raw}} + k \cdot 2\pi/t\)</span> for each <span class="math notranslate nohighlight">\(k\)</span> in the branch shift range (default: <span class="math notranslate nohighlight">\(k \in \{-2, -1, 0, 1, 2\}\)</span>)</p></li>
-<li><p>Include negative reflections: <span class="math notranslate nohighlight">\(-E_k\)</span> for symmetry</p></li>
-<li><p>If a reference energy is provided, select the candidate closest to the reference as <code class="docutils literal notranslate"><span class="pre">resolved_energy</span></code></p></li>
-</ol>
-<p>The branch shift range can be customized via the <code class="docutils literal notranslate"><span class="pre">branch_shifts</span></code> parameter in <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult.from_phase_fraction" title="qdk_chemistry.data.QpeResult.from_phase_fraction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_phase_fraction()</span></code></a>.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>A good choice for <code class="docutils literal notranslate"><span class="pre">reference_energy</span></code> is the energy from a classical multi-configuration calculation (e.g., <a class="reference internal" href="../../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a>), which is typically close to the true eigenvalue.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The current <code class="docutils literal notranslate"><span class="pre">from_phase_fraction</span></code> factory does not perform alias resolution automatically.
+Alias resolution is the responsibility of the calling algorithm when needed.</p>
 </div>
 </section>
 <section id="construction">
 <h2>Construction<a class="headerlink" href="#construction" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> objects are typically created by the <a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation</span></a> algorithm.
-They can also be constructed manually from a measured phase fraction using the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult.from_phase_fraction" title="qdk_chemistry.data.QpeResult.from_phase_fraction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_phase_fraction()</span></code></a> class method:</p>
+They can also be constructed manually using <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult.from_phase_fraction" title="qdk_chemistry.data.QpeResult.from_phase_fraction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_phase_fraction()</span></code></a>, passing <code class="docutils literal notranslate"><span class="pre">container.eigenvalue_from_phase</span></code> as the phase-to-energy mapping.</p>
+<section id="time-evolution-example">
+<h3>Time evolution example<a class="headerlink" href="#time-evolution-example" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QpeResult</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QpeResult</span><span class="p">,</span> <span class="n">QubitOperator</span>
 
-<span class="c1"># Construct a QpeResult from a measured phase fraction</span>
+<span class="c1"># Time-evolution QPE: U = e^{-iHt}, eigenvalue_from_phase wraps the angle.</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
+    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ZI&quot;</span><span class="p">,</span> <span class="s2">&quot;IZ&quot;</span><span class="p">,</span> <span class="s2">&quot;XX&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+<span class="p">)</span>
+<span class="n">evolution_time</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">evolution_time</span><span class="p">)</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="n">container</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+
 <span class="n">result</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
     <span class="n">method</span><span class="o">=</span><span class="s2">&quot;iterative&quot;</span><span class="p">,</span>
     <span class="n">phase_fraction</span><span class="o">=</span><span class="mf">0.423828125</span><span class="p">,</span>
-    <span class="n">evolution_time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">eigenvalue_from_phase</span><span class="o">=</span><span class="n">container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">,</span>
     <span class="n">bits_msb_first</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
     <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">&quot;0110110010&quot;</span><span class="p">,</span>
-    <span class="n">reference_energy</span><span class="o">=-</span><span class="mf">1.137</span><span class="p">,</span>
 <span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-<section id="inspecting-results">
-<h3>Inspecting results<a class="headerlink" href="#inspecting-results" title="Link to this heading"></a></h3>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inspect the result</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Method: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase fraction: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase angle: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_angle</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> rad&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw energy: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alias candidates: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">branching</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resolved energy: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">resolved_energy</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Measured bits: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bits_msb_first</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Full summary</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="working-with-aliases">
-<h3>Working with aliases<a class="headerlink" href="#working-with-aliases" title="Link to this heading"></a></h3>
+<section id="qubitization-example">
+<h3>Qubitization example<a class="headerlink" href="#qubitization-example" title="Link to this heading"></a></h3>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QpeResult</span><span class="p">,</span> <span class="n">QubitOperator</span>
+
+<span class="c1"># Qubitization QPE: W = walk operator, E = lambda * cos(2*pi*phi).</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
+    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ZI&quot;</span><span class="p">,</span> <span class="s2">&quot;IZ&quot;</span><span class="p">,</span> <span class="s2">&quot;XX&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="n">walk_container</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+
+<span class="n">result_qubitization</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;qubitization_qpe&quot;</span><span class="p">,</span>
+    <span class="n">phase_fraction</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+    <span class="n">eigenvalue_from_phase</span><span class="o">=</span><span class="n">walk_container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">,</span>
+    <span class="n">bits_msb_first</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">&quot;0100&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="inspecting-results">
+<h3>Inspecting results<a class="headerlink" href="#inspecting-results" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Construct without a reference energy — no alias resolution</span>
-<span class="n">result_no_ref</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
-    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;iterative&quot;</span><span class="p">,</span>
-    <span class="n">phase_fraction</span><span class="o">=</span><span class="mf">0.423828125</span><span class="p">,</span>
-    <span class="n">evolution_time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-<span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inspect the result</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Method: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase fraction: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase angle: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_angle</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> rad&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw energy: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Measured bits: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bits_msb_first</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># All alias candidates are available in the branching tuple</span>
-<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">energy</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">result_no_ref</span><span class="o">.</span><span class="n">branching</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Candidate </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
-
-<span class="c1"># Resolve later using a reference energy</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.phase</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_energy_aliases</span>
-
-<span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_energy_aliases</span><span class="p">(</span>
-    <span class="n">result_no_ref</span><span class="o">.</span><span class="n">raw_energy</span><span class="p">,</span>
-    <span class="n">evolution_time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-    <span class="n">reference_energy</span><span class="o">=-</span><span class="mf">1.137</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resolved energy: </span><span class="si">{</span><span class="n">resolved</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
+<span class="c1"># Full summary</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
@@ -328,7 +342,7 @@ They can also be constructed manually from a measured phase fraction using the <
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation</span></a>: Algorithm that produces <code class="docutils literal notranslate"><span class="pre">QpeResult</span></code> objects</p></li>
-<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Input qubit Hamiltonian</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>: Input qubit Hamiltonian</p></li>
 <li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>: Source wavefunction for state preparation</p></li>
 </ul>
 </section>
@@ -337,7 +351,7 @@ They can also be constructed manually from a measured phase fraction using the <
 <ul class="simple">
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/qpe_result.py">Python</a> script.</p></li>
 <li><p><a class="reference internal" href="../algorithms/phase_estimation.html"><span class="doc">PhaseEstimation</span></a>: Phase estimation algorithms</p></li>
-<li><p><a class="reference internal" href="../algorithms/time_evolution_builder.html"><span class="doc">TimeEvolutionBuilder</span></a>: Hamiltonian simulation methods</p></li>
+<li><p><a class="reference internal" href="../algorithms/hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>: Hamiltonian simulation or block encoding methods</p></li>
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence formats</p></li>
 <li><p>See the <code class="docutils literal notranslate"><span class="pre">examples/qpe_stretched_n2.ipynb</span></code> notebook for an end-to-end <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> workflow</p></li>
 </ul>

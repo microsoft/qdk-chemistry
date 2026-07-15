@@ -1,0 +1,8 @@
+qdk\_chemistry.data.unitary\_representation.containers.block\_encoding module
+=============================================================================
+
+.. automodule:: qdk_chemistry.data.unitary_representation.containers.block_encoding
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

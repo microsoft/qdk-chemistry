@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit package &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit package &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -132,6 +133,12 @@
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.qiskit_ibm_runtime_load">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.</span></span><span class="sig-name descname"><span class="pre">qiskit_ibm_runtime_load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit.html#qiskit_ibm_runtime_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.qiskit_ibm_runtime_load" title="Link to this definition"></a></dt>
+<dd><p>Load the Qiskit IBM Runtime fake provider into QDK/Chemistry.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.qiskit_aer_load">
 <span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.</span></span><span class="sig-name descname"><span class="pre">qiskit_aer_load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit.html#qiskit_aer_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.qiskit_aer_load" title="Link to this definition"></a></dt>
 <dd><p>Load the Qiskit Aer plugin into QDK/Chemistry.</p>
@@ -163,6 +170,7 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstitutePauliRotation"><code class="docutils literal notranslate"><span class="pre">SubstitutePauliRotation</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -192,6 +200,20 @@
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.conversion.html#qdk_chemistry.plugins.qiskit.conversion.create_statevector_from_wavefunction"><code class="docutils literal notranslate"><span class="pre">create_statevector_from_wavefunction()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html">qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitIterativeQpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QiskitIterativeQpeCircuitBuilder</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitIterativeQpeCircuitBuilder.__init__"><code class="docutils literal notranslate"><span class="pre">QiskitIterativeQpeCircuitBuilder.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitIterativeQpeCircuitBuilder.name"><code class="docutils literal notranslate"><span class="pre">QiskitIterativeQpeCircuitBuilder.name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitStandardQpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QiskitStandardQpeCircuitBuilder</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitStandardQpeCircuitBuilder.__init__"><code class="docutils literal notranslate"><span class="pre">QiskitStandardQpeCircuitBuilder.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitStandardQpeCircuitBuilder.build_circuit"><code class="docutils literal notranslate"><span class="pre">QiskitStandardQpeCircuitBuilder.build_circuit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitStandardQpeCircuitBuilder.name"><code class="docutils literal notranslate"><span class="pre">QiskitStandardQpeCircuitBuilder.name()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html">qdk_chemistry.plugins.qiskit.qubit_mapper module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper"><code class="docutils literal notranslate"><span class="pre">QiskitQubitMapper</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.QubitMappers"><code class="docutils literal notranslate"><span class="pre">QiskitQubitMapper.QubitMappers</span></code></a></li>
@@ -209,20 +231,6 @@
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparation</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation.__init__"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparation.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation.name"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparation.name()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html">qdk_chemistry.plugins.qiskit.standard_phase_estimation module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation.__init__"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation.create_circuit"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation.create_circuit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation.get_circuit"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation.get_circuit()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation.name"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation.name()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimationSettings"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimationSettings</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimationSettings.__init__"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimationSettings.__init__()</span></code></a></li>
 </ul>
 </li>
 </ul>

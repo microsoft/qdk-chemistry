@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>References &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>References &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=fc837d61"></script>
+      <script src="_static/documentation_options.js?v=51b770b3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -123,9 +124,17 @@
 <span class="label"><span class="fn-bracket">[</span>Cam19<span class="fn-bracket">]</span></span>
 <p>Earl Campbell. Random compiler for fast Hamiltonian simulation. <em>Physical Review Letters</em>, 123(7):070503, 2019. <a class="reference external" href="https://doi.org/10.1103/PhysRevLett.123.070503">doi:10.1103/PhysRevLett.123.070503</a>.</p>
 </div>
+<div class="citation" id="id63" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>CMN12<span class="fn-bracket">]</span></span>
+<p>Fernando Casas, Ander Murua, and Mladen Nadinic. Efficient computation of the Zassenhaus formula. <em>Computer Physics Communications</em>, 183(11):2386–2391, 2012. URL: <a class="reference external" href="https://arxiv.org/abs/1204.0389">https://arxiv.org/abs/1204.0389</a>, <a class="reference external" href="https://doi.org/10.1016/j.cpc.2012.06.006">doi:10.1016/j.cpc.2012.06.006</a>.</p>
+</div>
 <div class="citation" id="id58" role="doc-biblioentry">
 <span class="label"><span class="fn-bracket">[</span>CST+21<span class="fn-bracket">]</span></span>
 <p>Andrew M. Childs, Yuan Su, Minh C. Tran, Nathan Wiebe, and Shuchen Zhu. Theory of Trotter error with commutator scaling. <em>Physical Review X</em>, 11(1):011020, 2021. URL: <a class="reference external" href="https://arxiv.org/abs/1912.08854">https://arxiv.org/abs/1912.08854</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevX.11.011020">doi:10.1103/PhysRevX.11.011020</a>.</p>
+</div>
+<div class="citation" id="id64" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>CW12<span class="fn-bracket">]</span></span>
+<p>Andrew M. Childs and Nathan Wiebe. Hamiltonian simulation using linear combinations of unitary operations. <em>Quantum Info. Comput.</em>, 12(11-12):901–924, nov 2012.</p>
 </div>
 <div class="citation" id="id21" role="doc-biblioentry">
 <span class="label"><span class="fn-bracket">[</span>DJSW07<span class="fn-bracket">]</span></span>
@@ -299,6 +308,10 @@
 <span class="label"><span class="fn-bracket">[</span>Val25<span class="fn-bracket">]</span></span>
 <p>E. F. Valeev. Libint: a library for the evaluation of molecular integrals of many-body operators over Gaussian functions. http://libint.valeyev.net/, 2025. version 2.11.2.</p>
 </div>
+<div class="citation" id="id60" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>VC05<span class="fn-bracket">]</span></span>
+<p>F. Verstraete and J. I. Cirac. Mapping local Hamiltonians of fermions onto local Hamiltonians of spins. <em>Journal of Statistical Mechanics: Theory and Experiment</em>, 2005(09):P09012, 2005. <a class="reference external" href="https://doi.org/10.1088/1742-5468/2005/09/P09012">doi:10.1088/1742-5468/2005/09/P09012</a>.</p>
+</div>
 <div class="citation" id="id38" role="doc-biblioentry">
 <span class="label"><span class="fn-bracket">[</span>WHK+21<span class="fn-bracket">]</span></span>
 <p>Meng Wang, W. J. Huang, F. G. Kondev, G. Audi, and S. Naimi. The AME 2020 atomic mass evaluation (II). tables, graphs and references. <em>Chinese Physics C</em>, 45:030003, 2021. URL: <a class="reference external" href="https://doi.org/10.1088/1674-1137/abddaf">https://doi.org/10.1088/1674-1137/abddaf</a>, <a class="reference external" href="https://doi.org/10.1088/1674-1137/abddaf">doi:10.1088/1674-1137/abddaf</a>.</p>
@@ -306,6 +319,14 @@
 <div class="citation" id="id47" role="doc-biblioentry">
 <span class="label"><span class="fn-bracket">[</span>WIS+25<span class="fn-bracket">]</span></span>
 <p>Zhenling Wang, Kevin Ikeda, Hengyuan Shen, Matthias Loipersberger, Alexander Zech, Abdulrahman Aldossary, Teresa Head-Gordon, and Martin Head-Gordon. Second-generation energy decomposition analysis of intermolecular interaction energies from the second-order Mo̷ller–Plesset theory: an extensible, orthogonal formulation with useful basis set convergence for all terms. <em>Journal of Chemical Theory and Computation</em>, 21(3):1163–1178, 2025. URL: <a class="reference external" href="https://doi.org/10.1021/acs.jctc.4c01301">https://doi.org/10.1021/acs.jctc.4c01301</a>, <a class="reference external" href="https://doi.org/10.1021/acs.jctc.4c01301">doi:10.1021/acs.jctc.4c01301</a>.</p>
+</div>
+<div class="citation" id="id61" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>WHavlivcekT16<span class="fn-bracket">]</span></span>
+<p>James D. Whitfield, Vojtěch Havlíček, and Matthias Troyer. Local spin operators for fermion simulations. <em>Physical Review A</em>, 94(3):030301, 2016. URL: <a class="reference external" href="https://arxiv.org/abs/1605.09789">https://arxiv.org/abs/1605.09789</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevA.94.030301">doi:10.1103/PhysRevA.94.030301</a>.</p>
+</div>
+<div class="citation" id="id62" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>Wil67<span class="fn-bracket">]</span></span>
+<p>R. M. Wilcox. Exponential operators and parameter differentiation in quantum physics. <em>Journal of Mathematical Physics</em>, 8(4):962–982, 1967. URL: <a class="reference external" href="https://doi.org/10.1063/1.1705306">https://doi.org/10.1063/1.1705306</a>, <a class="reference external" href="https://doi.org/10.1063/1.1705306">doi:10.1063/1.1705306</a>.</p>
 </div>
 <div class="citation" id="id27" role="doc-biblioentry">
 <span class="label"><span class="fn-bracket">[</span>WYAP+23<span class="fn-bracket">]</span></span>

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Circuit &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Circuit &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -62,6 +62,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -79,6 +80,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -87,6 +89,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -137,9 +140,10 @@ It stores the circuit in one or more formats and converts between them on demand
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">qdk</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">qsharp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">qsharp</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
 
@@ -212,7 +216,7 @@ It stores the circuit in one or more formats and converts between them on demand
 <td><p>A <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> (Quantum Intermediate Representation) object for cross-platform compilation.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp</span></code></p></td>
-<td><p>A compiled <code class="docutils literal notranslate"><span class="pre">qsharp._native.Circuit</span></code> object for inspection and visualization.</p></td>
+<td><p>A compiled <code class="docutils literal notranslate"><span class="pre">qdk._native.Circuit</span></code> object for inspection and visualization.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp_op</span></code></p></td>
 <td><p>A Q# callable — a native Q# operation that can be composed with other Q# operations.</p></td>
@@ -228,7 +232,7 @@ When a format that is not stored is requested, the class converts automatically 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Circuit</span><span class="p">(</span>
     <span class="n">qasm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">qir</span><span class="p">:</span> <span class="n">QirInputData</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">qsharp</span><span class="p">:</span> <span class="n">qsharp</span><span class="o">.</span><span class="n">_native</span><span class="o">.</span><span class="n">Circuit</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsharp</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">_native</span><span class="o">.</span><span class="n">Circuit</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">qsharp_op</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">qsharp_factory</span><span class="p">:</span> <span class="n">QsharpFactoryData</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -297,7 +301,7 @@ These are Python-native values — lists, ints, floats, nested dicts, or even ot
 </thead>
 <tbody>
 <tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qsharp_circuit" title="qdk_chemistry.data.Circuit.get_qsharp_circuit"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qsharp_circuit()</span></code></a></p></td>
-<td><p>Returns a <code class="docutils literal notranslate"><span class="pre">qsharp._native.Circuit</span></code> for inspection. Accepts <code class="docutils literal notranslate"><span class="pre">prune_classical_qubits</span></code> to remove unused qubits.</p></td>
+<td><p>Returns a <code class="docutils literal notranslate"><span class="pre">qdk._native.Circuit</span></code> for inspection. Accepts <code class="docutils literal notranslate"><span class="pre">prune_classical_qubits</span></code> to remove unused qubits.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qir" title="qdk_chemistry.data.Circuit.get_qir"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qir()</span></code></a></p></td>
 <td><p>Returns the <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> representation. Compiles from Q# factory or converts from QASM if needed.</p></td>
@@ -383,7 +387,7 @@ These are Python-native values — lists, ints, floats, nested dicts, or even ot
 <td><p><a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> representation, if available. Lazily compiled from the Q# factory on first access.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp</span></code></p></td>
-<td><p>qsharp._native.Circuit | None</p></td>
+<td><p>qdk._native.Circuit | None</p></td>
 <td><p>Compiled Q# circuit object, if available.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encoding</span></code></p></td>
@@ -423,7 +427,7 @@ Q# callables and factories are not directly serializable — they are reconstruc
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CircuitExecutorData" title="qdk_chemistry.data.CircuitExecutorData"><code class="xref py py-class docutils literal notranslate"><span class="pre">CircuitExecutorData</span></code></a>: Measurement results from circuit execution</p></li>
-<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Often paired with a circuit for energy estimation</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>: Often paired with a circuit for energy estimation</p></li>
 </ul>
 </section>
 <section id="further-reading">

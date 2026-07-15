@@ -13,5 +13,5 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   qdk_chemistry.algorithms.time_evolution.builder
-   qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper
+   qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder
+   qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation

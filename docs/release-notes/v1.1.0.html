@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>What’s New in Version 1.1 &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>What’s New in Version 1.1 &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -28,7 +28,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Changelog" href="../changelog.html" />
-    <link rel="prev" title="Release Notes" href="index.html" /> 
+    <link rel="prev" title="What’s New in Version 2.0" href="v2.0.0.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -55,6 +55,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -64,6 +65,7 @@
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="v2.0.0.html">What’s New in Version 2.0</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 1.1</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#model-hamiltonians">Model Hamiltonians</a></li>
@@ -226,7 +228,7 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;
 </section>
 <section id="arbitrary-order-trotter-suzuki">
 <h2>Arbitrary-Order Trotter-Suzuki<a class="headerlink" href="#arbitrary-order-trotter-suzuki" title="Link to this heading"></a></h2>
-<p>Time-evolution builders now support product formulas of any even order via recursive Suzuki composition <span id="id1">[<a class="reference internal" href="../references.html#id59" title="Masuo Suzuki. General theory of higher-order decomposition of exponential operators and symplectic integrators. Physics Letters A, 165(5–6):387–395, 1992. doi:10.1016/0375-9601(92)90335-J.">Suz92</a>]</span>.</p>
+<p>Time-evolution builders now support product formulas of any even order via recursive Suzuki composition <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id59" title="Masuo Suzuki. General theory of higher-order decomposition of exponential operators and symplectic integrators. Physics Letters A, 165(5–6):387–395, 1992. doi:10.1016/0375-9601(92)90335-J.">Suz92</a>]</span>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">Trotter</span><span class="p">,</span>
 <span class="p">)</span>
@@ -238,7 +240,7 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;
 <p>When both <code class="docutils literal notranslate"><span class="pre">num_divisions</span></code> and <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> are specified, the builder uses whichever requires more Trotter steps. The <code class="docutils literal notranslate"><span class="pre">error_bound</span></code> parameter selects between two bounds:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code> — triangle-inequality bound: <span class="math notranslate nohighlight">\(N = \lceil (\sum_j |\alpha_j|)^2 t^2 / \epsilon \rceil\)</span></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> — tighter commutator-scaling bound from <span id="id2">[<a class="reference internal" href="../references.html#id58" title="Andrew M. Childs, Yuan Su, Minh C. Tran, Nathan Wiebe, and Shuchen Zhu. Theory of Trotter error with commutator scaling. Physical Review X, 11(1):011020, 2021. URL: https://arxiv.org/abs/1912.08854, doi:10.1103/PhysRevX.11.011020.">CST+21</a>]</span>: <span class="math notranslate nohighlight">\(N = \lceil \frac{t^2}{2\epsilon} \sum_{j&lt;k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert \rceil\)</span></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> — tighter commutator-scaling bound from <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id58" title="Andrew M. Childs, Yuan Su, Minh C. Tran, Nathan Wiebe, and Shuchen Zhu. Theory of Trotter error with commutator scaling. Physical Review X, 11(1):011020, 2021. URL: https://arxiv.org/abs/1912.08854, doi:10.1103/PhysRevX.11.011020.">CST+21</a>]</span>: <span class="math notranslate nohighlight">\(N = \lceil \frac{t^2}{2\epsilon} \sum_{j&lt;k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert \rceil\)</span></p></li>
 </ul>
 <p><strong>Error-bound utilities</strong> are available for manual step-count analysis:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter_error</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -271,7 +273,7 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_cholesky&quot;</span><span class="p">)</span>
 <span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;cholesky_tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
 <span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;eri_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
-<span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;store_cholesky_vectors&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;store_ao_cholesky_vectors&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">cholesky_hamiltonian</span> <span class="o">=</span> <span class="n">constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -386,7 +388,7 @@ Please see the OpenFermion documentation for more information.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="v2.0.0.html" class="btn btn-neutral float-left" title="What’s New in Version 2.0" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="../changelog.html" class="btn btn-neutral float-right" title="Changelog" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

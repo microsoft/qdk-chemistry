@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.phase\_estimation.circuit\_builder.base module
+========================================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation.circuit_builder.base
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

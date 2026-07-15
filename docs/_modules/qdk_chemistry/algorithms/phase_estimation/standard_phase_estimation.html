@@ -1,0 +1,259 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Standard (QFT-based) phase estimation implementation.</span>
+
+<span class="sd">This module implements the standard quantum phase estimation algorithm using the</span>
+<span class="sd">inverse Quantum Fourier Transform (QFT), which measures all phase bits in parallel using multiple ancilla qubits.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Nielsen, M. A., &amp; Chuang, I. L. (2010). :cite:`Nielsen-Chuang2010-QPE`</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">PhaseEstimation</span><span class="p">,</span> <span class="n">PhaseEstimationSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Circuit</span><span class="p">,</span>
+    <span class="n">QpeResult</span><span class="p">,</span>
+    <span class="n">QuantumErrorProfile</span><span class="p">,</span>
+    <span class="n">QubitOperator</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.circuit_builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StandardQpeCircuitBuilder</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;StandardPhaseEstimation&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;StandardPhaseEstimationSettings&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="StandardPhaseEstimationSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.StandardPhaseEstimationSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StandardPhaseEstimationSettings</span><span class="p">(</span><span class="n">PhaseEstimationSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the Standard Phase Estimation algorithm.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="StandardPhaseEstimationSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.StandardPhaseEstimationSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings for Standard Phase Estimation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            shots: The number of shots to execute the circuit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;shots&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">3</span><span class="p">,</span>
+            <span class="s2">&quot;The number of shots to execute the circuit.&quot;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="StandardPhaseEstimation">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.StandardPhaseEstimation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StandardPhaseEstimation</span><span class="p">(</span><span class="n">PhaseEstimation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Standard QFT-based (non-iterative) phase estimation.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="StandardPhaseEstimation.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.StandardPhaseEstimation.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the standard phase estimation routine.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            shots: The number of shots to execute the circuit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">StandardPhaseEstimationSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;shots&quot;</span><span class="p">,</span> <span class="n">shots</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">noise</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QpeResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the standard phase estimation algorithm given the state preparation and Hamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: The circuit that prepares the initial state.</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.</span>
+<span class="sd">            noise: The quantum error profile to simulate noise, defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A QpeResult object containing the results of the phase estimation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">circuit_executor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">)</span>
+        <span class="n">circuit_builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">circuit_builder</span><span class="p">,</span> <span class="n">StandardQpeCircuitBuilder</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">circuit_builder</span><span class="p">)</span><span class="si">}</span><span class="s2"> instead.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Resolve container before running the circuit</span>
+        <span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">)</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">unitary_rep</span> <span class="o">=</span> <span class="n">unitary_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+        <span class="n">container</span> <span class="o">=</span> <span class="n">unitary_rep</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+
+        <span class="n">num_bits</span> <span class="o">=</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">)</span>
+        <span class="n">circuits</span> <span class="o">=</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">state_preparation</span><span class="o">=</span><span class="n">state_preparation</span><span class="p">,</span>
+            <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">circuit</span> <span class="o">=</span> <span class="n">circuits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">shots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shots&quot;</span><span class="p">)</span>
+        <span class="n">execution_data</span> <span class="o">=</span> <span class="n">circuit_executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">,</span> <span class="n">noise</span><span class="o">=</span><span class="n">noise</span><span class="p">)</span>
+        <span class="n">counts</span> <span class="o">=</span> <span class="n">execution_data</span><span class="o">.</span><span class="n">bitstring_counts</span>
+
+        <span class="n">dominant_bitstring</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">)</span>
+        <span class="n">raw_phase</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">dominant_bitstring</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">num_bits</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
+            <span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+            <span class="n">phase_fraction</span><span class="o">=</span><span class="n">raw_phase</span><span class="p">,</span>
+            <span class="n">eigenvalue_from_phase</span><span class="o">=</span><span class="n">container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">,</span>
+            <span class="n">bits_msb_first</span><span class="o">=</span><span class="n">dominant_bitstring</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="StandardPhaseEstimation.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation.StandardPhaseEstimation.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name as qdk_standard.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk_standard&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

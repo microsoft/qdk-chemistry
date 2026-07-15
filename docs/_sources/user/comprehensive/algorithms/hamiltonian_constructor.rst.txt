@@ -31,19 +31,19 @@ Orbitals
 
 .. rubric:: Creating a constructor
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. rubric:: Configuring settings
 
@@ -53,13 +53,6 @@ See `Available implementations`_ below for implementation-specific options.
 .. note::
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-configure
-      :end-before: // end-cell-configure
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
@@ -67,14 +60,14 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-.. rubric:: Running the calculation
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
       :language: cpp
-      :start-after: // start-cell-construct
-      :end-before: // end-cell-construct
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running the calculation
 
 .. tab:: Python API
 
@@ -83,18 +76,18 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: # start-cell-construct
       :end-before: # end-cell-construct
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-construct
+      :end-before: // end-cell-construct
+
 Available implementations
 -------------------------
 
 QDK/Chemistry's ``HamiltonianConstructor`` provides a unified interface for Hamiltonian construction methods.
 You can discover available implementations programmatically:
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-      :language: cpp
-      :start-after: // start-cell-list-implementations
-      :end-before: // end-cell-list-implementations
 
 .. tab:: Python API
 
@@ -102,6 +95,13 @@ You can discover available implementations programmatically:
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
 
 QDK (Native)
 ~~~~~~~~~~~~
@@ -122,9 +122,6 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
-   * - ``scf_type``
-     - string
-     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -133,7 +130,10 @@ QDK Cholesky
 
 A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
-The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are then transformed to the molecular one- and two-electron integrals.
+The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are transformed to the MO basis.
+The output Hamiltonian stores the MO three-center integrals directly in a ``CholeskyHamiltonianContainer``, avoiding expansion to the full four-center representation.
+Additionally, the original AO Cholesky vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
+Four-center integrals are lazily computed from the three-center integrals on demand.
 
 .. rubric:: Settings
 
@@ -144,18 +144,15 @@ The decomposition represents the four-center ERIs as products of three-center in
    * - Setting
      - Type
      - Description
-   * - ``scf_type``
-     - string
-     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
    * - ``cholesky_tolerance``
      - float
      - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
    * - ``eri_threshold``
      - float
      - ERI screening threshold for skipping negligible shell quartets during Cholesky decomposition. Default: 1e-12
-   * - ``store_cholesky_vectors``
+   * - ``store_ao_cholesky_vectors``
      - bool
-     - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: false
+     - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
 
 Related classes
 ---------------

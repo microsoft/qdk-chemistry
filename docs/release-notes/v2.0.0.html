@@ -1,0 +1,573 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What’s New in Version 2.0 &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="What’s New in Version 1.1" href="v1.1.0.html" />
+    <link rel="prev" title="Release Notes" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 2.0</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#the-symmetry-blocked-data-model">The Symmetry-Blocked Data Model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#consolidated-wavefunction-containers">Consolidated Wavefunction Containers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#nuclear-gradients-and-hessians">Nuclear Gradients and Hessians</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#stabilized-scf-and-rohf-direct-minimization">Stabilized SCF and ROHF Direct Minimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#new-simulation-primitives">New Simulation Primitives</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fermion-to-qubit-mapping-as-data">Fermion-to-Qubit Mapping as Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#term-grouping-and-expectation-estimation">Term Grouping and Expectation Estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#resource-estimation">Resource Estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#other-improvements">Other Improvements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#breaking-changes-and-migration">Breaking Changes and Migration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#migrating-orbitals-accessors">Migrating <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> accessors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#consolidated-container-names">Consolidated container names</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#two-particle-rdm-spin-ordering-action-required">Two-particle RDM spin ordering (action required)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuration-factories">Configuration factories</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fermion-to-qubit-mapping">Fermion-to-qubit mapping</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#renamed-classes-and-keys">Renamed classes and keys</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#serialization-format">Serialization format</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#c-api-changes">C++ API changes</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#deprecation-policy">Deprecation Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bug-fixes">Bug Fixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#infrastructure-and-packaging">Infrastructure and Packaging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="v1.1.0.html">What’s New in Version 1.1</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Release Notes</a></li>
+      <li class="breadcrumb-item active">What’s New in Version 2.0</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/release-notes/v2.0.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-s-new-in-version-2-0">
+<span id="release-v2-0-0"></span><h1>What’s New in Version 2.0<a class="headerlink" href="#what-s-new-in-version-2-0" title="Link to this heading"></a></h1>
+<p>Version 2.0 reworks the core data structures around a single symmetry-blocked
+storage model (see <a class="reference internal" href="#v2-symmetry-blocked"><span class="std std-ref">The Symmetry-Blocked Data Model</span></a>), consolidates the wavefunction
+containers, and standardizes the fermion-to-qubit mapping workflow. Building on
+those foundations, it adds nuclear gradients and Hessians, more robust SCF
+convergence, and a broader set of quantum-simulation primitives: block-encoding /
+<a class="reference internal" href="../glossary.html#term-LCU"><span class="xref std std-term">LCU</span></a> qubitization, real-time dynamics for time-dependent Hamiltonians, and
+direct integration with the QDK Quantum Resource Estimator.</p>
+<p>Most v1 code keeps working through tested facades and deprecated aliases; the
+<a class="reference internal" href="#v2-breaking-changes"><span class="std std-ref">Breaking changes and migration</span></a> section covers the
+cases that need changes and the new APIs that replace them.</p>
+<nav class="contents local" id="on-this-page">
+<p class="topic-title">On this page</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#highlights" id="id2">Highlights</a></p></li>
+<li><p><a class="reference internal" href="#the-symmetry-blocked-data-model" id="id3">The Symmetry-Blocked Data Model</a></p></li>
+<li><p><a class="reference internal" href="#consolidated-wavefunction-containers" id="id4">Consolidated Wavefunction Containers</a></p></li>
+<li><p><a class="reference internal" href="#nuclear-gradients-and-hessians" id="id5">Nuclear Gradients and Hessians</a></p></li>
+<li><p><a class="reference internal" href="#stabilized-scf-and-rohf-direct-minimization" id="id6">Stabilized SCF and ROHF Direct Minimization</a></p></li>
+<li><p><a class="reference internal" href="#new-simulation-primitives" id="id7">New Simulation Primitives</a></p></li>
+<li><p><a class="reference internal" href="#fermion-to-qubit-mapping-as-data" id="id8">Fermion-to-Qubit Mapping as Data</a></p></li>
+<li><p><a class="reference internal" href="#term-grouping-and-expectation-estimation" id="id9">Term Grouping and Expectation Estimation</a></p></li>
+<li><p><a class="reference internal" href="#resource-estimation" id="id10">Resource Estimation</a></p></li>
+<li><p><a class="reference internal" href="#other-improvements" id="id11">Other Improvements</a></p></li>
+<li><p><a class="reference internal" href="#breaking-changes-and-migration" id="id12">Breaking Changes and Migration</a></p></li>
+<li><p><a class="reference internal" href="#deprecation-policy" id="id13">Deprecation Policy</a></p></li>
+<li><p><a class="reference internal" href="#bug-fixes" id="id14">Bug Fixes</a></p></li>
+<li><p><a class="reference internal" href="#infrastructure-and-packaging" id="id15">Infrastructure and Packaging</a></p></li>
+</ul>
+</nav>
+<section id="highlights">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Highlights</a><a class="headerlink" href="#highlights" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Symmetry-blocked storage.</strong> Orbital coefficients and energies, Hamiltonian integrals, and index sets share one symmetry-blocked representation, so restricted and unrestricted data use the same accessors (discussed in <a class="reference internal" href="#v2-symmetry-blocked"><span class="std std-ref">The Symmetry-Blocked Data Model</span></a>).</p></li>
+<li><p><strong>Consolidated wavefunction containers.</strong> The five v1 containers collapse into <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StateVectorContainer" title="qdk_chemistry.data.StateVectorContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateVectorContainer</span></code></a> and <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeContainer" title="qdk_chemistry.data.AmplitudeContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code></a>.</p></li>
+<li><p><strong>Nuclear gradients and Hessians.</strong> A new nuclear-derivative algorithm returns energies, gradients, and optionally a Hessian and the converged wavefunction.</p></li>
+<li><p><strong>More robust SCF.</strong> A stabilized SCF solver follows internal and external instabilities to a stable reference, and <a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a> gains geometric direct minimization.</p></li>
+<li><p><strong>New simulation primitives.</strong> Block-encoding / <a class="reference internal" href="../glossary.html#term-LCU"><span class="xref std std-term">LCU</span></a> qubitization, the Hadamard test, Zassenhaus product formulas, and real-time dynamics for driven Hamiltonians join the existing Trotter-Suzuki builders.</p></li>
+<li><p><strong>Fermion-to-qubit mapping as data.</strong> Encodings are carried by <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a>, including a Verstraete-Cirac local encoding.</p></li>
+<li><p><strong>Explicit term grouping and expectation estimation.</strong> Pauli grouping is now an opt-in <code class="docutils literal notranslate"><span class="pre">term_grouper</span></code> step, and the estimator generalizes to any <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>.</p></li>
+<li><p><strong>Resource estimation integration.</strong> Generated circuits hand off directly to the QDK Quantum Resource Estimator via <code class="docutils literal notranslate"><span class="pre">Circuit.estimate()</span></code> and <code class="docutils literal notranslate"><span class="pre">Circuit.get_qre_application()</span></code> (see <a class="reference internal" href="#v2-resource-estimation"><span class="std std-ref">Resource Estimation</span></a>).</p></li>
+</ul>
+</section>
+<section id="the-symmetry-blocked-data-model">
+<span id="v2-symmetry-blocked"></span><h2><a class="toc-backref" href="#id3" role="doc-backlink">The Symmetry-Blocked Data Model</a><a class="headerlink" href="#the-symmetry-blocked-data-model" title="Link to this heading"></a></h2>
+<p>Orbital coefficients and energies, Hamiltonian integrals, and index sets are now
+backed by symmetry-blocked containers
+(<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.symmetry.html#qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2" title="qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2"><code class="xref py py-class docutils literal notranslate"><span class="pre">SymmetryBlockedTensorRank2</span></code></a>,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.symmetry.html#qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1" title="qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1"><code class="xref py py-class docutils literal notranslate"><span class="pre">SymmetryBlockedTensorRank1</span></code></a>, and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.symmetry.html#qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet" title="qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">SymmetryBlockedIndexSet</span></code></a>). Each block
+carries its spin (and, in general, other single-particle symmetries) explicitly,
+so one representation serves both restricted and unrestricted data, and a spin
+channel is selected with a <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.symmetry.html#qdk_chemistry.data.symmetry.SymmetryLabel" title="qdk_chemistry.data.symmetry.SymmetryLabel"><code class="xref py py-class docutils literal notranslate"><span class="pre">SymmetryLabel</span></code></a>.</p>
+<p>The v1 dense accessors on <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> remain available
+as tested facades over this storage, but now emit a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>. See
+<a class="reference internal" href="#v2-migrating-orbitals"><span class="std std-ref">Migrating Orbitals accessors</span></a> for the replacement
+API.</p>
+</section>
+<section id="consolidated-wavefunction-containers">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">Consolidated Wavefunction Containers</a><a class="headerlink" href="#consolidated-wavefunction-containers" title="Link to this heading"></a></h2>
+<p>The five v1 wavefunction containers were merged into two. The single-determinant,
+complete-active-space, and selected-configuration-interaction containers were
+structurally identical apart from a type tag, and are now the single
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StateVectorContainer" title="qdk_chemistry.data.StateVectorContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateVectorContainer</span></code></a>, which stores a coefficient
+vector over a set of determinants and records the physical <em>sector</em> it describes.
+The Møller-Plesset and coupled-cluster containers are now the single
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeContainer" title="qdk_chemistry.data.AmplitudeContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code></a>, which carries an <code class="docutils literal notranslate"><span class="pre">AmplitudeType</span></code>
+tag (<code class="docutils literal notranslate"><span class="pre">moller_plesset</span></code> or <code class="docutils literal notranslate"><span class="pre">coupled_cluster</span></code>) recording how its amplitudes
+should be interpreted. Containers of the same type are therefore distinguished by
+their stored contents rather than by their class.</p>
+<p>The removed names remain importable as deprecated aliases, and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction.get_container_type" title="qdk_chemistry.data.Wavefunction.get_container_type"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_container_type()</span></code></a> now returns
+<code class="docutils literal notranslate"><span class="pre">&quot;state_vector&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;amplitude&quot;</span></code> instead of the former <code class="docutils literal notranslate"><span class="pre">&quot;sd&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;cas&quot;</span></code> /
+<code class="docutils literal notranslate"><span class="pre">&quot;sci&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;mp2&quot;</span></code> / <code class="docutils literal notranslate"><span class="pre">&quot;cc&quot;</span></code> strings. See
+<a class="reference internal" href="#v2-container-rename"><span class="std std-ref">Consolidated container names</span></a> for the mapping.</p>
+</section>
+<section id="nuclear-gradients-and-hessians">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">Nuclear Gradients and Hessians</a><a class="headerlink" href="#nuclear-gradients-and-hessians" title="Link to this heading"></a></h2>
+<p>A new <code class="docutils literal notranslate"><span class="pre">nuclear_derivative_calculator</span></code> algorithm computes nuclear derivatives of
+the electronic energy directly from a <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>.
+Two variants are available: an analytic <code class="docutils literal notranslate"><span class="pre">qdk</span></code> path built on the internal
+<a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> gradients, and a <code class="docutils literal notranslate"><span class="pre">qdk_finite_difference</span></code> path that evaluates
+central differences and can additionally assemble a Hessian.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analytic gradients</span>
+<span class="n">grad_calc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">gradients</span><span class="p">,</span> <span class="n">_hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">grad_calc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Numeric Hessian (central finite differences)</span>
+<span class="n">hess_calc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_finite_difference&quot;</span><span class="p">,</span> <span class="n">compute_hessian</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">gradients</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">hess_calc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The call returns the energy, the nuclear gradients, and optionally a Hessian and
+the converged wavefunction.</p>
+</section>
+<section id="stabilized-scf-and-rohf-direct-minimization">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">Stabilized SCF and ROHF Direct Minimization</a><a class="headerlink" href="#stabilized-scf-and-rohf-direct-minimization" title="Link to this heading"></a></h2>
+<p>A stabilized <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solver wraps an inner solver and a stability checker:
+after convergence it tests the wavefunction for internal and external
+instabilities, rotates the orbitals along any instability direction, and re-runs
+until the reference is stable or an iteration limit is reached.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_stabilized&quot;</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Its behavior is controlled through settings (which stability checks to run, the
+iteration limit, and how to follow an external instability).</p>
+<p>The <a class="reference internal" href="../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a> <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> backend also gains geometric direct minimization
+(<a class="reference internal" href="../glossary.html#term-GDM"><span class="xref std std-term">GDM</span></a>), including a <a class="reference internal" href="../glossary.html#term-DIIS"><span class="xref std std-term">DIIS</span></a>-to-GDM hybrid path, for
+<a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a> references that are difficult to converge with <a class="reference internal" href="../glossary.html#term-DIIS"><span class="xref std std-term">DIIS</span></a> alone.</p>
+</section>
+<section id="new-simulation-primitives">
+<h2><a class="toc-backref" href="#id7" role="doc-backlink">New Simulation Primitives</a><a class="headerlink" href="#new-simulation-primitives" title="Link to this heading"></a></h2>
+<p>Several new primitives complement the existing Trotter-Suzuki time-evolution
+builders.</p>
+<p><strong>Block encoding / LCU.</strong> A linear-combination-of-unitaries (<a class="reference internal" href="../glossary.html#term-LCU"><span class="xref std std-term">LCU</span></a>) builder
+produces a PREPARE-SELECT block encoding of a Hermitian
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>, and can wrap it as a qubitization walk
+operator for phase estimation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">walk</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Hadamard test.</strong> The <code class="docutils literal notranslate"><span class="pre">hadamard_test</span></code> algorithm (<code class="docutils literal notranslate"><span class="pre">create(&quot;hadamard_test&quot;,</span> <span class="pre">&quot;qdk&quot;)</span></code>)
+maps a target <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> into a controlled
+circuit and returns the measurement data for an overlap or expectation value.</p>
+<p><strong>Zassenhaus product formulas.</strong> A Zassenhaus builder expands the time-evolution
+operator with higher-order commutator corrections; the step count is set with
+<code class="docutils literal notranslate"><span class="pre">num_divisions</span></code> or selected from a <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;zassenhaus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span>
+<span class="p">)</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Real-time dynamics.</strong> Driven, time-dependent Hamiltonians
+(<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.TimeDependentQubitHamiltonian" title="qdk_chemistry.data.TimeDependentQubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">TimeDependentQubitHamiltonian</span></code></a>) can be evolved with the
+Euler evolution-circuit builder (<code class="docutils literal notranslate"><span class="pre">evolution_circuit_builder</span></code> / <code class="docutils literal notranslate"><span class="pre">euler</span></code>) and a
+first-order Magnus propagator (<code class="docutils literal notranslate"><span class="pre">propagator</span></code> / <code class="docutils literal notranslate"><span class="pre">magnus</span></code>); a companion
+<code class="docutils literal notranslate"><span class="pre">hamiltonian_simulation</span></code> / <code class="docutils literal notranslate"><span class="pre">euler_integrator</span></code> measures observables on the
+evolved state. See
+<a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/time_evolve_and_measure.ipynb">examples/time_evolve_and_measure.ipynb</a>
+and <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/estimation_ising_2d.ipynb">examples/estimation_ising_2d.ipynb</a>.</p>
+</section>
+<section id="fermion-to-qubit-mapping-as-data">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">Fermion-to-Qubit Mapping as Data</a><a class="headerlink" href="#fermion-to-qubit-mapping-as-data" title="Link to this heading"></a></h2>
+<p>Fermion-to-qubit encodings are now first-class data. A
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> describes how fermionic Majorana
+operators map to Pauli strings, and is passed to the qubit mapper at <code class="docutils literal notranslate"><span class="pre">run()</span></code>
+time instead of selecting an encoding by string:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">qubit_operator</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Built-in constructors cover Jordan-Wigner, Bravyi-Kitaev, Bravyi-Kitaev tree,
+parity, and symmetry-conserving Bravyi-Kitaev encodings, plus a new
+<strong>Verstraete-Cirac</strong> local encoding built from a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a> for lattice models. The
+<a class="reference internal" href="../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a> mapper dispatches to specialized native paths for sparse
+(lattice-model) and Cholesky-factorized Hamiltonians, avoiding dense four-center
+expansion without changing results. See
+<a class="reference internal" href="#v2-qubit-mapping"><span class="std std-ref">Fermion-to-qubit mapping</span></a> for the migration from the v1
+encoding-string workflow.</p>
+</section>
+<section id="term-grouping-and-expectation-estimation">
+<h2><a class="toc-backref" href="#id9" role="doc-backlink">Term Grouping and Expectation Estimation</a><a class="headerlink" href="#term-grouping-and-expectation-estimation" title="Link to this heading"></a></h2>
+<p>Pauli-term grouping is now an explicit <code class="docutils literal notranslate"><span class="pre">term_grouper</span></code> algorithm rather than an
+implicit step inside the estimator. A grouper attaches a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.TermPartition" title="qdk_chemistry.data.TermPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">TermPartition</span></code></a> (a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.FlatPartition" title="qdk_chemistry.data.FlatPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlatPartition</span></code></a> or
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LayeredPartition" title="qdk_chemistry.data.LayeredPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">LayeredPartition</span></code></a>) to a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> for downstream consumers:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grouper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span> <span class="s2">&quot;qubit_wise_commuting&quot;</span><span class="p">)</span>
+<span class="n">grouped</span> <span class="o">=</span> <span class="n">grouper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Built-in variants are <code class="docutils literal notranslate"><span class="pre">qubit_wise_commuting</span></code>, <code class="docutils literal notranslate"><span class="pre">commuting</span></code>, and <code class="docutils literal notranslate"><span class="pre">identity</span></code>
+(one term per group); a NetworkX plugin adds graph-coloring variants. The
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ExpectationEstimator" title="qdk_chemistry.algorithms.ExpectationEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpectationEstimator</span></code></a> (registry key
+<code class="docutils literal notranslate"><span class="pre">&quot;expectation_estimator&quot;</span></code>) estimates the expectation value of any
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> from the grouping it is given;
+pre-group its input to recover the grouping v1 applied automatically.</p>
+</section>
+<section id="resource-estimation">
+<span id="v2-resource-estimation"></span><h2><a class="toc-backref" href="#id10" role="doc-backlink">Resource Estimation</a><a class="headerlink" href="#resource-estimation" title="Link to this heading"></a></h2>
+<p>Circuits produced by the circuit builders integrate directly with the QDK
+Quantum Resource Estimator. A <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> exposes
+<code class="docutils literal notranslate"><span class="pre">estimate()</span></code>, which runs the estimator and returns an <code class="docutils literal notranslate"><span class="pre">EstimatorResult</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">get_qre_application()</span></code>, which wraps the circuit as a <code class="docutils literal notranslate"><span class="pre">qdk.qre</span></code> application
+(Q#, OpenQASM, or QIR) for use with <code class="docutils literal notranslate"><span class="pre">qdk.qre.estimate()</span></code> and custom hardware and
+factory models. Resource estimation is enabled by the optional <code class="docutils literal notranslate"><span class="pre">qre</span></code> extra:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[qre]&#39;</span>
+</pre></div>
+</div>
+<p>Circuits from any of the circuit builders can be estimated this way. See
+<a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/estimation_ising_2d.ipynb">examples/estimation_ising_2d.ipynb</a>
+for an end-to-end dynamics resource-estimation walkthrough, including the impact
+of lattice-aware term grouping on fault-tolerant cost.</p>
+</section>
+<section id="other-improvements">
+<h2><a class="toc-backref" href="#id11" role="doc-backlink">Other Improvements</a><a class="headerlink" href="#other-improvements" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Composable phase estimation.</strong> Standard and iterative <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> split into a reusable circuit builder and executor, composed via nested algorithm references; the builder can also generate circuits on its own for resource estimation (<code class="docutils literal notranslate"><span class="pre">create(&quot;qpe_circuit_builder&quot;,</span> <span class="pre">&quot;qdk_iterative&quot;)</span></code>). See <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/qpe_stretched_n2.ipynb">examples/qpe_stretched_n2.ipynb</a>.</p></li>
+<li><p><strong>Natural-orbital localizer.</strong> <code class="docutils literal notranslate"><span class="pre">orbital_localizer</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_natural_orbitals</span></code> diagonalizes the active-space one-particle <a class="reference internal" href="../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> to produce occupation-ordered natural orbitals.</p></li>
+<li><p><strong>Cholesky MO integrals persisted.</strong> Cholesky Hamiltonians now serialize their <a class="reference internal" href="../glossary.html#term-MO"><span class="xref std std-term">MO</span></a> three-center integrals, so factorized Hamiltonians round-trip without expanding to dense tensors.</p></li>
+<li><p><strong>Declarative algorithm nesting.</strong> An algorithm can hold sub-algorithms as declarative <code class="docutils literal notranslate"><span class="pre">(type,</span> <span class="pre">variant,</span> <span class="pre">settings)</span></code> references in its <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a>, resolved by the factory at run time.</p></li>
+<li><p><strong>Dense solver path for MACIS CAS.</strong> Complete-active-space calculations can use a dense eigensolver in addition to the iterative path.</p></li>
+<li><p><strong>Double-d-shell valence selection.</strong> Automated valence active-space selection can optionally include the double-d-shell orbitals important for transition-metal chemistry.</p></li>
+<li><p><strong>Qubit loss and richer noise profiles.</strong> The QDK sparse-state simulator accepts per-gate noise configuration, and <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QuantumErrorProfile" title="qdk_chemistry.data.QuantumErrorProfile"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a> adds a qubit-loss error type.</p></li>
+</ul>
+</section>
+<section id="breaking-changes-and-migration">
+<span id="v2-breaking-changes"></span><h2><a class="toc-backref" href="#id12" role="doc-backlink">Breaking Changes and Migration</a><a class="headerlink" href="#breaking-changes-and-migration" title="Link to this heading"></a></h2>
+<section id="migrating-orbitals-accessors">
+<span id="v2-migrating-orbitals"></span><h3>Migrating <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> accessors<a class="headerlink" href="#migrating-orbitals-accessors" title="Link to this heading"></a></h3>
+<p>Coefficients and energies are returned as symmetry-blocked tensors. Select a
+spin channel with a <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.symmetry.html#qdk_chemistry.data.symmetry.SymmetryLabel" title="qdk_chemistry.data.symmetry.SymmetryLabel"><code class="xref py py-class docutils literal notranslate"><span class="pre">SymmetryLabel</span></code></a> and read
+the block (for tensors) or the stored indices (for index sets) directly.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">SymmetryLabel</span><span class="p">,</span> <span class="n">axes</span>
+
+<span class="c1"># v1 (deprecated): tuple of dense alpha/beta arrays</span>
+<span class="n">alpha_c</span><span class="p">,</span> <span class="n">beta_c</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+<span class="n">alpha_e</span><span class="p">,</span> <span class="n">beta_e</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
+<span class="n">alpha_active</span><span class="p">,</span> <span class="n">beta_active</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+
+<span class="c1"># v2: symmetry-blocked tensors, selected per spin channel by SymmetryLabel</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()])</span>
+<span class="n">beta</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">()])</span>
+<span class="n">coefficients</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">()</span>          <span class="c1"># SymmetryBlockedTensorRank2</span>
+<span class="n">energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">energies</span><span class="p">()</span>                  <span class="c1"># SymmetryBlockedTensorRank1</span>
+<span class="n">alpha_c</span> <span class="o">=</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">block</span><span class="p">([</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">])</span>    <span class="c1"># alpha block</span>
+<span class="n">beta_c</span> <span class="o">=</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">block</span><span class="p">([</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">])</span>       <span class="c1"># beta block</span>
+<span class="n">alpha_e</span> <span class="o">=</span> <span class="n">energies</span><span class="o">.</span><span class="n">block</span><span class="p">([</span><span class="n">alpha</span><span class="p">])</span>
+<span class="n">alpha_active</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For a model (symmetry-free) system the trivial label <code class="docutils literal notranslate"><span class="pre">SymmetryLabel([])</span></code> selects
+the single block instead of an alpha/beta label. For the common case of counting
+active or inactive orbitals, take the length of the per-channel index list:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v1 (deprecated)</span>
+<span class="n">n_active</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+
+<span class="c1"># v2</span>
+<span class="n">n_active</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()])))</span>
+</pre></div>
+</div>
+</section>
+<section id="consolidated-container-names">
+<span id="v2-container-rename"></span><h3>Consolidated container names<a class="headerlink" href="#consolidated-container-names" title="Link to this heading"></a></h3>
+<p>The removed container names remain importable as deprecated aliases:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v1 (deprecated alias, emits DeprecationWarning)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">CasWavefunctionContainer</span>
+
+<span class="c1"># v2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">StateVectorContainer</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">SlaterDeterminantContainer</span></code>, <code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">SciWavefunctionContainer</span></code> map to
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StateVectorContainer" title="qdk_chemistry.data.StateVectorContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateVectorContainer</span></code></a>; <code class="docutils literal notranslate"><span class="pre">MP2Container</span></code> and
+<code class="docutils literal notranslate"><span class="pre">CoupledClusterContainer</span></code> map to
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeContainer" title="qdk_chemistry.data.AmplitudeContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code></a>.</p>
+</section>
+<section id="two-particle-rdm-spin-ordering-action-required">
+<span id="v2-two-rdm-ordering"></span><h3>Two-particle RDM spin ordering (action required)<a class="headerlink" href="#two-particle-rdm-spin-ordering-action-required" title="Link to this heading"></a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This is a silent change: the same accessor returns differently ordered data.</p>
+</div>
+<p>The <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> spin-resolved two-particle RDM
+accessor <code class="docutils literal notranslate"><span class="pre">get_active_two_rdm_spin_dependent()</span></code> now returns its blocks as
+<code class="docutils literal notranslate"><span class="pre">(aaaa,</span> <span class="pre">aabb,</span> <span class="pre">bbbb)</span></code> (previously <code class="docutils literal notranslate"><span class="pre">(aabb,</span> <span class="pre">aaaa,</span> <span class="pre">bbbb)</span></code>), and the <code class="docutils literal notranslate"><span class="pre">aabb</span></code>
+block is now stored in <em>alpha-alpha-beta-beta</em> index order (previously
+<em>alpha-beta-alpha-beta</em>). This reorders the blocks to match the two-electron
+integral block order used throughout <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>
+(also <code class="docutils literal notranslate"><span class="pre">(aaaa,</span> <span class="pre">aabb,</span> <span class="pre">bbbb)</span></code> in alpha-alpha-beta-beta index order), so integrals
+and RDMs now share one spin-block convention. The
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> constructor takes the blocks in the same
+new order. Update any positional unpacking:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v1</span>
+<span class="n">aabb</span><span class="p">,</span> <span class="n">aaaa</span><span class="p">,</span> <span class="n">bbbb</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+
+<span class="c1"># v2</span>
+<span class="n">aaaa</span><span class="p">,</span> <span class="n">aabb</span><span class="p">,</span> <span class="n">bbbb</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="configuration-factories">
+<h3>Configuration factories<a class="headerlink" href="#configuration-factories" title="Link to this heading"></a></h3>
+<p>The string and bitset constructors were replaced by explicit factory methods:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span>
+
+<span class="c1"># v1</span>
+<span class="c1"># config = Configuration(&quot;2020&quot;)</span>
+
+<span class="c1"># v2</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;2020&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The Python factories are
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Configuration.from_spin_half_string" title="qdk_chemistry.data.Configuration.from_spin_half_string"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_spin_half_string()</span></code></a> and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Configuration.from_bitstring" title="qdk_chemistry.data.Configuration.from_bitstring"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_bitstring()</span></code></a>.</p>
+</section>
+<section id="fermion-to-qubit-mapping">
+<span id="v2-qubit-mapping"></span><h3>Fermion-to-qubit mapping<a class="headerlink" href="#fermion-to-qubit-mapping" title="Link to this heading"></a></h3>
+<p>The qubit mapper no longer takes an <code class="docutils literal notranslate"><span class="pre">encoding</span></code> string. Build a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> and pass it to <code class="docutils literal notranslate"><span class="pre">run()</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v1</span>
+<span class="c1"># mapper = create(&quot;qubit_mapper&quot;, &quot;qdk&quot;)  # configured via encoding=&quot;jordan-wigner&quot;</span>
+<span class="c1"># qubit_operator = mapper.run(hamiltonian)</span>
+
+<span class="c1"># v2</span>
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="p">)</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">qubit_operator</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The standalone <code class="docutils literal notranslate"><span class="pre">EncodingMismatchError</span></code> and <code class="docutils literal notranslate"><span class="pre">validate_encoding_compatibility</span></code>
+helpers were removed in favor of this mapping-centric flow; importing them still
+works but emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>.</p>
+</section>
+<section id="renamed-classes-and-keys">
+<span id="v2-renames"></span><h3>Renamed classes and keys<a class="headerlink" href="#renamed-classes-and-keys" title="Link to this heading"></a></h3>
+<p>The following names changed. The former names remain importable or usable as
+deprecated aliases that emit a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> → <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>. The class now
+represents any weighted sum of Pauli strings, not only molecular Hamiltonians.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code> / <code class="docutils literal notranslate"><span class="pre">QdkEnergyEstimator</span></code> →
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ExpectationEstimator" title="qdk_chemistry.algorithms.ExpectationEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExpectationEstimator</span></code></a> /
+<code class="docutils literal notranslate"><span class="pre">QdkExpectationEstimator</span></code>, and the <code class="docutils literal notranslate"><span class="pre">&quot;energy_estimator&quot;</span></code> registry key →
+<code class="docutils literal notranslate"><span class="pre">&quot;expectation_estimator&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitary</span></code> → <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a>,
+and <code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitaryContainer</span></code> →
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryContainer" title="qdk_chemistry.data.UnitaryContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryContainer</span></code></a>.</p></li>
+</ul>
+</section>
+<section id="serialization-format">
+<h3>Serialization format<a class="headerlink" href="#serialization-format" title="Link to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The following on-disk schemas were bumped from <code class="docutils literal notranslate"><span class="pre">0.1.0</span></code> to <code class="docutils literal notranslate"><span class="pre">0.2.0</span></code>:
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> (and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a>); the
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer" title="qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">CanonicalFourCenterHamiltonianContainer</span></code></a>,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.SparseHamiltonianContainer" title="qdk_chemistry.data.SparseHamiltonianContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">SparseHamiltonianContainer</span></code></a>, and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CholeskyHamiltonianContainer" title="qdk_chemistry.data.CholeskyHamiltonianContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">CholeskyHamiltonianContainer</span></code></a> Hamiltonian
+containers; <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> together with its
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StateVectorContainer" title="qdk_chemistry.data.StateVectorContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateVectorContainer</span></code></a>; and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a>. The
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeContainer" title="qdk_chemistry.data.AmplitudeContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code></a> wavefunction container, the
+top-level <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>, and all other schemas are
+unchanged at <code class="docutils literal notranslate"><span class="pre">0.1.0</span></code>. An affected file no longer loads directly from data
+written by an earlier release; upgrade it with the shipped converter
+(<code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">qdk_chemistry.migrate</span> <span class="pre">old.hamiltonian.h5</span> <span class="pre">new.hamiltonian.h5</span></code>; see
+<a class="reference internal" href="../user/migrating-data-files.html"><span class="doc">Migrating data files between serialization versions</span></a>) or re-generate it.</p>
+</div>
+</section>
+<section id="c-api-changes">
+<h3>C++ API changes<a class="headerlink" href="#c-api-changes" title="Link to this heading"></a></h3>
+<p>These changes affect the C++ library directly; Python users are insulated by the
+bindings above.</p>
+<ul class="simple">
+<li><p>The redundant private <code class="docutils literal notranslate"><span class="pre">Hamiltonian::_to_fcidump_file</span></code> was removed (the public
+<code class="docutils literal notranslate"><span class="pre">Hamiltonian::to_fcidump_file(...)</span></code> remains), and
+<code class="docutils literal notranslate"><span class="pre">HamiltonianContainer::to_fcidump_file</span></code> became a concrete virtual.</p></li>
+<li><p>The Cholesky Hamiltonian container now derives from <code class="docutils literal notranslate"><span class="pre">HamiltonianContainer</span></code>
+(no longer from the four-center container) and its dense constructor takes
+three-center integrals plus optional AO Cholesky vectors.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ModelOrbitals(size_t,</span> <span class="pre">bool)</span></code> was replaced by a
+<code class="docutils literal notranslate"><span class="pre">std::shared_ptr&lt;const</span> <span class="pre">SymmetryProduct&gt;</span></code>-based constructor and a
+<code class="docutils literal notranslate"><span class="pre">SymmetryBlockedIndexSet</span></code>-based constructor.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">NuclearDerivativeCalculator</span></code> run signature takes a single
+<code class="docutils literal notranslate"><span class="pre">n_inactive_orbitals</span></code> argument in place of the earlier active-electron pair.</p></li>
+</ul>
+</section>
+</section>
+<section id="deprecation-policy">
+<h2><a class="toc-backref" href="#id13" role="doc-backlink">Deprecation Policy</a><a class="headerlink" href="#deprecation-policy" title="Link to this heading"></a></h2>
+<p>Deprecated v1 accessors and import aliases continue to work in this release and are
+covered by tests; using them emits a <code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code> (for renamed classes
+such as <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code>, on construction) to flag the migration path.
+They are transitional and scheduled for removal in a future release.</p>
+</section>
+<section id="bug-fixes">
+<h2><a class="toc-backref" href="#id14" role="doc-backlink">Bug Fixes</a><a class="headerlink" href="#bug-fixes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Fixed an <code class="docutils literal notranslate"><span class="pre">int32</span></code> overflow in two-body integral and RDM indexing for large
+active spaces.</p></li>
+<li><p>Added missing effective-core-potential (<a class="reference internal" href="../glossary.html#term-ECP"><span class="xref std std-term">ECP</span></a>) contributions in the
+affected integral path.</p></li>
+<li><p>Fixed a bug in the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability checker, and a separate
+<a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a> stability-check bug in the solver.</p></li>
+</ul>
+</section>
+<section id="infrastructure-and-packaging">
+<h2><a class="toc-backref" href="#id15" role="doc-backlink">Infrastructure and Packaging</a><a class="headerlink" href="#infrastructure-and-packaging" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Windows support.</strong> Native builds with MSVC / clang-cl via vcpkg, plus Windows CI coverage.</p></li>
+<li><p><strong>Algorithm result caching.</strong> Passing <code class="docutils literal notranslate"><span class="pre">cache=</span></code> to <code class="docutils literal notranslate"><span class="pre">run()</span></code> content-addresses a run and returns a stored result on a hit (<code class="docutils literal notranslate"><span class="pre">FolderCache</span></code>, <code class="docutils literal notranslate"><span class="pre">TieredCache</span></code>; <code class="docutils literal notranslate"><span class="pre">force_rerun=True</span></code> bypasses), enabling checkpoint/restart-style reuse across a pipeline.</p></li>
+<li><p><strong>Data-file migration tool.</strong> <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">qdk_chemistry.migrate</span> <span class="pre">old.hamiltonian.h5</span> <span class="pre">new.hamiltonian.h5</span></code> (and <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.migrate.convert_file</span></code>) upgrade serialized files across serialization versions and between JSON and HDF5.</p></li>
+<li><p><strong>Updated backend compatibility.</strong> Support for newer <code class="docutils literal notranslate"><span class="pre">qdk</span></code> (Q# 1.29+) API migrations and newer PyQIR versions.</p></li>
+<li><p><strong>Release examples bundle.</strong> The release pipeline packages the <code class="docutils literal notranslate"><span class="pre">examples/</span></code> directory as a downloadable archive.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="v1.1.0.html" class="btn btn-neutral float-right" title="What’s New in Version 1.1" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

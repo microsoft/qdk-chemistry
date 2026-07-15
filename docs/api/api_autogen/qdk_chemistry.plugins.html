@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins package &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins package &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="qdk_chemistry.plugins.openfermion package" href="qdk_chemistry.plugins.openfermion.html" />
+    <link rel="next" title="qdk_chemistry.plugins.networkx package" href="qdk_chemistry.plugins.networkx.html" />
     <link rel="prev" title="qdk_chemistry.algorithms.stability_checker module" href="qdk_chemistry.algorithms.stability_checker.html" /> 
 </head>
 
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -142,7 +143,7 @@ changing their workflow code.</p></li>
 cluster calculators, orbital localization, active space selection (AVAS), and
 stability analysis.</p></li>
 <li><p><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#module-qdk_chemistry.plugins.qiskit" title="qdk_chemistry.plugins.qiskit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.qiskit</span></code></a>: Qiskit integration providing qubit mapping,
-circuit execution, energy estimation, and state preparation.</p></li>
+circuit execution, expectation-value estimation, and state preparation.</p></li>
 <li><p><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#module-qdk_chemistry.plugins.openfermion" title="qdk_chemistry.plugins.openfermion"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.openfermion</span></code></a>: OpenFermion integration providing qubit mapping,
 operator conversion, and quantum circuit interoperability.</p></li>
 </ul>
@@ -165,8 +166,10 @@ and then creating instances through the registry or directly:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Import the OpenFermion plugin to register its implementations</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion</span>  <span class="c1"># noqa: F401</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create an OpenFermion qubit mapper through the registry</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;openfermion&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;openfermion&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="rubric">Notes</p>
@@ -185,6 +188,18 @@ separately.</p>
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.networkx.html">qdk_chemistry.plugins.networkx package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.networkx.html#qdk_chemistry.plugins.networkx.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.networkx.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.networkx.term_grouper.html">qdk_chemistry.plugins.networkx.term_grouper module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.networkx.term_grouper.html#qdk_chemistry.plugins.networkx.term_grouper.NxFullCommutingTermGrouper"><code class="docutils literal notranslate"><span class="pre">NxFullCommutingTermGrouper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.networkx.term_grouper.html#qdk_chemistry.plugins.networkx.term_grouper.NxQubitWiseCommutingTermGrouper"><code class="docutils literal notranslate"><span class="pre">NxQubitWiseCommutingTermGrouper</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html">qdk_chemistry.plugins.openfermion package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#qdk_chemistry.plugins.openfermion.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#qdk_chemistry.plugins.openfermion.openfermion_load"><code class="docutils literal notranslate"><span class="pre">openfermion_load()</span></code></a></li>
@@ -238,6 +253,8 @@ separately.</p>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html">qdk_chemistry.plugins.pyscf.scf_solver module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings"><code class="docutils literal notranslate"><span class="pre">PyscfScfSettings</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver"><code class="docutils literal notranslate"><span class="pre">PyscfScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSolver</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.stability.html">qdk_chemistry.plugins.pyscf.stability module</a><ul>
@@ -253,6 +270,7 @@ separately.</p>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_load"><code class="docutils literal notranslate"><span class="pre">qiskit_load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_nature_load"><code class="docutils literal notranslate"><span class="pre">qiskit_nature_load()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_ibm_runtime_load"><code class="docutils literal notranslate"><span class="pre">qiskit_ibm_runtime_load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_aer_load"><code class="docutils literal notranslate"><span class="pre">qiskit_aer_load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#subpackages">Subpackages</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.html">qdk_chemistry.plugins.qiskit._interop package</a><ul>
@@ -271,6 +289,11 @@ separately.</p>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.conversion.html#qdk_chemistry.plugins.qiskit.conversion.create_statevector_from_wavefunction"><code class="docutils literal notranslate"><span class="pre">create_statevector_from_wavefunction()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html">qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitIterativeQpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QiskitIterativeQpeCircuitBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.html#qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder.QiskitStandardQpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QiskitStandardQpeCircuitBuilder</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html">qdk_chemistry.plugins.qiskit.qubit_mapper module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper"><code class="docutils literal notranslate"><span class="pre">QiskitQubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings"><code class="docutils literal notranslate"><span class="pre">QiskitQubitMapperSettings</span></code></a></li>
@@ -278,11 +301,6 @@ separately.</p>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html">qdk_chemistry.plugins.qiskit.regular_isometry module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparation</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html">qdk_chemistry.plugins.qiskit.standard_phase_estimation module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimation</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html#qdk_chemistry.plugins.qiskit.standard_phase_estimation.QiskitStandardPhaseEstimationSettings"><code class="docutils literal notranslate"><span class="pre">QiskitStandardPhaseEstimationSettings</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -299,7 +317,7 @@ separately.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="qdk_chemistry.algorithms.stability_checker.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.stability_checker module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="qdk_chemistry.plugins.openfermion.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.openfermion package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qdk_chemistry.plugins.networkx.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.networkx package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

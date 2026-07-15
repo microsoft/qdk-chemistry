@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QDK/Chemistry: A Quantum Applications Toolkit &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>QDK/Chemistry: A Quantum Applications Toolkit &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=fc837d61"></script>
+      <script src="_static/documentation_options.js?v=51b770b3"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -152,6 +153,14 @@ The plugin system lets users swap implementations, integrate external packages, 
 <li class="toctree-l2"><a class="reference internal" href="user/comprehensive/plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="user/migrating-data-files.html">Migrating data files between serialization versions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user/migrating-data-files.html#command-line">Command line</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/migrating-data-files.html#python-api">Python API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/migrating-data-files.html#what-is-converted">What is converted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/migrating-data-files.html#cholesky-hamiltonians">Cholesky Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/migrating-data-files.html#supported-formats">Supported formats</a></li>
+</ul>
+</li>
 </ul>
 </div>
 <div class="toctree-wrapper compound" id="apidocs">
@@ -192,7 +201,7 @@ The plugin system lets users swap implementations, integrate external packages, 
 </section>
 <section id="citing-qdk-chemistry">
 <h2>Citing QDK/Chemistry<a class="headerlink" href="#citing-qdk-chemistry" title="Link to this heading"></a></h2>
-<p>If you use QDK/Chemistry in your work, please cite our paper <span id="id1">[<a class="reference internal" href="references.html#id4" title="Nathan A. Baker, Brian Bilodeau, Chi Chen, Yingrong Chen, Marco Eckhoff, Alexandra Efimovskaya, Piero Gasparotto, Puck van Gerwen, Rushi Gong, Kevin Hoang, Zahra Hooshmand, Andrew J. Jenkins, Conrad S. N. Johnston, Run R. Li, Jiashu Liang, Hongbin Liu, Alexis Mills, Maximilian M&quot;orchen, George Nishibuchi, Chong Sun, Bill Ticehurst, Matthias Troyer, Jan P. Unsleber, Stefan Wernli, David B. Williams-Young, and Boqin Zhang. QDK/Chemistry: a modular toolkit for quantum chemistry applications. arXiv, 2026. URL: https://arxiv.org/abs/2601.15253, doi:10.48550/arXiv.2601.15253.">BBC+26</a>]</span>:</p>
+<p>If you use QDK/Chemistry in your work, please cite our paper <span class="bibtex-citation" id="id1">[<a class="reference internal" href="references.html#id4" title="Nathan A. Baker, Brian Bilodeau, Chi Chen, Yingrong Chen, Marco Eckhoff, Alexandra Efimovskaya, Piero Gasparotto, Puck van Gerwen, Rushi Gong, Kevin Hoang, Zahra Hooshmand, Andrew J. Jenkins, Conrad S. N. Johnston, Run R. Li, Jiashu Liang, Hongbin Liu, Alexis Mills, Maximilian M&quot;orchen, George Nishibuchi, Chong Sun, Bill Ticehurst, Matthias Troyer, Jan P. Unsleber, Stefan Wernli, David B. Williams-Young, and Boqin Zhang. QDK/Chemistry: a modular toolkit for quantum chemistry applications. arXiv, 2026. URL: https://arxiv.org/abs/2601.15253, doi:10.48550/arXiv.2601.15253.">BBC+26</a>]</span>:</p>
 <blockquote>
 <div><p>N. A. Baker <em>et al.</em>, “QDK/Chemistry: A Modular Toolkit for Quantum Chemistry Applications,”
 <a class="reference external" href="https://arxiv.org/abs/2601.15253">arXiv:2601.15253</a> (2026).</p>

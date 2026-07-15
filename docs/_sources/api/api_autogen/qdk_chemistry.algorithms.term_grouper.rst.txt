@@ -1,0 +1,18 @@
+qdk\_chemistry.algorithms.term\_grouper package
+===============================================
+
+.. automodule:: qdk_chemistry.algorithms.term_grouper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.term_grouper.base
+   qdk_chemistry.algorithms.term_grouper.commuting
+   qdk_chemistry.algorithms.term_grouper.identity

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.openfermion.qubit_mapper &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.openfermion.qubit_mapper &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -91,11 +92,11 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.plugins.openfermion.qubit_mapper</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.</span>
+<span></span><span class="sd">&quot;&quot;&quot;OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit operators.</span>
 
 <span class="sd">This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians</span>
-<span class="sd">using different mapping strategies (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;,</span>
-<span class="sd">&quot;symmetry-conserving-bravyi-kitaev&quot;, and &quot;bravyi-kitaev-tree&quot;).</span>
+<span class="sd">using different mapping strategies. The encoding is determined by the MajoranaMapping passed</span>
+<span class="sd">to ``run()``.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
@@ -113,46 +114,36 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span><span class="p">,</span> <span class="n">QubitMapperSettings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.enums.fermion_mode_order</span><span class="w"> </span><span class="kn">import</span> <span class="n">FermionModeOrder</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">hamiltonian_to_fermion_operator</span><span class="p">,</span>
     <span class="n">hamiltonian_to_interaction_operator</span><span class="p">,</span>
     <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Symmetries</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="p">,</span> <span class="n">QubitOperator</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;OpenFermionQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;OpenFermionQubitMapperSettings&quot;</span><span class="p">]</span>
 
-<span class="n">_VALID_ENCODINGS</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;symmetry-conserving-bravyi-kitaev&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;bravyi-kitaev-tree&quot;</span><span class="p">,</span>
-<span class="p">]</span>
+<span class="n">_STANDARD_TRANSFORMS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">,</span>
+    <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev</span><span class="p">,</span>
+    <span class="s2">&quot;bravyi-kitaev-tree&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev_tree</span><span class="p">,</span>
+<span class="p">}</span>
 
 
 <div class="viewcode-block" id="OpenFermionQubitMapperSettings">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">OpenFermionQubitMapperSettings</span><span class="p">(</span><span class="n">QubitMapperSettings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for an OpenFermionQubitMapper.</span>
-
-<span class="sd">    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.</span>
-
-<span class="sd">    Available encodings:</span>
-<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
-<span class="sd">        - ``&quot;symmetry-conserving-bravyi-kitaev&quot;`` (requires :class:`~qdk_chemistry.data.Symmetries`)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev-tree&quot;``</span>
-
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for an OpenFermionQubitMapper.&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="OpenFermionQubitMapperSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize OpenFermionQubitMapperSettings.&quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">valid_encodings</span><span class="o">=</span><span class="n">_VALID_ENCODINGS</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 </div>
 
 
@@ -160,57 +151,98 @@
 <div class="viewcode-block" id="OpenFermionQubitMapper">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">OpenFermionQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map an electronic structure Hamiltonian to a QubitOperator using OpenFermion.</span>
 
-<span class="sd">    Available encodings:</span>
-<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
-<span class="sd">        - ``&quot;symmetry-conserving-bravyi-kitaev&quot;`` (requires :class:`~qdk_chemistry.data.Symmetries`)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev-tree&quot;``</span>
+<span class="sd">    This is a **third-party** backend: it reads</span>
+<span class="sd">    ``mapping.base_encoding`` to select the corresponding OpenFermion</span>
+<span class="sd">    transform function and **ignores** ``mapping.table``.  The qubit</span>
+<span class="sd">    operator is built from scratch using OpenFermion&#39;s own</span>
+<span class="sd">    fermion-to-qubit pipeline.</span>
+
+<span class="sd">    .. warning::</span>
+
+<span class="sd">       Because this backend chooses its transform by encoding *name*</span>
+<span class="sd">       rather than from the Pauli table, it relies on the mapping&#39;s</span>
+<span class="sd">       ``base_encoding`` string being consistent with its table.</span>
+<span class="sd">       This is guaranteed for factory-produced mappings</span>
+<span class="sd">       (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)</span>
+<span class="sd">       and is verified by cross-backend eigenvalue tests in the test</span>
+<span class="sd">       suite.  Manually built mappings with mismatched names will</span>
+<span class="sd">       produce silently incorrect results.</span>
+
+<span class="sd">    Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are</span>
+<span class="sd">    supported — each backend handles tapering in its own ``_run_impl()``</span>
+<span class="sd">    via the ``QubitMapper._taper_result()``</span>
+<span class="sd">    helper.</span>
+
+<span class="sd">    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.</span>
+<span class="sd">    For unrestricted systems, separate alpha/beta spin channels are handled</span>
+<span class="sd">    via ``hamiltonian_to_interaction_operator``.</span>
+
+<span class="sd">    Supported base encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` → ``openfermion.transforms.jordan_wigner``</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;`` → ``openfermion.transforms.bravyi_kitaev``</span>
+<span class="sd">        - ``&quot;bravyi-kitaev-tree&quot;`` → ``openfermion.transforms.bravyi_kitaev_tree``</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.data import MajoranaMapping</span>
+<span class="sd">        &gt;&gt;&gt; mapper = create(&quot;qubit_mapper&quot;, &quot;openfermion&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)</span>
+<span class="sd">        &gt;&gt;&gt; qh = mapper.run(hamiltonian, mapping)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="OpenFermionQubitMapper.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize OpenFermionQubitMapper with a specific mapping strategy.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            encoding: Qubit mapping strategy. See *Available encodings* above.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize OpenFermionQubitMapper.&quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">OpenFermionQubitMapperSettings</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">OpenFermionQubitMapperSettings</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
+        <span class="n">mapping</span><span class="p">:</span> <span class="n">MajoranaMapping</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a qubit operator via OpenFermion.</span>
+
+<span class="sd">        Reads ``mapping.base_encoding`` to select an OpenFermion transform</span>
+<span class="sd">        function.  ``mapping.table`` is **not used** — the qubit operator</span>
+<span class="sd">        is built entirely by OpenFermion&#39;s own pipeline.</span>
+
+<span class="sd">        If *mapping* carries tapering metadata, the base encoding is</span>
+<span class="sd">        extracted first, mapped, and tapering is applied to the result</span>
+<span class="sd">        via :meth:`~QubitMapper._taper_result`.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
-<span class="sd">            symmetries: Symmetry information. Required for SCBK encoding.</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).</span>
+<span class="sd">            mapping: Encoding selector — only ``base_encoding`` is read.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            QubitHamiltonian: An instance of the QubitHamiltonian.</span>
+<span class="sd">            QubitOperator: An instance of the QubitOperator.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: If ``mapping.base_encoding`` is not a supported OpenFermion encoding.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_VALID_ENCODINGS</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Encoding &#39;</span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&#39; is unknown for OpenFermionQubitMapper.</span><span class="se">\n</span><span class="s2">Please use one of: </span><span class="si">{</span><span class="n">_VALID_ENCODINGS</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># --- Select transform by encoding name (see QubitMapper class docstring) ---</span>
+        <span class="n">encoding_name</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">base_encoding</span>
+
+        <span class="k">if</span> <span class="n">encoding_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_STANDARD_TRANSFORMS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;OpenFermion plugin does not support base encoding </span><span class="si">{</span><span class="n">encoding_name</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Supported encodings: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_STANDARD_TRANSFORMS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mapping Hamiltonian with OpenFermion encoding: </span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">qubit_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map_standard</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">encoding_name</span><span class="p">)</span>
+        <span class="n">fermion_mode_order</span> <span class="o">=</span> <span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">BLOCKED</span>
 
-        <span class="k">if</span> <span class="n">encoding</span> <span class="o">==</span> <span class="s2">&quot;symmetry-conserving-bravyi-kitaev&quot;</span><span class="p">:</span>
-            <span class="n">qubit_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map_scbk</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">)</span>
-            <span class="n">fermion_mode_order</span> <span class="o">=</span> <span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">INTERLEAVED</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">qubit_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map_standard</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span>
-            <span class="n">fermion_mode_order</span> <span class="o">=</span> <span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">BLOCKED</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mapping Hamiltonian with OpenFermion encoding: </span><span class="si">{</span><span class="n">encoding_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="n">qubit_op</span><span class="o">.</span><span class="n">compress</span><span class="p">()</span>
 
@@ -221,17 +253,18 @@
             <span class="n">qubit_op</span> <span class="o">-=</span> <span class="n">core_energy</span> <span class="o">*</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(())</span>
             <span class="n">qubit_op</span><span class="o">.</span><span class="n">compress</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">(</span>
+        <span class="n">qh</span> <span class="o">=</span> <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">(</span>
             <span class="n">qubit_op</span><span class="p">,</span>
-            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding_name</span><span class="p">,</span>
             <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">fermion_mode_order</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taper_result</span><span class="p">(</span><span class="n">qh</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_map_standard</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).</span>
 
 <span class="sd">        Uses blocked spin-orbital ordering (α₀, α₁, …, β₀, β₁, …) so that</span>
-<span class="sd">        the resulting qubit Hamiltonian matches the QDK native mapper output.</span>
+<span class="sd">        the resulting qubit operator matches the QDK native mapper output.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
@@ -243,57 +276,8 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">fermion_op</span> <span class="o">=</span> <span class="n">_build_blocked_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
-
-        <span class="n">transform_map</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">,</span>
-            <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev</span><span class="p">,</span>
-            <span class="s2">&quot;bravyi-kitaev-tree&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev_tree</span><span class="p">,</span>
-        <span class="p">}</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transform_map</span><span class="p">[</span><span class="n">encoding</span><span class="p">]</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">_STANDARD_TRANSFORMS</span><span class="p">[</span><span class="n">encoding</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">transform</span><span class="p">(</span><span class="n">fermion_op</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_map_scbk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply symmetry-conserving Bravyi-Kitaev transformation.</span>
-
-<span class="sd">        This transform reduces the qubit count by 2 by exploiting particle number</span>
-<span class="sd">        and spin symmetry. The number of active electrons is read from the</span>
-<span class="sd">        ``symmetries`` parameter.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
-<span class="sd">            symmetries: Symmetry information providing the active electron count.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            openfermion.QubitOperator: The mapped qubit operator.</span>
-
-<span class="sd">        Raises:</span>
-<span class="sd">            ValueError: If ``symmetries`` is not provided.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">symmetries</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries &quot;</span>
-                <span class="s2">&quot;object specifying the number of active electrons.</span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="s2">&quot;Example:</span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="s2">&quot;  from qdk_chemistry.data import Symmetries</span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="s2">&quot;  symmetries = Symmetries(n_alpha=1, n_beta=1)</span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="s2">&quot;  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">fermion_op</span> <span class="o">=</span> <span class="n">hamiltonian_to_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
-        <span class="n">n_active_electrons</span> <span class="o">=</span> <span class="n">symmetries</span><span class="o">.</span><span class="n">n_particles</span>
-
-        <span class="c1"># Number of spin-orbitals</span>
-        <span class="n">h1_alpha</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
-        <span class="n">n_spinorbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">h1_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCBK: n_spinorbitals=</span><span class="si">{</span><span class="n">n_spinorbitals</span><span class="si">}</span><span class="s2">, n_active_electrons=</span><span class="si">{</span><span class="n">n_active_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">symmetry_conserving_bravyi_kitaev</span><span class="p">(</span>
-            <span class="n">fermion_op</span><span class="p">,</span>
-            <span class="n">n_spinorbitals</span><span class="p">,</span>
-            <span class="n">n_active_electrons</span><span class="p">,</span>
-        <span class="p">)</span>
 
 <div class="viewcode-block" id="OpenFermionQubitMapper.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.name">[docs]</a>
@@ -314,7 +298,7 @@
 <span class="sd">    This differs from OpenFermion&#39;s native interleaved convention</span>
 <span class="sd">    [α₀, β₀, α₁, β₁, …].  Building the operator in blocked order ensures</span>
 <span class="sd">    that subsequent fermion-to-qubit transforms (JW, BK, BK-tree) produce</span>
-<span class="sd">    qubit Hamiltonians directly compatible with the QDK native mapper.</span>
+<span class="sd">    qubit operators directly compatible with the QDK native mapper.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        hamiltonian: The QDK/Chemistry Hamiltonian.</span>

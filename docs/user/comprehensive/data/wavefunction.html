@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wavefunction &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Wavefunction &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -63,6 +63,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -78,6 +79,7 @@
 <li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -86,6 +88,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -129,7 +132,7 @@
   <section id="wavefunction">
 <h1>Wavefunction<a class="headerlink" href="#wavefunction" title="Link to this heading"></a></h1>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
-This class provides access to wavefunction coefficients, determinants, reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), orbital entropies <span id="id1">[<a class="reference internal" href="../../../references.html#id7" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, and other quantum chemical properties.</p>
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), orbital entropies <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id7" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, and other quantum chemical properties.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>A wavefunction in quantum chemistry describes the quantum state of a molecular system.
@@ -154,31 +157,30 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>Slater determinant container<a class="headerlink" href="#slater-determinant-container" title="Link to this heading"></a></h3>
 <p>Single-determinant wavefunctions (e.g., from Hartree-Fock calculations).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Use helper function to get orbitals</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
-<span class="w">  </span><span class="c1">// Create a simple Slater determinant wavefunction for H2 ground state</span>
-<span class="w">  </span><span class="c1">// 2 electrons in bonding sigma orbital</span>
-<span class="w">  </span><span class="n">Configuration</span><span class="w"> </span><span class="n">det</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Constructor takes single determinant and orbitals as input</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SlaterDeterminantContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
-<span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">sd_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sd_container</span><span class="p">));</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use helper function to get orbitals</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
 
 <span class="c1"># Create a simple Slater determinant wavefunction for H2 ground state</span>
 <span class="c1"># 2 electrons in bonding sigma orbital</span>
-<span class="n">det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
 
 <span class="c1"># Constructor takes single determinant and orbitals as input</span>
-<span class="n">sd_container</span> <span class="o">=</span> <span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
 <span class="n">sd_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Use helper function to get orbitals</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
+<span class="w">  </span><span class="c1">// Create a simple Slater determinant wavefunction for H2 ground state</span>
+<span class="w">  </span><span class="c1">// 2 electrons in bonding sigma orbital</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Constructor takes single determinant and orbitals as input</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">sd_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sd_container</span><span class="p">));</span>
 </pre></div>
 </div>
 </div>
@@ -188,14 +190,35 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>SCI wavefunction container<a class="headerlink" href="#sci-wavefunction-container" title="Link to this heading"></a></h3>
 <p>Sparse multi-determinant wavefunctions for Selected Configuration Interaction methods.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an SCI wavefunction for H2</span>
+<span class="c1"># SCI selects only the most important configurations/determinants from the full space</span>
+<span class="n">sci_dets</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+        <span class="s2">&quot;20&quot;</span>
+    <span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+<span class="p">]</span>
+
+<span class="c1"># Coefficients for selected determinants</span>
+<span class="n">sci_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.96</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">])</span>
+
+<span class="c1"># Create a SCI wavefunction: requires selected coefficients and determinants, as well</span>
+<span class="c1"># as orbitals, in constructor</span>
+<span class="n">sci_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">sci_coeffs</span><span class="p">,</span> <span class="n">sci_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">sci_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sci_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create an SCI wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// SCI selects only the most important configurations/determinants from the</span>
 <span class="w">  </span><span class="c1">// full space</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">sci_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Mixed state</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Mixed state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Mixed state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Mixed state</span>
 <span class="w">  </span><span class="p">};</span>
 
 <span class="w">  </span><span class="c1">// Coefficients for selected determinants</span>
@@ -204,28 +227,9 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 
 <span class="w">  </span><span class="c1">// Create a SCI wavefunction: requires selected coefficients and determinants,</span>
 <span class="w">  </span><span class="c1">// as well as orbitals, in constructor</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sci_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SciWavefunctionContainer</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">      </span><span class="n">sci_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">sci_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sci_container</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">sci_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">sci_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
 <span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">sci_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sci_container</span><span class="p">));</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an SCI wavefunction for H2</span>
-<span class="c1"># SCI selects only the most important configurations/determinants from the full space</span>
-<span class="n">sci_dets</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
-<span class="p">]</span>
-
-<span class="c1"># Coefficients for selected determinants</span>
-<span class="n">sci_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.96</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">])</span>
-
-<span class="c1"># Create a SCI wavefunction: requires selected coefficients and determinants, as well</span>
-<span class="c1"># as orbitals, in constructor</span>
-<span class="n">sci_container</span> <span class="o">=</span> <span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">sci_coeffs</span><span class="p">,</span> <span class="n">sci_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="n">sci_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sci_container</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -235,15 +239,42 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <h3>CAS wavefunction container<a class="headerlink" href="#cas-wavefunction-container" title="Link to this heading"></a></h3>
 <p>A multi-determinant wavefunction from Complete Active Space methods (<a class="reference internal" href="../../../glossary.html#term-CASSCF"><span class="xref std std-term">CASSCF</span></a>/<a class="reference internal" href="../../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a>).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a CAS wavefunction for H2</span>
+<span class="c1"># CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
+<span class="c1"># All possible configurations:</span>
+<span class="n">cas_dets</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+        <span class="s2">&quot;20&quot;</span>
+    <span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;02&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in antibonding</span>
+<span class="p">]</span>
+
+<span class="c1"># Coefficients (normalized later by container)</span>
+<span class="n">cas_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">])</span>
+
+<span class="c1"># Create a CAS wavefunction: requires all coefficients and determinants,</span>
+<span class="c1"># as well as orbitals, in constructor</span>
+<span class="n">cas_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">cas_coeffs</span><span class="p">,</span> <span class="n">cas_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">cas_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">cas_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a CAS wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
 <span class="w">  </span><span class="c1">// All possible configurations:</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cas_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Both electrons in bonding (ground state)</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Alpha in bonding, beta in antibonding</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Beta in bonding, alpha in antibonding</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="p">(</span><span class="s">&quot;02&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Both electrons in antibonding</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+<span class="w">          </span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Both electrons in bonding (ground state)</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+<span class="w">          </span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Alpha in bonding, beta in antibonding</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+<span class="w">          </span><span class="s">&quot;du&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Beta in bonding, alpha in antibonding</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
+<span class="w">          </span><span class="s">&quot;02&quot;</span><span class="p">)</span><span class="w">  </span><span class="c1">// Both electrons in antibonding</span>
 <span class="w">  </span><span class="p">};</span>
 
 <span class="w">  </span><span class="c1">// Coefficients</span>
@@ -252,96 +283,109 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 
 <span class="w">  </span><span class="c1">// Create a CAS wavefunction : requires all coefficients and determinants, as</span>
 <span class="w">  </span><span class="c1">// well as orbitals, in constructor</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cas_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">CasWavefunctionContainer</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">      </span><span class="n">cas_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">cas_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cas_container</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">cas_coeffs</span><span class="p">,</span><span class="w"> </span><span class="n">cas_dets</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
 <span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">cas_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">cas_container</span><span class="p">));</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a CAS wavefunction for H2</span>
-<span class="c1"># CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)</span>
-<span class="c1"># All possible configurations:</span>
-<span class="n">cas_dets</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
-    <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;02&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in antibonding</span>
-<span class="p">]</span>
-
-<span class="c1"># Coefficients (normalized later by container)</span>
-<span class="n">cas_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">])</span>
-
-<span class="c1"># Create a CAS wavefunction: requires all coefficients and determinants,</span>
-<span class="c1"># as well as orbitals, in constructor</span>
-<span class="n">cas_container</span> <span class="o">=</span> <span class="n">CasWavefunctionContainer</span><span class="p">(</span><span class="n">cas_coeffs</span><span class="p">,</span> <span class="n">cas_dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="n">cas_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">cas_container</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
-<section id="mp2-wavefunction-container">
-<h3>MP2 wavefunction container<a class="headerlink" href="#mp2-wavefunction-container" title="Link to this heading"></a></h3>
-<p>A wavefunction container for second-order Møller-Plesset perturbation theory (<a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a>), which stores a reference wavefunction and Hamiltonian.
-From these, T1 and T2 amplitudes can be computed on demand.</p>
+<section id="amplitude-wavefunction-container">
+<h3>Amplitude wavefunction container<a class="headerlink" href="#amplitude-wavefunction-container" title="Link to this heading"></a></h3>
+<p>A single container, <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeContainer" title="qdk_chemistry.data.AmplitudeContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeContainer</span></code></a>, represents amplitude-based correlated wavefunctions such as <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> and coupled cluster.
+It stores a reference wavefunction together with T1/T2 excitation amplitudes, and records which correlated method produced them via <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AmplitudeType" title="qdk_chemistry.data.AmplitudeType"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeType</span></code></a> (<code class="docutils literal notranslate"><span class="pre">MP2</span></code>, <code class="docutils literal notranslate"><span class="pre">CCSD</span></code>, or <code class="docutils literal notranslate"><span class="pre">Unspecified</span></code>).
+It is pure storage: the amplitudes are supplied by the producing algorithm and are not expanded into a determinant/coefficient representation, so determinant-, coefficient-, and <a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>-based accessors raise.</p>
+<p>The following example tags the amplitudes as <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> (T1 is zero for MP2):</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an MP2 wavefunction for H2</span>
+<span class="c1"># In practice the MP2 algorithm computes the amplitudes; here we store them</span>
+<span class="c1"># directly in an AmplitudeContainer. T1 is zero for MP2.</span>
+
+<span class="c1"># Use the Slater determinant as reference</span>
+<span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
+<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">ref_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
+
+<span class="c1"># MP2 amplitudes (T1 is zero for MP2)</span>
+<span class="n">t1_mp2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">t2_mp2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">])</span>
+<span class="n">mp2_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
+    <span class="n">orbitals</span><span class="p">,</span> <span class="n">ref_wavefunction</span><span class="p">,</span> <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">MollerPlesset</span><span class="p">,</span> <span class="n">t1_mp2</span><span class="p">,</span> <span class="n">t2_mp2</span>
+<span class="p">)</span>
+<span class="n">mp2_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">mp2_container</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create an MP2 wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on</span>
 <span class="w">  </span><span class="c1">// demand</span>
 
 <span class="w">  </span><span class="c1">// Use the Slater determinant as reference</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_mp2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_hamiltonian</span><span class="p">(</span><span class="n">orbitals_mp2</span><span class="p">);</span>
-<span class="w">  </span><span class="n">Configuration</span><span class="w"> </span><span class="n">ref_det</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container_mp2</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SlaterDeterminantContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_mp2</span><span class="p">);</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_mp2</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_wavefunction</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Wavefunction</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sd_container_mp2</span><span class="p">));</span>
 
-<span class="w">  </span><span class="c1">// Create MP2 container: requires Hamiltonian and reference wavefunction</span>
-<span class="w">  </span><span class="c1">// Amplitudes are computed lazily when first requested</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mp2_container</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MP2Container</span><span class="o">&gt;</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">ref_wavefunction</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;mp&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// In practice the MP2 algorithm computes the amplitudes; here we store them</span>
+<span class="w">  </span><span class="c1">// directly in an AmplitudeContainer. T1 is zero for MP2.</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="n">t1_mp2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="o">::</span><span class="n">Zero</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">t2_mp2</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">  </span><span class="n">t2_mp2</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.1</span><span class="p">;</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mp2_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">AmplitudeContainer</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">      </span><span class="n">orbitals_mp2</span><span class="p">,</span><span class="w"> </span><span class="n">ref_wavefunction</span><span class="p">,</span><span class="w"> </span><span class="n">AmplitudeType</span><span class="o">::</span><span class="n">MollerPlesset</span><span class="p">,</span><span class="w"> </span><span class="n">t1_mp2</span><span class="p">,</span>
+<span class="w">      </span><span class="n">t2_mp2</span><span class="p">);</span>
 <span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">mp2_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">mp2_container</span><span class="p">));</span>
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an MP2 wavefunction for H2</span>
-<span class="c1"># MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on demand</span>
+</div>
+<p>The same container holds coupled cluster amplitudes when tagged as <code class="docutils literal notranslate"><span class="pre">CCSD</span></code>:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a coupled cluster wavefunction for H2</span>
+<span class="c1"># CC uses a reference wavefunction and pre-computed amplitudes</span>
 
 <span class="c1"># Use the Slater determinant as reference</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">make_minimal_hamiltonian</span><span class="p">(</span><span class="n">orbitals</span><span class="p">)</span>
-<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
-<span class="n">sd_container</span> <span class="o">=</span> <span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
 <span class="n">ref_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
 
-<span class="c1"># Create MP2 container: requires Hamiltonian and reference wavefunction</span>
-<span class="c1"># Amplitudes are computed lazily when first requested</span>
-<span class="n">mp2_container</span> <span class="o">=</span> <span class="n">MP2Container</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">ref_wavefunction</span><span class="p">,</span> <span class="s2">&quot;mp&quot;</span><span class="p">)</span>
-<span class="n">mp2_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">mp2_container</span><span class="p">)</span>
+<span class="c1"># Create example T1 and T2 amplitudes</span>
+<span class="c1"># T1: occupied-virtual excitations (1 occ × 1 virt = 1 element for H2)</span>
+<span class="n">t1_amplitudes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.05</span><span class="p">])</span>
+
+<span class="c1"># T2: occupied-occupied to virtual-virtual excitations</span>
+<span class="c1"># (1 occ pair × 1 virt pair = 1 element for H2)</span>
+<span class="n">t2_amplitudes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.15</span><span class="p">])</span>
+
+<span class="c1"># Create CC container: requires reference wavefunction, orbitals, and amplitudes</span>
+<span class="n">cc_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
+    <span class="n">orbitals</span><span class="p">,</span>
+    <span class="n">ref_wavefunction</span><span class="p">,</span>
+    <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+    <span class="n">t1_amplitudes</span><span class="p">,</span>
+    <span class="n">t2_amplitudes</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">cc_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">cc_container</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
-</div>
-</section>
-<section id="coupled-cluster-wavefunction-container">
-<h3>Coupled cluster wavefunction container<a class="headerlink" href="#coupled-cluster-wavefunction-container" title="Link to this heading"></a></h3>
-<p>A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-The container supports reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>), which are available if they are provided at construction or computed and stored; otherwise, <a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>-related operations are not available.</p>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a coupled cluster wavefunction for H2</span>
 <span class="w">  </span><span class="c1">// CC uses a reference wavefunction and pre-computed amplitudes</span>
 
 <span class="w">  </span><span class="c1">// Use the Slater determinant as reference</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
-<span class="w">  </span><span class="n">Configuration</span><span class="w"> </span><span class="n">ref_det_cc</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det_cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container_cc</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SlaterDeterminantContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det_cc</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_cc</span><span class="p">);</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det_cc</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_cc</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_wavefunction_cc</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Wavefunction</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">sd_container_cc</span><span class="p">));</span>
 
@@ -357,35 +401,10 @@ The container supports reduced density matrices (<a class="reference internal" h
 
 <span class="w">  </span><span class="c1">// Create CC container: requires reference wavefunction, orbitals, and</span>
 <span class="w">  </span><span class="c1">// amplitudes</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cc_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">CoupledClusterContainer</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">      </span><span class="n">orbitals_cc</span><span class="p">,</span><span class="w"> </span><span class="n">ref_wavefunction_cc</span><span class="p">,</span><span class="w"> </span><span class="n">t1_amplitudes</span><span class="p">,</span><span class="w"> </span><span class="n">t2_amplitudes</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cc_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">AmplitudeContainer</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">      </span><span class="n">orbitals_cc</span><span class="p">,</span><span class="w"> </span><span class="n">ref_wavefunction_cc</span><span class="p">,</span><span class="w"> </span><span class="n">AmplitudeType</span><span class="o">::</span><span class="n">CoupledCluster</span><span class="p">,</span>
+<span class="w">      </span><span class="n">t1_amplitudes</span><span class="p">,</span><span class="w"> </span><span class="n">t2_amplitudes</span><span class="p">);</span>
 <span class="w">  </span><span class="n">Wavefunction</span><span class="w"> </span><span class="nf">cc_wavefunction</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">cc_container</span><span class="p">));</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a coupled cluster wavefunction for H2</span>
-<span class="c1"># CC uses a reference wavefunction and pre-computed amplitudes</span>
-
-<span class="c1"># Use the Slater determinant as reference</span>
-<span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
-<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
-<span class="n">sd_container</span> <span class="o">=</span> <span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="n">ref_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
-
-<span class="c1"># Create example T1 and T2 amplitudes</span>
-<span class="c1"># T1: occupied-virtual excitations (1 occ × 1 virt = 1 element for H2)</span>
-<span class="n">t1_amplitudes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.05</span><span class="p">])</span>
-
-<span class="c1"># T2: occupied-occupied to virtual-virtual excitations</span>
-<span class="c1"># (1 occ pair × 1 virt pair = 1 element for H2)</span>
-<span class="n">t2_amplitudes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.15</span><span class="p">])</span>
-
-<span class="c1"># Create CC container: requires reference wavefunction, orbitals, and amplitudes</span>
-<span class="n">cc_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
-    <span class="n">orbitals</span><span class="p">,</span> <span class="n">ref_wavefunction</span><span class="p">,</span> <span class="n">t1_amplitudes</span><span class="p">,</span> <span class="n">t2_amplitudes</span>
-<span class="p">)</span>
-<span class="n">cc_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">cc_container</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -512,30 +531,7 @@ The container supports reduced density matrices (<a class="reference internal" h
 <h2>Accessing wavefunction data<a class="headerlink" href="#accessing-wavefunction-data" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> class provides methods to access coefficients, determinants, and derived properties:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access coefficient(s) and determinant(s) - SD has only one</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_coefficients</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_determinants</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Get orbital information</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_ref</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Get electron counts</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">n_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">n_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_total_num_electrons</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Get RDMs</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm1_aa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm1_bb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm1_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm2_aa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_aabb</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_bbbb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm2_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Get single orbital entropies</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">entropies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_single_orbital_entropies</span><span class="p">();</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access coefficient(s) and determinant(s) - SD has only one</span>
 <span class="n">coeffs</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
 <span class="n">dets</span> <span class="o">=</span> <span class="n">sd_wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
@@ -557,34 +553,36 @@ The container supports reduced density matrices (<a class="reference internal" h
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access coefficient(s) and determinant(s) - SD has only one</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_coefficients</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_determinants</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get orbital information</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_ref</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get electron counts</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">n_alpha</span><span class="p">,</span><span class="w"> </span><span class="n">n_beta</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_total_num_electrons</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get RDMs</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm1_aa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm1_bb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm1_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">rdm2_aaaa</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_aabb</span><span class="p">,</span><span class="w"> </span><span class="n">rdm2_bbbb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">rdm2_total</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Get single orbital entropies</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">entropies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sd_wavefunction</span><span class="p">.</span><span class="n">get_single_orbital_entropies</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="accessing-cluster-amplitudes">
 <h2>Accessing cluster amplitudes<a class="headerlink" href="#accessing-cluster-amplitudes" title="Link to this heading"></a></h2>
 <p>For <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access T1 and T2 amplitudes from MP2 and CC containers</span>
-
-<span class="w">  </span><span class="c1">// MP2</span>
-<span class="w">  </span><span class="c1">// Get the container back from wfn</span>
-<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">mp2_container_ref</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">mp2_wavefunction</span><span class="p">.</span><span class="n">get_container</span><span class="o">&lt;</span><span class="n">MP2Container</span><span class="o">&gt;</span><span class="p">();</span>
-<span class="w">  </span><span class="c1">// Amplitudes are lazily evaluated on first call then cached</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t2_abab_mp2</span><span class="p">,</span><span class="w"> </span><span class="n">t2_aaaa_mp2</span><span class="p">,</span><span class="w"> </span><span class="n">t2_bbbb_mp2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">mp2_container_ref</span><span class="o">-&gt;</span><span class="n">get_t2_amplitudes</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// CC</span>
-<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cc_container_ref</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">cc_wavefunction</span><span class="p">.</span><span class="n">get_container</span><span class="o">&lt;</span><span class="n">CoupledClusterContainer</span><span class="o">&gt;</span><span class="p">();</span>
-<span class="w">  </span><span class="c1">// Amplitudes are stored already from construction</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t1_aa</span><span class="p">,</span><span class="w"> </span><span class="n">t1_bb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cc_container_ref</span><span class="o">-&gt;</span><span class="n">get_t1_amplitudes</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t2_abab_cc</span><span class="p">,</span><span class="w"> </span><span class="n">t2_aaaa_cc</span><span class="p">,</span><span class="w"> </span><span class="n">t2_bbbb_cc</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">cc_container_ref</span><span class="o">-&gt;</span><span class="n">get_t2_amplitudes</span><span class="p">();</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access T1 and T2 amplitudes from MP2 and CC containers</span>
 
 <span class="c1"># For MP2 - amplitudes computed on demand</span>
@@ -595,6 +593,26 @@ The container supports reduced density matrices (<a class="reference internal" h
 <span class="c1"># For CC - amplitudes stored during construction</span>
 <span class="n">t1_aa</span><span class="p">,</span> <span class="n">t1_bb</span> <span class="o">=</span> <span class="n">cc_wavefunction</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_t1_amplitudes</span><span class="p">()</span>
 <span class="n">t2_abab_cc</span><span class="p">,</span> <span class="n">t2_aaaa_cc</span><span class="p">,</span> <span class="n">t2_bbbb_cc</span> <span class="o">=</span> <span class="n">cc_wavefunction</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_t2_amplitudes</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access T1 and T2 amplitudes from MP2 and CC containers</span>
+
+<span class="w">  </span><span class="c1">// MP2</span>
+<span class="w">  </span><span class="c1">// Get the container back from wfn</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">mp2_container_ref</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">mp2_wavefunction</span><span class="p">.</span><span class="n">get_container</span><span class="o">&lt;</span><span class="n">AmplitudeContainer</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t2_abab_mp2</span><span class="p">,</span><span class="w"> </span><span class="n">t2_aaaa_mp2</span><span class="p">,</span><span class="w"> </span><span class="n">t2_bbbb_mp2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">mp2_container_ref</span><span class="p">.</span><span class="n">get_t2_amplitudes</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// CC</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cc_container_ref</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">cc_wavefunction</span><span class="p">.</span><span class="n">get_container</span><span class="o">&lt;</span><span class="n">AmplitudeContainer</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="c1">// Amplitudes are stored already from construction</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t1_aa</span><span class="p">,</span><span class="w"> </span><span class="n">t1_bb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cc_container_ref</span><span class="p">.</span><span class="n">get_t1_amplitudes</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">t2_abab_cc</span><span class="p">,</span><span class="w"> </span><span class="n">t2_aaaa_cc</span><span class="p">,</span><span class="w"> </span><span class="n">t2_bbbb_cc</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">cc_container_ref</span><span class="p">.</span><span class="n">get_t2_amplitudes</span><span class="p">();</span>
 </pre></div>
 </div>
 </div>

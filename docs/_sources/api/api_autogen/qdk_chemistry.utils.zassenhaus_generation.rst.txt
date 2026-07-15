@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.zassenhaus\_generation module
+==================================================
+
+.. automodule:: qdk_chemistry.utils.zassenhaus_generation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

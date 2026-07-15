@@ -1,0 +1,404 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hadamard test &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Phase estimation" href="phase_estimation.html" />
+    <link rel="prev" title="State preparation" href="state_preparation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Hadamard test</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-the-hadamardtest">Using the HadamardTest</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#interpreting-results">Interpreting results</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
+      <li class="breadcrumb-item active">Hadamard test</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/algorithms/hadamard_test.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="hadamard-test">
+<h1>Hadamard test<a class="headerlink" href="#hadamard-test" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a> algorithm in QDK/Chemistry estimates expectation values associated with a target unitary by measuring a single control qubit after a controlled evolution.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a state-preparation <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> (typically from <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>), a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> (for example from <a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>), and shot count as input, and returns <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CircuitExecutorData" title="qdk_chemistry.data.CircuitExecutorData"><code class="xref py py-class docutils literal notranslate"><span class="pre">CircuitExecutorData</span></code></a> containing measurement bitstring counts.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The Hadamard test is a standard primitive for extracting overlap information from a controlled unitary application.
+Given a prepared system state <span class="math notranslate nohighlight">\(\vert \psi\rangle\)</span> and a unitary <span class="math notranslate nohighlight">\(U\)</span>, the algorithm builds a circuit with one control qubit and the system register:</p>
+<ol class="arabic simple">
+<li><p>Prepare the system in <span class="math notranslate nohighlight">\(\vert \psi\rangle\)</span></p></li>
+<li><p>Apply <span class="math notranslate nohighlight">\(H\)</span> to the control qubit</p></li>
+<li><p>Apply controlled-<span class="math notranslate nohighlight">\(U\)</span> to the system register (controlled on the control qubit)</p></li>
+<li><p>Measure the control qubit in a selected basis</p></li>
+</ol>
+<p>QDK/Chemistry supports control-qubit measurement in <code class="docutils literal notranslate"><span class="pre">X</span></code> and <code class="docutils literal notranslate"><span class="pre">Y</span></code> bases through the <code class="docutils literal notranslate"><span class="pre">test_basis</span></code> setting.</p>
+<p>For the standard Hadamard-test circuit, <code class="docutils literal notranslate"><span class="pre">test_basis=&quot;X&quot;</span></code> estimates <span class="math notranslate nohighlight">\(\mathrm{Re}\langle \psi \vert U \vert \psi \rangle\)</span> and <code class="docutils literal notranslate"><span class="pre">test_basis=&quot;Y&quot;</span></code> estimates <span class="math notranslate nohighlight">\(\mathrm{Im}\langle \psi \vert U \vert \psi \rangle\)</span>.</p>
+<p>The algorithm returns the measurement counts for the control qubit, which can be converted to an expectation estimate:</p>
+<div class="math notranslate nohighlight">
+\[\hat{m} = \frac{N_0 - N_1}{N_0 + N_1}\]</div>
+<section id="typical-workflow">
+<h3>Typical workflow<a class="headerlink" href="#typical-workflow" title="Link to this heading"></a></h3>
+<p>A Hadamard-test workflow usually needs two prepared inputs:</p>
+<ol class="arabic simple">
+<li><p>A state-preparation <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> (often produced by <a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a> from a reference wavefunction)</p></li>
+<li><p>A target <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> (commonly a Hamiltonian time-evolution operator from <a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>)</p></li>
+<li><p>A configured <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a> instance to execute the circuit and collect counts</p></li>
+</ol>
+<p>In molecular pipelines, structure setup, <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>, and multi-configuration steps are typically used only to provide the wavefunction and Hamiltonian needed to build those two inputs.</p>
+</section>
+</section>
+<section id="using-the-hadamardtest">
+<h2>Using the HadamardTest<a class="headerlink" href="#using-the-hadamardtest" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This algorithm is currently available only in the Python API.</p>
+</div>
+<p>This section demonstrates how to create, configure, and run a Hadamard test calculation.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a> requires the following inputs:</p>
+<dl class="simple">
+<dt>State preparation circuit</dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> that prepares the target system state.</p>
+</dd>
+<dt>UnitaryRepresentation</dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> describing the unitary to apply under control.
+This is often generated from a qubit Hamiltonian via <a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>.</p>
+</dd>
+<dt>Shots</dt><dd><p>A positive integer number of circuit executions used to estimate expectation values from counts.</p>
+</dd>
+<dt>Settings</dt><dd><p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a> is configured via its settings object, which includes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">test_basis</span></code> - Measurement basis for the control qubit. Allowed values are <code class="docutils literal notranslate"><span class="pre">&quot;X&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;Y&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">controlled_circuit_mapper</span></code> - A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> to a <a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledCircuitMapper</span></a> implementation used to synthesize controlled-<span class="math notranslate nohighlight">\(U\)</span>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">circuit_executor</span></code> - A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> to a <a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a> implementation used to run the final circuit.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The state preparation circuit and unitary should be qubit-compatible and represent the same target system.</p>
+</div>
+<p class="rubric">Creating a Hadamard test algorithm</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+
+<span class="c1"># Create the default Hadamard test algorithm</span>
+<span class="n">hadamard_test</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hadamard_test&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Configuring settings</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
+
+<span class="c1"># Configure Hadamard test settings</span>
+<span class="n">hadamard_test</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hadamard_test&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">,</span> <span class="n">test_basis</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">)</span>
+<span class="n">hadamard_test</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span>
+    <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">hadamard_test</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span>
+    <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># Change measurement basis on the same algorithm implementation if needed</span>
+<span class="c1"># hadamard_test.settings().set(&quot;test_basis&quot;, &quot;Y&quot;)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Running the calculation</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span><span class="p">,</span> <span class="n">Structure</span>
+
+<span class="c1"># 1. Setup molecule</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
+
+<span class="c1"># 2. SCF</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># 3. Hamiltonian construction</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
+
+<span class="c1"># 4. Multi-configuration calculation (reference state)</span>
+<span class="n">cas_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">cas_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># 5. Qubit mapping</span>
+<span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">)</span>
+<span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># 6. State preparation</span>
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">state_preparation</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
+
+<span class="c1"># 7. Build target unitary U</span>
+<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;trotter&quot;</span><span class="p">,</span>
+    <span class="n">time</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">48.0</span><span class="p">),</span>
+    <span class="n">power</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">unitary_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+
+<span class="c1"># 8. Run Hadamard test and estimate expectation from counts</span>
+<span class="n">shots</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">hadamard_test</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state_preparation</span><span class="p">,</span> <span class="n">unitary</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">)</span>
+<span class="n">counts</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span>
+<span class="n">observable_value</span> <span class="o">=</span> <span class="p">(</span><span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">/</span> <span class="nb">sum</span><span class="p">(</span><span class="n">counts</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;bitstring_counts:&quot;</span><span class="p">,</span> <span class="n">counts</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;estimated expectation:&quot;</span><span class="p">,</span> <span class="n">observable_value</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="available-implementations">
+<h2>Available implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a> currently provides one built-in implementation.
+You can discover available implementations programmatically:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="c1"># List all registered Hadamard test implementations</span>
+<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;hadamard_test&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">implementations</span><span class="p">)</span>  <span class="c1"># e.g. [&#39;qdk&#39;]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk&quot;</span></code></p>
+<p class="rubric">Settings</p>
+<p>Direct settings on <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.hadamard_test.hadamard_test.html#qdk_chemistry.algorithms.hadamard_test.hadamard_test.HadamardTest" title="qdk_chemistry.algorithms.hadamard_test.hadamard_test.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">test_basis</span></code></p></td>
+<td><p>string</p></td>
+<td><p>Measurement basis for the control qubit. Allowed values are <code class="docutils literal notranslate"><span class="pre">&quot;X&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;Y&quot;</span></code>. Default is <code class="docutils literal notranslate"><span class="pre">&quot;X&quot;</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">controlled_circuit_mapper</span></code></p></td>
+<td><p>AlgorithmRef</p></td>
+<td><p>Nested <a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledCircuitMapper</span></a> used to synthesize controlled-<span class="math notranslate nohighlight">\(U\)</span>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">circuit_executor</span></code></p></td>
+<td><p>AlgorithmRef</p></td>
+<td><p>Nested <a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a> used to execute the generated circuit.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="interpreting-results">
+<h2>Interpreting results<a class="headerlink" href="#interpreting-results" title="Link to this heading"></a></h2>
+<p>The algorithm returns <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CircuitExecutorData" title="qdk_chemistry.data.CircuitExecutorData"><code class="xref py py-class docutils literal notranslate"><span class="pre">CircuitExecutorData</span></code></a>, whose <code class="docutils literal notranslate"><span class="pre">bitstring_counts</span></code> can be converted to an expectation estimate:</p>
+<div class="math notranslate nohighlight">
+\[\hat{m} = \frac{N_0 - N_1}{N_0 + N_1}\]</div>
+<p>Here <span class="math notranslate nohighlight">\(N_0 + N_1\)</span> is the number of clean measurement outcomes recorded in <code class="docutils literal notranslate"><span class="pre">bitstring_counts</span></code>.
+This can differ from requested <code class="docutils literal notranslate"><span class="pre">shots</span></code> when an executor tracks loss separately.
+Finite sampling still introduces statistical uncertainty, so increasing shots typically improves estimator stability.</p>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest" title="qdk_chemistry.algorithms.HadamardTest"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTest</span></code></a>: Main Hadamard test algorithm interface</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.hadamard_test.circuit_builder.base.html#qdk_chemistry.algorithms.hadamard_test.circuit_builder.base.HadamardTestCircuitBuilder" title="qdk_chemistry.algorithms.hadamard_test.circuit_builder.base.HadamardTestCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">HadamardTestCircuitBuilder</span></code></a>: Circuit-builder abstraction used internally</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>: State-preparation and executable circuit data model</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a>: Input unitary data model</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CircuitExecutorData" title="qdk_chemistry.data.CircuitExecutorData"><code class="xref py py-class docutils literal notranslate"><span class="pre">CircuitExecutorData</span></code></a>: Measurement output container</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a>: Nested algorithm configuration reference type</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/hadamard_test.py">Python</a> script.</p></li>
+<li><p><a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>: Build target unitaries such as time evolution</p></li>
+<li><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a>: Build state-preparation circuits from wavefunctions</p></li>
+<li><p><a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledCircuitMapper</span></a>: Synthesize controlled-unitary circuits</p></li>
+<li><p><a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a>: Execute circuits and collect bitstring counts</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configure algorithm settings</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Create algorithms by type and implementation name</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="state_preparation.html" class="btn btn-neutral float-left" title="State preparation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="phase_estimation.html" class="btn btn-neutral float-right" title="Phase estimation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

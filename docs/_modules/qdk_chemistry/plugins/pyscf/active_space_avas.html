@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.active_space_avas &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.active_space_avas &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -125,7 +126,9 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.mcscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">avas</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActiveSpaceSelector</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">SlaterDeterminantContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">StateVectorContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_indices</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">axes</span><span class="p">,</span> <span class="n">spin_index_set</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
@@ -141,7 +144,10 @@
 <span class="sd">    interface for setting and getting options.</span>
 
 <span class="sd">    Attributes:</span>
-<span class="sd">        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = None).</span>
+<span class="sd">        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = []).</span>
+<span class="sd">            Supports indexed atom labels (e.g., ``[&quot;C1 2pz&quot;, &quot;C2 2pz&quot;]``) for selecting specific atoms.</span>
+<span class="sd">        threshold (float): Eigenvalue threshold for including orbitals in the active space (default = 0.2).</span>
+<span class="sd">            Orbitals with AVAS projection eigenvalues above this threshold are included.</span>
 <span class="sd">        canonicalize (bool): Whether to canonicalize the active space orbitals after selection (default = False).</span>
 <span class="sd">        openshell_option (int): How to handle singly-occupied orbitals in the active space (default = 2).</span>
 <span class="sd">            The singly-occupied orbitals are projected as part of alpha orbitals if ``openshell_option=2``, or</span>
@@ -164,6 +170,7 @@
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;ao_labels&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;canonicalize&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;openshell_option&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
 </div>
@@ -225,6 +232,7 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PySCF-QDK/Chemistry AVAS Plugin only supports restricted orbitals.&quot;</span><span class="p">)</span>
 
         <span class="n">ao_labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ao_labels&quot;</span><span class="p">)</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">)</span>
         <span class="n">canonicalize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;canonicalize&quot;</span><span class="p">)</span>
         <span class="n">openshell_option</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openshell_option&quot;</span><span class="p">)</span>
 
@@ -259,15 +267,25 @@
                     <span class="sa">f</span><span class="s2">&quot;Or with indices: </span><span class="si">{</span><span class="n">atom_symbols</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
 
-        <span class="n">avas_obj</span> <span class="o">=</span> <span class="n">avas</span><span class="o">.</span><span class="n">AVAS</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">ao_labels_clean</span><span class="p">,</span> <span class="n">canonicalize</span><span class="o">=</span><span class="n">canonicalize</span><span class="p">,</span> <span class="n">openshell_option</span><span class="o">=</span><span class="n">openshell_option</span><span class="p">)</span>
+        <span class="n">avas_obj</span> <span class="o">=</span> <span class="n">avas</span><span class="o">.</span><span class="n">AVAS</span><span class="p">(</span>
+            <span class="n">mf</span><span class="p">,</span>
+            <span class="n">ao_labels_clean</span><span class="p">,</span>
+            <span class="n">threshold</span><span class="o">=</span><span class="n">threshold</span><span class="p">,</span>
+            <span class="n">canonicalize</span><span class="o">=</span><span class="n">canonicalize</span><span class="p">,</span>
+            <span class="n">openshell_option</span><span class="o">=</span><span class="n">openshell_option</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="n">norb_act</span><span class="p">,</span> <span class="n">nelec_act</span><span class="p">,</span> <span class="n">mo_coeff</span> <span class="o">=</span> <span class="n">avas_obj</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
 
         <span class="c1"># Extract active indices</span>
         <span class="c1"># nelec_act is the number of active electrons (int or tuple of alpha/beta)</span>
-        <span class="n">n_active_electrons</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">)</span>  <span class="c1"># noqa: UP038</span>
+        <span class="n">n_active_electrons</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">,</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">nelec_act</span><span class="p">)</span>
         <span class="n">n_inactive_occ</span> <span class="o">=</span> <span class="p">(</span><span class="n">mol</span><span class="o">.</span><span class="n">nelectron</span> <span class="o">-</span> <span class="n">n_active_electrons</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
         <span class="n">active_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">n_inactive_occ</span> <span class="o">+</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb_act</span><span class="p">)]</span>
         <span class="n">inactive_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_inactive_occ</span><span class="p">))</span>
+
+        <span class="n">nmo</span> <span class="o">=</span> <span class="n">mo_coeff</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">active_sbid</span> <span class="o">=</span> <span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="n">active_indices</span><span class="p">,</span> <span class="n">active_indices</span><span class="p">,</span> <span class="n">equivalent</span><span class="o">=</span><span class="ow">not</span> <span class="n">open_shell</span><span class="p">)</span>
+        <span class="n">inactive_sbid</span> <span class="o">=</span> <span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">,</span> <span class="n">equivalent</span><span class="o">=</span><span class="ow">not</span> <span class="n">open_shell</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">open_shell</span><span class="p">:</span>
             <span class="c1"># Create active orbitals</span>
@@ -278,7 +296,8 @@
                 <span class="kc">None</span><span class="p">,</span>
                 <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
-                <span class="p">[</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">active_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">],</span>
+                <span class="n">active_sbid</span><span class="p">,</span>
+                <span class="n">inactive_sbid</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Create active orbitals</span>
@@ -287,7 +306,8 @@
                 <span class="kc">None</span><span class="p">,</span>
                 <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
-                <span class="p">[</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">],</span>
+                <span class="n">active_sbid</span><span class="p">,</span>
+                <span class="n">inactive_sbid</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># Single determinant case - return new wavefunction with localized orbitals</span>
@@ -295,8 +315,8 @@
 
             <span class="c1"># Get old and new active space indices</span>
             <span class="n">old_orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
-            <span class="n">old_active_indices</span> <span class="o">=</span> <span class="n">old_orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">new_active_indices</span> <span class="o">=</span> <span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">old_active_indices</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">old_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+            <span class="n">new_active_indices</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">active_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
 
             <span class="c1"># Map from old active space to new active space</span>
             <span class="c1"># The old determinant is already shortened to the old active space</span>
@@ -313,8 +333,8 @@
                     <span class="c1"># This orbital wasn&#39;t in the old active space, so it&#39;s unoccupied</span>
                     <span class="n">new_config_chars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>
 
-            <span class="n">active_config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">new_config_chars</span><span class="p">))</span>
-            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">active_config</span><span class="p">,</span> <span class="n">active_orbitals</span><span class="p">))</span>
+            <span class="n">active_config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">new_config_chars</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">active_config</span><span class="p">,</span> <span class="n">active_orbitals</span><span class="p">,</span> <span class="s2">&quot;electrons&quot;</span><span class="p">))</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
             <span class="s2">&quot;PySCF AVAS active space selector currently only supports single-determinant wavefunctions.&quot;</span>
         <span class="p">)</span>

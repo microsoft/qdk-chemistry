@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.qiskit.phase\_estimation\_circuit\_builder module
+========================================================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

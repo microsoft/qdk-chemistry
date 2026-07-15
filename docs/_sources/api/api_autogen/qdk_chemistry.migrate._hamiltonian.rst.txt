@@ -1,0 +1,8 @@
+qdk\_chemistry.migrate.\_hamiltonian module
+===========================================
+
+.. automodule:: qdk_chemistry.migrate._hamiltonian
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

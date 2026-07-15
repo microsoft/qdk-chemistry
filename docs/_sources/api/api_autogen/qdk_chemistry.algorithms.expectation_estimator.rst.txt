@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.expectation\_estimator package
+========================================================
+
+.. automodule:: qdk_chemistry.algorithms.expectation_estimator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.expectation_estimator.expectation_estimator
+   qdk_chemistry.algorithms.expectation_estimator.qdk

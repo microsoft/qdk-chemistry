@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.controlled\_circuit\_mapper.controlled\_pauli\_sequence\_mapper module
+================================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

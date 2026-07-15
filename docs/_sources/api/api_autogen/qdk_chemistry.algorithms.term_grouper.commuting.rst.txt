@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.term\_grouper.commuting module
+========================================================
+
+.. automodule:: qdk_chemistry.algorithms.term_grouper.commuting
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

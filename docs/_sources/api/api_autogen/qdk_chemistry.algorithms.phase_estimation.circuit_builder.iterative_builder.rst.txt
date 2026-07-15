@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.phase\_estimation.circuit\_builder.iterative\_builder module
+======================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

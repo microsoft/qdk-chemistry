@@ -1,0 +1,301 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution package &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized module" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html" />
+    <link rel="prev" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu module" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CircuitExecutor"><code class="docutils literal notranslate"><span class="pre">CircuitExecutor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ControlledCircuitMapper"><code class="docutils literal notranslate"><span class="pre">ControlledCircuitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ExpectationEstimator"><code class="docutils literal notranslate"><span class="pre">ExpectationEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.FiniteDifferenceNuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">FiniteDifferenceNuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest"><code class="docutils literal notranslate"><span class="pre">HadamardTest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.NuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">NuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkExpectationEstimator"><code class="docutils literal notranslate"><span class="pre">QdkExpectationEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkHamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">QdkHamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2Calculator"><code class="docutils literal notranslate"><span class="pre">QdkMP2Calculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisAsci"><code class="docutils literal notranslate"><span class="pre">QdkMacisAsci</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisCas"><code class="docutils literal notranslate"><span class="pre">QdkMacisCas</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisPmc"><code class="docutils literal notranslate"><span class="pre">QdkMacisPmc</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkNaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkNaturalOrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkNuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">QdkNuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkQubitMapper"><code class="docutils literal notranslate"><span class="pre">QdkQubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilizedScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkStabilizedScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QpeCircuitBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TimeEvolutionBuilder"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution">
+<span id="qdk-chemistry-algorithms-hamiltonian-unitary-builder-time-evolution-package"></span><h1>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution package<a class="headerlink" href="#module-qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry Hamiltonian uniatry builder for time evolution.</p>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomized"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomized.__init__"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomized.name"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomized.type_name"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.__init__"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.weight_threshold"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.weight_threshold</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.trotter_order"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.trotter_order</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.num_random_samples"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.num_random_samples</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.seed"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.seed</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.PartiallyRandomizedSettings.tolerance"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.tolerance</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift"><code class="docutils literal notranslate"><span class="pre">QDrift</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.num_samples"><code class="docutils literal notranslate"><span class="pre">QDrift.num_samples</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.seed"><code class="docutils literal notranslate"><span class="pre">QDrift.seed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.merge_duplicate_terms"><code class="docutils literal notranslate"><span class="pre">QDrift.merge_duplicate_terms</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.__init__"><code class="docutils literal notranslate"><span class="pre">QDrift.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.name"><code class="docutils literal notranslate"><span class="pre">QDrift.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDrift.type_name"><code class="docutils literal notranslate"><span class="pre">QDrift.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDriftSettings"><code class="docutils literal notranslate"><span class="pre">QDriftSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDriftSettings.__init__"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDriftSettings.num_samples"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.num_samples</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDriftSettings.seed"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.seed</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift.QDriftSettings.merge_duplicate_terms"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.merge_duplicate_terms</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error.qdrift_samples_campbell"><code class="docutils literal notranslate"><span class="pre">qdrift_samples_campbell()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.Trotter"><code class="docutils literal notranslate"><span class="pre">Trotter</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.Trotter.__init__"><code class="docutils literal notranslate"><span class="pre">Trotter.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.Trotter.name"><code class="docutils literal notranslate"><span class="pre">Trotter.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.Trotter.type_name"><code class="docutils literal notranslate"><span class="pre">Trotter.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings"><code class="docutils literal notranslate"><span class="pre">TrotterSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.__init__"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.order"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.order</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.target_accuracy"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.target_accuracy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.num_divisions"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.num_divisions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.error_bound"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.error_bound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter.TrotterSettings.weight_threshold"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.weight_threshold</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error.trotter_steps_commutator"><code class="docutils literal notranslate"><span class="pre">trotter_steps_commutator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error.trotter_steps_naive"><code class="docutils literal notranslate"><span class="pre">trotter_steps_naive()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus"><code class="docutils literal notranslate"><span class="pre">Zassenhaus</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.__init__"><code class="docutils literal notranslate"><span class="pre">Zassenhaus.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.name"><code class="docutils literal notranslate"><span class="pre">Zassenhaus.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.type_name"><code class="docutils literal notranslate"><span class="pre">Zassenhaus.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.__init__"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.order"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.order</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.target_accuracy"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.target_accuracy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.num_divisions"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.num_divisions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.error_bound"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.error_bound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.weight_threshold"><code class="docutils literal notranslate"><span class="pre">ZassenhausSettings.weight_threshold</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_coefficient_sum"><code class="docutils literal notranslate"><span class="pre">zassenhaus_coefficient_sum()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_omitted_commutator_norm"><code class="docutils literal notranslate"><span class="pre">zassenhaus_omitted_commutator_norm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_commutator"><code class="docutils literal notranslate"><span class="pre">zassenhaus_steps_commutator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_naive"><code class="docutils literal notranslate"><span class="pre">zassenhaus_steps_naive()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

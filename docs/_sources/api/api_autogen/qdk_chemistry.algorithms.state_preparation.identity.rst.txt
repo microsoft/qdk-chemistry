@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.state\_preparation.identity module
+============================================================
+
+.. automodule:: qdk_chemistry.algorithms.state_preparation.identity
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

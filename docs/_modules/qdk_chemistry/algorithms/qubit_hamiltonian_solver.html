@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.qubit_hamiltonian_solver &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.qubit_hamiltonian_solver &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -130,11 +131,11 @@
 
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitHamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.</span>
+<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>
@@ -201,11 +202,11 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_m&quot;</span><span class="p">,</span> <span class="n">max_m</span><span class="p">)</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitHamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian using sparse matrix methods.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.</span>
+<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>
@@ -239,11 +240,11 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitHamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian using dense matrix methods.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.</span>
+<span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>

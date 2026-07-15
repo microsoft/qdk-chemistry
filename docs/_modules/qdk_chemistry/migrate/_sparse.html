@@ -1,0 +1,252 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.migrate._sparse &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../migrate.html">qdk_chemistry.migrate</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.migrate._sparse</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.migrate._sparse</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Migrate the ``sparse`` Hamiltonian container serialization to the current version.</span>
+
+<span class="sd">Only the two-body payload changed: the legacy flat ``two_body_integrals_sparse``</span>
+<span class="sd">list of ``[p, q, r, s, value]`` entries became a ``SymmetryBlockedSparseMap``.</span>
+<span class="sd">The (restricted) one-body sparse triplet list and the scalar metadata are</span>
+<span class="sd">schema-stable. Sparse model Hamiltonians carry no orbitals.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_sbt</span>
+
+<span class="n">CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+
+
+<div class="viewcode-block" id="from_json_doc">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.from_json_doc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_json_doc</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a parsed legacy sparse container JSON object into an old-doc.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="s2">&quot;sparse&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;num_orbitals&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;num_orbitals&quot;</span><span class="p">]),</span>
+        <span class="s2">&quot;one_body_sparse&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_alpha_sparse&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;two_body_sparse&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;two_body_integrals_sparse&quot;</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_unpack_indices</span><span class="p">(</span><span class="n">packed_column</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a column of ``pack_indices`` doubles into two integer arrays.</span>
+
+<span class="sd">    The legacy HDF5 sparse format packs an ``(a, b)`` uint32 index pair into the</span>
+<span class="sd">    bytes of a ``double`` (``uint32[2] = {a, b}`` memcpy&#39;d to a ``double``). On a</span>
+<span class="sd">    little-endian host this is recovered by viewing the double as two uint32s.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">packed_column</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pairs</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">pairs</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_scalar_int</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span> <span class="o">|</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Dataset</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read an integer stored as either an HDF5 attribute or a scalar dataset member.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">attrs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="n">name</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="ow">and</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">node</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">node</span><span class="p">[</span><span class="n">name</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="from_hdf5_group">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.from_hdf5_group">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_group</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a legacy sparse container HDF5 group into an old-doc.&quot;&quot;&quot;</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+    <span class="n">one_body_ds</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_integrals_alpha_sparse&quot;</span><span class="p">)</span>
+    <span class="n">two_body_ds</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;two_body_integrals_sparse&quot;</span><span class="p">)</span>
+
+    <span class="c1"># The legacy writer stores num_orbitals as an attribute on the one-body dataset;</span>
+    <span class="c1"># fall back to the metadata group (attribute or scalar dataset) otherwise.</span>
+    <span class="n">num_orbitals</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">one_body_ds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_orbitals</span> <span class="o">=</span> <span class="n">_read_scalar_int</span><span class="p">(</span><span class="n">one_body_ds</span><span class="p">,</span> <span class="s2">&quot;num_orbitals&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_orbitals</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_orbitals</span> <span class="o">=</span> <span class="n">_read_scalar_int</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;num_orbitals&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_orbitals</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">num_orbitals</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Sparse container is missing a positive num_orbitals value (looked for an &quot;</span>
+            <span class="s2">&quot;attribute on one_body_integrals_alpha_sparse and in metadata).&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">one_body</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">one_body_ds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Each row is [pack_indices(row, col), value].</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">one_body_ds</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">_unpack_indices</span><span class="p">(</span><span class="n">arr</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="n">one_body</span> <span class="o">=</span> <span class="p">[[</span><span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)]</span> <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">arr</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span>
+
+    <span class="n">two_body</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">two_body_ds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Each row is [pack_indices(p, q), pack_indices(r, s), value].</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">two_body_ds</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">p</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">_unpack_indices</span><span class="p">(</span><span class="n">arr</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="n">r</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="n">_unpack_indices</span><span class="p">(</span><span class="n">arr</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="n">two_body</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">pp</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">qq</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">rr</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">ss</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">pp</span><span class="p">,</span> <span class="n">qq</span><span class="p">,</span> <span class="n">rr</span><span class="p">,</span> <span class="n">ss</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">arr</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">]</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="s2">&quot;sparse&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;core_energy&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;Hermitian&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;num_orbitals&quot;</span><span class="p">:</span> <span class="n">num_orbitals</span><span class="p">,</span>
+        <span class="s2">&quot;one_body_sparse&quot;</span><span class="p">:</span> <span class="n">one_body</span><span class="p">,</span>
+        <span class="s2">&quot;two_body_sparse&quot;</span><span class="p">:</span> <span class="n">two_body</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="to_new_json">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.to_new_json">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated sparse container JSON object from a normalized old-doc.&quot;&quot;&quot;</span>
+    <span class="n">norb</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;num_orbitals&quot;</span><span class="p">]</span>
+    <span class="n">one_body</span> <span class="o">=</span> <span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;one_body_sparse&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">CONTAINER_VERSION</span><span class="p">,</span>
+        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="s2">&quot;sparse&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;core_energy&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;core_energy&quot;</span><span class="p">]),</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;is_restricted&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;num_orbitals&quot;</span><span class="p">:</span> <span class="n">norb</span><span class="p">,</span>
+        <span class="s2">&quot;has_one_body_integrals&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">one_body</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;one_body_integrals_alpha_sparse&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)]</span> <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">one_body</span><span class="p">],</span>
+        <span class="s2">&quot;two_body_integrals&quot;</span><span class="p">:</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">sparse_rank4_dict</span><span class="p">(</span><span class="n">old</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;two_body_sparse&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[],</span> <span class="n">norb</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

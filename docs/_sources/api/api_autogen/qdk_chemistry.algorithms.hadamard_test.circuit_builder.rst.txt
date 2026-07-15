@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.hadamard\_test.circuit\_builder package
+=================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hadamard_test.circuit_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hadamard_test.circuit_builder.base
+   qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder

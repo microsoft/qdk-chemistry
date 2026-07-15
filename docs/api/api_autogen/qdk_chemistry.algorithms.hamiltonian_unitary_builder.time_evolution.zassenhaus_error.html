@@ -1,0 +1,324 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error module &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.base module" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html" />
+    <link rel="prev" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus module" href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CircuitExecutor"><code class="docutils literal notranslate"><span class="pre">CircuitExecutor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ControlledCircuitMapper"><code class="docutils literal notranslate"><span class="pre">ControlledCircuitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ExpectationEstimator"><code class="docutils literal notranslate"><span class="pre">ExpectationEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.FiniteDifferenceNuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">FiniteDifferenceNuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HadamardTest"><code class="docutils literal notranslate"><span class="pre">HadamardTest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianUnitaryBuilder"><code class="docutils literal notranslate"><span class="pre">HamiltonianUnitaryBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.NuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">NuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkExpectationEstimator"><code class="docutils literal notranslate"><span class="pre">QdkExpectationEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkHamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">QdkHamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2Calculator"><code class="docutils literal notranslate"><span class="pre">QdkMP2Calculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisAsci"><code class="docutils literal notranslate"><span class="pre">QdkMacisAsci</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisCas"><code class="docutils literal notranslate"><span class="pre">QdkMacisCas</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisPmc"><code class="docutils literal notranslate"><span class="pre">QdkMacisPmc</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkNaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkNaturalOrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkNuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">QdkNuclearDerivativeCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkQubitMapper"><code class="docutils literal notranslate"><span class="pre">QdkQubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilizedScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkStabilizedScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QpeCircuitBuilder"><code class="docutils literal notranslate"><span class="pre">QpeCircuitBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitHamiltonianSolver"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonianSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TimeEvolutionBuilder"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.html">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error">
+<span id="qdk-chemistry-algorithms-hamiltonian-unitary-builder-time-evolution-zassenhaus-error-module"></span><h1>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error module<a class="headerlink" href="#module-qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error" title="Link to this heading"></a></h1>
+<p>Zassenhaus error bound estimation for accuracy-aware parameterization.</p>
+<p>This module provides functions to compute the number of steps
+required to achieve a target accuracy for Zassenhaus product-formula
+decompositions.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_coefficient_sum">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.</span></span><span class="sig-name descname"><span class="pre">zassenhaus_coefficient_sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_terms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutator_exponents</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus_error.html#zassenhaus_coefficient_sum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_coefficient_sum" title="Link to this definition"></a></dt>
+<dd><p>Return the absolute coefficient sum for the first omitted exponent.</p>
+<p>An order-<code class="docutils literal notranslate"><span class="pre">p</span></code> Zassenhaus approximation keeps correction exponents through
+<code class="docutils literal notranslate"><span class="pre">C_p</span></code>.  The leading omitted local remainder is therefore <code class="docutils literal notranslate"><span class="pre">C_{p+1}</span></code>.
+For the naive bound we combine like symbolic commutators and use
+<code class="docutils literal notranslate"><span class="pre">sum(abs(c_w))</span></code> over the terms in <code class="docutils literal notranslate"><span class="pre">C_{p+1}</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>commutator_exponents</strong> (<em>Mapping</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>PlanExpr</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_omitted_commutator_norm">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.</span></span><span class="sig-name descname"><span class="pre">zassenhaus_omitted_commutator_norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus_error.html#zassenhaus_omitted_commutator_norm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_omitted_commutator_norm" title="Link to this definition"></a></dt>
+<dd><p>Return a Pauli 1-norm bound for the first omitted Zassenhaus exponent.</p>
+<p>The returned value bounds <code class="docutils literal notranslate"><span class="pre">||C_{order</span> <span class="pre">+</span> <span class="pre">1}(-i</span> <span class="pre">H_1,</span> <span class="pre">...,</span> <span class="pre">-i</span> <span class="pre">H_m)||</span></code>.
+Multiplication by powers of <code class="docutils literal notranslate"><span class="pre">-i</span></code> does not change the norm, so the
+Hamiltonian commutator DAG can be evaluated directly and scaled by the
+symbolic Zassenhaus coefficients.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><em>QubitOperator</em></a>)</p></li>
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_commutator">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.</span></span><span class="sig-name descname"><span class="pre">zassenhaus_steps_commutator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_accuracy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus_error.html#zassenhaus_steps_commutator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_commutator" title="Link to this definition"></a></dt>
+<dd><p>Compute Zassenhaus steps using a commutator-aware bound.</p>
+<p>An order-<code class="docutils literal notranslate"><span class="pre">p</span></code> Zassenhaus formula keeps exponents through <code class="docutils literal notranslate"><span class="pre">C_p</span></code>.  The
+leading local remainder is the omitted exponent <code class="docutils literal notranslate"><span class="pre">C_{p+1}</span></code>.  This bound
+evaluates that omitted exponent as an actual nested-commutator expression
+over the Hamiltonian’s Pauli terms, rather than replacing every commutator
+by a worst-case triangle-inequality estimate.  If
+<code class="docutils literal notranslate"><span class="pre">beta</span> <span class="pre">=</span> <span class="pre">||C_{p+1}(-iH_1,</span> <span class="pre">...,</span> <span class="pre">-iH_m)||</span></code> is bounded by the Pauli
+coefficient 1-norm, then <code class="docutils literal notranslate"><span class="pre">N</span></code> time slices give</p>
+<div class="math notranslate nohighlight">
+\[\epsilon \le \frac{\beta |t|^{p+1}}{N^p}.\]</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><em>QubitOperator</em></a>) – The qubit Hamiltonian to simulate.</p></li>
+<li><p><strong>time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The total evolution time <em>t</em>.</p></li>
+<li><p><strong>target_accuracy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The target accuracy <span class="math notranslate nohighlight">\(\epsilon &gt; 0\)</span>.</p></li>
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The order of the Zassenhaus formula.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold below which coefficients are discarded.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The minimum number of Zassenhaus steps (at least 1).</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> is not positive or <code class="docutils literal notranslate"><span class="pre">order</span></code> is not positive.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_naive">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.</span></span><span class="sig-name descname"><span class="pre">zassenhaus_steps_naive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_accuracy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutator_exponents</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/hamiltonian_unitary_builder/time_evolution/zassenhaus_error.html#zassenhaus_steps_naive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error.zassenhaus_steps_naive" title="Link to this definition"></a></dt>
+<dd><p>Compute the number of Zassenhaus steps using a naive bound.</p>
+<p>This triangle-inequality estimate uses the Hamiltonian coefficient
+1-norm and treats an order-<code class="docutils literal notranslate"><span class="pre">p</span></code> Zassenhaus formula as having local
+remainder scaling like <code class="docutils literal notranslate"><span class="pre">O(t</span> <span class="pre">**</span> <span class="pre">(p</span> <span class="pre">+</span> <span class="pre">1))</span></code>.  The leading local remainder
+is the first omitted Zassenhaus exponent <code class="docutils literal notranslate"><span class="pre">C_{p+1}</span></code>, whose combined
+symbolic commutator coefficients are bounded by
+<span class="math notranslate nohighlight">\(\kappa_{p+1} = \sum_w |c_w|\)</span>.  Applying
+<span class="math notranslate nohighlight">\(\|[A, B]\| \le 2 \|A\| \|B\|\)</span> repeatedly gives:</p>
+<div class="math notranslate nohighlight">
+\[\epsilon \le
+\frac{\kappa_{p+1} 2^p \|H\|_1^{p+1} |t|^{p+1}}{N^p}.\]</div>
+<p>After splitting the total simulation time into <code class="docutils literal notranslate"><span class="pre">N</span></code> steps, the minimum
+naive step count is:</p>
+<div class="math notranslate nohighlight">
+\[N = \left\lceil
+\frac{(\kappa_{p+1} 2^p \|H\|_1^{p+1})^{1/p} |t|^{1+1/p}}{\epsilon^{1/p}}
+\right\rceil .\]</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><em>QubitOperator</em></a>) – The qubit Hamiltonian to simulate.</p></li>
+<li><p><strong>time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The total evolution time <em>t</em>.</p></li>
+<li><p><strong>target_accuracy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The target accuracy <span class="math notranslate nohighlight">\(\epsilon &gt; 0\)</span>.</p></li>
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The order of the Zassenhaus formula.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold below which coefficients are discarded.</p></li>
+<li><p><strong>commutator_exponents</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping" title="(in Python v3.14)"><em>Mapping</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Hashable" title="(in Python v3.14)"><em>Hashable</em></a><em> | </em><a class="reference internal" href="qdk_chemistry.utils.zassenhaus_generation.html#qdk_chemistry.utils.zassenhaus_generation.CommutatorNode" title="qdk_chemistry.utils.zassenhaus_generation.CommutatorNode"><em>CommutatorNode</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/fractions.html#fractions.Fraction" title="(in Python v3.14)"><em>Fraction</em></a><em>]</em><em>] </em><em>| </em><em>None</em>) – Precomputed mapping from zassenhaus_commutator_plan; must include order + 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The minimum number of Zassenhaus steps (at least 1).</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> is not positive or <code class="docutils literal notranslate"><span class="pre">order</span></code> is not positive.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.hamiltonian_unitary_builder.base module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

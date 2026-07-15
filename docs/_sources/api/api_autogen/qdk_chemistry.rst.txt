@@ -15,7 +15,9 @@ Subpackages
 
    qdk_chemistry.algorithms
    qdk_chemistry.data
+   qdk_chemistry.migrate
    qdk_chemistry.plugins
+   qdk_chemistry.remote
    qdk_chemistry.utils
 
 Submodules
@@ -24,6 +26,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   qdk_chemistry._version
    qdk_chemistry.constants
    qdk_chemistry.definitions

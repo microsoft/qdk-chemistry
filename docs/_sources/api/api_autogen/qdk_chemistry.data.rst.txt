@@ -14,7 +14,8 @@ Subpackages
    :maxdepth: 4
 
    qdk_chemistry.data.enums
-   qdk_chemistry.data.time_evolution
+   qdk_chemistry.data.time_dependent_qubit_hamiltonian
+   qdk_chemistry.data.unitary_representation
 
 Submodules
 ----------
@@ -22,6 +23,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.data._hashing
+   qdk_chemistry.data._spin_channels
    qdk_chemistry.data.base
    qdk_chemistry.data.circuit
    qdk_chemistry.data.circuit_executor_data
@@ -29,5 +32,7 @@ Submodules
    qdk_chemistry.data.estimator_data
    qdk_chemistry.data.noise_models
    qdk_chemistry.data.qpe_result
-   qdk_chemistry.data.qubit_hamiltonian
+   qdk_chemistry.data.qubit_operator
    qdk_chemistry.data.symmetries
+   qdk_chemistry.data.symmetry
+   qdk_chemistry.data.term_partition

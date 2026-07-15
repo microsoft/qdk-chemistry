@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.networkx.term\_grouper module
+====================================================
+
+.. automodule:: qdk_chemistry.plugins.networkx.term_grouper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,0 +1,286 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MajoranaMapping &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Pauli Operators" href="pauli_operator.html" />
+    <link rel="prev" title="LatticeGraph" href="lattice_graph.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">MajoranaMapping</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#bilinears-as-the-unified-primitive">Bilinears as the unified primitive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#built-in-encodings">Built-in encodings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#custom-encodings">Custom encodings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
+      <li class="breadcrumb-item active">MajoranaMapping</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/majorana_mapping.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="majoranamapping">
+<h1>MajoranaMapping<a class="headerlink" href="#majoranamapping" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> class defines a fermion-to-qubit encoding.
+It exposes the <strong>bilinear</strong> <span class="math notranslate nohighlight">\(i\,\gamma_j\,\gamma_k\)</span> as the unified primitive available across every encoding, and (for Majorana-atomic encodings) individual Majorana operators <span class="math notranslate nohighlight">\(\gamma_k\)</span> as an additional capability.
+It follows QDK/Chemistry’s data-container conventions for immutable fermion-to-qubit encoding data.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Fermion-to-qubit mappings transform fermionic creation and annihilation operators into qubit (Pauli) operators.
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> class encapsulates such an encoding as data, making the <a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a> algorithm encoding-agnostic: the mapper receives the encoding as data rather than selecting it internally.</p>
+</section>
+<section id="bilinears-as-the-unified-primitive">
+<h2>Bilinears as the unified primitive<a class="headerlink" href="#bilinears-as-the-unified-primitive" title="Link to this heading"></a></h2>
+<p>Every fermion-to-qubit encoding can express the <strong>bilinear</strong> product <span class="math notranslate nohighlight">\(i\,\gamma_j\,\gamma_k\)</span> as a Pauli string.
+This makes the bilinear the most general building block that all encodings share.</p>
+<p>Why bilinears?  Physical (parity-conserving) fermionic operators can always be
+written as products of bilinears, so any Hamiltonian can be mapped through
+bilinears alone — even if the encoding does not assign a Pauli image to
+individual Majorana operators <span class="math notranslate nohighlight">\(\gamma_k\)</span>.</p>
+<p>For the formal foundations, see <a class="reference external" href="https://arxiv.org/abs/quant-ph/0003137">Bravyi and Kitaev (2002)</a>,
+which develops the Majorana-operator perspective on fermion-to-qubit encodings.</p>
+<p>Individual Majorana operators <span class="math notranslate nohighlight">\(\gamma_k\)</span> have a Pauli image only in <strong>Majorana-atomic</strong> encodings (e.g. Jordan-Wigner, Bravyi-Kitaev, Parity).
+In <strong>bilinear-only</strong> encodings — where the number of qubits exceeds the number of fermionic modes — single Majoranas have no representation in the physical subspace; only the bilinears are observable.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> supports both forms:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.bilinear" title="qdk_chemistry.data.MajoranaMapping.bilinear"><code class="xref py py-meth docutils literal notranslate"><span class="pre">bilinear()</span></code></a> — the unified primitive available on every encoding.</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.majorana" title="qdk_chemistry.data.MajoranaMapping.majorana"><code class="xref py py-meth docutils literal notranslate"><span class="pre">majorana()</span></code></a> — the additional capability provided by Majorana-atomic encodings; gated by <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.is_majorana_atomic" title="qdk_chemistry.data.MajoranaMapping.is_majorana_atomic"><code class="xref py py-attr docutils literal notranslate"><span class="pre">is_majorana_atomic</span></code></a>.</p></li>
+</ul>
+<p>Majorana-atomic mappings are constructed from a Pauli-string table (the constructor or factory methods).
+Bilinear-only mappings are constructed via <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.from_bilinears" title="qdk_chemistry.data.MajoranaMapping.from_bilinears"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_bilinears()</span></code></a>.</p>
+<section id="convention">
+<h3>Convention<a class="headerlink" href="#convention" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">num_modes</span></code></dt><dd><p>The number of fermionic modes (spin-orbitals) in the system.</p>
+</dd>
+</dl>
+<p>Pauli strings use little-endian qubit ordering, consistent with the rest of QDK/Chemistry’s <a class="reference internal" href="pauli_operator.html"><span class="doc">PauliOperator</span></a> layer.
+<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.majorana" title="qdk_chemistry.data.MajoranaMapping.majorana"><code class="xref py py-meth docutils literal notranslate"><span class="pre">majorana()</span></code></a> and <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.bilinear" title="qdk_chemistry.data.MajoranaMapping.bilinear"><code class="xref py py-meth docutils literal notranslate"><span class="pre">bilinear()</span></code></a> return Pauli strings in the encoding’s native (pre-taper) qubit basis.</p>
+</section>
+</section>
+<section id="built-in-encodings">
+<h2>Built-in encodings<a class="headerlink" href="#built-in-encodings" title="Link to this heading"></a></h2>
+<p>Factory methods construct standard encodings for a given number of modes.
+Each returns a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> with the appropriate Pauli-string table and a descriptive <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<section id="jordan-wigner">
+<h3>Jordan-Wigner<a class="headerlink" href="#jordan-wigner" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+<span class="c1"># Bilinear (works on every encoding):</span>
+<span class="n">coeff</span><span class="p">,</span> <span class="n">pauli_str</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">bilinear</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Single Majorana (Majorana-atomic encodings only):</span>
+<span class="k">if</span> <span class="n">mapping</span><span class="o">.</span><span class="n">is_majorana_atomic</span><span class="p">:</span>
+    <span class="n">gamma_0</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">majorana</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Encodes each fermionic mode in a single qubit.
+See <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-jordan-wigner"><span class="std std-ref">Jordan-Wigner Jordan-Wigner1928</span></a> for a description of the encoding.</p>
+</section>
+<section id="bravyi-kitaev">
+<h3>Bravyi-Kitaev<a class="headerlink" href="#bravyi-kitaev" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">bravyi_kitaev</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Uses a binary-tree structure to reduce average Pauli-string weight.
+See <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-bravyi-kitaev"><span class="std std-ref">Bravyi-Kitaev Seeley2012</span></a> for a description of the encoding.</p>
+</section>
+<section id="parity">
+<h3>Parity<a class="headerlink" href="#parity" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">parity</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Encodes cumulative electron-number parities.
+See <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-parity"><span class="std std-ref">Parity Seeley2012</span></a> for a description of the encoding.</p>
+</section>
+</section>
+<section id="custom-encodings">
+<h2>Custom encodings<a class="headerlink" href="#custom-encodings" title="Link to this heading"></a></h2>
+<p>A custom Majorana-atomic encoding can be defined by providing a sparse Pauli-word table directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+
+<span class="c1"># Provide one sparse Pauli word per Majorana operator.</span>
+<span class="c1"># Entries are (qubit_index, operator_code), with X=1, Y=2, Z=3.</span>
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_table</span><span class="p">([</span><span class="o">...</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;my-custom-encoding&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> supports the same <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> formats as other QDK/Chemistry data classes:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+<span class="c1"># JSON round-trip</span>
+<span class="n">json_str</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+
+<span class="c1"># HDF5 round-trip</span>
+<span class="n">mapping</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;mapping.h5&quot;</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;mapping.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Fermionic Hamiltonian transformed by the mapping</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>: Output of qubit mapping using this encoding</p></li>
+<li><p><a class="reference internal" href="pauli_operator.html"><span class="doc">PauliOperator</span></a>: Pauli operator expressions used in the mapping table</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a>: The algorithm that consumes a <code class="docutils literal notranslate"><span class="pre">MajoranaMapping</span></code> to perform fermion-to-qubit transformations</p></li>
+<li><p><a class="reference internal" href="../design/index.html"><span class="doc">Design principles</span></a>: Data class design principles in QDK/Chemistry</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="lattice_graph.html" class="btn btn-neutral float-left" title="LatticeGraph" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pauli_operator.html" class="btn btn-neutral float-right" title="Pauli Operators" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

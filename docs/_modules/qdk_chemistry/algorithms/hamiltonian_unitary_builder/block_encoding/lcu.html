@@ -1,0 +1,392 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;QDK/Chemistry implementation of the LCU (Linear Combination of Unitaries).</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Childs, A. M. and Wiebe, N. &quot;Hamiltonian simulation using linear</span>
+<span class="sd">    combinations of unitary operations.&quot; *Quantum Information &amp;</span>
+<span class="sd">    Computation* 12.11-12 (2012): 901-924.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">HamiltonianUnitaryBuilder</span><span class="p">,</span>
+    <span class="n">HamiltonianUnitaryBuilderSettings</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Configuration</span><span class="p">,</span>
+    <span class="n">ModelOrbitals</span><span class="p">,</span>
+    <span class="n">QubitOperator</span><span class="p">,</span>
+    <span class="n">StateVectorContainer</span><span class="p">,</span>
+    <span class="n">UnitaryRepresentation</span><span class="p">,</span>
+    <span class="n">Wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.block_encoding</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ControlledOperation</span><span class="p">,</span>
+    <span class="n">LCUContainer</span><span class="p">,</span>
+    <span class="n">Select</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.quantum_walk</span><span class="w"> </span><span class="kn">import</span> <span class="n">LCUWalkContainer</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LCUBuilder&quot;</span><span class="p">,</span> <span class="s2">&quot;LCUSettings&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="LCUSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LCUSettings</span><span class="p">(</span><span class="n">HamiltonianUnitaryBuilderSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the LCU block encoding builder.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="LCUSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize LCUSettings with default values.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            power: The power to which the unitary is raised.</span>
+<span class="sd">            quantum_walk: If True, wrap block encoding with quantum walk operator (use with QPE).</span>
+<span class="sd">                If False, use plain block encoding (use with Hadamard test).</span>
+<span class="sd">            tolerance: Minimum L1 norm below which the LCU decomposition is numerically ill-defined.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;The power to which the Hamiltonian is raised.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;quantum_walk&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;bool&quot;</span><span class="p">,</span>
+            <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">&quot;If True, wrap block encoding with quantum walk operator (use with QPE). &quot;</span>
+            <span class="s2">&quot;If False, use plain block encoding (use with Hadamard test).&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;tolerance&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;float&quot;</span><span class="p">,</span>
+            <span class="mf">1e-12</span><span class="p">,</span>
+            <span class="s2">&quot;Minimum L1 norm below which the LCU decomposition is numerically ill-defined.&quot;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LCUBuilder">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUBuilder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LCUBuilder</span><span class="p">(</span><span class="n">HamiltonianUnitaryBuilder</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;LCU (Linear Combination of Unitaries) block encoding builder.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="LCUBuilder.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUBuilder.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">quantum_walk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize the LCU builder.</span>
+
+<span class="sd">        Given a Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` expressed as a</span>
+<span class="sd">        linear combination of Pauli strings :math:`P_j` with scalar coefficients</span>
+<span class="sd">        :math:`\alpha_j`, this builder constructs an LCU representation that block-encodes</span>
+<span class="sd">        :math:`H / \lambda`, where :math:`\lambda` is the L1 norm of the</span>
+<span class="sd">        Hamiltonian. The LCU representation follows the PREPARE-SELECT-PREPARE† pattern.</span>
+
+<span class="sd">        The PREPARE oracle encodes amplitudes :math:`\sqrt{|\alpha_j| / \lambda}` into</span>
+<span class="sd">        an ancilla register of :math:`\lceil \log_2 L \rceil` qubits. The SELECT oracle applies</span>
+<span class="sd">        the corresponding Pauli string :math:`P_j` (with sign correction) controlled on the</span>
+<span class="sd">        ancilla index. The :math:`\alpha_j` is positive by absorbing the sign into phases of</span>
+<span class="sd">        the SELECT operation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            power: The power to raise the unitary to. Defaults to 1.</span>
+<span class="sd">            quantum_walk: If True, the circuit mapper wraps the block encoding with</span>
+<span class="sd">                a quantum walk operator (use with QPE). If False, use the plain</span>
+<span class="sd">                block encoding (use with Hadamard test). Defaults to False.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">LCUSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="n">power</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;quantum_walk&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UnitaryRepresentation</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the unitary representation using LCU block encoding.</span>
+
+<span class="sd">        Computes normalized amplitudes, signs, and controlled operations from the</span>
+<span class="sd">        Hamiltonian, then packages them into generalized Prepare/Select dataclasses</span>
+<span class="sd">        stored in an LCUContainer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit operator to be used in the construction.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">)</span>
+        <span class="n">quantum_walk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;quantum_walk&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">is_hermitian</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;LCU block encoding requires a Hermitian Hamiltonian.&quot;</span><span class="p">)</span>
+
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">coefficients</span>
+        <span class="n">num_terms</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_terms</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;LCU block encoding requires a non-empty Hamiltonian.&quot;</span><span class="p">)</span>
+        <span class="n">num_prepare_ancillas</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">num_terms</span><span class="p">)))</span>
+
+        <span class="n">prepare_wfn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_prepare</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">num_prepare_ancillas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">))</span>
+        <span class="n">select</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_select</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">num_prepare_ancillas</span><span class="p">)</span>
+
+        <span class="n">lcu_container</span> <span class="o">=</span> <span class="n">LCUContainer</span><span class="p">(</span>
+            <span class="n">power</span><span class="o">=</span><span class="n">power</span><span class="p">,</span>
+            <span class="n">prepare</span><span class="o">=</span><span class="n">prepare_wfn</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">select</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">container</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">LCUWalkContainer</span><span class="p">(</span><span class="n">block_encoding</span><span class="o">=</span><span class="n">lcu_container</span><span class="p">,</span> <span class="n">power</span><span class="o">=</span><span class="n">power</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">schatten_norm</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">quantum_walk</span>
+            <span class="k">else</span> <span class="n">lcu_container</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">UnitaryRepresentation</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">container</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_prepare</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span> <span class="n">num_prepare_ancillas</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Wavefunction&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the prepare wavefunction from Hamiltonian coefficients.</span>
+
+<span class="sd">        Normalizes the absolute Hamiltonian coefficients by the L1 norm and</span>
+<span class="sd">        takes the element-wise square root to produce the state-preparation amplitudes.</span>
+<span class="sd">        Returns a :class:`Wavefunction` with 1-bit-per-mode configurations.</span>
+<span class="sd">        For single-term Hamiltonians (``num_prepare_ancillas == 0``), returns a</span>
+<span class="sd">        trivial 0-mode wavefunction.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit operator whose coefficients define the amplitudes.</span>
+<span class="sd">            num_prepare_ancillas: Number of qubits in the prepare ancillary register.</span>
+<span class="sd">            tolerance: Minimum allowable L1 norm; raises if the norm is below</span>
+<span class="sd">                this threshold.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Wavefunction: A wavefunction over the ancilla register whose amplitudes</span>
+<span class="sd">            encode the normalized coefficients (0-mode for single-term case).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">l1_norm</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">schatten_norm</span>
+        <span class="k">if</span> <span class="n">l1_norm</span> <span class="o">&lt;</span> <span class="n">tolerance</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;L1 norm is too small, cannot build LCU block encoding.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">num_prepare_ancillas</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">orbitals</span> <span class="o">=</span> <span class="n">ModelOrbitals</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">([</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="n">Configuration</span><span class="o">.</span><span class="n">from_bitstring</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)],</span> <span class="n">orbitals</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">c</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">()])</span>
+        <span class="n">abs_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+        <span class="n">amplitudes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">abs_coeffs</span> <span class="o">/</span> <span class="n">l1_norm</span><span class="p">)</span>
+
+        <span class="c1"># Build 1-bit-per-mode Configuration determinants for each nonzero amplitude.</span>
+        <span class="n">coeffs_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">dets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Configuration</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">amp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">amplitudes</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">amp</span> <span class="o">!=</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="n">bitstring</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;0</span><span class="si">{</span><span class="n">num_prepare_ancillas</span><span class="si">}</span><span class="s2">b&quot;</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">dets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Configuration</span><span class="o">.</span><span class="n">from_bitstring</span><span class="p">(</span><span class="n">bitstring</span><span class="p">))</span>
+                <span class="n">coeffs_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">amp</span><span class="p">))</span>
+
+        <span class="n">coeffs_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coeffs_list</span><span class="p">)</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">ModelOrbitals</span><span class="p">(</span><span class="n">num_prepare_ancillas</span><span class="p">)</span>
+        <span class="n">container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">coeffs_array</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_select</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span> <span class="n">num_prepare_ancillas</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Select</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute SELECT controlled operations and phases from Hamiltonian terms.</span>
+
+<span class="sd">        Builds a list of controlled Pauli-string operations (one per Hamiltonian term)</span>
+<span class="sd">        and an array of sign phases extracted from the real coefficients.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit operator whose Pauli strings and coefficients</span>
+<span class="sd">                define the controlled operations.</span>
+<span class="sd">            num_prepare_ancillas: Number of qubits in the prepare ancillary register.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Select: The SELECT oracle dataclass containing controlled operations, phases,</span>
+<span class="sd">                and qubit layout.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">real_coeffs</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">()</span>
+        <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">real_coeffs</span><span class="p">]</span>
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">coeff</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_coeffs</span><span class="p">])</span>
+        <span class="n">num_terms</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">coefficients</span><span class="p">)</span>
+        <span class="n">num_system_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
+        <span class="n">phases</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">coefficients</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">controlled_ops</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ControlledOperation</span><span class="p">(</span>
+                <span class="n">ctrl_state</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+                <span class="n">operation</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_terms</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">Select</span><span class="p">(</span>
+            <span class="n">controlled_operations</span><span class="o">=</span><span class="n">controlled_ops</span><span class="p">,</span>
+            <span class="n">phases</span><span class="o">=</span><span class="n">phases</span><span class="p">,</span>
+            <span class="n">num_prepare_ancillas</span><span class="o">=</span><span class="n">num_prepare_ancillas</span><span class="p">,</span>
+            <span class="n">num_target_qubits</span><span class="o">=</span><span class="n">num_system_qubits</span><span class="p">,</span>
+            <span class="n">prepare_qubits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_prepare_ancillas</span><span class="p">)),</span>
+            <span class="n">target_qubits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_prepare_ancillas</span><span class="p">,</span> <span class="n">num_prepare_ancillas</span> <span class="o">+</span> <span class="n">num_system_qubits</span><span class="p">)),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="LCUBuilder.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUBuilder.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The name ``&quot;lcu&quot;``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;lcu&quot;</span></div>
+
+
+<div class="viewcode-block" id="LCUBuilder.type_name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu.LCUBuilder.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The type name ``&quot;hamiltonian_unitary_builder&quot;``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

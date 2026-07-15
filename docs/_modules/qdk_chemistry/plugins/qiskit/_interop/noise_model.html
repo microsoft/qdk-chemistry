@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit._interop.noise_model &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit._interop.noise_model &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -98,8 +99,6 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
-
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_aer.noise</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseModel</span><span class="p">,</span> <span class="n">depolarizing_error</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.noise_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumErrorProfile</span><span class="p">,</span> <span class="n">SupportedErrorTypes</span>
@@ -126,23 +125,33 @@
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">noise_model</span> <span class="o">=</span> <span class="n">NoiseModel</span><span class="p">(</span><span class="n">basis_gates</span><span class="o">=</span><span class="n">quantum_error_profile</span><span class="o">.</span><span class="n">basis_gates</span><span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="n">quantum_error_profile</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_rates</span> <span class="ow">in</span> <span class="n">quantum_error_profile</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">exclude_gates</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span> <span class="ow">in</span> <span class="n">exclude_gates</span><span class="p">:</span>
             <span class="k">continue</span>
-        <span class="k">if</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">DEPOLARIZING_ERROR</span><span class="p">:</span>
-            <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span>
-                <span class="n">depolarizing_error</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]),</span>
-                <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)],</span>  <span class="c1"># Convert gate to string for Qiskit</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Unsupported error type: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> for gate </span><span class="si">{</span><span class="n">gate</span><span class="si">}</span><span class="s2">. &quot;</span>
-                <span class="s2">&quot;The error contribution will be ignored in this error model.&quot;</span><span class="p">,</span>
-                <span class="n">category</span><span class="o">=</span><span class="ne">UserWarning</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">rate</span> <span class="ow">in</span> <span class="n">error_rates</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">error_type</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">DEPOLARIZING_ERROR</span><span class="p">:</span>
+                <span class="n">num_qubits</span> <span class="o">=</span> <span class="n">_check_num_qubits</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">),</span> <span class="n">noise_model</span><span class="p">)</span>
+                <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span>
+                    <span class="n">depolarizing_error</span><span class="p">(</span><span class="n">rate</span><span class="p">,</span> <span class="n">num_qubits</span><span class="p">),</span>
+                    <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)],</span>  <span class="c1"># Convert gate to string for Qiskit</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">error_type</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">QUBIT_LOSS</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Qubit loss error is not currently supported in Qiskit noise models.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported error type: </span><span class="si">{</span><span class="n">error_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">noise_model</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_num_qubits</span><span class="p">(</span><span class="n">gate</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">noise_model</span><span class="p">:</span> <span class="n">NoiseModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to determine the number of qubits for a given gate.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">noise_model</span><span class="o">.</span><span class="n">_1qubit_instructions</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">noise_model</span><span class="o">.</span><span class="n">_2qubit_instructions</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">return</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">gate</span> <span class="ow">in</span> <span class="n">noise_model</span><span class="o">.</span><span class="n">_3qubit_instructions</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">return</span> <span class="mi">3</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported gate type: </span><span class="si">{</span><span class="n">gate</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 
            </div>

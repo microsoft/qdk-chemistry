@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit.regular_isometry &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit.regular_isometry &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -105,6 +106,8 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span><span class="p">,</span> <span class="n">StatePreparationSettings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_indices</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">axes</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit._interop.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">MergeZBasisRotations</span><span class="p">,</span>
     <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
@@ -146,7 +149,9 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="c1"># Active Space Consistency Check</span>
-        <span class="n">alpha_indices</span><span class="p">,</span> <span class="n">beta_indices</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+        <span class="n">active_indices</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span>
+        <span class="n">alpha_indices</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+        <span class="n">beta_indices</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
         <span class="k">if</span> <span class="n">alpha_indices</span> <span class="o">!=</span> <span class="n">beta_indices</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Active space contains </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">alpha_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> alpha orbitals and &quot;</span>

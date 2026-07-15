@@ -1,0 +1,22 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder.time\_evolution package
+===============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus
+   qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Namespace qdk::chemistry::utils &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Namespace qdk::chemistry::utils &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -113,6 +114,44 @@
 <dd><div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-enums">Enums</p>
 <dl class="cpp enum-class">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTagE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTagE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTagE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdc"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HashValueTag</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">uint8_t</span></span><br /></dt>
+<dd><p>Stable byte tags used to delimit generic hash_value encodings. </p>
+<p>These are explicit hash-format markers, not serialized C++ type identity. RTTI names are implementation-defined and may vary by compiler, standard library, and build flags; fixed tags keep the digest format deterministic. </p>
+<p><em>Values:</em></p>
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag15RealAlternativeE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag15RealAlternativeE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag15RealAlternativeE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdcaa884bb6b68c4612556d9e61bc1c64dcf"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">RealAlternative</span></span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag18ComplexAlternativeE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag18ComplexAlternativeE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag18ComplexAlternativeE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdca3529f9c8d8fd78bc58c03e948b66e6fa"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ComplexAlternative</span></span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag9SharedPtrE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag9SharedPtrE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag9SharedPtrE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdca309589a0fa2f1ec5e6b286ac5e8b6ac8"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">SharedPtr</span></span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag8OptionalE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag8OptionalE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag8OptionalE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdcaebb061953c0454b2c8ee7b0ac615ebcd"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Optional</span></span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag6VectorE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag6VectorE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag6VectorE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdca57dea6f5039281b7fee517fc43bf3110"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Vector</span></span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp enumerator">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils12HashValueTag7VariantE">
+<span id="_CPPv3N3qdk9chemistry5utils12HashValueTag7VariantE"></span><span id="_CPPv2N3qdk9chemistry5utils12HashValueTag7VariantE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1abc44471545393d539fd2458e239f5fdca492f18b60811bf85ce118c0c6a1a5c4a"></span><span class="k"><span class="pre">enumerator</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Variant</span></span></span><br /></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="cpp enum-class">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils8LogLevelE">
 <span id="_CPPv3N3qdk9chemistry5utils8LogLevelE"></span><span id="_CPPv2N3qdk9chemistry5utils8LogLevelE"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a0fb42ed4915b858bd97192d23c8bd9e1"></span><span class="k"><span class="pre">enum</span></span><span class="w"> </span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">LogLevel</span></span></span><br /></dt>
 <dd><p>Log level enumeration for QDK Chemistry logging. </p>
@@ -165,15 +204,16 @@
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-functions">Functions</p>
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEi">
-<span id="_CPPv3N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEi"></span><span id="_CPPv2N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEi"></span><span id="qdk::chemistry::utils::compute_valence_space_parameters__std::shared_ptr:qdk::chemistry::data::Wavefunction:.i"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1af771e066ee7bd09a79a56a229225dccc"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">pair</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">compute_valence_space_parameters</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data12WavefunctionE" title="qdk::chemistry::data::Wavefunction"><span class="n"><span class="pre">Wavefunction</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">wavefunction</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">charge</span></span><span class="sig-paren">)</span><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEib">
+<span id="_CPPv3N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEib"></span><span id="_CPPv2N3qdk9chemistry5utils32compute_valence_space_parametersENSt10shared_ptrIN3qdk9chemistry4data12WavefunctionEEEib"></span><span id="qdk::chemistry::utils::compute_valence_space_parameters__std::shared_ptr:qdk::chemistry::data::Wavefunction:.i.b"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a20be2b48729325ed933676113873d84c"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">pair</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">compute_valence_space_parameters</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data12WavefunctionE" title="qdk::chemistry::data::Wavefunction"><span class="n"><span class="pre">Wavefunction</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">wavefunction</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">charge</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">include_double_d_shell</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Computes the default number of valence orbitals and electrons for a given structure and wavefunction. </p>
 <p>This function analyzes the provided molecular structure and wavefunction to determine the number of electrons and orbitals in valence shell</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>wavefunction</strong> – Shared pointer to the wavefunction containing electronic structure information (structure is extracted from wavefunction-&gt;orbitals-&gt;basis_set) </p></li>
-<li><p><strong>charge</strong> – The total charge of the molecular system, which should be equal to the charge set in scf calculation</p></li>
+<li><p><strong>charge</strong> – The total charge of the molecular system, which should be equal to the charge set in scf calculation </p></li>
+<li><p><strong>include_double_d_shell</strong> – If true, add 5 correlating d’ orbitals to the valence space for d-block elements (Sc-Zn, Y-Cd, Hf-Hg) to capture the strong nd / (n+1)d’ radial correlation in transition metals (the “double d-shell” effect). Defaults to false.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -188,58 +228,369 @@
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I00EN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1T">
-<span id="_CPPv3I00EN3qdk9chemistry5utils12hash_combineENSt6size_tERK1T"></span><span id="_CPPv2I00EN3qdk9chemistry5utils12hash_combineENSt6size_tERK1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Hasher</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I00EN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1T" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1adb1d798a8dfc2344366308982665dfd4"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_combine</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4I00EN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1T" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">v</span></span><span class="sig-paren">)</span><br /></dt>
-<dd><p>Combines a hash value with the hash of another value. </p>
-<p>This function implements a hash combination algorithm that takes an existing hash seed and combines it with the hash of a new value. It uses a modified version of the boost::hash_combine algorithm with the golden ratio constant for better hash distribution.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The algorithm uses the magic constant 0x9e3779b9 (derived from the golden ratio) and bit shifting for good hash distribution properties. </p>
-</div>
+<span id="_CPPv3I00EN3qdk9chemistry5utils12hash_combineENSt6size_tERK1T"></span><span id="_CPPv2I00EN3qdk9chemistry5utils12hash_combineENSt6size_tERK1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Hasher</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">hash</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I00EN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1T" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1ad2f13d0b7ee7f071009d99f18b731e99"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_combine</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4I00EN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1T" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Combine an existing hash seed with the hash of another value. </p>
+<p>This helper is intended for fast local hash-code composition, not for persistent content hashes.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>T</strong> – The type of value to hash. </p></li>
-<li><p><strong>Hasher</strong> – The hash function type (defaults to std::hash&lt;T&gt;). </p></li>
+<li><p><strong>T</strong> – Value type to hash. </p></li>
+<li><p><strong>Hasher</strong> – Hash function type. Defaults to std::hash&lt;T&gt;. </p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>seed</strong> – The existing hash value to combine with. </p></li>
-<li><p><strong>v</strong> – The value to hash and combine. </p></li>
+<li><p><strong>seed</strong> – Existing hash seed. </p></li>
+<li><p><strong>value</strong> – Value to hash and combine into the seed. </p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The combined hash value.</p>
+<dd class="field-odd"><p>Combined hash value. </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1TDpRR4Args">
-<span id="_CPPv3I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tERK1TDpRR4Args"></span><span id="_CPPv2I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tERK1TDpRR4Args"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Args</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a37fdfcb3e5c12bbcd73d78f017b52575"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_combine</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1TDpRR4Args" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">v</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1TDpRR4Args" title="qdk::chemistry::utils::hash_combine::Args"><span class="n"><span class="pre">Args</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><br /></dt>
-<dd><p>Variadic overload that combines a hash seed with multiple values. </p>
-<p>This function recursively combines the hash of multiple values into a single hash value, processing values left-to-right.</p>
-<p>
-Example: <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="p">::</span><span class="n">size_t</span> <span class="n">h</span> <span class="o">=</span> <span class="n">hash_combine</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">);</span>  <span class="o">//</span> <span class="n">Combines</span> <span class="n">hashes</span> <span class="n">of</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span>
-</pre></div>
-</div>
- </p>
+<span id="_CPPv3I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tERK1TDpRR4Args"></span><span id="_CPPv2I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tERK1TDpRR4Args"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Args</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a9a905220c4ef85ee707a0ff4af4c02f7"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_combine</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">seed</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1TDpRR4Args" title="qdk::chemistry::utils::hash_combine::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4I0DpEN3qdk9chemistry5utils12hash_combineENSt6size_tENSt6size_tERK1TDpRR4Args" title="qdk::chemistry::utils::hash_combine::Args"><span class="n"><span class="pre">Args</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Combine an existing hash seed with multiple values from left to right. </p>
+<p>This helper is intended for fast local hash-code composition, not for persistent content hashes.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>T</strong> – The type of the first value to hash. </p></li>
-<li><p><strong>Args</strong> – The types of the remaining values to hash. </p></li>
+<li><p><strong>T</strong> – First value type to hash. </p></li>
+<li><p><strong>Args</strong> – Remaining value types to hash. </p></li>
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
-<li><p><strong>seed</strong> – The existing hash value to combine with. </p></li>
-<li><p><strong>v</strong> – The first value to hash and combine. </p></li>
-<li><p><strong>args</strong> – The remaining values to hash and combine. </p></li>
+<li><p><strong>seed</strong> – Existing hash seed. </p></li>
+<li><p><strong>value</strong> – First value to hash and combine into the seed. </p></li>
+<li><p><strong>args</strong> – Remaining values to hash and combine into the seed. </p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The combined hash value.</p>
+<dd class="field-odd"><p>Combined hash value. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils19hash_field_presenceER11HashContextb">
+<span id="_CPPv3N3qdk9chemistry5utils19hash_field_presenceER11HashContextb"></span><span id="_CPPv2N3qdk9chemistry5utils19hash_field_presenceER11HashContextb"></span><span id="qdk::chemistry::utils::hash_field_presence__HashContextR.b"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1ac26f4a0eb8182f063e91ed6640be523f"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_field_presence</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">present</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash whether a nullable field is present before its payload. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>present</strong> – Whether the field is present </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextb">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextb"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextb"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.b"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a66a6955139fcad28c09c47b042732f09"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a boolean value as one byte. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextPKc">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextPKc"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextPKc"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.cCP"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a9ee372029b1ea52fa70a9f2158c88687"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a null-terminated string value. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9MatrixXcdE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9MatrixXcdE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9MatrixXcdE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::MatrixXcdCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a0fb73149217b816c955a76f344ac6c5b"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXcd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a complex dense matrix. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8MatrixXdE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8MatrixXdE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8MatrixXdE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::MatrixXdCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1ae8ec491c8c77d664a6ca371e956ffd73"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a dense matrix. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen12SparseMatrixIdEE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen12SparseMatrixIdEE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen12SparseMatrixIdEE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::SparseMatrix:double:CR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a4307e83e46f20085c8250b1cdc81b274"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">SparseMatrix</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a sparse matrix. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9VectorXcdE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9VectorXcdE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen9VectorXcdE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::VectorXcdCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a7f5aad4a27a4c819b80f694da849e2fc"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXcd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a complex dense vector. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXdE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXdE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXdE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::VectorXdCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a54bdaf090424979953603976b67d0a02"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a dense vector. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXiE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXiE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN5Eigen8VectorXiE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.Eigen::VectorXiCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a0f51b605a41e1036b2ed5eb51c5c80cd"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXi</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a dense integer vector. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13MatrixVariantE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13MatrixVariantE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13MatrixVariantE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.HashContext::MatrixVariantCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a56a27e9c75c416f6440b5eb02d857c72"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContext13MatrixVariantE" title="qdk::chemistry::utils::HashContext::MatrixVariant"><span class="n"><span class="pre">MatrixVariant</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a matrix variant. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13VectorVariantE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13VectorVariantE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKN11HashContext13VectorVariantE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.HashContext::VectorVariantCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1af65ca6cdb4be6f30bece45f63b4f87dd"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContext13VectorVariantE" title="qdk::chemistry::utils::HashContext::VectorVariant"><span class="n"><span class="pre">VectorVariant</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a vector variant. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt7complexI1TEE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt7complexI1TEE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt7complexI1TEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a41ac937f396d7a950f3680475ad5c4b8"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">complex</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt7complexI1TEE" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt8optionalI1TEE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt8optionalI1TEE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt8optionalI1TEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1ab9539564a57ead918345110ebb1b651b"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">optional</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt8optionalI1TEE" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt10shared_ptrI1TEE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt10shared_ptrI1TEE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt10shared_ptrI1TEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a361f096c26ab3aac7be2bb3b009dd197"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt10shared_ptrI1TEE" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextRKNSt6stringE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextRKNSt6stringE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextRKNSt6stringE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.ssCR"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a62de7e0ac6670cb6c10e41fe16dc18d3"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a string value with a length prefix. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4IDpEN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt7variantIDp2TsEE">
+<span id="_CPPv3IDpEN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt7variantIDp2TsEE"></span><span id="_CPPv2IDpEN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt7variantIDp2TsEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Ts</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a49cdb1ad589dab6f8331125791a9d930"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4IDpEN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt7variantIDp2TsEE" title="qdk::chemistry::utils::hash_value::Ts"><span class="n"><span class="pre">Ts</span></span></a><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt6vectorI1TEE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt6vectorI1TEE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils10hash_valueER11HashContextRKNSt6vectorI1TEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a574d23cbd9afe221fa885fbdf47a4426"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContextRKNSt6vectorI1TEE" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">values</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextd">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextd"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextd"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.double"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a1829b94a682b43dd15844394b8dd993c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a double value as deterministic little-endian bytes. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextf">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextf"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextf"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.float"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a3af3e6a8579e6be2a98363d09dd77b08"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a float value through the canonical double encoding. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContext12HashValueTag">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContext12HashValueTag"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContext12HashValueTag"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.HashValueTag"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a9fd0f97baca1d3ff65028ee5d8e3a0cb"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils12HashValueTagE" title="qdk::chemistry::utils::HashValueTag"><span class="n"><span class="pre">HashValueTag</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">tag</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a generic hash-format tag. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>tag</strong> – Tag to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContext7int64_t">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContext7int64_t"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContext7int64_t"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.int64_t"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1ab900b3659ca7032c19e97ce99406b239"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="../../_cpp_placeholders.html#_CPPv47int64_t" title="int64_t"><span class="n"><span class="pre">int64_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a signed 64-bit integer as deterministic little-endian bytes. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContexte">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContexte"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContexte"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.l-double"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a49654a3ff084a481fd77ed16895cb811"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a long double value as a canonical hexadecimal string. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContextNSt11string_viewE">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContextNSt11string_viewE"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContextNSt11string_viewE"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.std::string_view"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a8b78d6b28c7a38654949ff4fa56f6c6d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string_view</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a string value with a length prefix. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContext1T">
+<span id="_CPPv3I0EN3qdk9chemistry5utils10hash_valueER11HashContext1T"></span><span id="_CPPv2I0EN3qdk9chemistry5utils10hash_valueER11HashContext1T"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a78852ba946405fe040c2cc330c2a53e2"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContext1T" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp">
+<span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a09f3ab4065d2d407278963d1654495d0"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContext1T" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp">
+<span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a8965c6acb6cd2fc405426c2e2fbb6ee1"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils10hash_valueEvR11HashContext1T" title="qdk::chemistry::utils::hash_value::T"><span class="n"><span class="pre">T</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContext8uint64_t">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContext8uint64_t"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContext8uint64_t"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.uint64_t"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a06744516693a76e4dd91011d86226e8d"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <a class="reference internal" href="../../_cpp_placeholders.html#_CPPv48uint64_t" title="uint64_t"><span class="n"><span class="pre">uint64_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash an unsigned 64-bit integer as deterministic little-endian bytes. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils10hash_valueER11HashContext7uint8_t">
+<span id="_CPPv3N3qdk9chemistry5utils10hash_valueER11HashContext7uint8_t"></span><span id="_CPPv2N3qdk9chemistry5utils10hash_valueER11HashContext7uint8_t"></span><span id="qdk::chemistry::utils::hash_value__HashContextR.uint8_t"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a0548d48241611b8fda495133ef89da90"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_value</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils11HashContextE" title="qdk::chemistry::utils::HashContext"><span class="n"><span class="pre">HashContext</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">ctx</span></span>, <span class="n"><span class="pre">uint8_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">value</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Hash a single sentinel byte. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ctx</strong> – Hash context to update </p></li>
+<li><p><strong>value</strong> – Value to hash </p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -334,6 +685,20 @@ Examples:<ul class="simple">
 </dd></dl>
 
 </div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-variables">Variables</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils19is_complex_scalar_vE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils19is_complex_scalar_vE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils19is_complex_scalar_vE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">S</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="namespaceqdk_1_1chemistry_1_1utils_1a9c316d35c8fd96c90ec9efb7e1427805"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_complex_scalar_v</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils17is_complex_scalarE" title="qdk::chemistry::utils::is_complex_scalar"><span class="n"><span class="pre">is_complex_scalar</span></span></a><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4I0EN3qdk9chemistry5utils19is_complex_scalar_vE" title="qdk::chemistry::utils::is_complex_scalar_v::S"><span class="n"><span class="pre">S</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">value</span></span><br /></dt>
+<dd><p>Convenience value template: <code class="docutils literal notranslate"><span class="pre">true</span></code> iff <code class="docutils literal notranslate"><span class="pre">S</span></code> is a <code class="docutils literal notranslate"><span class="pre">std::complex&lt;T&gt;</span></code> specialization. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>S</strong> – Scalar type under test (typically <code class="docutils literal notranslate"><span class="pre">double</span></code> or <code class="docutils literal notranslate"><span class="pre">std::complex&lt;double&gt;</span></code>). </p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils13ContextLoggerE">
 <span id="_CPPv3N3qdk9chemistry5utils13ContextLoggerE"></span><span id="_CPPv2N3qdk9chemistry5utils13ContextLoggerE"></span><span id="qdk::chemistry::utils::ContextLogger"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ContextLogger"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ContextLogger</span></span></span><br /></dt>
@@ -418,6 +783,84 @@ Examples:<ul class="simple">
 </dd></dl>
 
 <dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils11HashContextE">
+<span id="_CPPv3N3qdk9chemistry5utils11HashContextE"></span><span id="_CPPv2N3qdk9chemistry5utils11HashContextE"></span><span id="qdk::chemistry::utils::HashContext"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HashContext</span></span></span><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;qdk/chemistry/utils/hash_context.hpp&gt;</em></div>
+<p>Streaming context for deterministic content hashes. </p>
+<p>Provides an incremental byte-oriented interface for feeding data into a content digest. Producers must add fields in a deterministic order; this is a sequential streaming hash interface, not a tree hash suitable for parallel producers. Use <a class="reference internal" href="#namespaceqdk_1_1chemistry_1_1utils_1a1829b94a682b43dd15844394b8dd993c"><span class="std std-ref">hash_value()</span></a> to hash typed values.</p>
+<p>Content hashes are intended for cache keys and checkpoint/restart workflows among compatible builds. They are not a data preservation format, and the exact digest values are not guaranteed to remain stable across releases.</p>
+<p><a class="reference internal" href="#classqdk_1_1chemistry_1_1utils_1_1HashContext"><span class="std std-ref">HashContext</span></a> favors deterministic byte encodings over lookup speed. For performance-sensitive in-memory hash tables, prefer <a class="reference internal" href="#namespaceqdk_1_1chemistry_1_1utils_1ad2f13d0b7ee7f071009d99f18b731e99"><span class="std std-ref">hash_combine()</span></a> from qdk/chemistry/utils/hash.hpp unless the table key must intentionally use the deterministic content digest.</p>
+<p>Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">HashContext</span> <span class="n">ctx</span><span class="p">;</span>
+<span class="n">hash_value</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">some_matrix</span><span class="p">);</span>
+<span class="n">hash_value</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">some_double</span><span class="p">);</span>
+<span class="n">hash_value</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="s2">&quot;some_string&quot;</span><span class="p">);</span>
+<span class="n">std</span><span class="p">::</span><span class="n">string</span> <span class="nb">hash</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">();</span>
+</pre></div>
+</div>
+</p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils11HashContext13MatrixVariantE">
+<span id="_CPPv3N3qdk9chemistry5utils11HashContext13MatrixVariantE"></span><span id="_CPPv2N3qdk9chemistry5utils11HashContext13MatrixVariantE"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a9e61021162bca6a4fa9f20f03c0d6d85"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MatrixVariant</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXcd</span></span><span class="p"><span class="pre">&gt;</span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils11HashContext13VectorVariantE">
+<span id="_CPPv3N3qdk9chemistry5utils11HashContext13VectorVariantE"></span><span id="_CPPv2N3qdk9chemistry5utils11HashContext13VectorVariantE"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a822af96e25c76b33aff44141d4335ab6"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VectorVariant</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXd</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">VectorXcd</span></span><span class="p"><span class="pre">&gt;</span></span><br /></dt>
+<dd></dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils11HashContext11HashContextEv">
+<span id="_CPPv3N3qdk9chemistry5utils11HashContext11HashContextEv"></span><span id="_CPPv2N3qdk9chemistry5utils11HashContext11HashContextEv"></span><span id="qdk::chemistry::utils::HashContext::HashContext"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a959064719bd3ae0cbbd82f5e300dd8a2"></span><span class="sig-name descname"><span class="n"><span class="pre">HashContext</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry5utils11HashContext9hash_codeEv">
+<span id="_CPPv3NK3qdk9chemistry5utils11HashContext9hash_codeEv"></span><span id="_CPPv2NK3qdk9chemistry5utils11HashContext9hash_codeEv"></span><span id="qdk::chemistry::utils::HashContext::hash_codeC"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a9bd782282b5438afc6628355a6edba5a"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hash_code</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
+<dd><p>Finalize and return the leading digest bytes as a size_t value. </p>
+<p>Prefer <a class="reference internal" href="#namespaceqdk_1_1chemistry_1_1utils_1ad2f13d0b7ee7f071009d99f18b731e99"><span class="std std-ref">hash_combine()</span></a> for hot std::hash-compatible table hashers. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry5utils11HashContext9hexdigestE6size_t">
+<span id="_CPPv3NK3qdk9chemistry5utils11HashContext9hexdigestE6size_t"></span><span id="_CPPv2NK3qdk9chemistry5utils11HashContext9hexdigestE6size_t"></span><span id="qdk::chemistry::utils::HashContext::hexdigest__sC"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a468ad5853d8b445c8a765c7bd4cb3794"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hexdigest</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">truncate_chars</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">16</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
+<dd><p>Finalize and return truncated hex digest. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>truncate_chars</strong> – Number of hex characters to return (default 16) </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils11HashContext6updateEPKv6size_t">
+<span id="_CPPv3N3qdk9chemistry5utils11HashContext6updateEPKv6size_t"></span><span id="_CPPv2N3qdk9chemistry5utils11HashContext6updateEPKv6size_t"></span><span id="qdk::chemistry::utils::HashContext::update__voidCP.s"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1HashContext_1a4ed8d36fb066704786180726fbcf27a0"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">update</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">data</span></span>, <a class="reference internal" href="../../_cpp_placeholders.html#_CPPv46size_t" title="size_t"><span class="n"><span class="pre">size_t</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">len</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Feed raw bytes into the hash. </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4I0EN3qdk9chemistry5utils17is_complex_scalarE">
+<span id="_CPPv3I0EN3qdk9chemistry5utils17is_complex_scalarE"></span><span id="_CPPv2I0EN3qdk9chemistry5utils17is_complex_scalarE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">S</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="target" id="structqdk_1_1chemistry_1_1utils_1_1is__complex__scalar"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_complex_scalar</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">false_type</span></span><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;qdk/chemistry/utils/scalar_traits.hpp&gt;</em></div>
+<p>Type trait: true for <code class="docutils literal notranslate"><span class="pre">std::complex&lt;T&gt;</span></code> specializations. </p>
+<p>Default specialization yields <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Template Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>S</strong> – Scalar type under test. </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils6LoggerE">
 <span id="_CPPv3N3qdk9chemistry5utils6LoggerE"></span><span id="_CPPv2N3qdk9chemistry5utils6LoggerE"></span><span id="qdk::chemistry::utils::Logger"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1Logger"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Logger</span></span></span><br /></dt>
 <dd><div class="docutils container">
@@ -472,6 +915,24 @@ Examples:<ul class="simple">
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils6Logger33restore_global_level_if_unchangedE8LogLevel8LogLevel">
+<span id="_CPPv3N3qdk9chemistry5utils6Logger33restore_global_level_if_unchangedE8LogLevel8LogLevel"></span><span id="_CPPv2N3qdk9chemistry5utils6Logger33restore_global_level_if_unchangedE8LogLevel8LogLevel"></span><span id="qdk::chemistry::utils::Logger::restore_global_level_if_unchanged__LogLevel.LogLevel"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1Logger_1a5165db30d316e129c675b7b26590978b"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">restore_global_level_if_unchanged</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils8LogLevelE" title="qdk::chemistry::utils::LogLevel"><span class="n"><span class="pre">LogLevel</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">expected_current</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils8LogLevelE" title="qdk::chemistry::utils::LogLevel"><span class="n"><span class="pre">LogLevel</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">restored_level</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Restore the global log level if it has not changed. </p>
+<p>Atomically compares the current global log level with expected_current. If they match, restores restored_level and returns true. Otherwise leaves the current level unchanged and returns false.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>expected_current</strong> – The level that must still be current </p></li>
+<li><p><strong>restored_level</strong> – The level to restore when expected_current matches </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Whether restored_level was applied </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils6Logger16set_global_levelE8LogLevel">
 <span id="_CPPv3N3qdk9chemistry5utils6Logger16set_global_levelE8LogLevel"></span><span id="_CPPv2N3qdk9chemistry5utils6Logger16set_global_levelE8LogLevel"></span><span id="qdk::chemistry::utils::Logger::set_global_level__LogLevel"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1Logger_1afea5874e76b41b1fc931e22fe532294b"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_global_level</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils8LogLevelE" title="qdk::chemistry::utils::LogLevel"><span class="n"><span class="pre">LogLevel</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">level</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Set the global log level for all loggers. </p>
@@ -482,6 +943,38 @@ Examples:<ul class="simple">
 </dd>
 </dl>
 </dd></dl>
+
+</div>
+</dd></dl>
+
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils14ScopedLogLevelE">
+<span id="_CPPv3N3qdk9chemistry5utils14ScopedLogLevelE"></span><span id="_CPPv2N3qdk9chemistry5utils14ScopedLogLevelE"></span><span id="qdk::chemistry::utils::ScopedLogLevel"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ScopedLogLevel"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ScopedLogLevel</span></span></span><br /></dt>
+<dd><div class="docutils container">
+<em>#include &lt;qdk/chemistry/utils/logger.hpp&gt;</em></div>
+<p>Temporarily raises the global log level for a scope. </p>
+<p>If the current global log level is more verbose than the requested minimum, the constructor raises it to that minimum. The destructor restores the previous level only if no other code changed the global level while the guard was active. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelERK14ScopedLogLevel">
+<span id="_CPPv3N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelERK14ScopedLogLevel"></span><span id="_CPPv2N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelERK14ScopedLogLevel"></span><span id="qdk::chemistry::utils::ScopedLogLevel::ScopedLogLevel__ScopedLogLevelCR"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ScopedLogLevel_1a0838977b6b87c657ae6fd98eaeccfdac"></span><span class="sig-name descname"><span class="n"><span class="pre">ScopedLogLevel</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelERK14ScopedLogLevel" title="qdk::chemistry::utils::ScopedLogLevel::ScopedLogLevel"><span class="n"><span class="pre">ScopedLogLevel</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelE8LogLevel">
+<span id="_CPPv3N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelE8LogLevel"></span><span id="_CPPv2N3qdk9chemistry5utils14ScopedLogLevel14ScopedLogLevelE8LogLevel"></span><span id="qdk::chemistry::utils::ScopedLogLevel::ScopedLogLevel__LogLevel"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ScopedLogLevel_1aff82ed8ad46efda56dddee51b73937ba"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ScopedLogLevel</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils8LogLevelE" title="qdk::chemistry::utils::LogLevel"><span class="n"><span class="pre">LogLevel</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">minimum_level</span></span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils14ScopedLogLevelD0Ev">
+<span id="_CPPv3N3qdk9chemistry5utils14ScopedLogLevelD0Ev"></span><span id="_CPPv2N3qdk9chemistry5utils14ScopedLogLevelD0Ev"></span><span id="qdk::chemistry::utils::ScopedLogLevel::~ScopedLogLevel"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ScopedLogLevel_1ab805598acd460ce8dd18979a91a10191"></span><span class="sig-name descname"><span class="n"><span class="pre">~ScopedLogLevel</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry5utils14ScopedLogLevelaSERK14ScopedLogLevel">
+<span id="_CPPv3N3qdk9chemistry5utils14ScopedLogLevelaSERK14ScopedLogLevel"></span><span id="_CPPv2N3qdk9chemistry5utils14ScopedLogLevelaSERK14ScopedLogLevel"></span><span id="qdk::chemistry::utils::ScopedLogLevel::assign-operator__ScopedLogLevelCR"></span><span class="target" id="classqdk_1_1chemistry_1_1utils_1_1ScopedLogLevel_1a1ddbd60c091e27a176260d9505532a38"></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils14ScopedLogLevelE" title="qdk::chemistry::utils::ScopedLogLevel"><span class="n"><span class="pre">ScopedLogLevel</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry5utils14ScopedLogLevelE" title="qdk::chemistry::utils::ScopedLogLevel"><span class="n"><span class="pre">ScopedLogLevel</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">delete</span></span><br /></dt>
+<dd></dd></dl>
 
 </div>
 </dd></dl>

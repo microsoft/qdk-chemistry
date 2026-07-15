@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.term\_grouper.identity module
+=======================================================
+
+.. automodule:: qdk_chemistry.algorithms.term_grouper.identity
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

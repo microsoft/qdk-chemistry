@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit.conversion &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit.conversion &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -105,6 +106,8 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">data</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_indices</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">axes</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;create_statevector_from_wavefunction&quot;</span><span class="p">]</span>
 
@@ -146,9 +149,7 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
-    <span class="n">indices</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
-
-    <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+    <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()))</span>
     <span class="n">num_qubits</span> <span class="o">=</span> <span class="n">num_orbs</span> <span class="o">*</span> <span class="mi">2</span>
     <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_qubits</span>  <span class="c1"># 2^num_qubits</span>
 
@@ -164,7 +165,7 @@
     <span class="c1"># Fill statevector</span>
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">det</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">determinants</span><span class="p">):</span>
         <span class="c1"># Convert configuration to statevector index</span>
-        <span class="n">index</span> <span class="o">=</span> <span class="n">_configuration_to_statevector_index</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">_configuration_to_statevector_index</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">num_qubits</span><span class="p">)</span>
         <span class="n">statevector</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">coeffs_array</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
 
     <span class="c1"># Normalize if requested</span>
@@ -177,7 +178,7 @@
 
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_configuration_to_statevector_index</span><span class="p">(</span><span class="n">configuration</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">Configuration</span><span class="p">,</span> <span class="n">num_orbitals</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_configuration_to_statevector_index</span><span class="p">(</span><span class="n">configuration</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">Configuration</span><span class="p">,</span> <span class="n">n_bits</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a Configuration to its corresponding integer index in the statevector array.</span>
 
 <span class="sd">    This function maps an electronic configuration (orbital occupation pattern) to</span>
@@ -208,32 +209,23 @@
 <span class="sd">        configuration (Configuration): The electronic configuration to convert. This object</span>
 <span class="sd">            encodes the occupation of each orbital (unoccupied, alpha, beta,</span>
 <span class="sd">            or doubly occupied).</span>
-<span class="sd">        num_orbitals (int): Number of spatial orbitals to use from the configuration.</span>
-<span class="sd">            This allows extracting a subset for active space calculations.</span>
+<span class="sd">        n_bits (int): Number of bits to read from the configuration</span>
+<span class="sd">            (num_modes * bits_per_mode).</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        int: The statevector index (0 to 2^(2*num_orbitals) - 1) corresponding</span>
-<span class="sd">            to this configuration in the computational basis.</span>
-
-<span class="sd">    Raises:</span>
-<span class="sd">        RuntimeError: If num_orbitals exceeds the configuration&#39;s capacity.</span>
+<span class="sd">        int: The statevector index corresponding to this configuration in the</span>
+<span class="sd">            computational basis.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Get binary strings for alpha and beta</span>
-    <span class="n">alpha_str</span><span class="p">,</span> <span class="n">beta_str</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">to_binary_strings</span><span class="p">(</span><span class="n">num_orbitals</span><span class="p">)</span>
+    <span class="c1"># Get bit vector: [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]</span>
+    <span class="n">bits</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">to_bits</span><span class="p">(</span><span class="n">n_bits</span><span class="p">)</span>
 
     <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
 
-    <span class="c1"># Process alpha electrons (lower bits)</span>
     <span class="c1"># Little-endian: bit i corresponds to qubit i</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alpha_str</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">bit</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bits</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">bit</span><span class="p">:</span>
             <span class="n">index</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">i</span>
-
-    <span class="c1"># Process beta electrons (upper bits, offset by num_orbitals)</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">beta_str</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">bit</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
-            <span class="n">index</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">num_orbitals</span> <span class="o">+</span> <span class="n">i</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">index</span>
 </pre></div>

@@ -1,0 +1,18 @@
+qdk\_chemistry.algorithms.phase\_estimation.circuit\_builder package
+====================================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation.circuit_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.phase_estimation.circuit_builder.base
+   qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
+   qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder

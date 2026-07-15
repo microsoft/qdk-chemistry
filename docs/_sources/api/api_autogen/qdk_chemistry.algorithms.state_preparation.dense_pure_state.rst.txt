@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.state\_preparation.dense\_pure\_state module
+======================================================================
+
+.. automodule:: qdk_chemistry.algorithms.state_preparation.dense_pure_state
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

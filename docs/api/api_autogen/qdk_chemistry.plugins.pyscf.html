@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf package &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf package &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -131,6 +132,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.ao_labels"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings.ao_labels</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.threshold"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings.threshold</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.canonicalize"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings.canonicalize</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.openshell_option"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings.openshell_option</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.active_space_avas.html#qdk_chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.__init__"><code class="docutils literal notranslate"><span class="pre">PyscfAVASSettings.__init__()</span></code></a></li>
@@ -205,6 +207,15 @@
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver"><code class="docutils literal notranslate"><span class="pre">PyscfScfSolver</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver.__init__"><code class="docutils literal notranslate"><span class="pre">PyscfScfSolver.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver.name"><code class="docutils literal notranslate"><span class="pre">PyscfScfSolver.name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings.__init__"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSettings.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSolver</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.__init__"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSolver.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.name"><code class="docutils literal notranslate"><span class="pre">PyscfStabilizedScfSolver.name()</span></code></a></li>
 </ul>
 </li>
 </ul>

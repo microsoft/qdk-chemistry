@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.time\_evolution.evolution\_circuit\_builder package
+=============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base
+   qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder

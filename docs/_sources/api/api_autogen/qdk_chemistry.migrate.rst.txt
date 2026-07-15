@@ -1,0 +1,23 @@
+qdk\_chemistry.migrate package
+==============================
+
+.. automodule:: qdk_chemistry.migrate
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.migrate.__main__
+   qdk_chemistry.migrate._ansatz
+   qdk_chemistry.migrate._hamiltonian
+   qdk_chemistry.migrate._io
+   qdk_chemistry.migrate._orbitals
+   qdk_chemistry.migrate._sbt
+   qdk_chemistry.migrate._sparse
+   qdk_chemistry.migrate._wavefunction

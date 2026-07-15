@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit.qubit_mapper &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit.qubit_mapper &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -91,9 +92,9 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.plugins.qiskit.qubit_mapper</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.</span>
+<span></span><span class="sd">&quot;&quot;&quot;Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit operators.</span>
 
-<span class="sd">This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians</span>
+<span class="sd">This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitOperators</span>
 <span class="sd">using different mapping strategies (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;, and &quot;parity&quot;).</span>
 <span class="sd">&quot;&quot;&quot;</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
@@ -113,36 +114,35 @@
 <span class="p">)</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span><span class="p">,</span> <span class="n">QubitMapperSettings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_indices</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.enums.fermion_mode_order</span><span class="w"> </span><span class="kn">import</span> <span class="n">FermionModeOrder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">axes</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QiskitQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;QiskitQubitMapperSettings&quot;</span><span class="p">]</span>
+
+<span class="n">_SUPPORTED_ENCODINGS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">JordanWignerMapper</span><span class="p">,</span>
+    <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">BravyiKitaevMapper</span><span class="p">,</span>
+    <span class="s2">&quot;parity&quot;</span><span class="p">:</span> <span class="n">ParityMapper</span><span class="p">,</span>
+<span class="p">}</span>
 
 
 <div class="viewcode-block" id="QiskitQubitMapperSettings">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QiskitQubitMapperSettings</span><span class="p">(</span><span class="n">QubitMapperSettings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QiskitQubitMapper.</span>
-
-<span class="sd">    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.</span>
-
-<span class="sd">    Available encodings:</span>
-<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
-<span class="sd">        - ``&quot;parity&quot;``</span>
-
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QiskitQubitMapper.&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="QiskitQubitMapperSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapperSettings.&quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">valid_encodings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span> <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">,</span> <span class="s2">&quot;parity&quot;</span><span class="p">])</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 </div>
 
 
@@ -150,71 +150,128 @@
 <div class="viewcode-block" id="QiskitQubitMapper">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QiskitQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map an electronic structure Hamiltonian to a QubitOperator using Qiskit.</span>
 
-<span class="sd">    Available encodings:</span>
-<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
-<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
-<span class="sd">        - ``&quot;parity&quot;``</span>
+<span class="sd">    This is a **third-party** backend: it reads</span>
+<span class="sd">    ``mapping.base_encoding`` to select the corresponding Qiskit Nature</span>
+<span class="sd">    mapper class and **ignores** ``mapping.table``.  The qubit operator</span>
+<span class="sd">    is built from scratch using Qiskit Nature&#39;s own fermion-to-qubit</span>
+<span class="sd">    pipeline.</span>
+
+<span class="sd">    .. warning::</span>
+
+<span class="sd">       Because this backend chooses its transform by encoding *name*</span>
+<span class="sd">       rather than from the Pauli table, it relies on the mapping&#39;s</span>
+<span class="sd">       ``base_encoding`` string being consistent with its table.</span>
+<span class="sd">       This is guaranteed for factory-produced mappings</span>
+<span class="sd">       (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)</span>
+<span class="sd">       and is verified by cross-backend eigenvalue tests in the test</span>
+<span class="sd">       suite.  Manually built mappings with mismatched names will</span>
+<span class="sd">       produce silently incorrect results.</span>
+
+<span class="sd">    Tapering-based encodings (e.g. parity two-qubit reduction) are</span>
+<span class="sd">    supported — each backend handles tapering in its own ``_run_impl()``</span>
+<span class="sd">    via the ``QubitMapper._taper_result()``</span>
+<span class="sd">    helper.</span>
+
+<span class="sd">    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.</span>
+<span class="sd">    For unrestricted systems, separate alpha and beta one-body and two-body</span>
+<span class="sd">    integrals are forwarded to Qiskit Nature&#39;s ``ElectronicEnergy``.</span>
+
+<span class="sd">    Supported base encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` → :class:`qiskit_nature.second_q.mappers.JordanWignerMapper`</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;`` → :class:`qiskit_nature.second_q.mappers.BravyiKitaevMapper`</span>
+<span class="sd">        - ``&quot;parity&quot;`` → :class:`qiskit_nature.second_q.mappers.ParityMapper`</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.data import MajoranaMapping</span>
+<span class="sd">        &gt;&gt;&gt; mapper = create(&quot;qubit_mapper&quot;, &quot;qiskit&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)</span>
+<span class="sd">        &gt;&gt;&gt; qh = mapper.run(hamiltonian, mapping)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">QubitMappers</span><span class="p">:</span> <span class="n">ClassVar</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">BravyiKitaevMapper</span><span class="p">,</span>
-        <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">JordanWignerMapper</span><span class="p">,</span>
-        <span class="s2">&quot;parity&quot;</span><span class="p">:</span> <span class="n">ParityMapper</span><span class="p">,</span>
-    <span class="p">}</span>
+    <span class="n">QubitMappers</span><span class="p">:</span> <span class="n">ClassVar</span> <span class="o">=</span> <span class="n">_SUPPORTED_ENCODINGS</span>
 
 <div class="viewcode-block" id="QiskitQubitMapper.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapper with a specific mapping strategy.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            encoding (str): Qubit mapping strategy to use (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;, or &quot;parity&quot;).</span>
-<span class="sd">                Default: &quot;jordan-wigner&quot;.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapper.&quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QiskitQubitMapperSettings</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QiskitQubitMapperSettings</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>  <span class="c1"># noqa: ARG002</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
+        <span class="n">mapping</span><span class="p">:</span> <span class="n">MajoranaMapping</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a qubit operator via Qiskit Nature.</span>
+
+<span class="sd">        Reads ``mapping.base_encoding`` to select a Qiskit Nature mapper</span>
+<span class="sd">        class.  ``mapping.table`` is **not used** — the qubit operator</span>
+<span class="sd">        is built entirely by Qiskit&#39;s own pipeline.</span>
+
+<span class="sd">        If *mapping* carries tapering metadata, the base encoding is</span>
+<span class="sd">        extracted first, mapped, and tapering is applied to the result</span>
+<span class="sd">        via :meth:`~QubitMapper._taper_result`.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
-<span class="sd">            symmetries: Optional symmetry information. Not used by this implementation.</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).</span>
+<span class="sd">            mapping: Encoding selector — only ``base_encoding`` is read.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            QubitHamiltonian: An instance of the QubitHamiltonian.</span>
+<span class="sd">            QubitOperator: An instance of the QubitOperator.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: If ``mapping.base_encoding`` is not a supported Qiskit encoding.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Encoding </span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2"> is unknown for QiskitQubitMapper.</span><span class="se">\n</span><span class="s2">&quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;Please use one of the following options: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># --- Select transform by encoding name (see QubitMapper class docstring) ---</span>
+        <span class="n">encoding_name</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">base_encoding</span>
+
+        <span class="k">if</span> <span class="n">encoding_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_SUPPORTED_ENCODINGS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Qiskit plugin does not support base encoding </span><span class="si">{</span><span class="n">encoding_name</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Supported encodings: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_SUPPORTED_ENCODINGS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">.&quot;</span>
             <span class="p">)</span>
 
-        <span class="p">(</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
-        <span class="p">(</span><span class="n">h2_aa</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
-        <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">electronic_hamiltonian</span> <span class="o">=</span> <span class="n">ElectronicEnergy</span><span class="o">.</span><span class="n">from_raw_integrals</span><span class="p">(</span>
-            <span class="n">h1_a</span><span class="o">=</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">h2_aa</span><span class="o">=</span><span class="n">h2_aa</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
-        <span class="p">)</span>
+        <span class="n">h1_a</span><span class="p">,</span> <span class="n">h1_b</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">h2_aa</span><span class="p">,</span> <span class="n">h2_ab</span><span class="p">,</span> <span class="n">h2_bb</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+        <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()))</span>
+        <span class="n">is_restricted</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">is_restricted</span><span class="p">:</span>
+            <span class="n">electronic_hamiltonian</span> <span class="o">=</span> <span class="n">ElectronicEnergy</span><span class="o">.</span><span class="n">from_raw_integrals</span><span class="p">(</span>
+                <span class="n">h1_a</span><span class="o">=</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">h2_aa</span><span class="o">=</span><span class="n">h2_aa</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># h2_ab is eri_aabb in chemist notation: (aa|bb).</span>
+            <span class="c1"># Qiskit&#39;s h2_ba parameter expects (bb|aa) = eri_aabb transposed.</span>
+            <span class="c1"># By Coulomb symmetry (pq|rs)=(rs|pq), this is eri_aabb[r,s,p,q].</span>
+            <span class="n">h2_ab_4d</span> <span class="o">=</span> <span class="n">h2_ab</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
+            <span class="n">electronic_hamiltonian</span> <span class="o">=</span> <span class="n">ElectronicEnergy</span><span class="o">.</span><span class="n">from_raw_integrals</span><span class="p">(</span>
+                <span class="n">h1_a</span><span class="o">=</span><span class="n">h1_a</span><span class="p">,</span>
+                <span class="n">h2_aa</span><span class="o">=</span><span class="n">h2_aa</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">),</span>
+                <span class="n">h1_b</span><span class="o">=</span><span class="n">h1_b</span><span class="p">,</span>
+                <span class="n">h2_bb</span><span class="o">=</span><span class="n">h2_bb</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">),</span>
+                <span class="n">h2_ba</span><span class="o">=</span><span class="n">h2_ab_4d</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="p">)</span>
+
         <span class="n">fermionic_op</span> <span class="o">=</span> <span class="n">electronic_hamiltonian</span><span class="o">.</span><span class="n">second_q_op</span><span class="p">()</span>
-        <span class="n">qubit_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="p">[</span><span class="n">encoding</span><span class="p">]()</span>
+        <span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">_SUPPORTED_ENCODINGS</span><span class="p">[</span><span class="n">encoding_name</span><span class="p">]()</span>
         <span class="n">qubit_op</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">fermionic_op</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">QubitHamiltonian</span><span class="p">(</span>
+        <span class="n">qh</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
             <span class="n">pauli_strings</span><span class="o">=</span><span class="n">qubit_op</span><span class="o">.</span><span class="n">paulis</span><span class="o">.</span><span class="n">to_labels</span><span class="p">(),</span>
             <span class="n">coefficients</span><span class="o">=</span><span class="n">qubit_op</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span>
-            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding_name</span><span class="p">,</span>
             <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">BLOCKED</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taper_result</span><span class="p">(</span><span class="n">qh</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
 
 <div class="viewcode-block" id="QiskitQubitMapper.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.name">[docs]</a>

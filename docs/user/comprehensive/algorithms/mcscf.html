@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Configuration Self-Consistent Field &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Multi-Configuration Self-Consistent Field &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -60,7 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
@@ -78,11 +78,15 @@
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
-<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
@@ -91,6 +95,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -180,12 +185,7 @@ a <a class="reference internal" href="mc_calculator.html"><span class="doc">Mult
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-
-<span class="c1"># Create a HamiltonianConstructor</span>
-<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create a MC calculator</span>
-<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
 
 <span class="c1"># Create the default MultiConfigurationScf instance</span>
 <span class="n">mcscf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_scf&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
@@ -198,15 +198,36 @@ a <a class="reference internal" href="mc_calculator.html"><span class="doc">Mult
 See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the MC calculator using the settings interface</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_two_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># --- Pattern 1: kwargs at construction ---</span>
+<span class="c1"># Keyword arguments are applied as setting overrides on top of the defaults:</span>
+<span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span>
+    <span class="n">AlgorithmRef</span><span class="p">(</span>
+        <span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;macis_cas&quot;</span><span class="p">,</span>
+        <span class="n">ci_residual_tolerance</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>
+        <span class="n">calculate_one_rdm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">calculate_two_rdm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
 
-<span class="c1"># Configure the Hamiltonian constructor</span>
-<span class="n">ham_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;eri_method&quot;</span><span class="p">,</span> <span class="s2">&quot;direct&quot;</span><span class="p">)</span>
+<span class="c1"># --- Pattern 2: ref.set() / subscript notation ---</span>
+<span class="c1"># Get the existing ref, modify individual settings, and put it back:</span>
+<span class="n">mc_ref</span> <span class="o">=</span> <span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">mc_ref</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>  <span class="c1"># ref.set(key, value)</span>
+<span class="n">mc_ref</span><span class="p">[</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># ref[key] = value</span>
+<span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="n">mc_ref</span><span class="p">)</span>
 
-<span class="c1"># Configure the MCSCF solver</span>
+<span class="c1"># --- Pattern 3: ref.update() for bulk changes ---</span>
+<span class="n">mc_ref</span> <span class="o">=</span> <span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">mc_ref</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ci_residual_tolerance</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">calculate_two_rdm</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="n">mc_ref</span><span class="p">)</span>
+
+<span class="c1"># --- Pattern 4: reading back settings ---</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">mc_ref</span><span class="p">[</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">])</span>  <span class="c1"># ref[key]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span> <span class="ow">in</span> <span class="n">mc_ref</span><span class="p">)</span>  <span class="c1"># key in ref</span>
+
+<span class="c1"># Configure the MCSCF solver itself</span>
 <span class="n">mcscf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_cycle_macro&quot;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -215,14 +236,16 @@ See <a class="reference internal" href="#available-implementations">Available im
 <p class="rubric">Running the calculation</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_valence_space_parameters</span>
 
-<span class="c1"># Load nitrogen molecule structure</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
-    <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/n2_stretched.structure.xyz&quot;</span>
-<span class="p">)</span>
+<span class="c1"># Load nitrogen molecule structure from inline XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">2</span>
+
+<span class="s2">N 0 0 0</span>
+<span class="s2">N 0 0 2</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
 <span class="n">charge</span> <span class="o">=</span> <span class="mi">0</span>
 
 <span class="c1"># First, run SCF to get molecular orbitals</span>
@@ -240,9 +263,7 @@ See <a class="reference internal" href="#available-implementations">Available im
 
 <span class="c1"># Run MCSCF calculation</span>
 <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">active_wavefunction</span><span class="o">.</span><span class="n">get_active_num_electrons</span><span class="p">()</span>
-<span class="n">E_mcscf</span><span class="p">,</span> <span class="n">mcscf_wfn</span> <span class="o">=</span> <span class="n">mcscf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">active_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">(),</span> <span class="n">ham_constructor</span><span class="p">,</span> <span class="n">mc_calculator</span><span class="p">,</span> <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span>
-<span class="p">)</span>
+<span class="n">E_mcscf</span><span class="p">,</span> <span class="n">mcscf_wfn</span> <span class="o">=</span> <span class="n">mcscf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">(),</span> <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MCSCF Energy: </span><span class="si">{</span><span class="n">E_mcscf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>

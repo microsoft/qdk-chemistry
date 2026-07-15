@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Model Hamiltonians &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Model Hamiltonians &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -70,6 +70,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#spin-models">Spin models</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#heisenberg-model">Heisenberg model</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#ising-model">Ising model</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#geometry-aware-term-grouping">Geometry-aware term grouping</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#parameter-flexibility">Parameter flexibility</a></li>
@@ -81,6 +82,7 @@
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -137,7 +139,7 @@ They are defined directly in terms of their parameters and a <a class="reference
 <li><p><strong>Pariser-Parr-Pople (PPP)</strong> — extends Hubbard with long-range intersite Coulomb interactions</p></li>
 </ul>
 </dd>
-<dt>Spin models</dt><dd><p>Operate on spin-½ degrees of freedom and produce <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> objects expressed as sums of Pauli operators.</p>
+<dt>Spin models</dt><dd><p>Operate on spin-½ degrees of freedom and produce <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> objects expressed as sums of Pauli operators.</p>
 <ul class="simple">
 <li><p><strong>Heisenberg</strong> — anisotropic spin-spin coupling with external magnetic fields</p></li>
 <li><p><strong>Ising</strong> — special case of Heisenberg with ZZ coupling and transverse X field</p></li>
@@ -179,12 +181,12 @@ For a more detailed description of each model Hamiltonian and their parameters, 
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">create_heisenberg_hamiltonian</span></code></p></td>
 <td><p>Spin</p></td>
-<td><p>QubitHamiltonian</p></td>
+<td><p>QubitOperator</p></td>
 <td><p>Anisotropic spin coupling + external fields</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">create_ising_hamiltonian</span></code></p></td>
 <td><p>Spin</p></td>
-<td><p>QubitHamiltonian</p></td>
+<td><p>QubitOperator</p></td>
 <td><p>ZZ coupling + transverse X field</p></td>
 </tr>
 </tbody>
@@ -200,20 +202,7 @@ For a more detailed description of each model Hamiltonian and their parameters, 
 <p>where <span class="math notranslate nohighlight">\(\hat{a}_i^\dagger\)</span> and <span class="math notranslate nohighlight">\(\hat{a}_i\)</span> are the fermionic creation and annihilation operators for site <em>i</em>, <span class="math notranslate nohighlight">\(\hat{n}_i = \sum_\sigma \hat{a}_{i,\sigma}^\dagger \hat{a}_{i,\sigma}\)</span> is the number operator, <span class="math notranslate nohighlight">\(\varepsilon_i\)</span> are on-site energies, <span class="math notranslate nohighlight">\(t_{ij}\)</span> are hopping integrals, <span class="math notranslate nohighlight">\(w_{ij}\)</span> is the edge weight from the lattice adjacency matrix, and the sum runs over connected site pairs.
 This model produces a <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> with one-body integrals only.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 6-site chain for the Hückel model</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Uniform parameters: all sites have the same on-site energy and hopping</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">create_huckel_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">1.0</span><span class="p">);</span>
-
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">has_h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_one_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">has_h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// false</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 6-site chain for the Hückel model</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
 
@@ -223,6 +212,19 @@ This model produces a <a class="reference internal" href="data/hamiltonian.html"
 <span class="c1"># Print the one-body integrals</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has one-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_one_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 6-site chain for the Hückel model</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Uniform parameters: all sites have the same on-site energy and hopping</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">create_huckel_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">has_h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_one_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">has_h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// false</span>
 </pre></div>
 </div>
 </div>
@@ -236,7 +238,21 @@ This model produces a <a class="reference internal" href="data/hamiltonian.html"
 <p>where <span class="math notranslate nohighlight">\(U_i\)</span> is the on-site repulsion strength.
 This model produces a <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> with both one-body and two-body integrals.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4-site Hubbard chain</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has one-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_one_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Verify the on-site repulsion</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">num_sites</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  U(</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_element</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 4-site Hubbard chain</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hub_lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hub_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_hubbard_hamiltonian</span><span class="p">(</span>
@@ -252,24 +268,19 @@ This model produces a <a class="reference internal" href="data/hamiltonian.html"
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4-site Hubbard chain</span>
-<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has one-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_one_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Verify the on-site repulsion</span>
-<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">lattice</span><span class="o">.</span><span class="n">num_sites</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  U(</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">) = </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_element</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
 </div>
 <p>The Hubbard model naturally extends to 2D lattices for studying strongly correlated materials:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4x4 square lattice Hubbard model with periodic boundaries</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">periodic_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">periodic_y</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 4x4 square lattice Hubbard model with periodic boundaries</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">square_lattice</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">true</span><span class="p">);</span>
@@ -277,15 +288,6 @@ This model produces a <a class="reference internal" href="data/hamiltonian.html"
 <span class="w">      </span><span class="n">square_lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">4.0</span><span class="p">);</span>
 
 <span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">sq_has_h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">square_hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4x4 square lattice Hubbard model with periodic boundaries</span>
-<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">periodic_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">periodic_y</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -304,28 +306,7 @@ The intersite potential <span class="math notranslate nohighlight">\(V_{ij}\)</s
 This follows the standard quantum chemistry convention where the factor is applied at contraction time rather than stored in the integrals.</p>
 </div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 6-site ring for the PPP model (benzene-like)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ring</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic=*/</span><span class="nb">true</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Compute interpair Coulomb repulsion with the Ohno potential</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ohno_potential</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create the PPP Hamiltonian</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_ppp_hamiltonian</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span>
-<span class="w">                                                </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span>
-<span class="w">                                                </span><span class="cm">/*t=*/</span><span class="mf">0.088</span><span class="p">,</span>
-<span class="w">                                                </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span>
-<span class="w">                                                </span><span class="cm">/*V=*/</span><span class="n">V</span><span class="p">,</span>
-<span class="w">                                                </span><span class="cm">/*z=*/</span><span class="mf">1.0</span><span class="p">);</span>
-
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">ppp_has_h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">has_one_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">ppp_has_h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
-<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">core_e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">get_core_energy</span><span class="p">();</span><span class="w">           </span><span class="c1">// &gt; 0</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 6-site ring for the PPP model (benzene-like)</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
@@ -345,6 +326,27 @@ This follows the standard quantum chemistry convention where the factor is appli
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has one-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_one_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Has two-body integrals: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">has_two_body_integrals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Core energy: </span><span class="si">{</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 6-site ring for the PPP model (benzene-like)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ring</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic=*/</span><span class="nb">true</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Compute interpair Coulomb repulsion with the Ohno potential</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ohno_potential</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create the PPP Hamiltonian</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_ppp_hamiltonian</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span>
+<span class="w">                                                </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">                                                </span><span class="cm">/*t=*/</span><span class="mf">0.088</span><span class="p">,</span>
+<span class="w">                                                </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span>
+<span class="w">                                                </span><span class="cm">/*V=*/</span><span class="n">V</span><span class="p">,</span>
+<span class="w">                                                </span><span class="cm">/*z=*/</span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">ppp_has_h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">has_one_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">ppp_has_h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">has_two_body_integrals</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
+<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">core_e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ppp_hamiltonian</span><span class="p">.</span><span class="n">get_core_energy</span><span class="p">();</span><span class="w">           </span><span class="c1">// &gt; 0</span>
 </pre></div>
 </div>
 </div>
@@ -371,27 +373,7 @@ All three potential functions accept an optional <code class="docutils literal n
 <h5>Custom pairwise potential<a class="headerlink" href="#custom-pairwise-potential" title="Link to this heading"></a></h5>
 <p>The <code class="docutils literal notranslate"><span class="pre">pairwise_potential</span></code> function accepts a user-defined callable <code class="docutils literal notranslate"><span class="pre">func(i,</span> <span class="pre">j,</span> <span class="pre">U_ij,</span> <span class="pre">R_ij)</span> <span class="pre">-&gt;</span> <span class="pre">V_ij</span></code> for arbitrary distance-dependent potentials.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pot_lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_ohno</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">ohno_potential</span><span class="p">(</span><span class="n">pot_lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon_r=*/</span><span class="mf">1.0</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_mn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mataga_nishimoto_potential</span><span class="p">(</span><span class="n">pot_lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span>
-<span class="w">                                         </span><span class="cm">/*epsilon_r=*/</span><span class="mf">1.0</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Custom pairwise potential using a user-defined function</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_custom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pairwise_potential</span><span class="p">(</span>
-<span class="w">      </span><span class="n">pot_lattice</span><span class="p">,</span>
-<span class="w">      </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span>
-<span class="w">      </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span>
-<span class="w">      </span><span class="p">[](</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">Uij</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">Rij</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">Uij</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mf">1.0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Rij</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 
 <span class="c1"># Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)</span>
@@ -411,6 +393,26 @@ All three potential functions accept an optional <code class="docutils literal n
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ohno V(0,1) = </span><span class="si">{</span><span class="n">V_ohno</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mataga-Nishimoto V(0,1) = </span><span class="si">{</span><span class="n">V_mn</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Custom V(0,1) = </span><span class="si">{</span><span class="n">V_custom</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pot_lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Ohno potential: V_ij = U_ij / sqrt(1 + (U_ij * epsilon_r * R_ij)^2)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_ohno</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">ohno_potential</span><span class="p">(</span><span class="n">pot_lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon_r=*/</span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Mataga-Nishimoto potential: V_ij = U_ij / (1 + U_ij * epsilon_r * R_ij)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_mn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mataga_nishimoto_potential</span><span class="p">(</span><span class="n">pot_lattice</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span><span class="w"> </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span>
+<span class="w">                                         </span><span class="cm">/*epsilon_r=*/</span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Custom pairwise potential using a user-defined function</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">V_custom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pairwise_potential</span><span class="p">(</span>
+<span class="w">      </span><span class="n">pot_lattice</span><span class="p">,</span>
+<span class="w">      </span><span class="cm">/*U=*/</span><span class="mf">0.414</span><span class="p">,</span>
+<span class="w">      </span><span class="cm">/*R=*/</span><span class="mf">2.65</span><span class="p">,</span>
+<span class="w">      </span><span class="p">[](</span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">Uij</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">Rij</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">Uij</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mf">1.0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Rij</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
 </pre></div>
 </div>
 </div>
@@ -483,6 +485,18 @@ Each qubit corresponds to a lattice site.</p>
 </div>
 </div>
 </section>
+<section id="geometry-aware-term-grouping">
+<span id="model-term-partition"></span><h3>Geometry-aware term grouping<a class="headerlink" href="#geometry-aware-term-grouping" title="Link to this heading"></a></h3>
+<p>Both <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian" title="qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_heisenberg_hamiltonian()</span></code></a> and <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian" title="qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_ising_hamiltonian()</span></code></a> accept an <code class="docutils literal notranslate"><span class="pre">include_term_groups</span></code> flag (default <code class="docutils literal notranslate"><span class="pre">True</span></code>).
+When enabled, the builder consults the lattice’s edge coloring and stores the resulting group-and-layer structure on <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.term_partition" title="qdk_chemistry.data.QubitOperator.term_partition"><code class="xref py py-attr docutils literal notranslate"><span class="pre">term_partition</span></code></a> as a <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LayeredPartition" title="qdk_chemistry.data.LayeredPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">LayeredPartition</span></code></a> with <code class="docutils literal notranslate"><span class="pre">strategy=&quot;geometry_coloring&quot;</span></code>:</p>
+<ul class="simple">
+<li><p>each <em>group</em> corresponds to one interaction type (<code class="docutils literal notranslate"><span class="pre">XX</span></code>, <code class="docutils literal notranslate"><span class="pre">YY</span></code>, <code class="docutils literal notranslate"><span class="pre">ZZ</span></code>) or one external-field direction (<code class="docutils literal notranslate"><span class="pre">X</span></code>, <code class="docutils literal notranslate"><span class="pre">Y</span></code>, <code class="docutils literal notranslate"><span class="pre">Z</span></code>);</p></li>
+<li><p>each <em>layer</em> within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.</p></li>
+</ul>
+<p>Downstream consumers — most importantly the <a class="reference internal" href="algorithms/hamiltonian_unitary_builder.html"><span class="doc">Trotter time-evolution builder</span></a> — read <code class="docutils literal notranslate"><span class="pre">term_partition</span></code> automatically and use it to schedule fewer sequential exponentials per Trotter step.
+No manual geometry boilerplate is required at the call site.</p>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">include_term_groups=False</span></code> to skip this step and obtain a Hamiltonian with <code class="docutils literal notranslate"><span class="pre">term_partition</span> <span class="pre">is</span> <span class="pre">None</span></code> (useful for benchmarking or when a different partition is desired).</p>
+</section>
 </section>
 <section id="parameter-flexibility">
 <h2>Parameter flexibility<a class="headerlink" href="#parameter-flexibility" title="Link to this heading"></a></h2>
@@ -497,17 +511,7 @@ Used for: hopping (<span class="math notranslate nohighlight">\(t\)</span>), int
 </dd>
 </dl>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Site-dependent Hubbard model: different U on each site</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">chain</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
-<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">U_values</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
-<span class="w">  </span><span class="n">U_values</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span><span class="w"> </span><span class="mf">4.0</span><span class="p">,</span><span class="w"> </span><span class="mf">4.0</span><span class="p">,</span><span class="w"> </span><span class="mf">2.0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Weaker repulsion at edges</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">site_dep_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_hubbard_hamiltonian</span><span class="p">(</span>
-<span class="w">      </span><span class="n">chain</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="n">U_values</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Site-dependent Hubbard model: different U on each site</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 <span class="n">U_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])</span>  <span class="c1"># Weaker repulsion at edges</span>
@@ -521,6 +525,16 @@ Used for: hopping (<span class="math notranslate nohighlight">\(t\)</span>), int
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Site-dependent Hubbard model: different U on each site</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">chain</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">U_values</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">U_values</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span><span class="w"> </span><span class="mf">4.0</span><span class="p">,</span><span class="w"> </span><span class="mf">4.0</span><span class="p">,</span><span class="w"> </span><span class="mf">2.0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Weaker repulsion at edges</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">site_dep_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">create_hubbard_hamiltonian</span><span class="p">(</span>
+<span class="w">      </span><span class="n">chain</span><span class="p">,</span><span class="w"> </span><span class="cm">/*epsilon=*/</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*U=*/</span><span class="n">U_values</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="using-model-hamiltonians-with-algorithms">
@@ -531,10 +545,23 @@ Used for: hopping (<span class="math notranslate nohighlight">\(t\)</span>), int
 <li><p><a class="reference internal" href="algorithms/qubit_mapper.html"><span class="doc">Qubit mapping</span></a> (Jordan-Wigner, Bravyi-Kitaev, etc.)</p></li>
 <li><p><a class="reference internal" href="algorithms/phase_estimation.html"><span class="doc">Phase estimation</span></a> (<a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>, standard <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>)</p></li>
 </ul>
-<p>Spin model Hamiltonians produce <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> objects directly, which can be used with quantum algorithms without an intermediate qubit mapping step.</p>
+<p>Spin model Hamiltonians produce <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> objects directly, which can be used with quantum algorithms without an intermediate qubit mapping step.</p>
 <p class="rubric">Example: exact diagonalization of the Hubbard model</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4-site half-filled Hubbard chain</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
+
+<span class="c1"># Run exact diagonalization (CASCI) with half filling (2 alpha + 2 beta electrons)</span>
+<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">mc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ground state energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> a.u.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 4-site half-filled Hubbard chain</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">solve_lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">solve_hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Hamiltonian</span><span class="o">&gt;</span><span class="p">(</span>
@@ -546,19 +573,6 @@ Used for: hopping (<span class="math notranslate nohighlight">\(t\)</span>), int
 <span class="w">      </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span>
 <span class="w">          </span><span class="s">&quot;macis_cas&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">solve_hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4-site half-filled Hubbard chain</span>
-<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
-
-<span class="c1"># Run exact diagonalization (CASCI) with half filling (2 alpha + 2 beta electrons)</span>
-<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
-<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">mc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ground state energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> a.u.&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -586,7 +600,7 @@ Used for: hopping (<span class="math notranslate nohighlight">\(t\)</span>), int
 <ul class="simple">
 <li><p><a class="reference internal" href="data/lattice_graph.html"><span class="doc">LatticeGraph</span></a> — Lattice topology defining site connectivity</p></li>
 <li><p><a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> — Hamiltonian data class produced by fermionic models</p></li>
-<li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a> — Qubit Hamiltonian produced by spin models</p></li>
+<li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> — Qubit Hamiltonian produced by spin models</p></li>
 <li><p><a class="reference internal" href="data/orbitals.html"><span class="doc">Orbitals</span></a> — Full Orbitals class documentation</p></li>
 </ul>
 </section>

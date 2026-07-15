@@ -1,0 +1,8 @@
+qdk\_chemistry.migrate.\_sparse module
+======================================
+
+.. automodule:: qdk_chemistry.migrate._sparse
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

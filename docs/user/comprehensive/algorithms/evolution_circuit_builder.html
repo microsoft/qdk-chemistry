@@ -1,0 +1,367 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evolution circuit builder &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Hamiltonian Unitary Builder" href="hamiltonian_unitary_builder.html" />
+    <link rel="prev" title="Phase estimation circuit builder" href="qpe_circuit_builder.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Algorithm classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Evolution circuit builder</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-evolutioncircuitbuilder">Use EvolutionCircuitBuilder</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-implementations">Available Implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#circuit-composition-details">Circuit Composition Details</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further Reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Algorithm classes</a></li>
+      <li class="breadcrumb-item active">Evolution circuit builder</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/algorithms/evolution_circuit_builder.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="evolution-circuit-builder">
+<h1>Evolution circuit builder<a class="headerlink" href="#evolution-circuit-builder" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilder</span></code></a> is an abstract base class that defines the interface for constructing time-evolution circuits.
+It serves as the central component that orchestrates circuit synthesis by composing a <a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a> (to construct the time-evolution unitary) with a <a class="reference internal" href="circuit_mapper.html"><span class="doc">CircuitMapper</span></a> (to compile the unitary into a quantum circuit).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">EvolutionCircuitBuilder</span></code> mirrors the role of <a class="reference internal" href="qpe_circuit_builder.html"><span class="doc">QpeCircuitBuilder</span></a> for phase estimation: it produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> suitable for resource estimation or further analysis without requiring a simulator backend.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Evolution circuit builders are responsible for:</p>
+<ol class="arabic simple">
+<li><p><strong>Composing circuits</strong> from state preparation and time-evolution unitaries</p></li>
+<li><p><strong>Generating strategy-specific circuits</strong> (e.g., Euler stepping with configurable propagators and unitary builders)</p></li>
+</ol>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilder</span></code></a> abstract class provides the common interface, while concrete implementations handle variant-specific details (e.g., Euler stepping with Magnus propagation).</p>
+</section>
+<section id="use-evolutioncircuitbuilder">
+<h2>Use EvolutionCircuitBuilder<a class="headerlink" href="#use-evolutioncircuitbuilder" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This algorithm is currently available only in the Python API.</p>
+</div>
+<p>This section demonstrates how to create, configure, and run an evolution circuit builder.
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> containing the constructed state-prep + evolution circuit.</p>
+<section id="input-requirements">
+<h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilder</span></code></a> requires the following inputs:</p>
+<dl class="simple">
+<dt>TimeDependentQubitHamiltonian</dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.TimeDependentQubitHamiltonian" title="qdk_chemistry.data.TimeDependentQubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">TimeDependentQubitHamiltonian</span></code></a> specifying the time-evolution schedule.
+For static Hamiltonians, use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.DrivenQubitHamiltonian" title="qdk_chemistry.data.DrivenQubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">DrivenQubitHamiltonian</span></code></a> with a constant drive <code class="docutils literal notranslate"><span class="pre">lambda</span> <span class="pre">t:</span> <span class="pre">1.0</span></code>.</p>
+</dd>
+<dt>State preparation circuit</dt><dd><p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> that prepares the initial state.
+Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.html#qdk_chemistry.algorithms.state_preparation.identity_state_prep" title="qdk_chemistry.algorithms.state_preparation.identity_state_prep"><code class="xref py py-func docutils literal notranslate"><span class="pre">identity_state_prep()</span></code></a> for the trivial <span class="math notranslate nohighlight">\(|0\rangle^{\otimes n}\)</span> initial state.</p>
+</dd>
+</dl>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilderSettings</span></code></a> class defines the general configuration parameters shared by all evolution circuit builders.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">evolution_builder</span></code></p></td>
+<td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a></p></td>
+<td><p>Reference to the algorithm that constructs the time-evolution unitary. Default: <code class="docutils literal notranslate"><span class="pre">&quot;hamiltonian_unitary_builder&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;trotter&quot;</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">circuit_mapper</span></code></p></td>
+<td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a></p></td>
+<td><p>Reference to the algorithm that compiles the unitary to a quantum circuit. Default: <code class="docutils literal notranslate"><span class="pre">&quot;circuit_mapper&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;pauli_sequence&quot;</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">propagator</span></code></p></td>
+<td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a></p></td>
+<td><p>Reference to the propagator that evaluates the effective Hamiltonian over each time step. Default: <code class="docutils literal notranslate"><span class="pre">&quot;propagator&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;magnus&quot;</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">total_time</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Total evolution time <span class="math notranslate nohighlight">\(T\)</span>. Default: <code class="docutils literal notranslate"><span class="pre">1.0</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dt</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Time step for evolution discretization. Each step is passed to the propagator. Default: <code class="docutils literal notranslate"><span class="pre">0.0</span></code> (invalid; user must set).</p></td>
+</tr>
+</tbody>
+</table>
+<p>Once configured, the builder can be executed:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="c1"># 1. Define the Ising model on a small lattice with a sinusoidal drive</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity_state_prep</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">DrivenQubitHamiltonian</span><span class="p">,</span> <span class="n">LatticeGraph</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.model_hamiltonians</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_ising_hamiltonian</span>
+
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">h0</span> <span class="o">=</span> <span class="n">create_ising_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">j</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  <span class="c1"># ZZ coupling</span>
+<span class="n">h1</span> <span class="o">=</span> <span class="n">create_ising_hamiltonian</span><span class="p">(</span><span class="n">lattice</span><span class="p">,</span> <span class="n">j</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>  <span class="c1"># Transverse X field</span>
+
+<span class="c1"># Sinusoidal drive → time-dependent Hamiltonian: H(t) = H0 + sin(2πt)·H1</span>
+<span class="n">td_hamiltonian</span> <span class="o">=</span> <span class="n">DrivenQubitHamiltonian</span><span class="p">(</span><span class="n">h0</span><span class="p">,</span> <span class="n">h1</span><span class="p">,</span> <span class="n">drive</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">t</span><span class="p">))</span>
+
+<span class="c1"># 2. Configure the builder</span>
+<span class="n">evolution_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
+    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;propagator&quot;</span><span class="p">,</span> <span class="s2">&quot;magnus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;euler&quot;</span><span class="p">,</span>
+    <span class="n">evolution_builder</span><span class="o">=</span><span class="n">evolution_builder</span><span class="p">,</span>
+    <span class="n">propagator</span><span class="o">=</span><span class="n">propagator</span><span class="p">,</span>
+    <span class="n">total_time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">dt</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># 3. Build the circuit (state-prep + evolution) without executing</span>
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">identity_state_prep</span><span class="p">(</span><span class="n">num_qubits</span><span class="o">=</span><span class="n">td_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">td_hamiltonian</span><span class="p">,</span> <span class="n">state_prep</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Circuit has QIR: </span><span class="si">{</span><span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># 4. Use for quantum resource estimation</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qre_application</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;QRE application created: </span><span class="si">{</span><span class="n">app</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="available-implementations">
+<h2>Available Implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
+<section id="euler-evolution-circuit-builder">
+<h3>Euler Evolution Circuit Builder<a class="headerlink" href="#euler-evolution-circuit-builder" title="Link to this heading"></a></h3>
+<p class="rubric">Class: <code class="docutils literal notranslate"><span class="pre">EulerEvolutionCircuitBuilder</span></code></p>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;euler&quot;</span></code></p>
+<p>Divides <span class="math notranslate nohighlight">\([0, T]\)</span> into Euler steps of size <code class="docutils literal notranslate"><span class="pre">dt</span></code>.  At each step, the configured propagator (default: Magnus order-1) evaluates the effective Hamiltonian and the evolution builder constructs the time-evolution unitary.</p>
+<p>The default propagator (<code class="docutils literal notranslate"><span class="pre">magnus</span></code>) computes the Magnus-expanded Hamiltonian over each interval, giving second-order global accuracy for smooth drives.  Other propagators can be substituted via the <code class="docutils literal notranslate"><span class="pre">propagator</span></code> setting.</p>
+<p><strong>Usage example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
+
+<span class="c1"># Create an Euler evolution circuit builder.</span>
+<span class="c1"># The propagator evaluates the effective Hamiltonian over each dt interval,</span>
+<span class="c1"># and the evolution builder constructs the unitary with `num_divisions`</span>
+<span class="c1"># subdivisions within that interval.</span>
+<span class="n">evolution_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
+    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;propagator&quot;</span><span class="p">,</span> <span class="s2">&quot;magnus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;euler&quot;</span><span class="p">,</span>
+    <span class="n">evolution_builder</span><span class="o">=</span><span class="n">evolution_builder</span><span class="p">,</span>
+    <span class="n">propagator</span><span class="o">=</span><span class="n">propagator</span><span class="p">,</span>
+    <span class="n">total_time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">dt</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>  <span class="c1"># single Euler step = full time</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="circuit-composition-details">
+<h2>Circuit Composition Details<a class="headerlink" href="#circuit-composition-details" title="Link to this heading"></a></h2>
+<p>The evolution circuit is built by composing:</p>
+<ol class="arabic simple">
+<li><p><strong>State Preparation</strong> — Prepares the initial quantum state on the system register</p></li>
+<li><p><strong>time-evolution Unitaries</strong> — Applies the time-evolution unitary for each step obtained from the evolution builder</p></li>
+</ol>
+<p>To accomplish this, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilder</span></code></a> maintains three key nested algorithm references:</p>
+<dl>
+<dt><strong>Nested Algorithm 1: Propagator</strong></dt><dd><p>Reference setting: <code class="docutils literal notranslate"><span class="pre">&quot;propagator&quot;</span></code></p>
+<p>Default: <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> to <code class="docutils literal notranslate"><span class="pre">&quot;propagator&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;magnus&quot;</span></code></p>
+<p>The propagator evaluates the effective Hamiltonian over each time interval <span class="math notranslate nohighlight">\([t, t+\mathrm{d}t]\)</span>.
+The default Magnus propagator computes <span class="math notranslate nohighlight">\(H_\text{eff} = H_0 + \bar{f}\,H_1\)</span> where <span class="math notranslate nohighlight">\(\bar{f}\)</span> is the time-averaged drive.</p>
+</dd>
+<dt><strong>Nested Algorithm 2: Evolution Builder</strong></dt><dd><p>Reference setting: <code class="docutils literal notranslate"><span class="pre">&quot;evolution_builder&quot;</span></code></p>
+<p>Default: <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> to <code class="docutils literal notranslate"><span class="pre">&quot;hamiltonian_unitary_builder&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;trotter&quot;</span></code></p>
+<p>The evolution builder (typically <a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a>) produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> of the time-evolution operator from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>.</p>
+</dd>
+<dt><strong>Nested Algorithm 3: Circuit Mapper</strong></dt><dd><p>Reference setting: <code class="docutils literal notranslate"><span class="pre">&quot;circuit_mapper&quot;</span></code></p>
+<p>Default: <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> to <code class="docutils literal notranslate"><span class="pre">&quot;circuit_mapper&quot;</span></code> with method <code class="docutils literal notranslate"><span class="pre">&quot;pauli_sequence&quot;</span></code></p>
+<p>The circuit mapper (see <a class="reference internal" href="circuit_mapper.html"><span class="doc">CircuitMapper</span></a>) converts the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> into an executable <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="related-classes">
+<h2>Related Classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings" title="qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionCircuitBuilderSettings</span></code></a>: Settings for evolution circuit builders</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>: Quantum circuit representation</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a>: Output of unitary builders</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a>: Nested algorithm references</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator" title="qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EulerIntegrator</span></code></a>: High-level Hamiltonian simulation interface that uses evolution circuit builders internally</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">Hamiltonian Unitary Builder</span></a>: Constructs unitary operators for Hamiltonian time evolution</p></li>
+<li><p><a class="reference internal" href="circuit_executor.html"><span class="doc">Circuit execution</span></a>: Executes quantum circuits</p></li>
+<li><p><a class="reference internal" href="../design/index.html"><span class="doc">High-level design</span></a>: QDK/Chemistry algorithm design principles</p></li>
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration and settings management</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory pattern</span></a>: Understanding algorithm creation and composition</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qpe_circuit_builder.html" class="btn btn-neutral float-left" title="Phase estimation circuit builder" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hamiltonian_unitary_builder.html" class="btn btn-neutral float-right" title="Hamiltonian Unitary Builder" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

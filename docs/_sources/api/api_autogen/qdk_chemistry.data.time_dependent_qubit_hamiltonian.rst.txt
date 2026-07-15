@@ -1,0 +1,25 @@
+qdk\_chemistry.data.time\_dependent\_qubit\_hamiltonian package
+===============================================================
+
+.. automodule:: qdk_chemistry.data.time_dependent_qubit_hamiltonian
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.time_dependent_qubit_hamiltonian.base
+   qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven

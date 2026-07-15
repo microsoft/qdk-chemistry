@@ -1,0 +1,8 @@
+qdk\_chemistry.migrate.\_\_main\_\_ module
+==========================================
+
+.. automodule:: qdk_chemistry.migrate.__main__
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

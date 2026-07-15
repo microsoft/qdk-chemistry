@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder.block\_encoding.lcu module
+==================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

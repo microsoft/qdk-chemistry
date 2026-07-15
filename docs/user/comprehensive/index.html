@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>In-depth user guide &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>In-depth user guide &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -62,6 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -112,7 +113,7 @@ This documentation provides detailed information about QDK/Chemistry’s structu
 </ul>
 <p>The library is designed so that each stage feeds naturally into the next, while any individual component can be replaced without affecting the rest of the workflow.
 An example workflow diagram is shown below.</p>
-<div align="center" class="align-center"><div class="graphviz"><img src="../../_images/graphviz-e3c32890d6d261b8b51e21433dfb2cf592d8eb7b.png" alt="QDK/Chemistry Workflow" class="graphviz" /></div>
+<div align="center" class="align-center"><div class="graphviz"><img src="../../_images/graphviz-a93505e11845afe91f4cda27e0c5ea5b25ec6eb1.png" alt="QDK/Chemistry Workflow" class="graphviz" /></div>
 </div>
 <div class="line-block">
 <div class="line"><br /></div>
@@ -135,6 +136,7 @@ An example workflow diagram is shown below.</p>
 <li class="toctree-l2"><a class="reference internal" href="data/hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/orbitals.html">Orbitals</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data/majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/structure.html">Structure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/symmetries.html">Symmetries</a></li>
@@ -142,13 +144,14 @@ An example workflow diagram is shown below.</p>
 <li class="toctree-l2"><a class="reference internal" href="data/qpe_result.html">QpeResult</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/circuit.html">Circuit</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data/index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="algorithms/index.html">Algorithm classes</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/settings.html">Settings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/active_space.html">Active space selection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms/energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/localizer.html">Orbital localization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/mc_calculator.html">Multi-configuration calculations</a></li>
@@ -158,11 +161,15 @@ An example workflow diagram is shown below.</p>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/state_preparation.html">State preparation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/phase_estimation.html">Phase estimation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms/time_evolution_builder.html">Time evolution builder</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms/circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/index.html#term-grouper">Term grouper</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>

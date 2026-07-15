@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.propagator.magnus\_propagator module
+==============================================================
+
+.. automodule:: qdk_chemistry.algorithms.propagator.magnus_propagator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

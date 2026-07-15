@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Standard (QFT-based) phase estimation circuit builder.</span>
+
+<span class="sd">This module implements the circuit-building component of the standard quantum phase</span>
+<span class="sd">estimation (QPE) algorithm. It constructs a single circuit that uses multiple ancilla</span>
+<span class="sd">qubits and the inverse QFT, enabling standalone resource estimation and circuit preview.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">QpeCircuitBuilderSettings</span><span class="p">,</span> <span class="n">StandardQpeCircuitBuilder</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;QdkStandardQpeCircuitBuilder&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;QdkStandardQpeCircuitBuilderSettings&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="QdkStandardQpeCircuitBuilderSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.QdkStandardQpeCircuitBuilderSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QdkStandardQpeCircuitBuilderSettings</span><span class="p">(</span><span class="n">QpeCircuitBuilderSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the Standard Phase Estimation Circuit Builder.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QdkStandardQpeCircuitBuilderSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.QdkStandardQpeCircuitBuilderSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings for the Standard Phase Estimation Circuit Builder.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QdkStandardQpeCircuitBuilder">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.QdkStandardQpeCircuitBuilder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QdkStandardQpeCircuitBuilder</span><span class="p">(</span><span class="n">StandardQpeCircuitBuilder</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Standard (QFT-based) Phase Estimation circuit builder.</span>
+
+<span class="sd">    Constructs a single quantum circuit that performs standard QPE using multiple</span>
+<span class="sd">    ancilla qubits and the inverse QFT. Can be used standalone for resource estimation</span>
+<span class="sd">    or composed inside StandardPhaseEstimation.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QdkStandardQpeCircuitBuilder.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.QdkStandardQpeCircuitBuilder.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_bits</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">unitary_builder</span><span class="p">:</span> <span class="n">AlgorithmRef</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">controlled_circuit_mapper</span><span class="p">:</span> <span class="n">AlgorithmRef</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the StandardQpeCircuitBuilder.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_bits: The number of phase bits (ancilla qubits) to estimate. Default to -1;</span>
+<span class="sd">                        user needs to set a valid value.</span>
+<span class="sd">            unitary_builder: Optional algorithm reference for the unitary builder.</span>
+<span class="sd">            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">num_bits</span><span class="o">=</span><span class="n">num_bits</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QdkStandardQpeCircuitBuilderSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unitary_builder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">controlled_circuit_mapper</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the standard QPE circuit.</span>
+
+<span class="sd">        Constructs a single circuit with ``num_bits`` ancilla qubits, applying</span>
+<span class="sd">        controlled-U^(2^k) for each ancilla and finishing with the inverse QFT.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: The circuit that prepares the initial state.</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A single-element list containing the standard QPE circuit.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``num_bits`` is not a positive integer.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_bits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_bits</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_bits must be a positive integer. Got </span><span class="si">{</span><span class="n">num_bits</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">num_system_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
+
+        <span class="c1"># Build one controlled circuit per ancilla with power=2^k,</span>
+        <span class="c1"># respecting the unitary builder&#39;s power_strategy (e.g. &quot;rescale&quot;).</span>
+        <span class="c1"># ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.</span>
+        <span class="n">ctrl_unitary_circuits</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">num_ancilla_qubits</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_bits</span><span class="p">):</span>
+            <span class="n">power</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">num_bits</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">circuit</span><span class="p">,</span> <span class="n">num_ancilla_qubits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_controlled_circuit</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">power</span><span class="o">=</span><span class="n">power</span><span class="p">)</span>
+            <span class="n">ctrl_unitary_circuits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">_qsharp_op</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">_qsharp_op</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ctrl_unitary_circuits</span><span class="p">):</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="n">circuit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_circuit_from_qsharp_op</span><span class="p">(</span>
+                <span class="n">state_preparation</span><span class="p">,</span> <span class="n">ctrl_unitary_circuits</span><span class="p">,</span> <span class="n">num_bits</span><span class="p">,</span> <span class="n">num_system_qubits</span><span class="p">,</span> <span class="n">num_ancilla_qubits</span>
+            <span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Built standard QPE circuit with </span><span class="si">{</span><span class="n">num_bits</span><span class="si">}</span><span class="s2"> ancilla qubits.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">circuit</span><span class="p">]</span>
+
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Failed to create standard QPE circuit: Q# operations are not available. &quot;</span>
+            <span class="s2">&quot;For Qiskit support, use QiskitStandardQpeCircuitBuilder from the qiskit plugin.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_circuit_from_qsharp_op</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">controlled_unitary_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">],</span>
+        <span class="n">num_bits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_system_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">num_ancilla_qubits</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Circuit object from a Q# operation using MakeStandardQPECircuit.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: Circuit object containing a Q# operation for state preparation.</span>
+<span class="sd">            controlled_unitary_circuits: List of Circuit objects (one per ancilla) containing</span>
+<span class="sd">                Q# operations for controlled-U^(2^k).</span>
+<span class="sd">            num_bits: Number of ancilla qubits (phase bits).</span>
+<span class="sd">            num_system_qubits: Number of system qubits.</span>
+<span class="sd">            num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit object representing the standard QPE circuit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">state_prep_op</span> <span class="o">=</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">ctrl_unitary_ops</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">_qsharp_op</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">controlled_unitary_circuits</span><span class="p">]</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">phase_qubit_prep_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakePrepareHadamardAllOp</span><span class="p">()</span>
+        <span class="n">ancillas</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_bits</span><span class="p">))</span>
+        <span class="n">systems</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">num_bits</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_system_qubits</span><span class="p">)]</span>
+        <span class="n">standard_parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;statePrep&quot;</span><span class="p">:</span> <span class="n">state_prep_op</span><span class="p">,</span>
+            <span class="s2">&quot;controlledUnitary&quot;</span><span class="p">:</span> <span class="n">ctrl_unitary_ops</span><span class="p">,</span>
+            <span class="s2">&quot;numBits&quot;</span><span class="p">:</span> <span class="n">num_bits</span><span class="p">,</span>
+            <span class="s2">&quot;ancillas&quot;</span><span class="p">:</span> <span class="n">ancillas</span><span class="p">,</span>
+            <span class="s2">&quot;systems&quot;</span><span class="p">:</span> <span class="n">systems</span><span class="p">,</span>
+            <span class="s2">&quot;phaseQubitPrep&quot;</span><span class="p">:</span> <span class="n">phase_qubit_prep_op</span><span class="p">,</span>
+            <span class="s2">&quot;numAncillaQubits&quot;</span><span class="p">:</span> <span class="n">num_ancilla_qubits</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span>
+                <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StandardPhaseEstimation</span><span class="o">.</span><span class="n">MakeStandardQPECircuit</span><span class="p">,</span>
+                <span class="n">parameter</span><span class="o">=</span><span class="n">standard_parameters</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="QdkStandardQpeCircuitBuilder.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder.QdkStandardQpeCircuitBuilder.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the builder algorithm.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk_standard&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

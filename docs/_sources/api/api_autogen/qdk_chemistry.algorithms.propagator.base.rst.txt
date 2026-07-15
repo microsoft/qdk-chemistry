@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.propagator.base module
+================================================
+
+.. automodule:: qdk_chemistry.algorithms.propagator.base
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

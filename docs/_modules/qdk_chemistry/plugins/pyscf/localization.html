@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.localization &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.localization &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -123,7 +124,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">lo</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrbitalLocalizer</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">SciWavefunctionContainer</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">SlaterDeterminantContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.orbital_localizer</span><span class="w"> </span><span class="kn">import</span> <span class="n">new_aufbau_determinant_wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_indices</span><span class="p">,</span> <span class="n">spin_channel_matrix</span><span class="p">,</span> <span class="n">spin_channel_vector</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">axes</span><span class="p">,</span>
+    <span class="n">spin_index_set</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">basis_to_pyscf_mol</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
@@ -166,9 +173,21 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the localization object with default parameters.&quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;pipek-mezey&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pipek-mezey&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Localization algorithm&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;pipek-mezey&quot;</span><span class="p">,</span> <span class="s2">&quot;foster-boys&quot;</span><span class="p">,</span> <span class="s2">&quot;edmiston-ruedenberg&quot;</span><span class="p">,</span> <span class="s2">&quot;cholesky&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;occupation_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-10</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;population_method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;mulliken&quot;</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;population_method&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;mulliken&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Population analysis for Pipek-Mezey localization&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;mulliken&quot;</span><span class="p">,</span> <span class="s2">&quot;lowdin&quot;</span><span class="p">,</span> <span class="s2">&quot;meta_lowdin&quot;</span><span class="p">,</span> <span class="s2">&quot;becke&quot;</span><span class="p">],</span>
+        <span class="p">)</span></div>
 </div>
 
 
@@ -245,9 +264,20 @@
         <span class="k">if</span> <span class="n">loc_indices_b</span> <span class="o">!=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;loc_indices_b must be sorted&quot;</span><span class="p">)</span>
 
-        <span class="c1"># If both index vectors are empty, return original orbitals unchanged</span>
+        <span class="c1"># Localization rotates the (active) orbital basis. Correlated-state coefficients</span>
+        <span class="c1"># are not re-expressed in the localized basis; the returned wavefunction is an</span>
+        <span class="c1"># Aufbau determinant built from the transformed orbitals.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;PyscfLocalizer received a multi-determinant wavefunction. The returned wavefunction will contain &quot;</span>
+                <span class="s2">&quot;an Aufbau determinant built from the transformed orbitals; correlated-state coefficients are not &quot;</span>
+                <span class="s2">&quot;preserved.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># If both index vectors are empty, return an Aufbau determinant wavefunction</span>
+        <span class="c1"># with the original orbital coefficients unchanged.</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">wavefunction</span>
+            <span class="k">return</span> <span class="n">new_aufbau_determinant_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
         <span class="n">pop_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;population_method&quot;</span><span class="p">)</span>
         <span class="n">loc_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
@@ -272,13 +302,16 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown localization method: </span><span class="si">{</span><span class="n">loc_method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="c1"># Preserve active/inactive space indices from input orbitals if they exist</span>
-        <span class="c1"># For restricted: indices = (active, inactive)</span>
-        <span class="c1"># For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)</span>
-        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">():</span>
-            <span class="n">active_alpha</span><span class="p">,</span> <span class="n">active_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
-            <span class="n">inactive_alpha</span><span class="p">,</span> <span class="n">inactive_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()</span>
+        <span class="n">has_active</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">has_active</span><span class="p">:</span>
+            <span class="n">active_idx</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span>
+            <span class="n">active_alpha</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">active_idx</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+            <span class="n">active_beta</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">active_idx</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
+            <span class="n">inactive_idx</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">inactive_indices</span><span class="p">()</span>
+            <span class="n">inactive_alpha</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">inactive_idx</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+            <span class="n">inactive_beta</span> <span class="o">=</span> <span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">inactive_idx</span><span class="p">,</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">active_alpha</span> <span class="o">=</span> <span class="n">active_beta</span> <span class="o">=</span> <span class="n">inactive_alpha</span> <span class="o">=</span> <span class="n">inactive_beta</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">active_alpha</span> <span class="o">=</span> <span class="n">active_beta</span> <span class="o">=</span> <span class="n">inactive_alpha</span> <span class="o">=</span> <span class="n">inactive_beta</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="c1"># Perform localization and populate localized orbitals instance</span>
         <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
@@ -286,23 +319,28 @@
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;For restricted orbitals, loc_indices_a and loc_indices_b must be identical&quot;</span><span class="p">)</span>
 
             <span class="c1"># Start with original coefficients</span>
-            <span class="n">mo_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># For restricted, get alpha coefficients</span>
+            <span class="n">mo_coeffs</span> <span class="o">=</span> <span class="n">spin_channel_matrix</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>  <span class="c1"># restricted: alpha coefficients</span>
             <span class="n">mo_loc</span> <span class="o">=</span> <span class="n">mo_coeffs</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
             <span class="n">localized_mos</span> <span class="o">=</span> <span class="n">_do_loc</span><span class="p">(</span><span class="n">mo_coeffs</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">):</span>
                 <span class="n">mo_loc</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">localized_mos</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
 
+            <span class="n">nmo</span> <span class="o">=</span> <span class="n">mo_loc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
             <span class="n">loc_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
                 <span class="n">coefficients</span><span class="o">=</span><span class="n">mo_loc</span><span class="p">,</span>
-                <span class="n">energies</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">energies</span><span class="o">=</span><span class="n">spin_channel_vector</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">energies</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
-                <span class="n">indices</span><span class="o">=</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">))</span> <span class="k">if</span> <span class="n">active_alpha</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">active_indices</span><span class="o">=</span><span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">))</span> <span class="k">if</span> <span class="n">has_active</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">inactive_indices</span><span class="o">=</span><span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">has_active</span>
+                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Unrestricted case - handle alpha and beta separately</span>
-            <span class="n">mo_coeffs_alpha</span><span class="p">,</span> <span class="n">mo_coeffs_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+            <span class="n">mo_coeffs_alpha</span> <span class="o">=</span> <span class="n">spin_channel_matrix</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+            <span class="n">mo_coeffs_beta</span> <span class="o">=</span> <span class="n">spin_channel_matrix</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
             <span class="n">mo_a</span> <span class="o">=</span> <span class="n">mo_coeffs_alpha</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
             <span class="n">mo_b</span> <span class="o">=</span> <span class="n">mo_coeffs_beta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 
@@ -314,7 +352,12 @@
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">):</span>
                 <span class="n">mo_b</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">localized_b</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
 
-            <span class="n">energies_alpha</span><span class="p">,</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">nmo</span> <span class="o">=</span> <span class="n">mo_a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">():</span>
+                <span class="n">energies_alpha</span> <span class="o">=</span> <span class="n">spin_channel_vector</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">energies</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
+                <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">spin_channel_vector</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">energies</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">energies_alpha</span> <span class="o">=</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="n">loc_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
                 <span class="n">coefficients_alpha</span><span class="o">=</span><span class="n">mo_a</span><span class="p">,</span>
                 <span class="n">coefficients_beta</span><span class="o">=</span><span class="n">mo_b</span><span class="p">,</span>
@@ -322,19 +365,15 @@
                 <span class="n">energies_beta</span><span class="o">=</span><span class="n">energies_beta</span><span class="p">,</span>
                 <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
-                <span class="n">indices</span><span class="o">=</span><span class="p">(</span>
-                    <span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span>
-                    <span class="nb">list</span><span class="p">(</span><span class="n">active_beta</span><span class="p">),</span>
-                    <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">),</span>
-                    <span class="nb">list</span><span class="p">(</span><span class="n">inactive_beta</span><span class="p">),</span>
-                <span class="p">)</span>
-                <span class="k">if</span> <span class="n">active_alpha</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="n">active_indices</span><span class="o">=</span><span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">active_beta</span><span class="p">),</span> <span class="n">equivalent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">has_active</span>
+                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">inactive_indices</span><span class="o">=</span><span class="n">spin_index_set</span><span class="p">(</span><span class="n">nmo</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_alpha</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">inactive_beta</span><span class="p">),</span> <span class="n">equivalent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">has_active</span>
                 <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">)</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="c1"># Single determinant case - return new wavefunction with localized orbitals</span>
-            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">loc_orbitals</span><span class="p">))</span>
-        <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span> <span class="n">loc_orbitals</span><span class="p">))</span>
+        <span class="c1"># Return an Aufbau determinant wavefunction in the transformed orbital basis.</span>
+        <span class="k">return</span> <span class="n">new_aufbau_determinant_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">loc_orbitals</span><span class="p">)</span>
 
 <div class="viewcode-block" id="PyscfLocalizer.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizer.name">[docs]</a>

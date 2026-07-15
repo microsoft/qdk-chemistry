@@ -23,6 +23,6 @@ Submodules
 
    qdk_chemistry.plugins.qiskit.circuit_executor
    qdk_chemistry.plugins.qiskit.conversion
+   qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder
    qdk_chemistry.plugins.qiskit.qubit_mapper
    qdk_chemistry.plugins.qiskit.regular_isometry
-   qdk_chemistry.plugins.qiskit.standard_phase_estimation

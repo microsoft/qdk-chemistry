@@ -26,7 +26,7 @@ Submodules
    qdk_chemistry.utils.model_hamiltonians
    qdk_chemistry.utils.pauli_commutation
    qdk_chemistry.utils.pauli_matrix
-   qdk_chemistry.utils.phase
    qdk_chemistry.utils.telemetry
    qdk_chemistry.utils.telemetry_events
    qdk_chemistry.utils.wavefunction
+   qdk_chemistry.utils.zassenhaus_generation

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hashing module
+========================================
+
+.. automodule:: qdk_chemistry.algorithms.hashing
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

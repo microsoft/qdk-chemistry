@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LatticeGraph &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>LatticeGraph &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Pauli Operators" href="pauli_operator.html" />
+    <link rel="next" title="MajoranaMapping" href="majorana_mapping.html" />
     <link rel="prev" title="Orbitals" href="orbitals.html" /> 
 </head>
 
@@ -68,10 +68,12 @@
 <li class="toctree-l4"><a class="reference internal" href="#periodic-boundary-conditions">Periodic boundary conditions</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-lattice-data">Accessing lattice data</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#edge-coloring">Edge coloring</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="majorana_mapping.html">MajoranaMapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 <li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
@@ -79,6 +81,7 @@
 <li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#qubitoperator-and-term-partitions">QubitOperator and term partitions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
@@ -87,6 +90,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -221,7 +225,21 @@ Ring (n=6):   0 --- 1 --- 2 --- 3 --- 4 --- 5
 </pre></div>
 </div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 6-site open chain</span>
+<span class="n">chain</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chain: </span><span class="si">{</span><span class="n">chain</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">chain</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create a 6-site periodic chain (ring)</span>
+<span class="n">ring</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ring: </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create a chain with custom hopping weight</span>
+<span class="n">chain_weighted</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
 
@@ -234,20 +252,6 @@ Ring (n=6):   0 --- 1 --- 2 --- 3 --- 4 --- 5
 
 <span class="w">  </span><span class="c1">// Create a chain with custom hopping weight</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">chain_weighted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic=*/</span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="cm">/*t=*/</span><span class="mf">0.5</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 6-site open chain</span>
-<span class="n">chain</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chain: </span><span class="si">{</span><span class="n">chain</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">chain</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create a 6-site periodic chain (ring)</span>
-<span class="n">ring</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ring: </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create a chain with custom hopping weight</span>
-<span class="n">chain_weighted</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -325,26 +329,7 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
 </pre></div>
 </div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 4x3 square lattice</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">square</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create a 3x3 triangular lattice</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">triangular</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">triangular</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create a 3x2 honeycomb lattice (2 sites per unit cell)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">honeycomb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">honeycomb</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create a 3x2 kagome lattice (3 sites per unit cell)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">kagome</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">kagome</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create a periodic square lattice (torus topology)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">torus</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">true</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a 4x3 square lattice</span>
 <span class="n">square</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Square: </span><span class="si">{</span><span class="n">square</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">square</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
@@ -367,6 +352,25 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a 4x3 square lattice</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">square</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create a 3x3 triangular lattice</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">triangular</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">triangular</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create a 3x2 honeycomb lattice (2 sites per unit cell)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">honeycomb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">honeycomb</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create a 3x2 kagome lattice (3 sites per unit cell)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">kagome</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">kagome</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create a periodic square lattice (torus topology)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">torus</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">true</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 </section>
@@ -374,29 +378,7 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
 <h3>Creating from adjacency data<a class="headerlink" href="#creating-from-adjacency-data" title="Link to this heading"></a></h3>
 <p>For geometries not covered by the built-in methods, you can construct a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a> from a dense adjacency matrix, a sparse adjacency matrix, or an edge-weight dictionary.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a lattice from a dense adjacency matrix (star graph)</span>
-<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="o">::</span><span class="n">Zero</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">);</span>
-<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">adj</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="p">;</span>
-<span class="w">    </span><span class="n">adj</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="p">;</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">star_graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">from_dense_matrix</span><span class="p">(</span><span class="n">adj</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Create a lattice from an edge-weight map</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">edges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="p">{{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"> </span><span class="mf">0.5</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">0.5</span><span class="p">}};</span>
-<span class="w">  </span><span class="n">LatticeGraph</span><span class="w"> </span><span class="nf">custom_lattice</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span><span class="w"> </span><span class="cm">/*num_sites=*/</span><span class="mi">3</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Make a directed graph bidirectional</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">directed_edges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="p">{{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">}};</span>
-<span class="w">  </span><span class="n">LatticeGraph</span><span class="w"> </span><span class="nf">directed</span><span class="p">(</span><span class="n">directed_edges</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">bidirectional</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">make_bidirectional</span><span class="p">(</span><span class="n">directed</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a lattice from a dense adjacency matrix (star graph)</span>
 <span class="n">adj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
@@ -416,6 +398,28 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
 <span class="n">directed</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="p">(</span><span class="n">edge_weights</span><span class="o">=</span><span class="n">directed_edges</span><span class="p">,</span> <span class="n">num_sites</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 <span class="n">bidirectional</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">make_bidirectional</span><span class="p">(</span><span class="n">directed</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bidirectional: is_symmetric = </span><span class="si">{</span><span class="n">bidirectional</span><span class="o">.</span><span class="n">is_symmetric</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a lattice from a dense adjacency matrix (star graph)</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="o">::</span><span class="n">Zero</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">);</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">adj</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">adj</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">star_graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">from_dense_matrix</span><span class="p">(</span><span class="n">adj</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Create a lattice from an edge-weight map</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">edges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="p">{{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"> </span><span class="mf">0.5</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">0.5</span><span class="p">}};</span>
+<span class="w">  </span><span class="n">LatticeGraph</span><span class="w"> </span><span class="nf">custom_lattice</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span><span class="w"> </span><span class="cm">/*num_sites=*/</span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Make a directed graph bidirectional</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">map</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint64_t</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">directed_edges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="p">{{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">},</span><span class="w"> </span><span class="p">{{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">},</span><span class="w"> </span><span class="mf">1.0</span><span class="p">}};</span>
+<span class="w">  </span><span class="n">LatticeGraph</span><span class="w"> </span><span class="nf">directed</span><span class="p">(</span><span class="n">directed_edges</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">bidirectional</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">make_bidirectional</span><span class="p">(</span><span class="n">directed</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -449,21 +453,7 @@ The <code class="docutils literal notranslate"><span class="pre">~~~</span></cod
 </pre></div>
 </div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Periodic chain (ring)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ring_example</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic=*/</span><span class="nb">true</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Cylinder: periodic in x only</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cylinder</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">false</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Torus: periodic in both directions</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">torus_example</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">true</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Periodic chain (ring)</span>
 <span class="n">ring</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ring: </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_sites</span><span class="si">}</span><span class="s2"> sites, </span><span class="si">{</span><span class="n">ring</span><span class="o">.</span><span class="n">num_edges</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
@@ -478,33 +468,27 @@ The <code class="docutils literal notranslate"><span class="pre">~~~</span></cod
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Periodic chain (ring)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ring_example</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic=*/</span><span class="nb">true</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Cylinder: periodic in x only</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">cylinder</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">false</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Torus: periodic in both directions</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">torus_example</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_x=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="cm">/*periodic_y=*/</span><span class="nb">true</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="accessing-lattice-data">
 <h2>Accessing lattice data<a class="headerlink" href="#accessing-lattice-data" title="Link to this heading"></a></h2>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a> class provides methods to query connectivity, edge weights, and structural properties.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Query lattice properties</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Check connectivity</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">connected_01</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">are_connected</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// true</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">connected_02</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">are_connected</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// false</span>
-
-<span class="w">  </span><span class="c1">// Get edge weight</span>
-<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">w01</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">weight</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1.0</span>
-<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">w02</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">weight</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// 0.0</span>
-
-<span class="w">  </span><span class="c1">// Check symmetry</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">symmetric</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">is_symmetric</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
-
-<span class="w">  </span><span class="c1">// Get the full adjacency matrix</span>
-<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">adj_matrix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">adjacency_matrix</span><span class="p">();</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Query lattice properties</span>
 <span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 
@@ -525,6 +509,26 @@ The <code class="docutils literal notranslate"><span class="pre">~~~</span></cod
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Query lattice properties</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Check connectivity</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">connected_01</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">are_connected</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// true</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">connected_02</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">are_connected</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// false</span>
+
+<span class="w">  </span><span class="c1">// Get edge weight</span>
+<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">w01</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">weight</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1.0</span>
+<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">w02</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">weight</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// 0.0</span>
+
+<span class="w">  </span><span class="c1">// Check symmetry</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">symmetric</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">is_symmetric</span><span class="p">();</span><span class="w">  </span><span class="c1">// true</span>
+
+<span class="w">  </span><span class="c1">// Get the full adjacency matrix</span>
+<span class="w">  </span><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">adj_matrix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lattice</span><span class="p">.</span><span class="n">adjacency_matrix</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="serialization">
@@ -536,21 +540,7 @@ For detailed information about serialization in QDK/Chemistry, see the <a class=
 <p>Lattice graph files use the <code class="docutils literal notranslate"><span class="pre">.lattice_graph</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">chain.lattice_graph.json</span></code> and <code class="docutils literal notranslate"><span class="pre">square.lattice_graph.hdf5</span></code>.</p>
 </div>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Save to JSON</span>
-<span class="w">  </span><span class="n">lg</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.json&quot;</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Load from JSON</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">loaded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.json&quot;</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Save to HDF5</span>
-<span class="w">  </span><span class="n">lg</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.hdf5&quot;</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lattice</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 
 <span class="c1"># Save to JSON</span>
@@ -565,7 +555,29 @@ For detailed information about serialization in QDK/Chemistry, see the <a class=
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">lg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Save to JSON</span>
+<span class="w">  </span><span class="n">lg</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.json&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Load from JSON</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">loaded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LatticeGraph</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.json&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Save to HDF5</span>
+<span class="w">  </span><span class="n">lg</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;chain.lattice_graph.hdf5&quot;</span><span class="p">);</span>
+</pre></div>
 </div>
+</div>
+</div>
+</section>
+<section id="edge-coloring">
+<h2>Edge coloring<a class="headerlink" href="#edge-coloring" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">edge_coloring</span></code> property returns an optional <code class="docutils literal notranslate"><span class="pre">dict[tuple[int,</span> <span class="pre">int],</span> <span class="pre">int]</span></code> that assigns a color index to each undirected edge such that edges sharing a vertex receive distinct colors.
+Factory methods for recognised topologies (chain, square, honeycomb) pre-populate this with a deterministic optimal coloring; triangular and kagome lattices use a greedy heuristic.
+Custom lattices built from raw adjacency matrices have <code class="docutils literal notranslate"><span class="pre">edge_coloring</span></code> set to <code class="docutils literal notranslate"><span class="pre">None</span></code> — callers can compute and supply their own coloring.</p>
+<p>This coloring is the topological ingredient that powers geometry-aware Trotter scheduling: edges of the same color have disjoint qubit supports, so their Pauli exponentials can be applied in parallel inside one Trotter step.
+The <a class="reference internal" href="../model_hamiltonians.html"><span class="doc">spin model Hamiltonian builders</span></a> consume the coloring automatically when <code class="docutils literal notranslate"><span class="pre">include_term_groups=True</span></code> and store the result on <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator.term_partition" title="qdk_chemistry.data.QubitOperator.term_partition"><code class="xref py py-attr docutils literal notranslate"><span class="pre">term_partition</span></code></a>.</p>
 </section>
 <section id="related-classes">
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
@@ -588,7 +600,7 @@ For detailed information about serialization in QDK/Chemistry, see the <a class=
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="orbitals.html" class="btn btn-neutral float-left" title="Orbitals" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="pauli_operator.html" class="btn btn-neutral float-right" title="Pauli Operators" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="majorana_mapping.html" class="btn btn-neutral float-right" title="MajoranaMapping" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

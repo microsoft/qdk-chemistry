@@ -1,0 +1,8 @@
+qdk\_chemistry.data.\_spin\_channels module
+===========================================
+
+.. automodule:: qdk_chemistry.data._spin_channels
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

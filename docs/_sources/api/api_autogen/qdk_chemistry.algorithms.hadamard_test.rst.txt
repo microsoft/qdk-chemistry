@@ -1,0 +1,24 @@
+qdk\_chemistry.algorithms.hadamard\_test package
+================================================
+
+.. automodule:: qdk_chemistry.algorithms.hadamard_test
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hadamard_test.circuit_builder
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.hadamard_test.hadamard_test

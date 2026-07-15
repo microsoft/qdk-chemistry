@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.registry &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.registry &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -125,12 +126,182 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_AlgorithmWrapper</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Thin wrapper that adds a ``cache`` kwarg to ``run()``.</span>
+
+<span class="sd">    Forwards every other attribute to the wrapped algorithm so it</span>
+<span class="sd">    behaves identically for ``settings()``, ``hash()``, ``type_name()``,</span>
+<span class="sd">    ``name()``, etc.  The ``__class__`` property makes CPython&#39;s</span>
+<span class="sd">    ``isinstance()`` report the wrapped type because</span>
+<span class="sd">    ``type.__instancecheck__`` reads ``obj.__class__`` (not</span>
+<span class="sd">    ``type(obj)``) when the two differ.  Note that ``type(wrapper)``</span>
+<span class="sd">    still returns ``_AlgorithmWrapper``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;_algo&quot;</span><span class="p">,)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">algo</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_algo&quot;</span><span class="p">,</span> <span class="n">algo</span><span class="p">)</span>
+
+    <span class="nd">@property</span>  <span class="c1"># type: ignore[misc, override]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__class__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="vm">__class__</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force_rerun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute the algorithm with optional caching.</span>
+
+<span class="sd">        Without ``cache`` this is equivalent to calling</span>
+<span class="sd">        the underlying ``algorithm.run()`` directly.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            *args: Positional arguments for the algorithm.</span>
+<span class="sd">            cache: Cache backend — a :class:`CacheBackend`, a path</span>
+<span class="sd">                (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.</span>
+<span class="sd">            force_rerun: If ``True``, skip the cache lookup and re-execute,</span>
+<span class="sd">                overwriting any previously cached result.</span>
+<span class="sd">            **kwargs: Keyword arguments for the algorithm.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The algorithm result.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_cache</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">resolved_cache</span> <span class="o">=</span> <span class="n">resolve_cache</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">resolved_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">run_hash</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">run_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="n">hash</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Caching was requested for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="si">!r}</span><span class="s2">, but a run hash could not be computed &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;because the algorithm does not expose a compatible hash method: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="ne">UserWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Caching was requested for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="si">!r}</span><span class="s2">, but a run hash could not be computed &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;with the provided arguments: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="ne">UserWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">run_hash</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># Check the cache (skip on force_rerun)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">force_rerun</span><span class="p">:</span>
+            <span class="n">hit</span> <span class="o">=</span> <span class="n">_try_cache_hit</span><span class="p">(</span><span class="n">resolved_cache</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">hit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">hit</span>
+
+        <span class="c1"># Cache miss — execute locally and store</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_store_result</span><span class="p">(</span><span class="n">resolved_cache</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_algo</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_try_cache_hit</span><span class="p">(</span><span class="n">cache</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the cached result if available, else None.&quot;&quot;&quot;</span>
+    <span class="n">job</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">job</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;value&quot;</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;hash&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_store_result</span><span class="p">(</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Store a computation result in the cache.&quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_item_content_hash</span><span class="p">,</span> <span class="n">collect_content_hashes</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">output_hashes</span> <span class="o">=</span> <span class="n">collect_content_hashes</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="n">input_hashes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">input_hashes</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;arg_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">input_hashes</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+    <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span>
+        <span class="n">job_id</span><span class="o">=</span><span class="n">run_hash</span><span class="p">[:</span><span class="mi">12</span><span class="p">],</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;local&quot;</span><span class="p">,</span>
+        <span class="n">backend_config</span><span class="o">=</span><span class="p">{},</span>
+        <span class="n">backend_state</span><span class="o">=</span><span class="p">{},</span>
+        <span class="n">algorithm_info</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+            <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="p">},</span>
+        <span class="n">status</span><span class="o">=</span><span class="s2">&quot;retrieved&quot;</span><span class="p">,</span>
+        <span class="n">run_hash</span><span class="o">=</span><span class="n">run_hash</span><span class="p">,</span>
+        <span class="n">input_hashes</span><span class="o">=</span><span class="n">input_hashes</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">output_hashes</span><span class="o">=</span><span class="n">output_hashes</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Persist DataClass blobs</span>
+    <span class="n">items</span> <span class="o">=</span> <span class="n">result</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">result</span><span class="p">,)</span>
+    <span class="k">for</span> <span class="n">entry</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">output_hashes</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s2">&quot;value&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cache</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;hash&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Caching skipped for </span><span class="si">{</span><span class="n">algorithm</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">algorithm</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2"> because output &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">type</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> could not be persisted: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="ne">UserWarning</span><span class="p">,</span>
+                    <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span>
+
+    <span class="n">cache</span><span class="o">.</span><span class="n">put_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;available&quot;</span><span class="p">,</span>
@@ -148,6 +319,35 @@
 <span class="n">__cleanup_registered</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="n">__factories</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AlgorithmFactory</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="c1"># Deprecated algorithm-type keys mapped to their current names. Accessing a</span>
+<span class="c1"># deprecated key still works but emits a DeprecationWarning.</span>
+<span class="n">_DEPRECATED_TYPE_ALIASES</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;energy_estimator&quot;</span><span class="p">:</span> <span class="s2">&quot;expectation_estimator&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map a deprecated algorithm-type key to its current name.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The requested algorithm type key.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The resolved algorithm type key. A deprecated key is mapped to its replacement and</span>
+<span class="sd">            triggers a ``DeprecationWarning``; any other value passes through unchanged.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_type</span> <span class="o">=</span> <span class="n">_DEPRECATED_TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">new_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is deprecated and will be removed in a &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;future release; use &#39;</span><span class="si">{</span><span class="n">new_type</span><span class="si">}</span><span class="s2">&#39; instead.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_type</span>
+    <span class="k">return</span> <span class="n">algorithm_type</span>
 
 
 <div class="viewcode-block" id="create">
@@ -198,6 +398,7 @@
 <span class="sd">        &gt;&gt;&gt; default_calc = registry.create(&quot;dynamical_correlation_calculator&quot;)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">algorithm_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">algorithm_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
@@ -205,7 +406,7 @@
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
                 <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span> <span class="ow">or</span> <span class="p">{})</span>
-                <span class="k">return</span> <span class="n">instance</span>
+                <span class="k">return</span> <span class="n">_AlgorithmWrapper</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
             <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="n">available_algorithms</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">available_algorithms</span><span class="p">:</span>
@@ -269,6 +470,7 @@
 <span class="sd">        &gt;&gt;&gt; registry.print_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;, characters=100)</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
@@ -331,6 +533,7 @@
 <span class="sd">        force_restricted: bool = False  # Force restricted calculation</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
@@ -447,6 +650,7 @@
         <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
             <span class="n">result</span><span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()]</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">result</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
@@ -491,6 +695,7 @@
         <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
             <span class="n">result</span><span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()]</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">result</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">_resolve_algorithm_type</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">factory</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
@@ -596,6 +801,7 @@
         <span class="n">LocalizerFactory</span><span class="p">,</span>
         <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
         <span class="n">MultiConfigurationScfFactory</span><span class="p">,</span>
+        <span class="n">NuclearDerivativeCalculatorFactory</span><span class="p">,</span>
         <span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">,</span>
         <span class="n">ScfSolverFactory</span><span class="p">,</span>
         <span class="n">StabilityCheckerFactory</span><span class="p">,</span>
@@ -606,6 +812,7 @@
     <span class="n">register_factory</span><span class="p">(</span><span class="n">LocalizerFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationScfFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">NuclearDerivativeCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">DynamicalCorrelationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ScfSolverFactory</span><span class="p">)</span>
@@ -616,7 +823,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Register all built-in Python algorithm factories.</span>
 
 <span class="sd">    This internal initialization function registers all the Python-implemented</span>
-<span class="sd">    algorithm factories. This includes factories for energy estimators, phase estimation algorithms,</span>
+<span class="sd">    algorithm factories. This includes factories for expectation estimators, phase estimation algorithms,</span>
 <span class="sd">    qubit Hamiltonian solvers, qubit mappers, time evolution algorithms, and state preparation algorithms</span>
 <span class="sd">    that are implemented in Python.</span>
 
@@ -624,24 +831,46 @@
 <span class="sd">    be called by users.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_executor</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitExecutorFactory</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimatorFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">ControlledCircuitMapperFactory</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.expectation_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExpectationEstimatorFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hadamard_test</span><span class="w"> </span><span class="kn">import</span> <span class="n">HadamardTestFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hadamard_test.circuit_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">HadamardTestCircuitBuilderFactory</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">HamiltonianUnitaryBuilderFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation</span><span class="w"> </span><span class="kn">import</span> <span class="n">PhaseEstimationFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.circuit_builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">QpeCircuitBuilderFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.propagator</span><span class="w"> </span><span class="kn">import</span> <span class="n">PropagatorFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonianSolverFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparationFactory</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeEvolutionBuilderFactory</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
-        <span class="n">ControlledEvolutionCircuitMapperFactory</span><span class="p">,</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.term_grouper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TermGrouperFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">EvolutionCircuitBuilderFactory</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">HamiltonianSimulationFactory</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="n">register_factory</span><span class="p">(</span><span class="n">EnergyEstimatorFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ExpectationEstimatorFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">CircuitMapperFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianSimulationFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">EvolutionCircuitBuilderFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StatePreparationFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">TermGrouperFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitMapperFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitHamiltonianSolverFactory</span><span class="p">())</span>
-    <span class="n">register_factory</span><span class="p">(</span><span class="n">TimeEvolutionBuilderFactory</span><span class="p">())</span>
-    <span class="n">register_factory</span><span class="p">(</span><span class="n">ControlledEvolutionCircuitMapperFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianUnitaryBuilderFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ControlledCircuitMapperFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">CircuitExecutorFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">QpeCircuitBuilderFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">PhaseEstimationFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">HadamardTestFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">HadamardTestCircuitBuilderFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">PropagatorFactory</span><span class="p">())</span>
 
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">_register_cpp_factories</span><span class="p">()</span>
@@ -687,7 +916,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Register all built-in Python algorithm instances.</span>
 
 <span class="sd">    This internal initialization function registers specific Python-implemented</span>
-<span class="sd">    algorithm instances as built-in algorithms. This includes the default QDK energy estimator,</span>
+<span class="sd">    algorithm instances as built-in algorithms. This includes the default QDK expectation estimator,</span>
 <span class="sd">    phase estimation algorithms, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.</span>
 
 <span class="sd">    This function is automatically called during module import and should not</span>
@@ -697,38 +926,82 @@
         <span class="n">QdkFullStateSimulator</span><span class="p">,</span>
         <span class="n">QdkSparseStateSimulator</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator.qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdkEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">PauliSequenceMapper</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">ControlledPauliSequenceMapper</span><span class="p">,</span>
+        <span class="n">ControlledPSPMapper</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.expectation_estimator.qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdkExpectationEstimator</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">QdkHadamardTestCircuitBuilder</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hadamard_test.hadamard_test</span><span class="w"> </span><span class="kn">import</span> <span class="n">HadamardTest</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">LCUBuilder</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">PartiallyRandomized</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDrift</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter</span><span class="w"> </span><span class="kn">import</span> <span class="n">Trotter</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">Zassenhaus</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">QdkIterativeQpeCircuitBuilder</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">QdkStandardQpeCircuitBuilder</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
         <span class="n">IterativePhaseEstimation</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">StandardPhaseEstimation</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.propagator</span><span class="w"> </span><span class="kn">import</span> <span class="n">MagnusPropagator</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_hamiltonian_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseMatrixSolver</span><span class="p">,</span> <span class="n">SparseMatrixSolver</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdkQubitMapper</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparseIsometryGF2XStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.partially_randomized</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
-        <span class="n">PartiallyRandomized</span><span class="p">,</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation.dense_pure_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">DensePureStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.term_grouper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">FullCommutingTermGrouper</span><span class="p">,</span>
+        <span class="n">IdentityTermGrouper</span><span class="p">,</span>
+        <span class="n">QubitWiseCommutingTermGrouper</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.qdrift</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
-        <span class="n">QDrift</span><span class="p">,</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">EulerEvolutionCircuitBuilder</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
-        <span class="n">Trotter</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
-        <span class="n">PauliSequenceMapper</span><span class="p">,</span>
-    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">EulerIntegrator</span>  <span class="c1"># noqa: PLC0415</span>
 
-    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkEnergyEstimator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkExpectationEstimator</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">DenseMatrixSolver</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseMatrixSolver</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkQubitMapper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">FullCommutingTermGrouper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QubitWiseCommutingTermGrouper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">IdentityTermGrouper</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">Trotter</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">Zassenhaus</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDrift</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PartiallyRandomized</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">LCUBuilder</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PauliSequenceMapper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ControlledPSPMapper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">DensePureStatePreparation</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ControlledPauliSequenceMapper</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">EulerIntegrator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">EulerEvolutionCircuitBuilder</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">MagnusPropagator</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkFullStateSimulator</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkSparseStateSimulator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkIterativeQpeCircuitBuilder</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkStandardQpeCircuitBuilder</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">IterativePhaseEstimation</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">HadamardTest</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkHadamardTestCircuitBuilder</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">StandardPhaseEstimation</span><span class="p">())</span>
 
 
 <span class="n">_register_python_algorithms</span><span class="p">()</span>

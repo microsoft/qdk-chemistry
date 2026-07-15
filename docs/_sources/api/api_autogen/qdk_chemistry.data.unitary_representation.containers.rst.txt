@@ -1,0 +1,19 @@
+qdk\_chemistry.data.unitary\_representation.containers package
+==============================================================
+
+.. automodule:: qdk_chemistry.data.unitary_representation.containers
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.unitary_representation.containers.base
+   qdk_chemistry.data.unitary_representation.containers.block_encoding
+   qdk_chemistry.data.unitary_representation.containers.pauli_product_formula
+   qdk_chemistry.data.unitary_representation.containers.quantum_walk

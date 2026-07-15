@@ -1,0 +1,16 @@
+qdk\_chemistry.plugins.networkx package
+=======================================
+
+.. automodule:: qdk_chemistry.plugins.networkx
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.networkx.term_grouper

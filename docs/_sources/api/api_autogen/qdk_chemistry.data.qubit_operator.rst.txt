@@ -1,0 +1,8 @@
+qdk\_chemistry.data.qubit\_operator module
+==========================================
+
+.. automodule:: qdk_chemistry.data.qubit_operator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

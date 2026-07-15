@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>State preparation &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>State preparation &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Phase estimation" href="phase_estimation.html" />
+    <link rel="next" title="Hadamard test" href="hadamard_test.html" />
     <link rel="prev" title="Stability analysis" href="stability_checker.html" /> 
 </head>
 
@@ -60,7 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
@@ -77,11 +77,15 @@
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
-<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
@@ -90,6 +94,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -234,7 +239,7 @@ You can discover available implementations programmatically:</p>
 <section id="sparse-isometry-gf2-x">
 <h3>Sparse Isometry GF2+X<a class="headerlink" href="#sparse-isometry-gf2-x" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry_gf2x&quot;</span></code></p>
-<p>This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in <span id="id1">[<a class="reference internal" href="../../../references.html#id10" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry <span id="id2">[<a class="reference internal" href="../../../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span> on a smaller number of qubits, and finally scattered to the full qubit space using X and <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.</p>
+<p>This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id10" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span> on a smaller number of qubits, and finally scattered to the full qubit space using X and <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.</p>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>
@@ -267,7 +272,7 @@ You can discover available implementations programmatically:</p>
 <section id="regular-isometry">
 <h3>Regular Isometry<a class="headerlink" href="#regular-isometry" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qiskit_regular_isometry&quot;</span></code></p>
-<p>This method uses regular isometry synthesis via <a class="reference external" href="https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation">Qiskit</a>, implementing the isometry-based approach proposed by Matthias Christandl <span id="id3">[<a class="reference internal" href="../../../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.</p>
+<p>This method uses regular isometry synthesis via <a class="reference external" href="https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation">Qiskit</a>, implementing the isometry-based approach proposed by Matthias Christandl <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.</p>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>
@@ -309,7 +314,7 @@ You can discover available implementations programmatically:</p>
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/state_preparation.py">Python</a> script.</p></li>
-<li><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a>: Estimate the energy of prepared states</p></li>
+<li><p><a class="reference internal" href="expectation_estimator.html"><span class="doc">ExpectationEstimator</span></a>: Estimate the energy of prepared states</p></li>
 <li><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Map Hamiltonians to qubit operators</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
@@ -322,7 +327,7 @@ You can discover available implementations programmatically:</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="stability_checker.html" class="btn btn-neutral float-left" title="Stability analysis" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="phase_estimation.html" class="btn btn-neutral float-right" title="Phase estimation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="hadamard_test.html" class="btn btn-neutral float-right" title="Hadamard test" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hadamard\_test.circuit\_builder.qdk\_builder module
+=============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

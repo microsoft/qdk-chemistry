@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.time\_evolution.hamiltonian\_simulation package
+=========================================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base
+   qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator

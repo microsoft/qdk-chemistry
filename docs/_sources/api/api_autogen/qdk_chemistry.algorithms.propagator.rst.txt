@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.propagator package
+============================================
+
+.. automodule:: qdk_chemistry.algorithms.propagator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.propagator.base
+   qdk_chemistry.algorithms.propagator.magnus_propagator

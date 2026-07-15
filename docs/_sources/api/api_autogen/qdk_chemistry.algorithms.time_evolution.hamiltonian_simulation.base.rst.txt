@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.time\_evolution.hamiltonian\_simulation.base module
+=============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

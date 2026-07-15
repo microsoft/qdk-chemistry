@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder.time\_evolution.partially\_randomized module
+====================================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

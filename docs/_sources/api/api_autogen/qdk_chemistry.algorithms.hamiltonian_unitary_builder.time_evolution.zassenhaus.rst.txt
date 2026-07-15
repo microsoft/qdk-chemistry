@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder.time\_evolution.zassenhaus module
+=========================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

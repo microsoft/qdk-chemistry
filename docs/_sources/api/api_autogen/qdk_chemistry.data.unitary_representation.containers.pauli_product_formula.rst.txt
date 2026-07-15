@@ -1,0 +1,8 @@
+qdk\_chemistry.data.unitary\_representation.containers.pauli\_product\_formula module
+=====================================================================================
+
+.. automodule:: qdk_chemistry.data.unitary_representation.containers.pauli_product_formula
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

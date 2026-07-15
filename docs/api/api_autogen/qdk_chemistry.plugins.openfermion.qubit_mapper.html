@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.openfermion.qubit_mapper module &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.openfermion.qubit_mapper module &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
@@ -113,38 +114,58 @@
              
   <section id="module-qdk_chemistry.plugins.openfermion.qubit_mapper">
 <span id="qdk-chemistry-plugins-openfermion-qubit-mapper-module"></span><h1>qdk_chemistry.plugins.openfermion.qubit_mapper module<a class="headerlink" href="#module-qdk_chemistry.plugins.openfermion.qubit_mapper" title="Link to this heading"></a></h1>
-<p>OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.</p>
+<p>OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit operators.</p>
 <p>This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
-using different mapping strategies (“jordan-wigner”, “bravyi-kitaev”,
-“symmetry-conserving-bravyi-kitaev”, and “bravyi-kitaev-tree”).</p>
+using different mapping strategies. The encoding is determined by the MajoranaMapping passed
+to <code class="docutils literal notranslate"><span class="pre">run()</span></code>.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.openfermion.qubit_mapper.</span></span><span class="sig-name descname"><span class="pre">OpenFermionQubitMapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jordan-wigner'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.openfermion.qubit_mapper.</span></span><span class="sig-name descname"><span class="pre">OpenFermionQubitMapper</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></p>
-<p>Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.</p>
+<p>Map an electronic structure Hamiltonian to a QubitOperator using OpenFermion.</p>
+<p>This is a <strong>third-party</strong> backend: it reads
+<code class="docutils literal notranslate"><span class="pre">mapping.base_encoding</span></code> to select the corresponding OpenFermion
+transform function and <strong>ignores</strong> <code class="docutils literal notranslate"><span class="pre">mapping.table</span></code>.  The qubit
+operator is built from scratch using OpenFermion’s own
+fermion-to-qubit pipeline.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Because this backend chooses its transform by encoding <em>name</em>
+rather than from the Pauli table, it relies on the mapping’s
+<code class="docutils literal notranslate"><span class="pre">base_encoding</span></code> string being consistent with its table.
+This is guaranteed for factory-produced mappings
+(<code class="docutils literal notranslate"><span class="pre">MajoranaMapping.jordan_wigner()</span></code>, <code class="docutils literal notranslate"><span class="pre">.bravyi_kitaev()</span></code>, etc.)
+and is verified by cross-backend eigenvalue tests in the test
+suite.  Manually built mappings with mismatched names will
+produce silently incorrect results.</p>
+</div>
+<p>Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are
+supported — each backend handles tapering in its own <code class="docutils literal notranslate"><span class="pre">_run_impl()</span></code>
+via the <code class="docutils literal notranslate"><span class="pre">QubitMapper._taper_result()</span></code>
+helper.</p>
+<p>Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+For unrestricted systems, separate alpha/beta spin channels are handled
+via <code class="docutils literal notranslate"><span class="pre">hamiltonian_to_interaction_operator</span></code>.</p>
 <dl class="simple">
-<dt>Available encodings:</dt><dd><ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code> (default)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev&quot;</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;symmetry-conserving-bravyi-kitaev&quot;</span></code> (requires <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a>)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev-tree&quot;</span></code></p></li>
+<dt>Supported base encodings:</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code> → <code class="docutils literal notranslate"><span class="pre">openfermion.transforms.jordan_wigner</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev&quot;</span></code> → <code class="docutils literal notranslate"><span class="pre">openfermion.transforms.bravyi_kitaev</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev-tree&quot;</span></code> → <code class="docutils literal notranslate"><span class="pre">openfermion.transforms.bravyi_kitaev_tree</span></code></p></li>
 </ul>
 </dd>
 </dl>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>encoding</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p>
-</dd>
-</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;openfermion&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qh</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+</pre></div>
+</div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'jordan-wigner'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapper.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.__init__" title="Link to this definition"></a></dt>
-<dd><p>Initialize OpenFermionQubitMapper with a specific mapping strategy.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>encoding</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Qubit mapping strategy. See <em>Available encodings</em> above.</p>
-</dd>
-</dl>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapper.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize OpenFermionQubitMapper.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -165,16 +186,6 @@ using different mapping strategies (“jordan-wigner”, “bravyi-kitaev”,
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.openfermion.qubit_mapper.</span></span><span class="sig-name descname"><span class="pre">OpenFermionQubitMapperSettings</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapperSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings" title="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper.QubitMapperSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapperSettings</span></code></a></p>
 <p>Settings configuration for an OpenFermionQubitMapper.</p>
-<p>Inherits <code class="docutils literal notranslate"><span class="pre">encoding</span></code> from <a class="reference internal" href="qdk_chemistry.algorithms.qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings" title="qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitMapperSettings</span></code></a>.</p>
-<dl class="simple">
-<dt>Available encodings:</dt><dd><ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code> (default)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev&quot;</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;symmetry-conserving-bravyi-kitaev&quot;</span></code> (requires <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a>)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;bravyi-kitaev-tree&quot;</span></code></p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/openfermion/qubit_mapper.html#OpenFermionQubitMapperSettings.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings.__init__" title="Link to this definition"></a></dt>

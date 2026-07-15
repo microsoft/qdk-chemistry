@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -137,7 +138,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">cc</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamicalCorrelationCalculator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoupledClusterContainer</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AmplitudeContainer</span><span class="p">,</span> <span class="n">AmplitudeType</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">Wavefunction</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
@@ -302,26 +303,25 @@
                 <span class="n">t2_aabb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t2_aabb</span><span class="p">,</span> <span class="p">(</span><span class="n">t2_aabb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
                 <span class="n">t2_bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t2_bbbb</span><span class="p">,</span> <span class="p">(</span><span class="n">t2_bbbb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
-                <span class="c1"># Create CoupledClusterContainer with spin-separated amplitudes</span>
-                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                <span class="c1"># Create AmplitudeContainer with spin-separated amplitudes</span>
+                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
-                    <span class="n">t1_aa</span><span class="p">,</span>  <span class="c1"># Alpha T1 amplitudes</span>
-                    <span class="n">t1_bb</span><span class="p">,</span>  <span class="c1"># Beta T1 amplitudes</span>
-                    <span class="n">t2_aabb</span><span class="p">,</span>  <span class="c1"># Alpha-beta T2 amplitudes</span>
-                    <span class="n">t2_aaaa</span><span class="p">,</span>  <span class="c1"># Alpha-alpha T2 amplitudes</span>
-                    <span class="n">t2_bbbb</span><span class="p">,</span>  <span class="c1"># Beta-beta T2 amplitudes</span>
+                    <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                    <span class="n">t1_aa</span><span class="p">,</span>
+                    <span class="n">t1_bb</span><span class="p">,</span>
+                    <span class="n">t2_aabb</span><span class="p">,</span>
+                    <span class="n">t2_aaaa</span><span class="p">,</span>
+                    <span class="n">t2_bbbb</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
-                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
+                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T1 alpha amplitudes</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T1 beta amplitudes</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T2 alpha-beta amplitudes</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T2 alpha-alpha amplitudes</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T2 beta-beta amplitudes</span>
+                    <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Restricted case: t1 and t2 are single arrays</span>
@@ -333,20 +333,22 @@
                 <span class="n">t1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t1</span><span class="p">,</span> <span class="p">(</span><span class="n">t1</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
                 <span class="n">t2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t2</span><span class="p">,</span> <span class="p">(</span><span class="n">t2</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
-                <span class="c1"># Create CoupledClusterContainer with spatial amplitudes</span>
-                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                <span class="c1"># Create AmplitudeContainer with spatial amplitudes</span>
+                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
-                    <span class="n">t1</span><span class="p">,</span>  <span class="c1"># T1 amplitudes (used for both alpha and beta in restricted case)</span>
-                    <span class="n">t2</span><span class="p">,</span>  <span class="c1"># T2 amplitudes (alpha-beta coupling)</span>
+                    <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                    <span class="n">t1</span><span class="p">,</span>
+                    <span class="n">t2</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
-                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
+                <span class="n">cc_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T1 amplitudes</span>
-                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No T2 amplitudes</span>
+                    <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                 <span class="p">)</span>
 
         <span class="c1"># Create a new wavefunction with the CC container</span>
@@ -374,26 +376,25 @@
                     <span class="n">l2_aabb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2_aabb</span><span class="p">,</span> <span class="p">(</span><span class="n">l2_aabb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
                     <span class="n">l2_bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2_bbbb</span><span class="p">,</span> <span class="p">(</span><span class="n">l2_bbbb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
-                    <span class="c1"># Create CoupledClusterContainer for bra with lambda amplitudes</span>
-                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                    <span class="c1"># Create AmplitudeContainer for bra with lambda amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
-                        <span class="n">l1_aa</span><span class="p">,</span>  <span class="c1"># Alpha L1 (gamma) amplitudes</span>
-                        <span class="n">l1_bb</span><span class="p">,</span>  <span class="c1"># Beta L1 (gamma) amplitudes</span>
-                        <span class="n">l2_aabb</span><span class="p">,</span>  <span class="c1"># Alpha-beta L2 (gamma) amplitudes</span>
-                        <span class="n">l2_aaaa</span><span class="p">,</span>  <span class="c1"># Alpha-alpha L2 (gamma) amplitudes</span>
-                        <span class="n">l2_bbbb</span><span class="p">,</span>  <span class="c1"># Beta-beta L2 (gamma) amplitudes</span>
+                        <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                        <span class="n">l1_aa</span><span class="p">,</span>
+                        <span class="n">l1_bb</span><span class="p">,</span>
+                        <span class="n">l2_aabb</span><span class="p">,</span>
+                        <span class="n">l2_aaaa</span><span class="p">,</span>
+                        <span class="n">l2_bbbb</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
-                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                    <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                     <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Restricted case: l1 and l2 are single arrays</span>
@@ -405,20 +406,22 @@
                     <span class="n">l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="p">(</span><span class="n">l1</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
                     <span class="n">l2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2</span><span class="p">,</span> <span class="p">(</span><span class="n">l2</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
 
-                    <span class="c1"># Create CoupledClusterContainer for bra with lambda amplitudes</span>
-                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                    <span class="c1"># Create AmplitudeContainer for bra with lambda amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
-                        <span class="n">l1</span><span class="p">,</span>  <span class="c1"># L1 (gamma) amplitudes</span>
-                        <span class="n">l2</span><span class="p">,</span>  <span class="c1"># L2 (gamma) amplitudes</span>
+                        <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                        <span class="n">l1</span><span class="p">,</span>
+                        <span class="n">l2</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
-                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                    <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">AmplitudeContainer</span><span class="p">(</span>
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
-                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
                     <span class="p">)</span>
 
             <span class="n">bra_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">bra_container</span><span class="p">)</span>

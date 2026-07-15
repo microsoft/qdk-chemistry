@@ -7,6 +7,14 @@ qdk\_chemistry.algorithms.phase\_estimation package
    :show-inheritance:
    :undoc-members:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.phase_estimation.circuit_builder
+
 Submodules
 ----------
 
@@ -15,3 +23,4 @@ Submodules
 
    qdk_chemistry.algorithms.phase_estimation.base
    qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation
+   qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation

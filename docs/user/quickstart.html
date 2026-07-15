@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quickstart &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Quickstart &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -74,6 +74,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -132,7 +133,7 @@ For a minimal install, other methods (Dev Container, building from source), and 
 <p>This example walks through the full quantum applications workflow: from building classical context around a molecular structure, through encoding for a quantum computer, to estimating the ground-state energy via circuit simulation.
 The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry’s modular pipeline makes it easy to select the right method for each step.</p>
 <p>You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/">examples folder</a> of the GitHub repository.
-Companion chemistry datasets and supporting assets are also available in <a class="reference external" href="https://github.com/microsoft/qdk-chemistry-data">microsoft/qdk-chemistry-data</a>.</p>
+To run the examples, either clone the repository or download the packaged examples from the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/releases">GitHub releases page</a>, as individual examples may depend on accompanying files within the examples directory.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If you installed <code class="docutils literal notranslate"><span class="pre">qdk-chemistry</span></code> from PyPI, use the <code class="docutils literal notranslate"><span class="pre">stable/major.minor</span></code> branch
@@ -144,6 +145,7 @@ the released pip package. For example, to clone the repository for the latest st
 </div>
 <p>See the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md">examples README</a> for details.</p>
 </div>
+<p>Companion chemistry datasets and supporting assets are also available in <a class="reference external" href="https://github.com/microsoft/qdk-chemistry-data">microsoft/qdk-chemistry-data</a>.</p>
 <section id="create-a-structure-object">
 <h3>Create a Structure object<a class="headerlink" href="#create-a-structure-object" title="Link to this heading"></a></h3>
 <p>The <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> class represents a molecular structure, i.e. the coordinates of its atoms.
@@ -152,10 +154,50 @@ QDK/Chemistry supports multiple serialization formats for <a class="reference in
 Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (Angstrom for XYZ) or can be specified (JSON, HDF5).
 See below for language specific examples of creating and serializing <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> objects.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Load para-benzyne structure from XYZ file</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">      </span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;../data/para_benzyne.structure.xyz&quot;</span><span class="p">));</span>
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">SymmetryLabel</span><span class="p">,</span> <span class="n">axes</span>
+
+<span class="c1"># Load para-benzyne structure from inline XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">10</span>
+<span class="s2">para-Benzyne</span>
+<span class="s2">C    0.000000    1.396000    0.000000</span>
+<span class="s2">C    1.209077    0.698000    0.000000</span>
+<span class="s2">C    1.209077   -0.698000    0.000000</span>
+<span class="s2">C    0.000000   -1.396000    0.000000</span>
+<span class="s2">C   -1.209077   -0.698000    0.000000</span>
+<span class="s2">C   -1.209077    0.698000    0.000000</span>
+<span class="s2">H    2.151000    1.242000    0.000000</span>
+<span class="s2">H    2.151000   -1.242000    0.000000</span>
+<span class="s2">H   -2.151000   -1.242000    0.000000</span>
+<span class="s2">H   -2.151000    1.242000    0.000000</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created structure with </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elements: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Load para-benzyne structure from inline XYZ file</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">(</span><span class="s">10</span>
+<span class="s">para-Benzyne</span>
+<span class="s">C    0.000000    1.396000    0.000000</span>
+<span class="s">C    1.209077    0.698000    0.000000</span>
+<span class="s">C    1.209077   -0.698000    0.000000</span>
+<span class="s">C    0.000000   -1.396000    0.000000</span>
+<span class="s">C   -1.209077   -0.698000    0.000000</span>
+<span class="s">C   -1.209077    0.698000    0.000000</span>
+<span class="s">H    2.151000    1.242000    0.000000</span>
+<span class="s">H    2.151000   -1.242000    0.000000</span>
+<span class="s">H   -2.151000   -1.242000    0.000000</span>
+<span class="s">H   -2.151000    1.242000    0.000000</span>
+<span class="dl">)</span><span class="s">&quot;</span><span class="p">));</span>
 
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Created structure with &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">()</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; atoms&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
@@ -164,23 +206,6 @@ See below for language specific examples of creating and serializing <a class="r
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">::</span><span class="n">element_to_symbol</span><span class="p">(</span><span class="n">elem</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; &quot;</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-
-<span class="c1"># Load para-benzyne structure from XYZ file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
-    <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/para_benzyne.structure.xyz&quot;</span>
-<span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created structure with </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elements: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -197,19 +222,7 @@ See the <a class="reference internal" href="comprehensive/algorithms/factory_pat
 Optionally, <a class="reference internal" href="comprehensive/algorithms/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field (SCF) solver</span></a> can be configured to control the execution of the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> algorithm (e.g. convergence tolerances, etc) by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
 The basis for the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be set via a string input (specifying one of the <a class="reference internal" href="comprehensive/basis_functionals.html#available-basis-sets"><span class="std std-ref">Available basis sets</span></a>), a custom <a class="reference internal" href="comprehensive/data/basis_set.html"><span class="doc">BasisSet</span></a> or initial <a class="reference internal" href="comprehensive/data/orbitals.html"><span class="doc">Orbitals</span></a> can also be provided.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform a SCF calculation</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_hf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF energy is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_hf</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-
-<span class="w">  </span><span class="c1">// Display a summary of the molecular orbitals</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Orbitals:</span><span class="se">\n</span><span class="s">&quot;</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">wfn_hf</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Perform an SCF calculation, returning the energy and wavefunction</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
 <span class="n">E_hf</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -219,6 +232,18 @@ The basis for the <a class="reference internal" href="../glossary.html#term-SCF"
 
 <span class="c1"># Display a summary of the molecular orbitals obtained from the SCF calculation</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SCF Orbitals:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">wfn_hf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform a SCF calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_hf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF energy is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_hf</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">  </span><span class="c1">// Display a summary of the molecular orbitals</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Orbitals:</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">wfn_hf</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
@@ -232,23 +257,7 @@ For this reason, both <a class="reference internal" href="comprehensive/algorith
 See the <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">Active space selection</span></a> documentation for a list of supported methods, along with their associated <a class="reference internal" href="comprehensive/algorithms/settings.html"><span class="doc">Settings</span></a>, which accompany the standard QDK/Chemistry distribution.</p>
 <p>The following are language-specific examples of how to select a so-called “valence” active space containing a subset of only those orbitals surrounding the Fermi level - in this case 6 electrons to be distributed in 6 orbitals (6e, 6o).</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Select active space (6 electrons in 6 orbitals)</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
-<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
-<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
-
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Print a summary of the active space orbitals</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Active Space Orbitals:</span><span class="se">\n</span><span class="s">&quot;</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select active space (6 electrons in 6 orbitals for para-benzyne)</span>
 <span class="c1">#   to choose most chemically relevant orbitals</span>
 <span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
@@ -265,6 +274,22 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Select active space (6 electrons in 6 orbitals)</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Print a summary of the active space orbitals</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Active Space Orbitals:</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="calculate-the-hamiltonian">
@@ -273,21 +298,21 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 QDK/Chemistry provides flexible Hamiltonian construction capabilities through the <a class="reference internal" href="comprehensive/algorithms/hamiltonian_constructor.html"><span class="doc">Hamiltonian construction</span></a> algorithm.
 The Hamiltonian constructor generates the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum many-body calculations and quantum algorithms.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active Space Hamiltonian:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Construct Hamiltonian in the active space</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">algorithms</span><span class="o">::</span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">);</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Active Space Hamiltonian:</span><span class="se">\n</span><span class="s">&quot;</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">hamiltonian</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
-<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active Space Hamiltonian:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
@@ -303,17 +328,7 @@ On scaled fault-tolerant quantum computers, these classically-computed wavefunct
 These methods also serve as a critical analysis tool, allowing users to better understand the electronic structure of their systems of interest and the potential for quantum algorithms to provide meaningful utility over classical state of the art.</p>
 <p>In the following example, as the aforementioned (6e, 6o) active space is relatively small, we perform a <a class="reference internal" href="../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> calculation to obtain the exact ground state wavefunction within the active space.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform CASCI calculation</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_cas</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_cas</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;CASCI energy is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_cas</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree, and the electron correlation energy is &quot;</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">E_cas</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_hf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Perform CASCI calculation to get the wavefunction and exact energy for the active space</span>
 <span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -325,6 +340,16 @@ These methods also serve as a critical analysis tool, allowing users to better u
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform CASCI calculation</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_cas</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_cas</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;CASCI energy is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_cas</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree, and the electron correlation energy is &quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">E_cas</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_hf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="select-important-configurations">
@@ -332,19 +357,7 @@ These methods also serve as a critical analysis tool, allowing users to better u
 <p>For large active spaces, the multi-configuration <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get top 2 determinants from the CASCI wavefunction</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">top_configurations</span><span class="p">,</span><span class="w"> </span><span class="n">top_coeffs</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn_cas</span><span class="o">-&gt;</span><span class="n">get_top_determinants</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Perform PMC calculation with selected configurations</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pmc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_pmc</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_pmc</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pmc</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">top_configurations</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Reference energy for top 2 determinants is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_pmc</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction</span>
 <span class="n">top_configurations</span> <span class="o">=</span> <span class="n">wfn_cas</span><span class="o">.</span><span class="n">get_top_determinants</span><span class="p">(</span><span class="n">max_determinants</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
@@ -356,28 +369,42 @@ By identifying and retaining only the dominant configurations (those with the la
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get top 2 determinants from the CASCI wavefunction</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">top_configurations</span><span class="p">,</span><span class="w"> </span><span class="n">top_coeffs</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn_cas</span><span class="o">-&gt;</span><span class="n">get_top_determinants</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Perform PMC calculation with selected configurations</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pmc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_pmc</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_pmc</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pmc</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">top_configurations</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Reference energy for top 2 determinants is &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_pmc</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="preparing-a-qubit-representation-of-the-hamiltonian">
 <h3>Preparing a qubit representation of the Hamiltonian<a class="headerlink" href="#preparing-a-qubit-representation-of-the-hamiltonian" title="Link to this heading"></a></h3>
-<p>To execute quantum algorithms on actual quantum hardware, the Fermionic <a class="reference internal" href="comprehensive/data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> must be mapped to a qubit Hamiltonian composed of Pauli operators.
+<p>To execute quantum algorithms on actual quantum hardware, the Fermionic <a class="reference internal" href="comprehensive/data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> must be mapped to a qubit operator composed of Pauli operators.
 QDK/Chemistry supports multiple encoding schemes including the Jordan-Wigner and Bravyi-Kitaev transformations.
-The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor products of Pauli <span class="math notranslate nohighlight">\(X, Y, Z\)</span>, and identity operators), each with an associated coefficient.</p>
-<p>For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways:</p>
+The resulting qubit operator is represented as a sum of Pauli strings (tensor products of Pauli <span class="math notranslate nohighlight">\(X, Y, Z\)</span>, and identity operators), each with an associated coefficient.</p>
+<p>For efficient energy estimation, the qubit operator can be optimized in two ways:</p>
 <ol class="arabic simple">
 <li><p>Filter out terms that have negligible expectation values given the sparse <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, pre-computing their classical contributions.</p></li>
 <li><p>Group the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.</p></li>
 </ol>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare qubit Hamiltonian</span>
-<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
-<span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
+
+<span class="n">active_alpha</span> <span class="o">=</span> <span class="n">active_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()]))</span>
+<span class="n">active_beta</span> <span class="o">=</span> <span class="n">active_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">()]))</span>
+<span class="n">n_active_spin_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">active_alpha</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">active_beta</span><span class="p">)</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_active_spin_orbitals</span><span class="p">)</span>
+<span class="p">)</span>
 
 <span class="c1"># Print the number of Pauli strings in the full Hamiltonian</span>
 <span class="nb">print</span><span class="p">(</span>
@@ -386,22 +413,22 @@ The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="generate-the-state-preparation-circuit">
 <h3>Generate the state preparation circuit<a class="headerlink" href="#generate-the-state-preparation-circuit" title="Link to this heading"></a></h3>
 <p>Given the classical representation of the sparse multi-configurational <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, a quantum circuit can be generated to prepare this state on a quantum computer.
-This can be done in many ways, including via Isometry encoding <span id="id1">[<a class="reference internal" href="../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries, and tensor product methods.
+This can be done in many ways, including via Isometry encoding <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries, and tensor product methods.
 However, when the wavefunction is very sparse, these methods can be inefficient.
 In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates, provided as a <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> algorithm.
 See <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> for more details on the other algorithms provided for state preparation in QDK/Chemistry.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
 <span class="c1"># Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)</span>
 <span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
@@ -410,29 +437,34 @@ See <a class="reference internal" href="comprehensive/algorithms/state_preparati
 </pre></div>
 </div>
 </div>
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 <section id="estimate-the-ground-state-energy-by-sampling">
 <h3>Estimate the ground state energy by sampling<a class="headerlink" href="#estimate-the-ground-state-energy-by-sampling" title="Link to this heading"></a></h3>
-<p>The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit Hamiltonian to estimate the ground state energy.
+<p>The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit operator to estimate the ground state energy.
 Each measurement circuit appends specific Pauli basis rotations to the state preparation circuit, followed by computational basis measurements.
 The measurement outcomes are repeated many times (shots) to build up statistics for each observable group.</p>
 <p>The energy expectation value is computed by combining the measurement statistics from each group with their corresponding Hamiltonian coefficients and the pre-computed classical contributions.
 The statistical nature of quantum measurements introduces variance in the energy estimate, which decreases as the number of shots is increased.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--8-input--1" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Estimate energy using the optimized circuit and the qubit Hamiltonian</span>
-<span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
-<span class="n">circuit_executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;expectation_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">estimator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span>
+    <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">term_grouper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span> <span class="s2">&quot;qubit_wise_commuting&quot;</span><span class="p">)</span>
+<span class="n">grouped_hamiltonian</span> <span class="o">=</span> <span class="n">term_grouper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+
 <span class="n">energy_results</span><span class="p">,</span> <span class="n">simulation_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">circuit</span><span class="o">=</span><span class="n">sparse_isometry_circuit</span><span class="p">,</span>
-    <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
-    <span class="n">circuit_executor</span><span class="o">=</span><span class="n">circuit_executor</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">grouped_hamiltonian</span><span class="p">,</span>
     <span class="n">total_shots</span><span class="o">=</span><span class="mi">500000</span><span class="p">,</span>
 <span class="p">)</span>
 
@@ -450,6 +482,11 @@ The statistical nature of quantum measurements introduces variance in the energy
 
 <span class="c1"># Print comparison with reference energy</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Difference from reference energy: </span><span class="si">{</span><span class="n">energy_mean</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_sparse</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>

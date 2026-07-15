@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hamiltonian\_unitary\_builder.time\_evolution.trotter module
+======================================================================================
+
+.. automodule:: qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

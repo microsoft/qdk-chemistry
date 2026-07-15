@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.scf_solver &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.scf_solver &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -102,6 +103,7 @@
 
 <span class="sd">* :class:`PyscfScfSettings`: Configuration class for SCF calculation parameters</span>
 <span class="sd">* :class:`PyscfScfSolver`: Main solver class that performs HF and DFT calculations</span>
+<span class="sd">* :class:`PyscfStabilizedScfSolver`: Solver that uses PySCF&#39;s stability workflow to rerun unstable SCF solutions</span>
 <span class="sd">* Registration utilities to integrate the solver with QDK/Chemistry&#39;s plugin system</span>
 
 <span class="sd">The solver handles automatic conversion between QDK/Chemistry molecular structures and PySCF</span>
@@ -139,7 +141,7 @@
     <span class="n">Configuration</span><span class="p">,</span>
     <span class="n">ElectronicStructureSettings</span><span class="p">,</span>
     <span class="n">Orbitals</span><span class="p">,</span>
-    <span class="n">SlaterDeterminantContainer</span><span class="p">,</span>
+    <span class="n">StateVectorContainer</span><span class="p">,</span>
     <span class="n">Structure</span><span class="p">,</span>
     <span class="n">Wavefunction</span><span class="p">,</span>
 <span class="p">)</span>
@@ -151,7 +153,7 @@
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfScfSettings&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfScfSolver&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfScfSettings&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfScfSolver&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfStabilizedScfSettings&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfStabilizedScfSolver&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="PyscfScfSettings">
@@ -200,6 +202,25 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
             <span class="s2">&quot;xc_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;Density functional integration grid level (0=coarse, 9=very fine)&quot;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
         <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfStabilizedScfSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfStabilizedScfSettings</span><span class="p">(</span><span class="n">PyscfScfSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for PySCF&#39;s automated stable-SCF workflow.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfStabilizedScfSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize stabilized SCF settings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_stability_iterations&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;check_internal&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;check_external&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;fail_on_unstable&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span></div>
 </div>
 
 
@@ -281,6 +302,14 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_scf</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">)</span>
+        <span class="n">energy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_scf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_wavefunction</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">energy</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_scf</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="nb">str</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create and configure a PySCF mean-field object.&quot;&quot;&quot;</span>
         <span class="n">atoms</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
 
         <span class="c1"># Determine basis set name and initial guess</span>
@@ -366,11 +395,17 @@
         <span class="n">mf</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="n">convergence_threshold</span> <span class="o">*</span> <span class="mf">0.1</span>
         <span class="n">mf</span><span class="o">.</span><span class="n">max_cycle</span> <span class="o">=</span> <span class="n">max_iterations</span>
 
+        <span class="k">return</span> <span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">initial_guess</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_scf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run PySCF, using a QDK orbitals object as the initial density when provided.&quot;&quot;&quot;</span>
+        <span class="n">initial_guess</span> <span class="o">=</span> <span class="n">basis_or_guess</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">basis_or_guess</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+
         <span class="c1"># Set initial guess if provided</span>
         <span class="k">if</span> <span class="n">initial_guess</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">initial_guess</span><span class="p">,</span> <span class="s2">&quot;get_coefficients&quot;</span><span class="p">):</span>
             <span class="c1"># Validate initial guess compatibility with reference type</span>
             <span class="n">initial_guess_is_unrestricted</span> <span class="o">=</span> <span class="n">initial_guess</span><span class="o">.</span><span class="n">is_unrestricted</span><span class="p">()</span>
-            <span class="n">unrestricted</span> <span class="o">=</span> <span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">UNRESTRICTED</span> <span class="ow">or</span> <span class="p">(</span><span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span> <span class="ow">and</span> <span class="n">mol</span><span class="o">.</span><span class="n">spin</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">unrestricted</span> <span class="o">=</span> <span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">UNRESTRICTED</span> <span class="ow">or</span> <span class="p">(</span><span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span> <span class="ow">and</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">spin</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">unrestricted</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">initial_guess_is_unrestricted</span><span class="p">:</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                     <span class="s2">&quot;Unrestricted calculation requested but restricted initial guess provided.&quot;</span><span class="p">,</span>
@@ -381,8 +416,8 @@
 
             <span class="c1"># Create occupation arrays based on electron configuration</span>
             <span class="n">norb</span> <span class="o">=</span> <span class="n">initial_guess</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-            <span class="n">num_alpha</span> <span class="o">=</span> <span class="n">mol</span><span class="o">.</span><span class="n">nelec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Number of alpha electrons</span>
-            <span class="n">num_beta</span> <span class="o">=</span> <span class="n">mol</span><span class="o">.</span><span class="n">nelec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Number of beta electrons</span>
+            <span class="n">num_alpha</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Number of alpha electrons</span>
+            <span class="n">num_beta</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Number of beta electrons</span>
 
             <span class="n">occ_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">num_alpha</span> <span class="k">else</span> <span class="mf">0.0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb</span><span class="p">)])</span>
             <span class="n">occ_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">num_beta</span> <span class="k">else</span> <span class="mf">0.0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb</span><span class="p">)])</span>
@@ -399,15 +434,20 @@
             <span class="c1"># No initial guess provided, use default</span>
             <span class="n">energy</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
 
+        <span class="k">return</span> <span class="n">energy</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_wavefunction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">mf</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span><span class="p">,</span> <span class="n">energy</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a completed PySCF mean-field object to QDK/Chemistry data.&quot;&quot;&quot;</span>
+        <span class="n">mol</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span>
         <span class="n">basis_set</span> <span class="o">=</span> <span class="n">pyscf_mol_to_qdk_basis</span><span class="p">(</span><span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">)</span>
         <span class="n">_ovlp</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">get_ovlp</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">scf_type</span> <span class="o">==</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">RESTRICTED</span> <span class="ow">and</span> <span class="n">mol</span><span class="o">.</span><span class="n">spin</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="c1"># ROHF/ROKS case - create unrestricted-style orbitals but with same coefficients</span>
+            <span class="c1"># ROHF/ROKS case - restricted orbitals (same coefficients for alpha and beta)</span>
             <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
-                <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span>  <span class="c1"># Same coefficients for alpha and beta</span>
                 <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span>
-                <span class="n">mf</span><span class="o">.</span><span class="n">mo_energy</span><span class="p">,</span>  <span class="c1"># Same energies for alpha and beta</span>
                 <span class="n">mf</span><span class="o">.</span><span class="n">mo_energy</span><span class="p">,</span>
                 <span class="n">ao_overlap</span><span class="o">=</span><span class="n">_ovlp</span><span class="p">,</span>
                 <span class="n">basis_set</span><span class="o">=</span><span class="n">basis_set</span><span class="p">,</span>
@@ -442,7 +482,7 @@
         <span class="c1"># Create HF ground state configuration using canonical method</span>
         <span class="n">hf_config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">canonical_hf_configuration</span><span class="p">(</span><span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">,</span> <span class="n">n_orbitals</span><span class="p">)</span>
 
-        <span class="n">wfn</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">hf_config</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">))</span>
+        <span class="n">wfn</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">hf_config</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="s2">&quot;electrons&quot;</span><span class="p">))</span>
 
         <span class="k">return</span> <span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span>
 
@@ -453,6 +493,123 @@
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="s2">&quot;pyscf&quot;</span></div>
 </div>
+
+
+
+<div class="viewcode-block" id="PyscfStabilizedScfSolver">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfStabilizedScfSolver</span><span class="p">(</span><span class="n">PyscfScfSolver</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF SCF solver that reruns unstable references with PySCF&#39;s stability routine.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfStabilizedScfSolver.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the PySCF stabilized SCF solver with default settings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfStabilizedScfSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run SCF and iterate PySCF stability-driven reruns until stable or exhausted.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_scf</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">)</span>
+        <span class="n">energy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_scf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="p">)</span>
+
+        <span class="n">max_iterations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_stability_iterations&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">max_iterations</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_wavefunction</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">scf_type</span><span class="p">,</span> <span class="n">energy</span><span class="p">)</span>
+
+        <span class="n">check_internal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check_internal&quot;</span><span class="p">)</span>
+        <span class="n">check_external_setting</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check_external&quot;</span><span class="p">)</span>
+
+        <span class="n">is_stable</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_iterations</span><span class="p">):</span>
+            <span class="n">check_external</span> <span class="o">=</span> <span class="n">check_external_setting</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_check_external_stability</span><span class="p">(</span><span class="n">mf</span><span class="p">)</span>
+            <span class="n">stability</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">stability</span><span class="p">(</span><span class="n">internal</span><span class="o">=</span><span class="n">check_internal</span><span class="p">,</span> <span class="n">external</span><span class="o">=</span><span class="n">check_external</span><span class="p">,</span> <span class="n">return_status</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">mo_internal</span><span class="p">,</span> <span class="n">mo_external</span><span class="p">,</span> <span class="n">internal_stable</span><span class="p">,</span> <span class="n">external_stable</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unpack_stability</span><span class="p">(</span><span class="n">stability</span><span class="p">)</span>
+
+            <span class="n">is_stable</span> <span class="o">=</span> <span class="p">(</span><span class="ow">not</span> <span class="n">check_internal</span> <span class="ow">or</span> <span class="n">internal_stable</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">check_external</span> <span class="ow">or</span> <span class="n">external_stable</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_stable</span><span class="p">:</span>
+                <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">check_external</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">external_stable</span> <span class="ow">and</span> <span class="n">mo_external</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">mf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_to_unrestricted</span><span class="p">(</span><span class="n">mf</span><span class="p">)</span>
+                <span class="n">dm0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_external_density</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mo_external</span><span class="p">)</span>
+                <span class="n">energy</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">kernel</span><span class="p">(</span><span class="n">dm0</span><span class="o">=</span><span class="n">dm0</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">check_internal</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">internal_stable</span> <span class="ow">and</span> <span class="n">mo_internal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">dm0</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">make_rdm1</span><span class="p">(</span><span class="n">mo_internal</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">)</span>
+                <span class="n">energy</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">kernel</span><span class="p">(</span><span class="n">dm0</span><span class="o">=</span><span class="n">dm0</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="n">check_external</span> <span class="o">=</span> <span class="n">check_external_setting</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_check_external_stability</span><span class="p">(</span><span class="n">mf</span><span class="p">)</span>
+        <span class="n">stability</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">stability</span><span class="p">(</span><span class="n">internal</span><span class="o">=</span><span class="n">check_internal</span><span class="p">,</span> <span class="n">external</span><span class="o">=</span><span class="n">check_external</span><span class="p">,</span> <span class="n">return_status</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">internal_stable</span><span class="p">,</span> <span class="n">external_stable</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unpack_stability</span><span class="p">(</span><span class="n">stability</span><span class="p">)</span>
+        <span class="n">is_stable</span> <span class="o">=</span> <span class="p">(</span><span class="ow">not</span> <span class="n">check_internal</span> <span class="ow">or</span> <span class="n">internal_stable</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">check_external</span> <span class="ow">or</span> <span class="n">external_stable</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_stable</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fail_on_unstable&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;PySCF stabilized SCF did not reach a stable reference.&quot;</span><span class="p">)</span>
+
+        <span class="n">final_scf_type</span> <span class="o">=</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">UNRESTRICTED</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">)</span> <span class="k">else</span> <span class="n">scf_type</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_wavefunction</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">,</span> <span class="n">final_scf_type</span><span class="p">,</span> <span class="n">energy</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PyscfStabilizedScfSolver.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfStabilizedScfSolver.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the stabilized SCF solver.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf_stabilized&quot;</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_unpack_stability</span><span class="p">(</span><span class="n">stability</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Normalize PySCF stability return values across supported versions.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">stability</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">stability</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">stability</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">mo_internal</span><span class="p">,</span> <span class="n">mo_external</span> <span class="o">=</span> <span class="n">stability</span>
+            <span class="n">internal_stable</span> <span class="o">=</span> <span class="n">mo_internal</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="n">external_stable</span> <span class="o">=</span> <span class="n">mo_external</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="n">mo_internal</span><span class="p">,</span> <span class="n">mo_external</span><span class="p">,</span> <span class="n">internal_stable</span><span class="p">,</span> <span class="n">external_stable</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Unexpected PySCF stability return value.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_to_unrestricted</span><span class="p">(</span><span class="n">mf</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a restricted PySCF mean-field object to the unrestricted counterpart.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">mf</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">scf</span><span class="o">.</span><span class="n">addons</span><span class="p">,</span> <span class="s2">&quot;convert_to_uhf&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">scf</span><span class="o">.</span><span class="n">addons</span><span class="o">.</span><span class="n">convert_to_uhf</span><span class="p">(</span><span class="n">mf</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;PySCF does not provide convert_to_uhf for external stability reruns.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_can_check_external_stability</span><span class="p">(</span><span class="n">mf</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether PySCF external stability is applicable for this reference.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelec</span>
+        <span class="k">return</span> <span class="n">nalpha</span> <span class="o">==</span> <span class="n">nbeta</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_make_external_density</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mo_external</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build an unrestricted density matrix from PySCF external-stability orbitals.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mo_external</span><span class="p">,</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">mo_alpha</span><span class="p">,</span> <span class="n">mo_beta</span> <span class="o">=</span> <span class="n">mo_external</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mo_alpha</span> <span class="o">=</span> <span class="n">mo_external</span>
+            <span class="n">mo_beta</span> <span class="o">=</span> <span class="n">mo_external</span>
+        <span class="n">mo_occ</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mo_occ</span><span class="p">,</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelec</span>
+            <span class="n">norb</span> <span class="o">=</span> <span class="n">mo_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">mo_occ</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">nalpha</span> <span class="k">else</span> <span class="mf">0.0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb</span><span class="p">)]),</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">nbeta</span> <span class="k">else</span> <span class="mf">0.0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb</span><span class="p">)]),</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">mf</span><span class="o">.</span><span class="n">make_rdm1</span><span class="p">((</span><span class="n">mo_alpha</span><span class="p">,</span> <span class="n">mo_beta</span><span class="p">),</span> <span class="n">mo_occ</span><span class="p">)</span></div>
 
 </pre></div>
 

@@ -1,6 +1,0 @@
-Namespace qdk::chemistry::utils::microsoft
-==========================================
-
-.. doxygennamespace:: qdk::chemistry::utils::microsoft
-   :project: QDK/Chemistry
-   :members:

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Factory pattern &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>Factory pattern &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -69,7 +69,7 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
@@ -79,11 +79,15 @@
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
-<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#term-grouper">Term grouper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
 </li>
@@ -92,6 +96,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -204,8 +209,8 @@ In Python, algorithm instantiation is managed through a centralized registry mod
 <td><p><code class="docutils literal notranslate"><span class="pre">&quot;stability_checker&quot;</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">StabilityCheckerFactory</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">&quot;energy_estimator&quot;</span></code></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="expectation_estimator.html"><span class="doc">ExpectationEstimator</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;expectation_estimator&quot;</span></code></p></td>
 <td><p>Python only</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></td>
@@ -225,7 +230,32 @@ In Python, algorithm instantiation is managed through a centralized registry mod
 If no name is provided, the default implementation is used.
 See <a class="reference internal" href="#discovering-implementations"><span class="std std-ref">Discovering implementations</span></a> below for how to list available implementations programmatically.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="c1"># Load H2 molecule from inline XYZ file</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">2</span>
+<span class="s2">H2 molecule</span>
+<span class="s2">H    0.000000    0.000000    0.000000</span>
+<span class="s2">H    0.000000    0.000000    0.740848</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create a SCF solver using the default implementation</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create an orbital localizer using a specific implementation</span>
+<span class="n">localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_pipek_mezey&quot;</span><span class="p">)</span>
+
+<span class="c1"># Configure the SCF solver and run</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
@@ -245,27 +275,6 @@ See <a class="reference internal" href="#discovering-implementations"><span clas
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-
-<span class="c1"># Load H2 molecule from XYZ file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/h2.structure.xyz&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create a SCF solver using the default implementation</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-
-<span class="c1"># Create an orbital localizer using a specific implementation</span>
-<span class="n">localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_pipek_mezey&quot;</span><span class="p">)</span>
-
-<span class="c1"># Configure the SCF solver and run</span>
-<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-</div>
 </div>
 </section>
 <section id="discovering-implementations">
@@ -275,7 +284,31 @@ This is useful for exploring what’s available at runtime, building dynamic UIs
 <section id="listing-algorithm-types-and-implementations">
 <h3>Listing algorithm types and implementations<a class="headerlink" href="#listing-algorithm-types-and-implementations" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="c1"># List all algorithm types and their implementations</span>
+<span class="n">all_algorithms</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">all_algorithms</span><span class="p">)</span>
+<span class="c1"># Output: {&#39;scf_solver&#39;: [&#39;qdk&#39;, &#39;pyscf&#39;], &#39;orbital_localizer&#39;: [&#39;qdk_pipek_mezey&#39;, &#39;pyscf&#39;], ...}</span>
+
+<span class="c1"># List implementations for a specific algorithm type</span>
+<span class="n">scf_methods</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available SCF solvers:&quot;</span><span class="p">,</span> <span class="n">scf_methods</span><span class="p">)</span>
+<span class="c1"># Output: [&#39;qdk&#39;, &#39;pyscf&#39;]</span>
+
+<span class="n">localizer_methods</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available localizers:&quot;</span><span class="p">,</span> <span class="n">localizer_methods</span><span class="p">)</span>
+<span class="c1"># Output: [&#39;qdk_pipek_mezey&#39;, &#39;pyscf&#39;, ...]</span>
+
+<span class="c1"># Show default implementations for each algorithm type</span>
+<span class="n">defaults</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">show_default</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Defaults:&quot;</span><span class="p">,</span> <span class="n">defaults</span><span class="p">)</span>
+<span class="c1"># Output: {&#39;scf_solver&#39;: &#39;qdk&#39;, &#39;orbital_localizer&#39;: &#39;qdk_pipek_mezey&#39;, ...}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
@@ -321,30 +354,6 @@ This is useful for exploring what’s available at runtime, building dynamic UIs
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
-
-<span class="c1"># List all algorithm types and their implementations</span>
-<span class="n">all_algorithms</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">all_algorithms</span><span class="p">)</span>
-<span class="c1"># Output: {&#39;scf_solver&#39;: [&#39;qdk&#39;, &#39;pyscf&#39;], &#39;orbital_localizer&#39;: [&#39;qdk_pipek_mezey&#39;, &#39;pyscf&#39;], ...}</span>
-
-<span class="c1"># List implementations for a specific algorithm type</span>
-<span class="n">scf_methods</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available SCF solvers:&quot;</span><span class="p">,</span> <span class="n">scf_methods</span><span class="p">)</span>
-<span class="c1"># Output: [&#39;qdk&#39;, &#39;pyscf&#39;]</span>
-
-<span class="n">localizer_methods</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available localizers:&quot;</span><span class="p">,</span> <span class="n">localizer_methods</span><span class="p">)</span>
-<span class="c1"># Output: [&#39;qdk_pipek_mezey&#39;, &#39;pyscf&#39;, ...]</span>
-
-<span class="c1"># Show default implementations for each algorithm type</span>
-<span class="n">defaults</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">show_default</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Defaults:&quot;</span><span class="p">,</span> <span class="n">defaults</span><span class="p">)</span>
-<span class="c1"># Output: {&#39;scf_solver&#39;: &#39;qdk&#39;, &#39;orbital_localizer&#39;: &#39;qdk_pipek_mezey&#39;, ...}</span>
-</pre></div>
-</div>
-</div>
 </div>
 </section>
 <section id="inspecting-settings">
@@ -353,7 +362,22 @@ This is useful for exploring what’s available at runtime, building dynamic UIs
 You can discover available settings programmatically as shown below.
 For comprehensive documentation on working with settings, see <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="c1"># Create a SCF solver and inspect its settings</span>
+<span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+
+<span class="c1"># Print settings as a formatted table</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">print_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+
+<span class="c1"># Or iterate over individual settings</span>
+<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 
@@ -369,21 +393,6 @@ For comprehensive documentation on working with settings, see <a class="referenc
 <span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">keys</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get_as_string</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="p">}</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
-
-<span class="c1"># Create a SCF solver and inspect its settings</span>
-<span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
-
-<span class="c1"># Print settings as a formatted table</span>
-<span class="n">registry</span><span class="o">.</span><span class="n">print_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
-
-<span class="c1"># Or iterate over individual settings</span>
-<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.hadamard\_test.hadamard\_test module
+==============================================================
+
+.. automodule:: qdk_chemistry.algorithms.hadamard_test.hadamard_test
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

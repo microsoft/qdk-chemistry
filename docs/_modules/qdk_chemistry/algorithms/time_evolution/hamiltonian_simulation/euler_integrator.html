@@ -1,0 +1,246 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Euler integrator for time-dependent Hamiltonian simulation.</span>
+
+<span class="sd">This module implements a Hamiltonian simulation algorithm that uses an</span>
+<span class="sd">:class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder.EulerEvolutionCircuitBuilder`</span>
+<span class="sd">to construct the evolution circuit and then executes it to measure</span>
+<span class="sd">observable expectation values.</span>
+
+<span class="sd">The circuit builder handles all time-stepping, propagation, Trotterization,</span>
+<span class="sd">and circuit mapping.  This class adds circuit execution and observable</span>
+<span class="sd">measurement on top.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">HamiltonianSimulation</span><span class="p">,</span> <span class="n">HamiltonianSimulationSettings</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">EnergyExpectationResult</span><span class="p">,</span>
+        <span class="n">MeasurementData</span><span class="p">,</span>
+        <span class="n">QuantumErrorProfile</span><span class="p">,</span>
+        <span class="n">QubitOperator</span><span class="p">,</span>
+        <span class="n">TimeDependentQubitHamiltonian</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;EulerIntegrator&quot;</span><span class="p">,</span> <span class="s2">&quot;EulerIntegratorSettings&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="EulerIntegratorSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegratorSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EulerIntegratorSettings</span><span class="p">(</span><span class="n">HamiltonianSimulationSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the Euler integrator.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="EulerIntegratorSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegratorSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings for EulerIntegrator.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="EulerIntegrator">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EulerIntegrator</span><span class="p">(</span><span class="n">HamiltonianSimulation</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Euler integrator for time-dependent Hamiltonian simulation.</span>
+
+<span class="sd">    Delegates circuit construction to the configured</span>
+<span class="sd">    ``evolution_circuit_builder`` (default: ``EulerEvolutionCircuitBuilder``),</span>
+<span class="sd">    then executes the circuit and measures observables.</span>
+
+<span class="sd">    For resource estimation (without execution), use the</span>
+<span class="sd">    ``evolution_circuit_builder`` directly via</span>
+<span class="sd">    ``create(&quot;evolution_circuit_builder&quot;, &quot;euler&quot;, ...)``.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="EulerIntegrator.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize EulerIntegrator.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">EulerIntegratorSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">TimeDependentQubitHamiltonian</span><span class="p">,</span>
+        <span class="n">observables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitOperator</span><span class="p">],</span>
+        <span class="n">state_prep</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">shots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">noise</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the Euler-integrated Hamiltonian simulation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: Time-dependent Hamiltonian.</span>
+<span class="sd">            observables: List of observable Hamiltonians to measure after evolution.</span>
+<span class="sd">            state_prep: Circuit that prepares the initial state before time evolution.</span>
+<span class="sd">            shots: Number of measurement shots per observable. Defaults to 1000.</span>
+<span class="sd">            noise: Optional noise profile.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">observable</span> <span class="ow">in</span> <span class="n">observables</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">observable</span><span class="o">.</span><span class="n">num_qubits</span> <span class="o">!=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;All observables must have the same number of qubits as the Hamiltonian.&quot;</span><span class="p">)</span>
+
+        <span class="n">circuit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_evolution_circuit</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">state_prep</span><span class="p">)</span>
+
+        <span class="n">measurements</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">observable</span> <span class="ow">in</span> <span class="n">observables</span><span class="p">:</span>
+            <span class="n">measurements</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_measure_observable</span><span class="p">(</span>
+                    <span class="n">circuit</span><span class="o">=</span><span class="n">circuit</span><span class="p">,</span>
+                    <span class="n">observable</span><span class="o">=</span><span class="n">observable</span><span class="p">,</span>
+                    <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">,</span>
+                    <span class="n">noise</span><span class="o">=</span><span class="n">noise</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">measurements</span>
+
+<div class="viewcode-block" id="EulerIntegrator.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.euler_integrator.EulerIntegrator.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return ``euler_integrator`` as the algorithm name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;euler_integrator&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

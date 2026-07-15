@@ -13,5 +13,7 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.algorithms.state_preparation.dense_pure_state
+   qdk_chemistry.algorithms.state_preparation.identity
    qdk_chemistry.algorithms.state_preparation.sparse_isometry
    qdk_chemistry.algorithms.state_preparation.state_preparation

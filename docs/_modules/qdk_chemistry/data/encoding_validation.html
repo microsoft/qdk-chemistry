@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.encoding_validation &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.data.encoding_validation &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -90,10 +91,13 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.data.encoding_validation</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Utilities for validating fermion-to-qubit encoding compatibility.</span>
+<span></span><span class="sd">&quot;&quot;&quot;Deprecated utilities for validating fermion-to-qubit encoding compatibility.</span>
 
-<span class="sd">This module provides functions to validate that Circuit and QubitHamiltonian</span>
-<span class="sd">instances use compatible fermion-to-qubit encodings.</span>
+<span class="sd">.. deprecated:: 2.0</span>
+<span class="sd">    Encoding compatibility is superseded by the explicit :class:`~qdk_chemistry.data.MajoranaMapping`</span>
+<span class="sd">    fermion-to-qubit workflow. ``EncodingMismatchError`` and</span>
+<span class="sd">    ``validate_encoding_compatibility`` remain as deprecated facades for backward</span>
+<span class="sd">    compatibility and will be removed in a future release.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
@@ -103,11 +107,12 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitOperator</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;EncodingMismatchError&quot;</span><span class="p">,</span> <span class="s2">&quot;validate_encoding_compatibility&quot;</span><span class="p">]</span>
 
@@ -115,36 +120,45 @@
 <div class="viewcode-block" id="EncodingMismatchError">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.encoding_validation.html#qdk_chemistry.data.encoding_validation.EncodingMismatchError">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EncodingMismatchError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when Circuit and QubitHamiltonian have incompatible encodings.&quot;&quot;&quot;</span></div>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when Circuit and QubitOperator have incompatible encodings.</span>
+
+<span class="sd">    .. deprecated:: 2.0</span>
+<span class="sd">        Use the :class:`~qdk_chemistry.data.MajoranaMapping` fermion-to-qubit workflow instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
 
 
 
 <div class="viewcode-block" id="validate_encoding_compatibility">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.encoding_validation.html#qdk_chemistry.data.encoding_validation.validate_encoding_compatibility">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">validate_encoding_compatibility</span><span class="p">(</span><span class="n">circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a Circuit and QubitHamiltonian use compatible encodings.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_encoding_compatibility</span><span class="p">(</span><span class="n">circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that a Circuit and QubitOperator use compatible encodings.</span>
 
 <span class="sd">    This function checks that both the circuit and Hamiltonian have matching encodings.</span>
 <span class="sd">    Both must have their encoding specified (not None), and the encodings must match.</span>
+
+<span class="sd">    .. deprecated:: 2.0</span>
+<span class="sd">        Use the :class:`~qdk_chemistry.data.MajoranaMapping` fermion-to-qubit workflow instead.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        circuit: The quantum circuit with encoding metadata.</span>
 <span class="sd">        hamiltonian: The qubit Hamiltonian with encoding metadata.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        EncodingMismatchError: If the circuit or Hamiltonian encoding is None, or if</span>
-<span class="sd">            the encodings don&#39;t match.</span>
+<span class="sd">        EncodingMismatchError: If the circuit or Hamiltonian encoding is None, or if the encodings don&#39;t match.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; circuit = Circuit(qasm=&quot;...&quot;, encoding=&quot;jordan-wigner&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; hamiltonian = QubitHamiltonian(..., encoding=&quot;jordan-wigner&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; hamiltonian = QubitOperator(..., encoding=&quot;jordan-wigner&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; validate_encoding_compatibility(circuit, hamiltonian)  # OK</span>
-<span class="sd">        &gt;&gt;&gt; hamiltonian_bk = QubitHamiltonian(..., encoding=&quot;bravyi-kitaev&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; validate_encoding_compatibility(circuit, hamiltonian_bk)  # Raises EncodingMismatchError</span>
-<span class="sd">        &gt;&gt;&gt; circuit_none = Circuit(qasm=&quot;...&quot;, encoding=None)</span>
-<span class="sd">        &gt;&gt;&gt; validate_encoding_compatibility(circuit_none, hamiltonian)  # Raises EncodingMismatchError</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s2">&quot;validate_encoding_compatibility is deprecated and will be removed in a future release; &quot;</span>
+        <span class="s2">&quot;use the MajoranaMapping fermion-to-qubit workflow instead.&quot;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="n">circuit_encoding</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">encoding</span>
     <span class="n">hamiltonian_encoding</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">encoding</span>
 
@@ -157,7 +171,7 @@
 
     <span class="k">if</span> <span class="n">hamiltonian_encoding</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">EncodingMismatchError</span><span class="p">(</span>
-            <span class="s2">&quot;QubitHamiltonian encoding is not specified. All qubit Hamiltonians must have an &quot;</span>
+            <span class="s2">&quot;QubitOperator encoding is not specified. All qubit Hamiltonians must have an &quot;</span>
             <span class="s2">&quot;encoding metadata to ensure compatibility with circuits.&quot;</span>
         <span class="p">)</span>
 
@@ -165,7 +179,7 @@
     <span class="k">if</span> <span class="n">circuit_encoding</span> <span class="o">!=</span> <span class="n">hamiltonian_encoding</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">EncodingMismatchError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Encoding mismatch detected: Circuit uses &#39;</span><span class="si">{</span><span class="n">circuit_encoding</span><span class="si">}</span><span class="s2">&#39; encoding, &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;but QubitHamiltonian uses &#39;</span><span class="si">{</span><span class="n">hamiltonian_encoding</span><span class="si">}</span><span class="s2">&#39; encoding. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;but QubitOperator uses &#39;</span><span class="si">{</span><span class="n">hamiltonian_encoding</span><span class="si">}</span><span class="s2">&#39; encoding. &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;These encodings are incompatible and will lead to incorrect results. &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;Please ensure both the circuit and Hamiltonian use the same fermion-to-qubit encoding.&quot;</span>
         <span class="p">)</span></div>

@@ -1,0 +1,595 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.unitary_representation.containers.block_encoding &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.unitary_representation.containers.block_encoding</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.data.unitary_representation.containers.block_encoding</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry block encoding container module.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">asdict</span><span class="p">,</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_hash_array</span><span class="p">,</span> <span class="n">_hash_int</span><span class="p">,</span> <span class="n">_hash_str</span><span class="p">,</span> <span class="n">_hash_uint</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitaryContainer</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;BlockEncodingContainer&quot;</span><span class="p">,</span> <span class="s2">&quot;ControlledOperation&quot;</span><span class="p">,</span> <span class="s2">&quot;LCUContainer&quot;</span><span class="p">,</span> <span class="s2">&quot;Select&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="BlockEncodingContainer">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.BlockEncodingContainer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BlockEncodingContainer</span><span class="p">(</span><span class="n">UnitaryContainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for block encoding containers.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Class attribute for filename validation</span>
+    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;block_encoding_container&quot;</span>
+
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+
+<div class="viewcode-block" id="BlockEncodingContainer.power">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.BlockEncodingContainer.power">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">power</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of times to apply the block encoding.&quot;&quot;&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ControlledOperation">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ControlledOperation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A single controlled unitary operation in the SELECT oracle.&quot;&quot;&quot;</span>
+
+    <span class="n">ctrl_state</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Integer encoding of the control state that activates this operation.&quot;&quot;&quot;</span>
+
+    <span class="n">operation</span><span class="p">:</span> <span class="nb">str</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Operation descriptor (e.g., a Pauli string like ``&quot;XZI&quot;``).&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ControlledOperation.to_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.to_hdf5">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the ControlledOperation to an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to write attributes to.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;ctrl_state&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctrl_state</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;operation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">operation</span></div>
+
+
+<div class="viewcode-block" id="ControlledOperation.from_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.from_hdf5">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ControlledOperation&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a ControlledOperation from an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to read attributes from.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ControlledOperation: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">ctrl_state</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;ctrl_state&quot;</span><span class="p">]),</span>
+            <span class="n">operation</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;operation&quot;</span><span class="p">]),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Select">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Select</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class representing the SELECT oracle for block encoding.&quot;&quot;&quot;</span>
+
+    <span class="n">controlled_operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ControlledOperation</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List of controlled operations.&quot;&quot;&quot;</span>
+
+    <span class="n">phases</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Array of +1/-1 phase corrections (uncontrolled global phase per term).&quot;&quot;&quot;</span>
+
+    <span class="n">num_prepare_ancillas</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Number of control qubits.&quot;&quot;&quot;</span>
+
+    <span class="n">num_target_qubits</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Number of target (system) qubits.&quot;&quot;&quot;</span>
+
+    <span class="n">prepare_qubits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List of qubit indices for the prepare register.&quot;&quot;&quot;</span>
+
+    <span class="n">target_qubits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List of qubit indices for the target (system) register.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Select.to_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.to_hdf5">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the Select oracle to an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to write phases, attributes, and controlled operations to.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;phases&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">phases</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;num_prepare_ancillas&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_prepare_ancillas</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;num_target_qubits&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_target_qubits</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;prepare_qubits&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare_qubits</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;target_qubits&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_qubits</span>
+        <span class="n">ops_group</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;controlled_operations&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">op</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controlled_operations</span><span class="p">):</span>
+            <span class="n">op</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="n">ops_group</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;op_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Select.from_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.from_hdf5">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Select&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a Select oracle from an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to read phases, attributes, and controlled operations from.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Select: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ops_group</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;controlled_operations&quot;</span><span class="p">]</span>
+        <span class="n">controlled_ops</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ControlledOperation</span><span class="o">.</span><span class="n">from_hdf5</span><span class="p">(</span><span class="n">ops_group</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ops_group</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">controlled_operations</span><span class="o">=</span><span class="n">controlled_ops</span><span class="p">,</span>
+            <span class="n">phases</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;phases&quot;</span><span class="p">]),</span>
+            <span class="n">num_prepare_ancillas</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;num_prepare_ancillas&quot;</span><span class="p">]),</span>
+            <span class="n">num_target_qubits</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;num_target_qubits&quot;</span><span class="p">]),</span>
+            <span class="n">prepare_qubits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;prepare_qubits&quot;</span><span class="p">]),</span>
+            <span class="n">target_qubits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;target_qubits&quot;</span><span class="p">]),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LCUContainer">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LCUContainer</span><span class="p">(</span><span class="n">BlockEncodingContainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Container for a Linear Combination of Unitaries (LCU) decomposition.</span>
+
+<span class="sd">    Stores the pre-computed PREPARE and SELECT sub-objects that define a</span>
+<span class="sd">    block-encoding circuit. This container is agnostic to the specific method</span>
+<span class="sd">    used to compute these objects — that logic lives in the builder.</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        W = \text{PREPARE}^\dagger \cdot \text{SELECT} \cdot \text{PREPARE}</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Class attribute for filename validation</span>
+    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;lcu_container&quot;</span>
+
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
+
+<div class="viewcode-block" id="LCUContainer.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">prepare</span><span class="p">:</span> <span class="s2">&quot;Wavefunction&quot;</span><span class="p">,</span>
+        <span class="n">select</span><span class="p">:</span> <span class="n">Select</span><span class="p">,</span>
+        <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize an LCUContainer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            prepare: The prepare wavefunction encoding coefficients for the block encoded Hamiltonian.</span>
+<span class="sd">            select: The select oracle for controlled operations.</span>
+<span class="sd">            power: Number of times to apply the block encoding (for B[H]^power).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_power</span> <span class="o">=</span> <span class="n">power</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepare</span> <span class="o">=</span> <span class="n">prepare</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">select</span> <span class="o">=</span> <span class="n">select</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.power">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.power">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">power</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of times to apply the block encoding.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The power value.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_power</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.num_prepare_ancillas">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.num_prepare_ancillas">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_prepare_ancillas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of qubits in the prepare ancillary register.</span>
+
+<span class="sd">        Derived from the orbital basis size of the prepare wavefunction.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The ancilla qubit count.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">num_modes</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.num_qubits">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.num_qubits">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_qubits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Total number of qubits (system + ancilla).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: The combined qubit count.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">num_target_qubits</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_prepare_ancillas</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.type">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.type">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the type of the unitary container.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The type string ``&quot;lcu&quot;``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;lcu&quot;</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.to_json">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.to_json">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the LCUContainer to a JSON-serializable dictionary.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: Dictionary representation including container type, power,</span>
+<span class="sd">                prepare, and select fields.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="s2">&quot;power&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">power</span><span class="p">,</span>
+            <span class="s2">&quot;prepare&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span>
+            <span class="s2">&quot;select&quot;</span><span class="p">:</span> <span class="n">asdict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="p">)</span> <span class="o">|</span> <span class="p">{</span><span class="s2">&quot;phases&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">phases</span><span class="o">.</span><span class="n">tolist</span><span class="p">()},</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_json_version</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.to_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.to_hdf5">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the LCUContainer to an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to write container data to.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_hdf5_version</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;container_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;power&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">power</span>
+
+        <span class="n">_wavefunction_to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;prepare&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">&quot;select&quot;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.from_json">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.from_json">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;LCUContainer&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an LCUContainer from a JSON dictionary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            json_data: Dictionary containing the serialized LCU data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            LCUContainer: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_json_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">json_data</span><span class="p">)</span>
+
+        <span class="n">prepare</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;prepare&quot;</span><span class="p">])</span>
+
+        <span class="n">sel_data</span> <span class="o">=</span> <span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;select&quot;</span><span class="p">]</span>
+        <span class="n">controlled_ops</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ControlledOperation</span><span class="p">(</span>
+                <span class="n">ctrl_state</span><span class="o">=</span><span class="n">op</span><span class="p">[</span><span class="s2">&quot;ctrl_state&quot;</span><span class="p">],</span>
+                <span class="n">operation</span><span class="o">=</span><span class="n">op</span><span class="p">[</span><span class="s2">&quot;operation&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;controlled_operations&quot;</span><span class="p">]</span>
+        <span class="p">]</span>
+        <span class="n">select</span> <span class="o">=</span> <span class="n">Select</span><span class="p">(</span>
+            <span class="n">controlled_operations</span><span class="o">=</span><span class="n">controlled_ops</span><span class="p">,</span>
+            <span class="n">phases</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;phases&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+            <span class="n">num_prepare_ancillas</span><span class="o">=</span><span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;num_prepare_ancillas&quot;</span><span class="p">],</span>
+            <span class="n">num_target_qubits</span><span class="o">=</span><span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;num_target_qubits&quot;</span><span class="p">],</span>
+            <span class="n">prepare_qubits</span><span class="o">=</span><span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;prepare_qubits&quot;</span><span class="p">],</span>
+            <span class="n">target_qubits</span><span class="o">=</span><span class="n">sel_data</span><span class="p">[</span><span class="s2">&quot;target_qubits&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">power</span><span class="o">=</span><span class="n">json_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">prepare</span><span class="o">=</span><span class="n">prepare</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">select</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.from_hdf5">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.from_hdf5">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;LCUContainer&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load an LCUContainer from an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group: HDF5 group to read container data from.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            LCUContainer: The deserialized instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">prepare</span> <span class="o">=</span> <span class="n">_wavefunction_from_hdf5</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;prepare&quot;</span><span class="p">])</span>
+
+        <span class="n">select</span> <span class="o">=</span> <span class="n">Select</span><span class="o">.</span><span class="n">from_hdf5</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;select&quot;</span><span class="p">])</span>
+        <span class="n">power</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;power&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">power</span><span class="o">=</span><span class="n">power</span><span class="p">,</span>
+            <span class="n">prepare</span><span class="o">=</span><span class="n">prepare</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">select</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LCUContainer.get_summary">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.get_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a human-readable summary of the LCU container.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Multi-line summary describing power, prepare, and select settings.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;LCU Container:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Power: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">power</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Prepare: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_prepare_ancillas</span><span class="si">}</span><span class="s2"> qubits, statevector shape </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">())</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Select: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_prepare_ancillas</span><span class="si">}</span><span class="s2"> control qubits, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">num_target_qubits</span><span class="si">}</span><span class="s2"> target qubits,&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">controlled_operations</span><span class="p">)</span><span class="si">}</span><span class="s2"> controlled operations&quot;</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_hash_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Feed identifying data into the hasher.&quot;&quot;&quot;</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="s2">&quot;lcu_container&quot;</span><span class="p">)</span>
+        <span class="n">_hash_int</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_power</span><span class="p">)</span>
+        <span class="c1"># Hash prepare wavefunction via its own content_hash</span>
+        <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare</span><span class="o">.</span><span class="n">content_hash</span><span class="p">(</span><span class="n">truncate_chars</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># Hash select oracle</span>
+        <span class="n">_hash_uint</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">controlled_operations</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">controlled_operations</span><span class="p">:</span>
+            <span class="n">_hash_int</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">ctrl_state</span><span class="p">)</span>
+            <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">operation</span><span class="p">)</span>
+        <span class="n">_hash_array</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">phases</span><span class="p">)</span>
+        <span class="n">_hash_int</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">num_prepare_ancillas</span><span class="p">)</span>
+        <span class="n">_hash_int</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">select</span><span class="o">.</span><span class="n">num_target_qubits</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LCUContainer.eigenvalue_from_phase">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.eigenvalue_from_phase">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">eigenvalue_from_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase_fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Not applicable for a raw block encoding.</span>
+
+<span class="sd">        A plain block encoding does not define an eigenvalue-phase</span>
+<span class="sd">        relationship on its own.  Use</span>
+<span class="sd">        :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`</span>
+<span class="sd">        for QPE with qubitization.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: Always.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">&quot;LCUContainer does not define an eigenvalue-phase relationship. Wrap it in an LCUWalkContainer to use QPE.&quot;</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_wavefunction_to_hdf5</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">:</span> <span class="s2">&quot;Wavefunction&quot;</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Serialize a Wavefunction into an h5py Group via a temp-file bridge.</span>
+
+<span class="sd">    The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper</span>
+<span class="sd">    writes to a temporary file and copies the contents into *group*.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        wavefunction: The wavefunction to serialize.</span>
+<span class="sd">        group: Target HDF5 group to populate.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fd</span><span class="p">,</span> <span class="n">tmp_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.wavefunction.h5&quot;</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">wavefunction</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">src</span><span class="p">:</span>
+                <span class="n">src</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">attr_name</span><span class="p">,</span> <span class="n">attr_val</span> <span class="ow">in</span> <span class="n">src</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="n">attr_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">attr_val</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_wavefunction_from_hdf5</span><span class="p">(</span><span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Wavefunction&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Deserialize a Wavefunction from an h5py Group via a temp-file bridge.</span>
+
+<span class="sd">    The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper</span>
+<span class="sd">    copies *group* into a temporary file and loads from it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        group: Source HDF5 group containing serialized wavefunction data.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Wavefunction: The deserialized wavefunction.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">fd</span><span class="p">,</span> <span class="n">tmp_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.wavefunction.h5&quot;</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">dst</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
+                <span class="n">group</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">attr_name</span><span class="p">,</span> <span class="n">attr_val</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">dst</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="n">attr_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">attr_val</span>
+        <span class="k">return</span> <span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

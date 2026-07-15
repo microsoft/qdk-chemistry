@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils.model_hamiltonians &mdash; qdk-chemistry 1.1.0 documentation</title>
+  <title>qdk_chemistry.utils.model_hamiltonians &mdash; qdk-chemistry 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -109,7 +110,8 @@
     <span class="n">to_pair_param</span><span class="p">,</span>
     <span class="n">to_site_param</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatticeGraph</span><span class="p">,</span> <span class="n">PauliOperator</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatticeGraph</span><span class="p">,</span> <span class="n">LayeredPartition</span><span class="p">,</span> <span class="n">PauliOperator</span><span class="p">,</span> <span class="n">QubitOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;create_heisenberg_hamiltonian&quot;</span><span class="p">,</span>
@@ -123,13 +125,113 @@
 <span class="p">]</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_pauli_expr_to_qubit_hamiltonian</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">num_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a simplified PauliOperator expression to a QubitHamiltonian.&quot;&quot;&quot;</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_pauli_expr_to_qubit_hamiltonian</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">num_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a simplified PauliOperator expression to a QubitOperator.&quot;&quot;&quot;</span>
     <span class="n">simplified</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
     <span class="n">terms</span> <span class="o">=</span> <span class="n">simplified</span><span class="o">.</span><span class="n">to_canonical_terms</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">)</span>
     <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">][::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">]</span>
     <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">complex</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">])</span>
-    <span class="k">return</span> <span class="n">QubitHamiltonian</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_geometry_grouped_hamiltonian</span><span class="p">(</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">LatticeGraph</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">couplings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]],</span>
+    <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]],</span>
+    <span class="n">coloring</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.</span>
+
+<span class="sd">    This helper exists separately from the ungrouped construction path</span>
+<span class="sd">    because it builds the Pauli-string list in a specific order dictated</span>
+<span class="sd">    by the lattice edge coloring, then records that order as a</span>
+<span class="sd">    :class:`~qdk_chemistry.data.LayeredPartition`.  The ungrouped path</span>
+<span class="sd">    constructs terms from the adjacency matrix directly without regard</span>
+<span class="sd">    to color structure.</span>
+
+<span class="sd">    Groups are organised first by single-body field direction (one group</span>
+<span class="sd">    per direction, each containing a single layer because field terms</span>
+<span class="sd">    have disjoint support), then by two-body coupling type (one group</span>
+<span class="sd">    per ``XX``/``YY``/``ZZ`` block, each split into layers by edge</span>
+<span class="sd">    color).  Term indices in</span>
+<span class="sd">    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` align with the</span>
+<span class="sd">    indices stored in the returned :class:`LayeredPartition`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        graph: Lattice graph defining connectivity.</span>
+<span class="sd">        couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\&quot;XX\&quot;, jx)]``).</span>
+<span class="sd">        fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\&quot;X\&quot;, hx)]``).</span>
+<span class="sd">        coloring: Optional edge coloring ``{(i, j): color}`` (``i &lt; j``). Reads ``graph.edge_coloring`` when ``None``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        QubitOperator: The assembled Hamiltonian carrying a ``LayeredPartition``</span>
+<span class="sd">        with ``strategy=\&quot;geometry_coloring\&quot;``.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">num_sites</span>
+
+    <span class="k">if</span> <span class="n">coloring</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">coloring</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">edge_coloring</span>
+    <span class="k">if</span> <span class="n">coloring</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;No edge coloring available on the lattice graph. &quot;</span>
+            <span class="s2">&quot;Use a factory method that provides one, or pass an explicit coloring.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">coefficients</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">complex</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">groups_layers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Field groups: one group per direction, single layer each.</span>
+    <span class="k">for</span> <span class="n">pauli_char</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+        <span class="n">field_vec</span> <span class="o">=</span> <span class="n">to_site_param</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="s2">&quot;field&quot;</span><span class="p">)</span>
+        <span class="n">layer_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">field_vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">ps</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n</span>
+            <span class="n">ps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pauli_char</span>
+            <span class="n">pauli_strings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ps</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">coefficients</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">complex</span><span class="p">(</span><span class="n">field_vec</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+            <span class="n">layer_indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">layer_indices</span><span class="p">:</span>
+            <span class="n">groups_layers</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="nb">tuple</span><span class="p">(</span><span class="n">layer_indices</span><span class="p">),))</span>
+
+    <span class="c1"># Coupling groups: one group per (XX/YY/ZZ) block; layers given by edge colors.</span>
+    <span class="k">for</span> <span class="n">pauli_label</span><span class="p">,</span> <span class="n">coupling</span> <span class="ow">in</span> <span class="n">couplings</span><span class="p">:</span>
+        <span class="n">coupling_mat</span> <span class="o">=</span> <span class="n">to_pair_param</span><span class="p">(</span><span class="n">coupling</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="s2">&quot;coupling&quot;</span><span class="p">)</span>
+        <span class="n">color_to_indices</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">),</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coloring</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">edge_weight</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">weight</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">edge_weight</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">coeff_val</span> <span class="o">=</span> <span class="n">coupling_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">edge_weight</span>
+            <span class="k">if</span> <span class="n">coeff_val</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">ps</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n</span>
+            <span class="n">ps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pauli_label</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">ps</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">pauli_label</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">pauli_strings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ps</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">coefficients</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">complex</span><span class="p">(</span><span class="n">coeff_val</span><span class="p">))</span>
+            <span class="n">color_to_indices</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">color_to_indices</span><span class="p">:</span>
+            <span class="n">layers</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">color_to_indices</span><span class="p">[</span><span class="n">c</span><span class="p">])</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">color_to_indices</span><span class="p">))</span>
+            <span class="n">groups_layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pauli_strings</span><span class="p">:</span>
+        <span class="c1"># Empty Hamiltonian: emit a single all-identity term with zero coefficient</span>
+        <span class="c1"># so the resulting QubitOperator remains constructible.</span>
+        <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span> <span class="o">*</span> <span class="n">n</span><span class="p">]</span>
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span> <span class="o">+</span> <span class="mf">0.0</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">groups_layers</span> <span class="o">=</span> <span class="p">[((</span><span class="mi">0</span><span class="p">,),)]</span>
+
+    <span class="n">partition</span> <span class="o">=</span> <span class="n">LayeredPartition</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="s2">&quot;geometry_coloring&quot;</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">groups_layers</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">(</span>
+        <span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span>
+        <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coefficients</span><span class="p">),</span>
+        <span class="n">term_partition</span><span class="o">=</span><span class="n">partition</span><span class="p">,</span>
+    <span class="p">)</span>
 
 
 <div class="viewcode-block" id="create_heisenberg_hamiltonian">
@@ -142,7 +244,9 @@
     <span class="n">hx</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="n">hy</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="n">hz</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">include_term_groups</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Create the anisotropic Heisenberg model Hamiltonian on a lattice.</span>
 
 <span class="sd">    .. math::</span>
@@ -170,13 +274,23 @@
 <span class="sd">        hx: External magnetic field in the x direction. Scalar or length-n array. Defaults to 0.</span>
 <span class="sd">        hy: External magnetic field in the y direction. Defaults to 0.</span>
 <span class="sd">        hz: External magnetic field in the z direction. Defaults to 0.</span>
+<span class="sd">        include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        QubitHamiltonian: The Heisenberg model as a qubit Hamiltonian.</span>
+<span class="sd">        QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">is_symmetric</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Lattice graph must be symmetric for a valid Hamiltonian.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">include_term_groups</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">graph</span><span class="o">.</span><span class="n">edge_coloring</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_build_geometry_grouped_hamiltonian</span><span class="p">(</span>
+                <span class="n">graph</span><span class="p">,</span>
+                <span class="n">couplings</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;XX&quot;</span><span class="p">,</span> <span class="n">jx</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;YY&quot;</span><span class="p">,</span> <span class="n">jy</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;ZZ&quot;</span><span class="p">,</span> <span class="n">jz</span><span class="p">)],</span>
+                <span class="n">fields</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">hx</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="n">hy</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Z&quot;</span><span class="p">,</span> <span class="n">hz</span><span class="p">)],</span>
+            <span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.&quot;</span><span class="p">)</span>
 
     <span class="n">n</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">num_sites</span>
     <span class="n">adj</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">adjacency_matrix</span><span class="p">()</span>
@@ -222,7 +336,9 @@
     <span class="n">graph</span><span class="p">:</span> <span class="n">LatticeGraph</span><span class="p">,</span>
     <span class="n">j</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span>
     <span class="n">h</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">include_term_groups</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Create the Ising model Hamiltonian on a lattice.</span>
 
 <span class="sd">    .. math::</span>
@@ -236,12 +352,13 @@
 <span class="sd">        graph: Lattice graph defining the connectivity.</span>
 <span class="sd">        j: Coupling constant for ZZ interactions. Scalar or ``(n, n)`` array.</span>
 <span class="sd">        h: Transverse field strength (x direction). Scalar or length-n array.  Defaults to 0.</span>
+<span class="sd">        include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        QubitHamiltonian: The Ising model as a qubit Hamiltonian.</span>
+<span class="sd">        QubitOperator: The Ising model as a qubit Hamiltonian.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">create_heisenberg_hamiltonian</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">jx</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jy</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jz</span><span class="o">=</span><span class="n">j</span><span class="p">,</span> <span class="n">hx</span><span class="o">=</span><span class="n">h</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">create_heisenberg_hamiltonian</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">jx</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jy</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jz</span><span class="o">=</span><span class="n">j</span><span class="p">,</span> <span class="n">hx</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">include_term_groups</span><span class="o">=</span><span class="n">include_term_groups</span><span class="p">)</span></div>
 
 </pre></div>
 

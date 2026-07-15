@@ -1,0 +1,310 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.migrate package &mdash; qdk-chemistry 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.migrate package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.migrate.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.migrate">
+<span id="qdk-chemistry-migrate-package"></span><h1>qdk_chemistry.migrate package<a class="headerlink" href="#module-qdk_chemistry.migrate" title="Link to this heading"></a></h1>
+<p>Migrate serialized data files across serialization-schema versions.</p>
+<p>Each qdk-chemistry data class versions its serialization schema independently, and
+its deserializer accepts only the version the installed library was built against.
+Loading a file written against an older version of that class’s schema raises an
+error; use this module to upgrade such a file to the version the library accepts.</p>
+<p>Command line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">migrate</span> <span class="n">OLD_FILE</span> <span class="n">NEW_FILE</span>
+</pre></div>
+</div>
+<p>Python:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">migrate</span>
+<span class="n">migrate</span><span class="o">.</span><span class="n">convert_file</span><span class="p">(</span><span class="s2">&quot;old.hamiltonian.json&quot;</span><span class="p">,</span> <span class="s2">&quot;new.hamiltonian.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The data type is taken from the <code class="docutils literal notranslate"><span class="pre">name.type.ext</span></code> filename convention
+(<code class="docutils literal notranslate"><span class="pre">orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">hamiltonian</span></code> / <code class="docutils literal notranslate"><span class="pre">wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">ansatz</span></code>) and the
+serialization format from the file extension (<code class="docutils literal notranslate"><span class="pre">.json</span></code> or <code class="docutils literal notranslate"><span class="pre">.h5</span></code> / <code class="docutils literal notranslate"><span class="pre">.hdf5</span></code>).
+Input and output formats may differ.</p>
+<p>Migration is keyed point-by-point on each data class’s serialization version, not
+on a library release: every migratable type exposes a <code class="docutils literal notranslate"><span class="pre">STEPS</span></code> table mapping a
+source version to a <code class="docutils literal notranslate"><span class="pre">(next_version,</span> <span class="pre">transform)</span></code> pair, and the chain is followed
+until it reaches the version the installed library accepts. To support a future
+serialization-version bump for a data class, register the next step in that type’s
+<code class="docutils literal notranslate"><span class="pre">STEPS</span></code> table (<code class="docutils literal notranslate"><span class="pre">_orbitals</span></code>/<code class="docutils literal notranslate"><span class="pre">_hamiltonian</span></code>/<code class="docutils literal notranslate"><span class="pre">_wavefunction</span></code>); the migrated
+document is validated against the live deserializer, so a missing step fails loudly.</p>
+<p>This module lives outside the data classes so that no legacy-schema knowledge
+leaks into the core serialization.</p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="qdk_chemistry.migrate.MigrationError">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.migrate.</span></span><span class="sig-name descname"><span class="pre">MigrationError</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/migrate.html#MigrationError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.migrate.MigrationError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">RuntimeError</span></code></a></p>
+<p>Raised when a file cannot be migrated to the current serialization version.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.migrate.convert_file">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.migrate.</span></span><span class="sig-name descname"><span class="pre">convert_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/migrate.html#convert_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.migrate.convert_file" title="Link to this definition"></a></dt>
+<dd><p>Migrate a single data file to the serialization version the library accepts.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>src</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the file to read (format inferred from its extension).</p></li>
+<li><p><strong>dst</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to write the migrated file (format inferred from its extension).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The <code class="docutils literal notranslate"><span class="pre">dst</span></code> path as a <a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">pathlib.Path</span></code></a>.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.migrate.MigrationError" title="qdk_chemistry.migrate.MigrationError"><strong>MigrationError</strong></a> – If the data type/format cannot be determined, the source and
+    destination are the same file, the file is already at the current
+    serialization version, or the migration fails.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate.__main__.html">qdk_chemistry.migrate.__main__ module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate.__main__.html#qdk_chemistry.migrate.__main__.MigrationError"><code class="docutils literal notranslate"><span class="pre">MigrationError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate.__main__.html#qdk_chemistry.migrate.__main__.convert_file"><code class="docutils literal notranslate"><span class="pre">convert_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate.__main__.html#qdk_chemistry.migrate.__main__.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._ansatz.html">qdk_chemistry.migrate._ansatz module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">from_hdf5_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._hamiltonian.html">qdk_chemistry.migrate._hamiltonian module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">from_hdf5_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.from_hdf5_group"><code class="docutils literal notranslate"><span class="pre">from_hdf5_group()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._hamiltonian.html#qdk_chemistry.migrate._hamiltonian.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._io.html">qdk_chemistry.migrate._io module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.migrate_doc"><code class="docutils literal notranslate"><span class="pre">migrate_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.detect_format"><code class="docutils literal notranslate"><span class="pre">detect_format()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.detect_type"><code class="docutils literal notranslate"><span class="pre">detect_type()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.read_matrix"><code class="docutils literal notranslate"><span class="pre">read_matrix()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.read_vector"><code class="docutils literal notranslate"><span class="pre">read_vector()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.read_index_vector"><code class="docutils literal notranslate"><span class="pre">read_index_vector()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.read_attr"><code class="docutils literal notranslate"><span class="pre">read_attr()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.subgroup_to_json"><code class="docutils literal notranslate"><span class="pre">subgroup_to_json()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._io.html#qdk_chemistry.migrate._io.write_object"><code class="docutils literal notranslate"><span class="pre">write_object()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html">qdk_chemistry.migrate._orbitals module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.__init__"><code class="docutils literal notranslate"><span class="pre">BasisSet.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.ao_extents"><code class="docutils literal notranslate"><span class="pre">BasisSet.ao_extents()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.ao_symmetries"><code class="docutils literal notranslate"><span class="pre">BasisSet.ao_symmetries()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.atomic_orbital_type_to_string"><code class="docutils literal notranslate"><span class="pre">BasisSet.atomic_orbital_type_to_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.basis_to_shell_index"><code class="docutils literal notranslate"><span class="pre">BasisSet.basis_to_shell_index()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.custom_ecp_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.custom_ecp_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.custom_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.custom_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_basis_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_basis_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_element_map"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_element_map()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_index_map"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_index_map()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_json"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.from_json_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.from_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_angular_momentum"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_angular_momentum()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_atom_index_for_atomic_orbital"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_atom_index_for_atomic_orbital()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_atomic_orbital_indices_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_atomic_orbital_indices_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_atomic_orbital_info"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_atomic_orbital_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_atomic_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_atomic_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_electrons"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shell"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shell()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shell_indices_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shell_indices_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shell_indices_for_atom_and_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shell_indices_for_atom_and_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shell_indices_for_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shell_indices_for_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_ecp_shells_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_ecp_shells_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_name"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_atomic_orbitals"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_atomic_orbitals()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_atomic_orbitals_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_atomic_orbitals_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_atomic_orbitals_for_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_atomic_orbitals_for_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_atoms"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_atoms()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_ecp_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_ecp_shells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_orbitals_for_l"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_orbitals_for_l()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_num_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_num_shells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shell"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shell()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shell_indices_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shell_indices_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shell_indices_for_atom_and_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shell_indices_for_atom_and_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shell_indices_for_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shell_indices_for_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_shells_for_atom"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_shells_for_atom()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_structure"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_structure()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_summary"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_supported_basis_set_names"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_supported_basis_set_names()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.get_supported_elements_for_basis_set"><code class="docutils literal notranslate"><span class="pre">BasisSet.get_supported_elements_for_basis_set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.has_ecp_electrons"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_ecp_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.has_ecp_shells"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_ecp_shells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.has_structure"><code class="docutils literal notranslate"><span class="pre">BasisSet.has_structure()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.l_to_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.l_to_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.orbital_type_to_string"><code class="docutils literal notranslate"><span class="pre">BasisSet.orbital_type_to_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.string_to_atomic_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.string_to_atomic_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.string_to_orbital_type"><code class="docutils literal notranslate"><span class="pre">BasisSet.string_to_orbital_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.to_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.to_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.to_json"><code class="docutils literal notranslate"><span class="pre">BasisSet.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.BasisSet.to_json_file"><code class="docutils literal notranslate"><span class="pre">BasisSet.to_json_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.from_hdf5_group"><code class="docutils literal notranslate"><span class="pre">from_hdf5_group()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html">qdk_chemistry.migrate._sbt module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.rank2_dict"><code class="docutils literal notranslate"><span class="pre">rank2_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.rank1_dict"><code class="docutils literal notranslate"><span class="pre">rank1_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.rank4_dict"><code class="docutils literal notranslate"><span class="pre">rank4_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.rank3_three_center_dict"><code class="docutils literal notranslate"><span class="pre">rank3_three_center_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.sparse_rank4_dict"><code class="docutils literal notranslate"><span class="pre">sparse_rank4_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html#qdk_chemistry.migrate._sbt.rank4_rdm_dict"><code class="docutils literal notranslate"><span class="pre">rank4_rdm_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._sparse.html">qdk_chemistry.migrate._sparse module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.from_hdf5_group"><code class="docutils literal notranslate"><span class="pre">from_hdf5_group()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._sparse.html#qdk_chemistry.migrate._sparse.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._wavefunction.html">qdk_chemistry.migrate._wavefunction module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">from_hdf5_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_hdf5_group"><code class="docutils literal notranslate"><span class="pre">from_hdf5_group()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
