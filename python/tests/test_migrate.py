@@ -153,14 +153,18 @@ def _write_old_four_center_h5(group, container_type, restricted, h1, h2, fock, o
 # --------------------------------------------------------------------------- #
 # QPE result
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("fmt", ["json", "hdf5"])
-def test_qpe_result(tmp_path, fmt):
-    suffix = "json" if fmt == "json" else "h5"
-    src = tmp_path / f"qpe_old.qpe_result.{suffix}"
-    dst = tmp_path / f"qpe_new.qpe_result.{suffix}"
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_qpe_result(tmp_path, source_format, output_format):
+    source_suffix = "json" if source_format == "json" else "h5"
+    output_suffix = "json" if output_format == "json" else "h5"
+    src = tmp_path / f"qpe_old.qpe_result.{source_suffix}"
+    dst = tmp_path / f"qpe_new.qpe_result.{output_suffix}"
     old = _old_qpe_result_json()
 
-    if fmt == "json":
+    if source_format == "json":
         src.write_text(json.dumps(old))
     else:
         with h5py.File(src, "w") as handle:
@@ -172,11 +176,14 @@ def test_qpe_result(tmp_path, fmt):
             handle.create_dataset("bits_msb_first", data=old["bits_msb_first"])
 
     migrate.convert_file(src, dst)
-    result = QpeResult.from_file(str(dst), fmt)
+    result = QpeResult.from_file(str(dst), output_format)
 
     expected = {key: value for key, value in old.items() if key != "evolution_time"}
     expected["version"] = "0.2.0"
     assert result.to_json() == expected
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(dst, tmp_path / f"qpe_again.qpe_result.{output_suffix}")
 
 
 # --------------------------------------------------------------------------- #

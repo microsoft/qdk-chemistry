@@ -30,7 +30,6 @@ def from_hdf5_file(path) -> dict:
         old: dict = {
             "_source_version": str(_io.read_attr(handle, "version")),
             "method": _io.read_attr(handle, "method"),
-            "evolution_time": float(_io.read_attr(handle, "evolution_time")),
             "phase_fraction": float(_io.read_attr(handle, "phase_fraction")),
             "phase_angle": float(_io.read_attr(handle, "phase_angle")),
             "canonical_phase_fraction": float(_io.read_attr(handle, "canonical_phase_fraction")),
