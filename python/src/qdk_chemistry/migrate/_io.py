@@ -24,7 +24,7 @@ import numpy as np
 _JSON_SUFFIXES = {".json"}
 _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 
-_TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz")
+_TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz", "qpe_result")
 
 
 def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
@@ -60,7 +60,7 @@ def detect_format(path: Path) -> str:
 
 
 def detect_type(path: Path) -> str:
-    """Return the data type ('orbitals'/'hamiltonian'/'wavefunction'/'ansatz').
+    """Return the data type encoded in a data filename.
 
     Uses the ``name.type.ext`` filename convention (e.g. ``foo.hamiltonian.h5``).
     """
