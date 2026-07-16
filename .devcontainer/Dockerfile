@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y locales && \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    QDK_UARCH=native \
     LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
     PATH=/usr/local/bin:${PATH}
 
@@ -31,6 +30,7 @@ RUN apt-get update && \
     gnupg \
     build-essential \
     cmake \
+    ccache \
     clang \
     pkg-config \
     python3 \
@@ -45,7 +45,6 @@ RUN apt-get update && \
     libgtest-dev \
     libgmock-dev \
     libfmt-dev \
-    libecpint-dev \
     ninja-build \
     gcovr \
     patchelf \
@@ -53,6 +52,11 @@ RUN apt-get update && \
     graphviz \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the memory-/core-aware build parallelism helper. It is used during
+# dependency installation and may also be sourced by development scripts and
+# interactive shells.
+COPY .devcontainer/scripts/parallelism.sh /usr/local/share/qdk/parallelism.sh
 
 # Install C++ dependencies
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
@@ -62,7 +66,7 @@ COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
 # Delete build directory after installation
 ENV KEEP_BUILD_DIR=0
 RUN bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
-     rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
+    rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
@@ -89,3 +93,23 @@ USER $USERNAME
 
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
+
+# Create the Python virtual environment.
+ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
+    PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
+
+RUN python -m venv "$VIRTUAL_ENV" \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
+
+# Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells
+RUN echo "source /usr/local/share/qdk/parallelism.sh" >> ~/.bashrc
+
+# Set ENV variables for the container environment.
+# Override in shell (per-session) or devcontainer.json (persistent), if needed.
+#   CMAKE_PREFIX_PATH - Make user-local C++ installations discoverable
+#   QDK_UARCH         - default to native architecture for QDK builds
+#   CMAKE_BUILD_TYPE  - default CMake build type
+ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local \
+    QDK_UARCH=native \
+    CMAKE_BUILD_TYPE=RelWithDebInfo

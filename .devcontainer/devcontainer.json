@@ -20,15 +20,12 @@
                 "ms-toolsai.jupyter"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
-                "python.formatting.provider": "none",
+                "python.defaultInterpreterPath": "${containerEnv:VIRTUAL_ENV}/bin/python",
                 "editor.formatOnSave": true,
                 "editor.codeActionsOnSave": {
-                    "source.fixAll.ruff": true,
-                    "source.organizeImports.ruff": true
+                    "source.fixAll.ruff": "explicit",
+                    "source.organizeImports.ruff": "explicit"
                 },
-                "python.linting.enabled": true,
-                "python.linting.lintOnSave": true,
                 "[python]": {
                     "editor.defaultFormatter": "charliermarsh.ruff",
                     "editor.formatOnSave": true,
@@ -55,16 +52,25 @@
                 "C_Cpp.codeAnalysis.clangTidy.runAutomatically": true,
                 "C_Cpp.formatting": "clangFormat",
                 "C_Cpp.clang_format_style": "file",
-                "C_Cpp.clang_format_fallbackStyle": "Google"
+                "C_Cpp.clang_format_fallbackStyle": "Google",
+                "C_Cpp.default.cppStandard": "c++20",
+                "cmake.buildType": "Debug"
             }
         }
     },
     "features": {
-        "ghcr.io/devcontainers/features/git:1": {}
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        },
+        "ghcr.io/devcontainers/features/rust:1": {
+            "version": "stable",
+            "profile": "default"
+        }
     },
     "remoteEnv": {
         "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
     },
-    "postCreateCommand": "bash .devcontainer/scripts/venv.sh",
+    "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
 }
