@@ -25,18 +25,22 @@ from qdk_chemistry.utils.rpe import (
 # expectation_from_counts
 # --------------------------------------------------------------------------------------------
 def test_expectation_from_counts_all_zero_is_plus_one() -> None:
+    """All-zero outcomes produce the positive control expectation."""
     assert expectation_from_counts({"0": 100}) == 1.0
 
 
 def test_expectation_from_counts_all_one_is_minus_one() -> None:
+    """All-one outcomes produce the negative control expectation."""
     assert expectation_from_counts({"1": 100}) == -1.0
 
 
 def test_expectation_from_counts_balanced_is_zero() -> None:
+    """Balanced outcomes produce a zero control expectation."""
     assert expectation_from_counts({"0": 50, "1": 50}) == 0.0
 
 
 def test_expectation_from_counts_known_ratio() -> None:
+    """An asymmetric count ratio produces the corresponding expectation."""
     assert expectation_from_counts({"0": 75, "1": 25}) == pytest.approx(0.5)
 
 

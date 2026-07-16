@@ -67,7 +67,7 @@ class RobustPhaseEstimationSettings(Settings):
             "target_accuracy",
             "double",
             1e-3,
-            "Target absolute accuracy epsilon on the energy; sets the round count.",
+            "Requested absolute accuracy epsilon on the final energy estimate.",
         )
         self._set_default(
             "base_time",
@@ -83,6 +83,20 @@ class RobustPhaseEstimationSettings(Settings):
             "epsilon_unitary = f * target_accuracy and epsilon_rpe = (1 - f) * target_accuracy. "
             "Use a value in [0, 1); 0.5 splits the budget evenly. Ignored for pure qDRIFT, "
             "which auto-sets f = 0 so the whole budget sizes the RPE ladder.",
+        )
+        self._set_default(
+            "epsilon_rpe",
+            "double",
+            0.0,
+            "Optional explicit RPE energy tolerance. Set together with epsilon_unitary; "
+            "0.0 uses unitary_accuracy_fraction instead.",
+        )
+        self._set_default(
+            "epsilon_unitary",
+            "double",
+            0.0,
+            "Optional explicit dimensionless unitary signal tolerance. Set together with epsilon_rpe; "
+            "0.0 uses unitary_accuracy_fraction instead.",
         )
         self._set_default(
             "energy_correction",
@@ -110,13 +124,15 @@ class RobustPhaseEstimation(PhaseEstimation):
         unitary_accuracy_fraction: float = 0.5,
         energy_correction: str = "auto",
         seed: int = -1,
+        epsilon_rpe: float = 0.0,
+        epsilon_unitary: float = 0.0,
     ):
         """Initialize RobustPhaseEstimation.
 
         Args:
-            target_accuracy: Total target absolute accuracy on the energy. It is
-                split into a unitary-builder budget and an RPE budget via
-                ``unitary_accuracy_fraction``.
+            target_accuracy: Requested absolute accuracy on the final energy.
+                Explicit ``epsilon_rpe`` and ``epsilon_unitary`` values override
+                the fallback split defined by ``unitary_accuracy_fraction``.
             base_time: Base evolution time ``tau``. ``0.0`` selects ``pi/(2*lambda)``.
             unitary_accuracy_fraction: Fraction ``f`` of ``target_accuracy`` given
                 to the unitary builder (``epsilon_unitary = f * target_accuracy``,
@@ -127,6 +143,11 @@ class RobustPhaseEstimation(PhaseEstimation):
             energy_correction: Phase-to-energy map: ``"auto"`` (qDRIFT -> tangent,
                 otherwise linear), ``"linear"``, or ``"qdrift_tangent"``.
             seed: Random seed for the evolution builder (``-1`` for non-deterministic).
+            epsilon_rpe: Optional explicit RPE energy tolerance. Set together
+                with ``epsilon_unitary``; ``0.0`` uses the fraction-based split.
+            epsilon_unitary: Optional explicit dimensionless unitary signal
+                tolerance. Set together with ``epsilon_rpe``; ``0.0`` uses the
+                fraction-based split.
 
         """
         Logger.trace_entering()
@@ -137,6 +158,8 @@ class RobustPhaseEstimation(PhaseEstimation):
         self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
         self._settings.set("energy_correction", energy_correction)
         self._settings.set("seed", seed)
+        self._settings.set("epsilon_rpe", epsilon_rpe)
+        self._settings.set("epsilon_unitary", epsilon_unitary)
 
     def _run_impl(
         self,
@@ -167,18 +190,40 @@ class RobustPhaseEstimation(PhaseEstimation):
         correction = self._select_correction(category)
 
         fraction = min(max(float(self._settings.get("unitary_accuracy_fraction")), 0.0), 1.0)
+        explicit_epsilon_rpe = float(self._settings.get("epsilon_rpe"))
+        explicit_epsilon_unitary = float(self._settings.get("epsilon_unitary"))
+        has_explicit_budget = explicit_epsilon_rpe > 0.0 or explicit_epsilon_unitary > 0.0
+        budget_mode = "fraction"
         if category == "qdrift":
+            if has_explicit_budget:
+                raise ValueError("Explicit epsilon_rpe/epsilon_unitary budgets are not supported for pure qDRIFT.")
             # Pure qDRIFT ignores the unitary-accuracy budget: its depth comes
             # from the per-round num_samples schedule and its systematic bias is
             # removed by the tangent de-biasing map, not by an accuracy target.
             # Route the whole budget to the RPE ladder instead of stranding a
             # share of it on a builder that will not spend it.
             fraction = 0.0
-        epsilon_unitary = fraction * epsilon_total
-        epsilon_rpe = (1.0 - fraction) * epsilon_total
-        if epsilon_rpe <= 0.0:
-            # Degenerate split (fraction == 1): keep the RPE ladder finite.
-            epsilon_rpe = epsilon_total
+        if has_explicit_budget:
+            if explicit_epsilon_rpe <= 0.0 or explicit_epsilon_unitary <= 0.0:
+                raise ValueError("epsilon_rpe and epsilon_unitary must both be positive when set explicitly.")
+            if explicit_epsilon_unitary >= np.sin(np.pi / 3.0):
+                raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
+            propagated_bound = (2.0 / np.pi) * explicit_epsilon_rpe * np.arcsin(explicit_epsilon_unitary)
+            if propagated_bound > epsilon_total * (1.0 + 1e-12):
+                raise ValueError(
+                    "Explicit error budgets do not meet target_accuracy: "
+                    f"(2/pi) * epsilon_rpe * arcsin(epsilon_unitary) = {propagated_bound:.6g} "
+                    f"> {epsilon_total:.6g}."
+                )
+            epsilon_rpe = explicit_epsilon_rpe
+            epsilon_unitary = explicit_epsilon_unitary
+            budget_mode = "explicit"
+        else:
+            epsilon_unitary = fraction * epsilon_total
+            epsilon_rpe = (1.0 - fraction) * epsilon_total
+            if epsilon_rpe <= 0.0:
+                # Degenerate split (fraction == 1): keep the RPE ladder finite.
+                epsilon_rpe = epsilon_total
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
         base_time = self._settings.get("base_time")
@@ -237,6 +282,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             "epsilon_rpe": float(epsilon_rpe),
             "epsilon_unitary": float(epsilon_unitary),
             "unitary_accuracy_fraction": float(fraction),
+            "error_budget_mode": budget_mode,
             "unitary_builder": category,
             "energy_correction": correction,
         }

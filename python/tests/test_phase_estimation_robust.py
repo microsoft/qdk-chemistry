@@ -19,6 +19,8 @@ Two layers:
 from __future__ import annotations
 
 import importlib.util
+import os
+from typing import cast
 
 import numpy as np
 import pytest
@@ -28,6 +30,14 @@ from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.utils.rpe import num_rounds, qdrift_schedule
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+_RANDOMIZED_ACCURACY_MARKS = (
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow randomized accuracy test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    ),
+)
 
 _PAULI = {
     "I": np.eye(2, dtype=complex),
@@ -69,8 +79,9 @@ def _has_robust_stack() -> bool:
 class _FakeSettings:
     """Minimal stand-in for an algorithm Settings object."""
 
-    def __init__(self) -> None:
+    def __init__(self, supported_keys: set[str] | None = None) -> None:
         self._values: dict[str, object] = {}
+        self._supported_keys = frozenset(supported_keys or ())
 
     def set(self, key: str, value: object) -> None:
         self._values[key] = value
@@ -78,8 +89,8 @@ class _FakeSettings:
     def get(self, key: str) -> object:
         return self._values.get(key)
 
-    def has(self, key: str) -> bool:  # noqa: ARG002 - fakes accept any setting
-        return True
+    def has(self, key: str) -> bool:
+        return key in self._supported_keys
 
     def update(self, *args: object) -> None:
         if len(args) == 2:
@@ -98,13 +109,13 @@ class _FakeBuilder:
     """Fake time-evolution builder that records the requested evolution time."""
 
     def __init__(self) -> None:
-        self._settings = _FakeSettings()
+        self._settings = _FakeSettings({"time", "target_accuracy", "seed"})
 
     def settings(self) -> _FakeSettings:
         return self._settings
 
     def run(self, qubit_hamiltonian: object) -> _FakeUnitary:  # noqa: ARG002
-        return _FakeUnitary(float(self._settings.get("time")))
+        return _FakeUnitary(float(cast("float", self._settings.get("time"))))
 
 
 class _FakeExecutorData:
@@ -113,18 +124,19 @@ class _FakeExecutorData:
 
 
 class _FakeHadamardTest:
-    """Fake Hadamard test returning counts for the ideal signal g(t) = e^{-iEt}."""
+    """Fake Hadamard test returning counts for a scaled ideal signal."""
 
-    def __init__(self, energy: float, resolution: int = 2_000_000) -> None:
-        self._settings = _FakeSettings()
+    def __init__(self, energy: float, resolution: int = 2_000_000, signal_factor: complex = 1.0 + 0.0j) -> None:
+        self._settings = _FakeSettings({"test_basis"})
         self._energy = energy
         self._resolution = resolution
+        self._signal_factor = signal_factor
 
     def settings(self) -> _FakeSettings:
         return self._settings
 
     def run(self, state_preparation: object, unitary: _FakeUnitary, shots: int) -> _FakeExecutorData:  # noqa: ARG002
-        signal = np.exp(-1j * self._energy * unitary.time)
+        signal = self._signal_factor * np.exp(-1j * self._energy * unitary.time)
         basis = self._settings.get("test_basis")
         expectation = signal.real if basis == "X" else signal.imag
         n0 = round((1.0 + expectation) / 2.0 * self._resolution)
@@ -132,14 +144,19 @@ class _FakeHadamardTest:
         return _FakeExecutorData({"0": int(n0), "1": int(n1)})
 
 
-def _patch_with_ideal_signal(monkeypatch: pytest.MonkeyPatch, driver: RobustPhaseEstimation, energy: float) -> None:
+def _patch_with_ideal_signal(
+    monkeypatch: pytest.MonkeyPatch,
+    driver: RobustPhaseEstimation,
+    energy: float,
+    signal_factor: complex = 1.0 + 0.0j,
+) -> None:
     """Replace the driver's nested-algorithm factory with ideal-signal fakes."""
 
     def fake_create_nested(setting_key: str):
         if setting_key == "unitary_builder":
             return _FakeBuilder()
         if setting_key == "hadamard_test":
-            return _FakeHadamardTest(energy)
+            return _FakeHadamardTest(energy, signal_factor=signal_factor)
         raise KeyError(setting_key)
 
     monkeypatch.setattr(driver, "_create_nested", fake_create_nested)
@@ -176,7 +193,7 @@ def test_driver_uses_explicit_base_time(monkeypatch: pytest.MonkeyPatch) -> None
 
     result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
     assert result.resolved_energy == pytest.approx(energy, abs=1e-3)
-    assert result.evolution_time == pytest.approx(np.pi / 4)
+    assert result.metadata["base_time"] == pytest.approx(np.pi / 4)
 
 
 def test_robust_phase_estimation_name() -> None:
@@ -194,22 +211,44 @@ def test_energy_correction_auto_selection() -> None:
     assert forced._select_correction("partial_randomized") == "qdrift_tangent"
 
 
-def test_budget_split_drives_rounds_and_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The RPE round count uses epsilon_rpe and both budgets are recorded in metadata."""
+def test_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit RPE and unitary tolerances yield the requested deterministic bound."""
+    epsilon_total = 0.1
+    epsilon_unitary = 0.5
+    epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
+    energy = 0.3
+    phase_error = np.arcsin(epsilon_unitary)
+    signal_factor = np.sqrt(1.0 - epsilon_unitary**2) * np.exp(1j * phase_error)
+
     hamiltonian = QubitHamiltonian(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
-    driver = RobustPhaseEstimation(target_accuracy=1e-2, unitary_accuracy_fraction=0.25, energy_correction="linear")
-    _patch_with_ideal_signal(monkeypatch, driver, 0.3)
+    driver = RobustPhaseEstimation(
+        target_accuracy=epsilon_total,
+        epsilon_rpe=epsilon_rpe,
+        epsilon_unitary=epsilon_unitary,
+        energy_correction="linear",
+    )
+    _patch_with_ideal_signal(monkeypatch, driver, energy, signal_factor)
 
     result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
     metadata = result.metadata
     lambda_norm = 1.0  # |0.5| + |0.5|
-    assert metadata["epsilon_unitary"] == pytest.approx(0.25e-2)
-    assert metadata["epsilon_rpe"] == pytest.approx(0.75e-2)
-    assert metadata["unitary_accuracy_fraction"] == pytest.approx(0.25)
+    final_round = num_rounds(lambda_norm, epsilon_rpe)
+    base_time = np.pi / (2.0 * lambda_norm)
+    final_time = (2**final_round) * base_time
+    exact_energy_bound = phase_error / final_time
+    propagated_energy_bound = (2.0 / np.pi) * epsilon_rpe * phase_error
+
+    assert abs(signal_factor - 1.0) == pytest.approx(epsilon_unitary)
+    assert metadata["epsilon_unitary"] == pytest.approx(epsilon_unitary)
+    assert metadata["epsilon_rpe"] == pytest.approx(epsilon_rpe)
+    assert metadata["error_budget_mode"] == "explicit"
     assert metadata["energy_correction"] == "linear"
-    assert metadata["unitary_builder"] == "partial_randomized"  # the fake settings expose num_random_samples
+    assert metadata["unitary_builder"] == "deterministic_or_exact"
     # Round count is sized from epsilon_rpe, not the full target_accuracy.
-    assert metadata["num_rounds"] == num_rounds(lambda_norm, 0.75e-2) + 1
+    assert metadata["num_rounds"] == final_round + 1
+    assert abs(result.resolved_energy - energy) == pytest.approx(exact_energy_bound, rel=1e-3)
+    assert propagated_energy_bound == pytest.approx(epsilon_total)
+    assert exact_energy_bound <= propagated_energy_bound
 
 
 def test_partial_builder_receives_unitary_budget(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -224,14 +263,14 @@ def test_partial_builder_receives_unitary_budget(monkeypatch: pytest.MonkeyPatch
         """Fake builder that classifies as partial and records each round's settings."""
 
         def __init__(self) -> None:
-            self._settings = _FakeSettings()
+            self._settings = _FakeSettings({"time", "target_accuracy", "seed", "num_random_samples"})
 
         def settings(self) -> _FakeSettings:
             return self._settings
 
         def run(self, qubit_hamiltonian: object) -> _FakeUnitary:  # noqa: ARG002
             records.append(dict(self._settings._values))
-            return _FakeUnitary(float(self._settings.get("time")))
+            return _FakeUnitary(float(cast("float", self._settings.get("time"))))
 
     def fake_create_nested(setting_key: str):
         if setting_key == "unitary_builder":
@@ -255,7 +294,7 @@ def test_partial_builder_receives_unitary_budget(monkeypatch: pytest.MonkeyPatch
     # round's evolution time, every one seeded independently.
     builds_by_time: dict[float, list[dict[str, object]]] = {}
     for record in records:
-        builds_by_time.setdefault(float(record["time"]), []).append(record)
+        builds_by_time.setdefault(float(cast("float", record["time"])), []).append(record)
     for round_index in range(total + 1):
         round_time = (2**round_index) * tau
         round_builds = builds_by_time.get(round_time)
@@ -321,6 +360,41 @@ def test_sample_signal_randomized_nondeterministic_seed(monkeypatch: pytest.Monk
 _NONCOMMUTING_PAULIS = ["ZI", "XI", "IZ", "ZZ"]
 _NONCOMMUTING_COEFFS = [1.0, 0.8, 0.5, 0.3]
 
+_H2_STO3G_PAULIS = [
+    "ZIZI",
+    "YYYY",
+    "XXYY",
+    "IIII",
+    "XXXX",
+    "IIIZ",
+    "IZII",
+    "IIZI",
+    "ZIII",
+    "ZIIZ",
+    "IIZZ",
+    "IZZI",
+    "ZZII",
+    "IZIZ",
+    "YYXX",
+]
+_H2_STO3G_COEFFS = [
+    0.19176479,
+    0.04104867,
+    0.04104867,
+    -0.5734373,
+    0.04104867,
+    0.23708567,
+    0.23708567,
+    -0.46083546,
+    -0.46083546,
+    0.18168163,
+    0.14063296,
+    0.18168163,
+    0.14063296,
+    0.18454294,
+    0.04104867,
+]
+
 
 def _noncommuting_ground_state_problem() -> tuple[QubitHamiltonian, np.ndarray, float]:
     """Return (H, ground eigenvector, ground energy) for a non-commuting 2-qubit H.
@@ -331,6 +405,14 @@ def _noncommuting_ground_state_problem() -> tuple[QubitHamiltonian, np.ndarray, 
     """
     hamiltonian = QubitHamiltonian(pauli_strings=_NONCOMMUTING_PAULIS, coefficients=_NONCOMMUTING_COEFFS)
     dense = _dense_from_pauli(_NONCOMMUTING_PAULIS, _NONCOMMUTING_COEFFS)
+    eigenvalues, eigenvectors = np.linalg.eigh(dense)
+    return hamiltonian, eigenvectors[:, 0], float(eigenvalues[0])
+
+
+def _h2_sto3g_ground_state_problem() -> tuple[QubitHamiltonian, np.ndarray, float]:
+    """Return the repository's 4-qubit H2/STO-3G Hamiltonian and exact ground state."""
+    hamiltonian = QubitHamiltonian(pauli_strings=_H2_STO3G_PAULIS, coefficients=_H2_STO3G_COEFFS)
+    dense = np.asarray(hamiltonian.to_matrix(sparse=False), dtype=complex)
     eigenvalues, eigenvectors = np.linalg.eigh(dense)
     return hamiltonian, eigenvectors[:, 0], float(eigenvalues[0])
 
@@ -378,8 +460,20 @@ def _classical_signal_sampler(ground_vector: np.ndarray):
     ("builder_name", "builder_kwargs", "expected_category", "expected_correction"),
     [
         ("trotter", {"order": 2}, "deterministic_or_exact", "linear"),
-        ("qdrift", {}, "qdrift", "qdrift_tangent"),
-        ("partially_randomized", {"weight_threshold": 0.5, "trotter_order": 2}, "partial_randomized", "linear"),
+        pytest.param(
+            "qdrift",
+            {},
+            "qdrift",
+            "qdrift_tangent",
+            marks=_RANDOMIZED_ACCURACY_MARKS,
+        ),
+        pytest.param(
+            "partially_randomized",
+            {"weight_threshold": 0.5, "trotter_order": 2, "num_random_samples": 1},
+            "partial_randomized",
+            "linear",
+            marks=_RANDOMIZED_ACCURACY_MARKS,
+        ),
     ],
 )
 def test_robust_qpe_within_target_accuracy_classical_signal(
@@ -423,6 +517,81 @@ def test_robust_qpe_within_target_accuracy_classical_signal(
     assert result.resolved_energy == pytest.approx(ground_energy, abs=epsilon)
     assert result.metadata["unitary_builder"] == expected_category
     assert result.metadata["energy_correction"] == expected_correction
+
+
+@pytest.mark.parametrize(
+    ("epsilon_total", "epsilon_unitary"),
+    [(0.1, 0.5), (1e-3, 0.5)],
+    ids=["tenth-hartree", "one-millihartree"],
+)
+def test_product_budget_bounds_noncommuting_trotter_ground_energy(
+    monkeypatch: pytest.MonkeyPatch, epsilon_total: float, epsilon_unitary: float
+) -> None:
+    """Product budgets bound real order-2 Trotter ground-energy estimates."""
+    from qdk_chemistry.data import AlgorithmRef  # noqa: PLC0415
+
+    epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
+    hamiltonian, ground_vector, ground_energy = _noncommuting_ground_state_problem()
+    lambda_norm = float(np.sum(np.abs(_NONCOMMUTING_COEFFS)))
+
+    driver = RobustPhaseEstimation(
+        target_accuracy=epsilon_total,
+        epsilon_rpe=epsilon_rpe,
+        epsilon_unitary=epsilon_unitary,
+        energy_correction="linear",
+    )
+    driver.settings().set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2))
+    monkeypatch.setattr(driver, "_sample_signal", _classical_signal_sampler(ground_vector))
+
+    result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
+
+    final_round = num_rounds(lambda_norm, epsilon_rpe)
+    base_time = np.pi / (2.0 * lambda_norm)
+    final_time = (2**final_round) * base_time
+    ladder_bound = np.arcsin(epsilon_unitary) / final_time
+    product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)
+    energy_error = abs(result.resolved_energy - ground_energy)
+
+    assert result.metadata["num_rounds"] == final_round + 1
+    assert result.metadata["unitary_builder"] == "deterministic_or_exact"
+    assert result.metadata["error_budget_mode"] == "explicit"
+    assert product_bound == pytest.approx(epsilon_total)
+    assert energy_error <= ladder_bound <= epsilon_total
+
+
+def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The explicit product budget reaches one millihartree on H2/STO-3G."""
+    from qdk_chemistry.data import AlgorithmRef  # noqa: PLC0415
+
+    epsilon_total = 1e-3
+    epsilon_unitary = 0.5
+    epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
+    hamiltonian, ground_vector, ground_energy = _h2_sto3g_ground_state_problem()
+    lambda_norm = float(np.sum(np.abs(_H2_STO3G_COEFFS)))
+
+    driver = RobustPhaseEstimation(
+        target_accuracy=epsilon_total,
+        epsilon_rpe=epsilon_rpe,
+        epsilon_unitary=epsilon_unitary,
+        energy_correction="linear",
+    )
+    driver.settings().set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2))
+    monkeypatch.setattr(driver, "_sample_signal", _classical_signal_sampler(ground_vector))
+
+    result = driver.run(state_preparation=object(), qubit_hamiltonian=hamiltonian)
+
+    final_round = num_rounds(lambda_norm, epsilon_rpe)
+    base_time = np.pi / (2.0 * lambda_norm)
+    final_time = (2**final_round) * base_time
+    ladder_bound = np.arcsin(epsilon_unitary) / final_time
+    product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)
+    energy_error = abs(result.resolved_energy - ground_energy)
+
+    assert result.metadata["num_rounds"] == final_round + 1
+    assert result.metadata["unitary_builder"] == "deterministic_or_exact"
+    assert result.metadata["error_budget_mode"] == "explicit"
+    assert product_bound == pytest.approx(epsilon_total)
+    assert energy_error <= ladder_bound <= epsilon_total
 
 
 # =============================================================================
@@ -501,6 +670,11 @@ def test_robust_qpe_deterministic_control_recovers_gse() -> None:
 
 
 @pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the merged Hadamard test (#405)")
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow Q# qDRIFT integration test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
 def test_robust_qpe_qdrift_recovers_gse() -> None:
     """End-to-end qDRIFT run with a high-overlap trial state recovers the GSE within tolerance.
 
