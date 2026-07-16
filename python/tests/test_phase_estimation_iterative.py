@@ -22,6 +22,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -302,51 +303,129 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
 
 
 def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
-    """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state."""
+    """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state.
+
+    H = 0.519 X_0 + Z_0 Z_1 block-diagonalizes on the pairs {|00>, |10>} and
+    {|01>, |11>}. Each block has the form [[+/-1, 0.519], [0.519, -/+1]] with
+    eigenvalues +/- sqrt(1 + 0.519^2) = +/- 1.126659. The trial state
+    0.97|00> + sqrt(1 - 0.97^2)|10> lies entirely in the {|00>, |10>} block and
+    overlaps the E = +1.126659 eigenstate with probability 0.99996.
+
+    Theory (U = e^{-iHt}, t = pi/4, textbook convention phi = (-E t / 2pi) mod 1):
+        phi = (-1.126659 * (pi/4) / 2pi) mod 1 = -1.126659/8 mod 1 = 0.859168
+        6-bit rounding: round(0.859168 * 64) = 55 -> phi = 55/64 = 0.859375
+        MSB-first bits = 110111 = [1, 1, 0, 1, 1, 1]
+        E = -angle(phi)/t with phi folded to (-1/2, 1/2] (55/64 -> -9/64):
+            E = -(2pi * (-9/64)) / (pi/4) = 9/8 = 1.125
+        (nearest point on the 1/8-spaced energy grid to the exact 1.126659)
+    """
     pauli_strings = ["XI", "ZZ"]
     coefficients = [0.519, 1.0]
     state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=float)
+    evolution_time = np.pi / 4
+    num_bits = 6
+
+    # Canonical expectation, computed inline via exact diagonalization of this H.
+    hamiltonian_matrix = pauli_to_dense_matrix(pauli_strings, np.asarray(coefficients)).real
+    eigenvalues, eigenvectors = np.linalg.eigh(hamiltonian_matrix)
+    trial = state_vector / np.linalg.norm(state_vector)
+    dominant = int(np.argmax((eigenvectors.T @ trial) ** 2))
+    dominant_energy = float(eigenvalues[dominant])  # +sqrt(1 + 0.519**2) = 1.126659
+
+    # phi = (-E t / 2pi) mod 1, rounded to num_bits of precision.
+    phase_true = (-dominant_energy * evolution_time / (2 * np.pi)) % 1.0
+    index = round(phase_true * 2**num_bits) % 2**num_bits
+    expected_phase = index / 2**num_bits  # 55/64
+    expected_bits = [(index >> (num_bits - 1 - i)) & 1 for i in range(num_bits)]  # [1, 1, 0, 1, 1, 1]
+
+    # Recover energy from the rounded phase, folding the angle into (-pi, pi].
+    angle = expected_phase * 2 * np.pi
+    if angle > np.pi:
+        angle -= 2 * np.pi
+    expected_energy = -angle / evolution_time  # 1.125
 
     result = _run_iterative_with_parameters(
         pauli_strings,
         coefficients,
         state_vector,
-        evolution_time=np.pi / 4,
-        num_bits=6,
+        evolution_time=evolution_time,
+        num_bits=num_bits,
         shots_per_bit=3,
         seed=_SEED,
     )
 
-    assert list(result.bits_msb_first or []) == [1, 1, 0, 1, 1, 1]
+    assert list(result.bits_msb_first or []) == expected_bits
     assert np.isclose(
-        result.phase_fraction, 55 / 64, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+        result.phase_fraction,
+        expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert np.isclose(result.raw_energy, 1.125, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
+    assert np.isclose(
+        result.raw_energy, expected_energy, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
 
 
 def test_iterative_phase_estimation_second_non_commuting_example() -> None:
-    """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ."""
+    """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ.
+
+    H is symmetric under swapping the two qubits, so it block-diagonalizes into a
+    1-D antisymmetric sector ((|01> - |10>)/sqrt(2), eigenvalue -0.0740) and a 3-D
+    symmetric sector. Exact diagonalization gives eigenvalues
+    {-0.088779, -0.074000, -0.014303, 0.177082}. The trial state
+    (0, 0.47, 0.47, 0.75) (normalized) lies in the symmetric sector and overlaps
+    the ground state E0 = -0.088779 with probability 0.99089.
+
+    Theory (U = e^{-iHt}, t = pi/4, textbook convention phi = (-E t / 2pi) mod 1):
+        phi = (0.088779 / 8) mod 1 = 0.011097
+        11-bit rounding: round(0.011097 * 2048) = 23 -> phi = 23/2048 = 0.011230
+        MSB-first bits = 00000010111 = [0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1]
+        E = -angle(phi)/t = -(2pi * 23/2048) / (pi/4) = -184/2048 = -0.08984375
+    """
     pauli_strings = ["XI", "IX", "ZI", "IZ", "XX", "ZZ"]
     coefficients = [-0.0289, -0.0289, 0.0541, 0.0541, 0.0150, 0.059]
     state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=float)
     state_vector /= np.linalg.norm(state_vector)
+    evolution_time = np.pi / 4
+    num_bits = 11
+
+    hamiltonian_matrix = pauli_to_dense_matrix(pauli_strings, np.asarray(coefficients)).real
+    eigenvalues, eigenvectors = np.linalg.eigh(hamiltonian_matrix)
+    trial = state_vector / np.linalg.norm(state_vector)
+    dominant = int(np.argmax((eigenvectors.T @ trial) ** 2))
+    dominant_energy = float(eigenvalues[dominant])  # ground state = -0.088779
+
+    # phi = (-E t / 2pi) mod 1, rounded to num_bits of precision.
+    phase_true = (-dominant_energy * evolution_time / (2 * np.pi)) % 1.0
+    index = round(phase_true * 2**num_bits) % 2**num_bits
+    expected_phase = index / 2**num_bits  # 23/2048
+    expected_bits = [(index >> (num_bits - 1 - i)) & 1 for i in range(num_bits)]  # [0,0,0,0,0,0,1,0,1,1,1]
+
+    # Recover energy from the rounded phase, folding the angle into (-pi, pi].
+    angle = expected_phase * 2 * np.pi
+    if angle > np.pi:
+        angle -= 2 * np.pi
+    expected_energy = -angle / evolution_time  # -0.08984375
 
     result = _run_iterative_with_parameters(
         pauli_strings,
         coefficients,
         state_vector,
-        evolution_time=np.pi / 4,
-        num_bits=11,
+        evolution_time=evolution_time,
+        num_bits=num_bits,
         shots_per_bit=3,
         seed=_SEED,
     )
 
-    assert list(result.bits_msb_first or []) == [0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1]
+    assert list(result.bits_msb_first or []) == expected_bits
     assert np.isclose(
-        result.phase_fraction, 23 / 2048, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+        result.phase_fraction,
+        expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        result.raw_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+        result.raw_energy, expected_energy, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
     )
 
 
