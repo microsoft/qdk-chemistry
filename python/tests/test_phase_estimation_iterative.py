@@ -104,10 +104,9 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
         E = -angle(phi)/t = -4.75  (angle folded into (-pi, pi])
     """
     hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
-    inv_sqrt2 = 1.0 / np.sqrt(2.0)
     state_vector = np.zeros(2**4, dtype=float)
-    state_vector[int("1000", 2)] = inv_sqrt2
-    state_vector[int("0111", 2)] = -inv_sqrt2
+    state_vector[int("1000", 2)] = 1.0 / np.sqrt(2.0)
+    state_vector[int("0111", 2)] = -1.0 / np.sqrt(2.0)
     state_prep_params = {
         "rowMap": [3, 2, 1, 0],
         "stateVector": state_vector.tolist(),
