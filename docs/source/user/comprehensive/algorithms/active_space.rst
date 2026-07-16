@@ -214,7 +214,7 @@ QDK autoCAS EOS
 
 .. rubric:: Factory name: ``"qdk_autocas_eos"``
 
-Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
+Enhanced orbital selection (EOS) is a variant of the autoCAS algorithm that uses consecutive entropy differences to identify plateau boundaries.
 See :ref:`autoCAS Algorithm <autocas-algorithm-details>` below for a detailed description.
 
 .. note::
