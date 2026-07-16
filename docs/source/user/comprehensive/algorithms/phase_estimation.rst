@@ -12,7 +12,7 @@ Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has sig
 
 QDK/Chemistry supports two types of unitaries for QPE:
 
-- **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = \theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
+- **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = -\theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
 - **Qubitization** — The walk operator :math:`W` constructed via :ref:`LCU block encoding <lcu-builder>`. Energy is recovered as :math:`E = \lambda \cos(\theta)` where :math:`\lambda` is the L1 norm of the Hamiltonian.
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.

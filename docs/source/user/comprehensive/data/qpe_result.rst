@@ -20,7 +20,7 @@ When QPE acts on :math:`U = e^{-iHt}`, the eigenvalues are :math:`e^{-iEt}` and 
 
 .. math::
 
-   E = \frac{2\pi\varphi'}{t}
+   E = -\frac{2\pi\varphi'}{t}
 
 where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`.
 

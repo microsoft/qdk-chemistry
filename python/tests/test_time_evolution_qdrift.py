@@ -622,7 +622,7 @@ class TestQDriftScale:
         """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
         t = 1.5
         energy = 0.3
-        phi = (energy * t / (2 * np.pi)) % 1.0
+        phi = (-energy * t / (2 * np.pi)) % 1.0
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(time=t)
         container = builder.run(hamiltonian).get_container()
