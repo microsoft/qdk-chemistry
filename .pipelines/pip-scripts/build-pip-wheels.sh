@@ -12,6 +12,9 @@ BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
 MAC_BUILD=${10:-OFF}
 
+# Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
+export QDK_CHEMISTRY_RELEASE_BUILD="${QDK_CHEMISTRY_RELEASE_BUILD:-0}"
+
 export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
