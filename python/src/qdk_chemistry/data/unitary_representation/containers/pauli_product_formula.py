@@ -81,7 +81,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
 
-        Convert a measured phase fraction to energy using ``E = angle / t``.
+        For :math:`U(t) = e^{-iHt}` an eigenstate with energy :math:`E` acquires
+        phase :math:`e^{-iEt}`, so QPE measures :math:`\varphi = (-Et / 2\pi) \bmod 1`.
+        Inverting gives ``E = -angle / t``.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
@@ -93,7 +95,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
-        return float(angle / self.scale)
+        return float(-angle / self.scale)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""

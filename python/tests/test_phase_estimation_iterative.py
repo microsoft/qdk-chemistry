@@ -51,10 +51,25 @@ class PhaseEstimationProblem:
 
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
-    """Return the two-qubit phase estimation scenario used in documentation."""
+    """Return a canonical two-qubit phase estimation benchmark.
+
+    Uses ``H = 0.25*XX + 0.5*ZZ``.
+    The prepared state is the exact eigenstate ``(|00> + |11>)/sqrt(2)``
+    with eigenvalue ``E = +0.75``.
+
+    Theory (``U = e^{-iHt}`` with ``t = pi/2``, textbook convention
+    ``phi = (-E t / 2pi) mod 1``):
+        phi = (-0.75 * (pi/2) / 2pi) mod 1 = 13/16 = 0.8125
+        MSB-first bitstring = "1101"
+        E = -angle(phi)/t = +0.75
+    """
     hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
-    state_vector = [0.6, 0.0, 0.0, 0.8]
-    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
+    state_prep_params = {
+        "rowMap": [1, 0],
+        "stateVector": [1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)],
+        "expansionOps": [],
+        "numQubits": 2,
+    }
     factories = QsharpFactoryData(
         program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
     )
@@ -66,8 +81,8 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
         state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
-        expected_bits=[1, 1, 0, 0],
-        expected_phase=0.1875,
+        expected_bits=[1, 1, 0, 1],
+        expected_phase=13 / 16,
         expected_energy=0.75,
         expected_bitstring="1101",
         shots_iterative=3,
@@ -76,11 +91,23 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
-    """Return the four-qubit benchmark used in documentation."""
+    """Return a canonical four-qubit phase estimation benchmark.
+
+    Uses ``H = 0.25*XXXX + 4.5*ZZZZ``.
+    The prepared state is the exact eigenstate
+    ``(|1000> - |0111>)/sqrt(2)`` with eigenvalue ``E = -4.75``.
+
+    Theory (``U = e^{-iHt}`` with ``t = pi/8``, textbook convention
+    ``phi = (-E t / 2pi) mod 1``):
+        phi = (4.75 * (pi/8) / 2pi) mod 1 = 19/64 = 0.296875
+        MSB-first bitstring = "010011"
+        E = -angle(phi)/t = -4.75  (angle folded into (-pi, pi])
+    """
     hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
+    inv_sqrt2 = 1.0 / np.sqrt(2.0)
     state_vector = np.zeros(2**4, dtype=float)
-    state_vector[int("1000", 2)] = 0.8
-    state_vector[int("0111", 2)] = -0.6
+    state_vector[int("1000", 2)] = inv_sqrt2
+    state_vector[int("0111", 2)] = -inv_sqrt2
     state_prep_params = {
         "rowMap": [3, 2, 1, 0],
         "stateVector": state_vector.tolist(),
@@ -98,8 +125,8 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
         state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
         evolution_time=float(np.pi / 8.0),
         num_bits=6,
-        expected_bits=[1, 0, 1, 1, 0, 1],
-        expected_phase=45 / 64,
+        expected_bits=[0, 1, 0, 0, 1, 1],
+        expected_phase=19 / 64,
         expected_energy=-4.75,
         expected_bitstring="010011",
         shots_iterative=3,
@@ -208,35 +235,6 @@ def _run_iterative_with_parameters(
     )
 
 
-def _resolve_phase_ambiguity(
-    phase_fraction: float,
-    evolution_time: float,
-    expected_energy: float,
-) -> tuple[float, float]:
-    """Resolve phase ambiguity due to periodicity by selecting closest energy.
-
-    Args:
-        phase_fraction: Measured phase fraction from QPE.
-        evolution_time: Evolution time used in QPE.
-        expected_energy: Reference energy to resolve ambiguity.
-
-    Returns:
-        Tuple of (resolved phase fraction, resolved energy).
-
-    """
-    phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = []
-    for candidate in phase_fraction_candidates:
-        angle = (candidate % 1.0) * (2 * np.pi)
-        if angle > np.pi:
-            angle -= 2 * np.pi
-        energies.append(angle / evolution_time)
-
-    # Select candidate closest to expected energy
-    index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))
-    return phase_fraction_candidates[index], energies[index]
-
-
 # Parametrize over both qdk_iterative and qiskit_iterative builders
 _builder_params = [
     pytest.param("qdk_iterative", id="qdk_iterative"),
@@ -263,19 +261,16 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(
 ) -> None:
     """Verify the iterative algorithm recovers the expected phase and energy."""
     result = _run_iterative(two_qubit_phase_problem, builder_name, unitary_builder_name)
-    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
-    )
 
     assert list(result.bits_msb_first or []) == two_qubit_phase_problem.expected_bits
     assert np.isclose(
-        resolved_phase,
+        result.phase_fraction,
         two_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        resolved_energy,
+        result.raw_energy,
         two_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
@@ -291,19 +286,16 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
 ) -> None:
     """Validate phase and energy estimates on the documented four-qubit case."""
     result = _run_iterative(four_qubit_phase_problem, builder_name, unitary_builder_name)
-    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
-    )
 
     assert list(result.bits_msb_first or []) == four_qubit_phase_problem.expected_bits
     assert np.isclose(
-        resolved_phase,
+        result.phase_fraction,
         four_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        resolved_energy,
+        result.raw_energy,
         four_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
@@ -326,9 +318,9 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
         seed=_SEED,
     )
 
-    assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 0]
+    assert list(result.bits_msb_first or []) == [1, 1, 0, 1, 1, 1]
     assert np.isclose(
-        result.phase_fraction, 0.140625, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+        result.phase_fraction, 55 / 64, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
     )
     assert np.isclose(result.raw_energy, 1.125, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
 
@@ -350,9 +342,9 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
         seed=_SEED,
     )
 
-    assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]
+    assert list(result.bits_msb_first or []) == [0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1]
     assert np.isclose(
-        result.phase_fraction, 0.988770, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+        result.phase_fraction, 23 / 2048, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
     )
     assert np.isclose(
         result.raw_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
