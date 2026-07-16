@@ -23,9 +23,6 @@ parameters:
 - name: pythonVersion
   type: string
   default: 3.11
-- name: cmakeVersion
-  type: string
-  default: 3.28.3
 - name: hdf5Version
   type: string
   default: 1.13.0
@@ -102,7 +99,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.cmakeVersion }} \
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
@@ -131,7 +127,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.cmakeVersion }} \
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
@@ -151,7 +146,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.cmakeVersion }} \
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
