@@ -62,10 +62,6 @@ parameters:
   - 3.13
   - 3.14
   displayName: Python versions
-- name: publishInternalFeed
-  type: boolean
-  default: false
-  displayName: Publish to Internal Feed
 - name: publishEsrp
   type: boolean
   default: false
@@ -83,6 +79,9 @@ variables:
 - group: QdkChemistry
 - name: ComponentDetection.MaxDetectionThreads
   value: '16'
+# Emit a clean, publishable version (no +local suffix) when publishing to PyPI.
+- name: QDK_CHEMISTRY_RELEASE_BUILD
+  value: ${{ parameters.publishEsrp }}
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
@@ -205,9 +204,7 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
-                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
-                # the wheel is still built and published.
-                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
+                condition: succeeded()
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -231,9 +228,7 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
-                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
-                # the wheel is still built and published.
-                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
+                condition: succeeded()
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
@@ -255,9 +250,7 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
                 runSlowTests: ${{ parameters.runSlowTests }}
-                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
-                # the wheel is still built and published.
-                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
+                condition: succeeded()
 
           # Build - Windows x86_64
           - ${{ if eq(target.os, 'windows') }}:
@@ -275,29 +268,17 @@ extends:
               parameters:
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
-                # Python 3.10 tests temporarily disabled (qre/cirq cannot resolve on 3.10);
-                # the wheel is still built and published.
-                condition: and(succeeded(), ne(variables['pythonVersion'], '3.10'))
+                condition: succeeded()
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
           - ${{ if ne(target.os, 'windows') }}:
             - script: |
                 sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+                if [ -d "$(System.DefaultWorkingDirectory)/python/debug_symbols" ]; then
+                  sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/debug_symbols
+                fi
               displayName: Fix wheel directory ownership
-
-          - task: TwineAuthenticate@1
-            inputs:
-              artifactFeed: $(artifactProject)/$(artifactFeed)
-            displayName: Authenticate to internal feed
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
-
-          - script: |
-              cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              python3 -m pip install twine
-              python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
           # Publishing debug symbols is not supported for macOS
           - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
