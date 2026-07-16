@@ -40,7 +40,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_qiskit_iqpe_model_hamiltonian():
+def test_qiskit_iqpe_model_hamiltonian(initialize_qsharp_base_profile):
     """Execute the non-commuting IQPE sample and validate reported results."""
     repo_root = Path(__file__).resolve().parents[2]
     cmd = [sys.executable, "examples/interoperability/qiskit/iqpe_model_hamiltonian.py"]

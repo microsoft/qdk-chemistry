@@ -16,6 +16,7 @@ except ImportError:
 
 
 def test_default_qdk_interpreter_init():
+    init(target_profile=TargetProfile.Unrestricted)
     sys.modules.pop("qdk_chemistry", None)
     from qdk_chemistry import _QDK_INTERPRETER_PROFILE  # noqa: PLC0415
 
@@ -37,3 +38,14 @@ def test_qdk_interpreter_init_with_target_profile():
     from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
 
     assert getattr(QSHARP_UTILS, "StatePreparation", None) is not None
+
+
+def test_qsharp_utils_switch_between_base_and_adaptive_profiles():
+    """Load the Base-compatible subset, then restore the complete adaptive project."""
+    from qdk_chemistry.utils.qsharp import get_qsharp_utils  # noqa: PLC0415
+
+    base_utils = get_qsharp_utils(target_profile=TargetProfile.Base)
+    assert getattr(base_utils, "StatePreparation", None) is not None
+
+    adaptive_utils = get_qsharp_utils(target_profile=TargetProfile.Adaptive_RIF)
+    assert getattr(adaptive_utils, "SOSSAWalk", None) is not None

@@ -8,8 +8,10 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
     StatePreparation,
@@ -18,7 +20,9 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 )
 
 __all__ = [
+    "AliasSamplingStatePreparation",
     "DensePureStatePreparation",
+    "QROMStatePreparation",
     "SparseIsometryGF2XStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",

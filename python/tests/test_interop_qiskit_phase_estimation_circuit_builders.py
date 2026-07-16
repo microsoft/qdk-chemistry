@@ -157,7 +157,7 @@ class TestQiskitStandardQpeCircuitBuilder:
 class TestQiskitIterativeQpeCircuitBuilder:
     """Tests for the Qiskit iterative phase estimation circuit builder."""
 
-    def test_power_calculation(self) -> None:
+    def test_power_calculation(self, initialize_qsharp_base_profile) -> None:
         """Test that the power calculation is correct for different iterations."""
         hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
         state_prep = QuantumCircuit(1)

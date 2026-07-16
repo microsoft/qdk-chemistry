@@ -72,7 +72,7 @@ class TestPauliSequenceMapperNonControlled:
         assert num_qubits == 2
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_unitary_circuit_matrix(self, simple_unitary):
+    def test_unitary_circuit_matrix(self, simple_unitary, initialize_qsharp_base_profile):
         """Test that the constructed unitary circuit has the expected matrix."""
         mapper = PauliSequenceMapper()
         circuit = mapper.run(simple_unitary)
