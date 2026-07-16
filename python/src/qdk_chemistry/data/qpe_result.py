@@ -204,7 +204,6 @@ class QpeResult(DataClass):
 
         return cls(
             method=method_label,
-            evolution_time=float(evolution_time),
             phase_fraction=phase_fraction,
             phase_angle=phase_angle,
             canonical_phase_fraction=phase_fraction,
