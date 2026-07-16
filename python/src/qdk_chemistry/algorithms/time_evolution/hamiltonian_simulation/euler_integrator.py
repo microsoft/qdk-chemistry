@@ -1,21 +1,13 @@
 r"""Euler integrator for time-dependent Hamiltonian simulation.
 
-This module implements an Euler integrator for solving the time-dependent
-Schrodinger equation i*dU/dt = H(t)*U on a quantum computer.
+This module implements a Hamiltonian simulation algorithm that uses an
+:class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder.EulerEvolutionCircuitBuilder`
+to construct the evolution circuit and then executes it to measure
+observable expectation values.
 
-The integrator divides [0, T] into ``floor(T / dt)`` steps of size dt.  If T
-is not an exact multiple of dt, a final cleanup step of size ``T mod dt`` is
-appended.  At each step
-a :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` evaluates
-the effective Hamiltonian for the interval, which is then Trotterized into a
-quantum circuit.  Per-step unitaries are combined via
-UnitaryContainer.combine, which merges adjacent identical Pauli
-terms at step boundaries.
-
-The default propagator (``magnus``) computes the Magnus-expanded
-Hamiltonian over each interval, giving second-order global accuracy for
-smooth drives.  Other propagators can be substituted via the
-``propagator`` setting.
+The circuit builder handles all time-stepping, propagation, Trotterization,
+and circuit mapping.  This class adds circuit execution and observable
+measurement on top.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -27,22 +19,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from qdk_chemistry.algorithms.propagator.base import Propagator
-from qdk_chemistry.data import (
-    Circuit,
-    EnergyExpectationResult,
-    MeasurementData,
-    QuantumErrorProfile,
-    QubitHamiltonian,
-    TimeDependentQubitHamiltonian,
-    UnitaryRepresentation,
-)
 from qdk_chemistry.utils import Logger
 
 from .base import HamiltonianSimulation, HamiltonianSimulationSettings
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
+    from qdk_chemistry.data import (
+        Circuit,
+        EnergyExpectationResult,
+        MeasurementData,
+        QuantumErrorProfile,
+        QubitOperator,
+        TimeDependentQubitHamiltonian,
+    )
 
 __all__: list[str] = ["EulerIntegrator", "EulerIntegratorSettings"]
 
@@ -58,15 +47,13 @@ class EulerIntegratorSettings(HamiltonianSimulationSettings):
 class EulerIntegrator(HamiltonianSimulation):
     r"""Euler integrator for time-dependent Hamiltonian simulation.
 
-    Solves :math:`i\partial_t U = H(t)\,U` by dividing :math:`[0, T]` into
-    steps of size ``dt``.  At each step a
-    :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` computes
-    the effective Hamiltonian for the interval, which is Trotterized into
-    a quantum circuit.
+    Delegates circuit construction to the configured
+    ``evolution_circuit_builder`` (default: ``EulerEvolutionCircuitBuilder``),
+    then executes the circuit and measures observables.
 
-    The default ``magnus`` propagator integrates the drive function
-    over each interval, giving :math:`O(\Delta t^2)` global accuracy for
-    smooth drives.
+    For resource estimation (without execution), use the
+    ``evolution_circuit_builder`` directly via
+    ``create("evolution_circuit_builder", "euler", ...)``.
 
     """
 
@@ -75,12 +62,11 @@ class EulerIntegrator(HamiltonianSimulation):
         Logger.trace_entering()
         super().__init__()
         self._settings = EulerIntegratorSettings()
-        self._evolution_circuit: Circuit | None = None
 
     def _run_impl(
         self,
         hamiltonian: TimeDependentQubitHamiltonian,
-        observables: list[QubitHamiltonian],
+        observables: list[QubitOperator],
         state_prep: Circuit,
         shots: int = 1000,
         *,
@@ -103,121 +89,19 @@ class EulerIntegrator(HamiltonianSimulation):
             if observable.num_qubits != hamiltonian.num_qubits:
                 raise ValueError("All observables must have the same number of qubits as the Hamiltonian.")
 
-        self._evolution_circuit = self._build_evolution_circuit(hamiltonian, state_prep)
+        circuit = self._build_evolution_circuit(hamiltonian, state_prep)
 
         measurements = []
         for observable in observables:
             measurements.append(
                 self._measure_observable(
-                    circuit=self._evolution_circuit,
+                    circuit=circuit,
                     observable=observable,
                     shots=shots,
                     noise=noise,
                 )
             )
         return measurements
-
-    def _build_evolution_circuit(
-        self,
-        hamiltonian: TimeDependentQubitHamiltonian,
-        state_prep: Circuit,
-    ) -> Circuit:
-        """Construct the combined evolution circuit.
-
-        The interval ``[0, total_time]`` is divided into steps of size
-        ``dt``.  At each step the propagator evaluates the effective
-        Hamiltonian for the interval and the builder Trotterizes it.
-        The resulting per-step unitaries are combined via
-        :meth:`UnitaryContainer.combine`, which merges
-        adjacent identical Pauli terms at step boundaries.
-
-        Args:
-            hamiltonian: Time-dependent Hamiltonian.
-            state_prep: Circuit that prepares the initial state.
-
-        Returns:
-            The combined state-prep + evolution circuit.
-
-        """
-        total_time: float = self._settings.get("total_time")
-        evolution = self._build_time_dependent_evolution(hamiltonian, total_time)
-        circuit = self._map_time_evolution_to_circuit(evolution)
-        return self._prepend_state_prep_circuit(state_prep, circuit, hamiltonian.num_qubits)
-
-    def _build_time_dependent_evolution(
-        self,
-        hamiltonian: TimeDependentQubitHamiltonian,
-        total_time: float,
-    ) -> UnitaryRepresentation:
-        r"""Build the combined unitary via Euler steps.
-
-        Divides :math:`[0, T]` into steps of size ``dt``.  The number of
-        full steps is ``floor(T / dt)``.  If ``T`` is not an exact multiple
-        of ``dt``, a final cleanup step of size ``T mod dt`` is appended.
-        Raises ``ValueError`` if ``dt > T``.
-
-        Args:
-            hamiltonian: The time-dependent qubit Hamiltonian.
-            total_time: Total evolution time.
-
-        Returns:
-            Combined ``UnitaryRepresentation`` for the full evolution.
-
-        """
-        dt: float = self._settings.get("dt")
-        if total_time == 0.0:
-            raise ValueError("total_time must be nonzero.")
-        if dt == 0.0:
-            raise ValueError(f"dt ({dt}) must be nonzero.")
-        if dt / total_time > 1:
-            raise ValueError(f"dt ({dt}) must match not exceed total_time ({total_time}).")
-        if dt / total_time < 0:
-            raise ValueError(f"dt ({dt}) must match the sign of total_time ({total_time}).")
-
-        num_full_steps = int(total_time / dt)
-        residual = total_time - num_full_steps * dt
-
-        combined_container: UnitaryContainer | None = None
-        propagator = self._create_nested("propagator")
-        if not isinstance(propagator, Propagator):
-            raise TypeError(f"propagator must be a Propagator, got {type(propagator).__name__}.")
-        for i in range(num_full_steps):
-            t_start = i * dt
-            t_end = (i + 1) * dt
-            h_snapshot = propagator.run(hamiltonian, t_start, t_end)
-            step_evolution = self._create_time_step_evolution(h_snapshot, dt)
-            time_step_container = step_evolution.get_container()
-            if combined_container is None:
-                combined_container = time_step_container
-            else:
-                combined_container = combined_container.combine(time_step_container)
-
-        if residual > 0.0:
-            t_start = num_full_steps * dt
-            t_end = total_time
-            h_snapshot = propagator.run(hamiltonian, t_start, t_end)
-            step_evolution = self._create_time_step_evolution(h_snapshot, residual)
-            time_step_container = step_evolution.get_container()
-            if combined_container is None:
-                combined_container = time_step_container
-            else:
-                combined_container = combined_container.combine(time_step_container)
-
-        return UnitaryRepresentation(container=combined_container)
-
-    def get_circuit(self) -> Circuit:
-        """Get the evolution circuit generated during algorithm execution.
-
-        Returns:
-            The evolution circuit.
-
-        Raises:
-            ValueError: If no evolution circuit has been generated.
-
-        """
-        if self._evolution_circuit is not None:
-            return self._evolution_circuit
-        raise ValueError("No evolution circuit has been generated. Please run the algorithm first.")
 
     def name(self) -> str:
         """Return ``euler_integrator`` as the algorithm name."""

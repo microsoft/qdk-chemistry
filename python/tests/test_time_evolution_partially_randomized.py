@@ -19,7 +19,8 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import LatticeGraph, QubitHamiltonian
+from qdk_chemistry.data import LatticeGraph, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
@@ -137,10 +138,23 @@ class TestPartiallyRandomizedBasics:
 class TestPartiallyRandomizedConstruction:
     """Tests for PartiallyRandomized time evolution construction."""
 
+    def test_returns_unitary_representation(self):
+        """Test that run returns a UnitaryRepresentation."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
+            coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
+        )
+        builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
+
+        assert isinstance(unitary, UnitaryRepresentation)
+        container = unitary.get_container()
+        assert isinstance(container, PauliProductFormulaContainer)
+
     def test_second_order_structure(self):
         """Test that second-order Trotter has symmetric structure."""
         # Create Hamiltonian with clear weight separation
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z", "Y"],
             coefficients=[1.0, 0.1, 0.05],  # X is deterministic, Y and Z are random
         )
@@ -169,7 +183,7 @@ class TestPartiallyRandomizedConstruction:
 
     def test_first_order_structure(self):
         """Test that first-order Trotter has non-symmetric structure."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z", "Y"],
             coefficients=[1.0, 0.1, 0.05],
         )
@@ -194,7 +208,7 @@ class TestPartiallyRandomizedConstruction:
 
     def test_reproducible_with_seed(self):
         """Test that results are reproducible when using a seed."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
@@ -219,7 +233,7 @@ class TestPartiallyRandomizedSplitting:
 
     def test_split_by_weight_threshold_explicit(self):
         """Test splitting with explicit weight_threshold."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
@@ -247,7 +261,7 @@ class TestPartiallyRandomizedSplitting:
 
     def test_split_by_weight_threshold_first_order(self):
         """Test splitting with weight_threshold using first-order Trotter."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
@@ -269,7 +283,7 @@ class TestPartiallyRandomizedSplitting:
     def test_default_splitting(self):
         """Test default splitting (top 10% by weight)."""
         # Create Hamiltonian with 10 terms - all 2-qubit strings
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "YI", "ZI", "XX", "YY", "ZZ", "XY", "XZ", "YZ", "IZ"],
             coefficients=[1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
         )
@@ -294,7 +308,7 @@ class TestPartiallyRandomizedRandomPart:
 
     def test_random_samples_use_lambda_r(self):
         """Test that random samples use λ_R (weight of random terms only)."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z"],
             coefficients=[0.8, 0.2],  # X deterministic, Z random
         )
@@ -327,7 +341,7 @@ class TestPartiallyRandomizedRandomPart:
 
     def test_all_terms_deterministic(self):
         """Test when all terms are treated deterministically."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z"],
             coefficients=[1.0, 0.5],
         )
@@ -352,7 +366,7 @@ class TestPartiallyRandomizedEdgeCases:
 
     def test_empty_hamiltonian_after_filtering(self):
         """Test handling of Hamiltonian with only negligible terms."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-15])
+        hamiltonian = QubitOperator(pauli_strings=["X"], coefficients=[1e-15])
         builder = PartiallyRandomized(weight_threshold=0.5, num_random_samples=10, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
 
@@ -362,7 +376,7 @@ class TestPartiallyRandomizedEdgeCases:
 
     def test_single_term_hamiltonian(self):
         """Test with a single-term Hamiltonian (all deterministic)."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
+        hamiltonian = QubitOperator(pauli_strings=["X"], coefficients=[1.0])
         builder = PartiallyRandomized(
             weight_threshold=0.5,
             num_random_samples=10,
@@ -381,7 +395,7 @@ class TestPartiallyRandomizedEdgeCases:
 
     def test_rejects_non_hermitian_hamiltonian(self):
         """Test that non-Hermitian Hamiltonians raise an error."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X"],
             coefficients=[1.0 + 0.5j],
         )
@@ -392,7 +406,7 @@ class TestPartiallyRandomizedEdgeCases:
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled correctly."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z", "Y"],
             coefficients=[-1.0, 0.1, -0.05],
         )
@@ -412,7 +426,7 @@ class TestPartiallyRandomizedEdgeCases:
 
     def test_multi_qubit_hamiltonian(self):
         """Test with multi-qubit Pauli strings."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XII", "IZI", "IIY", "XXI", "ZZI", "IXX"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05, 0.01],
         )
@@ -434,7 +448,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_epsilon_zero_preserves_single_step(self):
         """With target_accuracy=0 the builder uses a single sandwich (r=1)."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z", "Y"],
             coefficients=[1.0, 0.1, 0.05],
         )
@@ -452,7 +466,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_resolve_num_divisions_matches_commutator_bound(self):
         """The outer step count r equals the commutator Trotter bound for ε_D."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -473,7 +487,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_resolve_num_divisions_matches_naive_bound(self):
         """The outer step count r equals the naive Trotter bound when selected."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -494,7 +508,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_smaller_epsilon_increases_divisions(self):
         """Tightening ε increases (never decreases) the outer step count r."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -509,13 +523,13 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_time_zero_single_division(self):
         """With ε set but time=0 the builder degenerates to a single step."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = PartiallyRandomized(target_accuracy=0.01, weight_threshold=0.6, time=0.0)
         assert builder._resolve_num_divisions(hamiltonian, 0.0) == 1
 
     def test_all_random_single_division(self):
         """With no deterministic terms there is no Trotter bias, so a single block is built."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         # weight_threshold huge -> all terms random
         builder = PartiallyRandomized(
             target_accuracy=0.01,
@@ -537,7 +551,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_total_random_samples_match_r_times_block(self):
         """Total qDRIFT rotations equal r times the per-step block size (merge disabled)."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -568,7 +582,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_block_samples_match_campbell_bound(self):
         """Per-step block size equals ceil(N_total / r) with N_total from Campbell."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -584,7 +598,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         )
         random_terms = [("XI", 0.4), ("IZ", 0.2)]
         r = builder._resolve_num_divisions(hamiltonian, time)
-        h_random = QubitHamiltonian(pauli_strings=["XI", "IZ"], coefficients=np.array([0.4, 0.2]))
+        h_random = QubitOperator(pauli_strings=["XI", "IZ"], coefficients=np.array([0.4, 0.2]))
         eps_r = math.sqrt(0.5) * eps
         n_total = qdrift_samples_campbell(h_random, time, eps_r, weight_threshold=1e-12)
         expected_block = max(1, math.ceil(n_total / r))
@@ -592,7 +606,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_num_random_samples_acts_as_floor(self):
         """A large num_random_samples floor wins over the Campbell-derived value."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -628,7 +642,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_larger_split_reduces_divisions(self):
         """A larger accuracy_split (looser ε_D) does not increase r."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -644,7 +658,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_reproducible_with_seed_accuracy_aware(self):
         """Two ε-aware builders with the same seed produce identical circuits."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["X", "Z", "Y"],
             coefficients=[1.0, 0.5, 0.4],
         )
@@ -667,7 +681,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         # Three dominant terms + a long tail of tiny terms.
         pauli_strings = ["XX", "YY", "ZZ"] + ["XI", "IX", "IY", "YI", "ZI"] * 4
         coefficients = [10.0, 9.0, 8.0] + [0.001] * 20
-        hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=np.array(coefficients))
+        hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=np.array(coefficients))
         time = 1.0
         builder = PartiallyRandomized(
             target_accuracy=0.01,
@@ -683,7 +697,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
 
     def test_explicit_threshold_overrides_cost_optimal(self):
         """An explicit weight_threshold takes precedence over cost-optimal split."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
             coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
         )
@@ -726,7 +740,7 @@ class TestPartiallyRandomizedOutputAccuracy:
 
     def test_deterministic_limit_within_epsilon(self):
         """All-deterministic split (λ_R=0): exact Trotter stays within ε."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
         time = 0.8
         eps = 0.05
         builder = PartiallyRandomized(
@@ -745,7 +759,7 @@ class TestPartiallyRandomizedOutputAccuracy:
 
     def test_deterministic_limit_error_decreases(self):
         """Tightening ε reduces the deterministic-limit operator-norm error."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
         time = 0.8
 
         def err_at(eps: float) -> float:
@@ -768,7 +782,7 @@ class TestPartiallyRandomizedOutputAccuracy:
     def test_partial_state_trace_within_tolerance(self):
         """Seed-averaged output state stays within a small multiple of ε."""
         # X deterministic; Z and Y random (non-commuting -> genuine qDRIFT noise).
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
         eps = 0.05
         time = 0.5
         err = _partial_state_trace_error(hamiltonian, eps=eps, t=time, weight_threshold=0.6, seeds=range(400))
@@ -777,7 +791,7 @@ class TestPartiallyRandomizedOutputAccuracy:
     @_slow_test
     def test_partial_error_scales_with_epsilon(self):
         """Tightening ε reduces the seed-averaged output-state error."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
         time = 0.5
         seeds = range(400)
         err_loose = _partial_state_trace_error(hamiltonian, eps=0.1, t=time, weight_threshold=0.6, seeds=seeds)
@@ -795,7 +809,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         ever collapses the loop back to a single step, this test fails loudly
         rather than silently degrading to single-sandwich coverage.
         """
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
         eps = 0.01
         time = 1.0
         weight_threshold = 0.6  # X deterministic; Z, Y randomized
@@ -818,7 +832,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         ``H_R = {XX, YY}`` on two qubits, and the parameters also yield
         ``r > 1`` so the multi-step loop is exercised in the multi-qubit case.
         """
-        hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IZ", "XX", "YY"], coefficients=[1.0, 0.8, 0.2, 0.15])
+        hamiltonian = QubitOperator(pauli_strings=["XI", "IZ", "XX", "YY"], coefficients=[1.0, 0.8, 0.2, 0.15])
         eps = 0.02
         time = 0.8
         weight_threshold = 0.5  # H_D = {XI, IZ}, H_R = {XX, YY}
@@ -841,7 +855,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         elsewhere, which only leave Monte-Carlo headroom).  Mirrors the strict
         qDRIFT accuracy tier; uses more seeds to suppress sampling noise.
         """
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
         eps = 0.05
         time = 0.5
         err = _partial_state_trace_error(hamiltonian, eps=eps, t=time, weight_threshold=0.6, seeds=range(500))
@@ -855,7 +869,7 @@ class TestPartiallyRandomizedOutputAccuracy:
         angle followed by the qDRIFT block) against the exact unitary, which the
         order-2 accuracy tests do not cover.
         """
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
         eps = 0.05
         time = 0.5
         err = _partial_state_trace_error(
@@ -940,7 +954,7 @@ class TestPartiallyRandomizedScale:
 
     def test_scale_equals_time(self):
         """Container scale should equal the evolution time."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
         t = 0.6
         builder = PartiallyRandomized(time=t)
         container = builder.run(hamiltonian).get_container()
@@ -951,7 +965,7 @@ class TestPartiallyRandomizedScale:
         t = 1.0
         energy = -0.4
         phi = (energy * t / (2 * np.pi)) % 1.0
-        hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
         builder = PartiallyRandomized(time=t)
         container = builder.run(hamiltonian).get_container()
         assert np.isclose(container.eigenvalue_from_phase(phi), energy, rtol=1e-10, atol=1e-12)

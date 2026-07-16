@@ -3,7 +3,7 @@
 These tests verify that mapping a Hamiltonian stored in a
 :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` or
 :class:`~qdk_chemistry.data.SparseHamiltonianContainer` produces a
-``QubitHamiltonian`` that is numerically equivalent, term-by-term, to the
+``QubitOperator`` that is numerically equivalent, term-by-term, to the
 dense (:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`)
 path for the *same* underlying integrals.  The fast paths never materialize a
 dense N^4 two-body tensor (the C++ ``majorana_map_hamiltonian`` overload taking
@@ -56,7 +56,7 @@ ENCODINGS = ["jordan_wigner", "bravyi_kitaev", "parity"]
 
 
 def _sum_coefficients_by_pauli(qh) -> dict:
-    """Collapse a QubitHamiltonian into a {pauli_string: summed_coefficient} map.
+    """Collapse a QubitOperator into a {pauli_string: summed_coefficient} map.
 
     Coefficients are summed per Pauli string so the comparison is correct even
     if an operator ever emits the same Pauli string in more than one term

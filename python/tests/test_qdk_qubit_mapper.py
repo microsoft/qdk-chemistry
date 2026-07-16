@@ -16,7 +16,7 @@ from qdk_chemistry.data import (
     Hamiltonian,
     MajoranaMapping,
     Orbitals,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
@@ -84,7 +84,7 @@ class TestQdkQubitMapper:
 
         result = mapper.run(hamiltonian, mapping)
 
-        assert isinstance(result, QubitHamiltonian)
+        assert isinstance(result, QubitOperator)
         assert result.num_qubits == 4
         assert len(result.pauli_strings) > 0
         assert len(result.coefficients) == len(result.pauli_strings)
@@ -111,7 +111,7 @@ class TestQdkQubitMapper:
         assert np.isclose(pauli_dict["IZ"].real, -0.5, atol=1e-10)
 
     def test_core_energy_not_included(self) -> None:
-        """Test that core energy is not included in QubitHamiltonian."""
+        """Test that core energy is not included in QubitOperator."""
         mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
@@ -525,7 +525,7 @@ class TestQdkQubitMapper:
         mapping_jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
         result_jw = mapper.run(hamiltonian, mapping_jw)
 
-        def _to_matrix(qh: QubitHamiltonian) -> np.ndarray:
+        def _to_matrix(qh: QubitOperator) -> np.ndarray:
             n = qh.num_qubits
             dim = 2**n
             mat = np.zeros((dim, dim), dtype=complex)
@@ -893,7 +893,7 @@ class TestBravyiKitaevMapper:
 
         result = mapper.run(hamiltonian, mapping)
 
-        assert isinstance(result, QubitHamiltonian)
+        assert isinstance(result, QubitOperator)
         assert result.num_qubits == 4
         assert len(result.pauli_strings) > 0
 
@@ -932,7 +932,7 @@ class TestBravyiKitaevMapper:
         assert np.isclose(bk_dict["ZZ"], -0.5, rtol=1e-10)
 
     def test_bk_core_energy_not_included(self) -> None:
-        """Test that core energy is not included in BK QubitHamiltonian."""
+        """Test that core energy is not included in BK QubitOperator."""
         mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
@@ -1211,7 +1211,7 @@ class TestScbkOneStep:
         np.testing.assert_allclose(eigs_scbk, eigs_exact, atol=1e-10)
 
     def test_standard_mappings_no_tapering(self) -> None:
-        """Standard mappings produce QubitHamiltonian with tapering=None."""
+        """Standard mappings produce QubitOperator with tapering=None."""
         hamiltonian = create_nontrivial_test_hamiltonian()
         n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
 

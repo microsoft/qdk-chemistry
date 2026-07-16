@@ -197,14 +197,17 @@ inline std::shared_ptr<Orbitals> with_active_space(
     const std::shared_ptr<Orbitals> existing,
     const std::vector<size_t>& active_indices,
     const std::vector<size_t>& inactive_indices) {
-  // Get existing data
-  auto [alpha_coeffs, beta_coeffs] = existing->get_coefficients();
+  // Get existing data (access the symmetry-blocked coefficient tensor per spin)
+  auto coefficients = existing->coefficients();
+  const auto& alpha_coeffs =
+      coefficients->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs = coefficients->block({axes::beta(), axes::beta()});
 
   std::optional<Eigen::VectorXd> alpha_energies, beta_energies;
   if (existing->has_energies()) {
-    auto [e_a, e_b] = existing->get_energies();
-    alpha_energies = e_a;
-    beta_energies = e_b;
+    auto energies = existing->energies();
+    alpha_energies = energies->block({axes::alpha()});
+    beta_energies = energies->block({axes::beta()});
   }
 
   std::optional<Eigen::MatrixXd> ao_overlap;
@@ -264,6 +267,24 @@ inline std::shared_ptr<Structure> create_li_structure() {
       {0.000000000, 0.000000000, 0.000000000}};
 
   std::vector<Element> elements = {qdk::chemistry::data::Element::Li};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Creates a LiH structure
+ */
+inline std::shared_ptr<Structure> create_lih_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.000000000, 0.000000000, 0.000000000},
+      {0.000000000, 0.000000000, 1.595000000}};
+
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::Li,
+                                   qdk::chemistry::data::Element::H};
 
   return std::make_shared<Structure>(coords, elements);
 }

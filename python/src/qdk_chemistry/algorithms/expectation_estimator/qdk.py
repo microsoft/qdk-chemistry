@@ -1,4 +1,4 @@
-"""QDK/Chemistry energy estimator abstractions and utilities."""
+"""QDK/Chemistry expectation estimator abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -14,16 +14,16 @@ from qdk_chemistry.data import (
     EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_string_to_masks
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .energy_estimator import EnergyEstimator
+from .expectation_estimator import ExpectationEstimator
 
-__all__: list[str] = ["QdkEnergyEstimator"]
+__all__: list[str] = ["QdkExpectationEstimator"]
 
 
 def _parity(integer: int) -> int:
@@ -165,7 +165,7 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
         )
         from qiskit.quantum_info import Pauli  # noqa: PLC0415
     except ImportError as err:
-        raise ImportError("Qiskit is required to use Qiskit circuits with EnergyEstimator.") from err
+        raise ImportError("Qiskit is required to use Qiskit circuits with ExpectationEstimator.") from err
     base_circuit = base_circuit.get_qiskit_circuit()
     if base_circuit.num_qubits != len(m_basis):
         raise ValueError("Measurement basis length must match the number of qubits in the circuit.")
@@ -184,21 +184,21 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     return Circuit(qasm=qasm3.dumps(qc))
 
 
-class QdkEnergyEstimator(EnergyEstimator):
-    """QDK implementation of the EnergyEstimator."""
+class QdkExpectationEstimator(ExpectationEstimator):
+    """QDK implementation of the ExpectationEstimator."""
 
     def __init__(self):
-        """Initialize the QdkEnergyEstimator."""
+        """Initialize the QdkExpectationEstimator."""
         super().__init__()
 
     def type_name(self) -> str:
-        """Return ``energy_estimator`` as the algorithm type name."""
-        return "energy_estimator"
+        """Return ``expectation_estimator`` as the algorithm type name."""
+        return "expectation_estimator"
 
     def _run_impl(
         self,
         circuit: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
@@ -206,7 +206,7 @@ class QdkEnergyEstimator(EnergyEstimator):
 
         Args:
             circuit: Circuit.
-            qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
+            qubit_hamiltonian: ``QubitOperator`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
 
@@ -217,7 +217,7 @@ class QdkEnergyEstimator(EnergyEstimator):
                 * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
         Note:
-            * Measurement circuits are generated for each QubitHamiltonian term.
+            * Measurement circuits are generated for each QubitOperator term.
             * Parameterized circuits are not supported.
             * Only one circuit is supported per run.
 
@@ -280,11 +280,11 @@ class QdkEnergyEstimator(EnergyEstimator):
         ), measurement_data
 
     @staticmethod
-    def _resolve_measurement_groups(qubit_hamiltonian: QubitHamiltonian) -> list[QubitHamiltonian]:
+    def _resolve_measurement_groups(qubit_hamiltonian: QubitOperator) -> list[QubitOperator]:
         """Resolve the Hamiltonian into simultaneously-measurable groups.
 
         If ``qubit_hamiltonian`` carries a
-        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the
+        :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the
         partition is consumed and each group becomes one measurement circuit.
         The groups must be compatible with the measurement backend — at
         present, each group must be qubit-wise commuting so that a single
@@ -297,7 +297,7 @@ class QdkEnergyEstimator(EnergyEstimator):
             qubit_hamiltonian: The Hamiltonian to partition for measurement.
 
         Returns:
-            A list of ``QubitHamiltonian`` objects, one per measurement group.
+            A list of ``QubitOperator`` objects, one per measurement group.
 
         """
         partition = qubit_hamiltonian.term_partition
@@ -306,11 +306,11 @@ class QdkEnergyEstimator(EnergyEstimator):
 
             if isinstance(partition, FlatPartition):
                 Logger.debug(
-                    f"EnergyEstimator: consuming term_partition "
+                    f"ExpectationEstimator: consuming term_partition "
                     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
                 return [
-                    QubitHamiltonian(
+                    QubitOperator(
                         pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
                         coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
                         encoding=qubit_hamiltonian.encoding,
@@ -320,13 +320,13 @@ class QdkEnergyEstimator(EnergyEstimator):
                 ]
 
             Logger.debug(
-                f"EnergyEstimator: ignoring unsupported partition type "
+                f"ExpectationEstimator: ignoring unsupported partition type "
                 f"{type(partition).__name__}; measuring each term individually."
             )
 
-        Logger.debug("EnergyEstimator: no term_partition; measuring each term individually.")
+        Logger.debug("ExpectationEstimator: no term_partition; measuring each term individually.")
         return [
-            QubitHamiltonian(
+            QubitOperator(
                 pauli_strings=[label],
                 coefficients=np.asarray([coeff]),
                 encoding=qubit_hamiltonian.encoding,
@@ -337,16 +337,16 @@ class QdkEnergyEstimator(EnergyEstimator):
 
     @staticmethod
     def _create_measurement_circuits(
-        circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]
-    ) -> tuple[list[Circuit], list[QubitHamiltonian], float]:
-        """Create measurement circuits for each QubitHamiltonian.
+        circuit: Circuit, grouped_hamiltonians: list[QubitOperator]
+    ) -> tuple[list[Circuit], list[QubitOperator], float]:
+        """Create measurement circuits for each QubitOperator.
 
         Identity-only groups (e.g. ``"IIII"``) are dropped from the circuit
         list and their coefficient sum is returned as an energy offset.
 
         Args:
             circuit: Circuit that provides an OpenQASM3 string of the base circuit.
-            grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.
+            grouped_hamiltonians: List of ``QubitOperator`` grouped in qubit-wise commuting sets.
 
         Returns:
             Tuple of (measurement circuits, corresponding hamiltonians, identity energy offset).
@@ -354,7 +354,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         Logger.trace_entering()
         meas_circuits: list[Circuit] = []
-        meas_hamiltonians: list[QubitHamiltonian] = []
+        meas_hamiltonians: list[QubitOperator] = []
         identity_offset = 0.0
 
         for hamiltonian in grouped_hamiltonians:
@@ -373,14 +373,14 @@ class QdkEnergyEstimator(EnergyEstimator):
 
     @staticmethod
     def _compute_energy_expectation_from_bitstrings(
-        hamiltonians: list[QubitHamiltonian],
+        hamiltonians: list[QubitOperator],
         bitstring_counts_list: list[dict[str, int] | None],
     ) -> EnergyExpectationResult:
-        """Compute total energy expectation value and variance for a QubitHamiltonian.
+        """Compute total energy expectation value and variance for a QubitOperator.
 
         Args:
-            hamiltonians: List of ``QubitHamiltonian`` defining Pauli terms and coefficients.
-            bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitHamiltonian.
+            hamiltonians: List of ``QubitOperator`` defining Pauli terms and coefficients.
+            bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitOperator.
 
         Returns:
             ``EnergyExpectationResult`` containing the energy expectation value and variance.
@@ -446,7 +446,7 @@ class QdkEnergyEstimator(EnergyEstimator):
     def _get_measurement_data(
         self,
         measurement_circuits: list[Circuit],
-        qubit_hamiltonians: list[QubitHamiltonian],
+        qubit_hamiltonians: list[QubitOperator],
         circuit_executor: CircuitExecutor,
         shots_list: list[int],
         noise_model: QuantumErrorProfile | None = None,
@@ -455,13 +455,13 @@ class QdkEnergyEstimator(EnergyEstimator):
 
         Args:
             measurement_circuits: A list of measurement circuits to run.
-            qubit_hamiltonians: A list of ``QubitHamiltonian`` to be evaluated.
+            qubit_hamiltonians: A list of ``QubitOperator`` to be evaluated.
             circuit_executor: An instance of ``CircuitExecutor`` to run the circuits.
             shots_list: A list of shots allocated for each measurement circuit.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
 
         Returns:
-            MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.
+            MeasurementData: Measurement counts paired with their corresponding ``QubitOperator`` objects.
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(

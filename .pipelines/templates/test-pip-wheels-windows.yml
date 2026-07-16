@@ -1,0 +1,22 @@
+parameters:
+- name: pythonVersion
+  type: string
+  default: '3.11'
+- name: runSlowTests
+  type: boolean
+  default: true
+- name: condition
+  type: string
+  default: succeeded()
+
+steps:
+- pwsh: |
+    $ErrorActionPreference = 'Stop'
+    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\test-pip-wheels-windows.ps1" `
+      -SrcDir "$(System.DefaultWorkingDirectory)" `
+      -PythonVersion '${{ parameters.pythonVersion }}' `
+      -RunSlowTests '${{ parameters.runSlowTests }}'
+  displayName: Test wheel (Windows, Python ${{ parameters.pythonVersion }})
+  condition: ${{ parameters.condition }}
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)

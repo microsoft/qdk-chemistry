@@ -13,11 +13,11 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.propagator import MagnusPropagator
-from qdk_chemistry.data import DrivenQubitHamiltonian, QubitHamiltonian
+from qdk_chemistry.data import DrivenQubitHamiltonian, QubitOperator
 
 
-def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitHamiltonian:
-    return QubitHamiltonian(labels, np.array(weights))
+def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitOperator:
+    return QubitOperator(labels, np.array(weights))
 
 
 class TestTimeAveragedPropagatorDriven:
@@ -71,7 +71,7 @@ class TestTimeAveragedPropagatorDriven:
         result = propagator.run(td, 0.0, 2.0 * math.pi)
 
         # f_avg should be ~0 → only H0 terms remain
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
+        def _to_dict(h: QubitOperator) -> dict[str, complex]:
             return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
 
         expected_dict = _to_dict(h0)
@@ -146,19 +146,26 @@ class TestTimeAveragedPropagatorValidation:
 class TestTimeAveragedPropagatorRegistry:
     """Test that the propagator can be created through the registry."""
 
-    def test_create_via_registry(self):
+    def test_can_create_via_registry(self):
         """The magnus propagator should be available through create()."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
         prop = registry.create("propagator", "magnus")
         assert prop.name() == "magnus"
 
-    def test_create_default(self):
+    def test_can_create_default(self):
         """Default propagator should be magnus."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
         prop = registry.create("propagator")
         assert prop.name() == "magnus"
+
+    def test_can_create_with_settings(self):
+        """Test that MagnusPropagator can be created with custom settings."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        prop = registry.create("propagator", "magnus", order=2)
+        assert prop.settings().get("order") == 2
 
 
 class TestMagnusOrder2:
@@ -185,13 +192,6 @@ class TestMagnusOrder2:
         prop.settings().set("order", 3)
         with pytest.raises(NotImplementedError, match="not yet implemented"):
             prop.run(td, 0.0, 1.0)
-
-    def test_order_setting_via_registry(self):
-        """Order should be configurable through the registry create kwargs."""
-        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
-
-        prop = registry.create("propagator", "magnus", order=2)
-        assert prop.settings().get("order") == 2
 
 
 # Higher-order Magnus convergence tests removed — order > 1 is not yet implemented.

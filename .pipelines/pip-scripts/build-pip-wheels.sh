@@ -6,15 +6,29 @@ PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
 BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
-CMAKE_VERSION=${6:-3.28.3}
-HDF5_VERSION=${7:-1.13.0}
-BLIS_VERSION=${8:-2.0}
-LIBFLAME_VERSION=${9:-5.2.0}
-MAC_BUILD=${10:-OFF}
+HDF5_VERSION=${6:-1.13.0}
+BLIS_VERSION=${7:-2.0}
+LIBFLAME_VERSION=${8:-5.2.0}
+MAC_BUILD=${9:-OFF}
+
+# Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
+export QDK_CHEMISTRY_RELEASE_BUILD="${QDK_CHEMISTRY_RELEASE_BUILD:-0}"
 
 export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
+
+    # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    _cfs_apt_redirect() {
+        sed -i \
+            -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.archive.ubuntu.com/ubuntu|g' \
+            "$1"
+    }
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && _cfs_apt_redirect /etc/apt/sources.list.d/ubuntu.sources
+    [ -f /etc/apt/sources.list ]                  && _cfs_apt_redirect /etc/apt/sources.list
+
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
@@ -22,11 +36,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     apt-get update -q
     apt-get install -y -q libc-bin
 
-    # Update and install dependencies
+    # Update and install dependencies.
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
         build-essential \
+        cmake \
         curl \
         gcc g++ \
         git \
@@ -60,20 +75,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         wget \
         xz-utils \
         zlib1g-dev
-
-    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    rm cmake-${CMAKE_VERSION}.tar.gz
-    cd cmake-${CMAKE_VERSION}
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make --silent -j$(nproc)
-    make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}
     cmake --version
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
@@ -83,7 +84,20 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     echo "Downloading and installing libflame..."
     bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+
 elif [ "$MAC_BUILD" == "ON" ]; then
+    # --- Apple Silicon Rosetta self-heal -----------------------------------------
+    # If this script is running under Rosetta on a genuinely arm64 machine, re-exec
+    # it natively so the whole build tree (conda/python/cmake/clang) is arm64.
+    # Uses sysctl (reliable under translation) instead of `uname -m` (which lies).
+    if [ "$(uname -s)" = "Darwin" ] \
+    && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ] \
+    && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
+        echo "Detected Rosetta on Apple Silicon; re-executing natively as arm64..."
+        exec arch -arm64 /bin/bash "$0" "$@"
+    fi
+    # -----------------------------------------------------------------------------
+
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \

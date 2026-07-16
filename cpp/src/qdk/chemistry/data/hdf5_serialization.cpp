@@ -187,9 +187,11 @@ void save_vector_to_group(H5::Group& group, const std::string& dataset_name,
   if (!vector.empty()) {
     hsize_t dims[1] = {vector.size()};
     H5::DataSpace dataspace(1, dims);
+    // Windows LLP64: unsigned long is 4 bytes, so use NATIVE_UINT64 for size_t.
+    static_assert(sizeof(size_t) == 8);
     H5::DataSet dataset = group.createDataSet(
-        dataset_name, H5::PredType::NATIVE_ULONG, dataspace);
-    dataset.write(vector.data(), H5::PredType::NATIVE_ULONG);
+        dataset_name, H5::PredType::NATIVE_UINT64, dataspace);
+    dataset.write(vector.data(), H5::PredType::NATIVE_UINT64);
   }
 }
 
@@ -225,7 +227,8 @@ std::vector<size_t> load_size_vector_from_group(
   hsize_t dims[1];
   dataspace.getSimpleExtentDims(dims);
   std::vector<size_t> vector(dims[0]);
-  dataset.read(vector.data(), H5::PredType::NATIVE_ULONG);
+  static_assert(sizeof(size_t) == 8);
+  dataset.read(vector.data(), H5::PredType::NATIVE_UINT64);
   return vector;
 }
 

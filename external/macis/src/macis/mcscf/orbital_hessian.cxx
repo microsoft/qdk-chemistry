@@ -110,7 +110,7 @@ void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
                               const double* OG, const double* K_lin,
                               double* HK_lin) {
   const size_t no = norb.get();
-  const size_t na = nact.get();
+  [[maybe_unused]] const size_t na = nact.get();
   const size_t no2 = no * no;
   const size_t no4 = no2 * no2;
   const size_t orb_rot_sz =
