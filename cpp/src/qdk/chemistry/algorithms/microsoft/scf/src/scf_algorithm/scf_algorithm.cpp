@@ -238,26 +238,36 @@ SCFAlgorithm::build_rohf_convergence_matrices(const SCFImpl& scf_impl) {
   const auto nelec_vec = scf_impl.get_num_electrons();
   build_rohf_f_p_matrix(
       scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-      scf_impl.get_density_matrix(), nelec_vec[0], nelec_vec[1],
-      rohf_effective_fock_, rohf_total_density_);
+      scf_impl.get_density_matrix(), scf_impl.overlap(), nelec_vec[0],
+      nelec_vec[1], rohf_effective_fock_, rohf_total_density_);
 
   return {get_rohf_convergence_fock_matrix(),
           get_rohf_convergence_density_matrix()};
 }
 
-void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
-                                         const RowMajorMatrix& C,
-                                         const RowMajorMatrix& P,
-                                         int nelec_alpha, int nelec_beta,
-                                         RowMajorMatrix& effective_fock,
-                                         RowMajorMatrix& total_density) {
+void SCFAlgorithm::build_rohf_f_p_matrix(
+    const RowMajorMatrix& F, const RowMajorMatrix& C, const RowMajorMatrix& P,
+    const RowMajorMatrix& S, int nelec_alpha, int nelec_beta,
+    RowMajorMatrix& effective_fock, RowMajorMatrix& total_density) {
   QDK_LOG_TRACE_ENTERING();
   const int num_atomic_orbitals = static_cast<int>(C.rows());
   const int num_molecular_orbitals = static_cast<int>(C.cols());
-  if (num_atomic_orbitals != num_molecular_orbitals) {
+  // Linear-dependency removal may yield nMO < nAO; nMO > nAO is always wrong.
+  if (num_molecular_orbitals > num_atomic_orbitals) {
     throw std::invalid_argument(
-        "ROHF build requires number of atomic orbitals to equal number of "
-        "molecular orbitals!");
+        "ROHF build: number of molecular orbitals cannot exceed number of "
+        "atomic orbitals!");
+  }
+  if (S.rows() != num_atomic_orbitals || S.cols() != num_atomic_orbitals) {
+    throw std::invalid_argument(
+        "ROHF build: overlap matrix S must be square with dimension equal "
+        "to the number of atomic orbitals!");
+  }
+  if (nelec_alpha > num_molecular_orbitals ||
+      nelec_beta > num_molecular_orbitals) {
+    throw std::invalid_argument(
+        "ROHF build: electron counts exceed the number of molecular "
+        "orbitals; nd/ns/nv block indices would be out of bounds!");
   }
 
   total_density =
@@ -324,42 +334,51 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   copy_block(F_up_mo, nd, nd + ns, ns, nv);
   copy_block(F_up_mo, nd + ns, nd, nv, ns);
 
-  // Transform the effective Fock matrix back to AO basis by solving
-  // C^{-T} * F_MO * C^{-1} = F_AO
-  // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
-  // C without explicitly inverting C
-  const int matrix_dim = num_molecular_orbitals;
-  using ColMajorMatrix =
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
-  // LAPACK expects column-major layout, so we copy the row-major data into a
-  // column-major matrix without transposing the logical layout
-  ColMajorMatrix Ct =
-      Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
-  // F_MO is symmetric, so we can use it directly as the right-hand side
-  // without transposing
-  ColMajorMatrix temp_rhs = effective_F_mo;
-  std::vector<int64_t> ipiv(matrix_dim);
+  if (num_atomic_orbitals == num_molecular_orbitals) {
+    // Square case (nAO == nMO): back-transform via C^{-T} * F_MO * C^{-1}.
+    const int matrix_dim = num_molecular_orbitals;
+    using ColMajorMatrix =
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+    ColMajorMatrix Ct =
+        Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
+    ColMajorMatrix temp_rhs = effective_F_mo;
+    std::vector<int64_t> ipiv(matrix_dim);
 
-  auto info =
-      lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim, ipiv.data());
-  if (info != 0) {
-    throw std::runtime_error("getrf failed while factorizing C^T");
+    auto info = lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim,
+                              ipiv.data());
+    if (info != 0) {
+      throw std::runtime_error("getrf failed while factorizing C^T");
+    }
+    info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                         matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+    if (info != 0) {
+      throw std::runtime_error("getrs failed while solving C^T X = F_mo");
+    }
+    temp_rhs.transposeInPlace();
+    info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                         matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+    if (info != 0) {
+      throw std::runtime_error("getrs failed while solving C^T X = M^T");
+    }
+    effective_fock = temp_rhs.transpose();
+  } else {
+    // Rectangular case (nMO < nAO): overlap-mediated projection
+    //   F_eff_AO = S * C * F_MO_eff * C^T * S = SC * F_MO_eff * SC^T
+    // Proof: C^T F_eff_AO C = (C^T S C) F_MO_eff (C^T S C) = F_MO_eff
+    // when C^T S C = I. This mirrors the RHF/UHF treatment in the
+    // reduced MO space.
+    RowMajorMatrix SC(num_atomic_orbitals, num_molecular_orbitals);
+    SC.noalias() = S * C;
+    // SC^T is nMO x nAO; similarity_transform computes
+    // (SC^T)^T * F_MO_eff * SC^T = SC * F_MO_eff * SC^T via blas::gemm.
+    RowMajorMatrix SC_T(num_molecular_orbitals, num_atomic_orbitals);
+    SC_T.noalias() = SC.transpose();
+    similarity_transform(blas::Layout::RowMajor, num_atomic_orbitals,
+                         num_molecular_orbitals, 1.0, SC_T.data(),
+                         num_atomic_orbitals, effective_F_mo.data(),
+                         num_molecular_orbitals, 0.0, effective_fock.data(),
+                         num_atomic_orbitals, &atba_workspace);
   }
-
-  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-  if (info != 0) {
-    throw std::runtime_error("getrs failed while solving C^T X = F_mo");
-  }
-
-  temp_rhs.transposeInPlace();
-  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-  if (info != 0) {
-    throw std::runtime_error("getrs failed while solving C^T X = M^T");
-  }
-
-  effective_fock = temp_rhs.transpose();
   if (!effective_fock.isApprox(effective_fock.transpose())) {
     QDK_LOGGER().warn(
         "Effective Fock matrix in AO is far from symmetric. Symmetrizing...");
