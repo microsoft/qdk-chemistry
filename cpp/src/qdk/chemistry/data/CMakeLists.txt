@@ -29,5 +29,6 @@ target_sources(chemistry PRIVATE
     tapering.cpp
     wavefunction.cpp
     wavefunction_containers/amplitude_container.cpp
+    wavefunction_containers/mps_wavefunction.cpp
     wavefunction_containers/state_vector.cpp
 )

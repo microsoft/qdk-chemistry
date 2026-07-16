@@ -86,6 +86,10 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
+    MPSCanonicalForm,
+    MPSMetadata,
+    MPSSite,
+    MPSWavefunction,
     NuclearGradients,
     NuclearHessian,
     Orbitals,
@@ -114,7 +118,6 @@ from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
-from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 
@@ -162,6 +165,9 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
+    "MPSCanonicalForm",
+    "MPSMetadata",
+    "MPSSite",
     "MPSWavefunction",
     "MajoranaMapping",
     "MeasurementData",

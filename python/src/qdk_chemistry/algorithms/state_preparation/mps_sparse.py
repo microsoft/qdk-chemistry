@@ -37,10 +37,10 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 import numpy as np
-from scipy.sparse import csc_array
+from scipy.sparse import csc_array, vstack
 
+from qdk_chemistry.data import MPSSite, MPSWavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .mps_sequential import (
@@ -103,7 +103,9 @@ class MPSSparseStatePreparation(StatePreparation):
         if not isinstance(wavefunction, MPSWavefunction):
             raise TypeError(f"MPSSparseStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
 
-        data = generate_mps_sparse_preparation_data(wavefunction.tensors)
+        if wavefunction.physical_dimension != 4:
+            raise ValueError("Sparse MPS state preparation requires four physical states per site.")
+        data = generate_mps_sparse_preparation_data(wavefunction.sites)
         rotation_bits = self._settings.get("rotation_bits")
         params = data.to_qsharp_params(rotation_bits)
         program = QSHARP_UTILS.MPSSparse.MakeMPSSparseCircuit
@@ -219,7 +221,7 @@ class MPSSparsePreparationData:
 
 
 def generate_mps_sparse_preparation_data(
-    tensors: Sequence[np.ndarray],
+    tensors: Sequence[np.ndarray | MPSSite],
 ) -> MPSSparsePreparationData:
     """Compute all data needed for the MPSSparse Q# operation.
 
@@ -236,16 +238,19 @@ def generate_mps_sparse_preparation_data(
         Structured preparation data.
 
     """
-    num_sites = len(tensors)
-    d = tensors[0].shape[1]
+    mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    num_sites = len(mps_sites)
+    d = mps_sites[0].shape[1]
+    if d != 4:
+        raise ValueError("Sparse MPS state preparation requires four physical states per site.")
 
     # Determine consistent ancilla size
     max_ancilla_dim = 1
     for i in range(1, num_sites):
-        chi_left, _, chi_right = tensors[i].shape
+        chi_left, _, chi_right = mps_sites[i].shape
         local_bits = int(np.ceil(np.log2(max(chi_left, chi_right)))) if max(chi_left, chi_right) > 1 else 1
         max_ancilla_dim = max(max_ancilla_dim, 1 << local_bits)
-    chi_1 = tensors[0].shape[2]
+    chi_1 = mps_sites[0].shape[2]
     init_bits = int(np.ceil(np.log2(max(1, chi_1)))) if chi_1 > 1 else 1
     max_ancilla_dim = max(max_ancilla_dim, 1 << init_bits)
     ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
@@ -254,11 +259,11 @@ def generate_mps_sparse_preparation_data(
     # Per-site decomposition
     sites: list[SparseSiteUnitaryData] = []
     for i in range(1, num_sites):
-        site_data = _decompose_sparse_site(tensors[i], ancilla_dim)
+        site_data = _decompose_sparse_site(mps_sites[i], ancilla_dim)
         sites.append(site_data)
 
     # Initial state from first tensor
-    first_tensor = tensors[0]
+    first_tensor = mps_sites[0].to_dense()
     chi_1 = first_tensor.shape[2]
     init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
     init_padded = np.zeros((d, ancilla_dim))
@@ -277,7 +282,7 @@ def generate_mps_sparse_preparation_data(
     )
 
 
-def _decompose_sparse_site(tensor: np.ndarray, ancilla_dim: int) -> SparseSiteUnitaryData:
+def _decompose_sparse_site(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> SparseSiteUnitaryData:
     """Decompose one MPS site tensor using the sparse permutation method.
 
     Parameters
@@ -352,7 +357,7 @@ def _decompose_sparse_site(tensor: np.ndarray, ancilla_dim: int) -> SparseSiteUn
 # ---------------------------------------------------------------------------
 
 
-def _tensor_to_target_matrix(tensor: np.ndarray, ancilla_dim: int) -> csc_array:
+def _tensor_to_target_matrix(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> csc_array:
     """Build the sparse target matrix from an MPS tensor.
 
     The target matrix has shape (4 * ancilla_dim, chi_left), where each column
@@ -372,22 +377,21 @@ def _tensor_to_target_matrix(tensor: np.ndarray, ancilla_dim: int) -> csc_array:
         The sparse target matrix of shape (4 * ancilla_dim, chi_left).
 
     """
-    chi_left, d, _ = tensor.shape
+    site = tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor)
+    chi_left, _, _ = site.shape
     # Reshape: for each physical index p, take the slice tensor[:, p, :] of shape
     # (chi_left, chi_right) -> transpose to (chi_right, chi_left).
     # Stack 4 such slices vertically to get (4*chi_right, chi_left), then pad rows.
-    slices = []
-    for p in range(d):
-        mat = tensor[:, p, :].T  # shape (chi_right, chi_left)
+    slices: list[csc_array] = []
+    for physical_slice in site.physical_slices:
+        matrix = physical_slice.T.tocsc()  # shape (chi_right, chi_left)
         # Pad rows to ancilla_dim
-        if mat.shape[0] < ancilla_dim:
-            padded = np.zeros((ancilla_dim, chi_left))
-            padded[: mat.shape[0], :] = mat
-            slices.append(padded)
+        if matrix.shape[0] < ancilla_dim:
+            padding = csc_array((ancilla_dim - matrix.shape[0], chi_left))
+            slices.append(csc_array(vstack((matrix, padding), format="csc")))
         else:
-            slices.append(mat[:ancilla_dim, :])
-    full_matrix = np.vstack(slices)  # (4 * ancilla_dim, chi_left)
-    return csc_array(full_matrix)
+            slices.append(matrix[:ancilla_dim, :])
+    return csc_array(vstack(slices, format="csc"))
 
 
 def _get_rectangles_and_row_permutation(

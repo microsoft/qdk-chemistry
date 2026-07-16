@@ -258,6 +258,17 @@ class SymmetryBlocked : public DataClass {
   std::size_t num_blocks() const { return _blocks.size(); }
 
   /**
+   * @brief Immutable view of all stored block keys and storage pointers.
+   *
+   * Aliased sectors appear as separate keys that share the same block pointer.
+   * This view enables sparse consumers to traverse stored sectors without
+   * materializing a dense tensor.
+   *
+   * @return Const reference to the complete block map.
+   */
+  const BlockMap& blocks() const { return _blocks; }
+
+  /**
    * @brief Whether every stored key in @p keys aliases the same block.
    *
    * Keys absent from the container are skipped (they do not break aliasing).

@@ -26,8 +26,9 @@ from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
 )
-from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
+
+from .mps_test_utils import contract_mps, make_mps, random_mps
 
 # =============================================================================
 # Qualtran reference data (from test_mps_sequential_state_prep.py)
@@ -370,8 +371,8 @@ class TestGenerateMPSSparsePreparationData:
     def test_random_mps_decomposition(self, num_sites, bond_dim, seed):
         """Verify decomposition produces valid data for random MPS tensors."""
         rng = np.random.default_rng(seed)
-        mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
-        data = generate_mps_sparse_preparation_data(mps.tensors)
+        mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+        data = generate_mps_sparse_preparation_data(mps.sites)
 
         assert data.num_sites == num_sites
         assert len(data.sites) == num_sites - 1
@@ -379,6 +380,7 @@ class TestGenerateMPSSparsePreparationData:
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
 
 
+@pytest.mark.slow
 class TestMPSSparseQSharpFidelity:
     """Test that the MPSSparse Q# circuit produces the correct state."""
 
@@ -396,10 +398,10 @@ class TestMPSSparseQSharpFidelity:
         get_qsharp_utils()
 
         rng = np.random.default_rng(seed)
-        mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
-        target_state = mps.contract()
+        mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+        target_state = contract_mps(mps)
 
-        data = generate_mps_sparse_preparation_data(mps.tensors)
+        data = generate_mps_sparse_preparation_data(mps.sites)
         params = data.to_qsharp_params(rotation_bits=10)
 
         num_state_qubits = 2 * num_sites
@@ -436,10 +438,10 @@ class TestMPSSparseQSharpFidelity:
         """Test sparse preparation fidelity on the Qualtran reference tensors."""
         get_qsharp_utils()
 
-        mps = MPSWavefunction(_qualtran_mps_tensors)
+        mps = make_mps(_qualtran_mps_tensors)
         target_state = _qualtran_mps_expected_state
 
-        data = generate_mps_sparse_preparation_data(mps.tensors)
+        data = generate_mps_sparse_preparation_data(mps.sites)
         params = data.to_qsharp_params(rotation_bits=10)
 
         num_sites = 4
@@ -471,12 +473,13 @@ class TestMPSSparseQSharpFidelity:
         assert fidelity > 0.90, f"Qualtran tensor fidelity {fidelity:.4f} too low"
 
 
+@pytest.mark.slow
 class TestMPSSparseResourceEstimate:
     """Test that resource estimates are consistent with Qualtran sparse mode."""
 
     def test_resource_estimate_qubit_count(self):
         """Verify Q# resource estimate qubit count is reasonable."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
+        mps = make_mps(_qualtran_mps_tensors)
         algo = MPSSparseStatePreparation()
         circuit = algo.run(mps)
         result = circuit.estimate()
@@ -488,7 +491,7 @@ class TestMPSSparseResourceEstimate:
 
     def test_resource_estimate_toffoli_count(self):
         """Verify Q# Toffoli count is in a reasonable range."""
-        mps = MPSWavefunction(_qualtran_mps_tensors)
+        mps = make_mps(_qualtran_mps_tensors)
         algo = MPSSparseStatePreparation()
         circuit = algo.run(mps)
         result = circuit.estimate()

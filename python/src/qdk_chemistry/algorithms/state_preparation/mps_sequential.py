@@ -42,8 +42,8 @@ from collections import deque
 
 import numpy as np
 
+from qdk_chemistry.data import MPSSite, MPSWavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation, StatePreparationSettings
@@ -126,7 +126,9 @@ class MPSSequentialStatePreparation(StatePreparation):
         fast_re = self._settings.get("fast_resource_estimation")
         fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")
 
-        data = generate_mps_preparation_data(wavefunction.tensors, fast_resource_estimation=fast_re or fast_grouped_re)
+        if wavefunction.physical_dimension != 4:
+            raise ValueError("MPS sequential state preparation requires four physical states per site.")
+        data = generate_mps_preparation_data(wavefunction.sites, fast_resource_estimation=fast_re or fast_grouped_re)
 
         rotation_bits = self._settings.get("rotation_bits")
 
@@ -359,7 +361,7 @@ class MPSPreparationData:
 
 
 def generate_mps_preparation_data(
-    tensors: Sequence[np.ndarray],
+    tensors: Sequence[np.ndarray | MPSSite],
     fast_resource_estimation: bool = False,
 ) -> MPSPreparationData:
     """Compute all data needed for the MPSSequential Q# operation.
@@ -384,16 +386,19 @@ def generate_mps_preparation_data(
         to flatten into the dict expected by the Q# operation.
 
     """
-    num_sites = len(tensors)
-    d = tensors[0].shape[1]
+    mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    num_sites = len(mps_sites)
+    d = mps_sites[0].shape[1]
+    if d != 4:
+        raise ValueError("MPS sequential state preparation requires four physical states per site.")
 
     # Determine consistent ancilla size across all sites
     max_ancilla_dim = 1
     for i in range(1, num_sites):
-        chi_left, _, chi_right = tensors[i].shape
+        chi_left, _, chi_right = mps_sites[i].shape
         local_bits = int(np.ceil(np.log2(max(chi_left, chi_right)))) if max(chi_left, chi_right) > 1 else 1
         max_ancilla_dim = max(max_ancilla_dim, 1 << local_bits)
-    chi_1 = tensors[0].shape[2]
+    chi_1 = mps_sites[0].shape[2]
     init_bits = int(np.ceil(np.log2(max(1, chi_1)))) if chi_1 > 1 else 1
     max_ancilla_dim = max(max_ancilla_dim, 1 << init_bits)
     ancilla_bits = int(np.ceil(np.log2(max_ancilla_dim))) if max_ancilla_dim > 1 else 1
@@ -411,7 +416,7 @@ def generate_mps_preparation_data(
         # Sites with the same max(chi_left, chi_right) have the similar circuit cost.
         site_effective_bits: list[int] = []
         for i in range(1, num_sites):
-            chi_left, _, chi_right = tensors[i].shape
+            chi_left, _, chi_right = mps_sites[i].shape
             eff = max(chi_left, chi_right)
             bits = int(np.ceil(np.log2(eff))) if eff > 1 else 1
             site_effective_bits.append(bits)
@@ -433,7 +438,7 @@ def generate_mps_preparation_data(
         # Reverse-order decomposition: last site first, propagating V backwards.
         sites_reversed: list[SiteUnitaryData] = []
         for i in range(num_sites - 1, 0, -1):
-            site_data, v_mat = _decompose_site_with_v(tensors[i], ancilla_dim, v_from_next=v_from_next)
+            site_data, v_mat = _decompose_site_with_v(mps_sites[i].to_dense(), ancilla_dim, v_from_next=v_from_next)
             sites_reversed.append(site_data)
             v_from_next = v_mat
         sites = list(reversed(sites_reversed))
@@ -445,7 +450,7 @@ def generate_mps_preparation_data(
         vec /= np.linalg.norm(vec)
         initial_state_vec = vec.tolist()
     else:
-        first_tensor = tensors[0]
+        first_tensor = mps_sites[0].to_dense()
         chi_1 = first_tensor.shape[2]
         init_state = first_tensor.transpose(1, 2, 0).sum(axis=2)  # (d, chi_1)
         init_padded = np.zeros((d, ancilla_dim))

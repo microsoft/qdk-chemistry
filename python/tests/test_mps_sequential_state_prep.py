@@ -12,6 +12,7 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 import numpy as np
 import pytest
 from qdk import qsharp
+from scipy.sparse import issparse
 
 from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     MPSSequentialStatePreparation,
@@ -20,8 +21,11 @@ from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     decompose_unitary_to_givens,
     generate_mps_preparation_data,
 )
-from qdk_chemistry.data.mps_wavefunction import MPSWavefunction
+from qdk_chemistry.data import MPSSite, MPSWavefunction, Wavefunction, WavefunctionContainer
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
+
+from .mps_test_utils import contract_mps, make_mps, random_mps
+from .test_helpers import create_test_orbitals
 
 
 class TestMPSWavefunction:
@@ -30,32 +34,52 @@ class TestMPSWavefunction:
     def test_basic_construction(self):
         """Test constructing an MPSWavefunction from tensors."""
         rng = np.random.default_rng(42)
-        mps = MPSWavefunction.random(num_sites=3, bond_dim=4, rng=rng)
+        mps = random_mps(num_sites=3, bond_dim=4, rng=rng)
         assert mps.num_sites == 3
-        assert mps.num_qubits == 6
-        assert mps.max_bond_dim == 4
+        assert mps.physical_dimension == 4
+        assert mps.max_bond_dimension == 4
+
+    def test_flattened_chemistry_properties(self):
+        """Test that chemistry properties are exposed directly on the wavefunction."""
+        site = MPSSite.from_dense(np.ones((1, 4, 1)))
+        mps = MPSWavefunction([site], create_test_orbitals(1))
+
+        assert isinstance(mps, WavefunctionContainer)
+        assert mps.total_num_particles is None
+        assert mps.active_num_particles is None
+        assert Wavefunction(mps).get_container_type() == "mps"
 
     def test_contract_normalized(self):
         """Test that contracted state vector is normalized."""
         rng = np.random.default_rng(42)
-        mps = MPSWavefunction.random(num_sites=3, bond_dim=4, rng=rng)
-        state = mps.contract()
+        mps = random_mps(num_sites=3, bond_dim=4, rng=rng)
+        state = contract_mps(mps)
         assert abs(np.linalg.norm(state) - 1.0) < 1e-10
+
+    def test_stores_sparse_physical_slices_and_materializes_one_site(self):
+        """Dense input is stored as sparse A^p matrices with a reversible site view."""
+        tensor = np.arange(24, dtype=float).reshape(2, 4, 3)
+        mps = make_mps([tensor])
+
+        assert isinstance(mps.sites[0], MPSSite)
+        assert len(mps.sites[0].physical_slices) == 4
+        assert all(issparse(value) for value in mps.sites[0].physical_slices)
+        assert np.array_equal(mps.sites[0].to_dense(), tensor)
 
     def test_validation_errors(self):
         """Test that invalid inputs raise ValueError."""
-        with pytest.raises(ValueError, match="must not be empty"):
-            MPSWavefunction([])
+        with pytest.raises(ValueError, match="must contain at least one site"):
+            MPSWavefunction([], create_test_orbitals(1))
 
-        with pytest.raises(ValueError, match="3-dimensional"):
-            MPSWavefunction([np.zeros((4, 4))])
+        with pytest.raises(ValueError, match="incorrect number of dimensions"):
+            MPSSite.from_dense(np.zeros((4, 4)))
 
     def test_bond_dim_consistency(self):
         """Test that inconsistent bond dimensions are caught."""
         t1 = np.zeros((1, 4, 3))
         t2 = np.zeros((2, 4, 1))  # chi_left=2 doesn't match t1's chi_right=3
-        with pytest.raises(ValueError, match="Bond dimension mismatch"):
-            MPSWavefunction([t1, t2])
+        with pytest.raises(ValueError, match="incompatible bond spaces"):
+            make_mps([t1, t2])
 
 
 class TestDecomposition:
@@ -168,8 +192,8 @@ class TestGenerateMPSPreparationData:
     def test_two_site_data_structure(self):
         """Verify generate_mps_preparation_data returns correct structure for 2 sites."""
         rng = np.random.default_rng(42)
-        mps = MPSWavefunction.random(num_sites=2, bond_dim=2, rng=rng)
-        data = generate_mps_preparation_data(mps.tensors)
+        mps = random_mps(num_sites=2, bond_dim=2, rng=rng)
+        data = generate_mps_preparation_data(mps.sites)
 
         assert data.num_sites == 2
         assert data.ancilla_bits >= 1
@@ -180,8 +204,8 @@ class TestGenerateMPSPreparationData:
     def test_three_site_data_structure(self):
         """Verify generate_mps_preparation_data returns correct structure for 3 sites."""
         rng = np.random.default_rng(42)
-        mps = MPSWavefunction.random(num_sites=3, bond_dim=2, rng=rng)
-        data = generate_mps_preparation_data(mps.tensors)
+        mps = random_mps(num_sites=3, bond_dim=2, rng=rng)
+        data = generate_mps_preparation_data(mps.sites)
 
         assert data.num_sites == 3
         assert len(data.sites) == 2
@@ -189,13 +213,14 @@ class TestGenerateMPSPreparationData:
     def test_initial_state_normalized(self):
         """Verify the initial state vector is normalized."""
         rng = np.random.default_rng(42)
-        mps = MPSWavefunction.random(num_sites=3, bond_dim=4, rng=rng)
-        data = generate_mps_preparation_data(mps.tensors)
+        mps = random_mps(num_sites=3, bond_dim=4, rng=rng)
+        data = generate_mps_preparation_data(mps.sites)
 
         init_vec = np.array(data.initial_state_vec)
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
 
 
+@pytest.mark.slow
 class TestMPSSequentialFidelity:
     """Test that MPS Sequential state preparation produces high-fidelity states."""
 
@@ -218,13 +243,13 @@ class TestMPSSequentialFidelity:
         get_qsharp_utils()
 
         rng = np.random.default_rng(seed)
-        mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+        mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
 
         # Classical reference state
-        target_state = mps.contract()
+        target_state = contract_mps(mps)
 
         # Prepare gate-based data
-        prep_data = generate_mps_preparation_data(mps.tensors)
+        prep_data = generate_mps_preparation_data(mps.sites)
         params = prep_data.to_qsharp_params(rotation_bits=10)
         num_state_qubits = 2 * num_sites
         num_ancilla_qubits = prep_data.ancilla_bits
@@ -613,8 +638,8 @@ class TestMPSSequentialQualtranFidelity:
     )
     def test_contract_matches_expected_state(self, tensors, expected_state):
         """Verify MPS contraction produces the Qualtran expected state vector."""
-        mps = MPSWavefunction(tensors)
-        contracted = mps.contract()
+        mps = make_mps(tensors)
+        contracted = contract_mps(mps)
         # Use atol=1e-3: non-zero spin tensors are not perfectly canonical,
         # so raw contraction has O(1e-4) leakage. Fidelity is still > 0.9999.
         assert np.allclose(contracted, expected_state, atol=1e-3)
@@ -633,8 +658,8 @@ class TestMPSSequentialQualtranCostComparison:
     )
     def test_prepare_gate_based_data_produces_valid_output(self, tensors, expected_num_sites, min_ancilla_bits):
         """Verify generate_mps_preparation_data succeeds on Qualtran tensors."""
-        mps = MPSWavefunction(tensors)
-        data = generate_mps_preparation_data(mps.tensors)
+        mps = make_mps(tensors)
+        data = generate_mps_preparation_data(mps.sites)
 
         assert data.num_sites == expected_num_sites
         assert data.ancilla_bits >= min_ancilla_bits
@@ -653,9 +678,10 @@ class TestMPSSequentialQualtranCostComparison:
         ],
         ids=["standard", "non_zero_spin"],
     )
+    @pytest.mark.slow
     def test_resource_estimate_qubit_count(self, tensors, qualtran_cost):
         """Verify Q# resource estimate qubit count is consistent with Qualtran."""
-        mps = MPSWavefunction(tensors)
+        mps = make_mps(tensors)
         algo = MPSSequentialStatePreparation()
         circuit = algo.run(mps)
         result = circuit.estimate()
@@ -673,9 +699,10 @@ class TestMPSSequentialQualtranCostComparison:
         ],
         ids=["standard", "non_zero_spin"],
     )
+    @pytest.mark.slow
     def test_resource_estimate_toffoli_count(self, tensors, qualtran_cost):
         """Verify Q# resource estimate Toffoli count is consistent with Qualtran."""
-        mps = MPSWavefunction(tensors)
+        mps = make_mps(tensors)
         algo = MPSSequentialStatePreparation()
         circuit = algo.run(mps)
         result = circuit.estimate()
@@ -687,6 +714,7 @@ class TestMPSSequentialQualtranCostComparison:
         assert counts["cczCount"] <= qualtran_cost["toffoli"] * 10
 
 
+@pytest.mark.slow
 class TestMPSSequentialFastEstimation:
     """Test that fast resource estimation mode produces similar results to normal mode."""
 
@@ -697,7 +725,7 @@ class TestMPSSequentialFastEstimation:
     )
     def test_fast_vs_normal_resource_estimates(self, tensors):
         """Verify fast estimation produces similar qubit and Toffoli counts as normal mode."""
-        mps = MPSWavefunction(tensors)
+        mps = make_mps(tensors)
 
         # Normal mode (full CSD decomposition per site)
         algo_normal = MPSSequentialStatePreparation()
@@ -738,7 +766,7 @@ class TestMPSSequentialFastEstimation:
     def test_fast_vs_normal_small_random_mps(self, num_sites, bond_dim, seed):
         """Verify fast estimation agrees with normal mode on small random MPS circuits."""
         rng = np.random.default_rng(seed)
-        mps = MPSWavefunction.random(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+        mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
 
         algo_normal = MPSSequentialStatePreparation()
         circuit_normal = algo_normal.run(mps)
