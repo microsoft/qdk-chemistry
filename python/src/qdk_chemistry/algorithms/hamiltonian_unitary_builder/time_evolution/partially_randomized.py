@@ -475,7 +475,7 @@ class PartiallyRandomized(QDrift):
         eps_r = math.sqrt(1.0 - split) * target_accuracy
         return eps_d, eps_r
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of outer Trotter steps ``r``.
 
         Returns 1 when accuracy-aware sizing is disabled (``target_accuracy <= 0``)
@@ -534,7 +534,7 @@ class PartiallyRandomized(QDrift):
             return num_random_samples
 
         tolerance: float = self._settings.get("tolerance")
-        h_random = QubitHamiltonian(
+        h_random = QubitOperator(
             pauli_strings=[label for label, _ in random_terms],
             coefficients=np.array([coeff for _, coeff in random_terms]),
         )
@@ -549,7 +549,7 @@ class PartiallyRandomized(QDrift):
 
     def _determine_num_deterministic(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         terms: list[tuple[str, float]],
         time: float,
     ) -> int:
@@ -591,7 +591,7 @@ class PartiallyRandomized(QDrift):
 
     def _determine_num_deterministic_cost_optimal(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         terms: list[tuple[str, float]],
         time: float,
     ) -> int:
