@@ -24,20 +24,21 @@ std::unique_ptr<ScfSolver> make_microsoft_ctf12_scf_solver() {
 
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::CtF12ScfSolver>();
+}
 
-  std::unique_ptr<ScfSolver> make_microsoft_stabilized_scf_solver() {
-    QDK_LOG_TRACE_ENTERING();
+std::unique_ptr<ScfSolver> make_microsoft_stabilized_scf_solver() {
+  QDK_LOG_TRACE_ENTERING();
 
-    return std::make_unique<
-        qdk::chemistry::algorithms::microsoft::StabilizedScfSolver>();
-  }
+  return std::make_unique<
+      qdk::chemistry::algorithms::microsoft::StabilizedScfSolver>();
+}
 
-  void ScfSolverFactory::register_default_instances() {
-    QDK_LOG_TRACE_ENTERING();
+void ScfSolverFactory::register_default_instances() {
+  QDK_LOG_TRACE_ENTERING();
 
-    ScfSolverFactory::register_instance(&make_microsoft_scf_solver);
-    ScfSolverFactory::register_instance(&make_microsoft_ctf12_scf_solver);
-    ScfSolverFactory::register_instance(&make_microsoft_stabilized_scf_solver);
-  }
+  ScfSolverFactory::register_instance(&make_microsoft_scf_solver);
+  ScfSolverFactory::register_instance(&make_microsoft_ctf12_scf_solver);
+  ScfSolverFactory::register_instance(&make_microsoft_stabilized_scf_solver);
+}
 
 }  // namespace qdk::chemistry::algorithms

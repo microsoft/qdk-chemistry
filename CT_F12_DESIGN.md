@@ -4,6 +4,7 @@
 implemented. **Branch:** `feature/ct-f12`.
 
 **Primary sources (in repo root):**
+
 - `084107_1_online.pdf` — Yanai & Shiozaki, *J. Chem. Phys.* **136**, 084107 (2012) ("the paper").
 - `2211.09685v2.pdf` — Masteran *et al.*, *Comment* + Supplemental Material ("the Comment"). **This is
   the corrected reference of truth for the equations and ships reference numbers.**
@@ -28,7 +29,7 @@ CT-F12 produces an *a priori*, Hermitian, **two-body effective Hamiltonian** H̄
 canonical (unitary) similarity transformation of the molecular Hamiltonian H with a fixed-amplitude
 projected Slater-type geminal generator A:
 
-> H̄_F12 = H + [H, A]_{1,2} + ½ [[F, A]_{1,2}, A]_{1,2}   (paper Eq. 9; Comment SM Eq. S2)
+> H̄_F12 = H + [H, A]*{1,2} + ½ [[F, A]*{1,2}, A]_{1,2}   (paper Eq. 9; Comment SM Eq. S2)
 
 The output is exactly a dressed `(h̄, ḡ, core energy, Fock)` — the **same shape and quartic complexity
 as the bare Hamiltonian** (paper §IV) — so it plugs into every existing downstream solver and qubit
@@ -54,6 +55,7 @@ codebase enforces one fixed `_run_impl` signature per algorithm type; configurat
 `Settings`, never runtime kwargs).
 
 The input is a reference **`Wavefunction`** because it carries *both* things the construction needs:
+
 1. its `Orbitals` via `Wavefunction::get_orbitals()` (`cpp/include/qdk/chemistry/data/wavefunction.hpp:909`)
    → AO basis, full MO coefficients, active/inactive/virtual partition;
 2. its **active 1-/2-RDMs** via `get_active_one_rdm_spin_traced()` / `get_active_two_rdm_spin_traced()`
@@ -93,6 +95,7 @@ factory. (A new *type* — unlike a new *variant* — requires a new abstract ba
 binding.)
 
 ### C++ base + factory (new)
+
 `cpp/include/qdk/chemistry/algorithms/effective_hamiltonian.hpp` (model on `algorithms/hamiltonian.hpp`):
 
 ```cpp
@@ -122,6 +125,7 @@ struct EffectiveHamiltonianConstructorFactory
 ```
 
 ### C++ registration
+
 `cpp/src/qdk/chemistry/algorithms/effective_hamiltonian.cpp` (model on
 `algorithms/hamiltonian.cpp:30-36`):
 
@@ -135,6 +139,7 @@ void EffectiveHamiltonianConstructorFactory::register_default_instances() {
 ```
 
 ### Python binding + registry (new type ⇒ binding required; use the `add-binding` skill)
+
 - `python/src/pybind11/algorithms/effective_hamiltonian.cpp` — bind base + factory via the generic
   `bind_algorithm_factory<Factory, Base, …>()` template (model on the hamiltonian-constructor
   binding); wire into `module.cpp` **after** `Wavefunction` and `Hamiltonian` are bound (binding order
@@ -146,6 +151,7 @@ void EffectiveHamiltonianConstructorFactory::register_default_instances() {
   `__all__`.
 
 ### Resulting user API
+
 ```python
 from qdk_chemistry.algorithms import create
 ctf12 = create("effective_hamiltonian_constructor", "qdk_ct_f12", gamma=1.5, cabs_basis="aug-cc-pvtz-optri")
@@ -161,6 +167,7 @@ h_bar = ctf12.run(reference_wavefunction)   # SD wfn → SR; CAS/SCI wfn → MR
 `name() == "qdk_ct_f12"`, owning a `CtF12HamiltonianSettings` (§7).
 
 `_run_impl(reference)` orchestration:
+
 1. `auto orbitals = reference->get_orbitals();` — reuse the AO core-Hamiltonian build and active-space
    folding already in `microsoft/hamiltonian.cpp` (T+V(+ECP) via `OneBodyIntegral`; inactive folding
    into core energy + inactive Fock). **Fold using the F12-dressed Fock**, not the bare Coulomb Fock,
@@ -202,6 +209,7 @@ Coulomb path (`scf/.../util/libint2_util.cpp` `opt_eri`/`debug_eri`; `scf/.../co
 | \|∇F12\|² / [t, F12] kernel | `delcgtg2` | B |
 
 Two new wiring layers:
+
 1. **Geminal AO-ERI helper** — given a libint2 geminal `Operator` (+ γ) and up to four (possibly
    different) basis sets, return AO integrals. Parameterize the existing `opt_eri` pattern by operator;
    reuse libint2 `Engine`.
@@ -227,18 +235,20 @@ bundled** — only `aug-cc-pV{D,T,Q,5,6}Z` OBS are present under
 
 Use **Comment SM Eqs. S2-S4** as the source of truth for the final `h̄`/`ḡ` matrix elements (they are
 the automated-SeQuant-verified, corrected forms). Key generator/projector definitions (paper):
-- A_F12 = ½ G^{αβ}_{ij}(Ê^{αβ}_{ij} − Ê^{ij}_{αβ})   (Eq. 10)
+
+- A_F12 = ½ G^{αβ}*{ij}(Ê^{αβ}*{ij} − Ê^{ij}_{αβ})   (Eq. 10)
 - G^{αβ}_{ij} = (3/8)⟨αβ|Q̂₁₂ F12|ij⟩ + (1/8)⟨αβ|Q̂₁₂ F12|ji⟩   (Eq. 11; SP/"fixed" amplitudes)
 - F12 = −γ⁻¹ exp(−γ r₁₂)   (Eq. 12)
 - Q̂₁₂ = (1−Ô₁)(1−Ô₂) − V̂₁V̂₂   (Eq. 13); α,β span complete-virtual = OBS-virt {a,b} ⊕ CABS {x,y}; i,j
   are valence-occupied.
 
 Intermediates (paper Eqs. 23-28; corrected):
-- V^{pq}_{ij} = g^{pq}_{αβ} G^{αβ}_{ij}   (Eq. 23; non-Hermitian — also need its adjoint Ṽ, SM S6-S7)
-- X^{kl}_{ij} = G^{αβ}_{ij} G^{αβ}_{kl}   (Eq. 24)
-- B^{kl}_{ij} = G^{αβ}_{ij} f^α_γ G^{γβ}_{kl} + G^{αβ}_{ij} f^β_γ G^{αγ}_{kl}   (Eq. 25; from [[F,A],A])
-- U^{prs}_{ijb} = g^{pr}_{xs} G^{xb}_{ij}   (Eq. 26)
-- **S^{klb}_{ija} = G^{xa}_{ij} G^{yb}_{kl}[f^x_y + δ^x_y(f^a_a − f^i_i − f^j_j)]   (Eq. 27 — DROP the
+
+- V^{pq}*{ij} = g^{pq}*{αβ} G^{αβ}_{ij}   (Eq. 23; non-Hermitian — also need its adjoint Ṽ, SM S6-S7)
+- X^{kl}*{ij} = G^{αβ}*{ij} G^{αβ}_{kl}   (Eq. 24)
+- B^{kl}*{ij} = G^{αβ}*{ij} f^α_γ G^{γβ}*{kl} + G^{αβ}*{ij} f^β_γ G^{αγ}_{kl}   (Eq. 25; from [[F,A],A])
+- U^{prs}*{ijb} = g^{pr}*{xs} G^{xb}_{ij}   (Eq. 26)
+- **S^{klb}*{ija} = G^{xa}*{ij} G^{yb}_{kl}[f^x_y + δ^x_y(f^a_a − f^i_i − f^j_j)]   (Eq. 27 — DROP the
   leading ½ shown in the paper; the Comment's bullet 1 identifies it as a spurious factor. Mandatory
   to reproduce the reference numbers.)**
 - RDM factors `D^p_q`, `D^{pr}_{qs}`, and pair-cumulant `D̄^{pr}_{qs}` (Eq. 28) are **read from the
@@ -247,6 +257,7 @@ Intermediates (paper Eqs. 23-28; corrected):
 **Permutational symmetry (critical for downstream):** ḡ keeps **4-fold** symmetry
 `ḡ^{pr}_{qs}=ḡ^{rp}_{sq}=ḡ^{qs}_{pr}=ḡ^{sq}_{rp}` (Hermiticity) but **NOT** `ḡ^{pr}_{qs}=ḡ^{rp}_{qs}`
 (paper p.4). Therefore:
+
 - Produce and store the **full dense n⁴ tensor** (the container does not assume 8-fold compression).
 - Native QDK MP2 is safe: `microsoft/mp2.cpp:316-336` reads `(ia|jb)` and `(ib|ja)` independently from
   the full tensor (no 8-fold assumption).
@@ -282,6 +293,7 @@ a.u.**; genuine Slater factor (no Gaussian fit); **no density fitting**; frozen-
 symmetrization. Validate **SR-first with an SD (HF) reference wavefunction**, then MR.
 
 Ladder (each a regression test):
+
 1. **G1 build gate** — assert libint2 geminal engines exist; compute one F12 AO block, compare to a
    hand/MPQC value.
 2. **CABS sanity** — `S(OBS,CABS) ≈ 0`, `S(CABS,CABS) = I`.
@@ -301,6 +313,7 @@ Ladder (each a regression test):
    `symmetrize_two_body` or defer (gated on M0/G2).
 
 Test files (auto-discovered / mirror-source):
+
 - `cpp/tests/test_ctf12_hamiltonian.cpp` (gtest; globbed by `file(GLOB_RECURSE test_*.cpp)` — no
   CMake edit needed; run serially with `OMP_NUM_THREADS=1`).
 - `python/tests/test_ct_f12_hamiltonian.py` (create→run on an SD Ne wfn→assert F12-HF/F12-MP2; later a
@@ -329,6 +342,7 @@ Test files (auto-discovered / mirror-source):
 ## 10. Conventions & gotchas (must follow)
 
 Build / test / lint (see the `cpp-build`, `python-build`, `lint` skills):
+
 - C++: `cmake --preset release -S cpp && cmake --build --preset release && cmake --install .local/release/build`.
 - **ctest is serial-only: `OMP_NUM_THREADS=1 ctest --preset release` — NEVER pass `-j`** (cardinal rule).
 - Python: C++ must be installed **first**; then
@@ -339,6 +353,7 @@ Build / test / lint (see the `cpp-build`, `python-build`, `lint` skills):
   `.pyi` stub check).
 
 Code style:
+
 - C++ namespace `qdk::chemistry`, backend under `…::algorithms::microsoft`; private members `_prefix`.
 - **Comments minimal** — only clarify non-obvious math; no narrative comments.
 - Python: Google-style docstrings, type hints required, **single-line** `Args:`/`Returns:`/`Raises:`
@@ -347,6 +362,7 @@ Code style:
 - New algorithm classes re-exported via `algorithms/__init__.py` `__all__`.
 
 Other:
+
 - **Spherical AO only** initially (Cartesian AO is an open `TODO` in `microsoft/utils.cpp:189`).
 - In-core `O(N⁴)` integrals/intermediates (mirrors the paper's pilot) — document basis-size limits;
   defer DF/out-of-core.
