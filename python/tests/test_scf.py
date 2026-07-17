@@ -70,6 +70,37 @@ def create_oxygen_structure():
     return Structure(symbols, coords)
 
 
+def create_obenzosemiquinone_structure():
+    """Create o-benzosemiquinone radical structure (issue #543).
+
+    Planar aromatic doublet radical. With def2-tzvp this geometry produces
+    a linearly dependent AO basis (n_MO < n_AO), exercising the rectangular
+    ROHF back-transform path.
+    """
+    symbols = ["O", "O", "C", "C", "C", "C", "C", "C", "H", "H", "H", "H", "H"]
+    coords = (
+        np.array(
+            [
+                [3.7321, 1.3450, 0.0000],
+                [2.0000, 0.3450, 0.0000],
+                [3.7321, 0.3450, 0.0000],
+                [2.8660, -0.1550, 0.0000],
+                [4.5981, -0.1550, 0.0000],
+                [2.8660, -1.1550, 0.0000],
+                [4.5981, -1.1550, 0.0000],
+                [3.7321, -1.6550, 0.0000],
+                [5.1350, 0.1550, 0.0000],
+                [2.3291, -1.4650, 0.0000],
+                [5.1350, -1.4650, 0.0000],
+                [3.7321, -2.2750, 0.0000],
+                [4.2690, 1.6550, 0.0000],
+            ]
+        )
+        * ANGSTROM_TO_BOHR
+    )
+    return Structure(symbols, coords)
+
+
 class TestScfSolver:
     """Test class for SCF solver functionality."""
 
@@ -484,3 +515,32 @@ class TestScfSolver:
         # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
+
+    def test_rohf_linearly_dependent_basis_issue_543(self):
+        """ROHF must not raise when n_MO < n_AO (regression for issue #543)."""
+        structure = create_obenzosemiquinone_structure()
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("enable_gdm", False)
+
+        # On some platforms linear-dependency removal drops so many
+        # functions that nMO < nelec_alpha; the solver correctly throws.
+        try:
+            energy, wavefunction = scf_solver.run(structure, 0, 2, "def2-tzvp")
+        except ValueError as e:
+            if "electron counts exceed the number of molecular orbitals" in str(e):
+                pytest.skip("Basis too linearly dependent for electron count on this platform")
+            raise
+        orbitals = wavefunction.get_orbitals()
+        # Always validate the basic contract from the issue report.
+        assert orbitals.is_restricted()
+        assert np.isfinite(energy)
+
+        coeffs_alpha, _ = orbitals.get_coefficients()
+
+        # Ensure linear-dependency removal actually fired (n_MO < n_AO).
+        if coeffs_alpha.shape[0] == coeffs_alpha.shape[1]:
+            pytest.skip("Linear-dependency removal did not trigger; expected n_MO < n_AO")
+        assert coeffs_alpha.shape[0] > coeffs_alpha.shape[1]  # nAO > nMO
+        # Reference energy intentionally omitted — needs confirmed converged value.
