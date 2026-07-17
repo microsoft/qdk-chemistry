@@ -18,6 +18,10 @@ class HamiltonianSettings : public qdk::chemistry::data::Settings {
                 "on-the-fly, 'incore' stores all integrals in memory",
                 data::ListConstraint<std::string>{
                     {std::vector<std::string>{"direct", "incore"}}});
+    set_default("eri_use_atomics", false,
+                "Use atomic accumulation (one shared buffer) instead of "
+                "per-thread private buffers during the AO->active-MO ERI "
+                "transformation.");
   }
   ~HamiltonianSettings() override = default;
 };
