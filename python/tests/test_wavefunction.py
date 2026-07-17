@@ -1034,7 +1034,7 @@ class TestWavefunctionSerialization:
             Wavefunction.from_hdf5_file("non_existent.wavefunction.h5")
 
 
-class TestWavefunctionRdmIntegraion:
+class TestWavefunctionRdmIntegration:
     """Test integration of RDMs within the Wavefunction class."""
 
     def test_rdm_n2_singlet_6_6(self):
@@ -1107,6 +1107,9 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+
+        # N2 ground state is a closed-shell singlet, so <S^2> = 0.
+        assert wfn.compute_s_squared() == pytest.approx(0.0, abs=rdm_tolerance)
 
     def test_rdm_o2_triplet_6_6(self):
         """Test RDM retrieval for O2 triplet 6e 6o wavefunction."""
@@ -1187,6 +1190,9 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+
+        # O2 ground state is a triplet (M_S=1), so <S^2> = S(S+1) = 2.0.
+        assert wfn.compute_s_squared() == pytest.approx(2.0, abs=rdm_tolerance)
 
     def test_sci_hdf5_roundtrip(self, tmp_path):
         symbols = ["C", "C", "H", "H", "H", "H"]

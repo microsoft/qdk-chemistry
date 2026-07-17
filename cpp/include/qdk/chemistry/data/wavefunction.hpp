@@ -526,6 +526,16 @@ class WavefunctionContainer {
   get_active_orbital_occupations() const;
 
   /**
+   * @brief Compute the expectation value of the total spin-squared operator
+   * from the RDMs.
+   *
+   * @return The expectation value \f$\langle S^2 \rangle\f$
+   * @throws std::runtime_error if the orbital basis declares no spin (S_z) axis
+   * (spin-blocked active-space RDMs cannot be generated)
+   */
+  double compute_s_squared() const;
+
+  /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
    * available
    * @return True if available
@@ -1321,6 +1331,16 @@ class Wavefunction : public DataClass,
    * @throws std::runtime_error if mutual information is not available
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
+
+  /**
+   * @brief Compute the expectation value of the total spin-squared operator
+   * from the RDMs.
+   *
+   * @return The expectation value \f$\langle S^2 \rangle\f$
+   * @throws std::runtime_error if the orbital basis declares no spin (S_z) axis
+   * (spin-blocked active-space RDMs cannot be generated)
+   */
+  double compute_s_squared() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs are available
