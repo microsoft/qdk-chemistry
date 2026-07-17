@@ -106,18 +106,53 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     )
 
 
+@pytest.fixture
+def chemistry_phase_problem() -> PhaseEstimationProblem:
+    """Return a number-conserving (chemistry-like) hopping Hamiltonian scenario.
+
+    The Hamiltonian ``0.5 (XX + YY)`` is the Jordan-Wigner image of a two-site
+    fermionic hopping term ``a0^dag a1 + a1^dag a0``. Its vacuum ``|00>`` is an
+    eigenstate with eigenvalue ``0``, so the CSWAP-sandwich controlled circuit
+    mapper introduces no vacuum-reference phase and agrees exactly with the direct
+    controlled-unitary mapper. The prepared state ``(|01> + |10>) / sqrt(2)`` is the
+    single-excitation eigenstate with energy ``+1``.
+    """
+    hamiltonian = QubitOperator(pauli_strings=["XX", "YY"], coefficients=[0.5, 0.5])
+    inv_sqrt2 = float(1.0 / np.sqrt(2.0))
+    state_vector = [0.0, inv_sqrt2, inv_sqrt2, 0.0]
+    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
+    factories = QsharpFactoryData(
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+    )
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+
+    return PhaseEstimationProblem(
+        label="chemistry_hopping",
+        hamiltonian=hamiltonian,
+        state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
+        evolution_time=float(np.pi / 2.0),
+        num_bits=4,
+        expected_bits=[1, 1, 0, 0],
+        expected_phase=0.25,
+        expected_energy=1.0,
+        expected_bitstring="1100",
+        shots_iterative=3,
+    )
+
+
 def _make_iterative_circuit_builder_ref(
     builder_name: str,
     num_bits: int,
     evolution_time: float,
     unitary_builder_name: str = "trotter",
+    controlled_circuit_mapper_name: str = "pauli_sequence",
 ) -> AlgorithmRef:
     """Return an iterative circuit builder AlgorithmRef for the given builder name."""
     return AlgorithmRef(
         "qpe_circuit_builder",
         builder_name,
         num_bits=num_bits,
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", controlled_circuit_mapper_name),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=evolution_time),
     )
 
@@ -126,6 +161,7 @@ def _run_iterative(
     problem: PhaseEstimationProblem,
     builder_name: str = "qdk_iterative",
     unitary_builder_name: str = "trotter",
+    controlled_circuit_mapper_name: str = "pauli_sequence",
 ) -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
@@ -133,6 +169,7 @@ def _run_iterative(
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
         builder_name: The circuit builder to use ("qdk_iterative" or "qiskit_iterative").
         unitary_builder_name: Name of the unitary builder to use.
+        controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
@@ -140,7 +177,7 @@ def _run_iterative(
     """
     state_prep_circuit = problem.state_prep
     circuit_builder = _make_iterative_circuit_builder_ref(
-        builder_name, problem.num_bits, problem.evolution_time, unitary_builder_name
+        builder_name, problem.num_bits, problem.evolution_time, unitary_builder_name, controlled_circuit_mapper_name
     )
     iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
@@ -253,6 +290,12 @@ _unitary_builder_params = [
     pytest.param("zassenhaus", id="zassenhaus"),
 ]
 
+# Parametrize over controlled circuit mapper variants
+_controlled_mapper_params = [
+    pytest.param("pauli_sequence", id="pauli_sequence"),
+    pytest.param("cswap_pauli_sequence", id="cswap_pauli_sequence"),
+]
+
 
 @pytest.mark.parametrize("builder_name", _builder_params)
 @pytest.mark.parametrize("unitary_builder_name", _unitary_builder_params)
@@ -277,6 +320,39 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(
     assert np.isclose(
         resolved_energy,
         two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+@pytest.mark.parametrize("controlled_circuit_mapper_name", _controlled_mapper_params)
+def test_iterative_phase_estimation_controlled_mapper_variants(
+    chemistry_phase_problem: PhaseEstimationProblem,
+    controlled_circuit_mapper_name: str,
+) -> None:
+    """Compare controlled circuit mappers on a number-conserving chemistry Hamiltonian.
+
+    The vacuum ``|00>`` is an eigenstate of ``0.5 (XX + YY)``, so the CSWAP-sandwich
+    mapper carries no vacuum-reference phase and must recover the same phase and
+    energy as the direct controlled-unitary mapper.
+    """
+    result = _run_iterative(
+        chemistry_phase_problem,
+        controlled_circuit_mapper_name=controlled_circuit_mapper_name,
+    )
+    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
+        result.phase_fraction, chemistry_phase_problem.evolution_time, chemistry_phase_problem.expected_energy
+    )
+
+    assert np.isclose(
+        resolved_phase,
+        chemistry_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        resolved_energy,
+        chemistry_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )

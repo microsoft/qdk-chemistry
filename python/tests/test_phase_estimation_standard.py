@@ -110,12 +110,56 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     )
 
 
-def _make_circuit_builder_ref(builder_name: str, problem: PhaseEstimationProblem) -> AlgorithmRef:
+@pytest.fixture
+def chemistry_phase_problem() -> PhaseEstimationProblem:
+    """Return a number-conserving (chemistry-like) hopping Hamiltonian scenario.
+
+    The Hamiltonian ``0.5 (XX + YY)`` is the Jordan-Wigner image of a two-site
+    fermionic hopping term ``a0^dag a1 + a1^dag a0``. Its vacuum ``|00>`` is an
+    eigenstate with eigenvalue ``0``, so the CSWAP-sandwich controlled circuit
+    mapper introduces no vacuum-reference phase and agrees exactly with the direct
+    controlled-unitary mapper. The prepared state ``(|01> + |10>) / sqrt(2)`` is the
+    single-excitation eigenstate with energy ``+1``.
+    """
+    hamiltonian = QubitOperator(pauli_strings=["XX", "YY"], coefficients=[0.5, 0.5])
+    inv_sqrt2 = float(1.0 / np.sqrt(2.0))
+    state_prep_params = {
+        "rowMap": [1, 0],
+        "stateVector": [0.0, inv_sqrt2, inv_sqrt2, 0.0],
+        "expansionOps": [],
+        "numQubits": 2,
+    }
+    factories = QsharpFactoryData(
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+    )
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+    state_prep = Circuit(qsharp_factory=factories, qsharp_op=qsharp_op)
+
+    return PhaseEstimationProblem(
+        label="chemistry_hopping",
+        hamiltonian=hamiltonian,
+        state_prep=state_prep,
+        evolution_time=float(np.pi / 2.0),
+        num_bits=4,
+        expected_bits=[1, 1, 0, 0],
+        expected_phase=0.25,
+        expected_energy=1.0,
+        expected_bitstring="1100",
+        shots=3,
+    )
+
+
+def _make_circuit_builder_ref(
+    builder_name: str,
+    problem: PhaseEstimationProblem,
+    controlled_circuit_mapper_name: str = "pauli_sequence",
+) -> AlgorithmRef:
     """Create an AlgorithmRef for the given circuit builder name and problem.
 
     Args:
         builder_name: The registered name of the circuit builder (e.g. "qdk_standard", "qiskit_standard").
         problem: The phase estimation problem providing num_bits and evolution_time.
+        controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
 
     Returns:
         An AlgorithmRef configured for the given builder.
@@ -123,7 +167,7 @@ def _make_circuit_builder_ref(builder_name: str, problem: PhaseEstimationProblem
     """
     kwargs: dict = {
         "num_bits": problem.num_bits,
-        "controlled_circuit_mapper": AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        "controlled_circuit_mapper": AlgorithmRef("controlled_circuit_mapper", controlled_circuit_mapper_name),
         "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
     }
     if builder_name == "qiskit_standard":
@@ -131,18 +175,23 @@ def _make_circuit_builder_ref(builder_name: str, problem: PhaseEstimationProblem
     return AlgorithmRef("qpe_circuit_builder", builder_name, **kwargs)
 
 
-def _run_standard(problem: PhaseEstimationProblem, builder_name: str = "qdk_standard") -> QpeResult:
+def _run_standard(
+    problem: PhaseEstimationProblem,
+    builder_name: str = "qdk_standard",
+    controlled_circuit_mapper_name: str = "pauli_sequence",
+) -> QpeResult:
     """Execute standard QPE and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
         builder_name: The circuit builder to use ("qdk_standard" or "qiskit_standard").
+        controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the standard run.
 
     """
-    qpe_circuit_builder = _make_circuit_builder_ref(builder_name, problem)
+    qpe_circuit_builder = _make_circuit_builder_ref(builder_name, problem, controlled_circuit_mapper_name)
     qpe = StandardPhaseEstimation(shots=problem.shots)
     qpe.settings().set(
         "circuit_executor",
@@ -198,6 +247,12 @@ _builder_params = [
     ),
 ]
 
+# Parametrize over controlled circuit mapper variants
+_controlled_mapper_params = [
+    pytest.param("pauli_sequence", id="pauli_sequence"),
+    pytest.param("cswap_pauli_sequence", id="cswap_pauli_sequence"),
+]
+
 
 @pytest.mark.parametrize("builder_name", _builder_params)
 def test_standard_phase_estimation_extracts_phase_and_energy(
@@ -220,6 +275,40 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     assert np.isclose(
         resolved_energy,
         two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+@pytest.mark.parametrize("controlled_circuit_mapper_name", _controlled_mapper_params)
+def test_standard_phase_estimation_controlled_mapper_variants(
+    chemistry_phase_problem: PhaseEstimationProblem,
+    controlled_circuit_mapper_name: str,
+) -> None:
+    """Compare controlled circuit mappers on a number-conserving chemistry Hamiltonian.
+
+    The vacuum ``|00>`` is an eigenstate of ``0.5 (XX + YY)``, so the CSWAP-sandwich
+    mapper carries no vacuum-reference phase and must recover the same phase and
+    energy as the direct controlled-unitary mapper.
+    """
+    result = _run_standard(
+        chemistry_phase_problem,
+        controlled_circuit_mapper_name=controlled_circuit_mapper_name,
+    )
+    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
+        result.phase_fraction, chemistry_phase_problem.evolution_time, chemistry_phase_problem.expected_energy
+    )
+
+    assert result.bitstring_msb_first == chemistry_phase_problem.expected_bitstring
+    assert np.isclose(
+        resolved_phase,
+        chemistry_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        resolved_energy,
+        chemistry_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
