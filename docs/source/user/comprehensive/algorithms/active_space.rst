@@ -270,7 +270,7 @@ autoCAS (Histogram-Based Plateau Detection)
   If none of the entropies exceed the ``entropy_threshold``, the system is considered single configurational and all orbitals are excluded from the active space.
 
 autoCAS-EOS (Entropy Difference Detection)
-  Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds ``diff_threshold`` and the entropy is above ``entropy_threshold``, a plateau boundary is identified.
+  The enhanced orbital selection (EOS) extension to the autoCAS protocol uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds ``diff_threshold`` and the entropy is above ``entropy_threshold``, a plateau boundary is identified.
 
 Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.
 
