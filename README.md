@@ -46,6 +46,38 @@ python3 -m pip install 'qdk-chemistry[all]'
 
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
+## If You Are an Agent
+
+AI coding agents (GitHub Copilot, Claude Code, Copilot CLI) can set up domain-specific skills, specialized agents, and workspace instructions by running:
+
+```bash
+# Deploy everything (VS Code skills/agents + Copilot CLI + Claude Code instructions)
+qc setup agents --target-dir . --flavor all
+
+# Or pick a specific flavor:
+qc setup agents --target-dir . --flavor vscode   # VS Code / Copilot Chat
+qc setup agents --target-dir . --flavor copilot  # Copilot CLI
+qc setup agents --target-dir . --flavor claude   # Claude Code
+```
+
+This deploys:
+
+| Flavor | What's Deployed | Purpose |
+|--------|----------------|--------|
+| `vscode` | `.github/copilot-instructions.md` | Baseline instructions: use skills first, agents for complex workflows |
+| | `.github/agents/` | Multi-agent orchestration (quantum-agent, chemist, researcher, reviewer, reporter) |
+| | `.github/skills/` | Domain knowledge (overview, MCP tools, Python SDK, remote execution) |
+| | `.vscode/mcp.json` (generated) | MCP server config auto-detected from current environment |
+| `copilot` | `copilot-instructions.md` | Full MCP tool reference for Copilot CLI |
+| `claude` | `CLAUDE.md` | Full MCP tool reference for Claude Code |
+| | `.claude/skills/` | Same shared domain knowledge as VS Code |
+
+**Skills** provide tested domain knowledge (tool references, workflow recipes, parameter guidance, common pitfalls). Load the relevant skill before acting — don't guess.
+
+**Agents** coordinate multi-step quantum chemistry workflows (research → plan → critique → execute → visualize → report). Use them for complex tasks; use skills directly for simple questions.
+
+If you are a different agent not listed above, you can still run `qc setup agents` with any flavor and adapt the generated instructions and skill files to your own format.
+
 ## Telemetry
 
 By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in [telemetry.py](./python/src/qdk_chemistry/utils/telemetry.py) and all telemetry events are defined in [telemetry_events.py](./python/src/qdk_chemistry/utils/telemetry_events.py).
