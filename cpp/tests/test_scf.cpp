@@ -231,33 +231,37 @@ TEST_F(ScfTest, OH_ROKS_invalid) {
 // Verifies the projection identity C^T * F_eff_AO * C = F_MO_eff
 // when C^T * S * C = I, without relying on a full SCF run.
 TEST_F(ScfTest, ROHF_RectangularBackTransform_ProjectionIdentity) {
+  using Mat =
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   const int nAO = 4;  // atomic orbitals
   const int nMO = 2;  // molecular orbitals (nMO < nAO = rectangular case)
 
-  // Construct S = identity (simplifies C^T S C = I to C^T C = I)
-  RowMajorMatrix S = RowMajorMatrix::Identity(nAO, nAO);
+  // S = identity (simplifies C^T S C = I to C^T C = I)
+  Mat S = Mat::Identity(nAO, nAO);
 
-  // Construct C: nAO x nMO with orthonormal columns (C^T C = I)
-  RowMajorMatrix C(nAO, nMO);
-  C << 1.0, 0.0,
-       0.0, 1.0,
-       0.0, 0.0,
-       0.0, 0.0;
+  // coeff: nAO x nMO with orthonormal columns (C^T C = I)
+  Mat coeff = Mat::Zero(nAO, nMO);
+  coeff(0, 0) = 1.0;
+  coeff(1, 1) = 1.0;
 
   // Arbitrary symmetric F_MO_eff in MO space
-  RowMajorMatrix F_MO(nMO, nMO);
-  F_MO << 2.0, 0.5,
-          0.5, 3.0;
+  Mat F_mo = Mat::Zero(nMO, nMO);
+  F_mo(0, 0) = 2.0;
+  F_mo(0, 1) = 0.5;
+  F_mo(1, 0) = 0.5;
+  F_mo(1, 1) = 3.0;
 
-  // Compute F_eff_AO = S * C * F_MO * C^T * S
-  RowMajorMatrix SC = S * C;
-  RowMajorMatrix F_AO = SC * F_MO * SC.transpose();
+  // Compute F_eff_AO = S * coeff * F_mo * coeff^T * S
+  Mat SC = S * coeff;
+  Mat F_ao = SC * F_mo * SC.transpose();
 
-  // Verify projection identity: C^T * F_AO * C = F_MO
-  RowMajorMatrix recovered = C.transpose() * F_AO * C;
-  EXPECT_TRUE(recovered.isApprox(F_MO, 1e-12))
+  // Verify projection identity: coeff^T * F_ao * coeff = F_mo
+  Mat recovered = coeff.transpose() * F_ao * coeff;
+  EXPECT_TRUE(recovered.isApprox(F_mo, 1e-12))
       << "Projection identity C^T F_eff_AO C = F_MO_eff failed.\n"
-      << "recovered:\n" << recovered << "\nexpected:\n" << F_MO;
+      << "recovered:\n"
+      << recovered << "\nexpected:\n"
+      << F_mo;
 }
 
 TEST_F(ScfTest, ROHF_LinearlyDependentBasis_Issue543) {
@@ -293,7 +297,10 @@ TEST_F(ScfTest, ROHF_LinearlyDependentBasis_Issue543) {
   EXPECT_TRUE(orbitals->is_restricted());
   EXPECT_TRUE(std::isfinite(energy));
 
-  const auto& coeff_alpha = orbitals->get_coefficients().first;
+  // Use non-deprecated API: coefficients() returns SymmetryBlockedTensor.
+  // Alpha block is index 0; .matrix() gives the dense Eigen matrix.
+  const auto& coeff_alpha =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
   if (coeff_alpha.rows() == coeff_alpha.cols()) {
     GTEST_SKIP() << "Linear-dependency removal did not trigger; expected "
                     "nMO < nAO";
