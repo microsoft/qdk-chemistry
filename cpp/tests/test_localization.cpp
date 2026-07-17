@@ -5,12 +5,15 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
+#include <limits>
 #include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
+#include <qdk/chemistry/algorithms/microsoft/localization/qio.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -46,7 +49,9 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
 
 TEST_F(LocalizationTest, Factory) {
   auto available_localizers = LocalizerFactory::available();
-  EXPECT_EQ(available_localizers.size(), 4);
+  // Lower bound rather than an exact count: adding future localizers should not
+  // break this test. The specific expected IDs are asserted individually below.
+  EXPECT_GE(available_localizers.size(), 5u);
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_pipek_mezey") != available_localizers.end());
@@ -56,6 +61,9 @@ TEST_F(LocalizationTest, Factory) {
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_natural_orbitals") != available_localizers.end());
+  EXPECT_TRUE(std::find(available_localizers.begin(),
+                        available_localizers.end(),
+                        "qdk_qio") != available_localizers.end());
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_vvhv") != available_localizers.end());
@@ -97,7 +105,7 @@ TEST_F(LocalizationTest,
   const std::vector<size_t> empty_indices;
   const std::vector<std::string> localizer_names = {
       "qdk_pipek_mezey", "qdk_mp2_natural_orbitals", "qdk_natural_orbitals",
-      "qdk_vvhv"};
+      "qdk_qio", "qdk_vvhv"};
 
   for (const auto& localizer_name : localizer_names) {
     auto localizer = LocalizerFactory::create(localizer_name);
@@ -1682,4 +1690,533 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
         localizer->run(wfn, active_alpha, active_alpha);
       },
       std::invalid_argument);
+}
+
+static void expect_qio_entropy_helper_matches_wavefunction(
+    const Wavefunction& wavefunction, std::size_t expected_alpha_electrons,
+    std::size_t expected_beta_electrons) {
+  ASSERT_TRUE(wavefunction.has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wavefunction.has_two_rdm_spin_dependent());
+
+  const auto* active_one_rdm = std::get_if<SymmetryBlockedTensor<2, double>>(
+      &wavefunction.active_one_rdm());
+  const auto* active_two_rdm = std::get_if<SymmetryBlockedTensor<4, double>>(
+      &wavefunction.active_two_rdm());
+  ASSERT_NE(active_one_rdm, nullptr);
+  ASSERT_NE(active_two_rdm, nullptr);
+
+  const auto& rdm_alpha = active_one_rdm->block({axes::alpha(), axes::alpha()});
+  const auto& rdm_beta = active_one_rdm->block({axes::beta(), axes::beta()});
+  const auto& rdm_aabb = active_two_rdm->block(
+      {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+  const Eigen::VectorXd expected = wavefunction.get_single_orbital_entropies();
+
+  ASSERT_GT(expected.size(), 0);
+  ASSERT_EQ(rdm_alpha.rows(), expected.size());
+  ASSERT_EQ(rdm_alpha.cols(), expected.size());
+  ASSERT_EQ(rdm_beta.rows(), expected.size());
+  ASSERT_EQ(rdm_beta.cols(), expected.size());
+  const std::size_t dim = static_cast<std::size_t>(expected.size());
+  ASSERT_EQ(static_cast<std::size_t>(rdm_aabb.size()), dim * dim * dim * dim);
+  EXPECT_NEAR(rdm_alpha.trace(), static_cast<double>(expected_alpha_electrons),
+              testing::wf_tolerance);
+  EXPECT_NEAR(rdm_beta.trace(), static_cast<double>(expected_beta_electrons),
+              testing::wf_tolerance);
+  if (expected_alpha_electrons == expected_beta_electrons) {
+    EXPECT_NEAR((rdm_alpha - rdm_beta).norm(), 0.0, testing::wf_tolerance);
+  } else {
+    EXPECT_GT((rdm_alpha - rdm_beta).norm(), testing::wf_tolerance);
+  }
+  EXPECT_GT(expected.maxCoeff(), 0.0);
+
+  for (std::size_t orbital = 0; orbital < dim; ++orbital) {
+    const auto index = static_cast<Eigen::Index>(orbital);
+    const auto diagonal_index = static_cast<Eigen::Index>(
+        ((orbital * dim + orbital) * dim + orbital) * dim + orbital);
+    const double actual =
+        qdk::chemistry::algorithms::microsoft::detail::single_orbital_entropy(
+            rdm_alpha(index, index), rdm_beta(index, index),
+            rdm_aabb(diagonal_index));
+    EXPECT_DOUBLE_EQ(actual, expected(index)) << "orbital " << orbital;
+  }
+}
+
+struct QIOEntropyTestWavefunction {
+  std::shared_ptr<Wavefunction> wavefunction;
+  std::size_t alpha_electrons;
+  std::size_t beta_electrons;
+};
+
+static QIOEntropyTestWavefunction make_qio_entropy_test_wavefunction(
+    const std::shared_ptr<Structure>& structure, int charge, int multiplicity) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", false);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_HF, wfn_HF] =
+      scf_solver->run(structure, charge, multiplicity, "sto-3g");
+  (void)E_HF;
+
+  const std::size_t num_orbitals =
+      wfn_HF->get_orbitals()->get_num_molecular_orbitals();
+  std::vector<std::size_t> active_indices(num_orbitals);
+  std::iota(active_indices.begin(), active_indices.end(), 0);
+  auto active_orbitals = testing::with_active_space(
+      wfn_HF->get_orbitals(), active_indices, std::vector<std::size_t>{});
+
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  const auto [total_alpha, total_beta] = wfn_HF->get_total_num_electrons();
+  const auto alpha_electrons =
+      static_cast<std::size_t>(std::llround(total_alpha));
+  const auto beta_electrons =
+      static_cast<std::size_t>(std::llround(total_beta));
+  auto [E_cas, wavefunction] =
+      mc_calc->run(hamiltonian_cas, alpha_electrons, beta_electrons);
+  (void)E_cas;
+
+  return {wavefunction, alpha_electrons, beta_electrons};
+}
+
+TEST_F(LocalizationTest, QIOSingleOrbitalEntropyIncludesTinyPositiveWeight) {
+  constexpr std::size_t dim = 2;
+  constexpr double tiny_weight = 1e-15;
+  Eigen::MatrixXd rdm_alpha = Eigen::MatrixXd::Zero(dim, dim);
+  Eigen::MatrixXd rdm_beta = Eigen::MatrixXd::Zero(dim, dim);
+  rdm_alpha.diagonal() << tiny_weight, 1.0 - tiny_weight;
+  rdm_beta = rdm_alpha;
+
+  Eigen::VectorXd rdm_aabb = Eigen::VectorXd::Zero(dim * dim * dim * dim);
+  const auto diagonal_index = [](std::size_t orbital) {
+    return static_cast<Eigen::Index>(
+        ((orbital * dim + orbital) * dim + orbital) * dim + orbital);
+  };
+  rdm_aabb(diagonal_index(0)) = tiny_weight;
+  rdm_aabb(diagonal_index(1)) = 1.0 - tiny_weight;
+  const Eigen::VectorXd same_spin = Eigen::VectorXd::Zero(rdm_aabb.size());
+
+  Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(dim, dim);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(dim, dim);
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap),
+      testing::create_random_basis_set(dim, "test"),
+      std::make_tuple(std::vector<std::size_t>({0, 1}),
+                      std::vector<std::size_t>{}));
+  Eigen::VectorXd ci_coefficients(2);
+  ci_coefficients << std::sqrt(tiny_weight), std::sqrt(1.0 - tiny_weight);
+  std::vector<Configuration> determinants{
+      Configuration::from_spin_half_string("20"),
+      Configuration::from_spin_half_string("02")};
+  auto wavefunction =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coefficients), determinants,
+          orbitals, std::nullopt,
+          std::make_optional<ContainerTypes::MatrixVariant>(rdm_alpha),
+          std::make_optional<ContainerTypes::MatrixVariant>(rdm_beta),
+          std::nullopt,
+          std::make_optional<ContainerTypes::VectorVariant>(same_spin),
+          std::make_optional<ContainerTypes::VectorVariant>(rdm_aabb),
+          std::make_optional<ContainerTypes::VectorVariant>(same_spin)));
+
+  expect_qio_entropy_helper_matches_wavefunction(*wavefunction, 1, 1);
+}
+
+TEST_F(LocalizationTest,
+       QIOSingleOrbitalEntropyMatchesClosedShellWavefunction) {
+  const auto test_wavefunction =
+      make_qio_entropy_test_wavefunction(testing::create_lih_structure(), 0, 1);
+  ASSERT_EQ(test_wavefunction.alpha_electrons,
+            test_wavefunction.beta_electrons);
+  ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
+  expect_qio_entropy_helper_matches_wavefunction(
+      *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
+      test_wavefunction.beta_electrons);
+}
+
+TEST_F(LocalizationTest, QIO) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  EXPECT_NO_THROW({ auto settings = localizer->settings(); });
+
+  // Get a canonical set of water orbitals.
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "cc-pvdz");
+
+  // Select a (6e, 6o) valence active space.
+  auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space->settings().set("num_active_electrons", 6);
+  active_space->settings().set("num_active_orbitals", 6);
+  auto active_space_wfn = active_space->run(wfn_HF);
+  auto active_orbitals = active_space_wfn->get_orbitals();
+
+  // Run CAS with spin-dependent 1- and 2-RDMs (required by the QIO localizer).
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  auto [E_cas, wfn_cas] = mc_calc->run(
+      hamiltonian_cas, active_space_wfn->get_active_num_electrons().first,
+      active_space_wfn->get_active_num_electrons().second);
+
+  ASSERT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
+
+  const auto active_indices_a =
+      spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
+  const auto active_indices_b =
+      spin_channel_indices(active_orbitals->active_indices(), axes::beta());
+  EXPECT_EQ(active_indices_b, active_indices_a);
+  std::vector<size_t> active_indices(active_indices_a.begin(),
+                                     active_indices_a.end());
+  ASSERT_TRUE(std::is_sorted(active_indices.begin(), active_indices.end()));
+
+  // Total single-orbital entropy in the input (canonical) basis.
+  const double entropy_before = wfn_cas->get_single_orbital_entropies().sum();
+  EXPECT_GE(entropy_before, 0.0);
+
+  std::shared_ptr<Wavefunction> qio_wfn_ptr;
+  EXPECT_NO_THROW({
+    qio_wfn_ptr = localizer->run(wfn_cas, active_indices, active_indices);
+  });
+  ASSERT_NE(qio_wfn_ptr, nullptr);
+  // The returned wavefunction is an Aufbau determinant carrier.
+  ASSERT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          qio_wfn_ptr));
+
+  auto& qio_orbitals = *qio_wfn_ptr->get_orbitals();
+  const auto& Ca_can =
+      active_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& Ca_qio =
+      qio_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  // QIO preserves the AO and MO dimensions.
+  EXPECT_EQ(Ca_qio.rows(), Ca_can.rows());
+  EXPECT_EQ(Ca_qio.cols(), Ca_can.cols());
+
+  // The active-space rotation U = Ca_can^T S Ca_qio must be unitary, and the
+  // QIO orbitals orthonormal.
+  const auto& S = active_orbitals->get_overlap_matrix();
+  const size_t num_active = active_indices.size();
+  Eigen::MatrixXd Ca_selected(Ca_can.rows(), num_active);
+  Eigen::MatrixXd Ca_qio_selected(Ca_qio.rows(), num_active);
+  for (size_t i = 0; i < num_active; ++i) {
+    Ca_selected.col(i) = Ca_can.col(active_indices[i]);
+    Ca_qio_selected.col(i) = Ca_qio.col(active_indices[i]);
+  }
+  Eigen::MatrixXd U_selected = Ca_selected.transpose() * S * Ca_qio_selected;
+  EXPECT_NEAR(0.0, testing::norm_diff_from_unitary(U_selected),
+              testing::numerical_zero_tolerance * 10);
+
+  Eigen::MatrixXd overlap_check =
+      Ca_qio_selected.transpose() * S * Ca_qio_selected;
+  EXPECT_NEAR(
+      0.0,
+      (overlap_check - Eigen::MatrixXd::Identity(num_active, num_active))
+          .norm(),
+      testing::numerical_zero_tolerance * 10);
+
+  // The output carries a real spin-traced 1-RDM payload conserving the active
+  // particle number.
+  const auto& output_rdm_variant =
+      qio_wfn_ptr->get_active_one_rdm_spin_traced();
+  const auto* output_rdm = std::get_if<Eigen::MatrixXd>(&output_rdm_variant);
+  ASSERT_NE(output_rdm, nullptr);
+  const auto [nelec_a, nelec_b] = wfn_cas->get_active_num_electrons();
+  EXPECT_NEAR(static_cast<double>(nelec_a + nelec_b), output_rdm->trace(),
+              1e-8);
+}
+
+TEST_F(LocalizationTest, QIOSingleOrbitalEntropyMatchesOpenShellWavefunction) {
+  const auto test_wavefunction =
+      make_qio_entropy_test_wavefunction(testing::create_oh_structure(), 0, 2);
+  ASSERT_NE(test_wavefunction.alpha_electrons,
+            test_wavefunction.beta_electrons);
+  ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
+  expect_qio_entropy_helper_matches_wavefunction(
+      *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
+      test_wavefunction.beta_electrons);
+}
+
+TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  std::vector<size_t> active_indices({0, 1, 2, 3});
+  std::vector<size_t> inactive_indices({});
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2200"), orbitals));
+
+  // QIO produces a single spatial orbital set: alpha and beta selection
+  // indices must be identical. This check precedes any RDM access.
+  std::vector<size_t> alpha_indices({0, 1, 2, 3});
+  std::vector<size_t> beta_indices({0, 1, 2});
+  EXPECT_THROW(localizer->run(wfn, alpha_indices, beta_indices),
+               std::invalid_argument);
+}
+
+// Minimal restricted single-determinant wavefunction with a defined active
+// space, used to exercise the QIO localizer input-validation branches that
+// reject before any RDM is accessed.
+static std::shared_ptr<Wavefunction> make_minimal_qio_wfn(
+    const std::vector<size_t>& active_indices,
+    const std::vector<size_t>& inactive_indices, const std::string& config) {
+  const size_t n = active_indices.size() + inactive_indices.size();
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(n, n);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(n, n);
+  auto basis_set = testing::create_random_basis_set(n, "test");
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      Configuration::from_spin_half_string(config), orbitals));
+}
+
+TEST_F(LocalizationTest, QIORejectsUnsortedIndices) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+  std::vector<size_t> unsorted({2, 0, 1, 3});
+  EXPECT_THROW(localizer->run(wfn, unsorted, unsorted), std::invalid_argument);
+}
+TEST_F(LocalizationTest, QIORejectsDuplicateIndices) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+  std::vector<size_t> duplicated({0, 1, 1, 2});  // sorted but not unique
+  EXPECT_THROW(localizer->run(wfn, duplicated, duplicated),
+               std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIORejectsMissingOverlap) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  const std::vector<size_t> active({0, 1, 2, 3});
+  const std::vector<size_t> inactive;
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  // Restricted orbitals with an active space but no AO overlap matrix.
+  auto orbitals =
+      std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt, basis_set,
+                                 std::make_tuple(active, inactive));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2200"), orbitals));
+  EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+  std::shared_ptr<Wavefunction> result;
+  std::vector<size_t> empty;
+  EXPECT_NO_THROW({ result = localizer->run(wfn, empty, empty); });
+  // Empty selection is a no-op, but (like the other localizers) it returns a
+  // fresh single-reference (Aufbau determinant) carrier with the input orbitals
+  // left unchanged, rather than the original wavefunction object.
+  ASSERT_NE(result, nullptr);
+  EXPECT_NE(result.get(), wfn.get());
+  EXPECT_TRUE(
+      qdk::chemistry::algorithms::detail::is_aufbau_determinant_wavefunction(
+          result));
+  const auto& original_alpha = wfn->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& result_alpha = result->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  EXPECT_NEAR(0.0, (result_alpha - original_alpha).norm(),
+              testing::numerical_zero_tolerance);
+}
+
+TEST_F(LocalizationTest, QIORejectsUnrestricted) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
+      std::make_optional(overlap), basis_set);
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2200"), orbitals));
+  std::vector<size_t> idx({0, 1});
+  EXPECT_THROW(localizer->run(wfn, idx, idx), std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIORejectsPartialActiveSpaceIndices) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+  std::vector<size_t> partial({1, 2});  // strict subset of the active space
+  EXPECT_THROW(localizer->run(wfn, partial, partial), std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  // A multi-determinant wavefunction that neither carries nor can lazily
+  // generate the spin-dependent active RDMs that QIO requires.
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(std::vector<size_t>({0, 1, 2, 3}),
+                      std::vector<size_t>({})));
+  Eigen::VectorXd ci_coeffs(2);
+  ci_coeffs << 0.9, std::sqrt(1.0 - 0.81);
+  std::vector<Configuration> dets(
+      {Configuration::from_spin_half_string("2200"),
+       Configuration::from_spin_half_string("0022")});
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
+          std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
+          std::optional<ContainerTypes::VectorVariant>(std::nullopt)));
+  std::vector<size_t> idx({0, 1, 2, 3});
+  EXPECT_THROW(localizer->run(wfn, idx, idx), std::invalid_argument);
+}
+
+// Build a synthetic closed-shell mean-field wavefunction of active-space
+// dimension `n`, carrying spin-dependent 1- and 2-RDMs (identity coefficients
+// and overlap). The 1-RDM has fractional occupations in a deliberately
+// scrambled (non-natural-orbital) basis, so QIO must perform real rotations to
+// lower the single-orbital entropy. A lightweight wavefunction with attached
+// RDMs (no SCF/CAS) for tests that must reach QIO's RDM-dependent code paths.
+static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
+    size_t n) {
+  // Requires n >= 2: the occupation ramp divides by (n - 1) and the 2-config
+  // determinant strings below index n / 2 - 1.
+  if (n < 2) {
+    throw std::invalid_argument(
+        "make_scrambled_meanfield_qio_wfn requires n >= 2");
+  }
+  // Fractional closed-shell occupations in (0, 1) -> nonzero single-orbital
+  // entropy, rotated by one layer of disjoint Givens rotations into a scrambled
+  // basis (QIO undoes it in a few sweeps, so the test stays fast).
+  Eigen::VectorXd occ(n);
+  for (size_t i = 0; i < n; ++i) {
+    occ(static_cast<Eigen::Index>(i)) =
+        0.9 - 0.8 * static_cast<double>(i) / static_cast<double>(n - 1);
+  }
+  Eigen::MatrixXd rot = Eigen::MatrixXd::Identity(n, n);
+  const double c = std::cos(0.35), s = std::sin(0.35);
+  for (size_t p = 0; p + 1 < n; p += 2) {
+    const Eigen::Index pi = static_cast<Eigen::Index>(p);
+    const Eigen::Index pj = static_cast<Eigen::Index>(p + 1);
+    const Eigen::VectorXd col_i = rot.col(pi);
+    const Eigen::VectorXd col_j = rot.col(pj);
+    rot.col(pi) = c * col_i + s * col_j;
+    rot.col(pj) = -s * col_i + c * col_j;
+  }
+  const Eigen::MatrixXd rdm1 = rot * occ.asDiagonal() * rot.transpose();
+
+  // Mean-field spin-dependent 2-RDM blocks (Wick from the closed-shell 1-RDM),
+  // flattened row-major as i*n^3 + j*n^2 + k*n + l.
+  auto g = [&](size_t p, size_t q) {
+    return rdm1(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q));
+  };
+  const size_t n4 = n * n * n * n;
+  Eigen::VectorXd aabb(n4), aaaa(n4);
+  for (size_t i = 0; i < n; ++i) {
+    for (size_t j = 0; j < n; ++j) {
+      for (size_t k = 0; k < n; ++k) {
+        for (size_t l = 0; l < n; ++l) {
+          const Eigen::Index e =
+              static_cast<Eigen::Index>(((i * n + j) * n + k) * n + l);
+          aabb(e) = g(i, k) * g(j, l);
+          aaaa(e) = g(i, k) * g(j, l) - g(i, l) * g(j, k);
+        }
+      }
+    }
+  }
+  const Eigen::VectorXd& bbbb = aaaa;  // closed shell: alpha == beta
+
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(n, n);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(n, n);
+  auto basis_set = testing::create_random_basis_set(n, "test");
+  std::vector<size_t> active(n);
+  std::iota(active.begin(), active.end(), 0);
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active, std::vector<size_t>({})));
+
+  // Two configurations (a correlated state) so the container uses the attached
+  // spin-dependent RDMs rather than mean-field determinant occupations; each
+  // has n/2 doubly-occupied orbitals (n electrons), matching the 1-RDM trace.
+  std::string config_a(n, '0');
+  for (size_t i = 0; i < n / 2; ++i) config_a[i] = '2';
+  std::string config_b = config_a;
+  config_b[n / 2 - 1] = '0';
+  config_b[n / 2] = '2';
+  std::vector<Configuration> dets(
+      {Configuration::from_spin_half_string(config_a),
+       Configuration::from_spin_half_string(config_b)});
+  Eigen::VectorXd ci_coeffs(2);
+  ci_coeffs << 0.9, std::sqrt(1.0 - 0.81);
+
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      ContainerTypes::VectorVariant(ci_coeffs), dets, orbitals,
+      std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant(rdm1)),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant(rdm1)),
+      std::optional<ContainerTypes::VectorVariant>(std::nullopt),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(aaaa)),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(aabb)),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(bbbb))));
+}
+
+TEST_F(LocalizationTest, QIOSettings) {
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto& settings = localizer->settings();
+  // Jacobi-sweep controls are exposed with documented defaults.
+  EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
+  EXPECT_NEAR(settings.get<double>("convergence_tolerance"), 1e-10, 1e-20);
+  EXPECT_NEAR(settings.get<double>("coarse_angle_step"), 0.02, 1e-12);
+  EXPECT_EQ(settings.get<int64_t>("fine_samples"), 201);
+  EXPECT_NEAR(settings.get<double>("improvement_tolerance"), 1e-12, 1e-22);
+  // ... and are user-configurable.
+  EXPECT_NO_THROW(settings.set("max_cycles", int64_t{50}));
+  EXPECT_EQ(settings.get<int64_t>("max_cycles"), 50);
+  // Numeric bounds are enforced at set-time so pathological values (size_t
+  // underflow / non-terminating angle scan) are rejected up front.
+  EXPECT_THROW(settings.set("max_cycles", int64_t{0}), std::invalid_argument);
+  EXPECT_THROW(settings.set("max_cycles", int64_t{-1}), std::invalid_argument);
+  EXPECT_THROW(settings.set("convergence_tolerance", -1e-6),
+               std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", 0.0), std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", -0.1), std::invalid_argument);
+  // A tiny-but-positive step (which would make the coarse scan take an
+  // astronomical number of iterations) and a step larger than pi are rejected.
+  EXPECT_THROW(settings.set("coarse_angle_step", 1e-10), std::invalid_argument);
+  EXPECT_THROW(settings.set("coarse_angle_step", 4.0), std::invalid_argument);
+  // fine_samples must be >= 2; improvement_tolerance must be >= 0.
+  EXPECT_NO_THROW(settings.set("fine_samples", int64_t{51}));
+  EXPECT_EQ(settings.get<int64_t>("fine_samples"), 51);
+  EXPECT_THROW(settings.set("fine_samples", int64_t{1}), std::invalid_argument);
+  EXPECT_THROW(settings.set("improvement_tolerance", -1e-9),
+               std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, QIORejectsNonFiniteSetting) {
+  // A NaN slips past the BoundConstraint range check (every comparison with NaN
+  // is false), so it must be rejected at run time with std::invalid_argument.
+  auto localizer = LocalizerFactory::create("qdk_qio");
+  localizer->settings().set("coarse_angle_step",
+                            std::numeric_limits<double>::quiet_NaN());
+  const size_t n = 4;
+  auto wfn = make_scrambled_meanfield_qio_wfn(n);
+  std::vector<size_t> active(n);
+  std::iota(active.begin(), active.end(), 0);
+  EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);
 }

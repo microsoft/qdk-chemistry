@@ -48,6 +48,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
+    QdkQIOLocalizer,
     QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
@@ -94,6 +95,7 @@ __all__ = [
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkQIOLocalizer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
