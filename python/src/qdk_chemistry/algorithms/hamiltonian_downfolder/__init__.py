@@ -30,8 +30,6 @@ def load():
     _loaded = True
 
     from qdk_chemistry.algorithms import register
-    from qdk_chemistry.algorithms.registry import register_factory
-
     from qdk_chemistry.algorithms.hamiltonian_downfolder.native_ducc import (
         NativeDuccFactory,
         NativeDuccSolver,
@@ -40,6 +38,7 @@ def load():
         ReferenceDuccFactory,
         ReferenceDuccSolver,
     )
+    from qdk_chemistry.algorithms.registry import register_factory
 
     # Register the factory. If ExaChem plugin already registered one, this will
     # raise ValueError — catch it and just register the algorithm.
@@ -76,6 +75,26 @@ def load():
     except ImportError:
         pass  # wicked not installed
 
+    # Pre-sliced spin-integrated wicked DUCC (requires wicked library)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_si_presliced import (
+            WickedDuccSIPreslicedSolver,
+        )
+
+        register(lambda: WickedDuccSIPreslicedSolver())
+    except ImportError:
+        pass  # wicked not installed
+
+    # Ambit-backed spin-integrated wicked DUCC (requires wicked + ambit)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_si_ambit import (
+            WickedDuccSIAmbitSolver,
+        )
+
+        register(lambda: WickedDuccSIAmbitSolver())
+    except ImportError:
+        pass  # wicked or ambit not installed
+
     # 4-space wicked DUCC (requires wicked library)
     try:
         from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_4space import (
@@ -83,5 +102,15 @@ def load():
         )
 
         register(lambda: WickedDucc4SpaceSolver())
+    except ImportError:
+        pass  # wicked not installed
+
+    # Hybrid wicked DUCC: gen_op H + 4-space T (requires wicked library)
+    try:
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_hybrid import (
+            WickedDuccHybridSolver,
+        )
+
+        register(lambda: WickedDuccHybridSolver())
     except ImportError:
         pass  # wicked not installed

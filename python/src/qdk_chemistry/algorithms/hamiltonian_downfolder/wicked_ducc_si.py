@@ -3,57 +3,135 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Spin-integrated DUCC Hamiltonian downfolding using wicked.
+"""Spin-integrated DUCC Hamiltonian downfolding using wicked (full-space).
 
-Uses wicked's 4-space spin-integrated formalism (α occ, α vir, β occ, β vir)
-to avoid the spin-orbital expansion entirely. Works directly with spatial
-integrals from the qdk-chemistry Hamiltonian and spin-blocked T amplitudes
-from PySCF.
-
-Advantages over the spin-orbital :class:`WickedDuccSolver`:
-
-- No 2× expansion to spin-orbitals (4× memory savings on 2e integrals)
-- Direct spatial output without ``spinorb_to_spatial`` conversion
-- Natural support for open-shell (UHF/ROHF) references
-
-The BCH truncation levels follow the same DUCC paper
-(Bauman et al., JCP 151, 014107) as the spin-orbital version.
+Computes the full Hbar in all orbital blocks, then extracts the active
+sub-block.  This is the reference implementation; for the optimised version
+that computes only active-space output see :mod:`wicked_ducc_si_presliced`.
 """
 
 from __future__ import annotations
 
-import itertools
 import logging
 
 import numpy as np
 
 from qdk_chemistry.algorithms.base import Algorithm
+from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_common import (
+    ScalarProxy,
+    assemble_active_hamiltonian,
+    build_ccsd_amplitudes,
+    build_ducc_bch,
+    build_integrals,
+    require_wicked,
+    zero_all_active_and_transpose,
+)
 
 logger = logging.getLogger(__name__)
 
-_wicked = None
+
+# ── Step 5a: Full-space einsum evaluation ────────────────────────────────────
 
 
-def _require_wicked():
-    global _wicked
-    if _wicked is None:
-        try:
-            import wicked
+def generate_equation(mbeq, osi, block_key):
+    """Generate an ``exec``-ready function string for one Hbar block.
 
-            _wicked = wicked
-        except ImportError:
-            raise ImportError(
-                "wicked is required for WickedDuccSISolver. Install from https://github.com/fevangelista/wicked"
-            )
-    return _wicked
+    Mirrors wicked's ``generate_equation`` helper: produces a Python function
+    that evaluates all einsum terms for *block_key* and returns the result
+    array (or scalar).  The function takes ``(E0, H, T)`` where ``E0`` is a
+    :class:`ScalarProxy` and ``H``/``T`` are space-keyed dicts.
+
+    Uses ``eq.compile('einsum')`` directly — no modification of the compiled
+    einsum strings.
+
+    The generated function uses ``nocc``/``nvir`` as free variables resolved
+    through the closure namespace at ``exec`` time.  Call with the appropriate
+    dimension dict.
+
+    Args:
+        mbeq: Many-body equation dict from ``Expression.to_manybody_equation``.
+        osi: ``OrbitalSpaceInfo`` from ``w.osi()``.
+        block_key: Block key string, e.g. ``"oo|vv"`` or ``"|"``.
+
+    Returns:
+        ``(func_str, output_spaces)`` — the function source and the list of
+        space labels for the output axes.
+
+    """
+    eqs = mbeq[block_key]
+    lhs_tensor = eqs[0].lhs().tensors()[0]
+    lhs_indices = lhs_tensor.upper() + lhs_tensor.lower()
+    ndim = len(lhs_indices)
+    output_spaces = [osi.label(idx.space()) for idx in lhs_indices]
+
+    fc = eqs[0].compile("einsum")
+    rv = fc.split("+=")[0].strip()
+
+    lines = ["def _eval(E0, H, T):"]
+    if ndim == 0:
+        lines.append(f"    {rv} = 0.0")
+    else:
+        dims = ",".join(f"_dims['{s}']" for s in output_spaces)
+        lines.append(f"    {rv} = np.zeros(({dims}))")
+
+    for eq in eqs:
+        lines.append(f"    {eq.compile('einsum')}")
+
+    lines.append(f"    return {rv}")
+    return "\n".join(lines), output_spaces
+
+
+def evaluate_bch_full(mbeq, osi, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b):
+    """Evaluate all BCH blocks at full orbital size.
+
+    For each non-empty block in *mbeq*, calls :func:`generate_equation` to
+    produce a function string, ``exec``s it, and evaluates with the given
+    tensors.
+
+    Args:
+        mbeq: Many-body equation dict.
+        osi: ``OrbitalSpaceInfo``.
+        H, T: Spin-blocked integral/amplitude dicts.
+        E0: Scalar reference energy.
+        nocc_a, nvir_a, nocc_b, nvir_b: Orbital counts.
+
+    Returns:
+        ``(fbar, vbar, E0_bch)`` — full-sized 1-body/2-body dicts and scalar.
+
+    """
+    dim_map = {"o": nocc_a, "v": nvir_a, "O": nocc_b, "V": nvir_b}
+    E0_proxy = ScalarProxy(E0)
+
+    fbar, vbar, E0_bch = {}, {}, 0.0
+    for key, eqs in mbeq.items():
+        if not eqs:
+            continue
+
+        func_str, output_spaces = generate_equation(mbeq, osi, key)
+        ndim = len(output_spaces)
+        ic = "".join(output_spaces)
+
+        ns = {}
+        exec(func_str, {"np": np, "_dims": dim_map}, ns)
+        result = ns["_eval"](E0_proxy, H, T)
+
+        if ndim == 0:
+            E0_bch = result
+        elif ndim == 2:
+            fbar[ic] = np.array(result)
+        elif ndim == 4:
+            vbar[ic] = np.array(result)
+
+    return fbar, vbar, E0_bch
+
+
+# ── Solver class ─────────────────────────────────────────────────────────────
 
 
 class WickedDuccSISolver(Algorithm):
-    """Spin-integrated DUCC Hamiltonian downfolder.
+    """Spin-integrated DUCC Hamiltonian downfolder (full-space evaluation).
 
-    Uses wicked's 4-space formalism with separate α/β orbital spaces,
-    working directly with spatial integrals. Supports both closed-shell
-    (RHF) and open-shell (UHF) references.
+    Computes Hbar at full orbital size, then extracts the active sub-block.
 
     Usage::
 
@@ -80,18 +158,7 @@ class WickedDuccSISolver(Algorithm):
         return "wicked_ducc_si"
 
     def _run_impl(self, hamiltonian, n_alpha, n_beta):
-        """Run spin-integrated DUCC downfolding.
-
-        Args:
-            hamiltonian: Full-space qdk-chemistry Hamiltonian (spatial, chemist).
-            n_alpha: Number of alpha electrons.
-            n_beta: Number of beta electrons.
-
-        Returns:
-            Downfolded active-space Hamiltonian (spatial, chemist).
-
-        """
-        w = _require_wicked()
+        w = require_wicked()
         s = self.settings()
         noa_act = s["nactive_oa"]
         nob_act = s["nactive_ob"]
@@ -99,21 +166,11 @@ class WickedDuccSISolver(Algorithm):
         nvb_act = s["nactive_vb"]
         ducc_level = s["ducc_level"]
 
-        # ── 1. Extract spatial integrals from Hamiltonian ──
-        # No spin-orbital expansion needed — work directly with spatial (nmo × nmo) arrays.
-        orbitals = hamiltonian.get_orbitals()
-        nmo = orbitals.get_num_molecular_orbitals()
         nocc_a, nocc_b = n_alpha, n_beta
+
+        # Step 1: integrals
+        H, E0, nmo = build_integrals(hamiltonian, nocc_a, nocc_b)
         nvir_a, nvir_b = nmo - nocc_a, nmo - nocc_b
-
-        h1_list, _ = hamiltonian.get_one_body_integrals()
-        h1 = np.array(h1_list).reshape(nmo, nmo)
-
-        eri_list, _, _ = hamiltonian.get_two_body_integrals()
-        eri = np.array(eri_list).reshape(nmo, nmo, nmo, nmo)
-
-        core_energy = hamiltonian.get_core_energy()
-
         logger.info(
             "WickedDuccSISolver: nmo=%d, nocc=(%d,%d), active=(%d,%d,%d,%d), level=%d",
             nmo,
@@ -126,270 +183,38 @@ class WickedDuccSISolver(Algorithm):
             ducc_level,
         )
 
-        # ── 2. Build Hamiltonian blocks in physicist notation ──
-        # V[p,q,r,s] = <pq|rs> = (pr|qs)_chemist  [swapaxes(1,2) of eri]
-        V = eri.swapaxes(1, 2)
-        # Same-spin antisymmetrized: <pq||rs> = <pq|rs> - <pq|sr>
-        V_asym = V - V.swapaxes(2, 3)
+        # Step 2: CCSD amplitudes
+        T = build_ccsd_amplitudes(hamiltonian, nmo, nocc_a, nocc_b)
 
-        # E₀ = V_nuc + Σ_m h[mm] + Σ_M h[MM] + ½Σ_{mn}<mn||mn> + ½Σ_{MN}<MN||MN> + Σ_{mM}<mM|mM>
-        E0 = core_energy
-        for m in range(nocc_a):
-            E0 += h1[m, m]
-        for m in range(nocc_b):
-            E0 += h1[m, m]
-        for m in range(nocc_a):
-            for n in range(nocc_a):
-                E0 += 0.5 * V_asym[m, n, m, n]
-        for m in range(nocc_b):
-            for n in range(nocc_b):
-                E0 += 0.5 * V_asym[m, n, m, n]
-        for m in range(nocc_a):
-            for n in range(nocc_b):
-                E0 += V[m, n, m, n]
+        # Step 3: zero all-active
+        act_oa, act_va, act_ob, act_vb = zero_all_active_and_transpose(
+            T, nocc_a, nocc_b, noa_act, nob_act, nva_act, nvb_act
+        )
 
-        # f[p,q] = h[p,q] + Σ_m <pm||qm> + Σ_M <pM|qM>
-        F = h1.copy()
-        for m in range(nocc_a):
-            F += V_asym[:, m, :, m]
-        for m in range(nocc_b):
-            F += V[:, m, :, m]
+        # Step 4: symbolic BCH
+        mbeq, osi = build_ducc_bch(w, ducc_level)
 
-        # Build H dictionary (lowercase=α, uppercase=β)
-        oa, va = slice(0, nocc_a), slice(nocc_a, nmo)
-        ob, vb = slice(0, nocc_b), slice(nocc_b, nmo)
-        sl_map = {"o": oa, "v": va, "O": ob, "V": vb}
+        # Step 5: full-space evaluation
+        fbar_full, vbar_full, E0_bch = evaluate_bch_full(mbeq, osi, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b)
 
-        H = {}
-        for c1 in ["o", "v"]:
-            for c2 in ["o", "v"]:
-                H[c1 + c2] = F[sl_map[c1], sl_map[c2]]
-                H[c1.upper() + c2.upper()] = F[sl_map[c1.upper()], sl_map[c2.upper()]]
-        for c1 in ["o", "v"]:
-            for c2 in ["o", "v"]:
-                for c3 in ["o", "v"]:
-                    for c4 in ["o", "v"]:
-                        H[c1 + c2 + c3 + c4] = V_asym[sl_map[c1], sl_map[c2], sl_map[c3], sl_map[c4]]
-                        H[c1.upper() + c2.upper() + c3.upper() + c4.upper()] = V_asym[
-                            sl_map[c1.upper()], sl_map[c2.upper()], sl_map[c3.upper()], sl_map[c4.upper()]
-                        ]
-                        H[c1 + c2.upper() + c3 + c4.upper()] = V[
-                            sl_map[c1], sl_map[c2.upper()], sl_map[c3], sl_map[c4.upper()]
-                        ]
-
-        # ── 3. CCSD amplitudes ──
-        from pyscf import cc
-
-        from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
-
-        alpha_occ = np.zeros(nmo)
-        alpha_occ[:nocc_a] = 1.0
-        beta_occ = np.zeros(nmo)
-        beta_occ[:nocc_b] = 1.0
-        mycc = cc.CCSD(hamiltonian_to_scf(hamiltonian, alpha_occ, beta_occ)).run()
-        logger.info("CCSD energy: %.10f", mycc.e_tot)
-
-        # Same-spin T2: antisymmetrize in (a,b) only. For RHF with t2[ij,ab]=t2[ji,ba],
-        # this automatically gives full antisymmetry in both pairs.
-        t2_asym = mycc.t2 - mycc.t2.swapaxes(2, 3)
-
-        T = {
-            "ov": mycc.t1.copy(),
-            "OV": mycc.t1.copy(),
-            "oovv": t2_asym.copy(),
-            "OOVV": t2_asym.copy(),
-            "oOvV": mycc.t2.copy(),
-        }
-
-        # ── 4. Zero all-active T → σ_ext ──
-        ncore_a, ncore_b = nocc_a - noa_act, nocc_b - nob_act
-        act_oa, act_va = slice(ncore_a, nocc_a), slice(0, nva_act)
-        act_ob, act_vb = slice(ncore_b, nocc_b), slice(0, nvb_act)
-
-        T["ov"][act_oa, act_va] = 0.0
-        T["OV"][act_ob, act_vb] = 0.0
-        T["oovv"][act_oa, act_oa, act_va, act_va] = 0.0
-        T["OOVV"][act_ob, act_ob, act_vb, act_vb] = 0.0
-        T["oOvV"][act_oa, act_ob, act_va, act_vb] = 0.0
-
-        # Transposes AFTER zeroing
-        T["vo"] = T["ov"].T.copy()
-        T["VO"] = T["OV"].T.copy()
-        T["vvoo"] = T["oovv"].transpose(2, 3, 0, 1).copy()
-        T["VVOO"] = T["OOVV"].transpose(2, 3, 0, 1).copy()
-        T["vVoO"] = T["oOvV"].transpose(2, 3, 0, 1).copy()
-        T["VvOo"] = T["oOvV"].transpose(3, 2, 1, 0).copy()
-
-        # ── 5. Wicked BCH ──
-        fbar, vbar, E0_bch = self._wicked_bch_si(w, ducc_level, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b)
-
-        # ── 6. Extract active sub-blocks directly, γ→χ ──
-        # Instead of assembling full nmo⁴ arrays, extract the active sub-block
-        # from each wicked output block directly. Only O(nact⁴) memory needed.
-        nact = noa_act + nva_act
-        act_o_idx = list(range(ncore_a, nocc_a))
-        act_v_idx = list(range(nva_act))
-
+        # Extract active sub-blocks from full arrays
         def _act(c):
-            """Active sub-indices within each block."""
-            return act_o_idx if c in ("o", "O") else act_v_idx
+            return list(range(act_oa.start, act_oa.stop)) if c in ("o", "O") else list(range(act_va.start, act_va.stop))
 
-        def _off(c):
-            """Offset in the nact-sized active array."""
-            return 0 if c in ("o", "O") else noa_act
+        fbar = {}
+        for key, arr in fbar_full.items():
+            fbar[key] = arr[np.ix_(_act(key[0]), _act(key[1]))]
 
-        # 1-body: extract active sub-blocks from fbar
-        g1_aa = np.zeros((nact, nact))
-        g1_bb = np.zeros((nact, nact))
-        for key, arr in fbar.items():
-            sub = arr[np.ix_(_act(key[0]), _act(key[1]))]
-            r0, c0 = _off(key[0]), _off(key[1])
-            if key.islower():
-                g1_aa[r0 : r0 + sub.shape[0], c0 : c0 + sub.shape[1]] = sub
-            elif key.isupper():
-                g1_bb[r0 : r0 + sub.shape[0], c0 : c0 + sub.shape[1]] = sub
+        vbar = {}
+        for key, arr in vbar_full.items():
+            vbar[key] = arr[np.ix_(*[_act(c) for c in key])]
 
-        # 2-body: extract active sub-blocks into nact⁴ arrays
-        g2_aa_raw = np.zeros((nact,) * 4)
-        g2_bb_raw = np.zeros((nact,) * 4)
-        g2_ab = np.zeros((nact,) * 4)
-        for key, arr in vbar.items():
-            n_lower = sum(1 for c in key if c.islower())
-            sub = arr[np.ix_(_act(key[0]), _act(key[1]), _act(key[2]), _act(key[3]))]
-            o = [_off(c) for c in key]
-            s = sub.shape
-            sl = tuple(slice(o[i], o[i] + s[i]) for i in range(4))
-            if n_lower == 4:
-                g2_aa_raw[sl] += sub
-            elif n_lower == 0:
-                g2_bb_raw[sl] += sub
-            elif n_lower == 2:
-                g2_ab[sl] += sub
+        # Step 6: assemble Hamiltonian
+        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act)
 
-        # Antisymmetrize same-spin at active size (nact⁴, not nmo⁴)
-        g2_aa = (
-            g2_aa_raw
-            - g2_aa_raw.transpose(1, 0, 2, 3)
-            - g2_aa_raw.transpose(0, 1, 3, 2)
-            + g2_aa_raw.transpose(1, 0, 3, 2)
-        )
-        g2_bb = (
-            g2_bb_raw
-            - g2_bb_raw.transpose(1, 0, 2, 3)
-            - g2_bb_raw.transpose(0, 1, 3, 2)
-            + g2_bb_raw.transpose(1, 0, 3, 2)
-        )
-
-        # χ₁^αα = γ₁^αα - Σ_m γ₂^αα[pm,qm] - Σ_M γ₂^αβ[pM,qM]
-        # χ₁^ββ = γ₁^ββ - Σ_M γ₂^ββ[pM,qM] - Σ_m γ₂^αβ[mp,mq]
-        aol = list(range(noa_act))
-        chi1_aa = (
-            g1_aa
-            - np.einsum("pmqm->pq", g2_aa[:, aol, :, :][:, :, :, aol])
-            - np.einsum("pmqm->pq", g2_ab[:, aol, :, :][:, :, :, aol])
-        )
-        chi1_bb = (
-            g1_bb
-            - np.einsum("pmqm->pq", g2_bb[:, aol, :, :][:, :, :, aol])
-            - np.einsum("mpmq->pq", g2_ab[np.ix_(aol, range(nact), aol, range(nact))])
-        )
-
-        # C = E₀ - Σ_m χ₁^αα[mm] - Σ_M χ₁^ββ[MM] - ½ΣΣ γ₂^αα - ½ΣΣ γ₂^ββ - ΣΣ γ₂^αβ
-        C = E0_bch
-        for m in aol:
-            C -= chi1_aa[m, m] + chi1_bb[m, m]
-            for n in aol:
-                C -= 0.5 * g2_aa[m, n, m, n] + 0.5 * g2_bb[m, n, m, n] + g2_ab[m, n, m, n]
-
-        # ── 7. Package Hamiltonian ──
-        from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
-
-        return Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(
-                chi1_aa, g2_ab.swapaxes(1, 2).ravel(), ModelOrbitals(nact), C, np.zeros((nact, nact))
-            )
-        )
-
+    # Keep as static method for tests that call it directly.
     @staticmethod
     def _wicked_bch_si(w, bch_order, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b):
-        """Run spin-integrated wicked BCH. Returns (fbar_dict, vbar_dict, E0_scalar)."""
-        w.reset_space()
-        w.add_space("o", "fermion", "occupied", list("ijklmn")[: max(nocc_a, 1)])
-        w.add_space("v", "fermion", "unoccupied", list("abcdef")[: max(nvir_a, 1)])
-        w.add_space("O", "fermion", "occupied", list("IJKLMN")[: max(nocc_b, 1)])
-        w.add_space("V", "fermion", "unoccupied", list("ABCDEF")[: max(nvir_b, 1)])
-
-        Top = w.op("T", ["v+ o", "V+ O", "v+ v+ o o", "V+ V+ O O", "V+ v+ O o"], unique=True)
-        Hops = []
-        for i in itertools.product(["v+", "o+"], ["v", "o"]):
-            Hops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V", "O"]):
-            Hops.append(" ".join(i))
-        for i in itertools.product(["v+", "o+"], ["v+", "o+"], ["v", "o"], ["v", "o"]):
-            Hops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V+", "O+"], ["V", "O"], ["V", "O"]):
-            Hops.append(" ".join(i))
-        for i in itertools.product(["v+", "o+"], ["V+", "O+"], ["v", "o"], ["V", "O"]):
-            Hops.append(" ".join(i))
-        Hop = w.op("H", Hops, unique=True)
-        Fops = []
-        for i in itertools.product(["v+", "o+"], ["v", "o"]):
-            Fops.append(" ".join(i))
-        for i in itertools.product(["V+", "O+"], ["V", "O"]):
-            Fops.append(" ".join(i))
-        Fop = w.op("H", Fops, unique=True)
-
-        sigma = w.op("T", ["v+ o", "V+ O", "v+ v+ o o", "V+ V+ O O", "V+ v+ O o"], unique=True)
-        sigma.add2(Top.adjoint(), w.rational(-1))
-
-        E0op = w.op("E0", [""])
-        if bch_order == 0:
-            Hbar = E0op + Hop
-        elif bch_order == 1:
-            Hbar = E0op + Hop + w.commutator(Hop, sigma)
-            Hbar.add2(w.commutator(Fop, sigma, sigma), w.rational(1, 2))
-        elif bch_order == 2:
-            Hbar = E0op + Hop + w.commutator(Hop, sigma)
-            Hbar.add2(w.commutator(Hop, sigma, sigma), w.rational(1, 2))
-            Hbar.add2(w.commutator(Fop, sigma, sigma, sigma), w.rational(1, 6))
-        else:
-            raise ValueError(f"Unsupported BCH order {bch_order}")
-
-        expr = w.WickTheorem().contract(w.rational(1), Hbar, 0, 4)
-        mbeq = expr.to_manybody_equation("R")
-
-        class _S:
-            def __init__(self, v):
-                self.val = v
-
-            def __getitem__(self, k):
-                return self.val
-
-        def _dim(c):
-            return {"o": nocc_a, "v": nvir_a, "O": nocc_b, "V": nvir_b}[c]
-
-        fbar, vbar, E0_bch = {}, {}, 0.0
-        for key, eqs in mbeq.items():
-            if not eqs:
-                continue
-            ndim = len(key.replace("|", ""))
-            fc = eqs[0].compile("einsum")
-            rv = fc.split("+=")[0].strip()
-            ic = rv[1:]
-            shape = [_dim(c) for c in ic]
-            lines = ["def _e(E0,H,T):"]
-            lines.append(f"    {rv}={'0.0' if ndim == 0 else 'np.zeros((' + ','.join(str(s) for s in shape) + '))'}")
-            for eq in eqs:
-                lines.append(f"    {eq.compile('einsum')}")
-            lines.append(f"    return {rv}")
-            ns = {}
-            exec("\n".join(lines), {"np": np}, ns)
-            result = ns["_e"](_S(E0), H, T)
-            if ndim == 0:
-                E0_bch = result
-            elif ndim == 2:
-                fbar[ic] = np.array(result)
-            elif ndim == 4:
-                vbar[ic] = np.array(result)
-
-        return fbar, vbar, E0_bch
+        """Run full-space BCH. Returns (fbar_dict, vbar_dict, E0_scalar)."""
+        mbeq, osi = build_ducc_bch(w, bch_order)
+        return evaluate_bch_full(mbeq, osi, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b)

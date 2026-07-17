@@ -37,13 +37,12 @@ def _require_wicked():
     global _wicked
     if _wicked is None:
         try:
-            import wicked
+            import wickd as wicked
 
             _wicked = wicked
         except ImportError:
             raise ImportError(
-                "wicked is required for WickedDuccSolver. "
-                "Install from https://github.com/fevangelista/wicked"
+                "wickd is required for WickedDuccSolver. Install from https://github.com/fevangelista/wicked"
             )
     return _wicked
 
@@ -89,6 +88,7 @@ class WickedDuccSolver(Algorithm):
 
         Returns:
             Downfolded active-space Hamiltonian (spatial, chemist).
+
         """
         w = _require_wicked()
         s = self.settings()
@@ -120,7 +120,11 @@ class WickedDuccSolver(Algorithm):
 
         logger.info(
             "WickedDuccSolver: nmo=%d, nocc=%d, active=(%d,%d), level=%d",
-            nmo, nocc, nactive_oa, nactive_va, ducc_level,
+            nmo,
+            nocc,
+            nactive_oa,
+            nactive_va,
+            ducc_level,
         )
 
         # ── 2. Convert spatial → spin-orbital (interleaved α,β) ──
@@ -220,17 +224,15 @@ class WickedDuccSolver(Algorithm):
                         t2_ext[i, j, a, b] = 0.0
 
         # ── 6. Wicked BCH expansion ──
-        chi_1, chi_2, C = self._wicked_bch(
-            w, ducc_level, f_no, v_no, t1_ext, t2_ext, E0_hf, nocc_so, nso, active_so
-        )
+        chi_1, chi_2, C = self._wicked_bch(w, ducc_level, f_no, v_no, t1_ext, t2_ext, E0_hf, nocc_so, nso, active_so)
 
         # ── 7. Convert chi (interleaved spin-orbital) → spatial chemist ──
-        from qdk_chemistry.plugins.exachem.conversion import FcidumpData, spinorb_to_spatial
         from qdk_chemistry.data import (
             CanonicalFourCenterHamiltonianContainer,
             Hamiltonian,
             ModelOrbitals,
         )
+        from qdk_chemistry.plugins.exachem.conversion import FcidumpData, spinorb_to_spatial
 
         # Pack chi into FcidumpData (interleaved spin-orbital physicist)
         fcidump = FcidumpData(
@@ -263,8 +265,10 @@ class WickedDuccSolver(Algorithm):
                     for s in range(nact):
                         if abs(chi_2[p, q, r, s]) > 1e-20:
                             chi2_blocked[
-                                il_to_blocked[p], il_to_blocked[q],
-                                il_to_blocked[r], il_to_blocked[s],
+                                il_to_blocked[p],
+                                il_to_blocked[q],
+                                il_to_blocked[r],
+                                il_to_blocked[s],
                             ] = chi_2[p, q, r, s]
 
         fcidump_blocked = FcidumpData(
@@ -307,6 +311,7 @@ class WickedDuccSolver(Algorithm):
 
         Returns:
             (chi_1, chi_2, C): Active-space chi tensors and scalar.
+
         """
         nvir = nso - nocc
 
@@ -345,17 +350,17 @@ class WickedDuccSolver(Algorithm):
         if bch_order == 0:
             Hbar = E0op + H_N
         elif bch_order == 1:
-            comm1 = w.commutator(H_N, sigma)           # [H_N, σ]
-            comm2_F = w.commutator(F, sigma, sigma)     # [[F, σ], σ]
+            comm1 = w.commutator(H_N, sigma)  # [H_N, σ]
+            comm2_F = w.commutator(F, sigma, sigma)  # [[F, σ], σ]
             Hbar = E0op + H_N + comm1
-            Hbar.add2(comm2_F, w.rational(1, 2))        # + ½[[F, σ], σ]
+            Hbar.add2(comm2_F, w.rational(1, 2))  # + ½[[F, σ], σ]
         elif bch_order == 2:
-            comm1 = w.commutator(H_N, sigma)            # [H_N, σ]
+            comm1 = w.commutator(H_N, sigma)  # [H_N, σ]
             comm2_HN = w.commutator(H_N, sigma, sigma)  # [[H_N, σ], σ]
             comm3_F = w.commutator(F, sigma, sigma, sigma)  # [[[F, σ], σ], σ]
             Hbar = E0op + H_N + comm1
-            Hbar.add2(comm2_HN, w.rational(1, 2))       # + ½[[H_N, σ], σ]
-            Hbar.add2(comm3_F, w.rational(1, 6))        # + ⅙[[[F, σ], σ], σ]
+            Hbar.add2(comm2_HN, w.rational(1, 2))  # + ½[[H_N, σ], σ]
+            Hbar.add2(comm3_F, w.rational(1, 6))  # + ⅙[[[F, σ], σ], σ]
         else:
             raise ValueError(f"Unsupported BCH order {bch_order} (must be 0, 1, or 2)")
 
@@ -370,8 +375,10 @@ class WickedDuccSolver(Algorithm):
         o_sl = slice(0, nocc)
         v_sl = slice(nocc, nso)
         f_dict = {
-            "oo": f_no[o_sl, o_sl], "ov": f_no[o_sl, v_sl],
-            "vo": f_no[v_sl, o_sl], "vv": f_no[v_sl, v_sl],
+            "oo": f_no[o_sl, o_sl],
+            "ov": f_no[o_sl, v_sl],
+            "vo": f_no[v_sl, o_sl],
+            "vv": f_no[v_sl, v_sl],
         }
         v_dict = {}
         for k1, s1 in [("o", o_sl), ("v", v_sl)]:
@@ -381,13 +388,16 @@ class WickedDuccSolver(Algorithm):
                         v_dict[k1 + k2 + k3 + k4] = v_no[s1, s2, s3, s4]
 
         t_dict = {
-            "ov": t1_ov, "vo": t1_ov.T,
-            "oovv": t2_oovv, "vvoo": t2_oovv.transpose(2, 3, 0, 1),
+            "ov": t1_ov,
+            "vo": t1_ov.T,
+            "oovv": t2_oovv,
+            "vvoo": t2_oovv.transpose(2, 3, 0, 1),
         }
 
         class _ScalarDict:
             def __init__(self, val):
                 self.val = val
+
             def __getitem__(self, key):
                 return self.val
 
@@ -408,15 +418,13 @@ class WickedDuccSolver(Algorithm):
             if ndim == 0:
                 lines.append(f"    {rv} = 0.0")
             else:
-                lines.append(
-                    f"    {rv} = np.zeros(({','.join(str(s) for s in shape)}))"
-                )
+                lines.append(f"    {rv} = np.zeros(({','.join(str(s) for s in shape)}))")
             for eq in eqs:
                 lines.append(f"    {eq.compile('einsum')}")
             lines.append(f"    return {rv}")
 
             ns = {}
-            exec("\n".join(lines), {"np": np}, ns)  # noqa: S102
+            exec("\n".join(lines), {"np": np}, ns)
             result = ns["_eval"](_ScalarDict(E0_hf), f_dict, v_dict, t_dict, nocc, nvir)
 
             if ndim == 0:
@@ -438,12 +446,7 @@ class WickedDuccSolver(Algorithm):
         vr = np.zeros((nso,) * 4)
         for k, (rv, ic, blk) in r2b.items():
             vr[tuple(slices_map[c] for c in ic)] += blk
-        vbar = (
-            vr
-            - vr.transpose(1, 0, 2, 3)
-            - vr.transpose(0, 1, 3, 2)
-            + vr.transpose(1, 0, 3, 2)
-        )
+        vbar = vr - vr.transpose(1, 0, 2, 3) - vr.transpose(0, 1, 3, 2) + vr.transpose(1, 0, 3, 2)
 
         # Restrict to active space → γ (Fermi-vacuum normal-ordered)
         # γ₁[PQ] = f̄[P,Q]  restricted to active indices
@@ -459,9 +462,7 @@ class WickedDuccSolver(Algorithm):
         # This re-normal-orders from the Fermi vacuum |Φ⟩ to the physical
         # vacuum |0⟩, absorbing the active-occupied contractions into the
         # 1-body term.  [Bauman et al., JCP 151, 014107, Eq. (30)-(31)]
-        chi_1 = gamma_1 - np.einsum(
-            "pmqm->pq", gamma_2[:, aol, :, :][:, :, :, aol]
-        )
+        chi_1 = gamma_1 - np.einsum("pmqm->pq", gamma_2[:, aol, :, :][:, :, :, aol])
         chi_2 = gamma_2.copy()
 
         # Physical-vacuum scalar (core energy of the downfolded Hamiltonian).

@@ -48,13 +48,11 @@ def _require_wicked():
     global _wicked
     if _wicked is None:
         try:
-            import wicked
+            import wickd as wicked
 
             _wicked = wicked
         except ImportError:
-            raise ImportError(
-                "wicked is required for WickedDucc4SpaceSolver. Install from https://github.com/fevangelista/wicked"
-            )
+            raise ImportError("wickd is required for WickedDucc4SpaceSolver. Install with: pip install wickd")
     return _wicked
 
 
@@ -100,6 +98,7 @@ class WickedDucc4SpaceSolver(Algorithm):
 
         Returns:
             Downfolded active-space Hamiltonian (spatial, chemist).
+
         """
         w = _require_wicked()
         s = self.settings()
@@ -237,33 +236,11 @@ class WickedDucc4SpaceSolver(Algorithm):
     def _build_T_dict(t1, t2, t2_asym, sl, nocc_a, nocc_b, spaces_a, spaces_b):
         """Build the T amplitude dictionary with proper index conventions.
 
-        Index Convention for wicked T2 tensors
-        =======================================
-
-        For same-spin T2, wicked's operator string "v1+ v2+ o2 o1" generates a key
-        ``v1+v2+o2+o1``. The tensor stored under this key follows the convention:
-
-            T[key][i_v1, i_v2, i_o2, i_o1] = t2_asym[o2_space, o1_space, v1_space, v2_space]
-
-        That is, the annihilation indices (positions 2, 3 in the key) map to the
-        FIRST two indices of the amplitude tensor in KEY-POSITION order:
-        position-2 index (ann1) → first amplitude axis, position-3 (ann2) → second.
-
-        For the "oovv"-type keys (de-excitation, from T†), the key is ``o1+o2+v1+v2``
-        and the storage is direct:
-
-            T[key][i_o1, i_o2, i_v1, i_v2] = t2_asym[o1_space, o2_space, v1_space, v2_space]
-
-        CRITICAL: For the "vvoo"-type transpose, one must use
-        ``t2_asym[o2_sl, o1_sl, v1_sl, v2_sl].transpose(2,3,0,1)``
-        (note o2 FIRST, o1 SECOND). Using ``t2_asym[o1, o2, ...]`` gives a sign error
-        when o1 != o2 due to antisymmetry: t2_asym[o2, o1, ...] = -t2_asym[o1, o2, ...].
-
-        For cross-spin T2 (αβ), no antisymmetry applies and the storage is:
-
-            T[α_occ + β_occ + α_vir + β_vir] = t2[α_occ_sl, β_occ_sl, α_vir_sl, β_vir_sl]
-
-        with transposes following directly from the operator-string order.
+        Follows the same pattern as the 2-space implementation: store
+        de-excitation entries directly from PySCF (natural index order),
+        then derive excitation entries via full index reversal (transpose
+        all axes). This avoids manual index reordering that can introduce
+        sign errors for antisymmetric same-spin amplitudes.
         """
         occ_a = ["c", "o"]
         vir_a = ["v", "e"]
@@ -297,6 +274,9 @@ class WickedDucc4SpaceSolver(Algorithm):
 
         # ── T2 same-spin blocks (αα and ββ) ──
         # All-active T2 (oo→vv, OO→VV) is excluded from σ_ext.
+        # Store de-excitation directly from PySCF, derive excitation via
+        # full index reversal — matches 2-space pattern, avoids manual
+        # index reordering that previously caused a sign bug.
         for o1 in occ_a:
             for o2 in occ_a:
                 for v1 in vir_a:
@@ -306,20 +286,18 @@ class WickedDucc4SpaceSolver(Algorithm):
                         o1_sl, o2_sl = sl[o1], sl[o2]
                         v1_sl = slice(sl[v1].start - nocc_a, sl[v1].stop - nocc_a)
                         v2_sl = slice(sl[v2].start - nocc_a, sl[v2].stop - nocc_a)
-                        block = t2_asym[o1_sl, o2_sl, v1_sl, v2_sl]
-                        # "oovv"-type key (de-excitation): direct storage
-                        T[o1 + o2 + v1 + v2] = block.copy()
-                        T[o1.upper() + o2.upper() + v1.upper() + v2.upper()] = block.copy()
-                        # "vvoo"-type key (excitation): t2_asym[o2, o1, ...] transposed
-                        # See docstring above for why o2 comes BEFORE o1 here.
-                        block_t = t2_asym[o2_sl, o1_sl, v1_sl, v2_sl]
-                        T[v1 + v2 + o2 + o1] = block_t.transpose(2, 3, 0, 1).copy()
-                        T[v1.upper() + v2.upper() + o2.upper() + o1.upper()] = (
-                            block_t.transpose(2, 3, 0, 1).copy()
-                        )
+                        # De-excitation key (natural PySCF order)
+                        deexc_key = o1 + o2 + v1 + v2
+                        T[deexc_key] = t2_asym[o1_sl, o2_sl, v1_sl, v2_sl].copy()
+                        T[deexc_key.upper()] = T[deexc_key].copy()
+                        # Excitation key: derive via full index reversal
+                        exc_key = deexc_key[::-1]
+                        T[exc_key] = T[deexc_key].transpose(3, 2, 1, 0).copy()
+                        T[exc_key.upper()] = T[exc_key].copy()
 
         # ── T2 cross-spin blocks (αβ) ──
         # All-active αβ T2 (oO→vV) is excluded from σ_ext.
+        # Same pattern: store de-excitation directly, derive excitation.
         for oa in occ_a:
             for ob in occ_b:
                 for va in vir_a:
@@ -329,13 +307,12 @@ class WickedDucc4SpaceSolver(Algorithm):
                         oa_sl, ob_sl = sl[oa], sl[ob]
                         va_sl = slice(sl[va].start - nocc_a, sl[va].stop - nocc_a)
                         vb_sl = slice(sl[vb].start - nocc_b, sl[vb].stop - nocc_b)
-                        raw = t2[oa_sl, ob_sl, va_sl, vb_sl]
-                        # "oOvV"-type (direct)
-                        T[oa + ob + va + vb] = raw.copy()
-                        # "VvOo"-type (full reverse)
-                        T[vb + va + ob + oa] = raw.transpose(3, 2, 1, 0).copy()
-                        # "vVoO"-type (swap pairs)
-                        T[va + vb + oa + ob] = raw.transpose(2, 3, 0, 1).copy()
+                        # De-excitation key (natural PySCF order)
+                        deexc_key = oa + ob + va + vb
+                        T[deexc_key] = t2[oa_sl, ob_sl, va_sl, vb_sl].copy()
+                        # Excitation keys: derive via transpose
+                        T[deexc_key[::-1]] = T[deexc_key].transpose(3, 2, 1, 0).copy()
+                        T[va + vb + oa + ob] = T[deexc_key].transpose(2, 3, 0, 1).copy()
 
         return T
 
@@ -382,17 +359,26 @@ class WickedDucc4SpaceSolver(Algorithm):
         # T2: exclude all-active (oo→vv, OO→VV, oO→vV)
         t2_aa = [
             f"{a1}+ {a2}+ {i2} {i1}"
-            for i1 in occ_a for i2 in occ_a for a1 in vir_a for a2 in vir_a
+            for i1 in occ_a
+            for i2 in occ_a
+            for a1 in vir_a
+            for a2 in vir_a
             if not _is_all_active([i1, i2], [a1, a2])
         ]
         t2_bb = [
             f"{a1}+ {a2}+ {i2} {i1}"
-            for i1 in occ_b for i2 in occ_b for a1 in vir_b for a2 in vir_b
+            for i1 in occ_b
+            for i2 in occ_b
+            for a1 in vir_b
+            for a2 in vir_b
             if not _is_all_active([i1, i2], [a1, a2])
         ]
         t2_ab = [
             f"{ab}+ {aa}+ {ib} {ia}"
-            for ia in occ_a for ib in occ_b for aa in vir_a for ab in vir_b
+            for ia in occ_a
+            for ib in occ_b
+            for aa in vir_a
+            for ab in vir_b
             if not _is_all_active([ia, ib], [aa, ab])
         ]
 
@@ -403,14 +389,8 @@ class WickedDucc4SpaceSolver(Algorithm):
         h1_ops = [f"{c1}+ {c2}" for c1 in spaces_a for c2 in spaces_a]
         h1_ops += [f"{c1}+ {c2}" for c1 in spaces_b for c2 in spaces_b]
 
-        h2_aa_ops = [
-            f"{c1}+ {c2}+ {c4} {c3}"
-            for c1, c2, c3, c4 in itertools.product(spaces_a, repeat=4)
-        ]
-        h2_bb_ops = [
-            f"{c1}+ {c2}+ {c4} {c3}"
-            for c1, c2, c3, c4 in itertools.product(spaces_b, repeat=4)
-        ]
+        h2_aa_ops = [f"{c1}+ {c2}+ {c4} {c3}" for c1, c2, c3, c4 in itertools.product(spaces_a, repeat=4)]
+        h2_bb_ops = [f"{c1}+ {c2}+ {c4} {c3}" for c1, c2, c3, c4 in itertools.product(spaces_b, repeat=4)]
         h2_ab_ops = [
             f"{c1}+ {c2}+ {c4} {c3}"
             for c1, c3 in itertools.product(spaces_a, repeat=2)
@@ -475,14 +455,12 @@ class WickedDucc4SpaceSolver(Algorithm):
                 continue
             shape = [dim[c] for c in ic]
             lines = ["def _e(E0,H,T):"]
-            lines.append(
-                f"    {rv}={'0.0' if ndim == 0 else 'np.zeros((' + ','.join(str(s) for s in shape) + '))'}"
-            )
+            lines.append(f"    {rv}={'0.0' if ndim == 0 else 'np.zeros((' + ','.join(str(s) for s in shape) + '))'}")
             for eq in eqs:
                 lines.append(f"    {eq.compile('einsum')}")
             lines.append(f"    return {rv}")
             ns = {}
-            exec("\n".join(lines), {"np": np}, ns)  # noqa: S102
+            exec("\n".join(lines), {"np": np}, ns)
             result = ns["_e"](_S(E0), H, T)
             if ndim == 0:
                 E0_bch = result

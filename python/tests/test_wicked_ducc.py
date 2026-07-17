@@ -22,14 +22,13 @@ import pytest
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 # Skip entire module if dependencies missing
-wicked = pytest.importorskip("wicked")
+wicked = pytest.importorskip("wickd")
 pytest.importorskip("pyscf")
 pytest.importorskip("h5py")
 
+import qdk_chemistry.algorithms.hamiltonian_downfolder  # noqa: E402
 from qdk_chemistry.algorithms import create  # noqa: E402
 from qdk_chemistry.data import Structure  # noqa: E402
-
-import qdk_chemistry.algorithms.hamiltonian_downfolder  # noqa: E402
 
 qdk_chemistry.algorithms.hamiltonian_downfolder.load()
 
