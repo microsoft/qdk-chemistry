@@ -57,6 +57,9 @@ from qdk_chemistry.algorithms.orbital_localizer import (
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
+    RobustPhaseEstimationCircuitBuilder,
+)
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
@@ -117,6 +120,7 @@ __all__ = [
     "QpeCircuitBuilder",
     "QubitHamiltonianSolver",
     "QubitMapper",
+    "RobustPhaseEstimationCircuitBuilder",
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
