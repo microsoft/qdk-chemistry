@@ -173,9 +173,12 @@ y_application = first_experiment.y_circuit.get_qre_application()
 print(first_experiment.round_index, first_experiment.circuit_multiplicity)
 print(x_application, y_application)
 
-# Execute the same re-iterable set, preserving its schedule and random draws.
-rpe_result = rpe.execute_circuit_set(circuit_set)
-print(rpe_result.get_summary())
+# Full millihartree execution is expensive. Set this to True to execute the same
+# re-iterable set while preserving its schedule and random draws.
+run_full_rpe = False
+if run_full_rpe:
+    rpe_result = rpe.execute_circuit_set(circuit_set)
+    print(rpe_result.get_summary())
 # end-cell-robust-circuit-set
 ################################################################################
 
