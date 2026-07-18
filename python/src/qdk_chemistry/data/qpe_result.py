@@ -155,6 +155,67 @@ class QpeResult(DataClass):
             metadata=metadata_copy,
         )
 
+    @classmethod
+    def from_energy(
+        cls,
+        *,
+        method: str,
+        energy: float,
+        evolution_time: float,
+        bits_msb_first: Sequence[int] | None = None,
+        bitstring_msb_first: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> "QpeResult":
+        """Construct a :class:`QpeResult` from an already-resolved energy.
+
+        Unlike :meth:`from_phase_fraction`, the energy is treated as primary. This
+        is required for workflows whose phase-to-energy map is non-linear (for
+        example the qDRIFT tangent de-biasing in robust phase estimation), where a
+        single ``phase_fraction`` cannot reproduce the energy. The reported phase
+        fields are the principal phase implied by ``angle = -energy * evolution_time``
+        under ``U = exp(-iHt)``.
+
+        Args:
+            method: Phase estimation algorithm or workflow label.
+            energy: Final resolved energy estimate.
+            evolution_time: Base evolution time ``t`` used to derive the display phase.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            metadata: Optional dictionary copied into the result for caller-defined context.
+
+        Returns:
+            QpeResult: Populated :class:`QpeResult` reflecting the supplied energy.
+
+        """
+        Logger.trace_entering()
+        method_label = str(method.value) if hasattr(method, "value") else str(method)
+
+        phase_angle = float((-energy * evolution_time) % (2 * np.pi))
+        phase_fraction = float(phase_angle / (2 * np.pi))
+
+        normalized_bits: tuple[int, ...] | None = None
+        bitstring = bitstring_msb_first
+        if bits_msb_first is not None:
+            normalized_bits = tuple(int(bit) for bit in bits_msb_first)
+            if bitstring is None:
+                bitstring = "".join(str(bit) for bit in normalized_bits)
+
+        metadata_copy = dict(metadata) if metadata is not None else None
+
+        return cls(
+            method=method_label,
+            phase_fraction=phase_fraction,
+            phase_angle=phase_angle,
+            canonical_phase_fraction=phase_fraction,
+            canonical_phase_angle=phase_angle,
+            raw_energy=float(energy),
+            branching=(float(energy),),
+            resolved_energy=float(energy),
+            bits_msb_first=normalized_bits,
+            bitstring_msb_first=bitstring,
+            metadata=metadata_copy,
+        )
+
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the QPE result.

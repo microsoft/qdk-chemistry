@@ -724,7 +724,10 @@ def _register_python_factories():
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder import (  # noqa: PLC0415
+        QpeCircuitBuilderFactory,
+        RobustPhaseEstimationCircuitBuilderFactory,
+    )
     from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
@@ -749,6 +752,7 @@ def _register_python_factories():
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
+    register_factory(RobustPhaseEstimationCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
     register_factory(HadamardTestFactory())
     register_factory(HadamardTestCircuitBuilderFactory())
@@ -832,11 +836,17 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
         QdkIterativeQpeCircuitBuilder,
     )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (  # noqa: PLC0415
+        QdkRobustPhaseEstimationCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (  # noqa: PLC0415
         QdkStandardQpeCircuitBuilder,
     )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (  # noqa: PLC0415
+        RobustPhaseEstimation,
     )
     from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import (  # noqa: PLC0415
         StandardPhaseEstimation,
@@ -883,7 +893,9 @@ def _register_python_algorithms():
     register(lambda: IterativePhaseEstimation())
     register(lambda: HadamardTest())
     register(lambda: QdkHadamardTestCircuitBuilder())
+    register(lambda: QdkRobustPhaseEstimationCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
+    register(lambda: RobustPhaseEstimation())
 
 
 _register_python_algorithms()

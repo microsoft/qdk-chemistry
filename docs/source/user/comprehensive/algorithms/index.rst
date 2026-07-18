@@ -24,6 +24,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    hadamard_test
    phase_estimation
    qpe_circuit_builder
+   robust_phase_estimation_circuit_builder
    evolution_circuit_builder
    hamiltonian_unitary_builder
    circuit_mapper
@@ -84,6 +85,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`
      - Phase estimation circuit composition
      - Circuit + QubitOperator → Circuit list
+   * - :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`
+     - Lazy robust phase-estimation circuit composition
+     - Circuit + QubitOperator → Circuit set
    * - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
      - Time-evolution circuit composition
      - TimeDependentQubitHamiltonian + Circuit → Circuit

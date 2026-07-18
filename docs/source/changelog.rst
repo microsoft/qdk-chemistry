@@ -18,6 +18,7 @@ See :ref:`release-v2.0.0` for full details and migration guidance.
 - Fermion-to-qubit mapping carried as data (``MajoranaMapping``), including a Verstraete-Cirac encoding
 - Explicit Pauli term grouping and generalized expectation estimation
 - Composable standard and iterative phase-estimation circuit builders
+- Lazy robust phase-estimation circuit builder with round, draw, seed, and multiplicity metadata for shared QRE and execution workflows
 - QDK Quantum Resource Estimator integration for generated circuits (``Circuit.estimate`` / ``get_qre_application``)
 - Algorithm result caching and data-file migration tooling
 - Windows build support with CI

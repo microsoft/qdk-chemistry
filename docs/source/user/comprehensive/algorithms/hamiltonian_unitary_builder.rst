@@ -10,9 +10,15 @@ Overview
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
-QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
+QDK/Chemistry provides several families of builders for this task. Three are *product-formula* methods that decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates:
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
+- **Trotter-Suzuki** — deterministic product formulas that apply every Hamiltonian term in a fixed, repeated sequence, with controllable error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
+- **qDRIFT** — randomized product formulas that sample terms with probability proportional to their coefficient magnitude, trading the fixed term ordering for a gate cost that depends on the Hamiltonian 1-norm rather than the number of terms :cite:`Campbell2019`.
+- **Partially randomized** — a hybrid that treats the largest-weight terms deterministically with Trotter and the remaining long tail with qDRIFT-style sampling :cite:`Guenther2025`.
+
+A fourth family, **block encoding**, instead embeds :math:`U = \frac{H}{\|H\|}` as a sub-block of a larger unitary via a linear combination of unitaries (LCU).
+
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (product formulas) or an ``LCUContainer`` (block encoding).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -141,6 +147,161 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+
+.. _qdrift-builder:
+
+qDRIFT randomized product formula
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"qdrift"``
+
+The qDRIFT method replaces the fixed term ordering of Trotter-Suzuki with *randomized sampling* :cite:`Campbell2019`.
+Instead of applying every term once per step, it draws each elementary exponential independently from a probability distribution weighted by coefficient magnitude.
+For a Hamiltonian :math:`H = \sum_j h_j P_j` with 1-norm :math:`\lambda = \sum_j |h_j|`:
+
+#. Form the distribution :math:`p_j = |h_j| / \lambda`.
+#. Draw :math:`N` terms independently according to :math:`p_j`.
+#. Apply each sampled term at a *fixed* angle that depends only on :math:`\lambda`, :math:`t`, and :math:`N`:
+
+.. math::
+
+   U(t) \approx \prod_{k=1}^{N} e^{-i\,\mathrm{sign}(h_{j_k})\,\frac{\lambda t}{N}\,P_{j_k}}
+
+The per-term angle :math:`\lambda t / N` is independent of the individual coefficient :math:`h_j`, so the gate cost depends on the 1-norm :math:`\lambda` and the target accuracy rather than on the number of terms :math:`L`.
+This makes qDRIFT attractive for Hamiltonians with many small terms.
+
+The approximation error (in expectation over the randomness) is bounded by :cite:`Campbell2019`
+
+.. math::
+
+   \epsilon \leq \frac{2 \lambda^2 t^2}{N}.
+
+The number of samples :math:`N` can be set directly (``num_samples``) or computed automatically from a ``target_accuracy`` :math:`\epsilon` by inverting the bound, :math:`N = \lceil 2\lambda^2 t^2 / \epsilon \rceil`.
+When both are provided, the larger of the two values is used, so ``num_samples`` acts as a floor.
+
+Consecutive sampled terms that are identical and lie within a mutually commuting run can be fused via ``merge_duplicate_terms`` to reduce circuit depth; the merge is exact and preserves the error bound.
+The ``commutation_type`` setting controls how commuting runs are detected: ``"qubit_wise"`` is stricter but always safe, while ``"general"`` (default) admits larger merge groups.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``num_samples``
+     - int
+     - Number of random samples :math:`N`. Acts as a floor when ``target_accuracy`` is set. Default is 100.
+   * - ``target_accuracy``
+     - float
+     - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic sample-count estimation is disabled.
+   * - ``error_bound``
+     - str
+     - Strategy for the qDRIFT error bound. Currently only ``"campbell"`` (default) is supported.
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+   * - ``seed``
+     - int
+     - Random seed for reproducibility. Use -1 (default) for non-deterministic sampling.
+   * - ``merge_duplicate_terms``
+     - bool
+     - Fuse identical Pauli terms within consecutive commuting runs to reduce circuit depth. Default is True.
+   * - ``commutation_type``
+     - str
+     - Commutation check used when merging: ``"qubit_wise"`` (stricter) or ``"general"`` (default).
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-configure-qdrift
+      :end-before: # end-cell-configure-qdrift
+
+.. _partially-randomized-builder:
+
+Partially randomized product formula
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"partially_randomized"``
+
+The partially randomized method is a hybrid that combines deterministic Trotter with randomized qDRIFT sampling :cite:`Guenther2025`.
+It splits the Hamiltonian into a deterministic part and a random part:
+
+.. math::
+
+   H = H_D + H_R,
+
+where :math:`H_D` collects the largest-weight terms (treated with a first- or second-order Trotter formula) and :math:`H_R` collects the remaining long tail of small terms (treated with qDRIFT-style sampling).
+This is effective for chemistry Hamiltonians where a few terms dominate the weight while many small terms form a long tail: the dominant terms get the better :math:`\epsilon`-scaling of Trotter, while the tail gets the depth savings of randomization.
+
+Each step applies :math:`H_D` and sandwiches a freshly sampled :math:`H_R` block inside it.
+For a second-order (symmetric) Trotter formula the deterministic part is applied with half-angles in a palindromic sweep around the random block; the first-order variant applies :math:`H_D` at full angle followed by :math:`H_R`.
+
+The split point is controlled by ``weight_threshold``: terms with :math:`|h_j|` at or above the threshold go into :math:`H_D`.
+Setting it to ``-1.0`` selects the split automatically (top 10% of terms by weight, or a cost-optimal split when ``target_accuracy`` is set).
+
+When ``target_accuracy`` :math:`\epsilon` is set, the builder becomes accuracy-aware.
+The squared error budget is split in quadrature between the two parts,
+
+.. math::
+
+   \epsilon_D^2 + \epsilon_R^2 = \epsilon^2, \qquad \epsilon_D^2 = s\,\epsilon^2,
+
+with the fraction :math:`s` given by ``accuracy_split``.
+The evolution is divided into :math:`r` outer Trotter steps sized from :math:`\epsilon_D` (using ``trotter_error_bound``), and the per-step qDRIFT sample count is sized from :math:`\epsilon_R` (Campbell bound).
+Each of the :math:`r` steps draws a *fresh* independent qDRIFT block, which is required for the randomized error to add up correctly across steps.
+With ``target_accuracy = 0.0`` (the default) a single step is used with ``num_random_samples`` samples, preserving the legacy behavior.
+
+The randomized part contributes :math:`O(\lambda_R^2 / \epsilon^2)` Pauli rotations, where :math:`\lambda_R = \sum_m |h_m|` is the 1-norm of :math:`H_R` :cite:`Guenther2025`.
+Because the deterministic part removes the dominant terms from :math:`\lambda_R`, this is typically much smaller than the cost of applying qDRIFT to the full Hamiltonian.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``weight_threshold``
+     - float
+     - Terms with :math:`|h_j|` at or above this value are treated deterministically. Use -1.0 (default) for automatic selection.
+   * - ``trotter_order``
+     - int
+     - Order of the Trotter formula for the deterministic part (1 or 2). Default is 2.
+   * - ``num_random_samples``
+     - int
+     - Number of qDRIFT samples for :math:`H_R`. Acts as a per-step floor when ``target_accuracy`` is set. Default is 100.
+   * - ``target_accuracy``
+     - float
+     - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic parameterization is disabled.
+   * - ``accuracy_split``
+     - float
+     - Fraction :math:`s` of the squared error budget given to the deterministic part (:math:`\epsilon_D^2 = s\,\epsilon^2`). Clamped to (0, 1). Default is 0.5.
+   * - ``trotter_error_bound``
+     - str
+     - Error bound for sizing the outer Trotter step count: ``"commutator"`` (default, tighter) or ``"naive"``.
+   * - ``seed``
+     - int
+     - Random seed for reproducibility. Use -1 (default) for non-deterministic sampling.
+   * - ``tolerance``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+   * - ``merge_duplicate_terms``
+     - bool
+     - Fuse identical Pauli terms within consecutive commuting runs of the random block. Default is True.
+   * - ``commutation_type``
+     - str
+     - Commutation check used when merging: ``"qubit_wise"`` (stricter) or ``"general"`` (default).
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-configure-pr
+      :end-before: # end-cell-configure-pr
 
 
 .. _zassenhaus-builder:
