@@ -26,21 +26,23 @@ from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
 )
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.rpe import (
     energy_from_rpe_angle,
     expectation_from_counts,
-    num_rounds,
     qdrift_phase_to_energy,
-    qdrift_schedule,
     rpe_angle_update,
     wrap_to_principal,
 )
 
 from .base import PhaseEstimation
+from .circuit_builder.robust_builder import (
+    RobustPhaseEstimationCircuitBuilder,
+    RobustPhaseEstimationCircuitSet,
+)
 
 __all__: list[str] = ["RobustPhaseEstimation", "RobustPhaseEstimationSettings"]
 
@@ -48,69 +50,20 @@ __all__: list[str] = ["RobustPhaseEstimation", "RobustPhaseEstimationSettings"]
 class RobustPhaseEstimationSettings(Settings):
     """Settings for the Robust Phase Estimation algorithm."""
 
-    def __init__(self):
-        """Initialize settings with nested algorithm references and scalar parameters."""
+    def __init__(self) -> None:
+        """Initialize circuit-builder and executor references."""
         super().__init__()
         self._set_default(
-            "unitary_builder",
+            "robust_phase_estimation_circuit_builder",
             "algorithm_ref",
-            AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
-            "Time-evolution builder used to realize U(t); sized per round.",
+            AlgorithmRef("robust_phase_estimation_circuit_builder", "qdk"),
+            "Circuit builder that owns the RPE schedule and circuit-generation settings.",
         )
         self._set_default(
-            "hadamard_test",
+            "circuit_executor",
             "algorithm_ref",
-            AlgorithmRef("hadamard_test", "qdk"),
-            "Hadamard test used to sample the real/imaginary parts of the signal.",
-        )
-        self._set_default(
-            "target_accuracy",
-            "double",
-            1e-3,
-            "Requested absolute accuracy epsilon on the final energy estimate.",
-        )
-        self._set_default(
-            "base_time",
-            "double",
-            0.0,
-            "Base evolution time tau (round-0 time). 0.0 selects pi/(2*lambda) automatically.",
-        )
-        self._set_default(
-            "unitary_accuracy_fraction",
-            "double",
-            0.5,
-            "Fraction f of the total target_accuracy budget assigned to the unitary builder: "
-            "epsilon_unitary = f * target_accuracy and epsilon_rpe = (1 - f) * target_accuracy. "
-            "Use a value in [0, 1); 0.5 splits the budget evenly. Ignored for pure qDRIFT, "
-            "which auto-sets f = 0 so the whole budget sizes the RPE ladder.",
-        )
-        self._set_default(
-            "epsilon_rpe",
-            "double",
-            0.0,
-            "Optional explicit RPE energy tolerance. Set together with epsilon_unitary; "
-            "0.0 uses unitary_accuracy_fraction instead.",
-        )
-        self._set_default(
-            "epsilon_unitary",
-            "double",
-            0.0,
-            "Optional explicit dimensionless unitary signal tolerance. Set together with epsilon_rpe; "
-            "0.0 uses unitary_accuracy_fraction instead.",
-        )
-        self._set_default(
-            "energy_correction",
-            "string",
-            "auto",
-            "Phase-to-energy map: 'auto' (qDRIFT -> tangent de-biasing, otherwise linear), "
-            "'linear', or 'qdrift_tangent'.",
-            ["auto", "linear", "qdrift_tangent"],
-        )
-        self._set_default(
-            "seed",
-            "int",
-            -1,
-            "Random seed for the evolution builder. Use -1 for non-deterministic sampling.",
+            AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+            "Backend used to execute generated Hadamard-test circuits.",
         )
 
 
@@ -119,52 +72,28 @@ class RobustPhaseEstimation(PhaseEstimation):
 
     def __init__(
         self,
-        target_accuracy: float = 1e-3,
-        base_time: float = 0.0,
-        unitary_accuracy_fraction: float = 0.5,
-        energy_correction: str = "auto",
-        seed: int = -1,
-        epsilon_rpe: float = 0.0,
-        epsilon_unitary: float = 0.0,
-    ):
-        """Initialize RobustPhaseEstimation.
+        robust_phase_estimation_circuit_builder: AlgorithmRef | None = None,
+        circuit_executor: AlgorithmRef | None = None,
+    ) -> None:
+        """Initialize robust phase estimation orchestration.
 
         Args:
-            target_accuracy: Requested absolute accuracy on the final energy.
-                Explicit ``epsilon_rpe`` and ``epsilon_unitary`` values override
-                the fallback split defined by ``unitary_accuracy_fraction``.
-            base_time: Base evolution time ``tau``. ``0.0`` selects ``pi/(2*lambda)``.
-            unitary_accuracy_fraction: Fraction ``f`` of ``target_accuracy`` given
-                to the unitary builder (``epsilon_unitary = f * target_accuracy``,
-                ``epsilon_rpe = (1 - f) * target_accuracy``). Use a value in ``[0, 1)``.
-                Ignored for pure qDRIFT, which auto-sets ``f = 0`` (the qDRIFT
-                builder is sized by its sample schedule and de-biased by the
-                tangent map, so the whole budget sizes the RPE ladder).
-            energy_correction: Phase-to-energy map: ``"auto"`` (qDRIFT -> tangent,
-                otherwise linear), ``"linear"``, or ``"qdrift_tangent"``.
-            seed: Random seed for the evolution builder (``-1`` for non-deterministic).
-            epsilon_rpe: Optional explicit RPE energy tolerance. Set together
-                with ``epsilon_unitary``; ``0.0`` uses the fraction-based split.
-            epsilon_unitary: Optional explicit dimensionless unitary signal
-                tolerance. Set together with ``epsilon_rpe``; ``0.0`` uses the
-                fraction-based split.
+            robust_phase_estimation_circuit_builder: Optional reference to the RPE circuit builder.
+            circuit_executor: Optional reference to the circuit execution backend.
 
         """
         Logger.trace_entering()
         super().__init__()
         self._settings = RobustPhaseEstimationSettings()
-        self._settings.set("target_accuracy", target_accuracy)
-        self._settings.set("base_time", base_time)
-        self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
-        self._settings.set("energy_correction", energy_correction)
-        self._settings.set("seed", seed)
-        self._settings.set("epsilon_rpe", epsilon_rpe)
-        self._settings.set("epsilon_unitary", epsilon_unitary)
+        if robust_phase_estimation_circuit_builder is not None:
+            self._settings.set("robust_phase_estimation_circuit_builder", robust_phase_estimation_circuit_builder)
+        if circuit_executor is not None:
+            self._settings.set("circuit_executor", circuit_executor)
 
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -180,241 +109,122 @@ class RobustPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
+        circuit_set = self.build_circuit_set(state_preparation, qubit_hamiltonian)
+        return self.execute_circuit_set(circuit_set, noise=noise)
+
+    def build_circuit_set(
+        self,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitOperator,
+    ) -> RobustPhaseEstimationCircuitSet:
+        """Build the public lazy circuit collection configured for this estimator.
+
+        Args:
+            state_preparation: Circuit preparing the trial state on the system qubits.
+            qubit_hamiltonian: Qubit Hamiltonian whose eigenenergy is estimated.
+
+        Returns:
+            Lazy, re-iterable robust phase estimation circuit collection.
+
+        Raises:
+            TypeError: If the configured nested algorithm is not an RPE circuit builder.
+
+        """
+        circuit_builder = self._create_nested("robust_phase_estimation_circuit_builder")
+        if not isinstance(circuit_builder, RobustPhaseEstimationCircuitBuilder):
+            raise TypeError(
+                "Expected robust_phase_estimation_circuit_builder to be an instance of "
+                f"RobustPhaseEstimationCircuitBuilder, got {type(circuit_builder)} instead."
+            )
+        return circuit_builder.run(state_preparation, qubit_hamiltonian)
+
+    def execute_circuit_set(
+        self,
+        circuit_set: RobustPhaseEstimationCircuitSet,
+        *,
+        noise: QuantumErrorProfile | None = None,
+    ) -> QpeResult:
+        """Execute a public RPE circuit set and return the recovered energy.
+
+        Args:
+            circuit_set: Lazy circuit collection returned by an RPE circuit builder.
+            noise: Noise model. Not supported in this MVP and ignored if provided.
+
+        Returns:
+            QpeResult carrying the resolved energy.
+
+        Raises:
+            TypeError: If ``circuit_set`` is not a robust phase estimation circuit set.
+
+        """
+        if not isinstance(circuit_set, RobustPhaseEstimationCircuitSet):
+            raise TypeError(
+                f"circuit_set must be an instance of RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead."
+            )
         if noise is not None:
             Logger.warning("RobustPhaseEstimation does not support noise yet; ignoring the noise model.")
 
-        epsilon_total = self._settings.get("target_accuracy")
-        seed = self._settings.get("seed")
-
-        category = self._classify_builder()
-        correction = self._select_correction(category)
-
-        fraction = min(max(float(self._settings.get("unitary_accuracy_fraction")), 0.0), 1.0)
-        explicit_epsilon_rpe = float(self._settings.get("epsilon_rpe"))
-        explicit_epsilon_unitary = float(self._settings.get("epsilon_unitary"))
-        has_explicit_budget = explicit_epsilon_rpe > 0.0 or explicit_epsilon_unitary > 0.0
-        budget_mode = "fraction"
-        if category == "qdrift":
-            if has_explicit_budget:
-                raise ValueError("Explicit epsilon_rpe/epsilon_unitary budgets are not supported for pure qDRIFT.")
-            # Pure qDRIFT ignores the unitary-accuracy budget: its depth comes
-            # from the per-round num_samples schedule and its systematic bias is
-            # removed by the tangent de-biasing map, not by an accuracy target.
-            # Route the whole budget to the RPE ladder instead of stranding a
-            # share of it on a builder that will not spend it.
-            fraction = 0.0
-        if has_explicit_budget:
-            if explicit_epsilon_rpe <= 0.0 or explicit_epsilon_unitary <= 0.0:
-                raise ValueError("epsilon_rpe and epsilon_unitary must both be positive when set explicitly.")
-            if explicit_epsilon_unitary >= np.sin(np.pi / 3.0):
-                raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
-            propagated_bound = (2.0 / np.pi) * explicit_epsilon_rpe * np.arcsin(explicit_epsilon_unitary)
-            if propagated_bound > epsilon_total * (1.0 + 1e-12):
-                raise ValueError(
-                    "Explicit error budgets do not meet target_accuracy: "
-                    f"(2/pi) * epsilon_rpe * arcsin(epsilon_unitary) = {propagated_bound:.6g} "
-                    f"> {epsilon_total:.6g}."
-                )
-            epsilon_rpe = explicit_epsilon_rpe
-            epsilon_unitary = explicit_epsilon_unitary
-            budget_mode = "explicit"
-        else:
-            epsilon_unitary = fraction * epsilon_total
-            epsilon_rpe = (1.0 - fraction) * epsilon_total
-            if epsilon_rpe <= 0.0:
-                # Degenerate split (fraction == 1): keep the RPE ladder finite.
-                epsilon_rpe = epsilon_total
-
-        lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
-        base_time = self._settings.get("base_time")
-        if base_time <= 0.0:
-            base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
-
-        total = num_rounds(lambda_norm, epsilon_rpe)
         Logger.info(
-            f"RobustPhaseEstimation: lambda={lambda_norm:.6g}, base_time={base_time:.6g}, "
-            f"rounds={total + 1}, builder={category}, correction={correction}, "
-            f"eps_rpe={epsilon_rpe:.3g}, eps_unitary={epsilon_unitary:.3g}."
+            f"RobustPhaseEstimation: lambda={circuit_set.lambda_norm:.6g}, "
+            f"base_time={circuit_set.base_time:.6g}, rounds={circuit_set.num_rounds}, "
+            f"builder={circuit_set.unitary_builder_category}, correction={circuit_set.energy_correction}, "
+            f"eps_rpe={circuit_set.epsilon_rpe:.3g}, eps_unitary={circuit_set.epsilon_unitary:.3g}."
         )
 
+        circuit_executor = self._create_nested("circuit_executor")
         theta = 0.0
-        final_samples = 1
-        randomized = category in ("qdrift", "partial_randomized")
-        for m in range(total + 1):
-            shots, samples = qdrift_schedule(total, m)
-            evolution_time = (2**m) * base_time
-            final_samples = samples
-
-            if randomized:
-                # Faithful estimator: each Hadamard repetition uses a freshly
-                # drawn circuit, so the shot-average estimates the expected
-                # signal <psi|E_C[U_C]|psi> rather than a single frozen draw.
-                real_part, imag_part = self._sample_signal_randomized(
-                    state_preparation,
-                    qubit_hamiltonian,
-                    evolution_time,
-                    samples,
-                    shots,
-                    seed,
-                    m,
-                    category,
-                    epsilon_unitary,
+        for round_data in circuit_set.rounds:
+            real_accumulator = 0.0
+            imag_accumulator = 0.0
+            for experiment in circuit_set.iter_round(round_data.round_index):
+                real_data = circuit_executor.run(
+                    experiment.x_circuit,
+                    shots=experiment.circuit_multiplicity,
                 )
-            else:
-                # Deterministic builder: the circuit is fixed, so one build
-                # measured `shots` times only samples measurement noise.
-                unitary = self._build_unitary(
-                    qubit_hamiltonian, evolution_time, samples, seed, m, category, epsilon_unitary
+                imag_data = circuit_executor.run(
+                    experiment.y_circuit,
+                    shots=experiment.circuit_multiplicity,
                 )
-                real_part = self._sample_signal(state_preparation, unitary, shots, "X")
-                imag_part = self._sample_signal(state_preparation, unitary, shots, "Y")
+                real_accumulator += expectation_from_counts(real_data.bitstring_counts)
+                imag_accumulator += expectation_from_counts(imag_data.bitstring_counts)
 
+            real_part = real_accumulator / float(round_data.num_draws)
+            imag_part = imag_accumulator / float(round_data.num_draws)
             measured_phase = float(np.angle(complex(real_part, imag_part)))
-            theta = rpe_angle_update(theta, measured_phase, m)
-            Logger.debug(f"Round {m}: shots={shots}, samples={samples}, phi={measured_phase:.6f}, theta={theta:.6f}.")
+            theta = rpe_angle_update(theta, measured_phase, round_data.round_index)
+            Logger.debug(
+                f"Round {round_data.round_index}: shots={round_data.shots_per_basis}, "
+                f"samples={round_data.scheduled_samples}, phi={measured_phase:.6f}, theta={theta:.6f}."
+            )
 
-        energy = self._resolve_energy(theta, base_time, total, lambda_norm, final_samples, correction=correction)
+        energy = self._resolve_energy(
+            theta,
+            circuit_set.base_time,
+            circuit_set.num_rounds - 1,
+            circuit_set.lambda_norm,
+            circuit_set.final_samples,
+            correction=circuit_set.energy_correction,
+        )
         metadata = {
-            "lambda": lambda_norm,
-            "base_time": base_time,
-            "num_rounds": total + 1,
-            "target_accuracy": float(epsilon_total),
-            "epsilon_rpe": float(epsilon_rpe),
-            "epsilon_unitary": float(epsilon_unitary),
-            "unitary_accuracy_fraction": float(fraction),
-            "error_budget_mode": budget_mode,
-            "unitary_builder": category,
-            "energy_correction": correction,
+            "lambda": circuit_set.lambda_norm,
+            "base_time": circuit_set.base_time,
+            "num_rounds": circuit_set.num_rounds,
+            "target_accuracy": circuit_set.target_accuracy,
+            "epsilon_rpe": circuit_set.epsilon_rpe,
+            "epsilon_unitary": circuit_set.epsilon_unitary,
+            "unitary_accuracy_fraction": circuit_set.unitary_accuracy_fraction,
+            "error_budget_mode": circuit_set.error_budget_mode,
+            "unitary_builder": circuit_set.unitary_builder_category,
+            "energy_correction": circuit_set.energy_correction,
+            "requested_seed": circuit_set.requested_seed,
+            "root_seed": circuit_set.root_seed,
         }
         return QpeResult.from_energy(
             method=self.name(),
             energy=energy,
-            evolution_time=base_time,
+            evolution_time=circuit_set.base_time,
             metadata=metadata,
         )
-
-    def _classify_builder(self) -> str:
-        """Classify the configured unitary builder by its sample-count settings.
-
-        Returns ``"partial_randomized"`` when the builder exposes
-        ``num_random_samples`` (the partially randomized family), ``"qdrift"``
-        when it exposes ``num_samples`` (pure qDRIFT), and otherwise
-        ``"deterministic_or_exact"`` (Trotter / Zassenhaus).
-        """
-        settings = self._create_nested("unitary_builder").settings()
-        if settings.has("num_random_samples"):
-            return "partial_randomized"
-        if settings.has("num_samples"):
-            return "qdrift"
-        return "deterministic_or_exact"
-
-    def _select_correction(self, category: str) -> str:
-        """Resolve the phase-to-energy correction mode for the builder category.
-
-        ``"auto"`` maps pure qDRIFT to the tangent de-biasing and every other
-        builder family (partially randomized, deterministic) to the linear map;
-        an explicit ``"linear"`` / ``"qdrift_tangent"`` overrides the inference.
-        """
-        mode = self._settings.get("energy_correction")
-        if mode != "auto":
-            return mode
-        return "qdrift_tangent" if category == "qdrift" else "linear"
-
-    def _build_unitary(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-        evolution_time: float,
-        samples: int,
-        seed: int,
-        round_index: int,
-        category: str,
-        epsilon_unitary: float,
-        *,
-        explicit_seed: bool = False,
-    ):
-        """Create and size the time-evolution unitary for one round.
-
-        qDRIFT keeps the explicit per-round sample schedule (paired with the
-        tangent energy map). Accuracy-aware builders (partially randomized or
-        deterministic) instead receive the per-round unitary accuracy budget
-        ``epsilon_unitary`` and self-size their internal resolution.
-
-        When ``explicit_seed`` is set the caller has already derived a per-draw
-        seed and ``seed`` is used verbatim; otherwise it is offset by
-        ``round_index`` so successive rounds draw independently.
-        """
-        builder = self._create_nested("unitary_builder")
-        settings = builder.settings()
-        settings.set("time", evolution_time)
-        if category == "qdrift":
-            if settings.has("num_samples"):
-                settings.set("num_samples", int(samples))
-        elif settings.has("target_accuracy"):
-            settings.set("target_accuracy", float(epsilon_unitary))
-        if seed >= 0 and settings.has("seed"):
-            settings.set("seed", int(seed) if explicit_seed else int(seed) + round_index)
-        return builder.run(qubit_hamiltonian)
-
-    def _sample_signal(self, state_preparation: Circuit, unitary, shots: int, test_basis: str) -> float:
-        """Run one Hadamard test in the given basis and reduce counts to an expectation."""
-        hadamard_test = self._create_nested("hadamard_test")
-        hadamard_test.settings().set("test_basis", test_basis)
-        executor_data = hadamard_test.run(state_preparation, unitary, shots)
-        return expectation_from_counts(executor_data.bitstring_counts)
-
-    def _sample_signal_randomized(
-        self,
-        state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
-        evolution_time: float,
-        samples: int,
-        shots: int,
-        seed: int,
-        round_index: int,
-        category: str,
-        epsilon_unitary: float,
-    ) -> tuple[float, float]:
-        r"""Estimate the round signal by averaging over independent fresh draws.
-
-        For randomized builders (qDRIFT / partially randomized) the faithful
-        quantity is the expected signal
-        :math:`\langle\psi|\mathbb{E}_C[U_C(t)]|\psi\rangle`, not any single
-        realization. Each of the ``shots`` Hadamard repetitions therefore uses a
-        freshly sampled circuit; the same draw supplies the X (real) and Y
-        (imaginary) sample so the complex signal stays consistent, and the
-        per-draw expectations are averaged. This is the qDRIFT sampling contract
-        of Günther et al. (2025), App. B.2 (``shots`` independent draws of depth
-        ``samples``).
-        """
-        real_accumulator = 0.0
-        imag_accumulator = 0.0
-        for draw_index in range(shots):
-            draw_seed = self._derive_seed(seed, round_index, draw_index) if seed >= 0 else -1
-            unitary = self._build_unitary(
-                qubit_hamiltonian,
-                evolution_time,
-                samples,
-                draw_seed,
-                round_index,
-                category,
-                epsilon_unitary,
-                explicit_seed=True,
-            )
-            real_accumulator += self._sample_signal(state_preparation, unitary, 1, "X")
-            imag_accumulator += self._sample_signal(state_preparation, unitary, 1, "Y")
-        inverse_shots = 1.0 / float(shots)
-        return real_accumulator * inverse_shots, imag_accumulator * inverse_shots
-
-    @staticmethod
-    def _derive_seed(seed: int, round_index: int, draw_index: int) -> int:
-        """Derive an independent, reproducible builder seed for one draw.
-
-        Mixes ``(seed, round_index, draw_index)`` through ``SeedSequence`` so that
-        every draw in every round is statistically independent yet fully
-        reproducible for a fixed top-level ``seed``.
-        """
-        sequence = np.random.SeedSequence([int(seed), int(round_index), int(draw_index)])
-        return int(sequence.generate_state(1)[0])
 
     @staticmethod
     def _resolve_energy(
