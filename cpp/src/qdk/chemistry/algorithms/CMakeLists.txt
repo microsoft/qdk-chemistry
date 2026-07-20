@@ -8,7 +8,6 @@ target_sources(chemistry PRIVATE
     nuclear_derivative.cpp
     nuclear_derivative_detail.cpp
     pmc.cpp
-    population_analysis.cpp
     qdk_nuclear_derivative.cpp
     dynamical_correlation_calculator.cpp
     geometry_optimization.cpp
