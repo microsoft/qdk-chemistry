@@ -91,9 +91,9 @@ class _QdkDerivativeEngine(Engine):
         self._last_structure = structure
         self._last_wavefunction: Any | None = None
 
-    def _structure_from_angstrom_coordinates(self, coordinates: np.ndarray) -> Structure:
-        """Create a QDK/Chemistry structure from Angstrom coordinates."""
-        matrix = np.asarray(coordinates, dtype=float).reshape((-1, 3)) * ANGSTROM_TO_BOHR
+    def _structure_from_bohr_coordinates(self, coordinates: np.ndarray) -> Structure:
+        """Create a QDK/Chemistry structure from Bohr coordinates."""
+        matrix = np.asarray(coordinates, dtype=float).reshape((-1, 3))
         return Structure(
             matrix, self._structure.get_elements(), self._structure.get_masses(), self._structure.get_nuclear_charges()
         )
@@ -111,7 +111,7 @@ class _QdkDerivativeEngine(Engine):
 
     def calc_new(self, coordinates: np.ndarray, dirname: str) -> dict[str, np.ndarray | float]:  # noqa: ARG002
         """Evaluate energy and gradients for geomeTRIC."""
-        structure = self._structure_from_angstrom_coordinates(coordinates)
+        structure = self._structure_from_bohr_coordinates(coordinates)
         energy, gradients, _hessian, wavefunction = self._derivative_calculator.run(
             structure,
             self._charge,
@@ -122,7 +122,7 @@ class _QdkDerivativeEngine(Engine):
         self._last_energy = energy
         self._last_structure = structure
         self._last_wavefunction = wavefunction
-        gradient = np.asarray(gradients.get_values(), dtype=float) * ANGSTROM_TO_BOHR
+        gradient = np.asarray(gradients.get_values(), dtype=float)
         return {"energy": energy, "gradient": gradient}
 
 
