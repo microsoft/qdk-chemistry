@@ -147,14 +147,7 @@ class GeometryOptimizerSettings(Settings):
 
 ################################################################################
 # start-cell-geometry-base-class
-from qdk_chemistry.algorithms.base import Algorithm
-
-
-class GeometryOptimizer(Algorithm):
-    """Abstract base class for geometry optimization algorithms."""
-
-    def type_name(self) -> str:
-        return "geometry_optimizer"
+from qdk_chemistry.algorithms import GeometryOptimizer
 
 
 # end-cell-geometry-base-class
@@ -193,14 +186,21 @@ class BfgsOptimizer(GeometryOptimizer):
     def name(self) -> str:
         return "bfgs"
 
-    def _run_impl(self, structure: Structure) -> Structure:
+    def _run_impl(
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        seed,
+        n_inactive_orbitals: int = 0,
+    ):
         # max_steps = self.settings().get("max_steps")
         # threshold = self.settings().get("convergence_threshold")
 
         # BFGS optimization implementation
         # Placeholder for optimized structure
         optimized_structure = Structure()
-        return optimized_structure
+        return 0.0, optimized_structure, None, None
 
 
 # end-cell-geometry-implementations
@@ -219,11 +219,18 @@ class SteepestDescentOptimizer(GeometryOptimizer):
     def name(self) -> str:
         return "steepest_descent"
 
-    def _run_impl(self, structure: Structure) -> Structure:
+    def _run_impl(
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        seed,
+        n_inactive_orbitals: int = 0,
+    ):
         # Steepest descent implementation
         # Placeholder for optimized structure
         optimized_structure = Structure()
-        return optimized_structure
+        return 0.0, optimized_structure, None, None
 
 
 # end-cell-steepest-descent
@@ -232,9 +239,6 @@ class SteepestDescentOptimizer(GeometryOptimizer):
 ################################################################################
 # start-cell-geometry-registration
 import qdk_chemistry.algorithms as algorithms
-
-# Register the factory
-algorithms.registry.register_factory(GeometryOptimizerFactory())
 
 # Register implementations
 algorithms.register(lambda: BfgsOptimizer())
