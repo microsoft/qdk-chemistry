@@ -1,13 +1,16 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License. See LICENSE.txt in the project root for
-// license information.
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See LICENSE.txt in the project root for
+ * license information.
+ */
 
 #include <gtest/gtest.h>
 
 #include <memory>
-#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
+#include <type_traits>
 
 #include "ut_common.hpp"
 
@@ -32,8 +35,8 @@ MPSSite::PhysicalSlicePtr make_slice(std::size_t left, std::size_t right,
   return std::make_shared<const MPSSite::PhysicalSlice>(std::move(slice));
 }
 
-MPSWavefunction::SitePtr make_site(std::size_t left, std::size_t right,
-                                   std::size_t physical = 4) {
+AbelianMPSContainer::SitePtr make_site(std::size_t left, std::size_t right,
+                                       std::size_t physical = 4) {
   std::vector<MPSSite::PhysicalSlicePtr> slices;
   for (std::size_t p = 0; p < physical; ++p) {
     slices.push_back(make_slice(left, right, static_cast<double>(p + 1)));
@@ -56,18 +59,20 @@ std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> make_particle_count(
 
 }  // namespace
 
-TEST(MPSWavefunctionTest, StoresSparseSitesAndMetadata) {
-  std::vector<MPSWavefunction::SitePtr> sites = {make_site(1, 2),
-                                                 make_site(2, 1)};
-  MPSMetadata metadata;
-  metadata.canonical_form = MPSCanonicalForm::RightNormalized;
-  metadata.discarded_weight = 1e-8;
-  metadata.physical_basis = {"empty", "alpha", "beta", "alpha_beta"};
-  auto total_num_particles = make_particle_count(4);
+static_assert(std::is_abstract_v<MPSContainer>);
+static_assert(std::is_base_of_v<MPSContainer, AbelianMPSContainer>);
 
-  MPSWavefunction wavefunction(
+TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2),
+                                                     make_site(2, 1)};
+  auto total_num_particles = make_particle_count(4);
+  const std::vector<std::string> physical_basis = {"empty", "alpha", "beta",
+                                                   "alpha_beta"};
+
+  AbelianMPSContainer wavefunction(
       std::move(sites), testing::create_test_orbitals(2, 2, true),
-      total_num_particles, nullptr, metadata);
+      total_num_particles, nullptr, MPSCanonicalForm::RightNormalized,
+      std::nullopt, 1e-8, physical_basis);
 
   EXPECT_EQ(wavefunction.num_sites(), 2u);
   EXPECT_EQ(wavefunction.max_bond_dimension(), 2u);
@@ -75,10 +80,23 @@ TEST(MPSWavefunctionTest, StoresSparseSitesAndMetadata) {
   EXPECT_EQ(wavefunction.get_container_type(), "mps");
   EXPECT_EQ(wavefunction.sectors(),
             std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
-  EXPECT_EQ(wavefunction.metadata().canonical_form,
-            MPSCanonicalForm::RightNormalized);
+  EXPECT_EQ(wavefunction.canonical_form(), MPSCanonicalForm::RightNormalized);
+  EXPECT_EQ(wavefunction.canonical_center(), std::nullopt);
+  EXPECT_EQ(wavefunction.discarded_weight(), 1e-8);
+  EXPECT_EQ(wavefunction.physical_basis(), physical_basis);
   EXPECT_FALSE(wavefunction.is_complex());
   EXPECT_EQ(wavefunction.sites().front()->physical_slices().size(), 4u);
+}
+
+TEST(AbelianMPSContainerTest, ExposesCommonMPSInterface) {
+  AbelianMPSContainer wavefunction({make_site(1, 1)},
+                                   testing::create_test_orbitals(1, 1, true));
+  const MPSContainer& base = wavefunction;
+
+  EXPECT_EQ(base.num_sites(), 1u);
+  EXPECT_EQ(base.get_container_type(), "mps");
+  EXPECT_EQ(base.orbitals(), wavefunction.orbitals());
+  EXPECT_FALSE(base.is_complex());
 }
 
 TEST(MPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
@@ -91,33 +109,29 @@ TEST(MPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
             (Eigen::VectorXd(6) << 1.0, 2.0, 3.0, 1.0, 2.0, 3.0).finished());
 }
 
-TEST(MPSWavefunctionTest, RejectsMismatchedAdjacentBonds) {
-  std::vector<MPSWavefunction::SitePtr> sites = {make_site(1, 2),
-                                                 make_site(3, 1)};
-  EXPECT_THROW(MPSWavefunction(std::move(sites),
-                               testing::create_test_orbitals(2, 2, true)),
+TEST(AbelianMPSContainerTest, RejectsMismatchedAdjacentBonds) {
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2),
+                                                     make_site(3, 1)};
+  EXPECT_THROW(AbelianMPSContainer(std::move(sites),
+                                   testing::create_test_orbitals(2, 2, true)),
                std::invalid_argument);
 }
 
-TEST(MPSWavefunctionTest, RejectsInvalidMixedCanonicalCenter) {
-  MPSMetadata metadata;
-  metadata.canonical_form = MPSCanonicalForm::Mixed;
-  metadata.canonical_center = 2;
-  std::vector<MPSWavefunction::SitePtr> sites = {make_site(1, 1)};
+TEST(AbelianMPSContainerTest, RejectsInvalidMixedCanonicalCenter) {
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 1)};
 
-  EXPECT_THROW(MPSWavefunction(
+  EXPECT_THROW(AbelianMPSContainer(
                    std::move(sites), testing::create_test_orbitals(1, 1, true),
-                   nullptr, nullptr, metadata),
+                   nullptr, nullptr, MPSCanonicalForm::Mixed, 2),
                std::invalid_argument);
 }
 
-TEST(MPSWavefunctionTest, RejectsPhysicalBasisSizeMismatch) {
-  MPSMetadata metadata;
-  metadata.physical_basis = {"zero", "one"};
-  std::vector<MPSWavefunction::SitePtr> sites = {make_site(1, 1, 3)};
+TEST(AbelianMPSContainerTest, RejectsPhysicalBasisSizeMismatch) {
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 1, 3)};
 
-  EXPECT_THROW(MPSWavefunction(
+  EXPECT_THROW(AbelianMPSContainer(
                    std::move(sites), testing::create_test_orbitals(1, 1, true),
-                   nullptr, nullptr, metadata),
+                   nullptr, nullptr, MPSCanonicalForm::Unspecified,
+                   std::nullopt, 0.0, {"zero", "one"}),
                std::invalid_argument);
 }

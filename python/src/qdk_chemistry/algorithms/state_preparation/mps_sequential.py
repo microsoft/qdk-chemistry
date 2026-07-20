@@ -42,7 +42,7 @@ from collections import deque
 
 import numpy as np
 
-from qdk_chemistry.data import MPSSite, MPSWavefunction
+from qdk_chemistry.data import AbelianMPSContainer, MPSSite
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -107,21 +107,21 @@ class MPSSequentialStatePreparation(StatePreparation):
         """
         return "mps_sequential"
 
-    def _run_impl(self, wavefunction: MPSWavefunction) -> Circuit:
+    def _run_impl(self, wavefunction: AbelianMPSContainer) -> Circuit:
         """Return a circuit to prepare an MPS state.
 
         Args:
-            wavefunction: An MPSWavefunction containing the tensors.
+            wavefunction: An AbelianMPSContainer containing the tensors.
 
         Returns:
             A Circuit object implementing the MPS state preparation.
 
         Raises:
-            TypeError: If wavefunction is not an MPSWavefunction instance.
+            TypeError: If wavefunction is not an AbelianMPSContainer instance.
 
         """
-        if not isinstance(wavefunction, MPSWavefunction):
-            raise TypeError(f"MPSSequentialStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
+        if not isinstance(wavefunction, AbelianMPSContainer):
+            raise TypeError(f"MPSSequentialStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
 
         fast_re = self._settings.get("fast_resource_estimation")
         fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")

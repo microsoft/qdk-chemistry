@@ -9,15 +9,15 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from qdk_chemistry.data import MPSSite, MPSWavefunction
+from qdk_chemistry.data import AbelianMPSContainer, MPSSite
 
 from .test_helpers import create_test_orbitals
 
 
-def make_mps(tensors: Sequence[np.ndarray]) -> MPSWavefunction:
+def make_mps(tensors: Sequence[np.ndarray]) -> AbelianMPSContainer:
     """Construct a native MPS wavefunction from dense test tensors."""
     sites = [MPSSite.from_dense(tensor) for tensor in tensors]
-    return MPSWavefunction(sites, create_test_orbitals(max(1, len(sites))))
+    return AbelianMPSContainer(sites, create_test_orbitals(max(1, len(sites))))
 
 
 def random_mps(
@@ -25,7 +25,7 @@ def random_mps(
     bond_dim: int,
     site_dim: int = 4,
     rng: np.random.Generator | None = None,
-) -> MPSWavefunction:
+) -> AbelianMPSContainer:
     """Construct a right-normalized random native MPS for algorithm tests."""
     rng = np.random.default_rng() if rng is None else rng
     bond_dims = [1]
@@ -47,7 +47,7 @@ def random_mps(
     return make_mps(tensors)
 
 
-def contract_mps(wavefunction: MPSWavefunction) -> np.ndarray:
+def contract_mps(wavefunction: AbelianMPSContainer) -> np.ndarray:
     """Contract a native MPS into a normalized dense state vector."""
     state = wavefunction.sites[0].to_dense()
     for site in wavefunction.sites[1:]:

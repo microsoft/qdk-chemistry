@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 import numpy as np
 from scipy.sparse import csc_array, vstack
 
-from qdk_chemistry.data import MPSSite, MPSWavefunction
+from qdk_chemistry.data import AbelianMPSContainer, MPSSite
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -87,21 +87,21 @@ class MPSSparseStatePreparation(StatePreparation):
         """Return the algorithm name."""
         return "mps_sparse"
 
-    def _run_impl(self, wavefunction: MPSWavefunction) -> Circuit:
+    def _run_impl(self, wavefunction: AbelianMPSContainer) -> Circuit:
         """Return a circuit to prepare an MPS state using block-sparsity.
 
         Args:
-            wavefunction: An MPSWavefunction containing the tensors.
+            wavefunction: An AbelianMPSContainer containing the tensors.
 
         Returns:
             A Circuit object implementing the MPS state preparation.
 
         Raises:
-            TypeError: If wavefunction is not an MPSWavefunction instance.
+            TypeError: If wavefunction is not an AbelianMPSContainer instance.
 
         """
-        if not isinstance(wavefunction, MPSWavefunction):
-            raise TypeError(f"MPSSparseStatePreparation requires an MPSWavefunction, got {type(wavefunction)}.")
+        if not isinstance(wavefunction, AbelianMPSContainer):
+            raise TypeError(f"MPSSparseStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
 
         if wavefunction.physical_dimension != 4:
             raise ValueError("Sparse MPS state preparation requires four physical states per site.")

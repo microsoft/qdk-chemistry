@@ -1,6 +1,8 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License. See LICENSE.txt in the project root for
-// license information.
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See LICENSE.txt in the project root for
+ * license information.
+ */
 
 #include <algorithm>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
@@ -148,45 +150,74 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
       *_physical_slices.front());
 }
 
-MPSWavefunction::MPSWavefunction(
-    std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
+MPSContainer::MPSContainer(
+    std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
         total_num_particles,
     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
         active_num_particles,
-    MPSMetadata metadata)
-    : _sites(std::move(sites)),
-      _orbitals(std::move(orbitals)),
+    MPSCanonicalForm canonical_form,
+    std::optional<std::size_t> canonical_center, double discarded_weight,
+    std::vector<std::string> physical_basis)
+    : _orbitals(std::move(orbitals)),
       _total_num_particles(std::move(total_num_particles)),
       _active_num_particles(std::move(active_num_particles)),
-      _metadata(std::move(metadata)) {
-  _validate();
-}
+      _canonical_form(canonical_form),
+      _canonical_center(canonical_center),
+      _discarded_weight(discarded_weight),
+      _physical_basis(std::move(physical_basis)) {}
 
-void MPSWavefunction::_validate() const {
-  if (_sites.empty()) {
+void MPSContainer::_validate_common(std::size_t site_count,
+                                    std::size_t physical_dimension) const {
+  if (site_count == 0) {
     throw std::invalid_argument(
         "MPS wavefunction must contain at least one site.");
   }
   if (!_orbitals) {
     throw std::invalid_argument("MPS wavefunction requires orbitals.");
   }
-  if (_metadata.discarded_weight < 0.0) {
+  if (_discarded_weight < 0.0) {
     throw std::invalid_argument("MPS discarded weight must be non-negative.");
   }
-  if (_metadata.canonical_form == MPSCanonicalForm::Mixed) {
-    if (!_metadata.canonical_center ||
-        *_metadata.canonical_center >= _sites.size()) {
+  if (_canonical_form == MPSCanonicalForm::Mixed) {
+    if (!_canonical_center || *_canonical_center >= site_count) {
       throw std::invalid_argument(
           "A mixed-canonical MPS requires a valid canonical center.");
     }
-  } else if (_metadata.canonical_center) {
+  } else if (_canonical_center) {
     throw std::invalid_argument(
         "A canonical center is only valid for mixed-canonical MPS data.");
   }
+  if (!_physical_basis.empty() &&
+      _physical_basis.size() != physical_dimension) {
+    throw std::invalid_argument(
+        "MPS physical basis size must match the number of physical slices.");
+  }
+}
 
-  const auto physical_dimension =
-      _sites.front() ? _sites.front()->physical_dimension() : 0;
+AbelianMPSContainer::AbelianMPSContainer(
+    std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+        total_num_particles,
+    std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+        active_num_particles,
+    MPSCanonicalForm canonical_form,
+    std::optional<std::size_t> canonical_center, double discarded_weight,
+    std::vector<std::string> physical_basis)
+    : MPSContainer(std::move(orbitals), std::move(total_num_particles),
+                   std::move(active_num_particles), canonical_form,
+                   canonical_center, discarded_weight,
+                   std::move(physical_basis)),
+      _sites(std::move(sites)) {
+  _validate();
+}
+
+void AbelianMPSContainer::_validate() const {
+  const auto physical_dimension = _sites.empty() || !_sites.front()
+                                      ? 0
+                                      : _sites.front()->physical_dimension();
+  _validate_common(_sites.size(), physical_dimension);
+
   const auto is_complex = _sites.front() && _sites.front()->is_complex();
   for (std::size_t index = 0; index < _sites.size(); ++index) {
     if (!_sites[index]) {
@@ -199,12 +230,6 @@ void MPSWavefunction::_validate() const {
       throw std::invalid_argument("MPS sites must use one scalar type.");
     }
   }
-  if (!_metadata.physical_basis.empty() &&
-      _metadata.physical_basis.size() != physical_dimension) {
-    throw std::invalid_argument(
-        "MPS physical basis size must match the number of physical slices.");
-  }
-
   for (std::size_t index = 0; index + 1 < _sites.size(); ++index) {
     const auto& left_slice = *_sites[index]->physical_slices().front();
     const auto& right_slice = *_sites[index + 1]->physical_slices().front();
@@ -226,7 +251,7 @@ void MPSWavefunction::_validate() const {
   }
 }
 
-std::size_t MPSWavefunction::max_bond_dimension() const {
+std::size_t AbelianMPSContainer::max_bond_dimension() const {
   std::size_t maximum = 0;
   for (const auto& site : _sites) {
     maximum = std::max(maximum, site->left_bond_dimension());
@@ -235,50 +260,50 @@ std::size_t MPSWavefunction::max_bond_dimension() const {
   return maximum;
 }
 
-bool MPSWavefunction::is_complex() const {
+bool AbelianMPSContainer::is_complex() const {
   return _sites.front()->is_complex();
 }
 
-std::unique_ptr<WavefunctionContainer> MPSWavefunction::clone() const {
-  return std::make_unique<MPSWavefunction>(*this);
+std::unique_ptr<WavefunctionContainer> AbelianMPSContainer::clone() const {
+  return std::make_unique<AbelianMPSContainer>(*this);
 }
 
-MPSWavefunction::ScalarVariant MPSWavefunction::overlap(
+MPSContainer::ScalarVariant MPSContainer::overlap(
     const WavefunctionContainer&) const {
   throw std::runtime_error(
       "overlap() is not implemented for MPS wavefunctions.");
 }
 
-double MPSWavefunction::norm() const {
+double MPSContainer::norm() const {
   throw std::runtime_error("norm() is not implemented for MPS wavefunctions.");
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
-MPSWavefunction::total_orbital_occupations() const {
+MPSContainer::total_orbital_occupations() const {
   throw std::runtime_error(
       "Orbital occupations are not implemented for MPS wavefunctions.");
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
-MPSWavefunction::active_orbital_occupations() const {
+MPSContainer::active_orbital_occupations() const {
   throw std::runtime_error(
       "Orbital occupations are not implemented for MPS wavefunctions.");
 }
 
-void MPSWavefunction::clear_caches() const {}
+void MPSContainer::clear_caches() const {}
 
-nlohmann::json MPSWavefunction::to_json() const {
+nlohmann::json MPSContainer::to_json() const {
   throw std::runtime_error(
       "to_json() is not implemented for MPS wavefunctions.");
 }
 
-std::string MPSWavefunction::get_container_type() const { return "mps"; }
+std::string MPSContainer::get_container_type() const { return "mps"; }
 
-std::vector<std::string> MPSWavefunction::sectors() const {
+std::vector<std::string> MPSContainer::sectors() const {
   return {Wavefunction::DEFAULT_SECTOR};
 }
 
-std::shared_ptr<const Orbitals> MPSWavefunction::sector_basis(
+std::shared_ptr<const Orbitals> MPSContainer::sector_basis(
     const std::string& name) const {
   if (name != Wavefunction::DEFAULT_SECTOR) {
     throw std::out_of_range("Unknown MPS wavefunction sector: " + name);

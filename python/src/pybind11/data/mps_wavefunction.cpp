@@ -11,8 +11,8 @@
 #include <complex>
 #include <memory>
 #include <numeric>
-#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
@@ -184,13 +184,6 @@ void bind_mps_wavefunction(py::module& data) {
       .value("RightNormalized", MPSCanonicalForm::RightNormalized)
       .value("Mixed", MPSCanonicalForm::Mixed);
 
-  py::class_<MPSMetadata>(data, "MPSMetadata")
-      .def(py::init<>())
-      .def_readwrite("canonical_form", &MPSMetadata::canonical_form)
-      .def_readwrite("canonical_center", &MPSMetadata::canonical_center)
-      .def_readwrite("discarded_weight", &MPSMetadata::discarded_weight)
-      .def_readwrite("physical_basis", &MPSMetadata::physical_basis);
-
   py::class_<MPSSite, py::smart_holder>(data, "MPSSite")
       .def(py::init(&site_from_slices<double>), py::arg("physical_slices"),
            py::arg("left_sector_order"), py::arg("right_sector_order"))
@@ -218,30 +211,42 @@ void bind_mps_wavefunction(py::module& data) {
                              })
       .def("to_dense", &site_to_dense);
 
-  py::class_<MPSWavefunction, WavefunctionContainer, py::smart_holder>(
-      data, "MPSWavefunction")
-      .def(py::init<std::vector<MPSWavefunction::SitePtr>,
+  py::class_<MPSContainer, WavefunctionContainer, py::smart_holder>(
+      data, "MPSContainer")
+      .def_property_readonly("orbitals", &MPSContainer::orbitals)
+      .def_property_readonly("total_num_particles",
+                             &MPSContainer::total_num_particles)
+      .def_property_readonly("active_num_particles",
+                             &MPSContainer::active_num_particles)
+      .def_property_readonly("canonical_form", &MPSContainer::canonical_form)
+      .def_property_readonly("canonical_center",
+                             &MPSContainer::canonical_center)
+      .def_property_readonly("discarded_weight",
+                             &MPSContainer::discarded_weight)
+      .def_property_readonly("physical_basis", &MPSContainer::physical_basis)
+      .def_property_readonly("num_sites", &MPSContainer::num_sites)
+      .def_property_readonly("is_complex", &MPSContainer::is_complex);
+
+  py::class_<AbelianMPSContainer, MPSContainer, py::smart_holder>(
+      data, "AbelianMPSContainer")
+      .def(py::init<std::vector<AbelianMPSContainer::SitePtr>,
                     std::shared_ptr<Orbitals>,
                     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>,
                     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>,
-                    MPSMetadata>(),
+                    MPSCanonicalForm, std::optional<std::size_t>, double,
+                    std::vector<std::string>>(),
            py::arg("sites"), py::arg("orbitals"),
            py::arg("total_num_particles") = nullptr,
            py::arg("active_num_particles") = nullptr,
-           py::arg("metadata") = MPSMetadata{})
-      .def_property_readonly("sites", &MPSWavefunction::sites)
-      .def_property_readonly("orbitals", &MPSWavefunction::orbitals)
-      .def_property_readonly("total_num_particles",
-                             &MPSWavefunction::total_num_particles)
-      .def_property_readonly("active_num_particles",
-                             &MPSWavefunction::active_num_particles)
-      .def_property_readonly("metadata", &MPSWavefunction::metadata)
-      .def_property_readonly("num_sites", &MPSWavefunction::num_sites)
+           py::arg("canonical_form") = MPSCanonicalForm::Unspecified,
+           py::arg("canonical_center") = std::nullopt,
+           py::arg("discarded_weight") = 0.0,
+           py::arg("physical_basis") = std::vector<std::string>{})
+      .def_property_readonly("sites", &AbelianMPSContainer::sites)
       .def_property_readonly("max_bond_dimension",
-                             &MPSWavefunction::max_bond_dimension)
-      .def_property_readonly("is_complex", &MPSWavefunction::is_complex)
+                             &AbelianMPSContainer::max_bond_dimension)
       .def_property_readonly(
-          "physical_dimension", [](const MPSWavefunction& self) {
+          "physical_dimension", [](const AbelianMPSContainer& self) {
             return self.sites().front()->physical_dimension();
           });
 }

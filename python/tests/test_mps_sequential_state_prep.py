@@ -14,6 +14,7 @@ import pytest
 from qdk import qsharp
 from scipy.sparse import issparse
 
+import qdk_chemistry.data as chemistry_data
 from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     MPSSequentialStatePreparation,
     compute_site_unitary_dense_data,
@@ -21,18 +22,25 @@ from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     decompose_unitary_to_givens,
     generate_mps_preparation_data,
 )
-from qdk_chemistry.data import MPSSite, MPSWavefunction, Wavefunction, WavefunctionContainer
+from qdk_chemistry.data import (
+    AbelianMPSContainer,
+    MPSCanonicalForm,
+    MPSContainer,
+    MPSSite,
+    Wavefunction,
+    WavefunctionContainer,
+)
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .mps_test_utils import contract_mps, make_mps, random_mps
 from .test_helpers import create_test_orbitals
 
 
-class TestMPSWavefunction:
-    """Tests for the MPSWavefunction data container."""
+class TestAbelianMPSContainer:
+    """Tests for the AbelianMPSContainer data container."""
 
     def test_basic_construction(self):
-        """Test constructing an MPSWavefunction from tensors."""
+        """Test constructing an AbelianMPSContainer from tensors."""
         rng = np.random.default_rng(42)
         mps = random_mps(num_sites=3, bond_dim=4, rng=rng)
         assert mps.num_sites == 3
@@ -42,12 +50,33 @@ class TestMPSWavefunction:
     def test_flattened_chemistry_properties(self):
         """Test that chemistry properties are exposed directly on the wavefunction."""
         site = MPSSite.from_dense(np.ones((1, 4, 1)))
-        mps = MPSWavefunction([site], create_test_orbitals(1))
+        mps = AbelianMPSContainer([site], create_test_orbitals(1))
 
         assert isinstance(mps, WavefunctionContainer)
+        assert isinstance(mps, MPSContainer)
+        assert isinstance(mps, AbelianMPSContainer)
         assert mps.total_num_particles is None
         assert mps.active_num_particles is None
         assert Wavefunction(mps).get_container_type() == "mps"
+
+    def test_metadata_is_stored_directly(self):
+        """Test that MPS metadata is exposed directly on the container."""
+        site = MPSSite.from_dense(np.ones((1, 4, 1)))
+        physical_basis = ["empty", "alpha", "beta", "alpha_beta"]
+        mps = AbelianMPSContainer(
+            [site],
+            create_test_orbitals(1),
+            canonical_form=MPSCanonicalForm.Mixed,
+            canonical_center=0,
+            discarded_weight=1e-8,
+            physical_basis=physical_basis,
+        )
+
+        assert mps.canonical_form == MPSCanonicalForm.Mixed
+        assert mps.canonical_center == 0
+        assert mps.discarded_weight == 1e-8
+        assert mps.physical_basis == physical_basis
+        assert not hasattr(chemistry_data, "MPSMetadata")
 
     def test_contract_normalized(self):
         """Test that contracted state vector is normalized."""
@@ -69,7 +98,7 @@ class TestMPSWavefunction:
     def test_validation_errors(self):
         """Test that invalid inputs raise ValueError."""
         with pytest.raises(ValueError, match="must contain at least one site"):
-            MPSWavefunction([], create_test_orbitals(1))
+            AbelianMPSContainer([], create_test_orbitals(1))
 
         with pytest.raises(ValueError, match="incorrect number of dimensions"):
             MPSSite.from_dense(np.zeros((4, 4)))
@@ -626,7 +655,7 @@ QUALTRAN_COST_NON_ZERO_SPIN_SPARSE = {"num_qubits": 29, "toffoli": 258}
 
 
 class TestMPSSequentialQualtranFidelity:
-    """Test that MPSWavefunction contraction matches Qualtran expected states."""
+    """Test that AbelianMPSContainer contraction matches Qualtran expected states."""
 
     @pytest.mark.parametrize(
         ("tensors", "expected_state"),
