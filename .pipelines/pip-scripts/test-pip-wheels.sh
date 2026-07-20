@@ -16,6 +16,17 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
+    # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    _cfs_apt_redirect() {
+        sed -i \
+            -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.archive.ubuntu.com/ubuntu|g' \
+            "$1"
+    }
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && _cfs_apt_redirect /etc/apt/sources.list.d/ubuntu.sources
+    [ -f /etc/apt/sources.list ]                  && _cfs_apt_redirect /etc/apt/sources.list
+
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*

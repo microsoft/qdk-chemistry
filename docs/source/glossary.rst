@@ -15,7 +15,7 @@ Acronym definitions
       Method that projects molecular orbitals onto a target atomic orbital basis to identify valence active orbitals.
 
    BFGS
-      Broyden–Fletcher–Goldfarb–Shanno quasi-Newton optimization algorithm.
+      Broyden-Fletcher-Goldfarb-Shanno quasi-Newton optimization algorithm.
 
    BSE
       Basis Set Exchange, a repository of standardized quantum chemistry basis sets and effective core potentials.
@@ -74,6 +74,10 @@ Acronym definitions
    IQPE
       Iterative Quantum Phase Estimation.
       A variant of QPE using a single ancilla qubit with sequential bit extraction and adaptive feedback.
+
+   LCU
+      Linear Combination of Unitaries.
+      A block-encoding technique that represents an operator as a weighted sum of unitaries using PREPARE and SELECT oracles.
 
    LDA
       Local Density Approximation.

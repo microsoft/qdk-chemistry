@@ -98,10 +98,11 @@ def test_geometric_engine_coordinates_are_bohr():
     molecule.xyzs = [np.zeros((2, 3))]
     engine = _QdkDerivativeEngine(structure, 0, 1, "sto-3g", 0, None, molecule)
 
-    displaced = np.asarray(structure.get_coordinates()) + 0.25
-    converted = engine.structure_from_coordinates(displaced)
+    displaced_bohr = np.asarray(structure.get_coordinates()) + 0.25
+    displaced_angstrom = displaced_bohr * BOHR_TO_ANGSTROM
+    converted = engine._structure_from_angstrom_coordinates(displaced_angstrom)
 
-    np.testing.assert_allclose(converted.get_coordinates(), displaced)
+    np.testing.assert_allclose(converted.get_coordinates(), displaced_bohr)
     np.testing.assert_allclose(engine.last_coordinates(), structure.get_coordinates())
 
 

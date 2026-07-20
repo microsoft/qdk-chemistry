@@ -87,13 +87,13 @@ class _QdkDerivativeEngine(Engine):
         self._seed_or_basis = seed_or_basis
         self._n_inactive_orbitals = n_inactive_orbitals
         self._derivative_calculator = derivative_calculator
-        self._last_energy = None
+        self._last_energy: float | None = None
         self._last_structure = structure
-        self._last_wavefunction = None
+        self._last_wavefunction: Any | None = None
 
-    def structure_from_coordinates(self, coordinates: np.ndarray) -> Structure:
-        """Create a QDK/Chemistry structure with updated coordinates."""
-        matrix = np.asarray(coordinates, dtype=float).reshape((-1, 3))
+    def _structure_from_angstrom_coordinates(self, coordinates: np.ndarray) -> Structure:
+        """Create a QDK/Chemistry structure from Angstrom coordinates."""
+        matrix = np.asarray(coordinates, dtype=float).reshape((-1, 3)) * ANGSTROM_TO_BOHR
         return Structure(
             matrix, self._structure.get_elements(), self._structure.get_masses(), self._structure.get_nuclear_charges()
         )
@@ -102,9 +102,16 @@ class _QdkDerivativeEngine(Engine):
         """Return the most recently evaluated coordinates."""
         return np.asarray(self._last_structure.get_coordinates(), dtype=float)
 
+    def cached_result(self, coordinates: np.ndarray) -> tuple[float, Any | None] | None:
+        """Return the cached energy and wavefunction when coordinates match."""
+        matrix = np.asarray(coordinates, dtype=float).reshape((-1, 3))
+        if self._last_energy is None or not np.allclose(matrix, self.last_coordinates(), rtol=0.0, atol=1.0e-12):
+            return None
+        return self._last_energy, self._last_wavefunction
+
     def calc_new(self, coordinates: np.ndarray, dirname: str) -> dict[str, np.ndarray | float]:  # noqa: ARG002
         """Evaluate energy and gradients for geomeTRIC."""
-        structure = self.structure_from_coordinates(coordinates)
+        structure = self._structure_from_angstrom_coordinates(coordinates)
         energy, gradients, _hessian, wavefunction = self._derivative_calculator.run(
             structure,
             self._charge,
@@ -115,7 +122,8 @@ class _QdkDerivativeEngine(Engine):
         self._last_energy = energy
         self._last_structure = structure
         self._last_wavefunction = wavefunction
-        return {"energy": energy, "gradient": np.asarray(gradients.get_values(), dtype=float)}
+        gradient = np.asarray(gradients.get_values(), dtype=float) * ANGSTROM_TO_BOHR
+        return {"energy": energy, "gradient": gradient}
 
 
 class GeometricOptimizer(GeometryOptimizer):
@@ -187,7 +195,14 @@ class GeometricOptimizer(GeometryOptimizer):
                 _close_geometric_log_handler(prefix.with_suffix(".log"))
 
         optimized_coordinates = _extract_coordinates(result, engine)
-        optimized_structure = engine.structure_from_coordinates(optimized_coordinates)
+        optimized_structure = Structure(
+            optimized_coordinates, structure.get_elements(), structure.get_masses(), structure.get_nuclear_charges()
+        )
+
+        cached_result = engine.cached_result(optimized_coordinates)
+        if not self._settings["compute_hessian"] and cached_result is not None:
+            final_energy, wavefunction = cached_result
+            return final_energy, optimized_structure, wavefunction, None
 
         final_calculator = self._create_nested("derivative_calculator")
         final_calculator.settings().set("compute_hessian", self._settings["compute_hessian"])
