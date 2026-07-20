@@ -204,6 +204,16 @@ class TestPyscfPlugin:
         assert len(populations) == 2
         np.testing.assert_allclose(populations, [1.0, 1.0], atol=1e-8)
 
+    def test_pyscf_o2_unrestricted_population_analysis(self):
+        """Test spin-summed PySCF populations from unrestricted orbitals."""
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        analyzer.settings().set("basis_set", "sto-3g")
+        analyzer.settings().set("scf_type", "unrestricted")
+
+        populations = analyzer.run(create_o2_structure(), charge=0, spin_multiplicity=3)
+
+        np.testing.assert_allclose(populations, [8.0, 8.0], atol=1e-8)
+
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""
         scf_solver = algorithms.create("scf_solver", "pyscf")

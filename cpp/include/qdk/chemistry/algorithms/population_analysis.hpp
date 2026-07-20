@@ -6,7 +6,6 @@
 
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
-#include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
@@ -23,22 +22,6 @@ using PopulationAnalysisInput =
                  std::shared_ptr<data::Wavefunction>>;
 
 /**
- * @class PopulationAnalysisSettings
- * @brief Settings for assigning particle populations to centers.
- */
-class PopulationAnalysisSettings : public data::Settings {
- public:
-  /**
-   * @brief Construct population-analysis settings.
-   */
-  PopulationAnalysisSettings() {
-    set_default("method", std::string("mulliken"),
-                "Population-analysis method used to assign per-center "
-                "populations.");
-  }
-};
-
-/**
  * @class PopulationAnalyzer
  * @brief Base class for assigning particle populations to centers.
  */
@@ -46,12 +29,6 @@ class PopulationAnalyzer
     : public Algorithm<PopulationAnalyzer, std::vector<double>,
                        PopulationAnalysisInput, int, int, unsigned int> {
  public:
-  /**
-   * @brief Construct a population analyzer with shared settings.
-   */
-  PopulationAnalyzer() {
-    _settings = std::make_unique<PopulationAnalysisSettings>();
-  }
   virtual ~PopulationAnalyzer() = default;
 
   /**

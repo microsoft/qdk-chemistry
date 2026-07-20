@@ -59,6 +59,12 @@ TEST(PopulationAnalyzerTest, FactoryRegistersQdkAnalyzer) {
   EXPECT_EQ(analyzer->type_name(), "population_analyzer");
 }
 
+TEST(PopulationAnalyzerTest, QdkAnalyzerHasNoMethodSetting) {
+  auto analyzer = PopulationAnalyzerFactory::create("qdk");
+
+  EXPECT_FALSE(analyzer->settings().has("method"));
+}
+
 TEST(PopulationAnalyzerTest, QdkAnalyzerRequiresWavefunctionInput) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 

@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+from pyscf.scf.hf import mulliken_pop
 
 from qdk_chemistry.algorithms import PopulationAnalyzer
 from qdk_chemistry.data import Settings, Structure, Wavefunction
@@ -93,9 +94,10 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
             self._settings.get("scf_type"),
             self._settings.get("scf_method"),
         )
-        mean_field.verbose = 0
-        density = mean_field.make_rdm1()
-        ao_populations, _ = mean_field.mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp())
+        density = np.asarray(mean_field.make_rdm1())
+        if density.ndim == 3 and density.shape[0] == 2:
+            density = density.sum(axis=0)
+        ao_populations, _ = mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp(), verbose=0)
         ao_slices = mean_field.mol.aoslice_by_atom()
         return [float(np.sum(ao_populations[start:stop])) for _, _, start, stop in ao_slices]
 
