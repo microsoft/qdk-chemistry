@@ -17,19 +17,6 @@
 namespace qdk::chemistry::algorithms {
 namespace {
 
-std::vector<double> structure_only_population(
-    const std::shared_ptr<data::Structure>& structure, double total_charge) {
-  if (!structure) {
-    throw std::invalid_argument(
-        "Population analysis requires a non-null structure.");
-  }
-  if (structure->get_num_atoms() == 0) {
-    return {};
-  }
-  return std::vector<double>(structure->get_num_atoms(),
-                             total_charge / structure->get_num_atoms());
-}
-
 Eigen::MatrixXd density_from_coefficients_and_occupations(
     const Eigen::MatrixXd& coefficients, const Eigen::VectorXd& occupations) {
   if (coefficients.cols() != occupations.size()) {
@@ -81,6 +68,24 @@ Eigen::MatrixXd density_from_symmetry_blocks(
   return density;
 }
 
+std::vector<double> model_population(
+    const std::shared_ptr<const data::SymmetryBlockedTensor<1>>& occupations,
+    size_t n_sites) {
+  std::vector<double> populations(n_sites, 0.0);
+  for (const auto& [label, _] : occupations->extents()[0]) {
+    const auto& block = occupations->block({label});
+    if (block.size() != static_cast<Eigen::Index>(n_sites)) {
+      throw std::runtime_error(
+          "Cannot compute model populations: occupation dimensions do not "
+          "match the number of sites.");
+    }
+    for (size_t site = 0; site < n_sites; ++site) {
+      populations[site] += block(static_cast<Eigen::Index>(site));
+    }
+  }
+  return populations;
+}
+
 std::vector<double> mulliken_population(
     const std::shared_ptr<data::Wavefunction>& wavefunction) {
   if (!wavefunction) {
@@ -89,8 +94,23 @@ std::vector<double> mulliken_population(
   }
 
   auto orbitals = wavefunction->get_orbitals();
-  if (!orbitals || !orbitals->has_basis_set() ||
-      !orbitals->has_overlap_matrix()) {
+  if (!orbitals) {
+    throw std::runtime_error(
+        "QDK population analysis requires a wavefunction with orbitals.");
+  }
+
+  auto occupations = wavefunction->total_orbital_occupations();
+  if (!occupations) {
+    throw std::runtime_error(
+        "QDK population analysis requires total orbital occupations.");
+  }
+
+  if (std::dynamic_pointer_cast<data::ModelOrbitals>(orbitals)) {
+    return model_population(occupations,
+                            orbitals->get_num_molecular_orbitals());
+  }
+
+  if (!orbitals->has_basis_set() || !orbitals->has_overlap_matrix()) {
     throw std::runtime_error(
         "QDK population analysis from a wavefunction requires orbitals with a "
         "basis set and AO overlap matrix.");
@@ -109,8 +129,7 @@ std::vector<double> mulliken_population(
 
   const auto& overlap = orbitals->get_overlap_matrix();
   auto coefficients = orbitals->coefficients();
-  auto occupations = wavefunction->total_orbital_occupations();
-  if (!coefficients || !occupations) {
+  if (!coefficients) {
     throw std::runtime_error(
         "QDK population analysis from a wavefunction requires symmetry-blocked "
         "orbital coefficients and occupations.");
@@ -128,13 +147,7 @@ std::vector<double> mulliken_population(
     }
   }
 
-  std::vector<double> populations(n_atoms, 0.0);
-  const auto& nuclear_charges = structure->get_nuclear_charges();
-  for (size_t atom = 0; atom < n_atoms; ++atom) {
-    populations[atom] = nuclear_charges(static_cast<Eigen::Index>(atom)) -
-                        electron_population[atom];
-  }
-  return populations;
+  return electron_population;
 }
 
 std::unique_ptr<PopulationAnalyzer> make_qdk_population_analyzer() {
@@ -146,14 +159,17 @@ std::unique_ptr<PopulationAnalyzer> make_qdk_population_analyzer() {
 std::vector<double> QdkPopulationAnalyzer::_run_impl(
     PopulationAnalysisInput input, int charge, int spin_multiplicity,
     unsigned int n_inactive_orbitals) const {
+  (void)charge;
   (void)spin_multiplicity;
   (void)n_inactive_orbitals;
   return std::visit(
-      [charge](const auto& value) -> std::vector<double> {
+      [](const auto& value) -> std::vector<double> {
         using ValueType = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<ValueType,
                                      std::shared_ptr<data::Structure>>) {
-          return structure_only_population(value, static_cast<double>(charge));
+          throw std::invalid_argument(
+              "QDK population analysis requires a wavefunction; use a backend "
+              "that can solve structure inputs first.");
         } else {
           return mulliken_population(value);
         }

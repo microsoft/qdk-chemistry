@@ -14,6 +14,12 @@ def _h2_structure():
     return data.Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]], [1, 1])
 
 
+def _model_wavefunction():
+    orbitals = data.ModelOrbitals(3)
+    determinant = data.Configuration.from_bitstring("110")
+    return data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+
+
 def test_population_analyzer_factory_registered():
     """Create the default population analyzer from the factory."""
     analyzer = algorithms.create("population_analyzer")
@@ -24,10 +30,17 @@ def test_population_analyzer_factory_registered():
 
 
 def test_qdk_population_analyzer_structure_input():
-    """The QDK analyzer accepts a structure input and returns one charge per atom."""
+    """The QDK analyzer rejects structures without an electronic state."""
     analyzer = algorithms.create("population_analyzer", "qdk")
 
-    charges = analyzer.run(_h2_structure(), charge=1, spin_multiplicity=1)
+    with np.testing.assert_raises(ValueError):
+        analyzer.run(_h2_structure(), charge=1, spin_multiplicity=1)
 
-    assert len(charges) == 2
-    np.testing.assert_allclose(charges, [0.5, 0.5])
+
+def test_qdk_population_analyzer_model_wavefunction():
+    """The QDK analyzer returns particle counts for model-system sites."""
+    analyzer = algorithms.create("population_analyzer", "qdk")
+
+    populations = analyzer.run(_model_wavefunction(), charge=0, spin_multiplicity=1)
+
+    np.testing.assert_allclose(populations, [1.0, 1.0, 0.0])

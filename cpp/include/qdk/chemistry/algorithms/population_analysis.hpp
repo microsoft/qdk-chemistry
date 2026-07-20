@@ -57,7 +57,7 @@ class PopulationAnalyzer
   /**
    * @brief Compute per-center particle populations.
    *
-   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
+   * \cond DOXYGEN_SUPPRESS (Doxygen warning suppression for argument packs)
    * @param input Structure or wavefunction to analyze
    * @param charge Total molecular charge
    * @param spin_multiplicity Spin multiplicity of the molecular system

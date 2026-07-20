@@ -33,7 +33,7 @@ class PyscfPopulationAnalysisSettings(Settings):
 
 
 class PyscfPopulationAnalyzer(PopulationAnalyzer):
-    """PySCF implementation of Mulliken partial-charge analysis."""
+    """PySCF implementation of Mulliken electron-population analysis."""
 
     def __init__(self):
         """Initialize the PySCF population analyzer."""
@@ -48,7 +48,7 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         spin_multiplicity: int,
         n_inactive_orbitals: int,
     ) -> list[float]:
-        """Compute partial charges using PySCF Mulliken population analysis."""
+        """Compute electron populations using PySCF Mulliken analysis."""
         Logger.trace_entering()
         del n_inactive_orbitals
         method = self._settings.get("method").lower()
@@ -63,10 +63,10 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
                 spin_multiplicity,
                 self._settings.get("basis_set"),
             )
-            return self._charges_from_wavefunction(wavefunction)
+            return self._populations_from_wavefunction(wavefunction)
 
         if isinstance(input_data, Wavefunction):
-            return self._charges_from_wavefunction(input_data)
+            return self._populations_from_wavefunction(input_data)
 
         raise TypeError("PySCF population analysis requires a Structure or Wavefunction input.")
 
@@ -80,7 +80,7 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         solver_settings.set("xc_grid", self._settings.get("xc_grid"))
         return solver
 
-    def _charges_from_wavefunction(self, wavefunction: Wavefunction) -> list[float]:
+    def _populations_from_wavefunction(self, wavefunction: Wavefunction) -> list[float]:
         orbitals = wavefunction.get_orbitals()
         if orbitals is None:
             raise ValueError("PySCF population analysis requires a wavefunction with orbitals.")
@@ -95,8 +95,9 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         )
         mean_field.verbose = 0
         density = mean_field.make_rdm1()
-        _, charges = mean_field.mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp())
-        return [float(chg) for chg in charges]
+        ao_populations, _ = mean_field.mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp())
+        ao_slices = mean_field.mol.aoslice_by_atom()
+        return [float(np.sum(ao_populations[start:stop])) for _, _, start, stop in ao_slices]
 
     def name(self) -> str:
         """Return the analyzer name."""

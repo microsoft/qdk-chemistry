@@ -194,15 +194,15 @@ class TestPyscfPlugin:
         assert population_analyzer is not None
 
     def test_pyscf_h2_population_analysis(self):
-        """Test PySCF Mulliken population analysis on neutral H2."""
+        """Test PySCF Mulliken electron populations on neutral H2."""
         h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
         analyzer = algorithms.create("population_analyzer", "pyscf")
         analyzer.settings().set("basis_set", "sto-3g")
 
-        charges = analyzer.run(h2, charge=0, spin_multiplicity=1)
+        populations = analyzer.run(h2, charge=0, spin_multiplicity=1)
 
-        assert len(charges) == 2
-        np.testing.assert_allclose(charges, [0.0, 0.0], atol=1e-8)
+        assert len(populations) == 2
+        np.testing.assert_allclose(populations, [1.0, 1.0], atol=1e-8)
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""
