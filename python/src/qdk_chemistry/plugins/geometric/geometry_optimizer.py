@@ -194,7 +194,7 @@ class GeometricOptimizer(GeometryOptimizer):
             finally:
                 _close_geometric_log_handler(prefix.with_suffix(".log"))
 
-        optimized_coordinates = _extract_coordinates(result, engine)
+        optimized_coordinates = np.asarray(_extract_coordinates(result, engine), dtype=float).reshape((-1, 3))
         optimized_structure = Structure(
             optimized_coordinates, structure.get_elements(), structure.get_masses(), structure.get_nuclear_charges()
         )
