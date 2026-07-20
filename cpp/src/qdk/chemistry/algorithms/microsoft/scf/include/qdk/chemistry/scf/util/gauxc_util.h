@@ -118,6 +118,13 @@ std::string to_string(GauXC::ExecutionSpace type);
  * time.
  */
 struct GAUXCInput {
+  std::string xc_name;  ///< Exchange-correlation functional name; part of the
+                        ///< cache identity so distinct functionals map to
+                        ///< distinct GAUXC instances
+
+  bool unrestricted = false;  ///< Spin treatment (polarized vs unpolarized);
+                              ///< part of the cache identity
+
   GauXC::AtomicGridSizeDefault grid_spec =
       GauXC::AtomicGridSizeDefault::UltraFineGrid;  ///< Atomic grid density
 
@@ -194,6 +201,8 @@ struct hash<qdk::chemistry::scf::GAUXCInput> {
   size_t operator()(const qdk::chemistry::scf::GAUXCInput& input) const {
     qdk::chemistry::utils::HashContext ctx;
     hash_value(ctx, "gauxc_input");
+    hash_value(ctx, input.xc_name);
+    hash_value(ctx, input.unrestricted);
     hash_value(ctx, input.grid_spec);
     hash_value(ctx, input.rad_quad_spec);
     hash_value(ctx, input.prune_spec);

@@ -9,10 +9,10 @@
 # start-cell-create-from-time-evolution
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.data import QpeResult, QubitOperator
 
 # Time-evolution QPE: U = e^{-iHt}, eigenvalue_from_phase wraps the angle.
-hamiltonian = QubitHamiltonian(
+hamiltonian = QubitOperator(
     pauli_strings=["ZI", "IZ", "XX"], coefficients=[0.5, -0.3, 0.2]
 )
 evolution_time = 0.1
@@ -35,10 +35,10 @@ result = QpeResult.from_phase_fraction(
 # start-cell-create-from-qubitization
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.data import QpeResult, QubitOperator
 
 # Qubitization QPE: W = walk operator, E = lambda * cos(2*pi*phi).
-hamiltonian = QubitHamiltonian(
+hamiltonian = QubitOperator(
     pauli_strings=["ZI", "IZ", "XX"], coefficients=[0.5, -0.3, 0.2]
 )
 

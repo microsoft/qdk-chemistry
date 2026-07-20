@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create, registry
-from qdk_chemistry.algorithms.energy_estimator.qdk import (
-    QdkEnergyEstimator,
+from qdk_chemistry.algorithms.expectation_estimator.qdk import (
+    QdkExpectationEstimator,
     _append_measurement_to_circuit,
     _compute_expval_and_variance_from_bitstrings,
     _determine_measurement_basis,
@@ -22,7 +22,7 @@ from qdk_chemistry.algorithms.energy_estimator.qdk import (
     _parity,
     _paulis_to_nonid_masks,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitOperator
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils import Logger
 
@@ -101,13 +101,13 @@ def test_create_measurement_circuits_basic(wavefunction_4e4o):
 
     # Define observable
     observable = [
-        QubitHamiltonian(["ZIIIIIII", "IZIIIIII", "ZZIIIIII"], np.array([1.0, 1.0, 1.0])),
-        QubitHamiltonian(["XXIIIIII"], np.array([1.0])),
-        QubitHamiltonian(["YYIIIIII"], np.array([1.0])),
+        QubitOperator(["ZIIIIIII", "IZIIIIII", "ZZIIIIII"], np.array([1.0, 1.0, 1.0])),
+        QubitOperator(["XXIIIIII"], np.array([1.0])),
+        QubitOperator(["YYIIIIII"], np.array([1.0])),
     ]
 
     # Call function
-    circuits, hamiltonians, identity_offset = QdkEnergyEstimator._create_measurement_circuits(circuit, observable)
+    circuits, hamiltonians, identity_offset = QdkExpectationEstimator._create_measurement_circuits(circuit, observable)
     qsc_json = [circ.get_qsharp_circuit().json() for circ in circuits]
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
@@ -203,18 +203,18 @@ def test_paulis_to_nonid_masks():
 def test_compute_energy_expectation_from_bitstrings_mismatched_lengths():
     """Test calculate_energy_expval_and_variance with mismatched input lengths."""
     bitstring_counts = [{"0": 50, "1": 50}]
-    observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]  # Extra observable
+    observables = [QubitOperator(["Z"], [1.0]), QubitOperator(["X"], [1.0])]  # Extra observable
 
     with pytest.raises(ValueError, match="Expected 2 bitstring result sets, got 1"):
-        QdkEnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+        QdkExpectationEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
 
 def test_calculate_energy_expval_variance_none_counts():
     """Test calculate_energy_expval_and_variance with None in bitstring_counts."""
     bitstring_counts = [None, {"0": 50, "1": 50}]
-    observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]
+    observables = [QubitOperator(["Z"], [1.0]), QubitOperator(["X"], [1.0])]
 
-    result = QdkEnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+    result = QdkExpectationEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
     # Should handle None entries gracefully
     assert np.isclose(
@@ -228,7 +228,7 @@ def test_calculate_energy_expval_variance_none_counts():
 def test_measurement_data_to_json():
     """Test MeasurementData.to_json method."""
     measurement_results = MeasurementData(
-        hamiltonians=[QubitHamiltonian(["Z"], np.array([1.0]))],
+        hamiltonians=[QubitOperator(["Z"], np.array([1.0]))],
         bitstring_counts=[{"0": 50, "1": 50}],
         shots_list=[100],
     )
@@ -253,18 +253,18 @@ def test_measurement_data_to_json():
         Path(temp_path).unlink()
 
 
-def test_create_energy_estimator_qdk():
-    """Test factory function for creating QDK energy estimator."""
-    estimator = create("energy_estimator", "qdk")
-    assert isinstance(estimator, QdkEnergyEstimator)
+def test_create_expectation_estimator_qdk():
+    """Test factory function for creating QDK expectation estimator."""
+    estimator = create("expectation_estimator", "qdk")
+    assert isinstance(estimator, QdkExpectationEstimator)
 
 
 def test_estimator_fewer_shots(wavefunction_4e4o):
     """Test estimator raises error when total shots is less than number of observables."""
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     circuit = state_prep.run(wavefunction_4e4o)
-    observable = QubitHamiltonian(["IIIIIIZZ", "IIIIIIXX", "IIIIIIYY"], np.array([2, 3, 4]))
-    estimator = QdkEnergyEstimator()
+    observable = QubitOperator(["IIIIIIZZ", "IIIIIIXX", "IIIIIIYY"], np.array([2, 3, 4]))
+    estimator = QdkExpectationEstimator()
     estimator.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
@@ -296,12 +296,12 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     state_prep_circuit = state_prep.run(wavefunction_4e4o)
     energy_offset = -4.19142869944708
-    test_hamiltonian = QubitHamiltonian(
+    test_hamiltonian = QubitOperator(
         ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([0.76388709, 0.1022262, 1.03502496])
     )
     # Pre-group by QWC so the estimator uses grouped measurement.
     test_hamiltonian = registry.create("term_grouper", "qubit_wise_commuting").run(test_hamiltonian)
-    estimator = QdkEnergyEstimator()
+    estimator = QdkExpectationEstimator()
     estimator.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", executor_name),
@@ -345,12 +345,12 @@ def test_is_identity_only(pauli_strings, expected):
 
 @pytest.mark.usefixtures("debug_logger")
 def test_estimator_pure_identity_hamiltonian(capfd):
-    """Test energy estimator with a Hamiltonian containing only identity terms."""
+    """Test expectation estimator with a Hamiltonian containing only identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
     circuit = Circuit(qasm=qasm)
     # Pure identity Hamiltonian: coefficient * I should give coefficient directly
-    observable = QubitHamiltonian(["IIII"], np.array([3.5]))
-    estimator = QdkEnergyEstimator()
+    observable = QubitOperator(["IIII"], np.array([3.5]))
+    estimator = QdkExpectationEstimator()
     estimator.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
@@ -382,13 +382,13 @@ def test_estimator_pure_identity_hamiltonian(capfd):
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_estimator_mixed_identity_and_pauli_terms():
-    """Test energy estimator with a Hamiltonian containing both identity and non-identity terms."""
+    """Test expectation estimator with a Hamiltonian containing both identity and non-identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n'
     circuit = Circuit(qasm=qasm)
     # Mixed Hamiltonian: identity term (coeff=2.0) + ZZ term (coeff=1.0)
     # For Bell state |00>+|11>, <ZZ> = 1.0, so total energy = 2.0 + 1.0 = 3.0
-    observable = QubitHamiltonian(["II", "ZZ"], np.array([2.0, 1.0]))
-    estimator = QdkEnergyEstimator()
+    observable = QubitOperator(["II", "ZZ"], np.array([2.0, 1.0]))
+    estimator = QdkExpectationEstimator()
     estimator.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
@@ -412,12 +412,12 @@ def test_estimator_mixed_identity_and_pauli_terms():
 
 
 def test_estimator_multiple_identity_terms(wavefunction_4e4o):
-    """Test energy estimator with multiple identity terms having different coefficients."""
+    """Test expectation estimator with multiple identity terms having different coefficients."""
     state_prep = create("state_prep", "sparse_isometry_gf2x")
     circuit = state_prep.run(wavefunction_4e4o)
     # Multiple identity terms: sum of coefficients should be the energy
-    observable = QubitHamiltonian(["IIIIIIII", "IIIIIIII", "IIIIIIII"], np.array([1.5, -0.5, 2.0]))
-    estimator = QdkEnergyEstimator()
+    observable = QubitOperator(["IIIIIIII", "IIIIIIII", "IIIIIIII"], np.array([1.5, -0.5, 2.0]))
+    estimator = QdkExpectationEstimator()
     estimator.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),

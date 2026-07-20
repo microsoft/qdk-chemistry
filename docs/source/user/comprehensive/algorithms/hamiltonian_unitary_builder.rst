@@ -2,13 +2,13 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitOperator` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
 QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
 
@@ -29,8 +29,8 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
-QubitHamiltonian
-   A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
+QubitOperator
+   A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder
@@ -204,7 +204,7 @@ When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 
 Consuming term partitions
 -------------------------
 
-When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the Trotter builder consumes it directly:
+When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
 * :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
@@ -239,9 +239,9 @@ Example::
     #           e^{fields·t/2}
     # where same-layer ZZ terms (e.g. Z₀Z₁ and Z₂Z₃) have disjoint
     # qubit support and are exponentiated independently within one step.
-    trotter = registry.create("time_evolution_builder", "trotter")
-    trotter.settings().update({"order": 2, "num_divisions": 1})
-    evolution = trotter.run(hamiltonian, time=1.0)
+    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+    trotter.settings().update({"order": 2, "num_divisions": 1, "time": 1.0})
+    evolution = trotter.run(hamiltonian)
     container = evolution.get_container()
 
     # The grouped schedule uses 11 exponentiated terms per step,
@@ -362,7 +362,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
 - :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading
