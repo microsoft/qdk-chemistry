@@ -684,17 +684,19 @@ def _register_cpp_factories():
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         NuclearDerivativeCalculatorFactory,
+        PopulationAnalyzerFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
     )
 
     register_factory(ActiveSpaceSelectorFactory)
+    register_factory(NuclearDerivativeCalculatorFactory)
+    register_factory(PopulationAnalyzerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
-    register_factory(NuclearDerivativeCalculatorFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)

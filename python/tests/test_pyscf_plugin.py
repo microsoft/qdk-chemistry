@@ -155,6 +155,9 @@ class TestPyscfPlugin:
         available_stability_checkers = algorithms.available("stability_checker")
         assert "pyscf" in available_stability_checkers
 
+        available_population_analyzers = algorithms.available("population_analyzer")
+        assert "pyscf" in available_population_analyzers
+
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
@@ -184,6 +187,32 @@ class TestPyscfPlugin:
         """Test creating PySCF stability checker."""
         stability_checker = algorithms.create("stability_checker", "pyscf")
         assert stability_checker is not None
+
+    def test_pyscf_population_analyzer_creation(self):
+        """Test creating PySCF population analyzer."""
+        population_analyzer = algorithms.create("population_analyzer", "pyscf")
+        assert population_analyzer is not None
+
+    def test_pyscf_h2_population_analysis(self):
+        """Test PySCF Mulliken electron populations on neutral H2."""
+        h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        analyzer.settings().set("basis_set", "sto-3g")
+
+        populations = analyzer.run(h2, charge=0, spin_multiplicity=1)
+
+        assert len(populations) == 2
+        np.testing.assert_allclose(populations, [1.0, 1.0], atol=1e-8)
+
+    def test_pyscf_o2_unrestricted_population_analysis(self):
+        """Test spin-summed PySCF populations from unrestricted orbitals."""
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        analyzer.settings().set("basis_set", "sto-3g")
+        analyzer.settings().set("scf_type", "unrestricted")
+
+        populations = analyzer.run(create_o2_structure(), charge=0, spin_multiplicity=3)
+
+        np.testing.assert_allclose(populations, [8.0, 8.0], atol=1e-8)
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""
