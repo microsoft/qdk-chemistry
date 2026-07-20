@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
@@ -109,6 +110,11 @@ TEST(MPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
             (Eigen::VectorXd(6) << 1.0, 2.0, 3.0, 1.0, 2.0, 3.0).finished());
 }
 
+TEST(MPSSiteTest, RejectsZeroBondDimensions) {
+  EXPECT_THROW(make_site(0, 1), std::invalid_argument);
+  EXPECT_THROW(make_site(1, 0), std::invalid_argument);
+}
+
 TEST(AbelianMPSContainerTest, RejectsMismatchedAdjacentBonds) {
   std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2),
                                                      make_site(3, 1)};
@@ -133,5 +139,18 @@ TEST(AbelianMPSContainerTest, RejectsPhysicalBasisSizeMismatch) {
                    std::move(sites), testing::create_test_orbitals(1, 1, true),
                    nullptr, nullptr, MPSCanonicalForm::Unspecified,
                    std::nullopt, 0.0, {"zero", "one"}),
+               std::invalid_argument);
+}
+
+TEST(AbelianMPSContainerTest, RejectsNonFiniteDiscardedWeight) {
+  EXPECT_THROW(AbelianMPSContainer(
+                   {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+                   nullptr, nullptr, MPSCanonicalForm::Unspecified,
+                   std::nullopt, std::numeric_limits<double>::quiet_NaN()),
+               std::invalid_argument);
+  EXPECT_THROW(AbelianMPSContainer(
+                   {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+                   nullptr, nullptr, MPSCanonicalForm::Unspecified,
+                   std::nullopt, std::numeric_limits<double>::infinity()),
                std::invalid_argument);
 }

@@ -59,7 +59,7 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the MPSSequentialStatePreparationSettings."""
         super().__init__()
-        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.")
+        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.", (2, 62))
         self._set_default(
             "fast_resource_estimation",
             "bool",
@@ -71,9 +71,7 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
             "fast_grouped_resource_estimation",
             "bool",
             False,
-            "Like fast_resource_estimation but with O(dim) serialization instead of O(dim^2). "
-            "Sends only 2 representative Givens layers per matrix plus the layer count. "
-            "Faster for large bond dimensions (chi >= 2000).",
+            "Compatibility alias for fast_resource_estimation.",
         )
 
 
@@ -122,6 +120,8 @@ class MPSSequentialStatePreparation(StatePreparation):
         """
         if not isinstance(wavefunction, AbelianMPSContainer):
             raise TypeError(f"MPSSequentialStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
+        if wavefunction.is_complex:
+            raise ValueError("MPS sequential state preparation currently supports only real-valued MPS tensors.")
 
         fast_re = self._settings.get("fast_resource_estimation")
         fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")
@@ -132,12 +132,9 @@ class MPSSequentialStatePreparation(StatePreparation):
 
         rotation_bits = self._settings.get("rotation_bits")
 
-        if fast_re:
+        if fast_re or fast_grouped_re:
             params = data.to_qsharp_params_grouped(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
-        elif fast_grouped_re:
-            params = data.to_qsharp_params_grouped_fast(rotation_bits)
-            program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGroupedFast
         else:
             params = data.to_qsharp_params(rotation_bits)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
@@ -148,12 +145,9 @@ class MPSSequentialStatePreparation(StatePreparation):
         )
 
         # Build composable op for QPE composition
-        if fast_re:
+        if fast_re or fast_grouped_re:
             op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedParams(**params)
             qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGrouped(op_params)
-        elif fast_grouped_re:
-            op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedFastParams(**params)
-            qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGroupedFast(op_params)
         else:
             op_params = QSHARP_UTILS.MPSSequential.MPSSequentialParams(**params)
             qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOp(op_params)
@@ -387,6 +381,12 @@ def generate_mps_preparation_data(
 
     """
     mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    if not mps_sites:
+        raise ValueError("MPS sequential state preparation requires at least one site.")
+    if any(site.is_complex for site in mps_sites):
+        raise ValueError("MPS sequential state preparation currently supports only real-valued MPS tensors.")
+    if any(not np.isfinite(site.to_dense()).all() or np.linalg.norm(site.to_dense()) <= 1e-15 for site in mps_sites):
+        raise ValueError("MPS sites must contain finite amplitudes with nonzero norm.")
     num_sites = len(mps_sites)
     d = mps_sites[0].shape[1]
     if d != 4:
@@ -463,8 +463,9 @@ def generate_mps_preparation_data(
             init_padded = init_padded @ v_pad.T
         initial_state_vec_arr = init_padded.flatten()
         norm = np.linalg.norm(initial_state_vec_arr)
-        if norm > 1e-15:
-            initial_state_vec_arr = initial_state_vec_arr / norm
+        if not np.isfinite(initial_state_vec_arr).all() or not np.isfinite(norm) or norm <= 1e-15:
+            raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
+        initial_state_vec_arr = initial_state_vec_arr / norm
         initial_state_vec = initial_state_vec_arr.tolist()
 
     return MPSPreparationData(

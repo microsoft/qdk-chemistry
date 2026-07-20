@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 import qdk
-from qdk import TargetProfile, qsharp
+from qdk import qsharp
 
 __all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
@@ -27,29 +27,16 @@ _QS_FILES = [
 
 _MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
 
-_state: dict[str, str | None] = {"mode": None}  # "base", "mps", or None
+_state: dict[str, str | None] = {"mode": None}
 
 
 def _ensure_base_session():
-    """Ensure interpreter is in Base mode with utility Q# files loaded."""
-    if _state["mode"] == "base":
-        try:
-            _ = qdk.code.QDKChemistry.Utils.StatePreparation
-            return
-        except AttributeError:
-            _state["mode"] = None  # stale — interpreter was reset externally
-    if _state["mode"] == "mps":
-        qsharp.init(target_profile=TargetProfile.Base)
-    try:
-        _ = qdk.code.QDKChemistry.Utils.StatePreparation
-    except AttributeError:
-        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
-        qsharp.eval(code)
-    _state["mode"] = "base"
+    """Ensure the unified MPS project context and utility Q# files are loaded."""
+    _ensure_mps_session()
 
 
 def _ensure_mps_session():
-    """Ensure interpreter has MPS project loaded (Unrestricted) plus utility files."""
+    """Ensure interpreter has the MPS project and shared utility files loaded."""
     if _state["mode"] == "mps":
         try:
             _ = qdk.code.MPSSparse

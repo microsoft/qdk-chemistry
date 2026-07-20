@@ -14,7 +14,53 @@ import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSequential, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, SiteUnitary;
+export MPSSequentialParams, MPSSequentialGroupedParams, MPSSequential, MakeMPSSequentialOp, MakeMPSSequentialOpGrouped, MakeMPSSequentialCircuit, MakeMPSSequentialCircuitGrouped, SiteUnitary;
+
+struct MPSSequentialParams {
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteVLayerAngles : Double[][][],
+    siteVLayerShifted : Bool[][],
+    siteVPhases : Bool[][],
+    siteRot0Angles : Double[][],
+    siteRot1Angles : Double[][],
+    siteRot2Angles : Double[][],
+    siteW0LayerAngles : Double[][][],
+    siteW0LayerShifted : Bool[][],
+    siteW0Phases : Bool[][],
+    siteW1LayerAngles : Double[][][],
+    siteW1LayerShifted : Bool[][],
+    siteW1Phases : Bool[][],
+    siteULayerAngles : Double[][][],
+    siteULayerShifted : Bool[][],
+    siteUPhases : Bool[][],
+}
+
+struct MPSSequentialGroupedParams {
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteShapeIndices : Int[],
+    shapeEffectiveBits : Int[],
+    shapeVLayerAngles : Double[][][],
+    shapeVLayerShifted : Bool[][],
+    shapeVPhases : Bool[][],
+    shapeRot0Angles : Double[][],
+    shapeRot1Angles : Double[][],
+    shapeRot2Angles : Double[][],
+    shapeW0LayerAngles : Double[][][],
+    shapeW0LayerShifted : Bool[][],
+    shapeW0Phases : Bool[][],
+    shapeW1LayerAngles : Double[][][],
+    shapeW1LayerShifted : Bool[][],
+    shapeW1Phases : Bool[][],
+    shapeULayerAngles : Double[][][],
+    shapeULayerShifted : Bool[][],
+    shapeUPhases : Bool[][],
+}
 
 // =============================================================================
 // CSD decomposition (Givens + QROAM + phase gradient)
@@ -285,6 +331,37 @@ operation MPSSequential(
     Adjoint PreparePhaseGradientState(phaseGradient);
 }
 
+operation ApplyMPSSequential(params : MPSSequentialParams, state : Qubit[]) : Unit {
+    Fact(Length(state) == 2 * params.numSites, "State register size must equal twice the number of MPS sites.");
+    use ancilla = Qubit[params.numAncillaQubits];
+    MPSSequential(
+        params.initialStateVec,
+        params.numSites,
+        params.rotationBits,
+        params.siteVLayerAngles,
+        params.siteVLayerShifted,
+        params.siteVPhases,
+        params.siteRot0Angles,
+        params.siteRot1Angles,
+        params.siteRot2Angles,
+        params.siteW0LayerAngles,
+        params.siteW0LayerShifted,
+        params.siteW0Phases,
+        params.siteW1LayerAngles,
+        params.siteW1LayerShifted,
+        params.siteW1Phases,
+        params.siteULayerAngles,
+        params.siteULayerShifted,
+        params.siteUPhases,
+        state,
+        ancilla
+    );
+}
+
+function MakeMPSSequentialOp(params : MPSSequentialParams) : Qubit[] => Unit {
+    ApplyMPSSequential(params, _)
+}
+
 /// Circuit wrapper for resource estimation — allocates qubits internally.
 operation MakeMPSSequentialCircuit(
     initialStateVec : Double[],
@@ -418,4 +495,48 @@ operation MakeMPSSequentialCircuitGrouped(
 
     // Undo phase gradient state
     Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+operation ApplyMPSSequentialGrouped(params : MPSSequentialGroupedParams, state : Qubit[]) : Unit {
+    Fact(Length(state) == 2 * params.numSites, "State register size must equal twice the number of MPS sites.");
+    use ancilla = Qubit[params.numAncillaQubits];
+    use phaseGradient = Qubit[params.rotationBits];
+    PreparePhaseGradientState(phaseGradient);
+    use angleReg = Qubit[params.rotationBits];
+
+    let initReg = ancilla + state[0..1];
+    QroamStatePrep(params.initialStateVec, Reversed(initReg), phaseGradient, angleReg);
+
+    for siteIdx in 0..params.numSites - 2 {
+        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let shapeIdx = params.siteShapeIndices[siteIdx];
+        let effectiveBits = params.shapeEffectiveBits[shapeIdx];
+        SiteUnitary(
+            params.shapeVLayerAngles[shapeIdx],
+            params.shapeVLayerShifted[shapeIdx],
+            params.shapeVPhases[shapeIdx],
+            params.shapeRot0Angles[shapeIdx],
+            params.shapeRot1Angles[shapeIdx],
+            params.shapeRot2Angles[shapeIdx],
+            params.shapeW0LayerAngles[shapeIdx],
+            params.shapeW0LayerShifted[shapeIdx],
+            params.shapeW0Phases[shapeIdx],
+            params.shapeW1LayerAngles[shapeIdx],
+            params.shapeW1LayerShifted[shapeIdx],
+            params.shapeW1Phases[shapeIdx],
+            params.shapeULayerAngles[shapeIdx],
+            params.shapeULayerShifted[shapeIdx],
+            params.shapeUPhases[shapeIdx],
+            newSite,
+            ancilla[0..effectiveBits - 1],
+            phaseGradient,
+            angleReg
+        );
+    }
+
+    Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+function MakeMPSSequentialOpGrouped(params : MPSSequentialGroupedParams) : Qubit[] => Unit {
+    ApplyMPSSequentialGrouped(params, _)
 }

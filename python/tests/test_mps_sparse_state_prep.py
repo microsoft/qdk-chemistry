@@ -321,6 +321,31 @@ class TestGenerateMPSSparsePreparationData:
         init_vec = np.array(data.initial_state_vec)
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
 
+    @pytest.mark.parametrize("value", [0.0, np.nan, np.inf])
+    def test_rejects_invalid_initial_state(self, value):
+        """Invalid amplitudes cannot be serialized as a quantum state."""
+        with pytest.raises(ValueError, match="finite amplitudes with nonzero norm"):
+            generate_mps_sparse_preparation_data([np.full((1, 4, 1), value)])
+
+    def test_rejects_complex_mps(self):
+        """The real-valued synthesis path rejects complex tensors explicitly."""
+        with pytest.raises(ValueError, match="only real-valued"):
+            generate_mps_sparse_preparation_data([np.array([[[1.0j], [0.0], [0.0], [0.0]]])])
+
+    def test_public_run_constructs_composable_circuit(self):
+        """Public run resolves both the estimator entry point and composable Q# operation."""
+        mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+        circuit = MPSSparseStatePreparation().run(mps)
+
+        assert circuit._qsharp_op is not None
+
+    @pytest.mark.parametrize("rotation_bits", [1, 63])
+    def test_rejects_unsupported_rotation_precision(self, rotation_bits):
+        """Settings reject precision values that Q# cannot execute safely."""
+        algorithm = MPSSparseStatePreparation()
+        with pytest.raises(ValueError, match="out of allowed range"):
+            algorithm.settings().update("rotation_bits", rotation_bits)
+
     def test_permutation_sizes_consistent(self):
         """Verify permutation target arrays have consistent sizes."""
         data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors)
@@ -425,13 +450,7 @@ class TestMPSSparseQSharpFidelity:
         state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
         state_amplitudes = _reindex_sites(state_amplitudes, num_sites)
 
-        # Compute probability fidelity (Bhattacharyya coefficient squared).
-        # The sparse circuit uses measurement-based QROAM uncomputation which
-        # introduces non-deterministic phase flips; probability fidelity is the
-        # appropriate metric.
-        p = np.abs(state_amplitudes[: len(target_state)]) ** 2
-        q = np.abs(target_state) ** 2
-        fidelity = np.sum(np.sqrt(p * q)) ** 2
+        fidelity = np.abs(np.vdot(target_state, state_amplitudes[: len(target_state)])) ** 2
         assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
 
     def test_fidelity_qualtran_tensors(self):
@@ -464,12 +483,7 @@ class TestMPSSparseQSharpFidelity:
         state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
         state_amplitudes = _reindex_sites(state_amplitudes, num_sites)
 
-        # Probability fidelity: measurement-based QROAM uncomputation
-        # introduces non-deterministic phase flips but preserves the correct
-        # probability distribution.
-        p = np.abs(state_amplitudes[: len(target_state)]) ** 2
-        q = np.abs(target_state) ** 2
-        fidelity = np.sum(np.sqrt(p * q)) ** 2
+        fidelity = np.abs(np.vdot(target_state, state_amplitudes[: len(target_state)])) ** 2
         assert fidelity > 0.90, f"Qualtran tensor fidelity {fidelity:.4f} too low"
 
 

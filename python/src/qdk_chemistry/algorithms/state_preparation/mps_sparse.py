@@ -60,7 +60,7 @@ class MPSSparseStatePreparationSettings(StatePreparationSettings):
     def __init__(self):
         """Initialize the MPSSparseStatePreparationSettings."""
         super().__init__()
-        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.")
+        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.", (2, 62))
 
 
 class MPSSparseStatePreparation(StatePreparation):
@@ -102,6 +102,8 @@ class MPSSparseStatePreparation(StatePreparation):
         """
         if not isinstance(wavefunction, AbelianMPSContainer):
             raise TypeError(f"MPSSparseStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
+        if wavefunction.is_complex:
+            raise ValueError("Sparse MPS state preparation currently supports only real-valued MPS tensors.")
 
         if wavefunction.physical_dimension != 4:
             raise ValueError("Sparse MPS state preparation requires four physical states per site.")
@@ -239,6 +241,12 @@ def generate_mps_sparse_preparation_data(
 
     """
     mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    if not mps_sites:
+        raise ValueError("Sparse MPS state preparation requires at least one site.")
+    if any(site.is_complex for site in mps_sites):
+        raise ValueError("Sparse MPS state preparation currently supports only real-valued MPS tensors.")
+    if any(not np.isfinite(site.to_dense()).all() or np.linalg.norm(site.to_dense()) <= 1e-15 for site in mps_sites):
+        raise ValueError("MPS sites must contain finite amplitudes with nonzero norm.")
     num_sites = len(mps_sites)
     d = mps_sites[0].shape[1]
     if d != 4:
@@ -270,8 +278,9 @@ def generate_mps_sparse_preparation_data(
     init_padded[:, :chi_1] = init_state
     initial_state_vec_arr = init_padded.flatten()
     norm = np.linalg.norm(initial_state_vec_arr)
-    if norm > 1e-15:
-        initial_state_vec_arr = initial_state_vec_arr / norm
+    if not np.isfinite(initial_state_vec_arr).all() or not np.isfinite(norm) or norm <= 1e-15:
+        raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
+    initial_state_vec_arr = initial_state_vec_arr / norm
     initial_state_vec = initial_state_vec_arr.tolist()
 
     return MPSSparsePreparationData(

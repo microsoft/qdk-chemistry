@@ -5,6 +5,7 @@
  */
 
 #include <algorithm>
+#include <cmath>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
@@ -96,6 +97,9 @@ void MPSSite::_validate() const {
         }
       },
       *_physical_slices.front());
+  if (left_bond_dimension() == 0 || right_bond_dimension() == 0) {
+    throw std::invalid_argument("MPS bond dimensions must be positive.");
+  }
 }
 
 std::size_t MPSSite::left_bond_dimension() const {
@@ -176,8 +180,9 @@ void MPSContainer::_validate_common(std::size_t site_count,
   if (!_orbitals) {
     throw std::invalid_argument("MPS wavefunction requires orbitals.");
   }
-  if (_discarded_weight < 0.0) {
-    throw std::invalid_argument("MPS discarded weight must be non-negative.");
+  if (!std::isfinite(_discarded_weight) || _discarded_weight < 0.0) {
+    throw std::invalid_argument(
+        "MPS discarded weight must be finite and non-negative.");
   }
   if (_canonical_form == MPSCanonicalForm::Mixed) {
     if (!_canonical_center || *_canonical_center >= site_count) {

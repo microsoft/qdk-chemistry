@@ -82,6 +82,13 @@ std::shared_ptr<MPSSite> site_from_dense(
                                    std::vector<SymmetryLabel>{SymmetryLabel{}});
 }
 
+std::shared_ptr<MPSSite> site_from_dense_dispatch(const py::array& tensor) {
+  if (tensor.dtype().kind() == 'c') {
+    return site_from_dense<std::complex<double>>(tensor);
+  }
+  return site_from_dense<double>(tensor);
+}
+
 template <typename Scalar>
 py::array_t<Scalar> unpack_dense(
     const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& packed,
@@ -190,7 +197,7 @@ void bind_mps_wavefunction(py::module& data) {
       .def(py::init(&site_from_slices<std::complex<double>>),
            py::arg("physical_slices"), py::arg("left_sector_order"),
            py::arg("right_sector_order"))
-      .def_static("from_dense", &site_from_dense<double>, py::arg("tensor"))
+      .def_static("from_dense", &site_from_dense_dispatch, py::arg("tensor"))
       .def_static("from_dense_complex", &site_from_dense<std::complex<double>>,
                   py::arg("tensor"))
       .def_property_readonly("physical_slices", &physical_slices)

@@ -9,30 +9,39 @@ import Std.Diagnostics.*;
 import Std.ResourceEstimation.*;
 import Std.Measurement.*;
 import Std.TableLookup.Select;
-import QDKChemistry.Utils.SelectSwap.SelectSwap;
 import PhaseGradient.RyViaPhaseGradient;
 import PhaseGradient.PreparePhaseGradientState;
 import QroamStatePrep.QroamStatePrep;
 import GivensDecomposition.*;
 
-export MPSSparse, MakeMPSSparseCircuit, SparseSiteUnitary, PermutationViaQROAM;
+export MPSSparseParams, MPSSparse, MakeMPSSparseOp, MakeMPSSparseCircuit, SparseSiteUnitary, PermutationViaQROAM;
+
+struct MPSSparseParams {
+    initialStateVec : Double[],
+    numSites : Int,
+    rotationBits : Int,
+    numAncillaQubits : Int,
+    siteColPermTargets : Bool[][][],
+    siteColInvPermTargets : Bool[][][],
+    siteRowPermTargets : Bool[][][],
+    siteRowInvPermTargets : Bool[][][],
+    siteBlockLayerAngles : Double[][][],
+    siteBlockLayerShifted : Bool[][],
+    siteBlockPhases : Bool[][],
+}
 
 // =============================================================================
 // Permutation via QROAM
 // =============================================================================
 
 /// # Summary
-/// Applies a permutation |i> -> |P(i)> using QROAM + SWAP + X-measurement.
+/// Applies a permutation |i> -> |P(i)> using coherent table lookup and SWAP.
 ///
 /// # Description
 /// Implements the permutation by:
-///   1. Loading P(address) into a fresh register via QROAM (SelectSwap)
+///   1. Loading P(address) into a fresh register via table lookup
 ///   2. SWAPping the target register with the loaded register
-///   3. X-basis measuring the old register (measurement-based uncomputation)
-///   4. Applying precomputed sign fix-ups via controlled-Z
-///
-/// The X-measurement uncomputes the loaded register but may introduce known
-/// sign flips. These are corrected by the signFixes array.
+///   3. Uncomputing the old register with the inverse permutation
 ///
 /// # Input
 /// ## permTargets
@@ -52,9 +61,9 @@ operation PermutationViaQROAM(
     let N = Length(permTargets);
     let nRequired = Ceiling(Lg(IntAsDouble(N)));
 
-    // Step 1: Load P(address) via QROAM into fresh register
+    // Step 1: Load P(address) into a fresh register.
     use loaded = Qubit[n];
-    SelectSwap(-1, permTargets, target[...nRequired - 1], loaded);
+    Select(permTargets, target[...nRequired - 1], loaded);
 
     // Step 2: SWAP target <-> loaded
     for i in 0..n - 1 {
@@ -64,8 +73,7 @@ operation PermutationViaQROAM(
     // Step 3: Uncompute loaded via XOR with inverse permutation.
     // After SWAP: target = P(i), loaded = i = invPermTargets[P(i)].
     // XOR invPermTargets[target] into loaded: loaded = i ⊕ i = 0.
-    // SelectSwap internally uses within/apply with measurement-based cleanup.
-    SelectSwap(-1, invPermTargets, target[...nRequired - 1], loaded);
+    Select(invPermTargets, target[...nRequired - 1], loaded);
 }
 
 // =============================================================================
@@ -208,6 +216,29 @@ operation MPSSparse(
 
     // Undo phase gradient state
     Adjoint PreparePhaseGradientState(phaseGradient);
+}
+
+operation ApplyMPSSparse(params : MPSSparseParams, state : Qubit[]) : Unit {
+    Fact(Length(state) == 2 * params.numSites, "State register size must equal twice the number of MPS sites.");
+    use ancilla = Qubit[params.numAncillaQubits];
+    MPSSparse(
+        params.initialStateVec,
+        params.numSites,
+        params.rotationBits,
+        params.siteColPermTargets,
+        params.siteColInvPermTargets,
+        params.siteRowPermTargets,
+        params.siteRowInvPermTargets,
+        params.siteBlockLayerAngles,
+        params.siteBlockLayerShifted,
+        params.siteBlockPhases,
+        state,
+        ancilla
+    );
+}
+
+function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
+    ApplyMPSSparse(params, _)
 }
 
 /// Circuit wrapper for resource estimation - allocates qubits internally.

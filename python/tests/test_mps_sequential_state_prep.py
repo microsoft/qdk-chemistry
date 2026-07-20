@@ -95,6 +95,14 @@ class TestAbelianMPSContainer:
         assert all(issparse(value) for value in mps.sites[0].physical_slices)
         assert np.array_equal(mps.sites[0].to_dense(), tensor)
 
+    def test_from_dense_preserves_complex_amplitudes(self):
+        """Generic dense construction dispatches to complex storage when needed."""
+        tensor = np.array([[[1.0j], [0.0], [0.0], [0.0]]])
+        site = MPSSite.from_dense(tensor)
+
+        assert site.is_complex
+        assert np.array_equal(site.to_dense(), tensor)
+
     def test_validation_errors(self):
         """Test that invalid inputs raise ValueError."""
         with pytest.raises(ValueError, match="must contain at least one site"):
@@ -123,8 +131,8 @@ class TestDecomposition:
             (4, 4, 789),
         ],
     )
-    def test_reconstruction_matches_target(self, chi_left, chi_right, seed):
-        """Verify the 7-matrix decomposition reconstructs the target isometry."""
+    def test_decomposition_factors_are_orthogonal(self, chi_left, chi_right, seed):
+        """Verify every unitary factor in the 7-matrix decomposition is orthogonal."""
         rng = np.random.default_rng(seed)
         d = 4
 
@@ -247,6 +255,45 @@ class TestGenerateMPSPreparationData:
 
         init_vec = np.array(data.initial_state_vec)
         assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
+
+    @pytest.mark.parametrize("value", [0.0, np.nan, np.inf])
+    def test_rejects_invalid_initial_state(self, value):
+        """Invalid amplitudes cannot be serialized as a quantum state."""
+        with pytest.raises(ValueError, match="finite amplitudes with nonzero norm"):
+            generate_mps_preparation_data([np.full((1, 4, 1), value)])
+
+    def test_rejects_complex_mps(self):
+        """The real-valued synthesis path rejects complex tensors explicitly."""
+        with pytest.raises(ValueError, match="only real-valued"):
+            generate_mps_preparation_data([np.array([[[1.0j], [0.0], [0.0], [0.0]]])])
+
+
+class TestMPSSequentialPublicApi:
+    """Test public algorithm validation and circuit construction."""
+
+    def test_run_constructs_composable_circuit(self):
+        """Public run resolves both the estimator entry point and composable Q# operation."""
+        mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+        circuit = MPSSequentialStatePreparation().run(mps)
+
+        assert circuit._qsharp_op is not None
+
+    def test_mps_and_base_callables_share_context(self):
+        """Loading either utility namespace does not invalidate retained Q# callables."""
+        from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
+
+        base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+        mps_callable = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
+        _ = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+
+        assert base_callable.__dict__["_qdk_context"] is mps_callable.__dict__["_qdk_context"]
+
+    @pytest.mark.parametrize("rotation_bits", [1, 63])
+    def test_rejects_unsupported_rotation_precision(self, rotation_bits):
+        """Settings reject precision values that Q# cannot execute safely."""
+        algorithm = MPSSequentialStatePreparation()
+        with pytest.raises(ValueError, match="out of allowed range"):
+            algorithm.settings().update("rotation_bits", rotation_bits)
 
 
 @pytest.mark.slow
