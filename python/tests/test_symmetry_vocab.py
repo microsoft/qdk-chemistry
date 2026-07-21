@@ -46,6 +46,21 @@ class TestSpinValue:
         assert sym.axes.alpha().axis() == sym.AxisName.Spin
 
 
+class TestParticleNumberValue:
+    """Tests for particle-number symmetry labels."""
+
+    def test_axis_value_and_factory(self):
+        """Particle-number values and axes retain their integer labels."""
+        value = sym.axes.particle_number_value(2)
+        axis = sym.axes.particle_number(3)
+
+        assert value.axis() == sym.AxisName.ParticleNumber
+        assert value.value() == 2
+        assert sym.axis_name_to_string(sym.AxisName.ParticleNumber) == "particle_number"
+        assert axis.name() == sym.AxisName.ParticleNumber
+        assert axis.admits(value)
+
+
 class TestSymmetryAxis:
     """Tests for SymmetryAxis construction and queries."""
 

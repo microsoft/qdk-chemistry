@@ -185,12 +185,6 @@ py::list physical_slices(const MPSSite& site) {
 }  // namespace
 
 void bind_mps_wavefunction(py::module& data) {
-  py::enum_<MPSCanonicalForm>(data, "MPSCanonicalForm")
-      .value("Unspecified", MPSCanonicalForm::Unspecified)
-      .value("LeftNormalized", MPSCanonicalForm::LeftNormalized)
-      .value("RightNormalized", MPSCanonicalForm::RightNormalized)
-      .value("Mixed", MPSCanonicalForm::Mixed);
-
   py::class_<MPSSite, py::smart_holder>(data, "MPSSite")
       .def(py::init(&site_from_slices<double>), py::arg("physical_slices"),
            py::arg("left_sector_order"), py::arg("right_sector_order"))
@@ -220,17 +214,16 @@ void bind_mps_wavefunction(py::module& data) {
 
   py::class_<MPSContainer, WavefunctionContainer, py::smart_holder>(
       data, "MPSContainer")
-      .def_property_readonly("orbitals", &MPSContainer::orbitals)
+      .def_property_readonly("orbitals", &MPSContainer::get_orbitals)
       .def_property_readonly("total_num_particles",
                              &MPSContainer::total_num_particles)
       .def_property_readonly("active_num_particles",
                              &MPSContainer::active_num_particles)
-      .def_property_readonly("canonical_form", &MPSContainer::canonical_form)
-      .def_property_readonly("canonical_center",
-                             &MPSContainer::canonical_center)
-      .def_property_readonly("discarded_weight",
-                             &MPSContainer::discarded_weight)
+      .def_property_readonly("orthogonality_center",
+                             &MPSContainer::orthogonality_center)
       .def_property_readonly("physical_basis", &MPSContainer::physical_basis)
+      .def_property_readonly("site_to_orbital_order",
+                             &MPSContainer::site_to_orbital_order)
       .def_property_readonly("num_sites", &MPSContainer::num_sites)
       .def_property_readonly("is_complex", &MPSContainer::is_complex);
 
@@ -240,15 +233,14 @@ void bind_mps_wavefunction(py::module& data) {
                     std::shared_ptr<Orbitals>,
                     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>,
                     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>,
-                    MPSCanonicalForm, std::optional<std::size_t>, double,
-                    std::vector<std::string>>(),
+                    std::optional<std::size_t>, std::vector<Configuration>,
+                    std::vector<std::size_t>>(),
            py::arg("sites"), py::arg("orbitals"),
            py::arg("total_num_particles") = nullptr,
            py::arg("active_num_particles") = nullptr,
-           py::arg("canonical_form") = MPSCanonicalForm::Unspecified,
-           py::arg("canonical_center") = std::nullopt,
-           py::arg("discarded_weight") = 0.0,
-           py::arg("physical_basis") = std::vector<std::string>{})
+           py::arg("orthogonality_center") = std::size_t{0},
+           py::arg("physical_basis") = std::vector<Configuration>{},
+           py::arg("site_to_orbital_order") = std::vector<std::size_t>{})
       .def_property_readonly("sites", &AbelianMPSContainer::sites)
       .def_property_readonly("max_bond_dimension",
                              &AbelianMPSContainer::max_bond_dimension)

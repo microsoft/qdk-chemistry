@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
@@ -19,14 +20,6 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-/** @brief Canonicalization state recorded for an MPS wavefunction. */
-enum class MPSCanonicalForm {
-  Unspecified,      ///< Producer did not record a canonical form.
-  LeftNormalized,   ///< Every site tensor is left-normalized.
-  RightNormalized,  ///< Every site tensor is right-normalized.
-  Mixed             ///< Sites are normalized about a canonical center.
-};
 
 /**
  * @brief One block-sparse MPS site.
@@ -146,12 +139,6 @@ class MPSContainer : public WavefunctionContainer {
   virtual bool is_complex() const override = 0;
 
   /**
-   * @brief Get the orbital basis associated with the MPS.
-   * @return Shared pointer to the orbitals.
-   */
-  std::shared_ptr<const Orbitals> orbitals() const { return _orbitals; }
-
-  /**
    * @brief Not supported for MPS wavefunctions.
    * @param other Wavefunction that would be used in the overlap.
    * @throws std::runtime_error Always.
@@ -233,32 +220,34 @@ class MPSContainer : public WavefunctionContainer {
       const std::string& name) const override;
 
   /**
-   * @brief Get the canonicalization state of the MPS.
-   * @return Recorded canonical form.
+   * @brief Get the orthogonality center of the MPS, if specified.
+   *
+   * Sites before the center are left-normalized and sites after it are
+   * right-normalized. Center zero denotes a right-canonical MPS, and the last
+   * site denotes a left-canonical MPS.
+   * @return Site index of the orthogonality center, or @c std::nullopt if the
+   * canonicalization state is unspecified.
    */
-  MPSCanonicalForm canonical_form() const { return _canonical_form; }
-
-  /**
-   * @brief Get the canonical center of a mixed-canonical MPS.
-   * @return Zero-based center site, or std::nullopt for other canonical forms.
-   */
-  std::optional<std::size_t> canonical_center() const {
-    return _canonical_center;
+  std::optional<std::size_t> orthogonality_center() const {
+    return _orthogonality_center;
   }
-
-  /**
-   * @brief Get the total weight discarded while truncating MPS bonds.
-   * @return Non-negative discarded weight.
-   */
-  double discarded_weight() const { return _discarded_weight; }
 
   /**
    * @brief Get labels describing the physical slices at every site.
    * @return Physical-basis labels in slice order, or an empty vector if they
    * were not supplied.
    */
-  const std::vector<std::string>& physical_basis() const {
+  const std::vector<Configuration>& physical_basis() const {
     return _physical_basis;
+  }
+
+  /**
+   * @brief Get the molecular orbital represented by each MPS site.
+   * @return Unique molecular-orbital indices in MPS chain order. The MPS may
+   * represent a subset of the associated orbital basis.
+   */
+  const std::vector<std::size_t>& site_to_orbital_order() const {
+    return _site_to_orbital_order;
   }
 
  protected:
@@ -268,29 +257,30 @@ class MPSContainer : public WavefunctionContainer {
    * @param total_num_particles Optional symmetry-blocked total particle count.
    * @param active_num_particles Optional symmetry-blocked active particle
    * count.
-   * @param canonical_form Canonicalization state of the MPS.
-   * @param canonical_center Optional zero-based center of a mixed-canonical
-   * MPS.
-   * @param discarded_weight Total weight discarded during bond truncation.
-   * @param physical_basis Optional labels for the physical slices at each site.
+   * @param orthogonality_center Optional site containing the orthogonality
+   * center. Sites on either side must be left- and right-normalized,
+   * respectively.
+   * @param physical_basis Optional one-orbital configurations for the physical
+   * slices at each site.
+   * @param site_to_orbital_order Unique molecular-orbital indices in MPS chain
+   * order. The number of sites may be smaller than the orbital basis size.
    */
   MPSContainer(std::shared_ptr<Orbitals> orbitals,
                std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
                    total_num_particles,
                std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
                    active_num_particles,
-               MPSCanonicalForm canonical_form,
-               std::optional<std::size_t> canonical_center,
-               double discarded_weight,
-               std::vector<std::string> physical_basis);
+               std::optional<std::size_t> orthogonality_center,
+               std::vector<Configuration> physical_basis,
+               std::vector<std::size_t> site_to_orbital_order);
 
   /**
    * @brief Validate representation-independent MPS invariants.
    * @param num_sites Number of sites supplied by the concrete container.
    * @param physical_dimension Number of physical slices at each site.
    * @throws std::invalid_argument if there are no sites, orbitals are null,
-   * discarded weight is negative, canonical-center metadata is inconsistent,
-   * or physical-basis labels do not match @p physical_dimension.
+   * physical-basis configurations are invalid, or the site-to-orbital order
+   * is not unique and in range.
    */
   void _validate_common(std::size_t num_sites,
                         std::size_t physical_dimension) const;
@@ -301,10 +291,9 @@ class MPSContainer : public WavefunctionContainer {
       _total_num_particles;
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
       _active_num_particles;
-  MPSCanonicalForm _canonical_form;
-  std::optional<std::size_t> _canonical_center;
-  double _discarded_weight;
-  std::vector<std::string> _physical_basis;
+  std::optional<std::size_t> _orthogonality_center;
+  std::vector<Configuration> _physical_basis;
+  std::vector<std::size_t> _site_to_orbital_order;
 };
 
 /**
@@ -325,11 +314,12 @@ class AbelianMPSContainer : public MPSContainer {
    * @param total_num_particles Optional symmetry-blocked total particle count.
    * @param active_num_particles Optional symmetry-blocked active particle
    * count.
-   * @param canonical_form Canonicalization state of the MPS.
-   * @param canonical_center Optional zero-based center of a mixed-canonical
-   * MPS.
-   * @param discarded_weight Total weight discarded during bond truncation.
-   * @param physical_basis Optional labels for the physical slices at each site.
+   * @param orthogonality_center Optional site containing the orthogonality
+   * center. Defaults to zero for a right-canonical MPS.
+   * @param physical_basis Optional one-orbital configurations for the physical
+   * slices at each site.
+   * @param site_to_orbital_order Molecular-orbital indices in MPS chain order;
+   * defaults to identity ordering.
    * @throws std::invalid_argument if common MPS metadata is invalid; a site is
    * null; sites differ in physical dimension or scalar type; or adjacent bond
    * spaces are incompatible.
@@ -340,10 +330,9 @@ class AbelianMPSContainer : public MPSContainer {
           total_num_particles = nullptr,
       std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
           active_num_particles = nullptr,
-      MPSCanonicalForm canonical_form = MPSCanonicalForm::Unspecified,
-      std::optional<std::size_t> canonical_center = std::nullopt,
-      double discarded_weight = 0.0,
-      std::vector<std::string> physical_basis = {});
+      std::optional<std::size_t> orthogonality_center = std::size_t{0},
+      std::vector<Configuration> physical_basis = {},
+      std::vector<std::size_t> site_to_orbital_order = {});
 
   /**
    * @brief Get the block-sparse sites in chain order.

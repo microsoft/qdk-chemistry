@@ -20,6 +20,8 @@ std::string to_string(AxisName axis) {
   switch (axis) {
     case AxisName::Spin:
       return "spin";
+    case AxisName::ParticleNumber:
+      return "particle_number";
   }
   throw std::logic_error("Unknown AxisName value");
 }
@@ -53,6 +55,30 @@ std::shared_ptr<const SymmetryAxisValue> SpinValue::from_json(
   return std::make_shared<const SpinValue>(j.at("two_ms").get<int>());
 }
 
+bool ParticleNumberValue::equals(const SymmetryAxisValue& other) const {
+  const auto* particle_number =
+      dynamic_cast<const ParticleNumberValue*>(&other);
+  return particle_number != nullptr && particle_number->_number == _number;
+}
+
+std::size_t ParticleNumberValue::hash() const {
+  utils::HashContext ctx;
+  hash_value(ctx, "particle_number_value");
+  hash_value(ctx, static_cast<int64_t>(AxisName::ParticleNumber));
+  hash_value(ctx, static_cast<uint64_t>(_number));
+  return ctx.hash_code();
+}
+
+nlohmann::json ParticleNumberValue::to_json() const {
+  return nlohmann::json{{"kind", to_string(axis())}, {"number", _number}};
+}
+
+std::shared_ptr<const SymmetryAxisValue> ParticleNumberValue::from_json(
+    const nlohmann::json& j) {
+  return std::make_shared<const ParticleNumberValue>(
+      j.at("number").get<std::size_t>());
+}
+
 // ---------------------------------------------------------------------------
 // JSON dispatch (internal, no public registry)
 // ---------------------------------------------------------------------------
@@ -62,6 +88,9 @@ std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
   const auto kind = j.at("kind").get<std::string>();
   if (kind == "spin") {
     return SpinValue::from_json(j);
+  }
+  if (kind == "particle_number") {
+    return ParticleNumberValue::from_json(j);
   }
   throw std::runtime_error("Unknown symmetry axis value kind '" + kind + "'.");
 }
@@ -75,6 +104,16 @@ void hash_value(qdk::chemistry::utils::HashContext& ctx,
       throw std::runtime_error("Spin axis value has unexpected runtime type.");
     }
     hash_value(ctx, static_cast<int64_t>(spin->value()));
+    return;
+  }
+  if (value.axis() == AxisName::ParticleNumber) {
+    const auto* particle_number =
+        dynamic_cast<const ParticleNumberValue*>(&value);
+    if (particle_number == nullptr) {
+      throw std::runtime_error(
+          "Particle-number axis value has unexpected runtime type.");
+    }
+    hash_value(ctx, static_cast<uint64_t>(particle_number->value()));
     return;
   }
   throw std::logic_error("Unknown AxisName value");
@@ -226,7 +265,12 @@ std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json(const nlohmann::json& j) {
                                    j["version"].get<std::string>());
 
     const auto name_str = j.at("name").get<std::string>();
-    if (name_str != to_string(AxisName::Spin)) {
+    AxisName name;
+    if (name_str == to_string(AxisName::Spin)) {
+      name = AxisName::Spin;
+    } else if (name_str == to_string(AxisName::ParticleNumber)) {
+      name = AxisName::ParticleNumber;
+    } else {
       throw std::runtime_error("Unknown symmetry axis name '" + name_str +
                                "'.");
     }
@@ -234,8 +278,8 @@ std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json(const nlohmann::json& j) {
     for (const auto& label_json : j.at("labels")) {
       labels.push_back(symmetry_axis_value_from_json(label_json));
     }
-    return std::make_shared<SymmetryAxis>(AxisName::Spin, std::move(labels),
-                                          j.at("equivalent").get<bool>());
+    return std::make_shared<SymmetryAxis>(name, std::move(labels),
+                        j.at("equivalent").get<bool>());
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse SymmetryAxis from JSON: " +
                              std::string(e.what()));
@@ -628,6 +672,20 @@ SymmetryAxis spin(unsigned two_s, bool equivalent) {
     labels.push_back(spin_value(two_ms));
   }
   return SymmetryAxis(AxisName::Spin, std::move(labels), equivalent);
+}
+
+std::shared_ptr<const ParticleNumberValue> particle_number_value(
+    std::size_t number) {
+  return std::make_shared<const ParticleNumberValue>(number);
+}
+
+SymmetryAxis particle_number(std::size_t maximum_number) {
+  std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
+  labels.reserve(maximum_number + 1);
+  for (std::size_t number = 0; number <= maximum_number; ++number) {
+    labels.push_back(particle_number_value(number));
+  }
+  return SymmetryAxis(AxisName::ParticleNumber, std::move(labels), false);
 }
 
 }  // namespace axes

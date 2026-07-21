@@ -23,7 +23,9 @@ namespace qdk::chemistry::data {
  */
 enum class AxisName {
   /** @brief The spin (@f$S_z@f$) axis carrying @ref SpinValue labels. */
-  Spin
+  Spin,
+  /** @brief The particle-number axis carrying @ref ParticleNumberValue labels. */
+  ParticleNumber
 };
 
 /**
@@ -162,6 +164,27 @@ class SpinValue : public SymmetryAxisValue {
    */
   static std::shared_ptr<const SymmetryAxisValue> from_json(
       const nlohmann::json& j);
+};
+
+/** @brief Concrete particle-number axis value. */
+class ParticleNumberValue : public SymmetryAxisValue {
+  std::size_t _number;
+
+ public:
+  /** @brief Construct a particle-number label. */
+  constexpr explicit ParticleNumberValue(std::size_t number)
+    : _number(number) {}
+
+  /** @brief The represented particle number. */
+  constexpr std::size_t value() const { return _number; }
+
+  /** @brief The axis this value belongs to. */
+  AxisName axis() const override { return AxisName::ParticleNumber; }
+  bool equals(const SymmetryAxisValue& other) const override;
+  std::size_t hash() const override;
+  nlohmann::json to_json() const override;
+  static std::shared_ptr<const SymmetryAxisValue> from_json(
+    const nlohmann::json& j);
 };
 
 /**
@@ -733,6 +756,12 @@ namespace axes {
 SymmetryAxis spin(unsigned two_s, bool equivalent = true);
 
 /**
+ * @brief Build a particle-number axis carrying labels from zero through
+ * @p maximum_number, inclusive.
+ */
+SymmetryAxis particle_number(std::size_t maximum_number);
+
+/**
  * @brief Interned shared spin-½ value with @f$2 M_s = +1@f$.
  * @return Reference to the global @f$\alpha@f$ instance; safe to capture
  *         by @c shared_ptr.
@@ -755,6 +784,10 @@ const std::shared_ptr<const SpinValue>& beta();
  * @return Shared pointer to the (possibly interned) spin value.
  */
 std::shared_ptr<const SpinValue> spin_value(int two_ms);
+
+/** @brief Construct a particle-number value. */
+std::shared_ptr<const ParticleNumberValue> particle_number_value(
+  std::size_t number);
 
 }  // namespace axes
 

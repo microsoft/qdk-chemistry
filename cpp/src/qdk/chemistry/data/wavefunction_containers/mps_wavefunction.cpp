@@ -5,7 +5,8 @@
  */
 
 #include <algorithm>
-#include <cmath>
+#include <limits>
+#include <numeric>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
@@ -43,6 +44,57 @@ std::unordered_map<SymmetryLabel, std::size_t> sector_offsets(
   return offsets;
 }
 
+void validate_bond_symmetry(const SymmetryProduct& symmetry) {
+  if (symmetry.has_axis(AxisName::Spin) &&
+      !symmetry.has_axis(AxisName::ParticleNumber)) {
+    throw std::invalid_argument(
+        "Spin-resolved MPS bond sectors must also carry particle number.");
+  }
+}
+
+std::vector<std::size_t> normalized_site_to_orbital_order(
+    std::vector<std::size_t> order, std::size_t site_count) {
+  if (order.empty()) {
+    order.resize(site_count);
+    std::iota(order.begin(), order.end(), std::size_t{});
+  }
+  return order;
+}
+
+template <typename Matrix>
+bool is_canonical_site(const Matrix& packed, std::size_t physical_dimension,
+                       bool left_normalized) {
+  using Scalar = typename Matrix::Scalar;
+  using RealScalar = typename Eigen::NumTraits<Scalar>::Real;
+  const auto left_dimension =
+      packed.rows() / static_cast<Eigen::Index>(physical_dimension);
+  const auto right_dimension = packed.cols();
+  const auto scale = static_cast<RealScalar>(
+      std::max({left_dimension, right_dimension,
+                static_cast<Eigen::Index>(physical_dimension)}));
+  const auto tolerance =
+      RealScalar{100} * std::numeric_limits<RealScalar>::epsilon() * scale;
+
+  if (left_normalized) {
+    const auto gram = packed.adjoint() * packed;
+    return gram.isApprox(Matrix::Identity(right_dimension, right_dimension),
+                         tolerance);
+  }
+
+  Matrix gram = Matrix::Zero(left_dimension, left_dimension);
+  for (std::size_t physical = 0; physical < physical_dimension; ++physical) {
+    Matrix slice(left_dimension, right_dimension);
+    for (Eigen::Index left = 0; left < left_dimension; ++left) {
+      slice.row(left) =
+          packed.row(left * static_cast<Eigen::Index>(physical_dimension) +
+                     static_cast<Eigen::Index>(physical));
+    }
+    gram.noalias() += slice * slice.adjoint();
+  }
+  return gram.isApprox(Matrix::Identity(left_dimension, left_dimension),
+                       tolerance);
+}
+
 }  // namespace
 
 MPSSite::MPSSite(std::vector<PhysicalSlicePtr> physical_slices,
@@ -67,6 +119,8 @@ void MPSSite::_validate() const {
   const auto scalar_index = _physical_slices.front()->index();
   std::visit(
       [&](const auto& reference) {
+        validate_bond_symmetry(*reference.symmetries()[0]);
+        validate_bond_symmetry(*reference.symmetries()[1]);
         sector_offsets(reference.extents()[0], _left_sector_order);
         sector_offsets(reference.extents()[1], _right_sector_order);
         for (const auto& slice : _physical_slices) {
@@ -160,16 +214,15 @@ MPSContainer::MPSContainer(
         total_num_particles,
     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
         active_num_particles,
-    MPSCanonicalForm canonical_form,
-    std::optional<std::size_t> canonical_center, double discarded_weight,
-    std::vector<std::string> physical_basis)
+    std::optional<std::size_t> orthogonality_center,
+    std::vector<Configuration> physical_basis,
+    std::vector<std::size_t> site_to_orbital_order)
     : _orbitals(std::move(orbitals)),
       _total_num_particles(std::move(total_num_particles)),
       _active_num_particles(std::move(active_num_particles)),
-      _canonical_form(canonical_form),
-      _canonical_center(canonical_center),
-      _discarded_weight(discarded_weight),
-      _physical_basis(std::move(physical_basis)) {}
+      _orthogonality_center(orthogonality_center),
+      _physical_basis(std::move(physical_basis)),
+      _site_to_orbital_order(std::move(site_to_orbital_order)) {}
 
 void MPSContainer::_validate_common(std::size_t site_count,
                                     std::size_t physical_dimension) const {
@@ -180,23 +233,34 @@ void MPSContainer::_validate_common(std::size_t site_count,
   if (!_orbitals) {
     throw std::invalid_argument("MPS wavefunction requires orbitals.");
   }
-  if (!std::isfinite(_discarded_weight) || _discarded_weight < 0.0) {
+  if (_orthogonality_center && *_orthogonality_center >= site_count) {
     throw std::invalid_argument(
-        "MPS discarded weight must be finite and non-negative.");
-  }
-  if (_canonical_form == MPSCanonicalForm::Mixed) {
-    if (!_canonical_center || *_canonical_center >= site_count) {
-      throw std::invalid_argument(
-          "A mixed-canonical MPS requires a valid canonical center.");
-    }
-  } else if (_canonical_center) {
-    throw std::invalid_argument(
-        "A canonical center is only valid for mixed-canonical MPS data.");
+        "MPS orthogonality center must be a valid site index.");
   }
   if (!_physical_basis.empty() &&
       _physical_basis.size() != physical_dimension) {
     throw std::invalid_argument(
         "MPS physical basis size must match the number of physical slices.");
+  }
+  if (std::any_of(_physical_basis.begin(), _physical_basis.end(),
+                  [](const Configuration& state) {
+                    return state.bits_per_mode() != 2;
+                  })) {
+    throw std::invalid_argument(
+        "MPS physical basis states must be one-orbital spin-half "
+        "configurations.");
+  }
+  if (_site_to_orbital_order.size() != site_count) {
+    throw std::invalid_argument(
+        "MPS site-to-orbital order size must match the number of sites.");
+  }
+  auto sorted_order = _site_to_orbital_order;
+  std::ranges::sort(sorted_order);
+  if (std::ranges::adjacent_find(sorted_order) != sorted_order.end() ||
+      sorted_order.back() >= _orbitals->get_num_molecular_orbitals()) {
+    throw std::invalid_argument(
+        "MPS site-to-orbital order must contain unique molecular-orbital "
+        "indices.");
   }
 }
 
@@ -206,13 +270,14 @@ AbelianMPSContainer::AbelianMPSContainer(
         total_num_particles,
     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
         active_num_particles,
-    MPSCanonicalForm canonical_form,
-    std::optional<std::size_t> canonical_center, double discarded_weight,
-    std::vector<std::string> physical_basis)
+    std::optional<std::size_t> orthogonality_center,
+    std::vector<Configuration> physical_basis,
+    std::vector<std::size_t> site_to_orbital_order)
     : MPSContainer(std::move(orbitals), std::move(total_num_particles),
-                   std::move(active_num_particles), canonical_form,
-                   canonical_center, discarded_weight,
-                   std::move(physical_basis)),
+                   std::move(active_num_particles), orthogonality_center,
+                   std::move(physical_basis),
+                   normalized_site_to_orbital_order(
+                       std::move(site_to_orbital_order), sites.size())),
       _sites(std::move(sites)) {
   _validate();
 }
@@ -233,6 +298,20 @@ void AbelianMPSContainer::_validate() const {
     }
     if (_sites[index]->is_complex() != is_complex) {
       throw std::invalid_argument("MPS sites must use one scalar type.");
+    }
+    if (orthogonality_center() && index != *orthogonality_center()) {
+      const auto left_normalized = index < *orthogonality_center();
+      const auto canonical = std::visit(
+          [&](const auto& dense) {
+            return is_canonical_site(dense, physical_dimension,
+                                     left_normalized);
+          },
+          _sites[index]->to_dense());
+      if (!canonical) {
+        throw std::invalid_argument(left_normalized
+                                        ? "MPS site is not left-normalized."
+                                        : "MPS site is not right-normalized.");
+      }
     }
   }
   for (std::size_t index = 0; index + 1 < _sites.size(); ++index) {
