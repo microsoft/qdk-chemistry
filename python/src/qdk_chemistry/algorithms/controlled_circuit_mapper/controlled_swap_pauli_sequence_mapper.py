@@ -23,9 +23,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     Given a time-evolution operator expressed as a Pauli product formula
     :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper constructs
     a controlled version of :math:`U(t)` without controlling every gate of the evolution.
-    Instead of applying ``Controlled Exp`` directly (as
-    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper.ControlledPauliSequenceMapper`
-    does), it uses a *CSWAP sandwich*:
+    It uses a *CSWAP sandwich*:
 
     1. An internally allocated ``vacuum`` register (initialized to :math:`|0\ldots0\rangle`)
        is conditionally swapped with the system register, controlled on the control qubit.
@@ -41,6 +39,17 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
     This trades the cost of controlling every gate for a single layer of controlled-:math:`\mathrm{SWAP}`
     gates, so the (repeated) evolution is applied with uncontrolled gates only.
+
+    **Residual phase / Hamiltonian restriction.** On the :math:`|0\rangle` branch the evolution acts on
+    the vacuum, contributing :math:`U|0\ldots0\rangle = \lambda\,|0\ldots0\rangle` with
+    :math:`\lambda = \langle 0\ldots0|U|0\ldots0\rangle`. This leaves a residual phase
+    :math:`\varphi_0 = \arg\lambda = -E_0 t` (where :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`) on the
+    measured eigenphase, which is a known constant and can be removed by the QPE feedback rotation.
+    The construction is exact **only if** :math:`|0\ldots0\rangle` is an eigenstate of :math:`U`
+    (equivalently :math:`|\lambda| = 1`); otherwise the vacuum leaks (:math:`|\lambda| < 1`), the control
+    qubit decoheres, and the phase cannot be recovered. This holds automatically for
+    particle-number-conserving Hamiltonians (e.g. Jordan-Wigner/Bravyi-Kitaev molecular Hamiltonians),
+    for which the all-zero register is the exact vacuum eigenstate.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
