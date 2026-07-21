@@ -198,6 +198,7 @@ def run_exachem(
     mpi_extra_args: list[str] | None = None,
     timeout: int | None = None,
     scf_files_prefix: Path | None = None,
+    libint_data_path: Path | None = None,
 ) -> ExachemResult:
     """Run an ExaChem DUCC calculation.
 
@@ -208,6 +209,10 @@ def run_exachem(
         exachem_binary: Path to ExaChem binary. If None, auto-detects.
         mpi_extra_args: Extra arguments for the MPI launcher (e.g. ``["--bind-to", "core"]``).
         timeout: Timeout in seconds for the subprocess.
+        libint_data_path: If given, set ``LIBINT_DATA_PATH`` for the ExaChem
+            subprocess so Libint2 reads the basis from
+            ``<libint_data_path>/basis/<name>.g94`` (see
+            :func:`~qdk_chemistry.plugins.exachem.scf_export.write_qdk_basis_g94`).
 
     Returns:
         ExachemResult with paths to outputs and captured output.
@@ -246,6 +251,11 @@ def run_exachem(
 
     logger.info("Running ExaChem DUCC: %s", " ".join(cmd))
 
+    run_env = None
+    if libint_data_path is not None:
+        run_env = {**os.environ, "LIBINT_DATA_PATH": str(libint_data_path)}
+        logger.info("Using LIBINT_DATA_PATH=%s for ExaChem basis", libint_data_path)
+
     result = subprocess.run(
         cmd,
         cwd=str(work_dir),
@@ -253,6 +263,7 @@ def run_exachem(
         text=True,
         timeout=timeout,
         check=False,
+        env=run_env,
     )
 
     # Locate output files
