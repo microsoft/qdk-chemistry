@@ -303,6 +303,43 @@ Examples:
 )",
                    py::arg("container"));
 
+  wavefunction.def_static("from_bitstrings", &Wavefunction::from_bitstrings,
+                          R"(
+Build a wavefunction from computational-basis bitstrings.
+
+Constructs a state-vector wavefunction expressed as a linear combination of
+computational-basis states, where each bitstring encodes an occupation-number
+vector (one bit per mode, ``'0'``/``'1'``) and the corresponding coefficient
+is its amplitude.
+
+This is a convenience factory for pure qubit/state-vector data that has no
+associated molecular structure. A placeholder minimal orbital basis (one
+S-type orbital per mode, identity molecular-orbital coefficients) is
+fabricated internally to satisfy the container's structural requirements; its
+numerical values carry no physical meaning.
+
+Bit ordering: each bitstring is read left-to-right so that the leftmost
+character is mode/orbital ``0``, the next is mode ``1``, and so on (i.e.
+``bitstring[i]`` occupies mode ``i``). For example, ``"10"`` means mode 0 is
+occupied and mode 1 is empty. This matches the wavefunction-level convention
+used throughout the data model (``Configuration.from_bitstring``).
+
+Args:
+    bitstrings (list[str]): Computational-basis bitstrings, all of equal length. Each character must be ``'0'`` or ``'1'``. Read left-to-right: ``bitstring[i]`` is the occupation of mode ``i`` (leftmost character is mode 0).
+    coeffs (numpy.ndarray): Amplitudes for each bitstring (real or complex). Must have the same length as ``bitstrings``.
+
+Returns:
+    Wavefunction: The constructed wavefunction.
+
+Raises:
+    ValueError: If ``bitstrings`` is empty, the bitstrings have unequal lengths, or the number of coefficients does not match the number of bitstrings.
+
+Examples:
+    >>> import numpy as np
+    >>> wf = qdk_chemistry.Wavefunction.from_bitstrings(["00", "11"], np.array([1.0, -1.0]) / np.sqrt(2))
+)",
+                          py::arg("bitstrings"), py::arg("coeffs"));
+
   // Orbital and container access
   bind_getter_as_property(wavefunction, "get_orbitals",
                           &Wavefunction::get_orbitals,

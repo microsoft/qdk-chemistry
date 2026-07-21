@@ -957,6 +957,63 @@ Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
   QDK_LOG_TRACE_ENTERING();
 }
 
+std::shared_ptr<Wavefunction> Wavefunction::from_bitstrings(
+    const std::vector<std::string>& bitstrings,
+    const ContainerTypes::VectorVariant& coeffs) {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (bitstrings.empty()) {
+    throw std::invalid_argument(
+        "Wavefunction::from_bitstrings: bitstrings must not be empty");
+  }
+
+  const std::size_t num_modes = bitstrings.front().size();
+  for (const auto& bitstring : bitstrings) {
+    if (bitstring.size() != num_modes) {
+      throw std::invalid_argument(
+          "Wavefunction::from_bitstrings: all bitstrings must have the same "
+          "length");
+    }
+  }
+
+  const std::size_t num_coeffs = std::visit(
+      [](const auto& vec) -> std::size_t {
+        return static_cast<std::size_t>(vec.size());
+      },
+      coeffs);
+  if (num_coeffs != bitstrings.size()) {
+    throw std::invalid_argument(
+        "Wavefunction::from_bitstrings: number of coefficients (" +
+        std::to_string(num_coeffs) + ") must match the number of bitstrings (" +
+        std::to_string(bitstrings.size()) + ")");
+  }
+
+  // Fabricate a placeholder minimal orbital basis: one S-type orbital per mode
+  // with identity molecular-orbital coefficients. The numerical values are
+  // meaningless; they exist only to satisfy the container's structural
+  // requirements for pure computational-basis data.
+  std::vector<Shell> shells;
+  shells.reserve(num_modes);
+  for (std::size_t mode = 0; mode < num_modes; ++mode) {
+    shells.emplace_back(mode, OrbitalType::S, std::vector<double>{1.0},
+                        std::vector<double>{1.0});
+  }
+  auto basis_set = std::make_shared<BasisSet>("min", shells);
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(num_modes, num_modes),
+      Eigen::VectorXd::Zero(num_modes), std::nullopt, basis_set);
+
+  ContainerTypes::DeterminantVector dets;
+  dets.reserve(bitstrings.size());
+  for (const auto& bitstring : bitstrings) {
+    dets.push_back(Configuration::from_bitstring(bitstring));
+  }
+
+  auto container =
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
+  return std::make_shared<Wavefunction>(std::move(container));
+}
+
 // Copy constructor
 Wavefunction::Wavefunction(const Wavefunction& other)
     : _container(other._container->clone()) {

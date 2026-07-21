@@ -880,6 +880,42 @@ class Wavefunction : public DataClass,
    */
   Wavefunction(std::unique_ptr<WavefunctionContainer> container);
 
+  /**
+   * @brief Build a wavefunction from computational-basis bitstrings.
+   *
+   * Constructs a state-vector wavefunction expressed as a linear combination
+   * of computational-basis states (Slater determinants), where each bitstring
+   * encodes an occupation-number vector (one bit per mode, @c '0'/@c '1') and
+   * the corresponding coefficient is its amplitude.
+   *
+   * This is a convenience factory for pure qubit/state-vector data that has no
+   * associated molecular structure. A placeholder minimal orbital basis (one
+   * S-type orbital per mode, identity molecular-orbital coefficients) is
+   * fabricated internally to satisfy the container's structural requirements;
+   * its numerical values carry no physical meaning.
+   *
+   * Bit ordering: each bitstring is read left-to-right so that the leftmost
+   * character is mode/orbital 0, the next is mode 1, and so on (i.e.
+   * @c bitstrings[k][i] is the occupation of mode @c i). For example, @c "10"
+   * means mode 0 is occupied and mode 1 is empty. This matches
+   * Configuration::from_bitstring and the wavefunction-level convention; the
+   * little-endian remap to Q# qubit order happens only later, in the
+   * state-preparation layer, not here.
+   *
+   * @param bitstrings Computational-basis bitstrings, all of equal length. Each
+   *        character must be @c '0' or @c '1'. Read left-to-right: character
+   *        @c i is the occupation of mode @c i (leftmost is mode 0).
+   * @param coeffs Amplitudes for each bitstring (real or complex). Must have
+   *        the same length as @p bitstrings.
+   * @return Shared pointer to the constructed Wavefunction.
+   * @throws std::invalid_argument If @p bitstrings is empty, the bitstrings
+   *         have unequal lengths, or the number of coefficients does not match
+   *         the number of bitstrings.
+   */
+  static std::shared_ptr<Wavefunction> from_bitstrings(
+      const std::vector<std::string>& bitstrings,
+      const ContainerTypes::VectorVariant& coeffs);
+
   ~Wavefunction() = default;
 
   /**
