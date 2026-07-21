@@ -165,6 +165,11 @@ class ExachemCcsdtCalculator(DynamicalCorrelationCalculator):
         scf_files_prefix = scf_dir / scf_prefix_name
         runcontext_prefix = scf_type_dir / scf_prefix_name
 
+        # Feed ExaChem qdk-chemistry's own basis (written here and read via
+        # LIBINT_DATA_PATH) so both codes share an identical inter-shell order and
+        # basis parameters; the AO export then only needs the within-shell p-swap.
+        basis_data_dir = work_path / "qdk_libint_basis"
+
         if is_unrestricted:
             # Per-spin densities: ExaChem reads D_alpha and D_beta separately.
             density_alpha, density_beta = orbitals.calculate_ao_density_matrix(alpha_occ, beta_occ)
@@ -173,9 +178,12 @@ class ExachemCcsdtCalculator(DynamicalCorrelationCalculator):
                 files_prefix=scf_files_prefix,
                 mo_coeff_alpha=mo_coeff_alpha,
                 density_alpha=np.asarray(density_alpha),
+                basis_set=basis_set,
+                basis_name=basis_name,
+                elements=list(symbols),
+                basis_data_dir=basis_data_dir,
                 ao_tilesize=30,
                 runcontext_prefix=runcontext_prefix,
-                basis_set=basis_set,
                 mo_coeff_beta=mo_coeff_beta,
                 density_beta=np.asarray(density_beta),
             )
@@ -187,9 +195,12 @@ class ExachemCcsdtCalculator(DynamicalCorrelationCalculator):
                 files_prefix=scf_files_prefix,
                 mo_coeff_alpha=mo_coeff_alpha,
                 density_alpha=density_total,
+                basis_set=basis_set,
+                basis_name=basis_name,
+                elements=list(symbols),
+                basis_data_dir=basis_data_dir,
                 ao_tilesize=30,
                 runcontext_prefix=runcontext_prefix,
-                basis_set=basis_set,
             )
         logger.info("Exported SCF data for noscf CCSD(T) (%s) to %s", scf_type, scf_dir)
 
@@ -216,6 +227,7 @@ class ExachemCcsdtCalculator(DynamicalCorrelationCalculator):
             exachem_binary=Path(binary) if binary else None,
             timeout=s.get("timeout"),
             scf_files_prefix=scf_files_prefix,
+            libint_data_path=basis_data_dir,
         )
 
         energies = parse_ccsdt_energy(result.stdout)

@@ -45,7 +45,7 @@ from qdk_chemistry.plugins.exachem.conversion import (
     parse_energy_shift,
 )
 from qdk_chemistry.plugins.exachem.ducc_solver import ExachemDuccSolver
-from qdk_chemistry.plugins.exachem.scf_export import reorder_ao_qdk_to_exachem
+from qdk_chemistry.plugins.exachem.scf_export import _within_shell_m_reorder
 
 # ---------------------------------------------------------------------------
 # Skip conditions
@@ -849,7 +849,7 @@ def _run_exachem_orbitals_comparison(
         # so ExaChem's DUCC receives exactly its own orbitals back.
         coords_bohr = np.array(coords_ang) / 0.529177249
         basis_set = BasisSet.from_basis_name(basis, Structure(coords_bohr, elements))
-        perm = reorder_ao_qdk_to_exachem(basis_set)  # c_exachem = c_qdk[perm]
+        perm = _within_shell_m_reorder(basis_set)  # c_exachem = c_qdk[perm]
         inv = np.argsort(perm)
         c_qdk = c_exachem[inv, :]
         nelec_alpha = (sum(e.value for e in elements) - charge + multiplicity - 1) // 2

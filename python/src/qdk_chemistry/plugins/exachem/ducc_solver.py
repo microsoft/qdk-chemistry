@@ -221,6 +221,12 @@ class ExachemDuccSolver(Algorithm):
         # For restricted closed-shell: D_total = 2 * D_alpha
         density_for_export = density_alpha * 2.0
 
+        # Feed ExaChem qdk-chemistry's own basis (written as a Gaussian-94 file
+        # here and read via LIBINT_DATA_PATH) so the two codes use an identical
+        # inter-shell order and identical basis parameters.  The AO export then
+        # only needs the within-shell p-component correction.
+        basis_data_dir = work_path / "qdk_libint_basis"
+
         export_scf_files(
             files_prefix=scf_files_prefix,
             mo_coeff_alpha=mo_coeff_alpha,
@@ -230,7 +236,7 @@ class ExachemDuccSolver(Algorithm):
             basis_set=basis_set,
             basis_name=s.get("basis"),
             elements=element_symbols,
-            exachem_binary=binary,
+            basis_data_dir=basis_data_dir,
         )
         logger.info("Exported SCF data for noscf mode to %s", scf_dir)
 
@@ -241,6 +247,7 @@ class ExachemDuccSolver(Algorithm):
             exachem_binary=Path(binary) if binary else None,
             timeout=s.get("timeout"),
             scf_files_prefix=scf_files_prefix,
+            libint_data_path=basis_data_dir,
         )
 
         # Parse DUCC results (prefer native format, fall back to FCIDUMP)
