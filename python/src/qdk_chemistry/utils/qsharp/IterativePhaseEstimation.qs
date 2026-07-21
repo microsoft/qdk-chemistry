@@ -129,7 +129,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             mutable accumulatePhase = 0.0;
             for j in 0..k - 1 {
                 if results[j] == One {
-                    set accumulatePhase -= 2.0 * PI() / IntAsDouble(1 <<< (k - j + 1));
+                    set accumulatePhase += 2.0 * PI() / IntAsDouble(1 <<< (k - j + 1));
                 }
             }
 

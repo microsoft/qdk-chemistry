@@ -169,9 +169,9 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Run the full IQPE as a single circuit with in-circuit classical feedback.
 
         The builder produces one circuit that performs every round using mid-circuit
-        measurement and classical feed-forward. Each shot yields a full measured bitstring
-        (MSB first after the executor's bit reversal); the dominant bitstring is decoded as
-        ``int(bitstring, 2) / 2**num_bits``, matching the standard phase estimation postprocessing.
+        measurement and classical feed-forward. The executor returns each shot's full
+        measured bitstring MSB-first (same convention as the standard QPE path); the most
+        frequent bitstring is decoded as ``int(bitstring_msb_first, 2) / 2**num_bits``.
 
         Args:
             circuit_builder: The iterative circuit builder configured with ``single_circuit`` enabled.
@@ -197,16 +197,19 @@ class IterativePhaseEstimation(PhaseEstimation):
         counts = executor_data.bitstring_counts
         if not counts:
             raise RuntimeError("No measurement results returned from the circuit executor.")
-        dominant_bitstring = max(counts, key=counts.get)
-        Logger.info(f"Dominant measured bitstring (MSB first): {dominant_bitstring}")
-        phase_fraction = int(dominant_bitstring, 2) / (2**num_bits)
+
+        # Most frequent bitstring across shots, decoded like standard QPE. The executor
+        # returns each bitstring MSB-first (same convention as the standard QPE path).
+        bitstring_msb_first = max(counts, key=counts.get)
+        Logger.info(f"Dominant measured bitstring (MSB first): {bitstring_msb_first}")
+        phase_fraction = int(bitstring_msb_first, 2) / (2**num_bits)
 
         return QpeResult.from_phase_fraction(
             method=self.name(),
             phase_fraction=phase_fraction,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
-            bits_msb_first=[int(c) for c in dominant_bitstring],
-            bitstring_msb_first=dominant_bitstring,
+            bits_msb_first=[int(c) for c in bitstring_msb_first],
+            bitstring_msb_first=bitstring_msb_first,
         )
 
     def name(self) -> str:

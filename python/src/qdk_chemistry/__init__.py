@@ -68,7 +68,7 @@ _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 qdk_config = get_qdk_profile_config()
 _QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
 if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
-    qdk_init(target_profile=TargetProfile.Base)
+    qdk_init(target_profile=TargetProfile.Adaptive_RIF)
     new_config = get_qdk_profile_config()
     _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()
     Logger.debug(

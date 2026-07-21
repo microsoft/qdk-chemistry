@@ -13,7 +13,7 @@ measurement bitstring results via CircuitExecutorData.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
@@ -77,116 +77,62 @@ class AzureQuantumEmulatorSettings(Settings):
             "Azure Quantum emulationSettings, as a JSON object string",
         )
         self._set_default("job_name", "string", "qdk-chemistry-azure-quantum-emulator", "Name for the submitted job")
-        self._set_default(
-            "target_ref",
-            "string",
-            "",
-            "Name of a target registered via AzureQuantumEmulator.register_target()",
-        )
         self._set_default("timeout_secs", "int", 3600, "Maximum seconds to wait for job completion")
 
 
 class AzureQuantumEmulator(CircuitExecutor):
     """Circuit executor that submits QIR to an Azure Quantum emulator target."""
 
-    _target_registry: ClassVar[dict[str, Target]] = {}
-
-    @classmethod
-    def register_target(cls, name: str, target: Target) -> str:
-        """Register a live Azure Quantum ``Target`` under a string name.
-
-        Because ``Settings`` (and therefore ``AlgorithmRef``) can only hold
-        serializable values, a live ``Target`` cannot be stored there directly.
-        Registering it here lets you build the ``Workspace``/``Target`` yourself
-        (with your own credential) and then reference it by name from settings
-        via the ``target_ref`` key, so it works through the declarative
-        ``AlgorithmRef`` path used for nested executors.
-
-        Args:
-            name: Lookup name to store the target under and set as ``target_ref``.
-            target: Pre-resolved Azure Quantum ``Target`` to register.
-
-        Returns:
-            str: The registered name, convenient for passing straight to ``target_ref``.
-
-        """
-        Logger.trace_entering()
-        cls._target_registry[name] = target
-        return name
-
     def __init__(
         self,
         target: Target | None = None,
         emulation_settings: dict | None = None,
         job_name: str = "qdk-chemistry-azure-quantum-emulator",
-        target_ref: str = "",
         timeout_secs: int = 3600,
     ) -> None:
         """Initialize the Azure Quantum Emulator circuit executor.
 
-        There are three ways to point the executor at a target, checked in this
-        order at run time:
-
-        * **Direct object**: pass a resolved ``azure.quantum`` ``Target`` via
-          ``target`` (or later via :meth:`set_target`). Best for interactive use.
-        * **Registered handle**: register a target with :meth:`register_target`
-          and pass its name via ``target_ref``. Because ``target_ref`` is a plain
-          string it survives the ``Settings`` / ``AlgorithmRef`` round-trip, so
-          this is the way to use the executor as a nested algorithm (e.g. as a
-          phase-estimation ``circuit_executor``).
+        Build the ``Workspace``/``Target`` yourself (with your own credential) and
+        provide the resolved ``Target`` here, or later via
+        ``set_algorithm_instance("target", target)``. The live target is never stored in
+        ``Settings``; to use this executor as a nested algorithm (e.g. a phase-estimation
+        ``circuit_executor``), attach the pre-built instance via the parent's
+        ``set_algorithm_instance()`` as well.
 
         Args:
-            target: Pre-resolved Azure Quantum ``Target``; may be set later via set_target(). Takes precedence.
+            target: Pre-resolved Azure Quantum ``Target``; may be set later via set_algorithm_instance().
             emulation_settings: Azure Quantum ``emulationSettings`` dict; defaults to a Clifford-rounding config.
             job_name: Name for the submitted Azure Quantum job.
-            target_ref: Name of a target registered via register_target(); used when no direct target is set.
             timeout_secs: Maximum seconds to wait for job completion.
 
         """
         Logger.trace_entering()
         super().__init__()
-        self._target = target
         self._settings = AzureQuantumEmulatorSettings()
+        if target is not None:
+            self.set_algorithm_instance("target", target)
         if emulation_settings is not None:
             self._settings.set("emulation_settings", json.dumps(emulation_settings))
         self._settings.set("job_name", job_name)
-        self._settings.set("target_ref", target_ref)
         self._settings.set("timeout_secs", timeout_secs)
 
-    def set_target(self, target: Target) -> None:
-        """Set the Azure Quantum target to submit circuits to.
-
-        Args:
-            target: Pre-resolved Azure Quantum ``Target`` to submit circuits to.
-
-        """
-        Logger.trace_entering()
-        self._target = target
-
     def _resolve_target(self) -> Target:
-        """Resolve the target to submit to, preferring a directly set object.
+        """Return the target to submit to.
 
         Returns:
-            Target: The directly set target, or the one registered under ``target_ref``.
+            Target: The target provided via the constructor or set_algorithm_instance().
 
         Raises:
-            ValueError: If no direct target is set and ``target_ref`` is unset or unregistered.
+            ValueError: If no target has been set.
 
         """
-        if self._target is not None:
-            return self._target
-        target_ref = self._settings.get("target_ref")
-        if not target_ref:
+        target = self._get_algorithm_instance("target")
+        if target is None:
             raise ValueError(
-                "No Azure Quantum target set; pass one to the constructor, call set_target(),"
-                " or register one with AzureQuantumEmulator.register_target() and set 'target_ref'."
+                "No Azure Quantum target set; pass one to the constructor or provide it via"
+                " set_algorithm_instance('target', target)."
             )
-        if target_ref not in self._target_registry:
-            raise ValueError(
-                f"target_ref '{target_ref}' is not registered;"
-                " call AzureQuantumEmulator.register_target() before running."
-            )
-        return self._target_registry[target_ref]
+        return target
 
     def _run_impl(
         self,

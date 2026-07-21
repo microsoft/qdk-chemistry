@@ -12,7 +12,7 @@ integrated into the QDK/Chemistry framework.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from qdk_chemistry.data import Settings
 
@@ -81,6 +81,7 @@ class Algorithm(ABC):
         """Initialize the base algorithm."""
         super().__init__()
         self._settings = Settings()
+        self._algorithm_instances: dict[str, Algorithm] = {}
 
     @abstractmethod
     def _run_impl(self, *args, **kwargs):
@@ -141,12 +142,45 @@ class Algorithm(ABC):
         """
         return self._settings
 
-    def _create_nested(self, setting_key: str):
-        """Instantiate a nested algorithm from an AlgorithmRef in settings.
+    def set_algorithm_instance(self, setting_key: str, instance: Any) -> None:
+        """Provide a live instance for a named slot, in place of a serializable descriptor.
 
-        Reads the ``AlgorithmRef`` stored at *setting_key*, creates the
-        corresponding algorithm via the registry, and applies any nested
-        settings overrides.
+        Named slots are normally described declaratively in settings (a nested
+        ``AlgorithmRef``, or a plain value) and materialized from those serializable
+        values at run time. Use this method instead when the slot must hold a live
+        object that cannot be reconstructed from ``Settings`` — for example a nested
+        algorithm instance holding a live network client, or a plugin-specific handle
+        such as an Azure Quantum ``target``. The instance is stored on this algorithm
+        only, is never serialized, and is never part of the content hash; for a nested
+        algorithm slot it takes precedence over any ``AlgorithmRef`` at *setting_key*.
+
+        Args:
+            setting_key: Slot the algorithm reads at run time (e.g. "circuit_executor", "target").
+            instance: A live object to use for that slot.
+
+        """
+        self._algorithm_instances[setting_key] = instance
+
+    def _get_algorithm_instance(self, setting_key: str, default: Any = None) -> Any:
+        """Return a live instance provided via :meth:`set_algorithm_instance`, or *default*.
+
+        Args:
+            setting_key: The slot to look up.
+            default: Value to return when nothing is provided for *setting_key*.
+
+        Returns:
+            Any: The provided instance, or *default* if none was set.
+
+        """
+        return getattr(self, "_algorithm_instances", {}).get(setting_key, default)
+
+    def _create_nested(self, setting_key: str):
+        """Instantiate a nested algorithm for *setting_key*.
+
+        If a live instance was provided via :meth:`set_algorithm_instance`, it is
+        returned directly. Otherwise the ``AlgorithmRef`` stored at *setting_key* is
+        read, the corresponding algorithm is created via the registry, and any nested
+        settings overrides are applied.
 
         Args:
             setting_key: Settings key that holds an ``AlgorithmRef`` value.
@@ -158,6 +192,9 @@ class Algorithm(ABC):
             KeyError: If the algorithm type or name cannot be found.
 
         """
+        instance = self._get_algorithm_instance(setting_key)
+        if instance is not None:
+            return instance
         return create_from_ref(self._settings, setting_key)
 
     @abstractmethod
