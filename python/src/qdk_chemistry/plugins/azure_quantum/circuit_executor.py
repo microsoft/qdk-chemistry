@@ -12,14 +12,24 @@ measurement bitstring results via CircuitExecutorData.
 
 from __future__ import annotations
 
-from azure.identity import AzureCliCredential
-from azure.quantum import Workspace
+import json
+from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
 from qdk_chemistry.utils import Logger
 
+if TYPE_CHECKING:
+    from azure.quantum.target import Target
+
 __all__: list[str] = ["AzureQuantumEmulator", "AzureQuantumEmulatorSettings"]
+
+_DEFAULT_EMULATION_SETTINGS: dict = {
+    "simulationType": "cliffordrounding",
+    "enableNoise": False,
+    "emulateTiming": False,
+    "seed": 42,
+}
 
 
 def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, int]]:
@@ -60,27 +70,14 @@ class AzureQuantumEmulatorSettings(Settings):
         """Initialize Azure Quantum Emulator settings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("subscription_id", "string", "", "Azure subscription ID")
-        self._set_default("resource_group", "string", "", "Azure resource group name")
-        self._set_default("workspace_name", "string", "", "Azure Quantum workspace name")
-        self._set_default("location", "string", "", "Azure region (e.g. eastus)")
-        self._set_default("target_name", "string", "", "Emulator target ID (e.g. <target-id>)")
         self._set_default(
-            "simulation_type",
+            "emulation_settings",
             "string",
-            "cliffordrounding",
-            "Emulator simulation type (e.g. cliffordrounding, clifford)",
+            json.dumps(_DEFAULT_EMULATION_SETTINGS),
+            "Azure Quantum emulationSettings, as a JSON object string",
         )
-        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
-        self._set_default("enable_noise", "bool", False, "Enable noise model on the emulator")
-        self._set_default("emulate_timing", "bool", False, "Enable timing emulation")
-        self._set_default(
-            "m_reset_z_us", "int", -1, "Measurement-reset-Z gate time in microseconds (-1 for device default)"
-        )
-        self._set_default("cz_us", "int", -1, "CZ gate time in microseconds (-1 for device default)")
-        self._set_default("sx_us", "int", -1, "SX gate time in microseconds (-1 for device default)")
-        self._set_default("rz_us", "int", -1, "RZ gate time in microseconds (-1 for device default)")
-        self._set_default("timeout_secs", "int", 600, "Maximum seconds to wait for job completion")
+        self._set_default("job_name", "string", "qdk-chemistry-azure-quantum-emulator", "Name for the submitted job")
+        self._set_default("timeout_secs", "int", 3600, "Maximum seconds to wait for job completion")
 
 
 class AzureQuantumEmulator(CircuitExecutor):
@@ -88,57 +85,45 @@ class AzureQuantumEmulator(CircuitExecutor):
 
     def __init__(
         self,
-        subscription_id: str = "",
-        resource_group: str = "",
-        workspace_name: str = "",
-        location: str = "",
-        target_name: str = "",
-        simulation_type: str = "cliffordrounding",
-        seed: int = 42,
-        enable_noise: bool = False,
-        emulate_timing: bool = False,
-        m_reset_z_us: int = -1,
-        cz_us: int = -1,
-        sx_us: int = -1,
-        rz_us: int = -1,
-        timeout_secs: int = 600,
+        target: Target | None = None,
+        emulation_settings: dict | None = None,
+        job_name: str = "qdk-chemistry-azure-quantum-emulator",
+        timeout_secs: int = 3600,
     ) -> None:
         """Initialize the Azure Quantum Emulator circuit executor.
 
+        Pass an already-resolved ``azure.quantum`` ``Target`` (e.g.
+        ``workspace.get_targets("...")``). The executor reuses your existing
+        workspace and credential, so no subscription/resource-group/workspace
+        connection details are needed here. The target is optional here and can
+        instead be provided later via :meth:`set_target`, but it must be set
+        before :meth:`run` is called.
+
         Args:
-            subscription_id: Azure subscription ID.
-            resource_group: Azure resource group name.
-            workspace_name: Azure Quantum workspace name.
-            location: Azure region (e.g. eastus).
-            target_name: Emulator target ID (e.g. <target-id>).
-            simulation_type: Emulator simulation type (e.g. cliffordrounding, clifford).
-            seed: Random seed for simulation reproducibility.
-            enable_noise: Enable noise model on the emulator.
-            emulate_timing: Enable timing emulation.
-            m_reset_z_us: Measurement-reset-Z gate time in microseconds (-1 for device default).
-            cz_us: CZ gate time in microseconds (-1 for device default).
-            sx_us: SX gate time in microseconds (-1 for device default).
-            rz_us: RZ gate time in microseconds (-1 for device default).
+            target: Pre-resolved Azure Quantum ``Target`` to submit circuits to; may be set later via set_target().
+            emulation_settings: Azure Quantum ``emulationSettings`` dict; defaults to a Clifford-rounding config.
+            job_name: Name for the submitted Azure Quantum job.
             timeout_secs: Maximum seconds to wait for job completion.
 
         """
         Logger.trace_entering()
         super().__init__()
+        self._target = target
         self._settings = AzureQuantumEmulatorSettings()
-        self._settings.set("subscription_id", subscription_id)
-        self._settings.set("resource_group", resource_group)
-        self._settings.set("workspace_name", workspace_name)
-        self._settings.set("location", location)
-        self._settings.set("target_name", target_name)
-        self._settings.set("simulation_type", simulation_type)
-        self._settings.set("seed", seed)
-        self._settings.set("enable_noise", enable_noise)
-        self._settings.set("emulate_timing", emulate_timing)
-        self._settings.set("m_reset_z_us", m_reset_z_us)
-        self._settings.set("cz_us", cz_us)
-        self._settings.set("sx_us", sx_us)
-        self._settings.set("rz_us", rz_us)
+        if emulation_settings is not None:
+            self._settings.set("emulation_settings", json.dumps(emulation_settings))
+        self._settings.set("job_name", job_name)
         self._settings.set("timeout_secs", timeout_secs)
+
+    def set_target(self, target: Target) -> None:
+        """Set the Azure Quantum target to submit circuits to.
+
+        Args:
+            target: Pre-resolved Azure Quantum ``Target`` to submit circuits to.
+
+        """
+        Logger.trace_entering()
+        self._target = target
 
     def _run_impl(
         self,
@@ -167,36 +152,14 @@ class AzureQuantumEmulator(CircuitExecutor):
         qir_string = str(circuit.get_qir())
         Logger.debug("QIR compiled")
 
-        workspace = Workspace(
-            subscription_id=self._settings.get("subscription_id"),
-            resource_group=self._settings.get("resource_group"),
-            name=self._settings.get("workspace_name"),
-            location=self._settings.get("location"),
-            credential=AzureCliCredential(),
-        )
-        target = workspace.get_targets(self._settings.get("target_name"))
+        if self._target is None:
+            raise ValueError("No Azure Quantum target set; pass one to the constructor or via set_target().")
+        target = self._target
 
-        emulation_settings: dict = {
-            "simulationType": self._settings.get("simulation_type"),
-            "enableNoise": self._settings.get("enable_noise"),
-            "emulateTiming": self._settings.get("emulate_timing"),
-            "seed": self._settings.get("seed"),
-        }
-
-        command_timings = {}
-        if self._settings.get("m_reset_z_us") >= 0:
-            command_timings["m_reset_z_us"] = self._settings.get("m_reset_z_us")
-        if self._settings.get("cz_us") >= 0:
-            command_timings["cz_us"] = self._settings.get("cz_us")
-        if self._settings.get("sx_us") >= 0:
-            command_timings["sx_us"] = self._settings.get("sx_us")
-        if self._settings.get("rz_us") >= 0:
-            command_timings["rz_us"] = self._settings.get("rz_us")
-        if command_timings:
-            emulation_settings["commandTimings"] = command_timings
+        emulation_settings: dict = json.loads(self._settings.get("emulation_settings"))
 
         job = target.submit(
-            name=f"qdk-chemistry-{self.name()}",
+            name=self._settings.get("job_name"),
             shots=shots,
             input_data=qir_string,
             input_data_format="qir.v1",
