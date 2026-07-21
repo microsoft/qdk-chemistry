@@ -52,6 +52,7 @@ Composable, Extensible Architecture
 
    user/quickstart
    user/features
+   user/agents
    user/comprehensive/index
    user/migrating-data-files
 

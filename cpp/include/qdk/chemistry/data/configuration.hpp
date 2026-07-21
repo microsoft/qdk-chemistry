@@ -40,7 +40,7 @@ class Configuration : public DataClass {
 
   /**
    * @brief Construct from a spin-½ string representation.
-   * @param str String with alphabet @c '0'/@c 'u'/@c 'd'/@c '2'.
+   * @param str String using the symbols 0, u, d, and 2.
    * @return Configuration with bits_per_mode() == 2.
    * @throws std::invalid_argument If the string contains invalid characters.
    */

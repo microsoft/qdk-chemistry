@@ -298,6 +298,9 @@ bilinear(j, k) is available on both forms.
           },
           py::arg("filename"));
 
+  // Data type name class attribute
+  mapping.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(MajoranaMapping);
+
   data.def(
       "majorana_map_hamiltonian",
       [](const MajoranaMapping& mapping, double core_energy,

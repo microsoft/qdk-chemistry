@@ -110,8 +110,6 @@ Each method returns the circuit in the requested format, converting from whateve
      - Returns the OpenQASM string. Converts from :term:`QIR` via Qiskit if only :term:`QIR` is available.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qiskit_circuit`
      - Returns a Qiskit ``QuantumCircuit``. Requires ``qiskit`` to be installed.
-   * - :meth:`~qdk_chemistry.data.Circuit.estimate`
-     - Runs Q#'s resource estimator on the circuit. Accepts optional ``params`` for estimation configuration.
 
 Example: Convert state preparation circuits to different formats
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

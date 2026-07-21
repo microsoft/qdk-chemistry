@@ -38,10 +38,17 @@ release = _version_file.read_text().strip()
 os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 
 # Add the Python source tree so Sphinx can find qdk_chemistry when the
-# package has not been pip-installed (e.g. local docs builds).
-# NOTE: The path must stay *after* any pip-installed copy so that the
-# compiled C++ extension (_core) from the installed package is preferred.
-sys.path.append(str(_repo_root / "python" / "src"))
+# package has not been pip-installed (e.g. local docs builds). Keep the
+# installed package first so the compiled extension (_core) remains available,
+# then prepend the source package path to qdk_chemistry.__path__ so pure-Python
+# submodules are documented from the working tree.
+_python_src = _repo_root / "python" / "src"
+sys.path.append(str(_python_src))
+import qdk_chemistry as _qdk_chemistry  # noqa: E402
+
+_source_package = str(_python_src / "qdk_chemistry")
+if _source_package not in _qdk_chemistry.__path__:
+    _qdk_chemistry.__path__.insert(0, _source_package)
 
 # Check if Graphviz 'dot' executable is available
 if shutil.which("dot") is None:
@@ -59,13 +66,12 @@ extensions = [
     "sphinx.ext.autosummary",  # Create summary tables for modules/classes
     "sphinx.ext.intersphinx",  # Link to other projects' documentation
     "sphinx.ext.viewcode",  # Add links to view source code
+    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     # Additional extensions
     "sphinx_autodoc_typehints",  # Better support for Python type annotations
     "sphinx_inline_tabs",  # Support for tabbed content in docs
     # C++ documentation
     "breathe",  # Bridge between Sphinx and Doxygen
-    # Enable Google-style docstrings parsing
-    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     "sphinx.ext.todo",  # Support for listing to-dos
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
     "sphinxcontrib.bibtex",  # Support for bibliographic references
@@ -241,9 +247,10 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     Prevent Sphinx from documenting standard library and third-party modules.
     This stops pathlib, pydantic_settings, etc. from being included in docs.
     """
-    # Get the module where the object is defined
-    if hasattr(obj, "__module__"):
-        module = obj.__module__
+    # Get the module where the object is defined. Instances such as the
+    # FastMCP application do not expose __module__, so fall back to their class.
+    module = getattr(obj, "__module__", None) or getattr(type(obj), "__module__", None)
+    if module:
         target_module = name.rsplit(".", 1)[0] if what != "module" else name
 
         # Skip re-exported members (e.g., qdk_chemistry.algorithms re-exporting data types)
@@ -253,6 +260,16 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
             and module != target_module
             and module.startswith("qdk_chemistry")
             and target_module.startswith("qdk_chemistry")
+        ):
+            return True
+
+        # Skip objects pulled in from third-party modules. Without this, module
+        # attributes such as FastMCP app instances cause autodoc to traverse MCP,
+        # Starlette, and Pydantic internals and report warnings from their docs.
+        if (
+            module
+            and target_module.startswith("qdk_chemistry")
+            and not module.startswith("qdk_chemistry")
         ):
             return True
 

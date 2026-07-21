@@ -59,6 +59,13 @@
             }
         }
     },
+    "forwardPorts": [8081],
+    "portsAttributes": {
+        "8081": {
+            "label": "QDK Chemistry MCP",
+            "onAutoForward": "silent"
+        }
+    },
     "features": {
         "ghcr.io/devcontainers/features/git:1": {}
     },
