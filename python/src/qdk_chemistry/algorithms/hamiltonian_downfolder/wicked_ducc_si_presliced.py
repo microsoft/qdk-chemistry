@@ -292,4 +292,6 @@ class WickedDuccSIPreslicedSolver(Algorithm):
         fbar, vbar, E0_bch = evaluate_bch_compiled(compiled, H, T, E0, act_ranges)
 
         # Step 6: assemble Hamiltonian
-        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act)
+        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
+                                             input_orbitals=hamiltonian.get_orbitals(),
+                                             nocc_a=nocc_a)

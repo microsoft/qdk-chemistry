@@ -49,6 +49,7 @@ def _require_ambit():
     if _ambit is None:
         try:
             import ambit
+
             _ambit = ambit
         except ImportError:
             raise ImportError("ambit is required for WickedDuccSIAmbitSolver.")
@@ -82,8 +83,8 @@ class TensorDispatch:
 
 
 # ── Ambit space & tensor setup ───────────────────────────────────────────────
-
-_MAX_IDX = 6
+# Change this to accomodate desired max DUCC level
+_MAX_IDX = 10
 _ELEM_MAP = {"o": ["c", "a"], "v": ["b", "e"], "O": ["C", "A"], "V": ["B", "E"]}
 _ACTIVE_ELEM = {"o": "a", "v": "b", "O": "A", "V": "B"}
 
@@ -104,14 +105,19 @@ def _active_key(spaces):
 
 def _fill(tensor, comp_key, arr, sl_a, sl_b, exclude=frozenset()):
     """Fill a BlockedTensor from a numpy array at elementary block level."""
+
     def _sl(s):
         return sl_a.get(s, sl_b.get(s))
+
     for combo in itertools.product(*[_ELEM_MAP[c] for c in comp_key]):
         blk = "".join(combo)
         if blk in exclude:
             continue
         slices = tuple(_sl(c) for c in combo)
-        np.asarray(tensor.block(blk))[:] = arr[slices]
+        sub = arr[slices]
+        if sub.size == 0:
+            continue
+        np.asarray(tensor.block(blk))[:] = sub
 
 
 def setup_spaces(ambit, nocc_a, nocc_b, nvir_a, nvir_b, noa, nva, nob, nvb):
@@ -136,10 +142,8 @@ def setup_spaces(ambit, nocc_a, nocc_b, nvir_a, nvir_b, noa, nva, nob, nvb):
     ambit.BlockedTensor.add_composite_mo_space("O", _idx("O"), ["C", "A"])
     ambit.BlockedTensor.add_composite_mo_space("V", _idx("V"), ["B", "E"])
 
-    sl_a = {"c": slice(0, ncore_a), "a": slice(ncore_a, nocc_a),
-            "b": slice(0, nva), "e": slice(nva, nvir_a)}
-    sl_b = {"C": slice(0, ncore_b), "A": slice(ncore_b, nocc_b),
-            "B": slice(0, nvb), "E": slice(nvb, nvir_b)}
+    sl_a = {"c": slice(0, ncore_a), "a": slice(ncore_a, nocc_a), "b": slice(0, nva), "e": slice(nva, nvir_a)}
+    sl_b = {"C": slice(0, ncore_b), "A": slice(ncore_b, nocc_b), "B": slice(0, nvb), "E": slice(nvb, nvir_b)}
     return sl_a, sl_b
 
 
@@ -153,8 +157,7 @@ def build_tensors(ambit, H_dict, T_dict, sl_a, sl_b):
     active_set = {"a", "A", "b", "B"}
 
     # ── H: rank-2 (Fock, all spins) ──
-    h1_keys = [c1 + c2 for c1 in "ov" for c2 in "ov"] + \
-              [c1 + c2 for c1 in "OV" for c2 in "OV"]
+    h1_keys = [c1 + c2 for c1 in "ov" for c2 in "ov"] + [c1 + c2 for c1 in "OV" for c2 in "OV"]
     H2 = BT.build(CT, "H", [b for ck in h1_keys for b in _expand(ck)])
     for ck in h1_keys:
         _fill(H2, ck, H_dict[ck], sl_a, sl_b)
@@ -162,8 +165,7 @@ def build_tensors(ambit, H_dict, T_dict, sl_a, sl_b):
     # ── H: rank-4 (2-body, αα + ββ + αβ) ──
     h2_aa = [c1 + c2 + c3 + c4 for c1 in "ov" for c2 in "ov" for c3 in "ov" for c4 in "ov"]
     h2_bb = [k.upper() for k in h2_aa]
-    h2_ab = [c1 + c2.upper() + c3 + c4.upper()
-             for c1 in "ov" for c2 in "ov" for c3 in "ov" for c4 in "ov"]
+    h2_ab = [c1 + c2.upper() + c3 + c4.upper() for c1 in "ov" for c2 in "ov" for c3 in "ov" for c4 in "ov"]
     h4_keys = h2_aa + h2_bb + h2_ab
     H4 = BT.build(CT, "H", [b for ck in h4_keys for b in _expand(ck)])
     for ck in h4_keys:
@@ -223,13 +225,15 @@ def compile_ambit_blocks(mbeq, osi):
     return blocks, scalar_key
 
 
-def evaluate_bch_ambit(ambit, compiled_blocks, scalar_key, mbeq, osi,
-                       H, T, E0, H_dict, T_dict, nocc_a, nvir_a, nocc_b, nvir_b):
+def evaluate_bch_ambit(
+    ambit, compiled_blocks, scalar_key, mbeq, osi, H, T, E0, H_dict, T_dict, nocc_a, nvir_a, nocc_b, nvir_b
+):
     """Evaluate pre-compiled ambit blocks with active-only output.
 
     Args:
         compiled_blocks: Output of :func:`compile_ambit_blocks`.
         scalar_key: Block key for the E0 scalar term (or None).
+
     """
     BT, CT = ambit.BlockedTensor, ambit.TensorType.CoreTensor
     exec_ns = {"H": H, "T": T, "E0": ScalarProxy(E0)}
@@ -242,10 +246,11 @@ def evaluate_bch_ambit(ambit, compiled_blocks, scalar_key, mbeq, osi,
         from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_si import (
             generate_equation,
         )
+
         dim_map = {"o": nocc_a, "v": nvir_a, "O": nocc_b, "V": nvir_b}
         func_str, _ = generate_equation(mbeq, osi, scalar_key)
         ns = {}
-        exec(func_str, {"np": np, "_dims": dim_map}, ns)  # noqa: S102
+        exec(func_str, {"np": np, "_dims": dim_map}, ns)
         E0_bch = ns["_eval"](ScalarProxy(E0), H_dict, T_dict)
 
     # Tensor blocks: exec pre-compiled ambit code
@@ -255,7 +260,7 @@ def evaluate_bch_ambit(ambit, compiled_blocks, scalar_key, mbeq, osi,
         R = BT.build(CT, "R", [active])
         exec_ns["R"] = R
 
-        exec(code, exec_ns)  # noqa: S102
+        exec(code, exec_ns)
 
         result = np.asarray(R.block(active)).copy()
         if ndim == 2:
@@ -327,18 +332,18 @@ class WickedDuccSIAmbitSolver(Algorithm):
         ambit.initialize()
         try:
             ambit.BlockedTensor.set_expert_mode(True)
-            sl_a, sl_b = setup_spaces(ambit, nocc_a, nocc_b, nvir_a, nvir_b,
-                                      noa_act, nva_act, nob_act, nvb_act)
+            sl_a, sl_b = setup_spaces(ambit, nocc_a, nocc_b, nvir_a, nvir_b, noa_act, nva_act, nob_act, nvb_act)
             H, T = build_tensors(ambit, H_dict, T_dict, sl_a, sl_b)
 
             fbar, vbar, E0_bch = evaluate_bch_ambit(
-                ambit, compiled_blocks, scalar_key, mbeq, osi,
-                H, T, E0, H_dict, T_dict,
-                nocc_a, nvir_a, nocc_b, nvir_b)
+                ambit, compiled_blocks, scalar_key, mbeq, osi, H, T, E0, H_dict, T_dict, nocc_a, nvir_a, nocc_b, nvir_b
+            )
 
             ambit.BlockedTensor.set_expert_mode(False)
         finally:
             ambit.finalize()
 
         # Step 6: assemble Hamiltonian
-        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act)
+        return assemble_active_hamiltonian(
+            fbar, vbar, E0_bch, noa_act, nva_act, input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a
+        )

@@ -210,7 +210,9 @@ class WickedDuccSISolver(Algorithm):
             vbar[key] = arr[np.ix_(*[_act(c) for c in key])]
 
         # Step 6: assemble Hamiltonian
-        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act)
+        return assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
+                                             input_orbitals=hamiltonian.get_orbitals(),
+                                             nocc_a=nocc_a)
 
     # Keep as static method for tests that call it directly.
     @staticmethod

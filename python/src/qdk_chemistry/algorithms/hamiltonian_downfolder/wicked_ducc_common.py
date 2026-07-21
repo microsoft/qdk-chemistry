@@ -327,6 +327,11 @@ def build_ducc_bch(w, bch_order):
         Hbar = E0op + Hop + w.commutator(Hop, sigma)
         Hbar.add2(w.commutator(Hop, sigma, sigma), w.rational(1, 2))
         Hbar.add2(w.commutator(Fop, sigma, sigma, sigma), w.rational(1, 6))
+    elif bch_order == 3:
+        Hbar = E0op + Hop + w.commutator(Hop, sigma)
+        Hbar.add2(w.commutator(Hop, sigma, sigma), w.rational(1, 2))
+        Hbar.add2(w.commutator(Hop, sigma, sigma, sigma), w.rational(1, 6))
+        Hbar.add2(w.commutator(Fop, sigma, sigma, sigma, sigma), w.rational(1, 24))
     else:
         raise ValueError(f"Unsupported BCH order {bch_order}")
 
@@ -338,7 +343,8 @@ def build_ducc_bch(w, bch_order):
 # ── Step 6: Assemble active-space Hamiltonian ────────────────────────────────
 
 
-def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act):
+def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
+                                input_orbitals=None, nocc_a=None):
     """Assemble active-space γ tensors, convert γ→χ, and package Hamiltonian.
 
     Takes the active-sized 1-body (*fbar*) and 2-body (*vbar*) output from
@@ -350,6 +356,11 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act):
         E0_bch: Scalar reference energy from BCH.
         noa_act: Number of active occupied α orbitals.
         nva_act: Number of active virtual α orbitals.
+        input_orbitals: Full-space Orbitals from the input Hamiltonian.
+            If provided, the active MO coefficients are extracted and
+            attached to the output Hamiltonian.
+        nocc_a: Number of occupied α orbitals (needed to locate active
+            columns when *input_orbitals* is given).
 
     Returns:
         A qdk-chemistry Hamiltonian object for the active space.
@@ -417,8 +428,25 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act):
     # Package
     from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
 
+    # Build active-space orbitals: extract the active MO columns from the
+    # full coefficient matrix if real orbitals are available.
+    active_orbitals = ModelOrbitals(nact)
+    if input_orbitals is not None and nocc_a is not None:
+        try:
+            from qdk_chemistry.data import Orbitals
+            coeffs, _ = input_orbitals.get_coefficients()
+            C_full = np.array(coeffs)
+            ncore = nocc_a - noa_act
+            # Active columns: [ncore..nocc_a) occupied, [nocc_a..nocc_a+nva_act) virtual
+            act_cols = list(range(ncore, nocc_a)) + list(range(nocc_a, nocc_a + nva_act))
+            C_act = C_full[:, act_cols]
+            basis_set = input_orbitals.get_basis_set()
+            active_orbitals = Orbitals(C_act, None, None, basis_set)
+        except (RuntimeError, AttributeError):
+            pass  # Model Hamiltonian without real MO coefficients — fall back
+
     return Hamiltonian(
         CanonicalFourCenterHamiltonianContainer(
-            chi1_aa, g2_ab.swapaxes(1, 2).ravel(), ModelOrbitals(nact), C, np.zeros((nact, nact))
+            chi1_aa, g2_ab.swapaxes(1, 2).ravel(), active_orbitals, C, np.zeros((nact, nact))
         )
     )
