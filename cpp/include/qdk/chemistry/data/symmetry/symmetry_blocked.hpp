@@ -259,11 +259,6 @@ class SymmetryBlocked : public DataClass {
 
   /**
    * @brief Immutable view of all stored block keys and storage pointers.
-   *
-   * Aliased sectors appear as separate keys that share the same block pointer.
-   * This view enables sparse consumers to traverse stored sectors without
-   * materializing a dense tensor.
-   *
    * @return Const reference to the complete block map.
    */
   const BlockMap& blocks() const { return _blocks; }
