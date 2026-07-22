@@ -40,7 +40,7 @@ import numpy as np
 from scipy.sparse import csc_array, vstack
 
 from qdk_chemistry._core.utils import decompose_sparse_site
-from qdk_chemistry.data import AbelianMPSContainer, MPSSite
+from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -85,36 +85,37 @@ class MPSSparseStatePreparation(StatePreparation):
         """Return the algorithm name."""
         return "mps_sparse"
 
-    def _run_impl(self, wavefunction: AbelianMPSContainer) -> Circuit:
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Return a circuit to prepare an MPS state using block-sparsity.
 
         Args:
-            wavefunction: An AbelianMPSContainer containing the tensors.
+            wavefunction: The wavefunction to prepare.
 
         Returns:
             A Circuit object implementing the MPS state preparation.
 
         Raises:
-            TypeError: If wavefunction is not an AbelianMPSContainer instance.
+            TypeError: If wavefunction is not an MPSContainer instance.
 
         """
-        if not isinstance(wavefunction, AbelianMPSContainer):
-            raise TypeError(f"MPSSparseStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
-        if wavefunction.is_complex:
+        container = wavefunction.get_container()
+        if not isinstance(container, MPSContainer):
+            raise TypeError(f"MPSSparseStatePreparation requires an MPSContainer, got {type(container)}.")
+        if container.is_complex:
             raise ValueError("Sparse MPS state preparation currently supports only real-valued MPS tensors.")
 
-        if wavefunction.physical_dimension != 4:
+        if container.physical_dimension != 4:
             raise ValueError("Sparse MPS state preparation requires four physical states per site.")
-        if wavefunction.orthogonality_center != 0:
+        if container.orthogonality_center != 0:
             raise ValueError("Sparse MPS state preparation requires a right-canonical MPS with center zero.")
-        num_orbitals = wavefunction.orbitals.get_num_molecular_orbitals()
-        if wavefunction.num_sites != num_orbitals:
+        num_orbitals = container.orbitals.get_num_molecular_orbitals()
+        if container.num_sites != num_orbitals:
             raise ValueError("Sparse MPS state preparation requires exactly one MPS site per molecular orbital.")
-        data = generate_mps_sparse_preparation_data(wavefunction.sites)
+        data = generate_mps_sparse_preparation_data(container.sites)
         rotation_bits = self._settings.get("rotation_bits")
         params = data.to_qsharp_params(
             rotation_bits,
-            wavefunction.site_to_orbital_order,
+            container.site_to_orbital_order,
         )
         program = QSHARP_UTILS.MPSSparse.MakeMPSSparseCircuit
 
@@ -235,7 +236,7 @@ class MPSSparsePreparationData:
 
 
 def generate_mps_sparse_preparation_data(
-    tensors: Sequence[np.ndarray | MPSSite],
+    tensors: Sequence[np.ndarray | AbelianMPSSite],
 ) -> MPSSparsePreparationData:
     """Compute all data needed for the MPSSparse Q# operation.
 
@@ -243,8 +244,10 @@ def generate_mps_sparse_preparation_data(
 
     Parameters
     ----------
-    tensors : sequence of np.ndarray
-        MPS tensors. ``tensors[i]`` has shape ``(chi_left, d, chi_right)``.
+    tensors : sequence of np.ndarray or AbelianMPSSite
+        MPS sites. Array inputs have shape ``(chi_left, d, chi_right)`` and are
+        wrapped as unsymmetrized sites. AbelianMPSSite inputs preserve their numerical
+        sparsity when converted to per-physical-state CSC matrices.
 
     Returns
     -------
@@ -252,7 +255,9 @@ def generate_mps_sparse_preparation_data(
         Structured preparation data.
 
     """
-    mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    mps_sites = [
+        tensor if isinstance(tensor, AbelianMPSSite) else AbelianMPSSite.from_dense(tensor) for tensor in tensors
+    ]
     if not mps_sites:
         raise ValueError("Sparse MPS state preparation requires at least one site.")
     if any(site.is_complex for site in mps_sites):
@@ -303,13 +308,14 @@ def generate_mps_sparse_preparation_data(
     )
 
 
-def _decompose_sparse_site(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> SparseSiteUnitaryData:
+def _decompose_sparse_site(tensor: np.ndarray | AbelianMPSSite, ancilla_dim: int) -> SparseSiteUnitaryData:
     """Decompose one MPS site tensor using the sparse permutation method.
 
     Parameters
     ----------
-    tensor : np.ndarray of shape (chi_left, 4, chi_right)
-        The MPS tensor for this site.
+    tensor : np.ndarray of shape (chi_left, 4, chi_right) or AbelianMPSSite
+        The MPS site to decompose. An AbelianMPSSite is read through its sparse
+        physical slices; an array is first wrapped as an unsymmetrized site.
     ancilla_dim : int
         The ancilla register dimension (power of 2).
 
@@ -358,7 +364,7 @@ def _decompose_sparse_site(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> Sp
 # ---------------------------------------------------------------------------
 
 
-def _tensor_to_target_matrix(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> csc_array:
+def _tensor_to_target_matrix(tensor: np.ndarray | AbelianMPSSite, ancilla_dim: int) -> csc_array:
     """Build the sparse target matrix from an MPS tensor.
 
     The target matrix has shape (4 * ancilla_dim, chi_left), where each column
@@ -367,8 +373,9 @@ def _tensor_to_target_matrix(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> 
 
     Parameters
     ----------
-    tensor : np.ndarray of shape (chi_left, 4, chi_right)
-        The MPS tensor.
+    tensor : np.ndarray of shape (chi_left, 4, chi_right) or AbelianMPSSite
+        The MPS site. Its four physical matrices are transposed, row-padded to
+        ``ancilla_dim``, and stacked vertically.
     ancilla_dim : int
         The ancilla dimension (padded, power of 2).
 
@@ -378,7 +385,7 @@ def _tensor_to_target_matrix(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> 
         The sparse target matrix of shape (4 * ancilla_dim, chi_left).
 
     """
-    site = tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor)
+    site = tensor if isinstance(tensor, AbelianMPSSite) else AbelianMPSSite.from_dense(tensor)
     chi_left, _, _ = site.shape
     # Reshape: for each physical index p, take the slice tensor[:, p, :] of shape
     # (chi_left, chi_right) -> transpose to (chi_right, chi_left).

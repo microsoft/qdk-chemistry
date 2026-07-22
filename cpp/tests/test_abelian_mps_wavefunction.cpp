@@ -1,15 +1,14 @@
-/*
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See LICENSE.txt in the project root for
- * license information.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <memory>
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/abelian_mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
 
@@ -19,24 +18,73 @@ using namespace qdk::chemistry::data;
 
 namespace {
 
-MPSSite::PhysicalSlicePtr make_slice(std::size_t left, std::size_t right,
-                                     double value) {
-  using Slice = SymmetryBlockedTensor<2>;
-  auto trivial =
-      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
-  Slice::ExtentsArray extents;
-  extents[0][SymmetryLabel{}] = left;
-  extents[1][SymmetryLabel{}] = right;
+// Per-physical-state particle counts for a spin-half orbital:
+// |0⟩ -> 0, |↑⟩ -> 1, |↓⟩ -> 1, |2⟩ -> 2
+constexpr std::size_t DELTA_N[] = {0, 1, 1, 2};
 
-  auto block = std::make_shared<const Eigen::MatrixXd>(
-      Eigen::MatrixXd::Constant(left, right, value));
-  Slice::BlockMap blocks;
-  blocks[{SymmetryLabel{}, SymmetryLabel{}}] = block;
-  Slice slice({trivial, trivial}, std::move(extents), std::move(blocks));
-  return std::make_shared<const MPSSite::PhysicalSlice>(std::move(slice));
+/**
+ * @brief Create a particle-number-blocked SymmetryProduct for MPS bonds.
+ * @param max_n Maximum particle-number label (inclusive).
+ */
+std::shared_ptr<const SymmetryProduct> make_bond_symmetries(std::size_t max_n) {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::particle_number(max_n)}));
 }
 
-MPSSite::PhysicalSlicePtr make_symmetry_slice(bool include_particle_number) {
+/**
+ * @brief Create a particle-number-blocked MPS site.
+ *
+ * Constructs a site where each bond has a single particle-number sector whose
+ * label is @p left_n (left bond) and @p right_n (right bond). The sector
+ * dimensions are @p left and @p right respectively.
+ *
+ * For each physical state p with DELTA_N[p], a block is populated only if
+ * left_n + DELTA_N[p] == right_n (particle number conservation). The populated
+ * block is set to a normalized isometry.
+ *
+ * @param left Left bond dimension (single sector).
+ * @param right Right bond dimension (single sector).
+ * @param left_n Particle-number label of the left bond sector.
+ * @param right_n Particle-number label of the right bond sector.
+ * @param max_n Maximum particle number for the axis (must be >= both labels).
+ * @param physical Number of physical states (default 4).
+ */
+AbelianMPSContainer::SitePtr make_site(std::size_t left, std::size_t right,
+                                       std::size_t left_n = 0,
+                                       std::size_t right_n = 0,
+                                       std::size_t max_n = 2,
+                                       std::size_t physical = 4) {
+  const auto symmetries = make_bond_symmetries(max_n);
+  const SymmetryLabel left_label({axes::particle_number_value(left_n)});
+  const SymmetryLabel right_label({axes::particle_number_value(right_n)});
+
+  using Slice = SymmetryBlockedTensor<2>;
+  Slice::ExtentsArray extents;
+  extents[0][left_label] = left;
+  extents[1][right_label] = right;
+
+  std::vector<AbelianMPSSite::PhysicalSlicePtr> slices;
+  for (std::size_t p = 0; p < physical; ++p) {
+    Slice::BlockMap blocks;
+    if (left_n + DELTA_N[p] == right_n) {
+      // Conservation satisfied — populate with normalized values.
+      Eigen::MatrixXd values =
+          Eigen::MatrixXd::Identity(left, right) /
+          std::sqrt(static_cast<double>(std::max(left, right)));
+      blocks[{left_label, right_label}] =
+          std::make_shared<const Eigen::MatrixXd>(std::move(values));
+    }
+    // If conservation is not satisfied, the block map is empty for this slice.
+    slices.push_back(std::make_shared<const AbelianMPSSite::PhysicalSlice>(
+        Slice({symmetries, symmetries}, extents, std::move(blocks))));
+  }
+  return std::make_shared<const AbelianMPSSite>(
+      std::move(slices), std::vector<SymmetryLabel>{left_label},
+      std::vector<SymmetryLabel>{right_label});
+}
+
+AbelianMPSSite::PhysicalSlicePtr make_symmetry_slice(
+    bool include_particle_number) {
   using Slice = SymmetryBlockedTensor<2>;
   const auto symmetries =
       include_particle_number
@@ -54,13 +102,21 @@ MPSSite::PhysicalSlicePtr make_symmetry_slice(bool include_particle_number) {
   Slice::BlockMap blocks;
   blocks[{label, label}] =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Ones(1, 1));
-  return std::make_shared<const MPSSite::PhysicalSlice>(
+  return std::make_shared<const AbelianMPSSite::PhysicalSlice>(
       Slice({symmetries, symmetries}, std::move(extents), std::move(blocks)));
 }
 
-AbelianMPSContainer::SitePtr make_site(std::size_t left, std::size_t right,
-                                       std::size_t physical = 4) {
-  std::vector<MPSSite::PhysicalSlicePtr> slices;
+/**
+ * @brief Create a trivially-blocked MPS site (no particle-number symmetry).
+ * Used for AbelianMPSSite-only tests that don't involve AbelianMPSContainer.
+ */
+AbelianMPSContainer::SitePtr make_trivial_site(std::size_t left,
+                                               std::size_t right,
+                                               std::size_t physical = 4) {
+  using Slice = SymmetryBlockedTensor<2>;
+  auto trivial =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::vector<AbelianMPSSite::PhysicalSlicePtr> slices;
   for (std::size_t p = 0; p < physical; ++p) {
     Eigen::MatrixXd values = Eigen::MatrixXd::Zero(left, right);
     for (std::size_t bond = 0; bond < left; ++bond) {
@@ -69,21 +125,50 @@ AbelianMPSContainer::SitePtr make_site(std::size_t left, std::size_t right,
                static_cast<Eigen::Index>(bond % right)) = 1.0;
       }
     }
-    using Slice = SymmetryBlockedTensor<2>;
-    auto trivial =
-        std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
     Slice::ExtentsArray extents;
     extents[0][SymmetryLabel{}] = left;
     extents[1][SymmetryLabel{}] = right;
     Slice::BlockMap blocks;
     blocks[{SymmetryLabel{}, SymmetryLabel{}}] =
         std::make_shared<const Eigen::MatrixXd>(std::move(values));
-    slices.push_back(std::make_shared<const MPSSite::PhysicalSlice>(
+    slices.push_back(std::make_shared<const AbelianMPSSite::PhysicalSlice>(
         Slice({trivial, trivial}, std::move(extents), std::move(blocks))));
   }
-  return std::make_shared<const MPSSite>(
+  return std::make_shared<const AbelianMPSSite>(
       std::move(slices), std::vector<SymmetryLabel>{SymmetryLabel{}},
       std::vector<SymmetryLabel>{SymmetryLabel{}});
+}
+
+/**
+ * @brief Create a particle-number-blocked unnormalized site (for canonicality
+ * rejection tests). Single sector on each bond with the given scalar value.
+ */
+AbelianMPSContainer::SitePtr make_unnormalized_site(std::size_t left_n = 0,
+                                                    std::size_t right_n = 0,
+                                                    std::size_t max_n = 2,
+                                                    std::size_t physical = 4,
+                                                    double value = 2.0) {
+  const auto symmetries = make_bond_symmetries(max_n);
+  const SymmetryLabel left_label({axes::particle_number_value(left_n)});
+  const SymmetryLabel right_label({axes::particle_number_value(right_n)});
+  using Slice = SymmetryBlockedTensor<2>;
+  Slice::ExtentsArray extents;
+  extents[0][left_label] = 1;
+  extents[1][right_label] = 1;
+  std::vector<AbelianMPSSite::PhysicalSlicePtr> slices;
+  for (std::size_t p = 0; p < physical; ++p) {
+    Slice::BlockMap blocks;
+    if (left_n + DELTA_N[p] == right_n) {
+      blocks[{left_label, right_label}] =
+          std::make_shared<const Eigen::MatrixXd>(
+              Eigen::MatrixXd::Constant(1, 1, value));
+    }
+    slices.push_back(std::make_shared<const AbelianMPSSite::PhysicalSlice>(
+        Slice({symmetries, symmetries}, extents, std::move(blocks))));
+  }
+  return std::make_shared<const AbelianMPSSite>(
+      std::move(slices), std::vector<SymmetryLabel>{left_label},
+      std::vector<SymmetryLabel>{right_label});
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> make_particle_count(
@@ -103,8 +188,9 @@ static_assert(std::is_abstract_v<MPSContainer>);
 static_assert(std::is_base_of_v<MPSContainer, AbelianMPSContainer>);
 
 TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
-  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2),
-                                                     make_site(2, 1)};
+  // 2-site chain: N=0 → N=1 → N=2 (one particle added per site)
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2, 0, 1, 4),
+                                                     make_site(2, 1, 1, 2, 4)};
   auto total_num_particles = make_particle_count(4);
   const std::vector<Configuration> physical_basis = {
       Configuration::from_spin_half_string("0"),
@@ -164,29 +250,33 @@ TEST(AbelianMPSContainerTest, RepresentsCanonicalFormByOrthogonalityCenter) {
 }
 
 TEST(AbelianMPSContainerTest, ValidatesSitesAroundOrthogonalityCenter) {
-  auto unnormalized = std::make_shared<const MPSSite>(
-      std::vector<MPSSite::PhysicalSlicePtr>{make_slice(1, 1, 2.0)},
-      std::vector<SymmetryLabel>{SymmetryLabel{}},
-      std::vector<SymmetryLabel>{SymmetryLabel{}});
+  auto unnormalized = make_unnormalized_site(0, 0, 2, 4, 2.0);
 
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1, 1), unnormalized},
+  // Unnormalized at position 1 with center=0 → site 1 must be right-canonical
+  // → rejected
+  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
                                    testing::create_test_orbitals(2, 2, true),
                                    nullptr, nullptr, 0),
                std::invalid_argument);
-  EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1, 1), unnormalized},
+  // Unnormalized at position 1 with center=1 → site 1 is the center → accepted
+  EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
                                       testing::create_test_orbitals(2, 2, true),
                                       nullptr, nullptr, 1));
-  EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1, 1), unnormalized},
+  // Unspecified canonicalization → accepted
+  EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
                                       testing::create_test_orbitals(2, 2, true),
                                       nullptr, nullptr, std::nullopt));
+  // Out-of-range center → rejected
   EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)},
                                    testing::create_test_orbitals(1, 1, true),
                                    nullptr, nullptr, 1),
                std::invalid_argument);
 }
 
-TEST(MPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
-  const auto site = make_site(2, 1, 3);
+TEST(AbelianMPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
+  // Use trivially-blocked site to test dense layout (AbelianMPSSite doesn't
+  // require particle-number blocking — only AbelianMPSContainer does).
+  const auto site = make_trivial_site(2, 1, 3);
   const auto dense = std::get<Eigen::MatrixXd>(site->to_dense());
 
   ASSERT_EQ(dense.rows(), 6);
@@ -195,36 +285,46 @@ TEST(MPSSiteTest, MaterializesOneSiteWithLeftPhysicalPacking) {
             (Eigen::VectorXd(6) << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0).finished());
 }
 
-TEST(MPSSiteTest, RejectsZeroBondDimensions) {
-  EXPECT_THROW(make_site(0, 1), std::invalid_argument);
-  EXPECT_THROW(make_site(1, 0), std::invalid_argument);
+TEST(AbelianMPSSiteTest, RejectsZeroBondDimensions) {
+  EXPECT_THROW(make_trivial_site(0, 1), std::invalid_argument);
+  EXPECT_THROW(make_trivial_site(1, 0), std::invalid_argument);
 }
 
-TEST(MPSSiteTest, RequiresParticleNumberForSpinResolvedBondSectors) {
+TEST(AbelianMPSSiteTest, RequiresParticleNumberForSpinResolvedBondSectors) {
   const auto spin_only = make_symmetry_slice(false);
-  EXPECT_THROW(MPSSite({spin_only}, {SymmetryLabel({axes::alpha()})},
-                       {SymmetryLabel({axes::alpha()})}),
+  EXPECT_THROW(AbelianMPSSite({spin_only}, {SymmetryLabel({axes::alpha()})},
+                              {SymmetryLabel({axes::alpha()})}),
                std::invalid_argument);
 
   const auto spin_and_number = make_symmetry_slice(true);
   const SymmetryLabel label({axes::alpha(), axes::particle_number_value(1)});
-  EXPECT_NO_THROW(MPSSite({spin_and_number}, {label}, {label}));
+  EXPECT_NO_THROW(AbelianMPSSite({spin_and_number}, {label}, {label}));
+}
+
+TEST(AbelianMPSContainerTest, RejectsTriviallyBlockedSites) {
+  // Trivially-blocked sites (no ParticleNumber axis) must be rejected.
+  EXPECT_THROW(AbelianMPSContainer({make_trivial_site(1, 1)},
+                                   testing::create_test_orbitals(1, 1, true)),
+               std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RejectsMismatchedAdjacentBonds) {
-  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2),
-                                                     make_site(3, 1)};
+  // Right bond of site 0 has dim=2, left bond of site 1 has dim=3 → mismatch.
+  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2, 0, 1, 4),
+                                                     make_site(3, 1, 1, 2, 4)};
   EXPECT_THROW(AbelianMPSContainer(std::move(sites),
                                    testing::create_test_orbitals(2, 2, true)),
                std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RejectsPhysicalBasisSizeMismatch) {
-  std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 1, 3)};
+  // Site has 3 physical states but physical_basis has 2 entries → mismatch.
+  std::vector<AbelianMPSContainer::SitePtr> sites = {
+      make_site(1, 1, 0, 0, 2, 3)};
 
   EXPECT_THROW(AbelianMPSContainer(std::move(sites),
                                    testing::create_test_orbitals(1, 1, true),
-                                   nullptr, nullptr, 0,
+                                   nullptr, nullptr, std::nullopt,
                                    {Configuration::from_spin_half_string("0"),
                                     Configuration::from_spin_half_string("u")}),
                std::invalid_argument);
@@ -233,7 +333,7 @@ TEST(AbelianMPSContainerTest, RejectsPhysicalBasisSizeMismatch) {
 TEST(AbelianMPSContainerTest, RejectsInvalidPhysicalBasisConfigurations) {
   EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)},
                                    testing::create_test_orbitals(1, 1, true),
-                                   nullptr, nullptr, 0,
+                                   nullptr, nullptr, std::nullopt,
                                    {Configuration::from_bitstring("0"),
                                     Configuration::from_bitstring("1"),
                                     Configuration::from_bitstring("0"),
@@ -244,10 +344,10 @@ TEST(AbelianMPSContainerTest, RejectsInvalidPhysicalBasisConfigurations) {
 TEST(AbelianMPSContainerTest, RejectsInvalidSiteToOrbitalOrder) {
   EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
                                    testing::create_test_orbitals(2, 2, true),
-                                   nullptr, nullptr, 0, {}, {0}),
+                                   nullptr, nullptr, std::nullopt, {}, {0}),
                std::invalid_argument);
   EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
                                    testing::create_test_orbitals(2, 2, true),
-                                   nullptr, nullptr, 0, {}, {0, 0}),
+                                   nullptr, nullptr, std::nullopt, {}, {0, 0}),
                std::invalid_argument);
 }

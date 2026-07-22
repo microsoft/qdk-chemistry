@@ -28,6 +28,7 @@ target_sources(chemistry PRIVATE
     symmetry/symmetry_blocked_index_set.cpp
     tapering.cpp
     wavefunction.cpp
+    wavefunction_containers/abelian_mps_wavefunction.cpp
     wavefunction_containers/amplitude_container.cpp
     wavefunction_containers/mps_wavefunction.cpp
     wavefunction_containers/state_vector.cpp

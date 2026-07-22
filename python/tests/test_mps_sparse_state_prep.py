@@ -26,11 +26,11 @@ from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
 )
-from qdk_chemistry.data import AbelianMPSContainer, MPSSite
+from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite, Wavefunction
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
-from .mps_test_utils import contract_mps, make_mps, random_mps
-from .test_helpers import create_test_orbitals
+from .mps_test_utils import contract_mps, make_mps, random_mps, right_normalized_mps
+from .test_helpers import create_test_orbitals, create_test_wavefunction
 
 # =============================================================================
 # Qualtran reference data (from test_mps_sequential_state_prep.py)
@@ -334,10 +334,15 @@ class TestGenerateMPSSparsePreparationData:
         with pytest.raises(ValueError, match="only real-valued"):
             generate_mps_sparse_preparation_data([np.array([[[1.0j], [0.0], [0.0], [0.0]]])])
 
+    def test_run_requires_mps_container(self):
+        """Public run accepts Wavefunction and rejects a non-MPS container."""
+        with pytest.raises(TypeError, match="requires an MPSContainer"):
+            MPSSparseStatePreparation().run(create_test_wavefunction())
+
     def test_public_run_constructs_composable_circuit(self):
         """Public run resolves both the estimator entry point and composable Q# operation."""
         mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        circuit = MPSSparseStatePreparation().run(mps)
+        circuit = MPSSparseStatePreparation().run(Wavefunction(mps))
 
         assert circuit._qsharp_op is not None
 
@@ -346,17 +351,17 @@ class TestGenerateMPSSparsePreparationData:
         source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
         mps = AbelianMPSContainer(source.sites, source.orbitals, site_to_orbital_order=[1, 0])
 
-        circuit = MPSSparseStatePreparation().run(mps)
+        circuit = MPSSparseStatePreparation().run(Wavefunction(mps))
 
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [1, 0]
 
     def test_run_requires_one_site_per_orbital(self):
         """State preparation rejects an MPS that covers only an orbital subset."""
-        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
         mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
 
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
-            MPSSparseStatePreparation().run(mps)
+            MPSSparseStatePreparation().run(Wavefunction(mps))
 
     @pytest.mark.parametrize("orthogonality_center", [1, None])
     def test_run_requires_right_canonical_mps(self, orthogonality_center):
@@ -370,7 +375,7 @@ class TestGenerateMPSSparsePreparationData:
         )
 
         with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
-            MPSSparseStatePreparation().run(mps)
+            MPSSparseStatePreparation().run(Wavefunction(mps))
 
     @pytest.mark.parametrize("rotation_bits", [1, 63])
     def test_rejects_unsupported_rotation_precision(self, rotation_bits):
@@ -492,7 +497,7 @@ class TestMPSSparseQSharpFidelity:
         """Test sparse preparation fidelity on the Qualtran reference tensors."""
         get_qsharp_utils()
 
-        mps = make_mps(_qualtran_mps_tensors)
+        mps = right_normalized_mps(_qualtran_mps_tensors)
         target_state = _qualtran_mps_expected_state
 
         data = generate_mps_sparse_preparation_data(mps.sites)
@@ -528,9 +533,9 @@ class TestMPSSparseResourceEstimate:
 
     def test_resource_estimate_qubit_count(self):
         """Verify Q# resource estimate qubit count is reasonable."""
-        mps = make_mps(_qualtran_mps_tensors)
+        mps = right_normalized_mps(_qualtran_mps_tensors)
         algo = MPSSparseStatePreparation()
-        circuit = algo.run(mps)
+        circuit = algo.run(Wavefunction(mps))
         result = circuit.estimate()
         counts = result.logical_counts
 
@@ -540,9 +545,9 @@ class TestMPSSparseResourceEstimate:
 
     def test_resource_estimate_toffoli_count(self):
         """Verify Q# Toffoli count is in a reasonable range."""
-        mps = make_mps(_qualtran_mps_tensors)
+        mps = right_normalized_mps(_qualtran_mps_tensors)
         algo = MPSSparseStatePreparation()
-        circuit = algo.run(mps)
+        circuit = algo.run(Wavefunction(mps))
         result = circuit.estimate()
         counts = result.logical_counts
 
@@ -660,6 +665,7 @@ def _build_mps_sparse_eval_code(params: dict) -> str:
     args = [
         f"[{initial_state_str}]",
         str(params["numSites"]),
+        str(params["siteToOrbitalOrder"]).replace(" ", ""),
         str(params["rotationBits"]),
         _nested_list_to_qsharp_3d_bool(params["siteColPermTargets"]),
         _nested_list_to_qsharp_3d_bool(params["siteColInvPermTargets"]),

@@ -4,4 +4,5 @@ target_sources(chemistry PRIVATE
     orbital_rotation.cpp
     logger.cpp
     unitary_synthesis.cpp
+    ${PROJECT_SOURCE_DIR}/include/qdk/chemistry/utils/unitary_synthesis.hpp
 )

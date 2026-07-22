@@ -12,8 +12,7 @@
 namespace qdk::chemistry::utils::detail {
 
 /**
- * @brief Parallel adjacent-pair Givens representation of a real orthogonal
- * matrix.
+ * @brief Resulting Givens representation of a real orthogonal matrix.
  *
  * The decomposition represents an orthogonal matrix as
  * @f$U = D L_{k-1} \cdots L_0@f$. Each @f$L_j@f$ contains non-overlapping

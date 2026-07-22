@@ -49,8 +49,7 @@ TEST(SymmetryVocabTest, ParticleNumberValueAndAxis) {
 }
 
 TEST(SymmetryVocabTest, RoundTripSpinAndParticleNumberLabelJson) {
-  const SymmetryLabel label(
-      {axes::alpha(), axes::particle_number_value(3)});
+  const SymmetryLabel label({axes::alpha(), axes::particle_number_value(3)});
   const auto restored = SymmetryLabel::from_json(label.to_json());
   EXPECT_EQ(restored, label);
   EXPECT_TRUE(restored.has(AxisName::Spin));

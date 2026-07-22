@@ -1,13 +1,8 @@
-/*
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See LICENSE.txt in the project root for
- * license information.
- */
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
 
 #pragma once
-
-#include <Eigen/Dense>
-#include <complex>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -20,102 +15,6 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-/**
- * @brief One block-sparse MPS site.
- *
- * Slice @c p stores the matrix @f$A^p[l,r]@f$. The number and meaning of the
- * slices are not fixed by this class; @ref MPSContainer::physical_basis may
- * describe their ordering. Bond-sector order is explicit so dense conversion
- * never depends on unordered block-map iteration.
- */
-class MPSSite {
- public:
-  using PhysicalSlice = SymmetryBlockedTensorVariant<2>;
-  using PhysicalSlicePtr = std::shared_ptr<const PhysicalSlice>;
-  using DenseMatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
-
-  /**
-   * @brief Construct a block-sparse MPS site from its physical slices.
-   * @param physical_slices Physical-state slices sharing one scalar type and
-   * identical left and right bond spaces.
-   * @param left_sector_order Order in which left-bond sectors are packed by
-   * @ref to_dense.
-   * @param right_sector_order Order in which right-bond sectors are packed by
-   * @ref to_dense.
-   * @throws std::invalid_argument if no slices are supplied, a slice is null,
-   * slices have inconsistent scalar types or bond spaces, or a sector order
-   * does not contain every bond sector exactly once.
-   */
-  MPSSite(std::vector<PhysicalSlicePtr> physical_slices,
-          std::vector<SymmetryLabel> left_sector_order,
-          std::vector<SymmetryLabel> right_sector_order);
-
-  /**
-   * @brief Get the physical-state slices stored at this site.
-   * @return Physical slices in local-basis order.
-   */
-  const std::vector<PhysicalSlicePtr>& physical_slices() const {
-    return _physical_slices;
-  }
-
-  /**
-   * @brief Get the packing order of the left-bond symmetry sectors.
-   * @return Left-bond sector labels in dense packing order.
-   */
-  const std::vector<SymmetryLabel>& left_sector_order() const {
-    return _left_sector_order;
-  }
-
-  /**
-   * @brief Get the packing order of the right-bond symmetry sectors.
-   * @return Right-bond sector labels in dense packing order.
-   */
-  const std::vector<SymmetryLabel>& right_sector_order() const {
-    return _right_sector_order;
-  }
-
-  /**
-   * @brief Get the local physical dimension.
-   * @return Number of physical-state slices stored at this site.
-   */
-  std::size_t physical_dimension() const { return _physical_slices.size(); }
-
-  /**
-   * @brief Get the full left-bond dimension across all symmetry sectors.
-   * @return Sum of the left-bond sector extents.
-   */
-  std::size_t left_bond_dimension() const;
-
-  /**
-   * @brief Get the full right-bond dimension across all symmetry sectors.
-   * @return Sum of the right-bond sector extents.
-   */
-  std::size_t right_bond_dimension() const;
-
-  /**
-   * @brief Check whether the site tensors are complex-valued.
-   * @return True for complex-valued slices; false for real-valued slices.
-   */
-  bool is_complex() const;
-
-  /**
-   * @brief Materialize this site as a matrix packed as
-   * @c (left * physical, right).
-   *
-   * Row @c (l * physical_dimension() + p) stores @f$A^p[l,r]@f$.
-   * @return Real or complex dense matrix matching the slices' scalar type.
-   */
-  DenseMatrixVariant to_dense() const;
-
- private:
-  /** @brief Validate slice compatibility and bond-sector packing orders. */
-  void _validate() const;
-
-  std::vector<PhysicalSlicePtr> _physical_slices;
-  std::vector<SymmetryLabel> _left_sector_order;
-  std::vector<SymmetryLabel> _right_sector_order;
-};
 
 /**
  * @brief Common interface and metadata for MPS wavefunction representations.
@@ -233,9 +132,9 @@ class MPSContainer : public WavefunctionContainer {
   }
 
   /**
-   * @brief Get labels describing the physical slices at every site.
-   * @return Physical-basis labels in slice order, or an empty vector if they
-   * were not supplied.
+   * @brief Get the one-orbital occupation states labeling physical slices.
+   * @return Configurations in physical-slice order, shared by every site, or
+   *         an empty vector if this metadata was not supplied.
    */
   const std::vector<Configuration>& physical_basis() const {
     return _physical_basis;
@@ -260,8 +159,8 @@ class MPSContainer : public WavefunctionContainer {
    * @param orthogonality_center Optional site containing the orthogonality
    * center. Sites on either side must be left- and right-normalized,
    * respectively.
-   * @param physical_basis Optional one-orbital configurations for the physical
-   * slices at each site.
+   * @param physical_basis Optional one-orbital configurations defining the
+   *        physical-slice order shared by every site.
    * @param site_to_orbital_order Unique molecular-orbital indices in MPS chain
    * order. The number of sites may be smaller than the orbital basis size.
    */
@@ -294,81 +193,6 @@ class MPSContainer : public WavefunctionContainer {
   std::optional<std::size_t> _orthogonality_center;
   std::vector<Configuration> _physical_basis;
   std::vector<std::size_t> _site_to_orbital_order;
-};
-
-/**
- * @brief Immutable Abelian block-sparse MPS wavefunction.
- *
- * Each site stores one symmetry-blocked matrix per local physical basis state.
- * Bond-sector extents are degeneracy dimensions, and dense conversion is a
- * direct assembly of those blocks in the declared sector order.
- */
-class AbelianMPSContainer : public MPSContainer {
- public:
-  using SitePtr = std::shared_ptr<const MPSSite>;
-
-  /**
-   * @brief Construct an Abelian block-sparse MPS wavefunction.
-   * @param sites MPS sites in chain order.
-   * @param orbitals Orbital basis associated with the MPS.
-   * @param total_num_particles Optional symmetry-blocked total particle count.
-   * @param active_num_particles Optional symmetry-blocked active particle
-   * count.
-   * @param orthogonality_center Optional site containing the orthogonality
-   * center. Defaults to zero for a right-canonical MPS.
-   * @param physical_basis Optional one-orbital configurations for the physical
-   * slices at each site.
-   * @param site_to_orbital_order Molecular-orbital indices in MPS chain order;
-   * defaults to identity ordering.
-   * @throws std::invalid_argument if common MPS metadata is invalid; a site is
-   * null; sites differ in physical dimension or scalar type; or adjacent bond
-   * spaces are incompatible.
-   */
-  AbelianMPSContainer(
-      std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-          total_num_particles = nullptr,
-      std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-          active_num_particles = nullptr,
-      std::optional<std::size_t> orthogonality_center = std::size_t{0},
-      std::vector<Configuration> physical_basis = {},
-      std::vector<std::size_t> site_to_orbital_order = {});
-
-  /**
-   * @brief Get the block-sparse sites in chain order.
-   * @return Immutable site pointers in chain order.
-   */
-  const std::vector<SitePtr>& sites() const { return _sites; }
-
-  /**
-   * @brief Copy this MPS container.
-   * @return A new container sharing the immutable site data and metadata.
-   */
-  std::unique_ptr<WavefunctionContainer> clone() const override;
-
-  /**
-   * @brief Get the number of sites in the MPS chain.
-   * @return Number of stored sites.
-   */
-  std::size_t num_sites() const override { return _sites.size(); }
-
-  /**
-   * @brief Get the largest total bond dimension in the MPS.
-   * @return Maximum left or right bond dimension across all sites.
-   */
-  std::size_t max_bond_dimension() const;
-
-  /**
-   * @brief Check whether the site tensors are complex-valued.
-   * @return True for complex-valued sites; false for real-valued sites.
-   */
-  bool is_complex() const override;
-
- private:
-  /** @brief Validate site consistency and adjacent bond compatibility. */
-  void _validate() const;
-
-  std::vector<SitePtr> _sites;
 };
 
 }  // namespace qdk::chemistry::data

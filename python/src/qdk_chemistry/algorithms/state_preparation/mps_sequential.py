@@ -45,7 +45,7 @@ from qdk_chemistry._core.utils import (
     decompose_site_csd,
     decompose_unitary_to_givens,
 )
-from qdk_chemistry.data import AbelianMPSContainer, MPSSite
+from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -108,39 +108,40 @@ class MPSSequentialStatePreparation(StatePreparation):
         """
         return "mps_sequential"
 
-    def _run_impl(self, wavefunction: AbelianMPSContainer) -> Circuit:
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Return a circuit to prepare an MPS state.
 
         Args:
-            wavefunction: An AbelianMPSContainer containing the tensors.
+            wavefunction: The wavefunction to prepare.
 
         Returns:
             A Circuit object implementing the MPS state preparation.
 
         Raises:
-            TypeError: If wavefunction is not an AbelianMPSContainer instance.
+            TypeError: If wavefunction is not an MPSContainer instance.
 
         """
-        if not isinstance(wavefunction, AbelianMPSContainer):
-            raise TypeError(f"MPSSequentialStatePreparation requires an AbelianMPSContainer, got {type(wavefunction)}.")
-        if wavefunction.is_complex:
+        container = wavefunction.get_container()
+        if not isinstance(container, MPSContainer):
+            raise TypeError(f"MPSSequentialStatePreparation requires an MPSContainer, got {type(container)}.")
+        if container.is_complex:
             raise ValueError("MPS sequential state preparation currently supports only real-valued MPS tensors.")
 
         fast_re = self._settings.get("fast_resource_estimation")
         fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")
 
-        if wavefunction.physical_dimension != 4:
+        if container.physical_dimension != 4:
             raise ValueError("MPS sequential state preparation requires four physical states per site.")
-        if wavefunction.orthogonality_center != 0:
+        if container.orthogonality_center != 0:
             raise ValueError("MPS sequential state preparation requires a right-canonical MPS with center zero.")
-        num_orbitals = wavefunction.orbitals.get_num_molecular_orbitals()
-        if wavefunction.num_sites != num_orbitals:
+        num_orbitals = container.orbitals.get_num_molecular_orbitals()
+        if container.num_sites != num_orbitals:
             raise ValueError("MPS sequential state preparation requires exactly one MPS site per molecular orbital.")
-        data = generate_mps_preparation_data(wavefunction.sites, fast_resource_estimation=fast_re or fast_grouped_re)
+        data = generate_mps_preparation_data(container.sites, fast_resource_estimation=fast_re or fast_grouped_re)
 
         rotation_bits = self._settings.get("rotation_bits")
 
-        site_to_orbital_order = wavefunction.site_to_orbital_order
+        site_to_orbital_order = container.site_to_orbital_order
         if fast_re or fast_grouped_re:
             params = data.to_qsharp_params_grouped(rotation_bits, site_to_orbital_order)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
@@ -191,7 +192,7 @@ class GivensLayerData:
 class SiteUnitaryData:
     r"""Decomposition data for a single MPS site unitary.
 
-    Holds the 7-matrix Cosine-Sine Decomposition(CSD) from Appendix B of
+    Holds the seven-matrix Cosine-Sine Decomposition (CSD) from Appendix B of
     :cite:`Rupprecht2026` and the Givens-layer synthesis of each component.
 
     The circuit applies these components in order (see Fig. 5 of the paper)::
@@ -382,7 +383,7 @@ class MPSPreparationData:
 
 
 def generate_mps_preparation_data(
-    tensors: Sequence[np.ndarray | MPSSite],
+    tensors: Sequence[np.ndarray | AbelianMPSSite],
     fast_resource_estimation: bool = False,
 ) -> MPSPreparationData:
     """Compute all data needed for the MPSSequential Q# operation.
@@ -393,12 +394,14 @@ def generate_mps_preparation_data(
 
     Parameters
     ----------
-    tensors : sequence of np.ndarray
-        MPS tensors. ``tensors[i]`` has shape ``(chi_left, d, chi_right)``.
+    tensors : sequence of np.ndarray or AbelianMPSSite
+        MPS sites. Array inputs have shape ``(chi_left, d, chi_right)`` and are
+        wrapped as unsymmetrized sites; AbelianMPSSite inputs retain their existing
+        symmetry-blocked representation before dense decomposition.
     fast_resource_estimation : bool
-        If True, for each unitary of a certain shapes, only decompose a single
-        representative site unitary and replicate its data for all sites.
-        This is valid for resource estimation but NOT for simulation.
+        If True, decompose one representative for each unitary shape and reuse
+        its data for all sites in that shape group. This is valid for resource
+        estimation but not for simulation.
 
     Returns
     -------
@@ -407,7 +410,9 @@ def generate_mps_preparation_data(
         to flatten into the dict expected by the Q# operation.
 
     """
-    mps_sites = [tensor if isinstance(tensor, MPSSite) else MPSSite.from_dense(tensor) for tensor in tensors]
+    mps_sites = [
+        tensor if isinstance(tensor, AbelianMPSSite) else AbelianMPSSite.from_dense(tensor) for tensor in tensors
+    ]
     if not mps_sites:
         raise ValueError("MPS sequential state preparation requires at least one site.")
     if any(site.is_complex for site in mps_sites):

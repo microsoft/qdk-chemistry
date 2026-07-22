@@ -23,16 +23,16 @@ from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
 )
 from qdk_chemistry.data import (
     AbelianMPSContainer,
+    AbelianMPSSite,
     Configuration,
     MPSContainer,
-    MPSSite,
     Wavefunction,
     WavefunctionContainer,
 )
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
-from .mps_test_utils import contract_mps, make_mps, random_mps
-from .test_helpers import create_test_orbitals
+from .mps_test_utils import contract_mps, make_mps, random_mps, right_normalized_mps
+from .test_helpers import create_test_orbitals, create_test_wavefunction
 
 
 class TestAbelianMPSContainer:
@@ -48,7 +48,7 @@ class TestAbelianMPSContainer:
 
     def test_flattened_chemistry_properties(self):
         """Test that chemistry properties are exposed directly on the wavefunction."""
-        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
         mps = AbelianMPSContainer([site], create_test_orbitals(1))
 
         assert isinstance(mps, WavefunctionContainer)
@@ -62,7 +62,7 @@ class TestAbelianMPSContainer:
 
     def test_metadata_is_stored_directly(self):
         """Test that MPS metadata is exposed directly on the container."""
-        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
         physical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
         mps = AbelianMPSContainer(
             [site],
@@ -93,7 +93,7 @@ class TestAbelianMPSContainer:
         tensor[1, 1, 1] = 1.0
         mps = make_mps([tensor])
 
-        assert isinstance(mps.sites[0], MPSSite)
+        assert isinstance(mps.sites[0], AbelianMPSSite)
         assert len(mps.sites[0].physical_slices) == 4
         assert all(issparse(value) for value in mps.sites[0].physical_slices)
         assert np.array_equal(mps.sites[0].to_dense(), tensor)
@@ -101,7 +101,7 @@ class TestAbelianMPSContainer:
     def test_from_dense_preserves_complex_amplitudes(self):
         """Generic dense construction dispatches to complex storage when needed."""
         tensor = np.array([[[1.0j], [0.0], [0.0], [0.0]]])
-        site = MPSSite.from_dense(tensor)
+        site = AbelianMPSSite.from_dense(tensor)
 
         assert site.is_complex
         assert np.array_equal(site.to_dense(), tensor)
@@ -112,7 +112,7 @@ class TestAbelianMPSContainer:
             AbelianMPSContainer([], create_test_orbitals(1))
 
         with pytest.raises(ValueError, match="incorrect number of dimensions"):
-            MPSSite.from_dense(np.zeros((4, 4)))
+            AbelianMPSSite.from_dense(np.zeros((4, 4)))
 
     def test_bond_dim_consistency(self):
         """Test that inconsistent bond dimensions are caught."""
@@ -306,10 +306,15 @@ class TestGenerateMPSPreparationData:
 class TestMPSSequentialPublicApi:
     """Test public algorithm validation and circuit construction."""
 
+    def test_run_requires_mps_container(self):
+        """Public run accepts Wavefunction and rejects a non-MPS container."""
+        with pytest.raises(TypeError, match="requires an MPSContainer"):
+            MPSSequentialStatePreparation().run(create_test_wavefunction())
+
     def test_run_constructs_composable_circuit(self):
         """Public run resolves both the estimator entry point and composable Q# operation."""
         mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        circuit = MPSSequentialStatePreparation().run(mps)
+        circuit = MPSSequentialStatePreparation().run(Wavefunction(mps))
 
         assert circuit._qsharp_op is not None
 
@@ -318,17 +323,17 @@ class TestMPSSequentialPublicApi:
         source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
         mps = AbelianMPSContainer(source.sites, source.orbitals, site_to_orbital_order=[1, 0])
 
-        circuit = MPSSequentialStatePreparation().run(mps)
+        circuit = MPSSequentialStatePreparation().run(Wavefunction(mps))
 
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [1, 0]
 
     def test_run_requires_one_site_per_orbital(self):
         """State preparation rejects an MPS that covers only an orbital subset."""
-        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
         mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
 
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
-            MPSSequentialStatePreparation().run(mps)
+            MPSSequentialStatePreparation().run(Wavefunction(mps))
 
     @pytest.mark.parametrize("orthogonality_center", [1, None])
     def test_run_requires_right_canonical_mps(self, orthogonality_center):
@@ -342,7 +347,7 @@ class TestMPSSequentialPublicApi:
         )
 
         with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
-            MPSSequentialStatePreparation().run(mps)
+            MPSSequentialStatePreparation().run(Wavefunction(mps))
 
     def test_mps_and_base_callables_share_context(self):
         """Loading either utility namespace does not invalidate retained Q# callables."""
@@ -781,7 +786,7 @@ class TestMPSSequentialQualtranFidelity:
     )
     def test_contract_matches_expected_state(self, tensors, expected_state):
         """Verify MPS contraction produces the Qualtran expected state vector."""
-        mps = make_mps(tensors)
+        mps = make_mps(tensors, orthogonality_center=None)
         contracted = contract_mps(mps)
         # Use atol=1e-3: non-zero spin tensors are not perfectly canonical,
         # so raw contraction has O(1e-4) leakage. Fidelity is still > 0.9999.
@@ -801,7 +806,7 @@ class TestMPSSequentialQualtranCostComparison:
     )
     def test_prepare_gate_based_data_produces_valid_output(self, tensors, expected_num_sites, min_ancilla_bits):
         """Verify generate_mps_preparation_data succeeds on Qualtran tensors."""
-        mps = make_mps(tensors)
+        mps = right_normalized_mps(tensors)
         data = generate_mps_preparation_data(mps.sites)
 
         assert data.num_sites == expected_num_sites
@@ -824,9 +829,9 @@ class TestMPSSequentialQualtranCostComparison:
     @pytest.mark.slow
     def test_resource_estimate_qubit_count(self, tensors, qualtran_cost):
         """Verify Q# resource estimate qubit count is consistent with Qualtran."""
-        mps = make_mps(tensors)
+        mps = right_normalized_mps(tensors)
         algo = MPSSequentialStatePreparation()
-        circuit = algo.run(mps)
+        circuit = algo.run(Wavefunction(mps))
         result = circuit.estimate()
         counts = result.logical_counts
 
@@ -845,9 +850,9 @@ class TestMPSSequentialQualtranCostComparison:
     @pytest.mark.slow
     def test_resource_estimate_toffoli_count(self, tensors, qualtran_cost):
         """Verify Q# resource estimate Toffoli count is consistent with Qualtran."""
-        mps = make_mps(tensors)
+        mps = right_normalized_mps(tensors)
         algo = MPSSequentialStatePreparation()
-        circuit = algo.run(mps)
+        circuit = algo.run(Wavefunction(mps))
         result = circuit.estimate()
         counts = result.logical_counts
 
@@ -868,18 +873,18 @@ class TestMPSSequentialFastEstimation:
     )
     def test_fast_vs_normal_resource_estimates(self, tensors):
         """Verify fast estimation produces similar qubit and Toffoli counts as normal mode."""
-        mps = make_mps(tensors)
+        mps = right_normalized_mps(tensors)
 
         # Normal mode (full CSD decomposition per site)
         algo_normal = MPSSequentialStatePreparation()
-        circuit_normal = algo_normal.run(mps)
+        circuit_normal = algo_normal.run(Wavefunction(mps))
         result_normal = circuit_normal.estimate()
         counts_normal = result_normal.logical_counts
 
         # Fast mode (one representative per shape group)
         algo_fast = MPSSequentialStatePreparation()
         algo_fast.settings().update("fast_resource_estimation", True)
-        circuit_fast = algo_fast.run(mps)
+        circuit_fast = algo_fast.run(Wavefunction(mps))
         result_fast = circuit_fast.estimate()
         counts_fast = result_fast.logical_counts
 
@@ -912,13 +917,13 @@ class TestMPSSequentialFastEstimation:
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
 
         algo_normal = MPSSequentialStatePreparation()
-        circuit_normal = algo_normal.run(mps)
+        circuit_normal = algo_normal.run(Wavefunction(mps))
         result_normal = circuit_normal.estimate()
         counts_normal = result_normal.logical_counts
 
         algo_fast = MPSSequentialStatePreparation()
         algo_fast.settings().update("fast_resource_estimation", True)
-        circuit_fast = algo_fast.run(mps)
+        circuit_fast = algo_fast.run(Wavefunction(mps))
         result_fast = circuit_fast.estimate()
         counts_fast = result_fast.logical_counts
 
@@ -952,6 +957,7 @@ def _build_mps_eval_code(params: dict) -> str:
     args = [
         f"[{initial_state_str}]",
         str(params["numSites"]),
+        str(params["siteToOrbitalOrder"]).replace(" ", ""),
         str(params["rotationBits"]),
         _nested_list_to_qsharp_3d(params["siteVLayerAngles"]),
         _nested_list_to_qsharp_2d_bool(params["siteVLayerShifted"]),
