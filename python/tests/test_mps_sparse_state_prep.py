@@ -26,9 +26,11 @@ from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
 )
+from qdk_chemistry.data import AbelianMPSContainer, MPSSite
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .mps_test_utils import contract_mps, make_mps, random_mps
+from .test_helpers import create_test_orbitals
 
 # =============================================================================
 # Qualtran reference data (from test_mps_sequential_state_prep.py)
@@ -339,6 +341,37 @@ class TestGenerateMPSSparsePreparationData:
 
         assert circuit._qsharp_op is not None
 
+    def test_run_propagates_site_to_orbital_order(self):
+        """Circuit parameters place MPS sites on their molecular-orbital qubits."""
+        source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
+        mps = AbelianMPSContainer(source.sites, source.orbitals, site_to_orbital_order=[1, 0])
+
+        circuit = MPSSparseStatePreparation().run(mps)
+
+        assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [1, 0]
+
+    def test_run_requires_one_site_per_orbital(self):
+        """State preparation rejects an MPS that covers only an orbital subset."""
+        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
+
+        with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
+            MPSSparseStatePreparation().run(mps)
+
+    @pytest.mark.parametrize("orthogonality_center", [1, None])
+    def test_run_requires_right_canonical_mps(self, orthogonality_center):
+        """State preparation rejects mixed or unspecified canonicalization."""
+        tensor = np.array([[[1.0], [0.0], [0.0], [0.0]]])
+        source = make_mps([tensor, tensor])
+        mps = AbelianMPSContainer(
+            source.sites,
+            source.orbitals,
+            orthogonality_center=orthogonality_center,
+        )
+
+        with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
+            MPSSparseStatePreparation().run(mps)
+
     @pytest.mark.parametrize("rotation_bits", [1, 63])
     def test_rejects_unsupported_rotation_precision(self, rotation_bits):
         """Settings reject precision values that Q# cannot execute safely."""
@@ -367,6 +400,7 @@ class TestGenerateMPSSparsePreparationData:
         expected_keys = {
             "initialStateVec",
             "numSites",
+            "siteToOrbitalOrder",
             "rotationBits",
             "numAncillaQubits",
             "siteColPermTargets",
@@ -379,6 +413,7 @@ class TestGenerateMPSSparsePreparationData:
         }
         assert set(params.keys()) == expected_keys
         assert params["numSites"] == 4
+        assert params["siteToOrbitalOrder"] == [0, 1, 2, 3]
         assert params["rotationBits"] == 10
         assert len(params["siteColPermTargets"]) == 3
         assert len(params["siteRowPermTargets"]) == 3
@@ -427,7 +462,7 @@ class TestMPSSparseQSharpFidelity:
         target_state = contract_mps(mps)
 
         data = generate_mps_sparse_preparation_data(mps.sites)
-        params = data.to_qsharp_params(rotation_bits=10)
+        params = data.to_qsharp_params(rotation_bits=6)
 
         num_state_qubits = 2 * num_sites
         num_ancilla_qubits = data.ancilla_bits
@@ -461,7 +496,7 @@ class TestMPSSparseQSharpFidelity:
         target_state = _qualtran_mps_expected_state
 
         data = generate_mps_sparse_preparation_data(mps.sites)
-        params = data.to_qsharp_params(rotation_bits=10)
+        params = data.to_qsharp_params(rotation_bits=6)
 
         num_sites = 4
         num_state_qubits = 2 * num_sites

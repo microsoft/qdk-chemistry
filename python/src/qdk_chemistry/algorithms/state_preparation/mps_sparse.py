@@ -39,14 +39,12 @@ if TYPE_CHECKING:
 import numpy as np
 from scipy.sparse import csc_array, vstack
 
+from qdk_chemistry._core.utils import decompose_sparse_site
 from qdk_chemistry.data import AbelianMPSContainer, MPSSite
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .mps_sequential import (
-    GivensLayerData,
-    decompose_block_diagonal_to_givens,
-)
+from .mps_sequential import GivensLayerData
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [
@@ -107,9 +105,17 @@ class MPSSparseStatePreparation(StatePreparation):
 
         if wavefunction.physical_dimension != 4:
             raise ValueError("Sparse MPS state preparation requires four physical states per site.")
+        if wavefunction.orthogonality_center != 0:
+            raise ValueError("Sparse MPS state preparation requires a right-canonical MPS with center zero.")
+        num_orbitals = wavefunction.orbitals.get_num_molecular_orbitals()
+        if wavefunction.num_sites != num_orbitals:
+            raise ValueError("Sparse MPS state preparation requires exactly one MPS site per molecular orbital.")
         data = generate_mps_sparse_preparation_data(wavefunction.sites)
         rotation_bits = self._settings.get("rotation_bits")
-        params = data.to_qsharp_params(rotation_bits)
+        params = data.to_qsharp_params(
+            rotation_bits,
+            wavefunction.site_to_orbital_order,
+        )
         program = QSHARP_UTILS.MPSSparse.MakeMPSSparseCircuit
 
         qsharp_factory = QsharpFactoryData(
@@ -174,13 +180,19 @@ class MPSSparsePreparationData:
     sites: list[SparseSiteUnitaryData] = field(default_factory=list)
     """Per-site decomposition data (one entry per site 1..num_sites-1)."""
 
-    def to_qsharp_params(self, rotation_bits: int) -> dict:
+    def to_qsharp_params(
+        self,
+        rotation_bits: int,
+        site_to_orbital_order: list[int] | None = None,
+    ) -> dict:
         """Flatten into the dict expected by the MakeMPSSparseCircuit Q# operation."""
         d = 4  # physical dimension (2-qubit site register)
         ancilla_dim = 1 << self.ancilla_bits
+        site_to_orbital_order = list(range(self.num_sites)) if site_to_orbital_order is None else site_to_orbital_order
         return {
             "initialStateVec": self.initial_state_vec,
             "numSites": self.num_sites,
+            "siteToOrbitalOrder": site_to_orbital_order,
             "rotationBits": rotation_bits,
             "numAncillaQubits": self.ancilla_bits,
             "siteColPermTargets": [
@@ -313,49 +325,29 @@ def _decompose_sparse_site(tensor: np.ndarray | MPSSite, ancilla_dim: int) -> Sp
     # Target matrix has shape (4*dim, chi_left) with columns = bond states
     target_matrix = _tensor_to_target_matrix(tensor, ancilla_dim)
 
-    # Step 1: Extract rectangles and row permutation
-    rectangles, row_perm = _get_rectangles_and_row_permutation(target_matrix)
-    row_perm = _pad_permutation(row_perm, active_dim)
-
-    # Step 2: Find column permutation to make rectangles square
-    col_perm = _find_column_permutation(rectangles, active_dim)
-
-    # Step 3: Expand rectangles to unitaries
-    blocks = [_expand_to_unitary(rect) for rect in rectangles]
-
-    # Pad with 1x1 identity blocks to fill remaining space
-    used_dim = sum(b.shape[0] for b in blocks)
-    remaining = active_dim - used_dim
-    blocks += [np.eye(1)] * remaining
-
-    # Step 4: Order blocks by size (largest first)
-    # Returns inverted ordering permutation and sorted blocks
-    ordering_perm, blocks = _order_blocks(blocks, active_dim)
-
-    col_composed = [col_perm[ordering_perm[i]] for i in range(active_dim)]
-    col_perm_final = _invert_perm(col_composed)
-    row_perm_final = [row_perm[ordering_perm[i]] for i in range(active_dim)]
-
-    # Step 5: Decompose block-diagonal into Givens layers
-    block_angles, block_shifted, block_phases = decompose_block_diagonal_to_givens(blocks)
+    (
+        col_perm_final,
+        col_inv_perm_final,
+        row_perm_final,
+        row_inv_perm_final,
+        block_angles,
+        block_shifted,
+        block_phases,
+    ) = decompose_sparse_site(target_matrix.toarray())
     block_givens = GivensLayerData(
         layer_angles=block_angles,
-        layer_shifted=block_shifted,
-        phases=block_phases,
+        layer_shifted=[bool(value) for value in block_shifted],
+        phases=[bool(value) for value in block_phases],
     )
-
-    # Compute inverse permutations for measurement-based unlookup
-    col_inv_perm_final = _invert_perm(col_perm_final)
-    row_inv_perm_final = _invert_perm(row_perm_final)
 
     # Number of bits in the target register (site + ancilla)
     target_bits = int(np.log2(active_dim))
 
     return SparseSiteUnitaryData(
-        col_perm_targets=col_perm_final,
-        col_inv_perm_targets=col_inv_perm_final,
-        row_perm_targets=row_perm_final,
-        row_inv_perm_targets=row_inv_perm_final,
+        col_perm_targets=list(col_perm_final),
+        col_inv_perm_targets=list(col_inv_perm_final),
+        row_perm_targets=list(row_perm_final),
+        row_inv_perm_targets=list(row_inv_perm_final),
         block_givens=block_givens,
         target_bits=target_bits,
     )

@@ -12,19 +12,18 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 import numpy as np
 import pytest
 from qdk import qsharp
+from qdk_chemistry._core.utils import decompose_2d, decompose_unitary_to_givens
 from scipy.sparse import issparse
 
 import qdk_chemistry.data as chemistry_data
 from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
     MPSSequentialStatePreparation,
     compute_site_unitary_dense_data,
-    decompose_2d,
-    decompose_unitary_to_givens,
     generate_mps_preparation_data,
 )
 from qdk_chemistry.data import (
     AbelianMPSContainer,
-    MPSCanonicalForm,
+    Configuration,
     MPSContainer,
     MPSSite,
     Wavefunction,
@@ -49,7 +48,7 @@ class TestAbelianMPSContainer:
 
     def test_flattened_chemistry_properties(self):
         """Test that chemistry properties are exposed directly on the wavefunction."""
-        site = MPSSite.from_dense(np.ones((1, 4, 1)))
+        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
         mps = AbelianMPSContainer([site], create_test_orbitals(1))
 
         assert isinstance(mps, WavefunctionContainer)
@@ -57,25 +56,27 @@ class TestAbelianMPSContainer:
         assert isinstance(mps, AbelianMPSContainer)
         assert mps.total_num_particles is None
         assert mps.active_num_particles is None
+        assert not hasattr(mps, "discarded_weight")
+        assert mps.site_to_orbital_order == [0]
         assert Wavefunction(mps).get_container_type() == "mps"
 
     def test_metadata_is_stored_directly(self):
         """Test that MPS metadata is exposed directly on the container."""
-        site = MPSSite.from_dense(np.ones((1, 4, 1)))
-        physical_basis = ["empty", "alpha", "beta", "alpha_beta"]
+        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        physical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
         mps = AbelianMPSContainer(
             [site],
             create_test_orbitals(1),
-            canonical_form=MPSCanonicalForm.Mixed,
-            canonical_center=0,
-            discarded_weight=1e-8,
+            orthogonality_center=0,
             physical_basis=physical_basis,
+            site_to_orbital_order=[0],
         )
 
-        assert mps.canonical_form == MPSCanonicalForm.Mixed
-        assert mps.canonical_center == 0
-        assert mps.discarded_weight == 1e-8
+        assert mps.orthogonality_center == 0
+        assert not hasattr(mps, "canonical_form")
+        assert not hasattr(mps, "discarded_weight")
         assert mps.physical_basis == physical_basis
+        assert mps.site_to_orbital_order == [0]
         assert not hasattr(chemistry_data, "MPSMetadata")
 
     def test_contract_normalized(self):
@@ -87,7 +88,9 @@ class TestAbelianMPSContainer:
 
     def test_stores_sparse_physical_slices_and_materializes_one_site(self):
         """Dense input is stored as sparse A^p matrices with a reversible site view."""
-        tensor = np.arange(24, dtype=float).reshape(2, 4, 3)
+        tensor = np.zeros((2, 4, 3))
+        tensor[0, 0, 0] = 1.0
+        tensor[1, 1, 1] = 1.0
         mps = make_mps([tensor])
 
         assert isinstance(mps.sites[0], MPSSite)
@@ -115,12 +118,44 @@ class TestAbelianMPSContainer:
         """Test that inconsistent bond dimensions are caught."""
         t1 = np.zeros((1, 4, 3))
         t2 = np.zeros((2, 4, 1))  # chi_left=2 doesn't match t1's chi_right=3
+        t1[0, 0, 0] = 1.0
+        t2[0, 0, 0] = 1.0
+        t2[1, 1, 0] = 1.0
         with pytest.raises(ValueError, match="incompatible bond spaces"):
             make_mps([t1, t2])
 
 
 class TestDecomposition:
     """Test that CSD reconstructs the target matrix."""
+
+    @staticmethod
+    def _reconstruct_givens(layer_angles, layer_shifted, phases):
+        """Reconstruct a real unitary from its serialized Q# Givens data."""
+        dim = len(phases)
+        result = np.eye(dim)
+        for angles, shifted in zip(layer_angles, layer_shifted, strict=True):
+            layer = np.eye(dim)
+            offset = 1 if shifted else 0
+            for slot, angle in enumerate(angles):
+                pair = offset + 2 * slot
+                cosine = np.cos(angle)
+                sine = np.sin(angle)
+                layer[pair : pair + 2, pair : pair + 2] = [[cosine, -sine], [sine, cosine]]
+            result = layer @ result
+        return np.diag(np.where(np.asarray(phases, dtype=bool), -1.0, 1.0)) @ result
+
+    @pytest.mark.parametrize("dim", [1, 2, 3, 4, 5, 8, 16])
+    def test_native_givens_reconstructs_source_unitary(self, dim):
+        """Native decomposition reconstructs the source unitary."""
+        rng = np.random.default_rng(1000 + dim)
+        matrix, _ = np.linalg.qr(rng.standard_normal((dim, dim)))
+
+        decomposition = decompose_unitary_to_givens(matrix)
+
+        assert np.allclose(self._reconstruct_givens(*decomposition), matrix, atol=1e-11)
+        assert len(decomposition[0]) == len(decomposition[1])
+        assert all(isinstance(value, bool) for value in decomposition[1])
+        assert all(isinstance(value, bool) for value in decomposition[2])
 
     @pytest.mark.parametrize(
         ("chi_left", "chi_right", "seed"),
@@ -278,6 +313,37 @@ class TestMPSSequentialPublicApi:
 
         assert circuit._qsharp_op is not None
 
+    def test_run_propagates_site_to_orbital_order(self):
+        """Circuit parameters place MPS sites on their molecular-orbital qubits."""
+        source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
+        mps = AbelianMPSContainer(source.sites, source.orbitals, site_to_orbital_order=[1, 0])
+
+        circuit = MPSSequentialStatePreparation().run(mps)
+
+        assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [1, 0]
+
+    def test_run_requires_one_site_per_orbital(self):
+        """State preparation rejects an MPS that covers only an orbital subset."""
+        site = MPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
+
+        with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
+            MPSSequentialStatePreparation().run(mps)
+
+    @pytest.mark.parametrize("orthogonality_center", [1, None])
+    def test_run_requires_right_canonical_mps(self, orthogonality_center):
+        """State preparation rejects mixed or unspecified canonicalization."""
+        tensor = np.array([[[1.0], [0.0], [0.0], [0.0]]])
+        source = make_mps([tensor, tensor])
+        mps = AbelianMPSContainer(
+            source.sites,
+            source.orbitals,
+            orthogonality_center=orthogonality_center,
+        )
+
+        with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
+            MPSSequentialStatePreparation().run(mps)
+
     def test_mps_and_base_callables_share_context(self):
         """Loading either utility namespace does not invalidate retained Q# callables."""
         from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
@@ -326,7 +392,7 @@ class TestMPSSequentialFidelity:
 
         # Prepare gate-based data
         prep_data = generate_mps_preparation_data(mps.sites)
-        params = prep_data.to_qsharp_params(rotation_bits=10)
+        params = prep_data.to_qsharp_params(rotation_bits=6)
         num_state_qubits = 2 * num_sites
         num_ancilla_qubits = prep_data.ancilla_bits
 
@@ -380,7 +446,8 @@ class TestMPSSequentialFidelity:
         # Compute quantum state fidelity |⟨target|prepared⟩|²
         fidelity = np.abs(np.dot(np.conj(state_amplitudes[: len(target_state)]), target_state)) ** 2
 
-        # Should achieve high fidelity with rotation_bits=10
+        # Six test bits keep statevector simulation small while retaining
+        # enough accuracy to detect synthesis regressions.
         assert fidelity > 0.95, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
 
 

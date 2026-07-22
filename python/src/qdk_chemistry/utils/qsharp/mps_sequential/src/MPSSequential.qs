@@ -19,6 +19,7 @@ export MPSSequentialParams, MPSSequentialGroupedParams, MPSSequential, MakeMPSSe
 struct MPSSequentialParams {
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteVLayerAngles : Double[][][],
@@ -41,6 +42,7 @@ struct MPSSequentialParams {
 struct MPSSequentialGroupedParams {
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteShapeIndices : Int[],
@@ -266,6 +268,7 @@ operation SiteUnitary(
 operation MPSSequential(
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     siteVLayerAngles : Double[][][],
     siteVLayerShifted : Bool[][],
@@ -293,14 +296,16 @@ operation MPSSequential(
     use angleReg = Qubit[rotationBits];
 
     // Prepare initial state
-    let initReg = ancilla + state[0..1];
+    let firstOrbital = siteToOrbitalOrder[0];
+    let initReg = ancilla + state[2 * firstOrbital..2 * firstOrbital + 1];
     QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
 
     // Apply site unitaries
     // All sites share the same circuit structure (same bond dimension / qubit counts),
     // so we cache the resource estimate from the first site and reuse it for the rest.
     for siteIdx in 0..numSites - 2 {
-        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let orbital = siteToOrbitalOrder[siteIdx + 1];
+        let newSite = state[2 * orbital..2 * orbital + 1];
         if BeginEstimateCaching("SiteUnitary", SingleVariant()) {
             SiteUnitary(
                 siteVLayerAngles[siteIdx],
@@ -337,6 +342,7 @@ operation ApplyMPSSequential(params : MPSSequentialParams, state : Qubit[]) : Un
     MPSSequential(
         params.initialStateVec,
         params.numSites,
+        params.siteToOrbitalOrder,
         params.rotationBits,
         params.siteVLayerAngles,
         params.siteVLayerShifted,
@@ -366,6 +372,7 @@ function MakeMPSSequentialOp(params : MPSSequentialParams) : Qubit[] => Unit {
 operation MakeMPSSequentialCircuit(
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteVLayerAngles : Double[][][],
@@ -389,6 +396,7 @@ operation MakeMPSSequentialCircuit(
     MPSSequential(
         initialStateVec,
         numSites,
+        siteToOrbitalOrder,
         rotationBits,
         siteVLayerAngles,
         siteVLayerShifted,
@@ -426,6 +434,7 @@ operation MakeMPSSequentialCircuit(
 operation MakeMPSSequentialCircuitGrouped(
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteShapeIndices : Int[],
@@ -457,14 +466,16 @@ operation MakeMPSSequentialCircuitGrouped(
     use angleReg = Qubit[rotationBits];
 
     // Prepare initial state (uses full ancilla)
-    let initReg = ancilla + state[0..1];
+    let firstOrbital = siteToOrbitalOrder[0];
+    let initReg = ancilla + state[2 * firstOrbital..2 * firstOrbital + 1];
     QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
 
     // Apply site unitaries — each site uses data for its shape group.
     // BeginEstimateCaching with the shape index ensures accurate per-shape costing:
     // sites with the same effective dimension share a cached cost.
     for siteIdx in 0..numSites - 2 {
-        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let orbital = siteToOrbitalOrder[siteIdx + 1];
+        let newSite = state[2 * orbital..2 * orbital + 1];
         let shapeIdx = siteShapeIndices[siteIdx];
         let effectiveBits = shapeEffectiveBits[shapeIdx];
         if BeginEstimateCaching("SiteUnitary", shapeIdx) {
@@ -504,11 +515,13 @@ operation ApplyMPSSequentialGrouped(params : MPSSequentialGroupedParams, state :
     PreparePhaseGradientState(phaseGradient);
     use angleReg = Qubit[params.rotationBits];
 
-    let initReg = ancilla + state[0..1];
+    let firstOrbital = params.siteToOrbitalOrder[0];
+    let initReg = ancilla + state[2 * firstOrbital..2 * firstOrbital + 1];
     QroamStatePrep(params.initialStateVec, Reversed(initReg), phaseGradient, angleReg);
 
     for siteIdx in 0..params.numSites - 2 {
-        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let orbital = params.siteToOrbitalOrder[siteIdx + 1];
+        let newSite = state[2 * orbital..2 * orbital + 1];
         let shapeIdx = params.siteShapeIndices[siteIdx];
         let effectiveBits = params.shapeEffectiveBits[shapeIdx];
         SiteUnitary(

@@ -19,6 +19,7 @@ export MPSSparseParams, MPSSparse, MakeMPSSparseOp, MakeMPSSparseCircuit, Sparse
 struct MPSSparseParams {
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteColPermTargets : Bool[][][],
@@ -174,6 +175,7 @@ operation SparseSiteUnitary(
 operation MPSSparse(
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     siteColPermTargets : Bool[][][],
     siteColInvPermTargets : Bool[][][],
@@ -193,12 +195,14 @@ operation MPSSparse(
     use angleReg = Qubit[rotationBits];
 
     // Prepare initial state
-    let initReg = ancilla + state[0..1];
+    let firstOrbital = siteToOrbitalOrder[0];
+    let initReg = ancilla + state[2 * firstOrbital..2 * firstOrbital + 1];
     QroamStatePrep(initialStateVec, Reversed(initReg), phaseGradient, angleReg);
 
     // Apply sparse site unitaries
     for siteIdx in 0..numSites - 2 {
-        let newSite = state[2 * (siteIdx + 1)..2 * (siteIdx + 1) + 1];
+        let orbital = siteToOrbitalOrder[siteIdx + 1];
+        let newSite = state[2 * orbital..2 * orbital + 1];
         SparseSiteUnitary(
             siteColPermTargets[siteIdx],
             siteColInvPermTargets[siteIdx],
@@ -224,6 +228,7 @@ operation ApplyMPSSparse(params : MPSSparseParams, state : Qubit[]) : Unit {
     MPSSparse(
         params.initialStateVec,
         params.numSites,
+        params.siteToOrbitalOrder,
         params.rotationBits,
         params.siteColPermTargets,
         params.siteColInvPermTargets,
@@ -245,6 +250,7 @@ function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
 operation MakeMPSSparseCircuit(
     initialStateVec : Double[],
     numSites : Int,
+    siteToOrbitalOrder : Int[],
     rotationBits : Int,
     numAncillaQubits : Int,
     siteColPermTargets : Bool[][][],
@@ -260,6 +266,7 @@ operation MakeMPSSparseCircuit(
     MPSSparse(
         initialStateVec,
         numSites,
+        siteToOrbitalOrder,
         rotationBits,
         siteColPermTargets,
         siteColInvPermTargets,

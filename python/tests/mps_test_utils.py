@@ -44,6 +44,7 @@ def random_mps(
         previous_left, previous_physical, _ = tensors[site - 1].shape
         previous = tensors[site - 1].reshape(previous_left * previous_physical, chi_left)
         tensors[site - 1] = (previous @ r_matrix.T).reshape(previous_left, previous_physical, chi_left)
+    tensors[0] /= np.linalg.norm(tensors[0])
     return make_mps(tensors)
 
 
