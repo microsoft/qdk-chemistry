@@ -312,7 +312,7 @@ def test_qpe_stretched_n2():
     _execute_notebook_skip_visualizations(
         notebook_path,
         cell_patches={
-            31: {
+            34: {
                 "NUM_TRIALS = 20": "NUM_TRIALS = 3",
             },
         },
