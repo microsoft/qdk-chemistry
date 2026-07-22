@@ -48,7 +48,7 @@ def _require_adaptive_profile() -> None:
             "and classical feedback (e.g. Adaptive_RI), but the active profile is 'Base'. "
             "Set an adaptive profile before importing qdk_chemistry, e.g. "
             "`import qsharp; qsharp.init(target_profile=qsharp.TargetProfile.Adaptive_RI)`, "
-            "or use the default per-bit IQPE (single_circuit=False)."
+            "or use the default per-bit IQPE (combine_iterations=False)."
         )
 
 
@@ -63,7 +63,7 @@ class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "num_iteration", "int", -1, "The specific iteration to build. Default to -1 to build all iterations."
         )
         self._set_default(
-            "single_circuit",
+            "combine_iterations",
             "bool",
             False,
             "Build the full IQPE as one circuit with in-circuit classical feedback (needs an Adaptive target).",
@@ -83,7 +83,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         num_bits: int = -1,
         phase_correction: float = 0.0,
         num_iteration: int = -1,
-        single_circuit: bool = False,
+        combine_iterations: bool = False,
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
     ):
@@ -93,7 +93,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
-            single_circuit: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
+            combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
 
@@ -104,7 +104,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
         self._settings.set("num_iteration", num_iteration)
-        self._settings.set("single_circuit", single_circuit)
+        self._settings.set("combine_iterations", combine_iterations)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if controlled_circuit_mapper is not None:
@@ -120,7 +120,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         Uses settings ``phase_correction`` (default 0.0) and ``num_iteration``
         (default -1). When ``num_iteration`` is negative, all iteration circuits
         are returned. When positive, only the circuit for that single iteration
-        (0-based) is returned. When ``single_circuit`` is True, a single circuit
+        (0-based) is returned. When ``combine_iterations`` is True, a single circuit
         implementing the full IQPE with in-circuit classical feedback is returned
         (``phase_correction`` and ``num_iteration`` are ignored in that mode).
 
@@ -131,7 +131,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
             list when ``num_iteration`` is set to a specific iteration index, or when
-            ``single_circuit`` is enabled).
+            ``combine_iterations`` is enabled).
 
         Raises:
             ValueError: If ``num_iteration`` >= ``num_bits``.
@@ -141,7 +141,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
-        if self.settings().get("single_circuit"):
+        if self.settings().get("combine_iterations"):
             circuit = self._create_full_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,

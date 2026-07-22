@@ -105,7 +105,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Full single-circuit IQPE with in-circuit classical feedback (Adaptive-profile targets).
         builder_settings = circuit_builder.settings()
         builder_keys = builder_settings.keys()
-        if "single_circuit" in builder_keys and builder_settings.get("single_circuit"):
+        if "combine_iterations" in builder_keys and builder_settings.get("combine_iterations"):
             return self._run_single_circuit(
                 circuit_builder=circuit_builder,
                 circuit_executor=circuit_executor,
@@ -174,7 +174,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         frequent bitstring is decoded as ``int(bitstring_msb_first, 2) / 2**num_bits``.
 
         Args:
-            circuit_builder: The iterative circuit builder configured with ``single_circuit`` enabled.
+            circuit_builder: The iterative circuit builder configured with ``combine_iterations`` enabled.
             circuit_executor: The circuit executor used to run the circuit.
             state_preparation: The state preparation circuit.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
