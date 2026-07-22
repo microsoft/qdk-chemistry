@@ -78,6 +78,7 @@ class AzureQuantumEmulatorSettings(Settings):
         )
         self._set_default("job_name", "string", "qdk-chemistry-azure-quantum-emulator", "Name for the submitted job")
         self._set_default("timeout_secs", "int", 3600, "Maximum seconds to wait for job completion")
+        self._set_default("input_params", "string", "{}", "Additional input parameters for the job submission")
 
 
 class AzureQuantumEmulator(CircuitExecutor):
@@ -173,6 +174,7 @@ class AzureQuantumEmulator(CircuitExecutor):
             output_data_format="microsoft.quantum-results.v2",
             input_params={
                 "emulationSettings": emulation_settings,
+                **json.loads(self._settings.get("input_params")),
             },
         )
         Logger.debug(f"Job submitted: {job.id}")

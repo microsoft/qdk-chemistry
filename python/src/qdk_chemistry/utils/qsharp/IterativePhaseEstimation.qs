@@ -119,11 +119,10 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         };
         let allTargets = system + ancillas;
 
-        statePrep(system);
-
         mutable results = [Zero, size = numBits];
 
         for k in 0..numBits - 1 {
+            statePrep(system);
             let rep = 2^(numBits - 1 - k);
             // Compute accumulated phase correction from previously measured bits.
             mutable accumulatePhase = 0.0;
@@ -143,9 +142,9 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             }
 
             set results w/= k <- MResetZ(phase);
+            ResetAll(allTargets);
         }
 
-        ResetAll(allTargets);
         return results;
     }
 }
