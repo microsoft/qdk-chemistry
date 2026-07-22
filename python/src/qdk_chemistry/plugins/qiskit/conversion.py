@@ -19,7 +19,10 @@ if TYPE_CHECKING:
     from qiskit import QuantumCircuit
 
     from qdk_chemistry import data
-    from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionOp
+    from qdk_chemistry.data._binary_encoding_utils import MatrixCompressionOp
+
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 
 __all__ = ["apply_matrix_compression_ops", "create_statevector_from_wavefunction"]
 
@@ -30,20 +33,23 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     This function converts a QDK Chemistry wavefunction into a dense statevector
     representation suitable for use with Qiskit quantum circuit simulators.
 
-    For standard chemistry wavefunctions (2 bits per mode), the encoding uses a
-    little-endian qubit ordering convention where each spatial orbital is mapped
-    to two qubits (one for alpha spin, one for beta spin).
+    The encoding uses a little-endian qubit ordering convention where each spatial
+    orbital is mapped to two qubits (one for alpha spin, one for beta spin):
+    - Lower qubits (0 to num_orbitals-1): alpha spin orbitals
+    - Upper qubits (num_orbitals to 2*num_orbitals-1): beta spin orbitals
 
-    For generic wavefunctions (1 bit per mode), each mode maps directly to one
-    qubit using little-endian ordering.
+    Each determinant in the wavefunction is mapped to its corresponding basis state
+    index, and the wavefunction coefficient is placed at that index in the statevector.
 
     Args:
         wavefunction: The wavefunction to convert to statevector representation.
+            Must have a defined active space with the same number of alpha and
+            beta orbitals.
         normalize: Whether to normalize the resulting statevector to unit norm.
             Default is True.
 
     Returns:
-        numpy.ndarray: Dense complex statevector of size 2^num_qubits.
+        numpy.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals).
             The dtype is always complex128, even if the wavefunction has real
             coefficients.
 
@@ -55,30 +61,25 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
         >>> print(f"Statevector dimension: {len(sv_array)}")
 
     """
-    determinants = wavefunction.get_active_determinants()
-    config_set = wavefunction.get_configuration_set()
-    bits_per_mode = determinants[0].bits_per_mode()
-
-    if bits_per_mode == 1:
-        num_qubits = config_set.num_modes()
-    else:
-        orbitals = wavefunction.get_orbitals()
-        indices, _ = orbitals.get_active_space_indices()
-        num_qubits = len(indices) * 2
-
-    dim = 1 << num_qubits
+    orbitals = wavefunction.get_orbitals()
+    num_orbs = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
+    num_qubits = num_orbs * 2
+    dim = 1 << num_qubits  # 2^num_qubits
 
     # Initialize statevector as complex array
     statevector = np.zeros(dim, dtype=np.complex128)
 
-    # Get coefficients
+    # Get determinants and coefficients
+    determinants = wavefunction.get_active_determinants()
     coefficients = wavefunction.get_coefficients()
+
     coeffs_array = np.array(coefficients)
 
     # Fill statevector
     for i, det in enumerate(determinants):
+        # Convert configuration to statevector index
         index = _configuration_to_statevector_index(det, num_qubits)
-        statevector[index] += coeffs_array[i]
+        statevector[index] = coeffs_array[i]
 
     # Normalize if requested
     if normalize:

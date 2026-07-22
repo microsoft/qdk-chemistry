@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
 from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 from qiskit.compiler import transpile
@@ -13,6 +12,8 @@ from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     MergeZBasisRotations,
     RemoveZBasisOnZeroState,
@@ -48,12 +49,24 @@ class RegularIsometryStatePreparation(StatePreparation):
 
         """
         Logger.trace_entering()
+        # Active Space Consistency Check
+        active_indices = wavefunction.get_orbitals().active_indices()
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
+        if alpha_indices != beta_indices:
+            raise ValueError(
+                f"Active space contains {len(alpha_indices)} alpha orbitals and "
+                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
+                "alpha and beta orbitals are not supported for state preparation."
+            )
 
-        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
-        n_qubits = int(np.log2(len(statevector_data)))
-
+        num_orbitals = len(alpha_indices)
+        n_qubits = num_orbitals * 2
         num_dets = wavefunction.size()
         Logger.debug(f"Using {num_dets} determinants for state preparation")
+
+        # Create statevector using Python conversion function
+        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
 
         # Create the circuit
         circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")

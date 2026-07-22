@@ -13,7 +13,7 @@ from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitHamiltonian,
+    QubitOperator,
     Settings,
 )
 
@@ -59,11 +59,11 @@ class PhaseEstimation(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
+        r"""Run the phase estimation algorithm with the given state preparation circuit and Hamiltonian.
 
         This method implements the quantum phase estimation procedure:
         1. The state preparation circuit initializes the system in the desired quantum state.

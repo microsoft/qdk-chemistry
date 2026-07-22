@@ -10,6 +10,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
@@ -531,13 +532,15 @@ TEST_F(StateVectorContainerTest, JsonSerializationRDMsOpenShell) {
 
   auto orbitals = wfn_default->get_orbitals();
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+      orbitals->energies()->block({axes::alpha()}),
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
-          orbitals->get_inactive_space_indices().first));
+          spin_channel_indices(orbitals->active_indices(), axes::alpha())),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals->inactive_indices(), axes::alpha())));
 
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(restricted_orbitals);
@@ -747,13 +750,15 @@ TEST_F(StateVectorContainerTest, Hdf5SerializationRDMsOpenShell) {
 
   auto orbitals = wfn_default->get_orbitals();
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+      orbitals->energies()->block({axes::alpha()}),
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
-          orbitals->get_inactive_space_indices().first));
+          spin_channel_indices(orbitals->active_indices(), axes::alpha())),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals->inactive_indices(), axes::alpha())));
 
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(restricted_orbitals);

@@ -33,12 +33,12 @@ class StatePreparation(Algorithm):
         the Jordan-Wigner encoding for fermion-to-qubit mapping. The returned :class:`~qdk_chemistry.data.Circuit`
         will have its ``encoding`` attribute set to ``"jordan-wigner"``.
 
-        If you use the state preparation circuit with a :class:`~qdk_chemistry.data.QubitHamiltonian`
+        If you use the state preparation circuit with a :class:`~qdk_chemistry.data.QubitOperator`
         that uses a different encoding (e.g., ``"bravyi-kitaev"`` or ``"parity"``), the
         encodings will be incompatible and may lead to incorrect results.
 
         **Recommended workflow**:
-            1. Create a :class:`~qdk_chemistry.data.QubitHamiltonian` using Jordan-Wigner encoding
+            1. Create a :class:`~qdk_chemistry.data.QubitOperator` using Jordan-Wigner encoding
             2. Use state preparation to create a :class:`~qdk_chemistry.data.Circuit`
             3. Both will have ``encoding="jordan-wigner"`` and will be compatible
 

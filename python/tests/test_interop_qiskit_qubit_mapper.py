@@ -23,7 +23,7 @@ if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
         Hamiltonian,
         MajoranaMapping,
         Orbitals,
-        QubitHamiltonian,
+        QubitOperator,
     )
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qis
 
 @pytest.mark.parametrize("encoding", ["jordan-wigner", "bravyi-kitaev", "parity"])
 def test_qiskit_qubit_mappers(encoding) -> None:
-    """Basic test for mapping a Hamiltonian to a Qubit Hamiltonian using Qiskit."""
+    """Basic test for mapping a Hamiltonian to a qubit operator using Qiskit."""
     assert "qiskit" in available("qubit_mapper")
     qubit_mapper = create("qubit_mapper", "qiskit")
     assert isinstance(qubit_mapper, QubitMapper)
@@ -46,7 +46,7 @@ def test_qiskit_qubit_mappers(encoding) -> None:
     }[encoding]
     mapping = factory(n_modes)
     qubit_hamiltonian = qubit_mapper.run(hamiltonian, mapping)
-    assert isinstance(qubit_hamiltonian, QubitHamiltonian)
+    assert isinstance(qubit_hamiltonian, QubitOperator)
     assert qubit_hamiltonian.num_qubits == 4
     assert isinstance(qubit_hamiltonian.pauli_strings, list)
     assert (
@@ -67,7 +67,7 @@ def test_qiskit_qubit_mappers(encoding) -> None:
 
 
 def test_qiskit_unrestricted_jw_matches_qdk():
-    """Qiskit plugin produces same UHF JW result as QDK engine."""
+    """Qiskit plugin produces same UHF JW result as QDK engine for qubit operators."""
     n = 2
     rng = np.random.default_rng(77)
     coeffs_a = np.eye(n)
