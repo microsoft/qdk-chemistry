@@ -64,9 +64,7 @@ struct SiteCsd {
 /** @brief Permutations and block synthesis data for one sparse MPS site. */
 struct SparseSiteSynthesis {
   std::vector<Eigen::Index> column_permutation;
-  std::vector<Eigen::Index> inverse_column_permutation;
   std::vector<Eigen::Index> row_permutation;
-  std::vector<Eigen::Index> inverse_row_permutation;
   GivensDecomposition block_givens;
 };
 
@@ -138,8 +136,8 @@ GivensDecomposition decompose_block_diagonal_to_givens(
  *
  * @param target Physical-major packed isometry. Its row dimension is the full
  * active register dimension and its columns are left-bond states.
- * @return Forward and inverse permutations plus merged Givens data for the
- * completed diagonal blocks.
+ * @return Row and column permutations plus merged Givens data for the completed
+ * diagonal blocks.
  * @throws std::invalid_argument If @p target is empty, nonfinite, wider than
  * tall, or not an isometry within tolerance.
  */

@@ -62,6 +62,16 @@ Eigen::MatrixXd random_orthogonal(Eigen::Index dim, std::uint32_t seed) {
   return qr.householderQ() * Eigen::MatrixXd::Identity(dim, dim);
 }
 
+std::vector<Eigen::Index> invert_permutation(
+    const std::vector<Eigen::Index>& permutation) {
+  std::vector<Eigen::Index> inverse(permutation.size());
+  for (std::size_t index = 0; index < permutation.size(); ++index) {
+    inverse[static_cast<std::size_t>(permutation[index])] =
+        static_cast<Eigen::Index>(index);
+  }
+  return inverse;
+}
+
 void expect_reconstruction(const Eigen::MatrixXd& matrix,
                            double tolerance = 1.0e-12) {
   const auto decomposition = decompose_unitary_to_givens(matrix);
@@ -151,11 +161,12 @@ TEST(UnitarySynthesisTest, ReconstructsSparseSiteIsometry) {
 
   const auto result = decompose_sparse_site(target);
   const Eigen::MatrixXd block_diagonal = reconstruct(result.block_givens);
+  const auto inverse_rows = invert_permutation(result.row_permutation);
   Eigen::MatrixXd reconstructed(target.rows(), target.cols());
   for (Eigen::Index row = 0; row < target.rows(); ++row) {
     for (Eigen::Index column = 0; column < target.cols(); ++column) {
       reconstructed(row, column) = block_diagonal(
-          result.inverse_row_permutation[static_cast<std::size_t>(row)],
+          inverse_rows[static_cast<std::size_t>(row)],
           result.column_permutation[static_cast<std::size_t>(column)]);
     }
   }

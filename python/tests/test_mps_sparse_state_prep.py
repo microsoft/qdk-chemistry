@@ -12,16 +12,10 @@ the full Q# circuit (state preparation fidelity via statevector simulation).
 import numpy as np
 import pytest
 from qdk import qsharp
-from scipy.linalg import block_diag
 
 from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     MPSSparseStatePreparation,
-    _expand_to_unitary,
-    _find_column_permutation,
-    _get_rectangles_and_row_permutation,
     _invert_perm,
-    _order_blocks,
-    _pad_permutation,
     _perm_to_bitstrings,
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
@@ -173,61 +167,6 @@ class TestSparseDecompositionHelpers:
         nnz_frac = np.count_nonzero(dense) / dense.size
         assert nnz_frac < 0.15  # less than 15% non-zero
 
-    def test_rectangles_cover_nonzero_rows(self):
-        """Verify that extracted rectangles cover all nonzero structure."""
-        tensor = _qualtran_mps_tensors[1]
-        ancilla_dim = 8
-        mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        rectangles, row_perm = _get_rectangles_and_row_permutation(mat)
-
-        # All nonzero rows should be captured in row_perm
-        dense = mat.toarray()
-        nonzero_rows = set(np.where(np.any(dense != 0, axis=1))[0])
-        assert nonzero_rows.issubset(set(row_perm))
-
-        # Each rectangle should be non-empty
-        for rect in rectangles:
-            assert rect.size > 0
-
-    def test_column_permutation_is_valid(self):
-        """Verify column permutation is a valid permutation."""
-        tensor = _qualtran_mps_tensors[1]
-        ancilla_dim = 8
-        active_dim = 4 * ancilla_dim
-        mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        rectangles, _ = _get_rectangles_and_row_permutation(mat)
-        col_perm = _find_column_permutation(rectangles, active_dim)
-
-        # Should be a valid permutation of [0..active_dim-1]
-        assert sorted(col_perm) == list(range(active_dim))
-
-    def test_expand_to_unitary_produces_unitary(self):
-        """Verify expanded blocks are unitary."""
-        tensor = _qualtran_mps_tensors[1]
-        ancilla_dim = 8
-        mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        rectangles, _ = _get_rectangles_and_row_permutation(mat)
-
-        for rect in rectangles:
-            unitary = _expand_to_unitary(rect)
-            h = unitary.shape[0]
-            assert np.allclose(unitary @ unitary.T, np.eye(h), atol=1e-8)
-
-    def test_order_blocks_sorts_descending(self):
-        """Verify blocks are sorted by size largest first."""
-        blocks = [np.eye(2), np.eye(5), np.eye(3)]
-        dim = 10
-        _, sorted_blocks = _order_blocks(blocks, dim)
-        sizes = [b.shape[0] for b in sorted_blocks]
-        assert sizes == sorted(sizes, reverse=True)
-
-    def test_order_blocks_permutation_valid(self):
-        """Verify _order_blocks returns a valid permutation."""
-        blocks = [np.eye(2), np.eye(5), np.eye(3)]
-        dim = 10
-        perm, _ = _order_blocks(blocks, dim)
-        assert sorted(perm) == list(range(dim))
-
     def test_invert_perm_roundtrip(self):
         """Verify inverting a permutation round-trips."""
         perm = [3, 0, 4, 1, 2]
@@ -244,65 +183,6 @@ class TestSparseDecompositionHelpers:
         for i, bits in enumerate(bitstrings):
             val = sum(int(b) << j for j, b in enumerate(bits))
             assert val == perm[i]
-
-
-class TestSparseDecompositionCorrectness:
-    """End-to-end correctness tests for the sparse decomposition.
-
-    Verifies that V[invert(row_perm)][:, col_perm][:, :cols] == target.
-    """
-
-    @pytest.mark.parametrize("site_idx", [1, 2, 3])
-    def test_decomposition_reconstructs_target(self, site_idx):
-        """Verify decomposition reproduces the target matrix for each site."""
-        tensor = _qualtran_mps_tensors[site_idx]
-        chi_left = tensor.shape[0]
-        ancilla_dim = 8
-        active_dim = 4 * ancilla_dim
-
-        target_mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        target_dense = target_mat.toarray()
-        num_cols = chi_left
-
-        # Run the decomposition steps manually
-        rectangles, row_perm = _get_rectangles_and_row_permutation(target_mat)
-        row_perm = _pad_permutation(row_perm, active_dim)
-        col_perm = _find_column_permutation(rectangles, active_dim)
-
-        blocks = [_expand_to_unitary(r) for r in rectangles]
-        blocks += [np.eye(1)] * (active_dim - sum(b.shape[0] for b in blocks))
-
-        ordering_perm, blocks = _order_blocks(blocks, active_dim)
-
-        # Compose following Qualtran convention
-        col_composed = [col_perm[ordering_perm[i]] for i in range(active_dim)]
-        col_perm_final = _invert_perm(col_composed)
-        row_perm_final = [row_perm[ordering_perm[i]] for i in range(active_dim)]
-
-        row_inv = _invert_perm(row_perm_final)
-        block_diag_mat = block_diag(*blocks)
-        result = block_diag_mat[row_inv][:, col_perm_final][:, :num_cols]
-
-        assert np.allclose(result, target_dense, atol=1e-10), (
-            f"Decomposition failed for site {site_idx}: max error = {np.max(np.abs(result - target_dense)):.2e}"
-        )
-
-    def test_decomposition_all_blocks_unitary(self):
-        """Verify all blocks after ordering are unitary."""
-        tensor = _qualtran_mps_tensors[1]
-        ancilla_dim = 8
-        active_dim = 4 * ancilla_dim
-
-        mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        rectangles, _ = _get_rectangles_and_row_permutation(mat)
-        blocks = [_expand_to_unitary(r) for r in rectangles]
-        blocks += [np.eye(1)] * (active_dim - sum(b.shape[0] for b in blocks))
-        _, blocks = _order_blocks(blocks, active_dim)
-
-        for i, b in enumerate(blocks):
-            h = b.shape[0]
-            err = np.max(np.abs(b @ b.T - np.eye(h)))
-            assert err < 1e-8, f"Block {i} (size {h}) not unitary: error={err:.2e}"
 
 
 class TestGenerateMPSSparsePreparationData:
@@ -395,7 +275,6 @@ class TestGenerateMPSSparsePreparationData:
             assert len(site.row_perm_targets) == active_dim
             assert sorted(site.col_perm_targets) == list(range(active_dim))
             assert sorted(site.row_perm_targets) == list(range(active_dim))
-            assert site.target_bits == int(np.log2(active_dim))
 
     def test_to_qsharp_params_structure(self):
         """Verify to_qsharp_params returns all expected keys."""
@@ -424,6 +303,19 @@ class TestGenerateMPSSparsePreparationData:
         assert len(params["siteRowPermTargets"]) == 3
         assert len(params["siteColInvPermTargets"]) == 3
         assert len(params["siteRowInvPermTargets"]) == 3
+
+    def test_generate_preserves_site_to_orbital_order(self):
+        """Preparation data maps chain sites to orbitals without reordering tensors."""
+        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors, [2, 0, 3, 1])
+
+        assert data.site_to_orbital_order == [2, 0, 3, 1]
+        assert data.to_qsharp_params(rotation_bits=10)["siteToOrbitalOrder"] == [2, 0, 3, 1]
+
+    @pytest.mark.parametrize("orbital_order", [[0, 1], [0, 1, 1, 3], [0, 1, 2, -1]])
+    def test_generate_rejects_invalid_site_to_orbital_order(self, orbital_order: list[int]):
+        """Preparation data requires one unique nonnegative orbital per site."""
+        with pytest.raises(ValueError, match="one unique nonnegative index per MPS site"):
+            generate_mps_sparse_preparation_data(_qualtran_mps_tensors, orbital_order)
 
     @pytest.mark.parametrize(
         ("num_sites", "bond_dim", "seed"),

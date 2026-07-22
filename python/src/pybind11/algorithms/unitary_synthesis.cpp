@@ -92,9 +92,8 @@ void bind_unitary_synthesis(py::module& module) {
           result = qdk::chemistry::utils::detail::decompose_sparse_site(target);
         }
         return py::make_tuple(
-            result.column_permutation, result.inverse_column_permutation,
-            result.row_permutation, result.inverse_row_permutation,
-            result.block_givens.layer_angles,
+          result.column_permutation, result.row_permutation,
+          result.block_givens.layer_angles,
             to_bool_list(result.block_givens.layer_shifted),
             to_bool_list(result.block_givens.phases));
       },

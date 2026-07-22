@@ -70,12 +70,6 @@ class MPSSequentialStatePreparationSettings(StatePreparationSettings):
             "Synthesize one representative per shape group and use BeginEstimateCaching to "
             "replicate cost. Valid for resource estimation only — not simulation.",
         )
-        self._set_default(
-            "fast_grouped_resource_estimation",
-            "bool",
-            False,
-            "Compatibility alias for fast_resource_estimation.",
-        )
 
 
 class MPSSequentialStatePreparation(StatePreparation):
@@ -127,8 +121,7 @@ class MPSSequentialStatePreparation(StatePreparation):
         if container.is_complex:
             raise ValueError("MPS sequential state preparation currently supports only real-valued MPS tensors.")
 
-        fast_re = self._settings.get("fast_resource_estimation")
-        fast_grouped_re = self._settings.get("fast_grouped_resource_estimation")
+        fast_resource_estimation = self._settings.get("fast_resource_estimation")
 
         if container.physical_dimension != 4:
             raise ValueError("MPS sequential state preparation requires four physical states per site.")
@@ -137,12 +130,15 @@ class MPSSequentialStatePreparation(StatePreparation):
         num_orbitals = container.orbitals.get_num_molecular_orbitals()
         if container.num_sites != num_orbitals:
             raise ValueError("MPS sequential state preparation requires exactly one MPS site per molecular orbital.")
-        data = generate_mps_preparation_data(container.sites, fast_resource_estimation=fast_re or fast_grouped_re)
+        data = generate_mps_preparation_data(
+            container.sites,
+            fast_resource_estimation=fast_resource_estimation,
+        )
 
         rotation_bits = self._settings.get("rotation_bits")
 
         site_to_orbital_order = container.site_to_orbital_order
-        if fast_re or fast_grouped_re:
+        if fast_resource_estimation:
             params = data.to_qsharp_params_grouped(rotation_bits, site_to_orbital_order)
             program = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuitGrouped
         else:
@@ -155,7 +151,7 @@ class MPSSequentialStatePreparation(StatePreparation):
         )
 
         # Build composable op for QPE composition
-        if fast_re or fast_grouped_re:
+        if fast_resource_estimation:
             op_params = QSHARP_UTILS.MPSSequential.MPSSequentialGroupedParams(**params)
             qsharp_op = QSHARP_UTILS.MPSSequential.MakeMPSSequentialOpGrouped(op_params)
         else:
@@ -327,58 +323,9 @@ class MPSPreparationData:
         }
         return params
 
-    def to_qsharp_params_grouped_fast(
-        self,
-        rotation_bits: int,
-        site_to_orbital_order: list[int] | None = None,
-    ) -> dict:
-        """Flatten into the dict expected by MakeMPSSequentialCircuitGroupedFast.
-
-        Passes only 2 representative layers per Givens matrix (one non-shifted,
-        one shifted) plus the total layer count. This reduces serialization from
-        O(dim^2) to O(dim) and enables RepeatEstimates on the Q# side.
-        """
-        assert self.site_shape_indices is not None, "Grouped mode requires site_shape_indices"
-        assert self.shape_effective_bits is not None, "Grouped mode requires shape_effective_bits"
-        site_to_orbital_order = list(range(self.num_sites)) if site_to_orbital_order is None else site_to_orbital_order
-
-        def _rep_layers(givens: GivensLayerData) -> list[list[float]]:
-            """Extract at most 2 representative layers (non-shifted, shifted)."""
-            if len(givens.layer_angles) == 0:
-                return []
-            if len(givens.layer_angles) == 1:
-                return [givens.layer_angles[0]]
-            return [givens.layer_angles[0], givens.layer_angles[1]]
-
-        params: dict = {
-            "initialStateVec": self.initial_state_vec,
-            "numSites": self.num_sites,
-            "siteToOrbitalOrder": site_to_orbital_order,
-            "rotationBits": rotation_bits,
-            "numAncillaQubits": self.ancilla_bits,
-            "siteShapeIndices": self.site_shape_indices,
-            "shapeEffectiveBits": self.shape_effective_bits,
-            "shapeVRepLayerAngles": [_rep_layers(s.v) for s in self.sites],
-            "shapeVNumLayers": [len(s.v.layer_angles) for s in self.sites],
-            "shapeVPhases": [s.v.phases for s in self.sites],
-            "shapeRot0Angles": [s.rot_angles[0] for s in self.sites],
-            "shapeRot1Angles": [s.rot_angles[1] for s in self.sites],
-            "shapeRot2Angles": [s.rot_angles[2] for s in self.sites],
-            "shapeW0RepLayerAngles": [_rep_layers(s.w0) for s in self.sites],
-            "shapeW0NumLayers": [len(s.w0.layer_angles) for s in self.sites],
-            "shapeW0Phases": [s.w0.phases for s in self.sites],
-            "shapeW1RepLayerAngles": [_rep_layers(s.w1) for s in self.sites],
-            "shapeW1NumLayers": [len(s.w1.layer_angles) for s in self.sites],
-            "shapeW1Phases": [s.w1.phases for s in self.sites],
-            "shapeURepLayerAngles": [_rep_layers(s.u) for s in self.sites],
-            "shapeUNumLayers": [len(s.u.layer_angles) for s in self.sites],
-            "shapeUPhases": [s.u.phases for s in self.sites],
-        }
-        return params
-
 
 # ---------------------------------------------------------------------------
-# Unitary synthesis helpers
+# Entry point
 # ---------------------------------------------------------------------------
 
 
@@ -510,93 +457,9 @@ def generate_mps_preparation_data(
     )
 
 
-def _make_dummy_site_data(effective_dim: int) -> SiteUnitaryData:
-    """Generate representative site unitary data for resource estimation.
-
-    Creates arrays with the correct shapes (matching the Clements Givens
-    decomposition output) without performing the expensive O(n³) decomposition.
-    The Q# resource estimator cost depends only on array dimensions (number of
-    layers, angles per layer, QROAM table sizes), not on actual angle values.
-    """
-    dim = effective_dim
-
-    # V is always empty (absorbed into previous site)
-    v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
-
-    # W0, W1: Clements decomposition of dim*dim unitary produces exactly `dim` layers
-    w0_givens = _make_dummy_givens_layers(dim)
-    w1_givens = _make_dummy_givens_layers(dim)
-
-    # UCR rotation angles: array length = dim (resource cost depends on length)
-    rot_angles = [[0.1] * dim for _ in range(3)]
-
-    # U: block-diagonal of 4 dim*dim blocks, merged into global layers
-    u_givens = _make_dummy_block_diagonal_layers(dim, num_blocks=4)
-
-    return SiteUnitaryData(v=v_givens, rot_angles=rot_angles, w0=w0_givens, w1=w1_givens, u=u_givens)
-
-
-def _make_dummy_givens_layers(dim: int) -> GivensLayerData:
-    """Create dummy Givens layer structure for a dim*dim Clements decomposition.
-
-    The Clements decomposition always produces exactly `dim` layers with
-    alternating even/odd pair structure. This runs in O(dim) time.
-    """
-    if dim <= 1:
-        return GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * max(dim, 0))
-
-    num_layers = 1 if dim == 2 else dim
-    layer_angles: list[list[float]] = []
-    layer_shifted: list[bool] = []
-
-    for i in range(num_layers):
-        shifted = i % 2 == 1
-        num_slots = (dim - 1) // 2 if shifted else dim // 2
-        layer_angles.append([0.1] * num_slots)
-        layer_shifted.append(shifted)
-
-    phases = [False] * dim
-    return GivensLayerData(layer_angles=layer_angles, layer_shifted=layer_shifted, phases=phases)
-
-
-def _make_dummy_block_diagonal_layers(dim: int, num_blocks: int = 4) -> GivensLayerData:
-    """Create dummy merged Givens layers for a block-diagonal unitary.
-
-    Simulates the merge of `num_blocks` Clements decompositions (each dim*dim)
-    into global layers of the full (num_blocks*dim)*(num_blocks*dim) register.
-    Runs in O(num_blocks * dim) time instead of O(dim³).
-    """
-    total_dim = num_blocks * dim
-    num_even_slots = total_dim // 2
-    num_odd_slots = (total_dim - 1) // 2
-
-    if dim <= 1:
-        return GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * total_dim)
-
-    # Each block has `dim` layers. Simulate merge by computing how many global
-    # layers are needed. In practice, blocks at different offsets can share
-    # global layers when parity allows. The worst case is `dim` global layers
-    # (all blocks fit in parallel). We use `dim` layers as accurate estimate.
-    num_layers = 1 if dim == 2 else dim
-    layer_angles: list[list[float]] = []
-    layer_shifted: list[bool] = []
-
-    # Determine global_shifted from offset of first block (offset=0 → no flip)
-    for i in range(num_layers):
-        shifted = i % 2 == 1
-        num_slots = num_odd_slots if shifted else num_even_slots
-        layer_angles.append([0.1] * num_slots)
-        layer_shifted.append(shifted)
-
-    phases = [False] * total_dim
-    return GivensLayerData(layer_angles=layer_angles, layer_shifted=layer_shifted, phases=phases)
-
-
-def _random_orthogonal(dim: int, rng: np.random.Generator) -> np.ndarray:
-    """Generate a random orthogonal matrix via QR decomposition."""
-    raw = rng.standard_normal((dim, dim))
-    q, _ = np.linalg.qr(raw)
-    return q
+# ---------------------------------------------------------------------------
+# Decomposition helpers
+# ---------------------------------------------------------------------------
 
 
 def _pad_and_givens(mat: np.ndarray, dim: int) -> GivensLayerData:
@@ -763,3 +626,90 @@ def _pad_to_power_of_2(arr: np.ndarray, target_len: int) -> np.ndarray:
     if len(arr) >= target_len:
         return arr[:target_len]
     return np.concatenate([arr, np.zeros(target_len - len(arr))])
+
+
+# ---------------------------------------------------------------------------
+# Dummy data builders
+# ---------------------------------------------------------------------------
+
+
+def _make_dummy_site_data(effective_dim: int) -> SiteUnitaryData:
+    """Generate representative site unitary data for resource estimation.
+
+    Creates arrays with the correct shapes (matching the Clements Givens
+    decomposition output) without performing the expensive O(n³) decomposition.
+    The Q# resource estimator cost depends only on array dimensions (number of
+    layers, angles per layer, QROAM table sizes), not on actual angle values.
+    """
+    dim = effective_dim
+
+    # V is always empty (absorbed into previous site)
+    v_givens = GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * dim)
+
+    # W0, W1: Clements decomposition of dim*dim unitary produces exactly `dim` layers
+    w0_givens = _make_dummy_givens_layers(dim)
+    w1_givens = _make_dummy_givens_layers(dim)
+
+    # UCR rotation angles: array length = dim (resource cost depends on length)
+    rot_angles = [[0.1] * dim for _ in range(3)]
+
+    # U: block-diagonal of 4 dim*dim blocks, merged into global layers
+    u_givens = _make_dummy_block_diagonal_layers(dim, num_blocks=4)
+
+    return SiteUnitaryData(v=v_givens, rot_angles=rot_angles, w0=w0_givens, w1=w1_givens, u=u_givens)
+
+
+def _make_dummy_givens_layers(dim: int) -> GivensLayerData:
+    """Create dummy Givens layer structure for a dim*dim Clements decomposition.
+
+    The Clements decomposition always produces exactly `dim` layers with
+    alternating even/odd pair structure. This runs in O(dim) time.
+    """
+    if dim <= 1:
+        return GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * max(dim, 0))
+
+    num_layers = 1 if dim == 2 else dim
+    layer_angles: list[list[float]] = []
+    layer_shifted: list[bool] = []
+
+    for i in range(num_layers):
+        shifted = i % 2 == 1
+        num_slots = (dim - 1) // 2 if shifted else dim // 2
+        layer_angles.append([0.1] * num_slots)
+        layer_shifted.append(shifted)
+
+    phases = [False] * dim
+    return GivensLayerData(layer_angles=layer_angles, layer_shifted=layer_shifted, phases=phases)
+
+
+def _make_dummy_block_diagonal_layers(dim: int, num_blocks: int = 4) -> GivensLayerData:
+    """Create dummy merged Givens layers for a block-diagonal unitary.
+
+    Simulates the merge of `num_blocks` Clements decompositions (each dim*dim)
+    into global layers of the full (num_blocks*dim)*(num_blocks*dim) register.
+    Runs in O(num_blocks * dim) time instead of O(dim³).
+    """
+    total_dim = num_blocks * dim
+    num_even_slots = total_dim // 2
+    num_odd_slots = (total_dim - 1) // 2
+
+    if dim <= 1:
+        return GivensLayerData(layer_angles=[], layer_shifted=[], phases=[False] * total_dim)
+
+    # Each block has `dim` layers. Simulate merge by computing how many global
+    # layers are needed. In practice, blocks at different offsets can share
+    # global layers when parity allows. The worst case is `dim` global layers
+    # (all blocks fit in parallel). We use `dim` layers as accurate estimate.
+    num_layers = 1 if dim == 2 else dim
+    layer_angles: list[list[float]] = []
+    layer_shifted: list[bool] = []
+
+    # Determine global_shifted from offset of first block (offset=0 → no flip)
+    for i in range(num_layers):
+        shifted = i % 2 == 1
+        num_slots = num_odd_slots if shifted else num_even_slots
+        layer_angles.append([0.1] * num_slots)
+        layer_shifted.append(shifted)
+
+    phases = [False] * total_dim
+    return GivensLayerData(layer_angles=layer_angles, layer_shifted=layer_shifted, phases=phases)

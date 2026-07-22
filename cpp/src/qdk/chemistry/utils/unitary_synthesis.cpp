@@ -505,10 +505,7 @@ SparseSiteSynthesis decompose_sparse_site(
 
   SparseSiteSynthesis result;
   result.column_permutation = invert_permutation(composed);
-  result.inverse_column_permutation =
-      invert_permutation(result.column_permutation);
   result.row_permutation = std::move(final_rows);
-  result.inverse_row_permutation = invert_permutation(result.row_permutation);
   result.block_givens = decompose_block_diagonal_to_givens(sorted_blocks);
   return result;
 }
