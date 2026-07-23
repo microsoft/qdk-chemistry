@@ -165,4 +165,15 @@ size_t factorial(size_t n);
  */
 size_t binomial_coefficient(size_t n, size_t k);
 
+/**
+ * @brief Validate active orbital indices
+ * @param indices The indices to validate
+ * @param spin_label Label for error messages (e.g., "Alpha", "Beta")
+ * @param num_molecular_orbitals Total number of molecular orbitals
+ * @return true if the indices are contiguous, false otherwise
+ */
+bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
+                                        const std::string& spin_label,
+                                        size_t num_molecular_orbitals);
+
 }  // namespace qdk::chemistry::utils::microsoft

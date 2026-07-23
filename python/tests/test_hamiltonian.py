@@ -13,12 +13,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
+    Structure,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data.symmetry import SymmetryProduct, axes
@@ -1140,3 +1143,147 @@ def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""
     assert hasattr(Hamiltonian, "_data_type_name")
     assert Hamiltonian._data_type_name == "hamiltonian"
+
+
+class TestX2CHamiltonian:
+    """Test suite for Hamiltonians produced by the X2C (scalar-relativistic) constructor.
+
+    Mirrors TestHamiltonian and TestCholeskyHamiltonian: tests that the
+    Hamiltonian object returned by the qdk_x2c constructor has correct
+    properties, serialises correctly, and survives pickling.
+    """
+
+    @pytest.fixture(scope="class")
+    def x2c_hamiltonian(self):
+        """Run SCF + X2C constructor once for the class."""
+        mol = Structure(
+            ["O", "H", "H"],
+            np.array(
+                [
+                    [0.0, -0.0758 * ANGSTROM_TO_BOHR, 0.0],
+                    [0.8668 * ANGSTROM_TO_BOHR, 0.6013 * ANGSTROM_TO_BOHR, 0.0],
+                    [-0.8668 * ANGSTROM_TO_BOHR, 0.6013 * ANGSTROM_TO_BOHR, 0.0],
+                ]
+            ),
+        )
+        scf_solver = algorithms.create("scf_solver", "qdk")
+        _, wfn = scf_solver.run(mol, 0, 1, "sto-3g")
+        orbitals = wfn.get_orbitals()
+
+        ham_nr = algorithms.create("hamiltonian_constructor", "qdk")
+        h_nr = ham_nr.run(orbitals)
+
+        ham_x2c = algorithms.create("hamiltonian_constructor", "qdk_x2c", xuncontract=False)
+        h_x2c = ham_x2c.run(orbitals)
+
+        return h_nr, h_x2c
+
+    def test_has_integrals(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert h.has_one_body_integrals()
+        assert h.has_two_body_integrals()
+        assert h.has_orbitals()
+
+    def test_is_restricted(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert h.is_restricted()
+        assert not h.is_unrestricted()
+
+    def test_core_energy_matches_nr(self, x2c_hamiltonian):
+        h_nr, h_x2c = x2c_hamiltonian
+        assert h_nr.get_core_energy() == h_x2c.get_core_energy()
+
+    def test_one_body_differs_from_nr(self, x2c_hamiltonian):
+        h_nr, h_x2c = x2c_hamiltonian
+        h1_nr, _ = h_nr.get_one_body_integrals()
+        h1_x2c, _ = h_x2c.get_one_body_integrals()
+        assert not np.allclose(h1_nr, h1_x2c), "X2C one-body should differ from NR"
+
+    def test_one_body_symmetric(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        h1, _ = h.get_one_body_integrals()
+        np.testing.assert_allclose(h1, h1.T, atol=1e-12)
+
+    def test_two_body_unchanged_from_nr(self, x2c_hamiltonian):
+        h_nr, h_x2c = x2c_hamiltonian
+        eri_nr, _, _ = h_nr.get_two_body_integrals()
+        eri_x2c, _, _ = h_x2c.get_two_body_integrals()
+        np.testing.assert_allclose(eri_x2c, eri_nr, atol=1e-12)
+
+    def test_two_body_element_access(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        val = h.get_two_body_element(0, 1, 1, 0)
+        assert isinstance(val, float)
+
+    def test_orbital_count(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert h.get_orbitals().get_num_molecular_orbitals() == 7  # STO-3G water
+
+    def test_json_roundtrip(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        data = json.loads(h.to_json())
+        assert data["container"]["has_one_body_integrals"] is True
+        assert data["container"]["has_two_body_integrals"] is True
+
+        h2 = Hamiltonian.from_json(json.dumps(data))
+        assert h2.get_core_energy() == h.get_core_energy()
+        assert h2.has_one_body_integrals()
+        assert h2.has_two_body_integrals()
+        h1_orig, _ = h.get_one_body_integrals()
+        h1_rt, _ = h2.get_one_body_integrals()
+        np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+
+    def test_json_file_io(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
+            filename = f.name
+        try:
+            h.to_json_file(filename)
+            h2 = Hamiltonian.from_json_file(filename)
+            h1_orig, _ = h.get_one_body_integrals()
+            h1_rt, _ = h2.get_one_body_integrals()
+            np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+        finally:
+            Path(filename).unlink(missing_ok=True)
+
+    def test_hdf5_file_io(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
+            filename = f.name
+        try:
+            h.to_hdf5_file(filename)
+            h2 = Hamiltonian.from_hdf5_file(filename)
+            h1_orig, _ = h.get_one_body_integrals()
+            h1_rt, _ = h2.get_one_body_integrals()
+            np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+        finally:
+            Path(filename).unlink(missing_ok=True)
+
+    def test_pickling(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        pickled = pickle.dumps(h)
+        h2 = pickle.loads(pickled)
+
+        assert h2.get_core_energy() == h.get_core_energy()
+        assert h2.has_one_body_integrals()
+        assert h2.has_two_body_integrals()
+
+        h1_orig, _ = h.get_one_body_integrals()
+        h1_rt, _ = h2.get_one_body_integrals()
+        np.testing.assert_array_equal(h1_orig, h1_rt)
+
+        eri_orig, _, _ = h.get_two_body_integrals()
+        eri_rt, _, _ = h2.get_two_body_integrals()
+        np.testing.assert_array_equal(eri_orig, eri_rt)
+
+    def test_repr(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert "Hamiltonian" in repr(h)
+
+    def test_container_type(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert h.get_container_type() == "canonical_four_center"
+
+    def test_data_type_name(self, x2c_hamiltonian):
+        _, h = x2c_hamiltonian
+        assert h.get_data_type_name() == "hamiltonian"
