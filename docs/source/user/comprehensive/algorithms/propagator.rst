@@ -2,7 +2,7 @@ Propagator
 ==========
 
 The :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` algorithm in QDK/Chemistry converts a time-dependent Hamiltonian over a finite time interval into a single effective (time-independent) Hamiltonian.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and a time interval as input and produces a :class:`~qdk_chemistry.data.QubitHamiltonian` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and a time interval as input and produces a :class:`~qdk_chemistry.data.QubitOperator` as output.
 
 Overview
 --------
@@ -29,7 +29,7 @@ A propagator is not usually called directly.  Instead, an
 sequence within each step is:
 
 1. The circuit builder passes the :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and the current interval :math:`[t_1, t_2]` to the propagator
-2. The propagator returns an effective :class:`~qdk_chemistry.data.QubitHamiltonian`
+2. The propagator returns an effective :class:`~qdk_chemistry.data.QubitOperator`
 3. The :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` implements the effective evolution as a :class:`~qdk_chemistry.data.UnitaryRepresentation`
 4. A :doc:`CircuitMapper <circuit_mapper>` converts the unitary into executable gates
 
@@ -158,7 +158,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`: Input time-dependent Hamiltonian
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Output effective Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Output effective Hamiltonian
 - :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder`: The circuit builder that calls the propagator each step
 - :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder`: Constructs the time-evolution unitary from the effective Hamiltonian produced by the propagator
 

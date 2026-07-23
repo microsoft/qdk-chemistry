@@ -11,7 +11,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    factory_pattern
    settings
    active_space
-   energy_estimator
+   expectation_estimator
    hamiltonian_constructor
    localizer
    mc_calculator
@@ -67,34 +67,34 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Orbitals → Wavefunction
    * - :doc:`QubitMapper <qubit_mapper>`
      - Fermion-to-qubit mapping
-     - Hamiltonian → QubitHamiltonian
+     - Hamiltonian → QubitOperator
    * - :doc:`StatePreparation <state_preparation>`
      - Quantum state preparation
      - Wavefunction → Circuit
    * - :doc:`HadamardTest <hadamard_test>`
      - Controlled-unitary overlap estimation
      - Circuit + UnitaryRepresentation → CircuitExecutorData
-   * - :doc:`EnergyEstimator <energy_estimator>`
+   * - :doc:`ExpectationEstimator <expectation_estimator>`
      - Quantum energy expectation values
-     - Circuit + QubitHamiltonian → Energy
+     - Circuit + QubitOperator → Energy
    * - :doc:`StabilityChecker <stability_checker>`
      - :term:`SCF` stability analysis
      - Orbitals → Stability
    * - :doc:`PhaseEstimation <phase_estimation>`
      - Quantum phase estimation
-     - Circuit + QubitHamiltonian → QpeResult
+     - Circuit + QubitOperator → QpeResult
    * - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`
      - Phase estimation circuit composition
-     - Circuit + QubitHamiltonian → Circuit list
+     - Circuit + QubitOperator → Circuit list
    * - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
      - Time-evolution circuit composition
      - TimeDependentQubitHamiltonian + Circuit → Circuit
    * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
-     - QubitHamiltonian → UnitaryRepresentation
+     - QubitOperator → UnitaryRepresentation
    * - :doc:`Propagator <propagator>`
      - Effective Hamiltonians for time-dependent evolution
-     - TimeDependentQubitHamiltonian → QubitHamiltonian
+     - TimeDependentQubitHamiltonian → QubitOperator
    * - :doc:`HamiltonianSimulation <hamiltonian_simulation>`
      - Time-dependent Hamiltonian simulation
      - TimeDependentQubitHamiltonian + Circuit + Observables → (EnergyExpectationResult, MeasurementData) list
@@ -111,8 +111,8 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
 Term grouper
 ------------
 
-The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitHamiltonian` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`.
-A grouper consumes a ``QubitHamiltonian`` and returns a *new* ``QubitHamiltonian`` whose ``term_partition`` field is populated; the input is not mutated.
+The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitOperator` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
+A grouper consumes a ``QubitOperator`` and returns a *new* ``QubitOperator`` whose ``term_partition`` field is populated; the input is not mutated.
 
 Strategies include full commutation grouping, qubit-wise commutation grouping, and trivial (identity) grouping.
 Use ``registry.available("term_grouper")`` to list implementations.

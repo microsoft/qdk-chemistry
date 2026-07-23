@@ -2,7 +2,7 @@ Hamiltonian simulation
 ======================
 
 The :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulation` algorithm in QDK/Chemistry simulates the time evolution of a quantum system under a time-dependent Hamiltonian and measures observable expectation values.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`, a list of observable :class:`~qdk_chemistry.data.QubitHamiltonian` operators, and a state-preparation :class:`~qdk_chemistry.data.Circuit` as input and returns a list of :class:`~qdk_chemistry.data.EnergyExpectationResult` and :class:`~qdk_chemistry.data.MeasurementData` pairs.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`, a list of observable :class:`~qdk_chemistry.data.QubitOperator` operators, and a state-preparation :class:`~qdk_chemistry.data.Circuit` as input and returns a list of :class:`~qdk_chemistry.data.EnergyExpectationResult` and :class:`~qdk_chemistry.data.MeasurementData` pairs.
 
 Overview
 --------
@@ -35,7 +35,7 @@ TimeDependentQubitHamiltonian
    A :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` describing how the Hamiltonian varies with time.
 
 Observables
-   A list of :class:`~qdk_chemistry.data.QubitHamiltonian` operators to measure after evolution.
+   A list of :class:`~qdk_chemistry.data.QubitOperator` operators to measure after evolution.
    Each observable must have the same number of qubits as the Hamiltonian.
 
 State preparation circuit
@@ -94,7 +94,7 @@ Euler integrator
 The Euler integrator delegates circuit construction to an
 :doc:`EulerEvolutionCircuitBuilder <evolution_circuit_builder>`, then
 executes the resulting circuit and measures each observable independently
-using the configured energy estimator.
+using the configured expectation estimator.
 
 The circuit builder handles all time-stepping, propagation, and circuit
 mapping.  See :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
@@ -119,7 +119,7 @@ Direct settings on :class:`~qdk_chemistry.algorithms.time_evolution.hamiltonian_
      - Circuit executor used to run quantum circuits. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"circuit_executor"`` with method ``"qdk_sparse_state_simulator"``.
    * - ``observable_estimator``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Estimator used to compute observable expectation values. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"energy_estimator"`` with method ``"qdk"``.
+     - Estimator used to compute observable expectation values. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"expectation_estimator"`` with method ``"qdk"``.
 
 Nested algorithm configuration (via ``evolution_circuit_builder``):
 
@@ -136,7 +136,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`: Input time-dependent Hamiltonian
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Observable operators
+- :class:`~qdk_chemistry.data.QubitOperator`: Observable operators
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit and output evolution circuit
 - :class:`~qdk_chemistry.data.EnergyExpectationResult`: Output energy expectation values
 - :class:`~qdk_chemistry.data.MeasurementData`: Output measurement data
@@ -149,7 +149,7 @@ Further reading
 - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`: Time-evolution circuit composition
 - :doc:`Propagator <propagator>`: Effective Hamiltonians for time-dependent evolution
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
-- :doc:`EnergyEstimator <energy_estimator>`: Observable expectation value estimation
+- :doc:`ExpectationEstimator <expectation_estimator>`: Observable expectation value estimation
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
