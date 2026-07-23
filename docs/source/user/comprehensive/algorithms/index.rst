@@ -92,15 +92,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
      - QubitOperator → UnitaryRepresentation
-<<<<<<< HEAD
    * - :doc:`Propagator <propagator>`
      - Effective Hamiltonians for time-dependent evolution
      - TimeDependentQubitHamiltonian → QubitOperator
    * - :doc:`HamiltonianSimulation <hamiltonian_simulation>`
      - Time-dependent Hamiltonian simulation
      - TimeDependentQubitHamiltonian + Circuit + Observables → (EnergyExpectationResult, MeasurementData) list
-=======
->>>>>>> origin
    * - :doc:`ControlledCircuitMapper <circuit_mapper>`
      - Controlled-unitary circuit synthesis
      - UnitaryRepresentation → Circuit
