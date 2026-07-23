@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <qdk/chemistry/data/configuration.hpp>
@@ -63,16 +64,26 @@ AbelianMPSContainer::SitePtr make_site(std::size_t left, std::size_t right,
   extents[0][left_label] = left;
   extents[1][right_label] = right;
 
+  const auto delta_n = right_n - left_n;
+  const auto conserving_slices = static_cast<std::size_t>(
+      std::count(std::begin(DELTA_N), std::end(DELTA_N), delta_n));
+  std::size_t conserving_index = 0;
   std::vector<AbelianMPSSite::PhysicalSlicePtr> slices;
   for (std::size_t p = 0; p < physical; ++p) {
     Slice::BlockMap blocks;
     if (left_n + DELTA_N[p] == right_n) {
-      // Conservation satisfied — populate with normalized values.
-      Eigen::MatrixXd values =
-          Eigen::MatrixXd::Identity(left, right) /
-          std::sqrt(static_cast<double>(std::max(left, right)));
+      Eigen::MatrixXd values = Eigen::MatrixXd::Zero(left, right);
+      if (left * conserving_slices == right) {
+        values.block(0, conserving_index * left, left, left).setIdentity();
+      } else if (right * conserving_slices == left) {
+        values.block(conserving_index * right, 0, right, right).setIdentity();
+      } else {
+        values = Eigen::MatrixXd::Identity(left, right) /
+                 std::sqrt(static_cast<double>(conserving_slices));
+      }
       blocks[{left_label, right_label}] =
           std::make_shared<const Eigen::MatrixXd>(std::move(values));
+      ++conserving_index;
     }
     // If conservation is not satisfied, the block map is empty for this slice.
     slices.push_back(std::make_shared<const AbelianMPSSite::PhysicalSlice>(
@@ -188,7 +199,7 @@ static_assert(std::is_abstract_v<MPSContainer>);
 static_assert(std::is_base_of_v<MPSContainer, AbelianMPSContainer>);
 
 TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
-  // 2-site chain: N=0 → N=1 → N=2 (one particle added per site)
+  // 2-site chain: N=0 -> N=1 -> N=2 (one particle added per site)
   std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2, 0, 1, 4),
                                                      make_site(2, 1, 1, 2, 4)};
   auto total_num_particles = make_particle_count(4);

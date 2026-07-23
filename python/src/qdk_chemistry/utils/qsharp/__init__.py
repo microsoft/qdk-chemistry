@@ -4,11 +4,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import re
 from pathlib import Path
 
 import qdk
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
+
+try:
+    from qdk._interpreter import get_config
+except ImportError:
+    from qsharp._qsharp import get_config
 
 __all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
@@ -31,8 +35,18 @@ _state: dict[str, str | None] = {"mode": None}
 
 
 def _ensure_base_session():
-    """Ensure the unified MPS project context and utility Q# files are loaded."""
-    _ensure_mps_session()
+    """Ensure shared utility Q# files are loaded without the MPS project."""
+    if _state["mode"] == "base":
+        try:
+            _ = qdk.code.QDKChemistry.Utils
+            return
+        except AttributeError:
+            _state["mode"] = None
+    target_profile = TargetProfile.from_str(get_config().get_target_profile())
+    qsharp.init(target_profile=target_profile)
+    code = "\n".join(f.read_text() for f in _QS_FILES)
+    qsharp.eval(code)
+    _state["mode"] = "base"
 
 
 def _ensure_mps_session():

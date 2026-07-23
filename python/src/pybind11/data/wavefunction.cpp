@@ -15,6 +15,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
@@ -328,6 +329,8 @@ Examples:
           return self.get_container<StateVectorContainer>();
         } else if (self.has_container_type<AmplitudeContainer>()) {
           return self.get_container<AmplitudeContainer>();
+        } else if (self.has_container_type<MPSContainer>()) {
+          return self.get_container<MPSContainer>();
         } else {
           throw std::runtime_error("Unknown container type.");
         }

@@ -13,96 +13,6 @@ from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite
 
 from .test_helpers import create_test_orbitals
 
-# Per-physical-state particle counts for spin-half orbitals:
-# |0⟩ -> 0, |↑⟩ -> 1, |↓⟩ -> 1, |2⟩ -> 2
-DELTA_N = [0, 1, 1, 2]
-
-
-def _compute_sector_dims(
-    bond_dim: int, left_max_n: int, right_max_n: int
-) -> tuple[dict[int, int], dict[int, int]]:
-    """Compute sector dimensions for a bond, distributing evenly.
-
-    The left bond can carry sectors from 0..left_max_n and the right bond
-    from 0..right_max_n. Dimensions are distributed as evenly as possible,
-    with each sector getting at least 1.
-    """
-    def _distribute(dim: int, max_n: int) -> dict[int, int]:
-        num_sectors = max_n + 1
-        if dim <= num_sectors:
-            # At most one per sector; assign to the first `dim` sectors.
-            return dict.fromkeys(range(dim), 1)
-        base = dim // num_sectors
-        remainder = dim % num_sectors
-        sizes = {}
-        for n in range(num_sectors):
-            sizes[n] = base + (1 if n < remainder else 0)
-        return sizes
-
-    left_sizes = _distribute(bond_dim, left_max_n)
-    right_sizes = _distribute(bond_dim, right_max_n)
-    return left_sizes, right_sizes
-
-
-def _sector_sizes_for_chain(
-    bond_dims: list[int], num_sites: int
-) -> list[dict[int, int]]:
-    """Compute sector sizes for each bond in an MPS chain.
-
-    bond_dims[k] is the dimension of the bond between site k-1 and site k
-    (with bond_dims[0] = left boundary, bond_dims[num_sites] = right boundary).
-
-    Returns a list of length num_sites+1 where entry k is the sector-size map
-    for bond k.
-    """
-    sector_sizes = []
-    for k in range(num_sites + 1):
-        # Maximum particle number reachable at bond k is min(2*k, total_sites*2)
-        max_n = min(2 * k, 2 * num_sites)
-        num_sectors = max_n + 1
-        dim = bond_dims[k]
-        if dim <= num_sectors:
-            sizes = dict.fromkeys(range(dim), 1)
-        else:
-            base = dim // num_sectors
-            remainder = dim % num_sectors
-            sizes = {n: base + (1 if n < remainder else 0) for n in range(num_sectors)}
-        sector_sizes.append(sizes)
-    return sector_sizes
-
-
-def dense_to_abelian_site(
-    tensor: np.ndarray,
-    left_sector_sizes: dict[int, int],
-    right_sector_sizes: dict[int, int],
-    max_particle_number: int | None = None,
-) -> AbelianMPSSite:
-    """Convert a dense tensor to a particle-number-blocked AbelianMPSSite.
-
-    Args:
-        tensor: Dense array of shape (chi_left, d, chi_right).
-        left_sector_sizes: Map from particle number to sector dimension (left bond).
-        right_sector_sizes: Map from particle number to sector dimension (right bond).
-        max_particle_number: Maximum particle number for the axis. Defaults to
-            max key in either sector map.
-
-    Returns:
-        A particle-number-blocked AbelianMPSSite.
-
-    """
-    if max_particle_number is None:
-        max_particle_number = max(
-            max(left_sector_sizes.keys(), default=0),
-            max(right_sector_sizes.keys(), default=0),
-        )
-    return AbelianMPSSite.from_dense_abelian(
-        tensor,
-        left_sector_sizes,
-        right_sector_sizes,
-        DELTA_N[: tensor.shape[1]],
-        max_particle_number,
-    )
-
 
 def make_mps(
     tensors: Sequence[np.ndarray],
@@ -110,17 +20,26 @@ def make_mps(
 ) -> AbelianMPSContainer:
     """Construct a native MPS wavefunction from dense test tensors.
 
-    Creates particle-number-blocked sites with sectors distributed evenly
-    across the bond dimension.
+    Uses one particle-number sector per bond so arbitrary dense test tensors
+    are preserved exactly while satisfying the container's blocked-data
+    contract.
     """
     num_sites = len(tensors)
-    bond_dims = [t.shape[0] for t in tensors] + [tensors[-1].shape[2]]
-    sector_sizes = _sector_sizes_for_chain(bond_dims, num_sites)
-    max_n = 2 * num_sites
+    for index in range(num_sites - 1):
+        if tensors[index].shape[2] != tensors[index + 1].shape[0]:
+            raise ValueError("Adjacent MPS sites have incompatible bond spaces.")
 
     sites = []
-    for k, tensor in enumerate(tensors):
-        sites.append(dense_to_abelian_site(tensor, sector_sizes[k], sector_sizes[k + 1], max_n))
+    for tensor in tensors:
+        sites.append(
+            AbelianMPSSite.from_dense_abelian(
+                tensor,
+                {0: tensor.shape[0]},
+                {0: tensor.shape[2]},
+                [0] * tensor.shape[1],
+                0,
+            )
+        )
 
     return AbelianMPSContainer(
         sites,

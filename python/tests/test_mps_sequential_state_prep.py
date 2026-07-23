@@ -48,8 +48,7 @@ class TestAbelianMPSContainer:
 
     def test_flattened_chemistry_properties(self):
         """Test that chemistry properties are exposed directly on the wavefunction."""
-        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
-        mps = AbelianMPSContainer([site], create_test_orbitals(1))
+        mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
 
         assert isinstance(mps, WavefunctionContainer)
         assert isinstance(mps, MPSContainer)
@@ -62,7 +61,7 @@ class TestAbelianMPSContainer:
 
     def test_metadata_is_stored_directly(self):
         """Test that MPS metadata is exposed directly on the container."""
-        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])]).sites[0]
         physical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
         mps = AbelianMPSContainer(
             [site],
@@ -329,7 +328,7 @@ class TestMPSSequentialPublicApi:
 
     def test_run_requires_one_site_per_orbital(self):
         """State preparation rejects an MPS that covers only an orbital subset."""
-        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])]).sites[0]
         mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
 
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
@@ -874,17 +873,18 @@ class TestMPSSequentialFastEstimation:
     def test_fast_vs_normal_resource_estimates(self, tensors):
         """Verify fast estimation produces similar qubit and Toffoli counts as normal mode."""
         mps = right_normalized_mps(tensors)
+        wavefunction = Wavefunction(mps)
 
         # Normal mode (full CSD decomposition per site)
         algo_normal = MPSSequentialStatePreparation()
-        circuit_normal = algo_normal.run(Wavefunction(mps))
+        circuit_normal = algo_normal.run(wavefunction)
         result_normal = circuit_normal.estimate()
         counts_normal = result_normal.logical_counts
 
         # Fast mode (one representative per shape group)
         algo_fast = MPSSequentialStatePreparation()
         algo_fast.settings().update("fast_resource_estimation", True)
-        circuit_fast = algo_fast.run(Wavefunction(mps))
+        circuit_fast = algo_fast.run(wavefunction)
         result_fast = circuit_fast.estimate()
         counts_fast = result_fast.logical_counts
 
@@ -915,15 +915,16 @@ class TestMPSSequentialFastEstimation:
         """Verify fast estimation agrees with normal mode on small random MPS circuits."""
         rng = np.random.default_rng(seed)
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
+        wavefunction = Wavefunction(mps)
 
         algo_normal = MPSSequentialStatePreparation()
-        circuit_normal = algo_normal.run(Wavefunction(mps))
+        circuit_normal = algo_normal.run(wavefunction)
         result_normal = circuit_normal.estimate()
         counts_normal = result_normal.logical_counts
 
         algo_fast = MPSSequentialStatePreparation()
         algo_fast.settings().update("fast_resource_estimation", True)
-        circuit_fast = algo_fast.run(Wavefunction(mps))
+        circuit_fast = algo_fast.run(wavefunction)
         result_fast = circuit_fast.estimate()
         counts_fast = result_fast.logical_counts
 

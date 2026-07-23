@@ -20,7 +20,7 @@ from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
 )
-from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite, Wavefunction
+from qdk_chemistry.data import AbelianMPSContainer, Wavefunction
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .mps_test_utils import contract_mps, make_mps, random_mps, right_normalized_mps
@@ -237,7 +237,7 @@ class TestGenerateMPSSparsePreparationData:
 
     def test_run_requires_one_site_per_orbital(self):
         """State preparation rejects an MPS that covers only an orbital subset."""
-        site = AbelianMPSSite.from_dense(np.array([[[1.0], [0.0], [0.0], [0.0]]]))
+        site = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])]).sites[0]
         mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
 
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):

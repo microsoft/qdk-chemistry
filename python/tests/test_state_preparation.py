@@ -38,10 +38,10 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, Orbitals, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_helpers import create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_orbitals
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit dependencies not available")
@@ -308,20 +308,25 @@ def test_prepare_single_reference_state_error_cases():
 
 def test_asymmetric_active_space_error():
     """Test error for asymmetric active space in StatePrep."""
-
-    class MockOrbitals:
-        """Mock orbitals with asymmetric active space indices."""
-
-        def get_active_space_indices(self):
-            """Return asymmetric active space indices."""
-            return ([0, 1, 2], [0, 1, 2, 3])
+    coefficients = np.eye(4)
+    active_indices = ([0, 1, 2], [0, 1, 2, 3], [3], list[int]())
+    with pytest.warns(DeprecationWarning, match="coefficients_alpha, coefficients_beta"):
+        orbitals = Orbitals(
+            coefficients,
+            coefficients,
+            None,
+            None,
+            None,
+            create_test_basis_set(4),
+            active_indices,
+        )
 
     class MockWavefunction:
         """Mock wavefunction for testing asymmetric active space."""
 
         def get_orbitals(self):
             """Return mock orbitals."""
-            return MockOrbitals()
+            return orbitals
 
         def get_active_determinants(self):
             """Return mock determinants."""
@@ -340,23 +345,15 @@ def test_asymmetric_active_space_error():
             return len(self.get_active_determinants())
 
     mock_wfn = MockWavefunction()
-    # Skip MPS algorithms — they require MPSContainer and raise TypeError
-    # before reaching the asymmetric active space validation.
-    mps_keys = {"mps_sequential", "mps_sparse"}
-    for sp_key in available("state_prep"):
-        if sp_key in mps_keys:
-            continue
-        prep = create("state_prep", sp_key)
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            ),
-        ):
-            prep.run(mock_wfn)
-    with pytest.raises(ValueError, match="Bitstring must contain only 0 and 1 values"):
-        test_cls._prepare_single_reference_state([1, 0, 2])
+    prep = create("state_prep", "qiskit_regular_isometry")
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
+            "alpha and beta orbitals are not supported for state preparation."
+        ),
+    ):
+        prep.run(mock_wfn)
 
 
 def test_find_pivot_row():

@@ -226,8 +226,7 @@ class TestDensePureStatePreparation:
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415
 
         # Re-init with Base profile required for QIR compilation (get_qiskit_circuit)
-        current_profile = get_config().get_target_profile()
-        qsharp.init(target_profile=TargetProfile.from_str(current_profile))
+        qsharp.init(target_profile=TargetProfile.Base)
         _ = QSHARP_UTILS.StatePreparation
 
         dense_prep = create("state_prep", "dense_pure_state")
