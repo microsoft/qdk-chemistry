@@ -9,6 +9,8 @@ from pathlib import Path
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Orbitals, Structure
+from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 
 if __name__ == "__main__":
@@ -23,8 +25,8 @@ if __name__ == "__main__":
     )
 
     active_space_orbitals = Orbitals(
-        hf_wfn.get_orbitals().get_coefficients()[0],
-        hf_wfn.get_orbitals().get_energies()[0],
+        spin_channel_matrix(hf_wfn.get_orbitals().coefficients(), axes.alpha()),
+        spin_channel_vector(hf_wfn.get_orbitals().energies(), axes.alpha()),
         hf_wfn.get_orbitals().get_overlap_matrix(),
         hf_wfn.get_orbitals().get_basis_set(),
         (

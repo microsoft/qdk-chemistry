@@ -26,7 +26,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_naive,
 )
 from qdk_chemistry.data import (
-    QubitHamiltonian,
+    QubitOperator,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -124,8 +124,8 @@ class Trotter(TimeEvolutionBuilder):
         * ``"naive"``: uses the triangle-inequality bound.
           :math:`N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil`
 
-        When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated
-        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the builder consumes it
+        When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated
+        :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the builder consumes it
         directly for schedule-level grouping.  When no partition is present, each Pauli term
         is exponentiated as its own group.
 
@@ -151,7 +151,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
         Args:
@@ -168,7 +168,7 @@ class Trotter(TimeEvolutionBuilder):
         raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
     def _trotter(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, power_repetitions: int = 1
+        self, qubit_hamiltonian: QubitOperator, time: float, power_repetitions: int = 1
     ) -> UnitaryRepresentation:
         r"""Construct the unitary representation using the Trotter decomposition.
 
@@ -214,7 +214,7 @@ class Trotter(TimeEvolutionBuilder):
 
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of Trotter divisions to use.
 
         When both *num_divisions* and *target_accuracy* are provided, the
@@ -253,7 +253,7 @@ class Trotter(TimeEvolutionBuilder):
 
     def _decompose_trotter_step(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         time: float,
         *,
         atol: float = 1e-12,

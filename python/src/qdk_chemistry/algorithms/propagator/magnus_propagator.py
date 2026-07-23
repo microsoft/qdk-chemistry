@@ -66,7 +66,7 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven impor
 from .base import Propagator
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitHamiltonian, TimeDependentQubitHamiltonian
+    from qdk_chemistry.data import QubitOperator, TimeDependentQubitHamiltonian
 
 __all__: list[str] = ["MagnusPropagator", "MagnusPropagatorSettings"]
 
@@ -125,7 +125,7 @@ class MagnusPropagator(Propagator):
         hamiltonian: TimeDependentQubitHamiltonian,
         t_start: float,
         t_end: float,
-    ) -> QubitHamiltonian:
+    ) -> QubitOperator:
         r"""Compute the effective Hamiltonian over :math:`[t_1, t_2]`.
 
         Args:
@@ -168,7 +168,7 @@ class MagnusPropagator(Propagator):
         container: DrivenContainer,
         t_start: float,
         t_end: float,
-    ) -> QubitHamiltonian:
+    ) -> QubitOperator:
         r"""Order-1 Magnus expansion (time averaging) for driven Hamiltonians.
 
         For the driven case :math:`H(t) = H_0 + f(t)\,H_1` the order-1
@@ -194,8 +194,8 @@ class MagnusPropagator(Propagator):
         :math:`O(\delta t^2)` per-step accuracy.
 
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
-        :meth:`~qdk_chemistry.data.QubitHamiltonian.__mul__` and
-        :meth:`~qdk_chemistry.data.QubitHamiltonian.__add__`.
+        :meth:`~qdk_chemistry.data.QubitOperator.__mul__` and
+        :meth:`~qdk_chemistry.data.QubitOperator.__add__`.
 
         Returns the effective time-independent Hamiltonian
         :math:`H_\text{eff}`.

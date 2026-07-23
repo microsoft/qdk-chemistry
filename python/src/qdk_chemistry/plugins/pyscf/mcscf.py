@@ -61,7 +61,8 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -333,9 +334,11 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         # Create nested MC calculator from settings
         mc_calculator = self._create_nested("multi_configuration_calculator")
         # check that alpha and beta active space indices are the same
-        if orbitals.get_active_space_indices()[0] != orbitals.get_active_space_indices()[1]:
+        active_ai = orbitals.active_indices()
+        if spin_channel_indices(active_ai, axes.alpha()) != spin_channel_indices(active_ai, axes.beta()):
             raise ValueError("MCSCF implementation only supports identical active spaces for alpha and beta electrons.")
-        if orbitals.get_inactive_space_indices()[0] != orbitals.get_inactive_space_indices()[1]:
+        inactive_ai = orbitals.inactive_indices()
+        if spin_channel_indices(inactive_ai, axes.alpha()) != spin_channel_indices(inactive_ai, axes.beta()):
             raise ValueError(
                 "MCSCF implementation only supports identical inactive spaces for alpha and beta electrons."
             )
@@ -343,7 +346,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
             raise ValueError("MCSCF implementation only supports restricted orbitals.")
 
         # Get orbital information from hamiltonian
-        active_indices = orbitals.get_active_space_indices()[0]  # Get alpha indices (same for restricted)
+        active_indices = spin_channel_indices(orbitals.active_indices(), axes.alpha())
         n_active_orbitals = len(active_indices)
         n_active_electrons = n_active_alpha_electrons + n_active_beta_electrons
 
@@ -351,7 +354,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         # occupied orbitals are doubly occupied
         alpha_occ = [0] * orbitals.get_num_molecular_orbitals()
         beta_occ = [0] * orbitals.get_num_molecular_orbitals()
-        for i in orbitals.get_inactive_space_indices()[0]:
+        for i in spin_channel_indices(orbitals.inactive_indices(), axes.alpha()):
             alpha_occ[i] = 1
             beta_occ[i] = 1
         for i in active_indices:
@@ -415,8 +418,8 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         wfn = pyscf_mcscf.fcisolver.wavefunction
 
         nmo = pyscf_mcscf.mo_coeff.shape[1]
-        active_alpha = orbitals.get_active_space_indices()[0]
-        inactive_alpha = orbitals.get_inactive_space_indices()[0]
+        active_alpha = spin_channel_indices(orbitals.active_indices(), axes.alpha())
+        inactive_alpha = spin_channel_indices(orbitals.inactive_indices(), axes.alpha())
         orbitals = Orbitals(
             pyscf_mcscf.mo_coeff,
             pyscf_mcscf.mo_energy,

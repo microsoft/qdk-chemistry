@@ -12,7 +12,9 @@ import json
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitHamiltonian
+from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -172,7 +174,16 @@ class TestFolderCacheData:
         loaded = folder_cache.get_data("orb_hash_1")
         assert loaded is not None
         assert isinstance(loaded, Orbitals)
-        np.testing.assert_array_equal(loaded.get_coefficients(), sample_orbitals.get_coefficients())
+        coefficients = loaded.coefficients()
+        sample_coefficients = sample_orbitals.coefficients()
+        np.testing.assert_array_equal(
+            spin_channel_matrix(coefficients, axes.alpha()),
+            spin_channel_matrix(sample_coefficients, axes.alpha()),
+        )
+        np.testing.assert_array_equal(
+            spin_channel_matrix(coefficients, axes.beta()),
+            spin_channel_matrix(sample_coefficients, axes.beta()),
+        )
 
     def test_put_data_skips_if_exists(self, folder_cache, sample_orbitals, cache_dir):
         """Second put with same hash is a no-op (doesn't overwrite)."""
@@ -305,7 +316,7 @@ class TestFolderCacheData:
             variances_each_term=[np.array([0.001, 0.002])],
         )
         measurement = MeasurementData(
-            hamiltonians=[QubitHamiltonian(["ZI", "XI"], np.array([1.0, 0.5]))],
+            hamiltonians=[QubitOperator(["ZI", "XI"], np.array([1.0, 0.5]))],
             bitstring_counts=[{"0": 50, "1": 50}],
             shots_list=[100],
         )
