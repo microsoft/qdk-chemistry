@@ -20,36 +20,23 @@ __all__: list[str] = ["ControlledSwapPauliSequenceMapper"]
 class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     r"""Controlled evolution circuit mapper using a CSWAP-sandwich construction.
 
-    Given a time-evolution operator expressed as a Pauli product formula
-    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper constructs
-    a controlled version of :math:`U(t)` without controlling every gate of the evolution.
-    It uses a *CSWAP sandwich*:
+    Given a time-evolution operator as a Pauli product formula
+    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper builds a controlled
+    :math:`U(t)` without controlling every gate. It uses a *CSWAP sandwich*: an internally allocated
+    ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system register,
+    the *uncontrolled* evolution is applied to the vacuum (repeated ``step_reps`` times), and the swap
+    is uncomputed. When the control is :math:`|0\rangle` the evolution acts on the vacuum (system
+    untouched); when it is :math:`|1\rangle` the system is parked in the vacuum and evolved, so the
+    target eigenphase accumulates on the :math:`|1\rangle` branch (standard controlled-:math:`U`
+    convention). This trades controlling every gate for a single layer of controlled-:math:`\mathrm{SWAP}`.
 
-    1. An internally allocated ``vacuum`` register (initialized to :math:`|0\ldots0\rangle`)
-       is conditionally swapped with the system register, controlled on the control qubit.
-    2. The *uncontrolled* Pauli evolution :math:`U(t)` is applied to the vacuum register
-       (repeated ``step_reps`` times).
-    3. The controlled swap is uncomputed and the vacuum register is reset.
-
-    When the control qubit is :math:`|0\rangle` the evolution acts on the vacuum reference
-    :math:`|0\ldots0\rangle` (leaving the system state untouched); when it is :math:`|1\rangle`
-    the system state is parked in the vacuum register and is evolved. The target eigenphase
-    therefore accumulates on the :math:`|1\rangle` branch, matching the standard controlled-:math:`U`
-    convention.
-
-    This trades the cost of controlling every gate for a single layer of controlled-:math:`\mathrm{SWAP}`
-    gates, so the (repeated) evolution is applied with uncontrolled gates only.
-
-    **Residual phase / Hamiltonian restriction.** On the :math:`|0\rangle` branch the evolution acts on
-    the vacuum, contributing :math:`U|0\ldots0\rangle = \lambda\,|0\ldots0\rangle` with
-    :math:`\lambda = \langle 0\ldots0|U|0\ldots0\rangle`. This leaves a residual phase
-    :math:`\varphi_0 = \arg\lambda = -E_0 t` (where :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`) on the
-    measured eigenphase, which is a known constant and can be removed by the QPE feedback rotation.
-    The construction is exact **only if** :math:`|0\ldots0\rangle` is an eigenstate of :math:`U`
-    (equivalently :math:`|\lambda| = 1`); otherwise the vacuum leaks (:math:`|\lambda| < 1`), the control
-    qubit decoheres, and the phase cannot be recovered. This holds automatically for
-    particle-number-conserving Hamiltonians (e.g. Jordan-Wigner/Bravyi-Kitaev molecular Hamiltonians),
-    for which the all-zero register is the exact vacuum eigenstate.
+    **Hamiltonian restriction.** On the :math:`|0\rangle` branch the vacuum picks up
+    :math:`U|0\ldots0\rangle = \lambda\,|0\ldots0\rangle`, leaving a residual phase
+    :math:`\varphi_0 = \arg\lambda = -E_0 t` (:math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`) that the QPE
+    feedback rotation removes. The construction is exact **only if** :math:`|0\ldots0\rangle` is an
+    eigenstate of :math:`U` (:math:`|\lambda| = 1`); otherwise the vacuum leaks, the control decoheres, and
+    the phase is lost. This holds automatically for particle-number-conserving Hamiltonians
+    (e.g. Jordan-Wigner/Bravyi-Kitaev molecular Hamiltonians).
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
