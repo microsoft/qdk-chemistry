@@ -60,13 +60,12 @@ class RegularIsometryStatePreparation(StatePreparation):
                 "alpha and beta orbitals are not supported for state preparation."
             )
 
-        num_orbitals = len(alpha_indices)
-        n_qubits = num_orbitals * 2
         num_dets = wavefunction.size()
         Logger.debug(f"Using {num_dets} determinants for state preparation")
 
-        # Create statevector using Python conversion function
+        # Create statevector from wavefunction
         statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
+        n_qubits = int(statevector_data.shape[0]).bit_length() - 1
 
         # Create the circuit
         circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")
