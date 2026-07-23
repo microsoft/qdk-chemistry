@@ -67,7 +67,7 @@ qubit_hamiltonian = qubit_mapper.run(
 )
 
 # 6. State preparation
-state_prep = create("state_prep", "sparse_isometry_gf2x")
+state_prep = create("state_prep", "sparse_isometry")
 state_preparation = state_prep.run(wfn_cas)
 
 # 7. Build target unitary U

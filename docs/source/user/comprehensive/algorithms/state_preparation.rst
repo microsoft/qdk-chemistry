@@ -75,12 +75,12 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
-Sparse Isometry GF2+X
-~~~~~~~~~~~~~~~~~~~~~
+Sparse Isometry
+~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"sparse_isometry_gf2x"``
+.. rubric:: Factory name: ``"sparse_isometry"``
 
-This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.
+This method is an optimized approach that leverages sparsity in the target wavefunction. The method is a modification of the original sparse isometry work in :cite:`Malvetti2021`, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry :cite:`Christandl2016` on a smaller number of qubits, and finally scattered to the full qubit space using X and :term:`CNOT` gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.
 
 .. rubric:: Settings
 

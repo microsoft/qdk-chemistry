@@ -761,7 +761,9 @@ jobs:
 
   test-with-qdk-branch:
     name: Full Test with QDK Branch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    # TODO(temporary): also run on pull_request so this job runs and must pass on this PR.
+    # Revert to `github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch` before merge.
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch) }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
       BUILD_DIR: cpp/build
@@ -882,8 +884,7 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/widgets" "${{ runner.temp }}/qdk/source/jupyterlab"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/qdk_package"
+        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 

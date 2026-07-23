@@ -15,13 +15,44 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
-from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation
+from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation, Wavefunction
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
-_SHOTS = 100
+_SHOTS = 5000
 _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
+_ATOL = 1.0 / np.sqrt(_SHOTS)  # Limited by shot noise
+
+
+def _exact_overlap(wavefunction: Wavefunction, unitary: UnitaryRepresentation) -> complex:
+    r"""Compute the exact expectation :math:`\langle\psi|U|\psi\rangle` for the prepared state and Trotter unitary."""
+    container = unitary.get_container()
+    num_qubits = unitary.get_num_qubits()
+    dim = 2**num_qubits
+
+    # Exact statevector |psi> from the wavefunction determinants (Jordan-Wigner, qubit q -> bit 2**q).
+    determinants = wavefunction.get_active_determinants()
+    coefficients = np.asarray(wavefunction.get_coefficients(), dtype=complex)
+    num_bits = wavefunction.get_configuration_set().num_modes() * determinants[0].bits_per_mode()
+    psi = np.zeros(dim, dtype=complex)
+    for determinant, coefficient in zip(determinants, coefficients, strict=False):
+        index = sum(int(bit) << qubit for qubit, bit in enumerate(determinant.to_bits(num_bits)))
+        psi[index] += coefficient
+    psi /= np.linalg.norm(psi)
+
+    # Exact Trotter unitary U = (prod_j exp(-i theta_j P_j))^step_reps.
+    step = np.eye(dim, dtype=complex)
+    for term in container.step_terms:
+        label = ["I"] * num_qubits
+        for qubit, pauli in term.pauli_term.items():
+            label[num_qubits - 1 - qubit] = pauli
+        pauli_matrix = np.asarray(pauli_to_dense_matrix(["".join(label)], [1.0]), dtype=complex)
+        step = (np.cos(term.angle) * np.eye(dim) - 1j * np.sin(term.angle) * pauli_matrix) @ step
+    matrix = np.linalg.matrix_power(step, container.step_reps)
+
+    return complex(np.conjugate(psi) @ (matrix @ psi))
 
 
 def _make_hadamard_test(test_basis: HadamardTestBasis = HadamardTestBasis.X):
@@ -39,6 +70,8 @@ class HadamardWaterBenchmark:
 
     state_preparation: Circuit
     unitary: UnitaryRepresentation
+    reference: complex
+    r"""Exact classical expectation :math:`\langle\psi|U|\psi\rangle` the Hadamard test should estimate."""
 
 
 @pytest.fixture(scope="module")
@@ -80,7 +113,7 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     mapping = MajoranaMapping.jordan_wigner(2 * num_active_orbitals)
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
-    state_prep_builder = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+    state_prep_builder = create("state_prep", algorithm_name="sparse_isometry")
     state_preparation = state_prep_builder.run(active_wfn)
 
     evolution_builder = create("hamiltonian_unitary_builder", "trotter", time=_EVOLUTION_TIME, power=_OBSERVABLE_POWER)
@@ -89,6 +122,7 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     return HadamardWaterBenchmark(
         state_preparation=state_preparation,
         unitary=unitary,
+        reference=_exact_overlap(active_wfn, unitary),
     )
 
 
@@ -105,7 +139,8 @@ def test_qdk_hadamard_test_measures_water_observable(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.34, atol=1e-12)
+    # The X-basis Hadamard test estimates Re<psi|U|psi>; compare to the reference within shot-noise tolerance.
+    assert np.isclose(observable_value, water_hadamard_benchmark.reference.real, atol=_ATOL)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
@@ -122,7 +157,8 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.98, atol=1e-12)
+    # The Y-basis Hadamard test estimates Im<psi|U|psi>; compare to the reference within shot-noise tolerance.
+    assert np.isclose(observable_value, water_hadamard_benchmark.reference.imag, atol=_ATOL)
 
 
 def test_hadamard_test_rejects_invalid_test_basis() -> None:

@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
-from qdk_chemistry.data import Circuit
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryStatePreparation
+from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -39,7 +39,7 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     # Create both state preparation instances
     basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
     sparse_prep_gf2x = create(
-        "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="sparse_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
         "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
@@ -71,22 +71,25 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     ), f"Energy difference {energy_diff} exceeds tolerance. "
 
 
-def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_10e6o, ref_energy_10e6o):
-    """Test SparseIsometryGF2XStatePreparation energy validation for 10e6o F2."""
-    # Create SparseIsometryGF2XStatePreparation instance for F2 test
+def test_sparse_isometry_energy_validation(wavefunction_10e6o, hamiltonian_10e6o, ref_energy_10e6o):
+    """Test SparseIsometryStatePreparation energy validation for 10e6o F2."""
+    # Create SparseIsometryStatePreparation instance for F2 test
     sparse_prep = create(
         "state_prep",
-        algorithm_name="sparse_isometry_gf2x",
+        algorithm_name="sparse_isometry",
         basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
         transpile_optimization_level=1,
     )
 
     qiskit_sparse_prep = create(
         "state_prep",
-        algorithm_name="sparse_isometry_gf2x",
-        basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
-        transpile_optimization_level=1,
-        dense_preparation_method="qiskit",
+        algorithm_name="sparse_isometry",
+        dense_state_prep=AlgorithmRef(
+            "state_prep",
+            "qiskit_regular_isometry",
+            basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
+            transpile_optimization_level=1,
+        ),
     )
 
     circuit = sparse_prep.run(wavefunction_10e6o).get_qiskit_circuit()
@@ -122,16 +125,16 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
     )
 
 
-def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
+def test_sparse_isometry_circuit_efficiency(wavefunction_4e4o):
     """Compare isometry resource requirements.
 
-    Test that SparseIsometryGF2XStatePrep creates more circuits using fewer resources
+    Test that SparseIsometryStatePrep creates more circuits using fewer resources
     than regular isometry.
     """
     # Create both state preparation instances
     basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
     sparse_prep = create(
-        "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
+        "state_prep", algorithm_name="sparse_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
     regular_prep = create(
         "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
@@ -191,7 +194,7 @@ def get_bitstring(circuit: Circuit) -> str:
 )
 def test_single_reference_state_basic(bitstring):
     """Test basic single reference state preparation with various bitstrings."""
-    test_cls = SparseIsometryGF2XStatePreparation()
+    test_cls = SparseIsometryStatePreparation()
     circuit = test_cls._prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
     expected = "".join(str(b) for b in bitstring[::-1])  # Reverse for Qiskit's little-endian format
