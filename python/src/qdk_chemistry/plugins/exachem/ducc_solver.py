@@ -23,6 +23,7 @@ References:
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -183,6 +184,7 @@ class ExachemDuccSolver(Algorithm):
 
         binary = s.get("exachem_binary") or None
         work = s.get("work_dir") or None
+        cleanup_work_dir = work is None
         work_path = Path(work) if work else None
 
         import tempfile
@@ -191,105 +193,106 @@ class ExachemDuccSolver(Algorithm):
             work_path = Path(tempfile.mkdtemp(prefix="exachem_ducc_"))
         work_path.mkdir(parents=True, exist_ok=True)
 
-        scf_prefix_name = f"ducc_input.{s.get('basis')}"
-        scf_type_dir = work_path / f"{scf_prefix_name}_files" / s.get("scf_type")
-        scf_dir = scf_type_dir / "scf"
-        scf_dir.mkdir(parents=True, exist_ok=True)
-        scf_files_prefix = scf_dir / scf_prefix_name
+        try:
+            scf_prefix_name = f"ducc_input.{s.get('basis')}"
+            scf_type_dir = work_path / f"{scf_prefix_name}_files" / s.get("scf_type")
+            scf_dir = scf_type_dir / "scf"
+            scf_dir.mkdir(parents=True, exist_ok=True)
+            scf_files_prefix = scf_dir / scf_prefix_name
 
-        # Run context JSON goes one level up from scf/ (at the scf_type level)
-        runcontext_prefix = scf_type_dir / scf_prefix_name
+            # Run context JSON goes one level up from scf/ (at the scf_type level)
+            runcontext_prefix = scf_type_dir / scf_prefix_name
 
-        # Build basis set for AO reordering
-        from qdk_chemistry.data import BasisSet, Element, Structure
+            # Build basis set for AO reordering
+            from qdk_chemistry.data import BasisSet, Element, Structure
 
-        atom_coords = []
-        atom_elements = []
-        element_symbols = []
-        for line in atoms:
-            parts = line.split()
-            atom_elements.append(getattr(Element, parts[0]))
-            element_symbols.append(parts[0])
-            atom_coords.append([float(x) for x in parts[1:4]])
-        coords_np = np.array(atom_coords)
-        if s.get("units").lower() == "angstrom":
-            coords_np = coords_np / 0.529177249
-        structure = Structure(coords_np, atom_elements)
-        basis_set = BasisSet.from_basis_name(s.get("basis"), structure)
+            atom_coords = []
+            atom_elements = []
+            element_symbols = []
+            for line in atoms:
+                parts = line.split()
+                atom_elements.append(getattr(Element, parts[0]))
+                element_symbols.append(parts[0])
+                atom_coords.append([float(x) for x in parts[1:4]])
+            coords_np = np.array(atom_coords)
+            if s.get("units").lower() == "angstrom":
+                coords_np = coords_np / 0.529177249
+            structure = Structure(coords_np, atom_elements)
+            basis_set = BasisSet.from_basis_name(s.get("basis"), structure)
 
-        # ExaChem expects the TOTAL density (alpha + beta), not alpha-only.
-        # For restricted closed-shell: D_total = 2 * D_alpha
-        density_for_export = density_alpha * 2.0
+            # ExaChem expects the TOTAL density (alpha + beta), not alpha-only.
+            # For restricted closed-shell: D_total = 2 * D_alpha
+            density_for_export = density_alpha * 2.0
 
-        # Feed ExaChem qdk-chemistry's own basis (written as a Gaussian-94 file
-        # here and read via LIBINT_DATA_PATH) so the two codes use an identical
-        # inter-shell order and identical basis parameters.  The AO export then
-        # only needs the within-shell p-component correction.
-        basis_data_dir = work_path / "qdk_libint_basis"
+            # Feed ExaChem qdk-chemistry's own basis (written as a Gaussian-94 file
+            # here and read via LIBINT_DATA_PATH) so the two codes use an identical
+            # inter-shell order and identical basis parameters.  The AO export then
+            # only needs the within-shell p-component correction.
+            basis_data_dir = work_path / "qdk_libint_basis"
 
-        export_scf_files(
-            files_prefix=scf_files_prefix,
-            mo_coeff_alpha=mo_coeff_alpha,
-            density_alpha=density_for_export,
-            ao_tilesize=30,
-            runcontext_prefix=runcontext_prefix,
-            basis_set=basis_set,
-            basis_name=s.get("basis"),
-            elements=element_symbols,
-            basis_data_dir=basis_data_dir,
-        )
-        logger.info("Exported SCF data for noscf mode to %s", scf_dir)
+            export_scf_files(
+                files_prefix=scf_files_prefix,
+                mo_coeff_alpha=mo_coeff_alpha,
+                density_alpha=density_for_export,
+                ao_tilesize=30,
+                runcontext_prefix=runcontext_prefix,
+                basis_set=basis_set,
+                basis_name=s.get("basis"),
+                elements=element_symbols,
+                basis_data_dir=basis_data_dir,
+            )
+            logger.info("Exported SCF data for noscf mode to %s", scf_dir)
 
-        result: ExachemResult = run_exachem(
-            config,
-            nprocs=s.get("mpi_ranks"),
-            work_dir=work_path,
-            exachem_binary=Path(binary) if binary else None,
-            timeout=s.get("timeout"),
-            scf_files_prefix=scf_files_prefix,
-            libint_data_path=basis_data_dir,
-        )
-
-        # Parse DUCC results (prefer native format, fall back to FCIDUMP)
-        if result.ducc_results_path and result.ducc_json_path:
-            logger.info("Parsing DUCC results from %s", result.ducc_results_path)
-            fcidump = parse_ducc_results(result.ducc_results_path, result.ducc_json_path)
-        elif result.fcidump_path:
-            logger.info("Parsing FCIDUMP from %s", result.fcidump_path)
-            fcidump = parse_fcidump(result.fcidump_path)
-        else:
-            raise RuntimeError(
-                f"ExaChem completed but no DUCC output files were produced. Check {result.work_dir} for output files."
+            result: ExachemResult = run_exachem(
+                config,
+                nprocs=s.get("mpi_ranks"),
+                work_dir=work_path,
+                exachem_binary=Path(binary) if binary else None,
+                timeout=s.get("timeout"),
+                scf_files_prefix=scf_files_prefix,
+                libint_data_path=basis_data_dir,
             )
 
-        # Extract the DUCC energy shift from ExaChem's stdout (see
-        # conversion.parse_energy_shift). The shift excludes nuclear repulsion;
-        # at ducc_lvl=0 ExaChem prints no "Total Energy Shift" line, so the
-        # helper falls back to (Full SCF - Bare Active Space SCF). The correct
-        # qdk core_energy is core_energy = energy_shift + V_nuc, so that
-        # E_total = E_CI_active(from MACIS) + core_energy.
-        total_energy_shift = parse_energy_shift(result.stdout)
+            # Parse DUCC results (prefer native format, fall back to FCIDUMP)
+            if result.ducc_results_path and result.ducc_json_path:
+                logger.info("Parsing DUCC results from %s", result.ducc_results_path)
+                fcidump = parse_ducc_results(result.ducc_results_path, result.ducc_json_path)
+            elif result.fcidump_path:
+                logger.info("Parsing FCIDUMP from %s", result.fcidump_path)
+                fcidump = parse_fcidump(result.fcidump_path)
+            else:
+                raise RuntimeError(
+                    f"ExaChem completed but no DUCC output files were produced. "
+                    f"Check {result.work_dir} for output files."
+                )
 
-        if total_energy_shift is not None:
-            core_energy = total_energy_shift + fcidump.nuclear_repulsion
-        else:
-            core_energy = fcidump.nuclear_repulsion
-            logger.warning("Could not extract energy shift from ExaChem stdout; using nuc_rep only")
+            # Extract the DUCC energy shift from ExaChem's stdout (see
+            # conversion.parse_energy_shift). The shift excludes nuclear repulsion;
+            # at ducc_lvl=0 ExaChem prints no "Total Energy Shift" line, so the
+            # helper falls back to (Full SCF - Bare Active Space SCF). The correct
+            # qdk core_energy is core_energy = energy_shift + V_nuc, so that
+            # E_total = E_CI_active(from MACIS) + core_energy.
+            total_energy_shift = parse_energy_shift(result.stdout)
 
-        # Convert to Hamiltonian
-        hamiltonian = fcidump_to_hamiltonian(
-            fcidump,
-            atoms=list(s.get("atoms")),
-            basis=s.get("basis"),
-            units=s.get("units"),
-            core_energy_override=core_energy,
-        )
+            if total_energy_shift is not None:
+                core_energy = total_energy_shift + fcidump.nuclear_repulsion
+            else:
+                core_energy = fcidump.nuclear_repulsion
+                logger.warning("Could not extract energy shift from ExaChem stdout; using nuc_rep only")
 
-        # Clean up temporary files unless a work_dir was explicitly provided
-        if not s.get("work_dir"):
-            import shutil
+            # Convert to Hamiltonian
+            hamiltonian = fcidump_to_hamiltonian(
+                fcidump,
+                atoms=list(s.get("atoms")),
+                basis=s.get("basis"),
+                units=s.get("units"),
+                core_energy_override=core_energy,
+            )
 
-            shutil.rmtree(result.work_dir, ignore_errors=True)
-            logger.debug("Cleaned up work directory %s", result.work_dir)
-
-        return hamiltonian
+            return hamiltonian
+        finally:
+            # Remove every input/output/basis file written during the run, unless
+            # the caller supplied an explicit work_dir (then they own the files).
+            if cleanup_work_dir:
+                shutil.rmtree(work_path, ignore_errors=True)
+                logger.debug("Cleaned up work directory %s", work_path)
