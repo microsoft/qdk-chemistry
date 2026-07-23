@@ -10,8 +10,8 @@ for two methods:
 
 - Double Unitary Coupled Cluster (DUCC) Hamiltonian downfolding
   (:class:`~qdk_chemistry.plugins.exachem.ducc_solver.ExachemDuccSolver`).
-- CCSD(T) total-energy calculations
-  (:class:`~qdk_chemistry.plugins.exachem.ccsdt_calculator.ExachemCcsdtCalculator`).
+- CCSD calculations that return the converged T1/T2 cluster amplitudes
+  (:class:`~qdk_chemistry.plugins.exachem.ccsd_calculator.ExachemCcsdCalculator`).
 
 ExaChem runs as an external MPI process; qdk-chemistry supplies pre-computed SCF
 orbitals via ExaChem's serial-IO restart format and parses the results.
@@ -33,7 +33,7 @@ def load():
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.algorithms.registry import register_factory  # noqa: PLC0415
-    from qdk_chemistry.plugins.exachem.ccsdt_calculator import ExachemCcsdtCalculator  # noqa: PLC0415
+    from qdk_chemistry.plugins.exachem.ccsd_calculator import ExachemCcsdCalculator  # noqa: PLC0415
     from qdk_chemistry.plugins.exachem.ducc_solver import (  # noqa: PLC0415
         ExachemDuccSolver,
         HamiltonianDownfolderFactory,
@@ -41,4 +41,4 @@ def load():
 
     register_factory(HamiltonianDownfolderFactory())
     register(lambda: ExachemDuccSolver())
-    register(lambda: ExachemCcsdtCalculator())
+    register(lambda: ExachemCcsdCalculator())

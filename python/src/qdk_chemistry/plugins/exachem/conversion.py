@@ -258,6 +258,89 @@ def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
     return energies
 
 
+def _read_amplitude_file(path: str | Path, shape: tuple[int, ...]) -> np.ndarray:
+    """Read a TAMM ``print_max_above_threshold`` text file into a dense array.
+
+    Each non-empty line is ``idx0 idx1 ... value``; entries not listed are exact
+    zeros (TAMM only writes amplitudes whose magnitude exceeds the print
+    threshold).  The returned array has the given ``shape``.
+    """
+    arr = np.zeros(shape, dtype=float)
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) != len(shape) + 1:
+                continue
+            idx = tuple(int(p) for p in parts[:-1])
+            arr[idx] = float(parts[-1])
+    return arr
+
+
+def parse_ccsd_amplitudes_restricted(
+    t1_path: str | Path, t2_path: str | Path, nocc: int, nvir: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Parse restricted (RHF) CCSD T amplitudes from ExaChem text files.
+
+    ExaChem stores T1 as ``(vir, occ)`` and T2 as ``(vir, vir, occ, occ)``.
+    This returns them in the qdk-chemistry/PySCF layout: ``t1[i, a]`` with shape
+    ``(nocc, nvir)`` and ``t2[i, j, a, b]`` with shape
+    ``(nocc, nocc, nvir, nvir)`` (the closed-shell ``abab`` amplitude).
+
+    Args:
+        t1_path: Path to ``<prefix>.print_t1amp.txt``.
+        t2_path: Path to ``<prefix>.print_t2amp.txt``.
+        nocc: Number of correlated occupied (spatial) orbitals.
+        nvir: Number of correlated virtual (spatial) orbitals.
+
+    Returns:
+        ``(t1, t2)`` dense arrays in qdk-chemistry layout.
+    """
+    t1_vo = _read_amplitude_file(t1_path, (nvir, nocc))
+    t2_vvoo = _read_amplitude_file(t2_path, (nvir, nvir, nocc, nocc))
+    t1 = np.ascontiguousarray(t1_vo.transpose(1, 0))
+    t2 = np.ascontiguousarray(t2_vvoo.transpose(2, 3, 0, 1))
+    return t1, t2
+
+
+def parse_ccsd_amplitudes_unrestricted(
+    t1_path: str | Path,
+    t2_path: str | Path,
+    noa: int,
+    nob: int,
+    nva: int,
+    nvb: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Parse unrestricted (UHF) CCSD T amplitudes from ExaChem MSO text files.
+
+    ExaChem writes a single molecular-spin-orbital (MSO) tensor whose occupied
+    block is ordered ``[alpha, beta]`` and whose virtual block is ordered
+    ``[alpha, beta]``.  This splits the MSO tensor into the spin blocks and
+    returns them in the qdk-chemistry/PySCF layout (occupied indices first):
+    ``t1_aa`` ``(noa, nva)``, ``t1_bb`` ``(nob, nvb)``, ``t2_aaaa``
+    ``(noa, noa, nva, nva)``, ``t2_abab`` ``(noa, nob, nva, nvb)``, ``t2_bbbb``
+    ``(nob, nob, nvb, nvb)``.
+
+    Args:
+        t1_path: Path to ``<prefix>.print_t1amp.txt``.
+        t2_path: Path to ``<prefix>.print_t2amp.txt``.
+        noa, nob: Number of correlated occupied alpha/beta orbitals.
+        nva, nvb: Number of correlated virtual alpha/beta orbitals.
+
+    Returns:
+        ``(t1_aa, t1_bb, t2_aaaa, t2_abab, t2_bbbb)`` dense arrays.
+    """
+    no, nv = noa + nob, nva + nvb
+    t1 = _read_amplitude_file(t1_path, (nv, no))                 # (vir_mso, occ_mso)
+    t2 = _read_amplitude_file(t2_path, (nv, nv, no, no))         # (v1, v2, o1, o2)
+    va, vb = slice(0, nva), slice(nva, nv)
+    oa, ob = slice(0, noa), slice(noa, no)
+    t1_aa = np.ascontiguousarray(t1[va, oa].transpose(1, 0))
+    t1_bb = np.ascontiguousarray(t1[vb, ob].transpose(1, 0))
+    t2_aaaa = np.ascontiguousarray(t2[va, va, oa, oa].transpose(2, 3, 0, 1))
+    t2_abab = np.ascontiguousarray(t2[va, vb, oa, ob].transpose(2, 3, 0, 1))
+    t2_bbbb = np.ascontiguousarray(t2[vb, vb, ob, ob].transpose(2, 3, 0, 1))
+    return t1_aa, t1_bb, t2_aaaa, t2_abab, t2_bbbb
+
 
 def _parse_ducc_blocks(text: str) -> dict[str, list[tuple]]:
     """Parse block-labeled DUCC results into a dict of integral lists."""

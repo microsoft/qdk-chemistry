@@ -166,14 +166,15 @@ class DuccInputConfig:
 
 
 @dataclass
-class CcsdtInputConfig:
-    """Configuration for an ExaChem CCSD(T) calculation.
+class CcsdInputConfig:
+    """Configuration for an ExaChem CCSD calculation that writes T amplitudes.
 
-    Unlike :class:`DuccInputConfig`, CCSD(T) is a full-space total-energy method
-    (no active-space downfolding), so there are no ``nactive_*`` or ``ducc_lvl``
-    options. Frozen core/virtual orbitals are supported via the CC ``freeze``
-    block. Both restricted (RHF) and unrestricted (UHF) references are supported;
-    ExaChem requires ``scf_type="unrestricted"`` whenever ``multiplicity > 1``.
+    Runs ExaChem's ``ccsd`` task (Coupled Cluster Singles and Doubles) and, when
+    ``write_amplitudes`` is set, enables ExaChem's ``CC.PRINT.tamplitudes`` option
+    so the converged T1/T2 amplitudes are written to text files
+    (``<prefix>.print_t1amp.txt`` and ``<prefix>.print_t2amp.txt``).  No
+    perturbative-triples ``(T)`` step is performed, so the T amplitudes ExaChem
+    writes are exactly the converged CCSD amplitudes.
 
     Attributes:
         atoms: List of atom lines, e.g. ``["H 0.0 0.0 0.0", "O 0.0 0.0 1.0"]``.
@@ -188,6 +189,9 @@ class CcsdtInputConfig:
         freeze_virtual: Number of frozen virtual orbitals (0 = none).
         scf_type: SCF type (``"restricted"`` or ``"unrestricted"``).
         noscf: Whether ExaChem should skip its internal SCF and restart.
+        write_amplitudes: Enable ``CC.PRINT.tamplitudes`` to write T1/T2 to text.
+        amplitude_threshold: Only amplitudes with absolute value strictly greater
+            than this are written (``0.0`` writes every nonzero amplitude).
         input_prefix: Base name for the ExaChem input file and restart directory.
         extra_cc_options: Additional CC block options merged into the input.
         extra_scf_options: Additional SCF block options merged into the input.
@@ -206,7 +210,9 @@ class CcsdtInputConfig:
     freeze_virtual: int = 0
     scf_type: str = "restricted"
     noscf: bool = False
-    input_prefix: str = "ccsdt_input"
+    write_amplitudes: bool = True
+    amplitude_threshold: float = 0.0
+    input_prefix: str = "ccsd_input"
     extra_cc_options: dict = field(default_factory=dict)
     extra_scf_options: dict = field(default_factory=dict)
 
@@ -217,6 +223,8 @@ class CcsdtInputConfig:
             "ccsd_maxiter": self.ccsd_maxiter,
             "writet": False,
         }
+        if self.write_amplitudes:
+            cc_block["PRINT"] = {"tamplitudes": [True, self.amplitude_threshold]}
         if self.freeze_core or self.freeze_virtual:
             cc_block["freeze"] = {
                 "core": self.freeze_core,
@@ -250,7 +258,7 @@ class CcsdtInputConfig:
             "CC": cc_block,
             "TASK": {
                 "scf": not self.noscf,
-                "ccsd_t": True,
+                "ccsd": True,
             },
         }
 
@@ -282,7 +290,7 @@ class ExachemResult:
 
 
 def run_exachem(
-    config: DuccInputConfig | CcsdtInputConfig,
+    config: DuccInputConfig | CcsdInputConfig,
     *,
     nprocs: int = 1,
     work_dir: Path | None = None,
@@ -292,10 +300,10 @@ def run_exachem(
     scf_files_prefix: Path | None = None,
     libint_data_path: Path | None = None,
 ) -> ExachemResult:
-    """Run an ExaChem DUCC or CCSD(T) calculation.
+    """Run an ExaChem DUCC or CCSD calculation.
 
     Args:
-        config: ExaChem input configuration (:class:`DuccInputConfig` or :class:`CcsdtInputConfig`).
+        config: ExaChem input configuration (:class:`DuccInputConfig` or :class:`CcsdInputConfig`).
         nprocs: Number of MPI processes.
         work_dir: Working directory. If None, creates a temporary directory.
         exachem_binary: Path to ExaChem binary. If None, auto-detects.
@@ -388,7 +396,7 @@ def run_exachem(
     return exachem_result
 
 
-def _setup_noscf_directory(work_dir: Path, config: DuccInputConfig | CcsdtInputConfig, scf_files_prefix: Path) -> None:
+def _setup_noscf_directory(work_dir: Path, config: DuccInputConfig | CcsdInputConfig, scf_files_prefix: Path) -> None:
     """Set up ExaChem directory structure for noscf restart.
 
     ExaChem expects SCF restart files at a specific path derived from the
