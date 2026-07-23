@@ -44,7 +44,7 @@ void MPSContainer::_validate_common(std::size_t site_count,
   }
   if (std::any_of(_physical_basis.begin(), _physical_basis.end(),
                   [](const Configuration& state) {
-                    return state.bits_per_mode() != 2;
+                    return state.bits_per_mode() != 2 || state.capacity() != 1;
                   })) {
     throw std::invalid_argument(
         "MPS physical basis states must be one-orbital spin-half "
@@ -105,6 +105,18 @@ std::shared_ptr<const Orbitals> MPSContainer::sector_basis(
     throw std::out_of_range("Unknown MPS wavefunction sector: " + name);
   }
   return _orbitals;
+}
+
+void MPSContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _orbitals->content_hash());
+  hash_value(ctx, _total_num_particles);
+  hash_value(ctx, _active_num_particles);
+  hash_value(ctx, _orthogonality_center);
+  hash_value(ctx, _physical_basis);
+  hash_value(ctx, _site_to_orbital_order);
 }
 
 }  // namespace qdk::chemistry::data

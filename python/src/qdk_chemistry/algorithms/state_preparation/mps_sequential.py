@@ -45,7 +45,7 @@ from qdk_chemistry._core.utils import (
     decompose_site_csd,
     decompose_unitary_to_givens,
 )
-from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
+from qdk_chemistry.data import AbelianMPSSite, Configuration, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -54,6 +54,15 @@ from .state_preparation import StatePreparation, StatePreparationSettings
 __all__: list[str] = [
     "MPSSequentialStatePreparation",
 ]
+
+
+def validate_mps_physical_basis(container: MPSContainer) -> None:
+    """Require the physical-slice order assumed by the Q# operations."""
+    if not container.physical_basis:
+        return
+    canonical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
+    if container.physical_basis != canonical_basis:
+        raise ValueError("MPS state preparation requires physical basis ordering ('0', 'u', 'd', '2').")
 
 
 class MPSSequentialStatePreparationSettings(StatePreparationSettings):
@@ -125,6 +134,7 @@ class MPSSequentialStatePreparation(StatePreparation):
 
         if container.physical_dimension != 4:
             raise ValueError("MPS sequential state preparation requires four physical states per site.")
+        validate_mps_physical_basis(container)
         if container.orthogonality_center != 0:
             raise ValueError("MPS sequential state preparation requires a right-canonical MPS with center zero.")
         num_orbitals = container.orbitals.get_num_molecular_orbitals()

@@ -11,7 +11,7 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 
 import numpy as np
 import pytest
-from qdk import TargetProfile, qsharp
+from qdk import qsharp
 from qdk_chemistry._core.utils import decompose_2d, decompose_unitary_to_givens
 from scipy.sparse import issparse
 
@@ -112,6 +112,18 @@ class TestAbelianMPSContainer:
 
         with pytest.raises(ValueError, match="incorrect number of dimensions"):
             AbelianMPSSite.from_dense(np.zeros((4, 4)))
+
+    def test_from_dense_abelian_rejects_sector_dimension_overflow(self):
+        """Sector extents cannot wrap while matching the dense tensor shape."""
+        size_max = np.iinfo(np.uintp).max
+        with pytest.raises(ValueError, match="sector dimensions are too large"):
+            AbelianMPSSite.from_dense_abelian(
+                np.zeros((1, 1, 1)),
+                {0: size_max, 1: 2},
+                {0: 1},
+                [0],
+                1,
+            )
 
     def test_bond_dim_consistency(self):
         """Test that inconsistent bond dimensions are caught."""
@@ -334,6 +346,19 @@ class TestMPSSequentialPublicApi:
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
             MPSSequentialStatePreparation().run(Wavefunction(mps))
 
+    def test_run_rejects_noncanonical_physical_basis(self):
+        """Q# physical-slice interpretation requires canonical occupation order."""
+        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+        physical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "d", "u", "2")]
+        mps = AbelianMPSContainer(
+            source.sites,
+            source.orbitals,
+            physical_basis=physical_basis,
+        )
+
+        with pytest.raises(ValueError, match="physical basis ordering"):
+            MPSSequentialStatePreparation().run(Wavefunction(mps))
+
     @pytest.mark.parametrize("orthogonality_center", [1, None])
     def test_run_requires_right_canonical_mps(self, orthogonality_center):
         """State preparation rejects mixed or unspecified canonicalization."""
@@ -348,21 +373,18 @@ class TestMPSSequentialPublicApi:
         with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
             MPSSequentialStatePreparation().run(Wavefunction(mps))
 
-    def test_mps_and_base_callables_use_required_profiles(self):
-        """MPS and ordinary utilities use their required target profiles."""
+    def test_base_utility_access_does_not_invalidate_mps_circuit(self):
+        """Ordinary utility access preserves callables stored by MPS circuits."""
         from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
 
-        base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
-        mps_callable = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
-        refreshed_base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+        tensor = np.array([[[1.0], [0.0], [0.0], [0.0]]])
+        circuit = MPSSequentialStatePreparation().run(Wavefunction(make_mps([tensor])))
 
+        base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+
+        mps_context = circuit._qsharp_factory.program.__dict__["_qdk_context"]
         base_context = base_callable.__dict__["_qdk_context"]
-        mps_context = mps_callable.__dict__["_qdk_context"]
-        refreshed_base_context = refreshed_base_callable.__dict__["_qdk_context"]
-        assert base_context.get_target_profile() == TargetProfile.Base
-        assert mps_context.get_target_profile() == TargetProfile.Unrestricted
-        assert refreshed_base_context.get_target_profile() == TargetProfile.Base
-        assert refreshed_base_context is not mps_context
+        assert base_context is mps_context
 
     @pytest.mark.parametrize("rotation_bits", [1, 63])
     def test_rejects_unsupported_rotation_precision(self, rotation_bits):

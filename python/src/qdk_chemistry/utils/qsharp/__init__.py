@@ -7,64 +7,32 @@
 from pathlib import Path
 
 import qdk
-from qdk import TargetProfile, qsharp
+from qdk import qsharp
 
 __all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "CircuitComposition.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "StandardPhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "HadamardTest.qs",
-    Path(__file__).parent / "PauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-    Path(__file__).parent / "PrepSelPrep.qs",
-    Path(__file__).parent / "Select.qs",
-]
-
-_MPS_PROJECT_ROOT = str(Path(__file__).parent / "mps_sequential")
-
-_state: dict[str, str | None] = {"mode": None}
+_PROJECT_ROOT = str(Path(__file__).parent)
+_initialized = False
 
 
-def _ensure_base_session():
-    """Ensure shared utility Q# files are loaded with the Base target profile."""
-    if _state["mode"] == "base":
-        try:
-            _ = qdk.code.QDKChemistry.Utils
-            return
-        except AttributeError:
-            _state["mode"] = None
-    qsharp.init(target_profile=TargetProfile.Base)
-    code = "\n".join(f.read_text() for f in _QS_FILES)
-    qsharp.eval(code)
-    _state["mode"] = "base"
-
-
-def _ensure_mps_session():
-    """Ensure interpreter has the MPS project and shared utility files loaded."""
-    if _state["mode"] == "mps":
-        try:
-            _ = qdk.code.MPSSparse
-            return
-        except AttributeError:
-            _state["mode"] = None  # stale - interpreter was reset externally
-    qsharp.init(project_root=_MPS_PROJECT_ROOT)
-    code = "\n".join(f.read_text() for f in _QS_FILES)
-    qsharp.eval(code)
-    _state["mode"] = "mps"
+def _ensure_qsharp_session():
+    """Ensure the interpreter has the chemistry Q# project loaded."""
+    global _initialized  # noqa: PLW0603
+    try:
+        _ = qdk.code.MPSSequential
+    except AttributeError:
+        _initialized = False
+    if not _initialized:
+        qsharp.init(project_root=_PROJECT_ROOT)
+        _initialized = True
 
 
 def get_qsharp_utils():
     """Returns the Q# namespace for chemistry operations (lazy-loaded).
 
-    Initializes the global Q# interpreter with the MPS project on first call,
-    then loads additional Q# utility files via eval. Use this when the MPS
-    project must be available (e.g. for resource estimation of MPS circuits).
+    Initializes the global Q# interpreter with the chemistry project on first call.
     """
-    _ensure_mps_session()
+    _ensure_qsharp_session()
     return qdk.code.QDKChemistry.Utils
 
 
@@ -81,12 +49,12 @@ class _QSharpUtilsProxy:
 
         """
         if name == "MPSSequential":
-            _ensure_mps_session()
+            _ensure_qsharp_session()
             return qdk.code.MPSSequential
         if name == "MPSSparse":
-            _ensure_mps_session()
+            _ensure_qsharp_session()
             return qdk.code.MPSSparse
-        _ensure_base_session()
+        _ensure_qsharp_session()
         return getattr(qdk.code.QDKChemistry.Utils, name)
 
 

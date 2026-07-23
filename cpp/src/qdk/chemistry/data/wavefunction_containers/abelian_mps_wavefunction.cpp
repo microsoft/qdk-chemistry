@@ -10,6 +10,8 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include "../json_serialization.hpp"
+
 namespace qdk::chemistry::data {
 namespace {
 
@@ -349,6 +351,89 @@ nlohmann::json AbelianMPSContainer::to_json() const {
     json["sites"].push_back(std::move(site_json));
   }
   return json;
+}
+
+std::unique_ptr<AbelianMPSContainer> AbelianMPSContainer::from_json(
+    const nlohmann::json& json) {
+  try {
+    validate_serialization_version(SERIALIZATION_VERSION, json.at("version"));
+    if (json.at("container_type") != "mps" ||
+        json.at("representation") != "abelian") {
+      throw std::invalid_argument(
+          "JSON does not contain an Abelian MPS container.");
+    }
+
+    auto orbitals = Orbitals::from_json(json.at("orbitals"));
+    auto load_particle_count = [&](const char* key) {
+      return json.at(key).is_null()
+                 ? std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>{}
+                 : SymmetryBlockedScalar<std::size_t>::from_json(json.at(key));
+    };
+
+    std::optional<std::size_t> orthogonality_center;
+    if (!json.at("orthogonality_center").is_null()) {
+      orthogonality_center = json.at("orthogonality_center").get<std::size_t>();
+    }
+
+    std::vector<Configuration> physical_basis;
+    for (const auto& state : json.at("physical_basis")) {
+      physical_basis.push_back(Configuration::from_json(state));
+    }
+
+    std::vector<SitePtr> sites;
+    for (const auto& site_json : json.at("sites")) {
+      std::vector<SymmetryLabel> left_sector_order;
+      for (const auto& label : site_json.at("left_sector_order")) {
+        left_sector_order.push_back(SymmetryLabel::from_json(label));
+      }
+      std::vector<SymmetryLabel> right_sector_order;
+      for (const auto& label : site_json.at("right_sector_order")) {
+        right_sector_order.push_back(SymmetryLabel::from_json(label));
+      }
+
+      std::vector<AbelianMPSSite::PhysicalSlicePtr> physical_slices;
+      for (const auto& slice_json : site_json.at("physical_slices")) {
+        if (slice_json.at("scalar") == "complex") {
+          physical_slices.push_back(
+              std::make_shared<const AbelianMPSSite::PhysicalSlice>(
+                  *SymmetryBlockedTensor<2, std::complex<double>>::from_json(
+                      slice_json)));
+        } else if (slice_json.at("scalar") == "real") {
+          physical_slices.push_back(
+              std::make_shared<const AbelianMPSSite::PhysicalSlice>(
+                  *SymmetryBlockedTensor<2, double>::from_json(slice_json)));
+        } else {
+          throw std::invalid_argument(
+              "MPS physical slice has an unsupported scalar type.");
+        }
+      }
+      sites.push_back(std::make_shared<const AbelianMPSSite>(
+          std::move(physical_slices), std::move(left_sector_order),
+          std::move(right_sector_order)));
+    }
+
+    return std::make_unique<AbelianMPSContainer>(
+        std::move(sites), std::move(orbitals),
+        load_particle_count("total_num_particles"),
+        load_particle_count("active_num_particles"), orthogonality_center,
+        std::move(physical_basis),
+        json.at("site_to_orbital_order").get<std::vector<std::size_t>>());
+  } catch (const std::exception& error) {
+    throw std::runtime_error("Failed to parse AbelianMPSContainer from JSON: " +
+                             std::string(error.what()));
+  }
+}
+
+void AbelianMPSContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  MPSContainer::hash_update(ctx);
+  hash_value(ctx, std::string("abelian"));
+  hash_value(ctx, static_cast<uint64_t>(_sites.size()));
+  for (const auto& site : _sites) {
+    hash_value(ctx, site->left_sector_order());
+    hash_value(ctx, site->right_sector_order());
+    hash_value(ctx, site->physical_slices());
+  }
 }
 
 std::unique_ptr<WavefunctionContainer> AbelianMPSContainer::clone() const {

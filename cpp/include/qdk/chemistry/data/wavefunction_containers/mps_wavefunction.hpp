@@ -150,6 +150,9 @@ class MPSContainer : public WavefunctionContainer {
   }
 
  protected:
+  /** @brief Hash representation-independent MPS metadata. */
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * @brief Construct the representation-independent portion of an MPS.
    * @param orbitals Orbital basis associated with the MPS.

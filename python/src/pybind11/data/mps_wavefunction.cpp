@@ -11,6 +11,7 @@
 #include <complex>
 #include <map>
 #include <memory>
+#include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/abelian_mps_wavefunction.hpp>
@@ -132,26 +133,31 @@ std::shared_ptr<AbelianMPSSite> site_from_dense_abelian(
   // Compute cumulative offsets for left and right sectors.
   // Sectors are ordered by particle number.
   std::map<std::size_t, std::size_t> left_offsets, right_offsets;
-  std::size_t offset = 0;
-  for (auto& [n, dim] : std::map<std::size_t, std::size_t>(
-           left_sector_sizes.begin(), left_sector_sizes.end())) {
-    left_offsets[n] = offset;
-    offset += dim;
-  }
-  if (offset != chi_left) {
-    throw std::invalid_argument(
-        "Sum of left sector sizes must equal chi_left.");
-  }
-  offset = 0;
-  for (auto& [n, dim] : std::map<std::size_t, std::size_t>(
-           right_sector_sizes.begin(), right_sector_sizes.end())) {
-    right_offsets[n] = offset;
-    offset += dim;
-  }
-  if (offset != chi_right) {
-    throw std::invalid_argument(
-        "Sum of right sector sizes must equal chi_right.");
-  }
+  auto build_offsets = [](const auto& sector_sizes, auto& offsets,
+                          std::size_t expected_dimension,
+                          const char* bond_name) {
+    std::size_t offset = 0;
+    for (const auto& [particle_number, dimension] :
+         std::map<std::size_t, std::size_t>(sector_sizes.begin(),
+                                            sector_sizes.end())) {
+      if (dimension >
+              static_cast<std::size_t>(
+                  std::numeric_limits<Eigen::Index>::max()) ||
+          dimension > std::numeric_limits<std::size_t>::max() - offset) {
+        throw std::invalid_argument(std::string("MPS ") + bond_name +
+                                    " sector dimensions are too large.");
+      }
+      offsets[particle_number] = offset;
+      offset += dimension;
+    }
+    if (offset != expected_dimension) {
+      throw std::invalid_argument(std::string("Sum of ") + bond_name +
+                                  " sector sizes must equal chi_" +
+                                  bond_name + ".");
+    }
+  };
+  build_offsets(left_sector_sizes, left_offsets, chi_left, "left");
+  build_offsets(right_sector_sizes, right_offsets, chi_right, "right");
 
   // Build extents.
   using Slice = SymmetryBlockedTensor<2, Scalar>;
@@ -181,6 +187,10 @@ std::shared_ptr<AbelianMPSSite> site_from_dense_abelian(
   for (std::size_t p = 0; p < d; ++p) {
     typename Slice::BlockMap blocks;
     for (auto& [n_left, left_dim] : left_sector_sizes) {
+      if (delta_n[p] > std::numeric_limits<std::size_t>::max() - n_left) {
+        throw std::invalid_argument(
+            "MPS particle-number sector label overflows size_t.");
+      }
       std::size_t n_right = n_left + delta_n[p];
       auto it = right_sector_sizes.find(n_right);
       if (it == right_sector_sizes.end()) {

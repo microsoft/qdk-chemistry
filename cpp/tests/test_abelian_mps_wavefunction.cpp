@@ -263,6 +263,37 @@ TEST(AbelianMPSContainerTest, SerializesToJson) {
   }
 }
 
+TEST(AbelianMPSContainerTest, RoundTripsThroughWavefunctionJson) {
+  const std::vector<Configuration> physical_basis = {
+      Configuration::from_spin_half_string("0"),
+      Configuration::from_spin_half_string("u"),
+      Configuration::from_spin_half_string("d"),
+      Configuration::from_spin_half_string("2")};
+  Wavefunction original(std::make_unique<AbelianMPSContainer>(
+      std::vector<AbelianMPSContainer::SitePtr>{make_site(1, 1)},
+      testing::create_test_orbitals(1, 1, true), make_particle_count(2),
+      nullptr, 0, physical_basis, std::vector<std::size_t>{0}));
+
+  const auto restored = Wavefunction::from_json(original.to_json());
+
+  EXPECT_EQ(restored->content_hash(), original.content_hash());
+}
+
+TEST(AbelianMPSContainerTest, HashIncludesTensorValues) {
+  Wavefunction first(std::make_unique<AbelianMPSContainer>(
+      std::vector<AbelianMPSContainer::SitePtr>{
+          make_unnormalized_site(0, 0, 2, 4, 1.0)},
+      testing::create_test_orbitals(1, 1, true), nullptr, nullptr,
+      std::nullopt));
+  Wavefunction second(std::make_unique<AbelianMPSContainer>(
+      std::vector<AbelianMPSContainer::SitePtr>{
+          make_unnormalized_site(0, 0, 2, 4, 2.0)},
+      testing::create_test_orbitals(1, 1, true), nullptr, nullptr,
+      std::nullopt));
+
+  EXPECT_NE(first.content_hash(), second.content_hash());
+}
+
 TEST(AbelianMPSContainerTest, ExposesCommonMPSInterface) {
   AbelianMPSContainer wavefunction({make_site(1, 1)},
                                    testing::create_test_orbitals(1, 1, true));
@@ -386,6 +417,16 @@ TEST(AbelianMPSContainerTest, RejectsInvalidPhysicalBasisConfigurations) {
                                     Configuration::from_bitstring("0"),
                                     Configuration::from_bitstring("1")}),
                std::invalid_argument);
+
+  EXPECT_THROW(
+      AbelianMPSContainer(
+          {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+          nullptr, nullptr, std::nullopt,
+          {Configuration::from_spin_half_string("00"),
+           Configuration::from_spin_half_string("uu"),
+           Configuration::from_spin_half_string("dd"),
+           Configuration::from_spin_half_string("22")}),
+      std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RejectsInvalidSiteToOrbitalOrder) {

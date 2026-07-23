@@ -44,7 +44,7 @@ from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .mps_sequential import GivensLayerData
+from .mps_sequential import GivensLayerData, validate_mps_physical_basis
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [
@@ -106,6 +106,7 @@ class MPSSparseStatePreparation(StatePreparation):
 
         if container.physical_dimension != 4:
             raise ValueError("Sparse MPS state preparation requires four physical states per site.")
+        validate_mps_physical_basis(container)
         if container.orthogonality_center != 0:
             raise ValueError("Sparse MPS state preparation requires a right-canonical MPS with center zero.")
 

@@ -212,6 +212,18 @@ class AbelianMPSContainer : public MPSContainer {
    */
   nlohmann::json to_json() const override;
 
+  /**
+   * @brief Reconstruct an Abelian block-sparse MPS from JSON.
+   * @param json Versioned JSON emitted by @ref to_json.
+   * @return Reconstructed MPS container.
+   */
+  static std::unique_ptr<AbelianMPSContainer> from_json(
+      const nlohmann::json& json);
+
+ protected:
+  /** @brief Hash Abelian MPS sites and block-sparse tensor data. */
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   /** @brief Validate site consistency and adjacent bond compatibility. */
   void _validate() const;
