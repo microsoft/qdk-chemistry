@@ -812,6 +812,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
+        ControlledSwapPauliSequenceMapper,
     )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
@@ -873,6 +874,7 @@ def _register_python_algorithms():
     register(lambda: ControlledPSPMapper())
     register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())
     register(lambda: MagnusPropagator())

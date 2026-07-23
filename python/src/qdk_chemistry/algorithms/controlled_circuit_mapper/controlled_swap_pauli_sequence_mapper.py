@@ -1,0 +1,115 @@
+"""QDK/Chemistry CSWAP-sandwich controlled circuit mapper."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from qdk import qsharp
+
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from .base import ControlledCircuitMapper
+
+__all__: list[str] = ["ControlledSwapPauliSequenceMapper"]
+
+
+class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
+    r"""Controlled evolution circuit mapper using a CSWAP-sandwich construction.
+
+    Given a time-evolution operator as a Pauli product formula
+    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper builds a controlled
+    :math:`U(t)` without controlling every gate. It uses a *CSWAP sandwich*: an internally allocated
+    ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system register,
+    the *uncontrolled* evolution is applied to the vacuum (repeated ``step_reps`` times), and the swap
+    is uncomputed. When the control is :math:`|0\rangle` the evolution acts on the vacuum (system
+    untouched); when it is :math:`|1\rangle` the system is parked in the vacuum and evolved, so the
+    target eigenphase accumulates on the :math:`|1\rangle` branch (standard controlled-:math:`U`
+    convention). This trades controlling every gate for a single layer of controlled-:math:`\mathrm{SWAP}`.
+
+    **Hamiltonian restriction.** On the :math:`|0\rangle` branch the vacuum picks up
+    :math:`U|0\ldots0\rangle = \lambda\,|0\ldots0\rangle`, leaving a residual phase
+    :math:`\varphi_0 = \arg\lambda = -E_0 t` (:math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`) that the QPE
+    feedback rotation removes. The construction is exact **only if** :math:`|0\ldots0\rangle` is an
+    eigenstate of :math:`U` (:math:`|\lambda| = 1`); otherwise the vacuum leaks, the control decoheres, and
+    the phase is lost. This holds automatically for particle-number-conserving Hamiltonians
+    (e.g. Jordan-Wigner/Bravyi-Kitaev molecular Hamiltonians).
+
+    Notes:
+        * Currently supports only single-control-qubit scenarios.
+        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
+        * The vacuum register is allocated internally by the Q# operation.
+
+    """
+
+    def __init__(self):
+        """Initialize the ControlledSwapPauliSequenceMapper."""
+        super().__init__()
+
+    def name(self) -> str:
+        """Return the algorithm name."""
+        return "cswap_pauli_sequence"
+
+    def type_name(self) -> str:
+        """Return controlled_circuit_mapper as the algorithm type name."""
+        return "controlled_circuit_mapper"
+
+    def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
+        r"""Construct a quantum circuit implementing the controlled unitary.
+
+        Args:
+            unitary: The unitary representation containing the Hamiltonian and evolution parameters.
+            Control and target indices are read from settings.
+
+        Returns:
+            Circuit: A quantum circuit implementing the controlled unitary :math:`U` via the CSWAP sandwich,
+            where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
+
+        Raises:
+            ValueError: If the unitary container type is not supported.
+            ValueError: If multiple control qubits are provided.
+
+        """
+        unitary_container = unitary.get_container()
+        if not isinstance(unitary_container, PauliProductFormulaContainer):
+            raise ValueError(
+                f"The {unitary.get_container_type()} container type is not supported. "
+                "ControlledSwapPauliSequenceMapper only supports PauliProductFormula container for the unitary."
+            )
+
+        control_indices = self._get_control_indices()
+        if len(control_indices) != 1:
+            raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
+
+        target_indices = self._get_target_indices(unitary)
+
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        angles: list[float] = []
+        for term in unitary_container.step_terms:
+            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
+            for index, pauli in term.pauli_term.items():
+                base_terms[index] = getattr(qsharp.Pauli, pauli)
+            pauli_terms.append(base_terms.copy())
+            angles.append(term.angle)
+
+        controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.ControlledSwapPauliExpParams(
+            pauliExponents=pauli_terms,
+            pauliCoefficients=angles,
+            repetitions=unitary_container.step_reps,
+            control=control_indices[0],
+            systems=target_indices,
+        )
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit,
+            parameter=vars(controlled_evo_params),
+        )
+
+        controlled_unitary_op = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpOp(
+            controlled_evo_params
+        )
+
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
