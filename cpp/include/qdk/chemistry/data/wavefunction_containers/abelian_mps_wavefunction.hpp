@@ -21,6 +21,7 @@ namespace qdk::chemistry::data {
  * physical-state index @f$p@f$, and a right-bond index @f$r@f$. This class
  * stores it as a list of rank-2 matrices @f$A^p[l,r]@f$ per physical state.
  * For a spin-half spatial orbital, the usual four slices represent the empty,
+  nlohmann::json to_json() const override;
  * alpha-occupied, beta-occupied, and doubly occupied states.
  * @ref MPSContainer::physical_basis records the physical-slice ordering when
  * that metadata is available.
@@ -204,11 +205,20 @@ class AbelianMPSContainer : public MPSContainer {
    */
   bool is_complex() const override;
 
+  /**
+   * @brief Serialize this Abelian block-sparse MPS to JSON.
+   * @return Versioned JSON containing chemistry metadata, site metadata, and
+   *         every symmetry-blocked physical slice.
+   */
+  nlohmann::json to_json() const override;
+
  private:
   /** @brief Validate site consistency and adjacent bond compatibility. */
   void _validate() const;
 
   std::vector<SitePtr> _sites;
+  /// Serialization version.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 }  // namespace qdk::chemistry::data

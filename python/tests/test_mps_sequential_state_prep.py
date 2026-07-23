@@ -11,7 +11,7 @@ and the full Q# circuit (state preparation fidelity and gate counts).
 
 import numpy as np
 import pytest
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 from qdk_chemistry._core.utils import decompose_2d, decompose_unitary_to_givens
 from scipy.sparse import issparse
 
@@ -348,15 +348,21 @@ class TestMPSSequentialPublicApi:
         with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
             MPSSequentialStatePreparation().run(Wavefunction(mps))
 
-    def test_mps_and_base_callables_share_context(self):
-        """Loading either utility namespace does not invalidate retained Q# callables."""
+    def test_mps_and_base_callables_use_required_profiles(self):
+        """MPS and ordinary utilities use their required target profiles."""
         from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
 
         base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
         mps_callable = QSHARP_UTILS.MPSSequential.MakeMPSSequentialCircuit
-        _ = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+        refreshed_base_callable = QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
 
-        assert base_callable.__dict__["_qdk_context"] is mps_callable.__dict__["_qdk_context"]
+        base_context = base_callable.__dict__["_qdk_context"]
+        mps_context = mps_callable.__dict__["_qdk_context"]
+        refreshed_base_context = refreshed_base_callable.__dict__["_qdk_context"]
+        assert base_context.get_target_profile() == TargetProfile.Base
+        assert mps_context.get_target_profile() == TargetProfile.Unrestricted
+        assert refreshed_base_context.get_target_profile() == TargetProfile.Base
+        assert refreshed_base_context is not mps_context
 
     @pytest.mark.parametrize("rotation_bits", [1, 63])
     def test_rejects_unsupported_rotation_precision(self, rotation_bits):

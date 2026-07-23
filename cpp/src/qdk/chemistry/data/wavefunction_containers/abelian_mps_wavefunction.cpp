@@ -308,6 +308,48 @@ std::size_t AbelianMPSContainer::max_bond_dimension() const {
 bool AbelianMPSContainer::is_complex() const {
   return _sites.front()->is_complex();
 }
+nlohmann::json AbelianMPSContainer::to_json() const {
+  nlohmann::json json;
+  json["version"] = SERIALIZATION_VERSION;
+  json["container_type"] = get_container_type();
+  json["representation"] = "abelian";
+  json["orbitals"] = get_orbitals()->to_json();
+  json["total_num_particles"] = total_num_particles()
+                                    ? total_num_particles()->to_json()
+                                    : nlohmann::json(nullptr);
+  json["active_num_particles"] = active_num_particles()
+                                     ? active_num_particles()->to_json()
+                                     : nlohmann::json(nullptr);
+  json["orthogonality_center"] = orthogonality_center()
+                                     ? nlohmann::json(*orthogonality_center())
+                                     : nlohmann::json(nullptr);
+
+  json["physical_basis"] = nlohmann::json::array();
+  for (const auto& state : physical_basis()) {
+    json["physical_basis"].push_back(state.to_json());
+  }
+  json["site_to_orbital_order"] = site_to_orbital_order();
+
+  json["sites"] = nlohmann::json::array();
+  for (const auto& site : _sites) {
+    nlohmann::json site_json;
+    site_json["left_sector_order"] = nlohmann::json::array();
+    for (const auto& label : site->left_sector_order()) {
+      site_json["left_sector_order"].push_back(label.to_json());
+    }
+    site_json["right_sector_order"] = nlohmann::json::array();
+    for (const auto& label : site->right_sector_order()) {
+      site_json["right_sector_order"].push_back(label.to_json());
+    }
+    site_json["physical_slices"] = nlohmann::json::array();
+    for (const auto& slice : site->physical_slices()) {
+      site_json["physical_slices"].push_back(std::visit(
+          [](const auto& value) { return value.to_json(); }, *slice));
+    }
+    json["sites"].push_back(std::move(site_json));
+  }
+  return json;
+}
 
 std::unique_ptr<WavefunctionContainer> AbelianMPSContainer::clone() const {
   return std::make_unique<AbelianMPSContainer>(*this);

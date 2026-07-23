@@ -9,11 +9,6 @@ from pathlib import Path
 import qdk
 from qdk import TargetProfile, qsharp
 
-try:
-    from qdk._interpreter import get_config
-except ImportError:
-    from qsharp._qsharp import get_config
-
 __all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
 _QS_FILES = [
@@ -35,15 +30,14 @@ _state: dict[str, str | None] = {"mode": None}
 
 
 def _ensure_base_session():
-    """Ensure shared utility Q# files are loaded without the MPS project."""
+    """Ensure shared utility Q# files are loaded with the Base target profile."""
     if _state["mode"] == "base":
         try:
             _ = qdk.code.QDKChemistry.Utils
             return
         except AttributeError:
             _state["mode"] = None
-    target_profile = TargetProfile.from_str(get_config().get_target_profile())
-    qsharp.init(target_profile=target_profile)
+    qsharp.init(target_profile=TargetProfile.Base)
     code = "\n".join(f.read_text() for f in _QS_FILES)
     qsharp.eval(code)
     _state["mode"] = "base"
@@ -56,7 +50,7 @@ def _ensure_mps_session():
             _ = qdk.code.MPSSparse
             return
         except AttributeError:
-            _state["mode"] = None  # stale — interpreter was reset externally
+            _state["mode"] = None  # stale - interpreter was reset externally
     qsharp.init(project_root=_MPS_PROJECT_ROOT)
     code = "\n".join(f.read_text() for f in _QS_FILES)
     qsharp.eval(code)

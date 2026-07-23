@@ -227,6 +227,42 @@ TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
   EXPECT_EQ(wavefunction.sites().front()->physical_slices().size(), 4u);
 }
 
+TEST(AbelianMPSContainerTest, SerializesToJson) {
+  const std::vector<AbelianMPSContainer::SitePtr> sites = {
+      make_site(1, 2, 0, 1, 4), make_site(2, 1, 1, 2, 4)};
+  const auto total_num_particles = make_particle_count(4);
+  const std::vector<Configuration> physical_basis = {
+      Configuration::from_spin_half_string("0"),
+      Configuration::from_spin_half_string("u"),
+      Configuration::from_spin_half_string("d"),
+      Configuration::from_spin_half_string("2")};
+  AbelianMPSContainer wavefunction(
+      sites, testing::create_test_orbitals(2, 2, true), total_num_particles,
+      nullptr, std::nullopt, physical_basis, {1, 0});
+
+  const auto json = wavefunction.to_json();
+
+  EXPECT_EQ(json.at("version"), "0.1.0");
+  EXPECT_EQ(json.at("container_type"), "mps");
+  EXPECT_EQ(json.at("representation"), "abelian");
+  EXPECT_TRUE(json.contains("orbitals"));
+  EXPECT_TRUE(json.contains("total_num_particles"));
+  EXPECT_TRUE(json.at("active_num_particles").is_null());
+  EXPECT_TRUE(json.at("orthogonality_center").is_null());
+  EXPECT_EQ(json.at("physical_basis").size(), 4u);
+  EXPECT_EQ(json.at("site_to_orbital_order"), std::vector<std::size_t>({1, 0}));
+  ASSERT_EQ(json.at("sites").size(), 2u);
+  for (const auto& site : json.at("sites")) {
+    EXPECT_TRUE(site.contains("left_sector_order"));
+    EXPECT_TRUE(site.contains("right_sector_order"));
+    ASSERT_EQ(site.at("physical_slices").size(), 4u);
+    for (const auto& slice : site.at("physical_slices")) {
+      EXPECT_EQ(slice.at("type"), "SymmetryBlockedTensor");
+      EXPECT_EQ(slice.at("rank"), 2u);
+    }
+  }
+}
+
 TEST(AbelianMPSContainerTest, ExposesCommonMPSInterface) {
   AbelianMPSContainer wavefunction({make_site(1, 1)},
                                    testing::create_test_orbitals(1, 1, true));

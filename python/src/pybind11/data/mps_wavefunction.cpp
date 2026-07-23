@@ -39,7 +39,8 @@ AbelianMPSSite::PhysicalSlicePtr make_trivial_slice(
   blocks[{SymmetryLabel{}, SymmetryLabel{}}] = std::make_shared<
       const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>(matrix);
   Slice slice({trivial, trivial}, std::move(extents), std::move(blocks));
-  return std::make_shared<const AbelianMPSSite::PhysicalSlice>(std::move(slice));
+  return std::make_shared<const AbelianMPSSite::PhysicalSlice>(
+      std::move(slice));
 }
 
 template <typename Scalar>
@@ -55,11 +56,12 @@ std::shared_ptr<AbelianMPSSite> site_from_slices(
       throw std::invalid_argument(
           "MPS physical slice pointers must not be null.");
     }
-    variants.push_back(std::make_shared<const AbelianMPSSite::PhysicalSlice>(*slice));
+    variants.push_back(
+        std::make_shared<const AbelianMPSSite::PhysicalSlice>(*slice));
   }
   return std::make_shared<AbelianMPSSite>(std::move(variants),
-                                   std::move(left_sector_order),
-                                   std::move(right_sector_order));
+                                          std::move(left_sector_order),
+                                          std::move(right_sector_order));
 }
 
 template <typename Scalar>
@@ -78,12 +80,13 @@ std::shared_ptr<AbelianMPSSite> site_from_dense(
     }
     slices.push_back(make_trivial_slice<Scalar>(matrix));
   }
-  return std::make_shared<AbelianMPSSite>(std::move(slices),
-                                   std::vector<SymmetryLabel>{SymmetryLabel{}},
-                                   std::vector<SymmetryLabel>{SymmetryLabel{}});
+  return std::make_shared<AbelianMPSSite>(
+      std::move(slices), std::vector<SymmetryLabel>{SymmetryLabel{}},
+      std::vector<SymmetryLabel>{SymmetryLabel{}});
 }
 
-std::shared_ptr<AbelianMPSSite> site_from_dense_dispatch(const py::array& tensor) {
+std::shared_ptr<AbelianMPSSite> site_from_dense_dispatch(
+    const py::array& tensor) {
   if (tensor.dtype().kind() == 'c') {
     return site_from_dense<std::complex<double>>(tensor);
   }
@@ -205,8 +208,8 @@ std::shared_ptr<AbelianMPSSite> site_from_dense_abelian(
         Slice({symmetries, symmetries}, extents, std::move(blocks))));
   }
   return std::make_shared<AbelianMPSSite>(std::move(slices),
-                                   std::move(left_sector_order),
-                                   std::move(right_sector_order));
+                                          std::move(left_sector_order),
+                                          std::move(right_sector_order));
 }
 
 std::shared_ptr<AbelianMPSSite> site_from_dense_abelian_dispatch(
@@ -368,7 +371,8 @@ void bind_mps_wavefunction(py::module& data) {
       .def_property_readonly(
           "right_sector_order", &AbelianMPSSite::right_sector_order,
           "Right-bond sector labels in dense column-packing order.")
-      .def_property_readonly("physical_dimension", &AbelianMPSSite::physical_dimension,
+      .def_property_readonly("physical_dimension",
+                             &AbelianMPSSite::physical_dimension,
                              "Number of physical-state slices at this site.")
       .def_property_readonly("left_bond_dimension",
                              &AbelianMPSSite::left_bond_dimension,
@@ -428,6 +432,10 @@ void bind_mps_wavefunction(py::module& data) {
       .def_property_readonly("max_bond_dimension",
                              &AbelianMPSContainer::max_bond_dimension,
                              "Largest total left or right bond dimension.")
+      .def(
+          "to_json",
+          [](const AbelianMPSContainer& self) { return self.to_json().dump(); },
+          "Serialize the complete block-sparse MPS container to a JSON string.")
       .def_property_readonly(
           "physical_dimension",
           [](const AbelianMPSContainer& self) {
