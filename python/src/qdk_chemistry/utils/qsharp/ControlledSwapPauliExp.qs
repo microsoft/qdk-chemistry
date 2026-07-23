@@ -89,7 +89,17 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         control : Int,
         systems : Int[]
     ) : Unit {
-        use qs = Qubit[Length(systems) + 1];
+        // Determine the maximum index across `control` and `systems` to size the qubit register
+        // safely, so that non-contiguous indices (e.g. control=2, systems=[3,4]) stay in range.
+        mutable maxIndex = control;
+        for idx in systems {
+            if idx > maxIndex {
+                set maxIndex = idx;
+            }
+        }
+
+        // Allocate enough qubits so that `control` and every index in `systems` are valid.
+        use qs = Qubit[maxIndex + 1];
         ControlledSwapPauliExp(
             pauliExponents,
             pauliCoefficients,
