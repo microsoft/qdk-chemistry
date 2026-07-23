@@ -111,8 +111,8 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
 
 
 @pytest.fixture
-def chemistry_phase_problem() -> PhaseEstimationProblem:
-    """Return a number-conserving (chemistry-like) hopping Hamiltonian scenario.
+def number_conserving_phase_problem() -> PhaseEstimationProblem:
+    """Return a number-conserving Hamiltonian.
 
     The Hamiltonian ``0.5 (XX + YY)`` is the Jordan-Wigner image of a two-site
     fermionic hopping term ``a0^dag a1 + a1^dag a0``. Its vacuum ``|00>`` is an
@@ -280,9 +280,11 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     )
 
 
+@pytest.mark.parametrize("builder_name", _builder_params)
 @pytest.mark.parametrize("controlled_circuit_mapper_name", _controlled_mapper_params)
 def test_standard_phase_estimation_controlled_mapper_variants(
-    chemistry_phase_problem: PhaseEstimationProblem,
+    number_conserving_phase_problem: PhaseEstimationProblem,
+    builder_name: str,
     controlled_circuit_mapper_name: str,
 ) -> None:
     """Compare controlled circuit mappers on a number-conserving chemistry Hamiltonian.
@@ -292,23 +294,26 @@ def test_standard_phase_estimation_controlled_mapper_variants(
     energy as the direct controlled-unitary mapper.
     """
     result = _run_standard(
-        chemistry_phase_problem,
+        number_conserving_phase_problem,
+        builder_name=builder_name,
         controlled_circuit_mapper_name=controlled_circuit_mapper_name,
     )
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction, chemistry_phase_problem.evolution_time, chemistry_phase_problem.expected_energy
+        result.phase_fraction,
+        number_conserving_phase_problem.evolution_time,
+        number_conserving_phase_problem.expected_energy,
     )
 
-    assert result.bitstring_msb_first == chemistry_phase_problem.expected_bitstring
+    assert result.bitstring_msb_first == number_conserving_phase_problem.expected_bitstring
     assert np.isclose(
         resolved_phase,
-        chemistry_phase_problem.expected_phase,
+        number_conserving_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
         resolved_energy,
-        chemistry_phase_problem.expected_energy,
+        number_conserving_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
