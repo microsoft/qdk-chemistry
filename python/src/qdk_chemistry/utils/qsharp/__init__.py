@@ -19,7 +19,7 @@ def _ensure_qsharp_session():
     """Ensure the interpreter has the chemistry Q# project loaded."""
     global _initialized  # noqa: PLW0603
     try:
-        _ = qdk.code.MPSSequential
+        _ = qdk.code.MPSSparse
     except AttributeError:
         _initialized = False
     if not _initialized:
@@ -48,9 +48,6 @@ class _QSharpUtilsProxy:
             name: The name of the attribute being accessed on the Q# utilities namespace.
 
         """
-        if name == "MPSSequential":
-            _ensure_qsharp_session()
-            return qdk.code.MPSSequential
         if name == "MPSSparse":
             _ensure_qsharp_session()
             return qdk.code.MPSSparse

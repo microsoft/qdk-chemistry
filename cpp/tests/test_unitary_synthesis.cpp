@@ -11,14 +11,12 @@
 #include <random>
 #include <stdexcept>
 
-using qdk::chemistry::utils::detail::decompose_2d;
 using qdk::chemistry::utils::detail::decompose_block_diagonal_to_givens;
-using qdk::chemistry::utils::detail::decompose_site_csd;
 using qdk::chemistry::utils::detail::decompose_sparse_site;
 using qdk::chemistry::utils::detail::decompose_unitary_to_givens;
 using qdk::chemistry::utils::detail::GivensDecomposition;
 
-namespace {
+namespace detail {
 
 Eigen::MatrixXd reconstruct(const GivensDecomposition& decomposition) {
   const Eigen::Index dim =
@@ -80,55 +78,9 @@ void expect_reconstruction(const Eigen::MatrixXd& matrix,
             decomposition.layer_shifted.size());
 }
 
-void expect_two_block_reconstruction(const Eigen::MatrixXd& stacked,
-                                     double tolerance = 1.0e-11) {
-  const Eigen::Index rows = stacked.rows() / 2;
-  const Eigen::Index width = stacked.cols();
-  const auto result =
-      decompose_2d(stacked.topRows(rows), stacked.bottomRows(rows));
-  EXPECT_TRUE((result.u_1.leftCols(width) * result.d_1.asDiagonal() * result.v)
-                  .isApprox(stacked.topRows(rows), tolerance));
-  EXPECT_TRUE((result.u_2.leftCols(width) * result.d_2.asDiagonal() * result.v)
-                  .isApprox(stacked.bottomRows(rows), tolerance));
-  EXPECT_TRUE((result.d_1.array().square() + result.d_2.array().square())
-                  .matrix()
-                  .isApprox(Eigen::VectorXd::Ones(width), tolerance));
-}
+}  // namespace detail
 
-}  // namespace
-
-TEST(UnitarySynthesisTest, ReconstructsTwoBlockCsd) {
-  for (const auto [rows, width] :
-       {std::pair<Eigen::Index, Eigen::Index>{4, 2}, {4, 4}, {8, 3}}) {
-    expect_two_block_reconstruction(
-        random_orthogonal(2 * rows, 42).leftCols(width));
-  }
-}
-
-TEST(UnitarySynthesisTest, ReconstructsRankDeficientTwoBlockCsd) {
-  Eigen::MatrixXd stacked = Eigen::MatrixXd::Zero(8, 4);
-  stacked.topLeftCorner(4, 2).setIdentity();
-  stacked.bottomRightCorner(4, 2).setIdentity();
-  expect_two_block_reconstruction(stacked);
-}
-
-TEST(UnitarySynthesisTest, ProducesOrthogonalSiteCsdFactors) {
-  constexpr Eigen::Index dim = 4;
-  constexpr Eigen::Index width = 3;
-  const Eigen::MatrixXd matrix = random_orthogonal(4 * dim, 17).leftCols(width);
-  const auto result = decompose_site_csd(matrix, dim);
-
-  for (const auto& unitary : result.u) {
-    EXPECT_TRUE((unitary.transpose() * unitary)
-                    .isApprox(Eigen::MatrixXd::Identity(dim, dim), 1.0e-11));
-  }
-  EXPECT_TRUE((result.w_0.transpose() * result.w_0)
-                  .isApprox(Eigen::MatrixXd::Identity(dim, dim), 1.0e-11));
-  EXPECT_TRUE((result.w_1.transpose() * result.w_1)
-                  .isApprox(Eigen::MatrixXd::Identity(dim, dim), 1.0e-11));
-  EXPECT_TRUE((result.v.transpose() * result.v)
-                  .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
-}
+namespace detail {
 
 TEST(UnitarySynthesisTest, ReconstructsMixedBlockDiagonalMatrix) {
   const std::vector<Eigen::Index> dimensions{1, 3, 4, 2};
@@ -173,15 +125,7 @@ TEST(UnitarySynthesisTest, ReconstructsSparseSiteIsometry) {
   EXPECT_TRUE(reconstructed.isApprox(target, 1.0e-11));
 }
 
-TEST(UnitarySynthesisTest, RejectsInvalidCsdInputs) {
-  EXPECT_THROW(decompose_2d(Eigen::MatrixXd::Identity(2, 2),
-                            Eigen::MatrixXd::Identity(3, 2)),
-               std::invalid_argument);
-  EXPECT_THROW(
-      decompose_2d(Eigen::MatrixXd::Zero(2, 2), Eigen::MatrixXd::Zero(2, 2)),
-      std::invalid_argument);
-  EXPECT_THROW(decompose_site_csd(Eigen::MatrixXd::Identity(4, 4), 2),
-               std::invalid_argument);
+TEST(UnitarySynthesisTest, RejectsInvalidSparseInputs) {
   EXPECT_THROW(decompose_block_diagonal_to_givens({}), std::invalid_argument);
   EXPECT_THROW(decompose_sparse_site(Eigen::MatrixXd::Zero(4, 2)),
                std::invalid_argument);
@@ -230,3 +174,5 @@ TEST(UnitarySynthesisTest, RejectsInvalidMatrices) {
   nonfinite(0, 0) = std::numeric_limits<double>::quiet_NaN();
   EXPECT_THROW(decompose_unitary_to_givens(nonfinite), std::invalid_argument);
 }
+
+}  // namespace detail

@@ -17,7 +17,7 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace detail {
 
 // Per-physical-state particle counts for a spin-half orbital:
 // |0⟩ -> 0, |↑⟩ -> 1, |↓⟩ -> 1, |2⟩ -> 2
@@ -193,7 +193,9 @@ std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> make_particle_count(
                                         std::move(blocks));
 }
 
-}  // namespace
+}  // namespace detail
+
+namespace detail {
 
 static_assert(std::is_abstract_v<MPSContainer>);
 static_assert(std::is_base_of_v<MPSContainer, AbelianMPSContainer>);
@@ -203,6 +205,7 @@ TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
   std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2, 0, 1, 4),
                                                      make_site(2, 1, 1, 2, 4)};
   auto total_num_particles = make_particle_count(4);
+  auto active_num_particles = make_particle_count(2);
   const std::vector<Configuration> physical_basis = {
       Configuration::from_spin_half_string("0"),
       Configuration::from_spin_half_string("u"),
@@ -210,13 +213,15 @@ TEST(AbelianMPSContainerTest, StoresSparseSitesAndMetadata) {
       Configuration::from_spin_half_string("2")};
   const std::vector<std::size_t> site_to_orbital_order = {1, 0};
 
-  AbelianMPSContainer wavefunction(
-      std::move(sites), testing::create_test_orbitals(2, 2, true),
-      total_num_particles, nullptr, 0, physical_basis, site_to_orbital_order);
+  AbelianMPSContainer wavefunction(std::move(sites),
+                                   testing::create_test_orbitals(2, 2, true),
+                                   total_num_particles, active_num_particles, 0,
+                                   physical_basis, site_to_orbital_order);
 
   EXPECT_EQ(wavefunction.num_sites(), 2u);
   EXPECT_EQ(wavefunction.max_bond_dimension(), 2u);
   EXPECT_EQ(wavefunction.total_num_particles(), total_num_particles);
+  EXPECT_EQ(wavefunction.active_num_particles(), active_num_particles);
   EXPECT_EQ(wavefunction.get_container_type(), "mps");
   EXPECT_EQ(wavefunction.sectors(),
             std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
@@ -231,6 +236,7 @@ TEST(AbelianMPSContainerTest, SerializesToJson) {
   const std::vector<AbelianMPSContainer::SitePtr> sites = {
       make_site(1, 2, 0, 1, 4), make_site(2, 1, 1, 2, 4)};
   const auto total_num_particles = make_particle_count(4);
+  const auto active_num_particles = make_particle_count(2);
   const std::vector<Configuration> physical_basis = {
       Configuration::from_spin_half_string("0"),
       Configuration::from_spin_half_string("u"),
@@ -238,7 +244,7 @@ TEST(AbelianMPSContainerTest, SerializesToJson) {
       Configuration::from_spin_half_string("2")};
   AbelianMPSContainer wavefunction(
       sites, testing::create_test_orbitals(2, 2, true), total_num_particles,
-      nullptr, std::nullopt, physical_basis, {1, 0});
+      active_num_particles, std::nullopt, physical_basis, {1, 0});
 
   const auto json = wavefunction.to_json();
 
@@ -247,7 +253,7 @@ TEST(AbelianMPSContainerTest, SerializesToJson) {
   EXPECT_EQ(json.at("representation"), "abelian");
   EXPECT_TRUE(json.contains("orbitals"));
   EXPECT_TRUE(json.contains("total_num_particles"));
-  EXPECT_TRUE(json.at("active_num_particles").is_null());
+  EXPECT_FALSE(json.at("active_num_particles").is_null());
   EXPECT_TRUE(json.at("orthogonality_center").is_null());
   EXPECT_EQ(json.at("physical_basis").size(), 4u);
   EXPECT_EQ(json.at("site_to_orbital_order"), std::vector<std::size_t>({1, 0}));
@@ -272,7 +278,7 @@ TEST(AbelianMPSContainerTest, RoundTripsThroughWavefunctionJson) {
   Wavefunction original(std::make_unique<AbelianMPSContainer>(
       std::vector<AbelianMPSContainer::SitePtr>{make_site(1, 1)},
       testing::create_test_orbitals(1, 1, true), make_particle_count(2),
-      nullptr, 0, physical_basis, std::vector<std::size_t>{0}));
+      make_particle_count(2), 0, physical_basis, std::vector<std::size_t>{0}));
 
   const auto restored = Wavefunction::from_json(original.to_json());
 
@@ -283,43 +289,62 @@ TEST(AbelianMPSContainerTest, HashIncludesTensorValues) {
   Wavefunction first(std::make_unique<AbelianMPSContainer>(
       std::vector<AbelianMPSContainer::SitePtr>{
           make_unnormalized_site(0, 0, 2, 4, 1.0)},
-      testing::create_test_orbitals(1, 1, true), nullptr, nullptr,
-      std::nullopt));
+      testing::create_test_orbitals(1, 1, true), make_particle_count(0),
+      make_particle_count(0), std::nullopt));
   Wavefunction second(std::make_unique<AbelianMPSContainer>(
       std::vector<AbelianMPSContainer::SitePtr>{
           make_unnormalized_site(0, 0, 2, 4, 2.0)},
-      testing::create_test_orbitals(1, 1, true), nullptr, nullptr,
-      std::nullopt));
+      testing::create_test_orbitals(1, 1, true), make_particle_count(0),
+      make_particle_count(0), std::nullopt));
 
   EXPECT_NE(first.content_hash(), second.content_hash());
 }
 
 TEST(AbelianMPSContainerTest, ExposesCommonMPSInterface) {
-  AbelianMPSContainer wavefunction({make_site(1, 1)},
-                                   testing::create_test_orbitals(1, 1, true));
+  AbelianMPSContainer wavefunction(
+      {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+      make_particle_count(0), make_particle_count(0));
   const MPSContainer& base = wavefunction;
 
   EXPECT_EQ(base.num_sites(), 1u);
   EXPECT_EQ(base.get_container_type(), "mps");
   EXPECT_EQ(base.get_orbitals(), wavefunction.get_orbitals());
   EXPECT_EQ(base.site_to_orbital_order(), std::vector<std::size_t>{0});
+  EXPECT_EQ(
+      base.physical_basis(),
+      std::vector<Configuration>({Configuration::from_spin_half_string("0"),
+                                  Configuration::from_spin_half_string("u"),
+                                  Configuration::from_spin_half_string("d"),
+                                  Configuration::from_spin_half_string("2")}));
   EXPECT_FALSE(base.is_complex());
+}
+
+TEST(AbelianMPSContainerTest, RequiresParticleCounts) {
+  const auto count = make_particle_count(0);
+  const auto orbitals = testing::create_test_orbitals(1, 1, true);
+
+  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)}, orbitals, nullptr, count),
+               std::invalid_argument);
+  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)}, orbitals, count, nullptr),
+               std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RepresentsCanonicalFormByOrthogonalityCenter) {
   AbelianMPSContainer right_canonical(
       {make_site(1, 1), make_site(1, 1), make_site(1, 1)},
-      testing::create_test_orbitals(3, 3, true), nullptr, nullptr, 0);
+      testing::create_test_orbitals(3, 3, true), make_particle_count(0),
+      make_particle_count(0), 0);
   AbelianMPSContainer mixed({make_site(1, 1), make_site(1, 1), make_site(1, 1)},
-                            testing::create_test_orbitals(3, 3, true), nullptr,
-                            nullptr, 1);
+                            testing::create_test_orbitals(3, 3, true),
+                            make_particle_count(0), make_particle_count(0), 1);
   AbelianMPSContainer left_canonical(
       {make_site(1, 1), make_site(1, 1), make_site(1, 1)},
-      testing::create_test_orbitals(3, 3, true), nullptr, nullptr, 2);
+      testing::create_test_orbitals(3, 3, true), make_particle_count(0),
+      make_particle_count(0), 2);
   AbelianMPSContainer unspecified(
       {make_site(1, 1), make_site(1, 1), make_site(1, 1)},
-      testing::create_test_orbitals(3, 3, true), nullptr, nullptr,
-      std::nullopt);
+      testing::create_test_orbitals(3, 3, true), make_particle_count(0),
+      make_particle_count(0), std::nullopt);
 
   EXPECT_EQ(right_canonical.orthogonality_center(), 0u);
   EXPECT_EQ(mixed.orthogonality_center(), 1u);
@@ -332,22 +357,25 @@ TEST(AbelianMPSContainerTest, ValidatesSitesAroundOrthogonalityCenter) {
 
   // Unnormalized at position 1 with center=0 → site 1 must be right-canonical
   // → rejected
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
-                                   testing::create_test_orbitals(2, 2, true),
-                                   nullptr, nullptr, 0),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AbelianMPSContainer({make_site(1, 1), unnormalized},
+                          testing::create_test_orbitals(2, 2, true),
+                          make_particle_count(0), make_particle_count(0), 0),
+      std::invalid_argument);
   // Unnormalized at position 1 with center=1 → site 1 is the center → accepted
   EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
                                       testing::create_test_orbitals(2, 2, true),
-                                      nullptr, nullptr, 1));
+                                      make_particle_count(0),
+                                      make_particle_count(0), 1));
   // Unspecified canonicalization → accepted
   EXPECT_NO_THROW(AbelianMPSContainer({make_site(1, 1), unnormalized},
                                       testing::create_test_orbitals(2, 2, true),
-                                      nullptr, nullptr, std::nullopt));
+                                      make_particle_count(0),
+                                      make_particle_count(0), std::nullopt));
   // Out-of-range center → rejected
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)},
-                                   testing::create_test_orbitals(1, 1, true),
-                                   nullptr, nullptr, 1),
+  EXPECT_THROW(AbelianMPSContainer(
+                   {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+                   make_particle_count(0), make_particle_count(0), 1),
                std::invalid_argument);
 }
 
@@ -381,17 +409,20 @@ TEST(AbelianMPSSiteTest, RequiresParticleNumberForSpinResolvedBondSectors) {
 
 TEST(AbelianMPSContainerTest, RejectsTriviallyBlockedSites) {
   // Trivially-blocked sites (no ParticleNumber axis) must be rejected.
-  EXPECT_THROW(AbelianMPSContainer({make_trivial_site(1, 1)},
-                                   testing::create_test_orbitals(1, 1, true)),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AbelianMPSContainer({make_trivial_site(1, 1)},
+                          testing::create_test_orbitals(1, 1, true),
+                          make_particle_count(0), make_particle_count(0)),
+      std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RejectsMismatchedAdjacentBonds) {
   // Right bond of site 0 has dim=2, left bond of site 1 has dim=3 → mismatch.
   std::vector<AbelianMPSContainer::SitePtr> sites = {make_site(1, 2, 0, 1, 4),
                                                      make_site(3, 1, 1, 2, 4)};
-  EXPECT_THROW(AbelianMPSContainer(std::move(sites),
-                                   testing::create_test_orbitals(2, 2, true)),
+  EXPECT_THROW(AbelianMPSContainer(
+                   std::move(sites), testing::create_test_orbitals(2, 2, true),
+                   make_particle_count(0), make_particle_count(0)),
                std::invalid_argument);
 }
 
@@ -400,42 +431,38 @@ TEST(AbelianMPSContainerTest, RejectsPhysicalBasisSizeMismatch) {
   std::vector<AbelianMPSContainer::SitePtr> sites = {
       make_site(1, 1, 0, 0, 2, 3)};
 
-  EXPECT_THROW(AbelianMPSContainer(std::move(sites),
-                                   testing::create_test_orbitals(1, 1, true),
-                                   nullptr, nullptr, std::nullopt,
-                                   {Configuration::from_spin_half_string("0"),
-                                    Configuration::from_spin_half_string("u")}),
+  EXPECT_THROW(AbelianMPSContainer(
+                   std::move(sites), testing::create_test_orbitals(1, 1, true),
+                   make_particle_count(0), make_particle_count(0), std::nullopt,
+                   {Configuration::from_spin_half_string("0"),
+                    Configuration::from_spin_half_string("u")}),
                std::invalid_argument);
 }
 
-TEST(AbelianMPSContainerTest, RejectsInvalidPhysicalBasisConfigurations) {
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1)},
-                                   testing::create_test_orbitals(1, 1, true),
-                                   nullptr, nullptr, std::nullopt,
-                                   {Configuration::from_bitstring("0"),
-                                    Configuration::from_bitstring("1"),
-                                    Configuration::from_bitstring("0"),
-                                    Configuration::from_bitstring("1")}),
+TEST(AbelianMPSContainerTest, RejectsSpinlessPhysicalBasisConfigurations) {
+  EXPECT_THROW(AbelianMPSContainer(
+                   {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
+                   make_particle_count(0), make_particle_count(0), std::nullopt,
+                   {Configuration::from_bitstring("0"),
+                    Configuration::from_bitstring("1"),
+                    Configuration::from_bitstring("0"),
+                    Configuration::from_bitstring("1")}),
                std::invalid_argument);
-
-  EXPECT_THROW(
-      AbelianMPSContainer(
-          {make_site(1, 1)}, testing::create_test_orbitals(1, 1, true),
-          nullptr, nullptr, std::nullopt,
-          {Configuration::from_spin_half_string("00"),
-           Configuration::from_spin_half_string("uu"),
-           Configuration::from_spin_half_string("dd"),
-           Configuration::from_spin_half_string("22")}),
-      std::invalid_argument);
 }
 
 TEST(AbelianMPSContainerTest, RejectsInvalidSiteToOrbitalOrder) {
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
-                                   testing::create_test_orbitals(2, 2, true),
-                                   nullptr, nullptr, std::nullopt, {}, {0}),
-               std::invalid_argument);
-  EXPECT_THROW(AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
-                                   testing::create_test_orbitals(2, 2, true),
-                                   nullptr, nullptr, std::nullopt, {}, {0, 0}),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
+                          testing::create_test_orbitals(2, 2, true),
+                          make_particle_count(0), make_particle_count(0),
+                          std::nullopt, {}, {0}),
+      std::invalid_argument);
+  EXPECT_THROW(
+      AbelianMPSContainer({make_site(1, 1), make_site(1, 1)},
+                          testing::create_test_orbitals(2, 2, true),
+                          make_particle_count(0), make_particle_count(0),
+                          std::nullopt, {}, {0, 0}),
+      std::invalid_argument);
 }
+
+}  // namespace detail

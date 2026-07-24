@@ -13,7 +13,7 @@
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
-namespace {
+namespace detail {
 
 template <typename Extents>
 std::size_t total_extent(const Extents& extents) {
@@ -104,7 +104,7 @@ bool is_canonical_site(const Matrix& packed, std::size_t physical_dimension,
                        tolerance);
 }
 
-}  // namespace
+}  // namespace detail
 
 AbelianMPSSite::AbelianMPSSite(std::vector<PhysicalSlicePtr> physical_slices,
                                std::vector<SymmetryLabel> left_sector_order,
@@ -128,10 +128,10 @@ void AbelianMPSSite::_validate() const {
   const auto scalar_index = _physical_slices.front()->index();
   std::visit(
       [&](const auto& reference) {
-        validate_bond_symmetry(*reference.symmetries()[0]);
-        validate_bond_symmetry(*reference.symmetries()[1]);
-        sector_offsets(reference.extents()[0], _left_sector_order);
-        sector_offsets(reference.extents()[1], _right_sector_order);
+        detail::validate_bond_symmetry(*reference.symmetries()[0]);
+        detail::validate_bond_symmetry(*reference.symmetries()[1]);
+        detail::sector_offsets(reference.extents()[0], _left_sector_order);
+        detail::sector_offsets(reference.extents()[1], _right_sector_order);
         for (const auto& slice : _physical_slices) {
           if (!slice) {
             throw std::invalid_argument(
@@ -167,13 +167,17 @@ void AbelianMPSSite::_validate() const {
 
 std::size_t AbelianMPSSite::left_bond_dimension() const {
   return std::visit(
-      [](const auto& slice) { return total_extent(slice.extents()[0]); },
+      [](const auto& slice) {
+        return detail::total_extent(slice.extents()[0]);
+      },
       *_physical_slices.front());
 }
 
 std::size_t AbelianMPSSite::right_bond_dimension() const {
   return std::visit(
-      [](const auto& slice) { return total_extent(slice.extents()[1]); },
+      [](const auto& slice) {
+        return detail::total_extent(slice.extents()[1]);
+      },
       *_physical_slices.front());
 }
 
@@ -191,10 +195,10 @@ AbelianMPSSite::DenseMatrixVariant AbelianMPSSite::to_dense() const {
                 static_cast<Eigen::Index>(left_bond_dimension() *
                                           physical_dimension()),
                 static_cast<Eigen::Index>(right_bond_dimension()));
-        const auto left_offsets =
-            sector_offsets(first_slice.extents()[0], _left_sector_order);
-        const auto right_offsets =
-            sector_offsets(first_slice.extents()[1], _right_sector_order);
+        const auto left_offsets = detail::sector_offsets(
+            first_slice.extents()[0], _left_sector_order);
+        const auto right_offsets = detail::sector_offsets(
+            first_slice.extents()[1], _right_sector_order);
 
         for (std::size_t physical = 0; physical < physical_dimension();
              ++physical) {
@@ -229,7 +233,7 @@ AbelianMPSContainer::AbelianMPSContainer(
     : MPSContainer(std::move(orbitals), std::move(total_num_particles),
                    std::move(active_num_particles), orthogonality_center,
                    std::move(physical_basis),
-                   normalized_site_to_orbital_order(
+                   detail::normalized_site_to_orbital_order(
                        std::move(site_to_orbital_order), sites.size())),
       _sites(std::move(sites)) {
   _validate();
@@ -248,8 +252,8 @@ void AbelianMPSContainer::_validate() const {
     const auto& first_slice = *_sites[index]->physical_slices().front();
     std::visit(
         [](const auto& slice) {
-          validate_abelian_bond_symmetry(*slice.symmetries()[0]);
-          validate_abelian_bond_symmetry(*slice.symmetries()[1]);
+          detail::validate_abelian_bond_symmetry(*slice.symmetries()[0]);
+          detail::validate_abelian_bond_symmetry(*slice.symmetries()[1]);
         },
         first_slice);
   }
@@ -266,8 +270,8 @@ void AbelianMPSContainer::_validate() const {
       const auto left_normalized = index < *orthogonality_center();
       const auto canonical = std::visit(
           [&](const auto& dense) {
-            return is_canonical_site(dense, physical_dimension,
-                                     left_normalized);
+            return detail::is_canonical_site(dense, physical_dimension,
+                                             left_normalized);
           },
           _sites[index]->to_dense());
       if (!canonical) {
@@ -316,12 +320,8 @@ nlohmann::json AbelianMPSContainer::to_json() const {
   json["container_type"] = get_container_type();
   json["representation"] = "abelian";
   json["orbitals"] = get_orbitals()->to_json();
-  json["total_num_particles"] = total_num_particles()
-                                    ? total_num_particles()->to_json()
-                                    : nlohmann::json(nullptr);
-  json["active_num_particles"] = active_num_particles()
-                                     ? active_num_particles()->to_json()
-                                     : nlohmann::json(nullptr);
+  json["total_num_particles"] = total_num_particles()->to_json();
+  json["active_num_particles"] = active_num_particles()->to_json();
   json["orthogonality_center"] = orthogonality_center()
                                      ? nlohmann::json(*orthogonality_center())
                                      : nlohmann::json(nullptr);
@@ -364,12 +364,6 @@ std::unique_ptr<AbelianMPSContainer> AbelianMPSContainer::from_json(
     }
 
     auto orbitals = Orbitals::from_json(json.at("orbitals"));
-    auto load_particle_count = [&](const char* key) {
-      return json.at(key).is_null()
-                 ? std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>{}
-                 : SymmetryBlockedScalar<std::size_t>::from_json(json.at(key));
-    };
-
     std::optional<std::size_t> orthogonality_center;
     if (!json.at("orthogonality_center").is_null()) {
       orthogonality_center = json.at("orthogonality_center").get<std::size_t>();
@@ -414,9 +408,11 @@ std::unique_ptr<AbelianMPSContainer> AbelianMPSContainer::from_json(
 
     return std::make_unique<AbelianMPSContainer>(
         std::move(sites), std::move(orbitals),
-        load_particle_count("total_num_particles"),
-        load_particle_count("active_num_particles"), orthogonality_center,
-        std::move(physical_basis),
+        SymmetryBlockedScalar<std::size_t>::from_json(
+            json.at("total_num_particles")),
+        SymmetryBlockedScalar<std::size_t>::from_json(
+            json.at("active_num_particles")),
+        orthogonality_center, std::move(physical_basis),
         json.at("site_to_orbital_order").get<std::vector<std::size_t>>());
   } catch (const std::exception& error) {
     throw std::runtime_error("Failed to parse AbelianMPSContainer from JSON: " +

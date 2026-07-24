@@ -10,8 +10,15 @@ from collections.abc import Sequence
 import numpy as np
 
 from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite
+from qdk_chemistry.data.symmetry import SymmetryBlockedScalarCount, SymmetryLabel, SymmetryProduct
 
 from .test_helpers import create_test_orbitals
+
+
+def _particle_count(count: int) -> SymmetryBlockedScalarCount:
+    symmetry = SymmetryProduct([])
+    label = SymmetryLabel([])
+    return SymmetryBlockedScalarCount([symmetry], [((label,), count)])
 
 
 def make_mps(
@@ -44,6 +51,8 @@ def make_mps(
     return AbelianMPSContainer(
         sites,
         create_test_orbitals(max(1, num_sites)),
+        _particle_count(0),
+        _particle_count(0),
         orthogonality_center=orthogonality_center,
     )
 

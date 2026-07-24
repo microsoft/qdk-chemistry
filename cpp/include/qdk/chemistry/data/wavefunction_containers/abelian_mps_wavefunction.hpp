@@ -150,14 +150,14 @@ class AbelianMPSContainer : public MPSContainer {
    * @brief Construct an Abelian block-sparse MPS wavefunction.
    * @param sites MPS sites in chain order.
    * @param orbitals Orbital basis associated with the MPS.
-   * @param total_num_particles Optional symmetry-blocked total particle count.
-   * @param active_num_particles Optional symmetry-blocked active particle
-   * count.
+   * @param total_num_particles Symmetry-blocked total particle count.
+   * @param active_num_particles Symmetry-blocked active particle count.
    * @param orthogonality_center Optional site containing the orthogonality
    *        center. Defaults to site zero, representing right-canonical form
    *        with every later site right-normalized.
-   * @param physical_basis Optional one-orbital configurations defining the
-   *        physical-slice order shared by every site.
+   * @param physical_basis Spin-half configurations defining the
+   *        physical-slice order shared by every site. Defaults to the
+   *        canonical spin-half order @c (0,u,d,2).
    * @param site_to_orbital_order Molecular-orbital indices in MPS chain order;
    * defaults to identity ordering.
    * @throws std::invalid_argument if common MPS metadata is invalid; a site is
@@ -168,9 +168,9 @@ class AbelianMPSContainer : public MPSContainer {
   AbelianMPSContainer(
       std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
       std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-          total_num_particles = nullptr,
+          total_num_particles,
       std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-          active_num_particles = nullptr,
+          active_num_particles,
       std::optional<std::size_t> orthogonality_center = std::size_t{0},
       std::vector<Configuration> physical_basis = {},
       std::vector<std::size_t> site_to_orbital_order = {});

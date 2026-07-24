@@ -44,7 +44,7 @@ from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .mps_sequential import GivensLayerData, validate_mps_physical_basis
+from ._mps_common import GivensLayerData, validate_mps_physical_basis
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [

@@ -8,6 +8,23 @@
 
 namespace qdk::chemistry::data {
 
+namespace detail {
+
+std::vector<Configuration> normalize_physical_basis(
+    std::vector<Configuration> physical_basis) {
+  if (physical_basis.empty()) {
+    physical_basis = {
+        Configuration::from_spin_half_string("0"),
+        Configuration::from_spin_half_string("u"),
+        Configuration::from_spin_half_string("d"),
+        Configuration::from_spin_half_string("2"),
+    };
+  }
+  return physical_basis;
+}
+
+}  // namespace detail
+
 MPSContainer::MPSContainer(
     std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
@@ -21,7 +38,8 @@ MPSContainer::MPSContainer(
       _total_num_particles(std::move(total_num_particles)),
       _active_num_particles(std::move(active_num_particles)),
       _orthogonality_center(orthogonality_center),
-      _physical_basis(std::move(physical_basis)),
+      _physical_basis(
+          detail::normalize_physical_basis(std::move(physical_basis))),
       _site_to_orbital_order(std::move(site_to_orbital_order)) {}
 
 void MPSContainer::_validate_common(std::size_t site_count,
@@ -32,6 +50,10 @@ void MPSContainer::_validate_common(std::size_t site_count,
   }
   if (!_orbitals) {
     throw std::invalid_argument("MPS wavefunction requires orbitals.");
+  }
+  if (!_total_num_particles || !_active_num_particles) {
+    throw std::invalid_argument(
+        "MPS wavefunction requires total and active particle counts.");
   }
   if (_orthogonality_center && *_orthogonality_center >= site_count) {
     throw std::invalid_argument(
@@ -44,11 +66,10 @@ void MPSContainer::_validate_common(std::size_t site_count,
   }
   if (std::any_of(_physical_basis.begin(), _physical_basis.end(),
                   [](const Configuration& state) {
-                    return state.bits_per_mode() != 2 || state.capacity() != 1;
+                    return state.bits_per_mode() != 2;
                   })) {
     throw std::invalid_argument(
-        "MPS physical basis states must be one-orbital spin-half "
-        "configurations.");
+        "MPS physical basis states must be spin-half configurations.");
   }
   if (_site_to_orbital_order.size() != site_count) {
     throw std::invalid_argument(
@@ -107,8 +128,7 @@ std::shared_ptr<const Orbitals> MPSContainer::sector_basis(
   return _orbitals;
 }
 
-void MPSContainer::hash_update(
-    qdk::chemistry::utils::HashContext& ctx) const {
+void MPSContainer::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   hash_value(ctx, _orbitals->content_hash());

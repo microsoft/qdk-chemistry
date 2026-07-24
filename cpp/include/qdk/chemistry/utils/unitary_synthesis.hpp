@@ -5,7 +5,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -37,64 +36,12 @@ struct GivensDecomposition {
   std::vector<std::uint8_t> phases;
 };
 
-/**
- * @brief Cosine-sine factors for a vertically stacked two-block isometry.
- *
- * Represents @f$[A;B]=\operatorname{diag}(U_1,U_2)[D_1;D_2]V@f$, where
- * @f$D_1@f$ and @f$D_2@f$ are diagonal vectors satisfying
- * @f$D_1^2+D_2^2=I@f$.
- */
-struct TwoBlockCsd {
-  Eigen::MatrixXd u_1;
-  Eigen::MatrixXd u_2;
-  Eigen::VectorXd d_1;
-  Eigen::VectorXd d_2;
-  Eigen::MatrixXd v;
-};
-
-/** @brief Matrix factors produced by the three-step MPS site CSD peel. */
-struct SiteCsd {
-  std::array<Eigen::MatrixXd, 4> u;
-  std::array<Eigen::VectorXd, 3> d_prime;
-  Eigen::MatrixXd w_0;
-  Eigen::MatrixXd w_1;
-  Eigen::MatrixXd v;
-};
-
 /** @brief Permutations and block synthesis data for one sparse MPS site. */
 struct SparseSiteSynthesis {
   std::vector<Eigen::Index> column_permutation;
   std::vector<Eigen::Index> row_permutation;
   GivensDecomposition block_givens;
 };
-
-/**
- * @brief Decompose two equally sized blocks whose vertical stack is an
- * isometry.
- *
- * @param a Upper block with shape @f$m\times k@f$.
- * @param b Lower block with the same shape as @p a.
- * @return Complete left orthogonal factors, CS diagonals, and the shared right
- * orthogonal factor.
- * @throws std::invalid_argument If dimensions, entries, or the isometry
- * precondition are invalid.
- */
-TwoBlockCsd decompose_2d(const Eigen::Ref<const Eigen::MatrixXd>& a,
-                         const Eigen::Ref<const Eigen::MatrixXd>& b);
-
-/**
- * @brief Compute the three-step CSD peel of a packed MPS site isometry.
- *
- * @param matrix Physical-major packed isometry with shape
- * @f$(4\chi)\times\chi_L@f$.
- * @param ancilla_dim Padded bond dimension @f$\chi@f$.
- * @return Four terminal unitaries, three sine diagonals, two mixing unitaries,
- * and the right factor propagated to the preceding site.
- * @throws std::invalid_argument If the matrix shape or isometry precondition is
- * invalid.
- */
-SiteCsd decompose_site_csd(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
-                           Eigen::Index ancilla_dim);
 
 /**
  * @brief Decompose a real orthogonal matrix into parallel Givens layers.

@@ -9,9 +9,9 @@
 
 #include <array>
 #include <complex>
+#include <limits>
 #include <map>
 #include <memory>
-#include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/abelian_mps_wavefunction.hpp>
@@ -24,7 +24,7 @@
 namespace py = pybind11;
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace detail {
 
 template <typename Scalar>
 AbelianMPSSite::PhysicalSlicePtr make_trivial_slice(
@@ -140,9 +140,8 @@ std::shared_ptr<AbelianMPSSite> site_from_dense_abelian(
     for (const auto& [particle_number, dimension] :
          std::map<std::size_t, std::size_t>(sector_sizes.begin(),
                                             sector_sizes.end())) {
-      if (dimension >
-              static_cast<std::size_t>(
-                  std::numeric_limits<Eigen::Index>::max()) ||
+      if (dimension > static_cast<std::size_t>(
+                          std::numeric_limits<Eigen::Index>::max()) ||
           dimension > std::numeric_limits<std::size_t>::max() - offset) {
         throw std::invalid_argument(std::string("MPS ") + bond_name +
                                     " sector dimensions are too large.");
@@ -152,8 +151,8 @@ std::shared_ptr<AbelianMPSSite> site_from_dense_abelian(
     }
     if (offset != expected_dimension) {
       throw std::invalid_argument(std::string("Sum of ") + bond_name +
-                                  " sector sizes must equal chi_" +
-                                  bond_name + ".");
+                                  " sector sizes must equal chi_" + bond_name +
+                                  ".");
     }
   };
   build_offsets(left_sector_sizes, left_offsets, chi_left, "left");
@@ -330,37 +329,40 @@ py::list physical_slices(const AbelianMPSSite& site) {
   return result;
 }
 
-}  // namespace
+}  // namespace detail
 
 void bind_mps_wavefunction(py::module& data) {
   py::class_<AbelianMPSSite, py::smart_holder>(
       data, "AbelianMPSSite",
       "One MPS site stored as a symmetry-blocked matrix for each physical "
       "state. All slices share common left and right bond spaces.")
-      .def(py::init(&site_from_slices<double>), py::arg("physical_slices"),
-           py::arg("left_sector_order"), py::arg("right_sector_order"),
+      .def(py::init(&::detail::site_from_slices<double>),
+           py::arg("physical_slices"), py::arg("left_sector_order"),
+           py::arg("right_sector_order"),
            "Construct a real-valued site from symmetry-blocked physical "
            "slices. Sector-order arguments specify how sector-local rows and "
            "columns are concatenated when forming dense bond indices.")
-      .def(py::init(&site_from_slices<std::complex<double>>),
+      .def(py::init(&::detail::site_from_slices<std::complex<double>>),
            py::arg("physical_slices"), py::arg("left_sector_order"),
            py::arg("right_sector_order"),
            "Construct a complex-valued site from symmetry-blocked physical "
            "slices. Sector-order arguments specify how sector-local rows and "
            "columns are concatenated when forming dense bond indices.")
       .def_static(
-          "from_dense", &site_from_dense_dispatch, py::arg("tensor"),
+          "from_dense", &::detail::site_from_dense_dispatch, py::arg("tensor"),
           "Construct an unsymmetrized site from an array with shape "
           "(chi_left, physical_dimension, chi_right). The result has one "
           "trivial block per physical state and cannot be used to construct "
           "an AbelianMPSContainer.")
-      .def_static("from_dense_complex", &site_from_dense<std::complex<double>>,
+      .def_static("from_dense_complex",
+                  &::detail::site_from_dense<std::complex<double>>,
                   py::arg("tensor"),
                   "Construct an unsymmetrized complex-valued site from an "
                   "array with shape (chi_left, physical_dimension, "
                   "chi_right). Prefer from_dense for automatic dtype "
                   "dispatch.")
-      .def_static("from_dense_abelian", &site_from_dense_abelian_dispatch,
+      .def_static("from_dense_abelian",
+                  &::detail::site_from_dense_abelian_dispatch,
                   py::arg("tensor"), py::arg("left_sector_sizes"),
                   py::arg("right_sector_sizes"), py::arg("delta_n"),
                   py::arg("max_particle_number"),
@@ -370,7 +372,7 @@ void bind_mps_wavefunction(py::module& data) {
                   "n + delta_n[p] is extracted. Sectors are packed in "
                   "ascending particle-number order.")
       .def_property_readonly(
-          "physical_slices", &physical_slices,
+          "physical_slices", &::detail::physical_slices,
           "Per-physical-state matrices as scipy.sparse.csc_array objects. "
           "Rows and columns follow left_sector_order and "
           "right_sector_order; absent symmetry blocks and zero block entries "
@@ -400,7 +402,7 @@ void bind_mps_wavefunction(py::module& data) {
                                   self.right_bond_dimension());
           },
           "Dense tensor shape (chi_left, physical_dimension, chi_right).")
-      .def("to_dense", &site_to_dense,
+      .def("to_dense", &::detail::site_to_dense,
            "Return an array with shape (chi_left, physical_dimension, "
            "chi_right), inserting zeros for absent symmetry blocks.");
 
@@ -430,8 +432,7 @@ void bind_mps_wavefunction(py::module& data) {
                     std::optional<std::size_t>, std::vector<Configuration>,
                     std::vector<std::size_t>>(),
            py::arg("sites"), py::arg("orbitals"),
-           py::arg("total_num_particles") = nullptr,
-           py::arg("active_num_particles") = nullptr,
+           py::arg("total_num_particles"), py::arg("active_num_particles"),
            py::arg("orthogonality_center") = std::size_t{0},
            py::arg("physical_basis") = std::vector<Configuration>{},
            py::arg("site_to_orbital_order") = std::vector<std::size_t>{},

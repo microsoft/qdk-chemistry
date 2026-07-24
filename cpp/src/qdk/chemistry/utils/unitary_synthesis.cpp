@@ -11,25 +11,12 @@
 #include <utility>
 
 namespace qdk::chemistry::utils::detail {
-namespace {
 
 constexpr double elimination_tolerance = 1.0e-15;
 constexpr double orthogonality_tolerance = 1.0e-8;
 
 // A rotation is stored by the lower index of its adjacent pair and its angle.
 using Rotation = std::pair<Eigen::Index, double>;
-
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> complete_qr(
-    const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
-  Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
-  Eigen::MatrixXd q = qr.householderQ() *
-                      Eigen::MatrixXd::Identity(matrix.rows(), matrix.rows());
-  Eigen::MatrixXd r = Eigen::MatrixXd::Zero(matrix.rows(), matrix.cols());
-  r.topRows(matrix.cols()) = qr.matrixQR()
-                                 .topRows(matrix.cols())
-                                 .template triangularView<Eigen::Upper>();
-  return {std::move(q), std::move(r)};
-}
 
 void validate_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
                        const char* message) {
@@ -49,80 +36,6 @@ std::vector<Eigen::Index> invert_permutation(
         static_cast<Eigen::Index>(index);
   }
   return inverse;
-}
-
-}  // namespace
-
-TwoBlockCsd decompose_2d(const Eigen::Ref<const Eigen::MatrixXd>& a,
-                         const Eigen::Ref<const Eigen::MatrixXd>& b) {
-  if (a.rows() == 0 || a.cols() == 0 || a.rows() < a.cols() ||
-      a.rows() != b.rows() || a.cols() != b.cols()) {
-    throw std::invalid_argument(
-        "Two-block CSD requires equally sized nonempty matrices with rows >= "
-        "columns.");
-  }
-  if (!a.allFinite() || !b.allFinite()) {
-    throw std::invalid_argument(
-        "Two-block CSD requires finite matrix entries.");
-  }
-
-  Eigen::MatrixXd stacked(2 * a.rows(), a.cols());
-  stacked << a, b;
-  validate_isometry(stacked,
-                    "Two-block CSD requires an isometric vertical stack.");
-
-  Eigen::JacobiSVD<Eigen::MatrixXd> upper_svd(
-      a, Eigen::ComputeFullU | Eigen::ComputeFullV);
-  TwoBlockCsd result;
-  result.u_1 = upper_svd.matrixU();
-  result.d_1 = upper_svd.singularValues();
-  result.v = upper_svd.matrixV().transpose();
-
-  const Eigen::MatrixXd lower_in_right_basis = b * upper_svd.matrixV();
-  Eigen::JacobiSVD<Eigen::MatrixXd> lower_svd(
-      lower_in_right_basis, Eigen::ComputeFullU | Eigen::ComputeFullV);
-  result.u_2 = lower_svd.matrixU();
-  result.u_2.leftCols(a.cols()) =
-      lower_svd.matrixU().leftCols(a.cols()) * lower_svd.matrixV().transpose();
-  const Eigen::MatrixXd d_2_matrix = lower_svd.matrixV() *
-                                     lower_svd.singularValues().asDiagonal() *
-                                     lower_svd.matrixV().transpose();
-  result.d_2 = d_2_matrix.diagonal();
-  return result;
-}
-
-SiteCsd decompose_site_csd(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
-                           Eigen::Index ancilla_dim) {
-  if (ancilla_dim <= 0 || matrix.rows() != 4 * ancilla_dim ||
-      matrix.cols() == 0 || matrix.cols() > ancilla_dim) {
-    throw std::invalid_argument(
-        "Site CSD requires a (4 * ancilla_dim) by width matrix with 0 < width "
-        "<= ancilla_dim.");
-  }
-  if (!matrix.allFinite()) {
-    throw std::invalid_argument("Site CSD requires finite matrix entries.");
-  }
-  validate_isometry(matrix, "Site CSD requires an isometric matrix.");
-
-  const auto [b_full, r] = complete_qr(matrix.bottomRows(3 * ancilla_dim));
-  const auto [c, s] =
-      complete_qr(b_full.block(ancilla_dim, 0, 2 * ancilla_dim, ancilla_dim));
-
-  const auto bottom =
-      decompose_2d(c.topLeftCorner(ancilla_dim, ancilla_dim),
-                   c.bottomLeftCorner(ancilla_dim, ancilla_dim));
-  const auto middle = decompose_2d(
-      b_full.topLeftCorner(ancilla_dim, ancilla_dim), s.topRows(ancilla_dim));
-  const auto top =
-      decompose_2d(matrix.topRows(ancilla_dim), r.topRows(ancilla_dim));
-
-  SiteCsd result;
-  result.u = {top.u_1, middle.u_1, bottom.u_1, bottom.u_2};
-  result.d_prime = {top.d_2, middle.d_2, bottom.d_2};
-  result.w_0 = middle.v * top.u_2;
-  result.w_1 = bottom.v * middle.u_2;
-  result.v = top.v;
-  return result;
 }
 
 GivensDecomposition decompose_unitary_to_givens(

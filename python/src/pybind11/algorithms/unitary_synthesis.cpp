@@ -10,7 +10,7 @@
 
 namespace py = pybind11;
 
-namespace {
+namespace detail {
 
 py::list to_bool_list(const std::vector<std::uint8_t>& values) {
   py::list result;
@@ -20,38 +20,9 @@ py::list to_bool_list(const std::vector<std::uint8_t>& values) {
   return result;
 }
 
-}  // namespace
+}  // namespace detail
 
 void bind_unitary_synthesis(py::module& module) {
-  module.def(
-      "decompose_2d",
-      [](const Eigen::Ref<const Eigen::MatrixXd>& a,
-         const Eigen::Ref<const Eigen::MatrixXd>& b) {
-        qdk::chemistry::utils::detail::TwoBlockCsd result;
-        {
-          py::gil_scoped_release release;
-          result = qdk::chemistry::utils::detail::decompose_2d(a, b);
-        }
-        return py::make_tuple(result.u_1, result.u_2, result.d_1, result.d_2,
-                              result.v);
-      },
-      py::arg("a"), py::arg("b"));
-
-  module.def(
-      "decompose_site_csd",
-      [](const Eigen::Ref<const Eigen::MatrixXd>& matrix,
-         Eigen::Index ancilla_dim) {
-        qdk::chemistry::utils::detail::SiteCsd result;
-        {
-          py::gil_scoped_release release;
-          result = qdk::chemistry::utils::detail::decompose_site_csd(
-              matrix, ancilla_dim);
-        }
-        return py::make_tuple(result.u, result.d_prime, result.w_0, result.w_1,
-                              result.v);
-      },
-      py::arg("matrix"), py::arg("ancilla_dim"));
-
   module.def(
       "decompose_unitary_to_givens",
       [](const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
@@ -62,8 +33,8 @@ void bind_unitary_synthesis(py::module& module) {
               matrix);
         }
         return py::make_tuple(result.layer_angles,
-                              to_bool_list(result.layer_shifted),
-                              to_bool_list(result.phases));
+                              detail::to_bool_list(result.layer_shifted),
+                              detail::to_bool_list(result.phases));
       },
       py::arg("matrix"));
 
@@ -78,8 +49,8 @@ void bind_unitary_synthesis(py::module& module) {
                   blocks);
         }
         return py::make_tuple(result.layer_angles,
-                              to_bool_list(result.layer_shifted),
-                              to_bool_list(result.phases));
+                              detail::to_bool_list(result.layer_shifted),
+                              detail::to_bool_list(result.phases));
       },
       py::arg("blocks"));
 
@@ -92,10 +63,10 @@ void bind_unitary_synthesis(py::module& module) {
           result = qdk::chemistry::utils::detail::decompose_sparse_site(target);
         }
         return py::make_tuple(
-          result.column_permutation, result.row_permutation,
-          result.block_givens.layer_angles,
-            to_bool_list(result.block_givens.layer_shifted),
-            to_bool_list(result.block_givens.phases));
+            result.column_permutation, result.row_permutation,
+            result.block_givens.layer_angles,
+            detail::to_bool_list(result.block_givens.layer_shifted),
+            detail::to_bool_list(result.block_givens.phases));
       },
       py::arg("target"));
 }

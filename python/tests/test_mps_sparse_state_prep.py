@@ -20,14 +20,14 @@ from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     _tensor_to_target_matrix,
     generate_mps_sparse_preparation_data,
 )
-from qdk_chemistry.data import AbelianMPSContainer, Configuration, Wavefunction
+from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite, Configuration, Wavefunction
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .mps_test_utils import contract_mps, make_mps, random_mps, right_normalized_mps
 from .test_helpers import create_test_orbitals, create_test_wavefunction
 
 # =============================================================================
-# Qualtran reference data (from test_mps_sequential_state_prep.py)
+# Qualtran reference data
 # =============================================================================
 
 _qualtran_mps_tensors = (
@@ -148,6 +148,45 @@ QUALTRAN_COST_SPARSE = {"num_qubits": 32, "toffoli": 321}
 # =============================================================================
 
 
+class TestAbelianMPSSiteBindings:
+    """Regression tests for dense-to-Abelian site conversion."""
+
+    def test_from_dense_preserves_complex_amplitudes(self):
+        tensor = np.array([[[1.0j], [0.0], [0.0], [0.0]]])
+        site = AbelianMPSSite.from_dense(tensor)
+
+        assert site.is_complex
+        assert np.array_equal(site.to_dense(), tensor)
+
+    def test_from_dense_abelian_rejects_sector_dimension_overflow(self):
+        with pytest.raises(ValueError, match="sector dimensions are too large"):
+            AbelianMPSSite.from_dense_abelian(
+                np.zeros((1, 1, 1)),
+                {0: np.iinfo(np.uintp).max, 1: 2},
+                {0: 1},
+                [0],
+                1,
+            )
+
+
+class TestAbelianMPSContainerBindings:
+    """Validate the public Python metadata contract for native MPS data."""
+
+    def test_requires_particle_counts(self):
+        """Both total and active particle counts are required constructor arguments."""
+        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+
+        with pytest.raises(TypeError):
+            AbelianMPSContainer(source.sites, source.orbitals)
+
+    def test_defaults_to_canonical_physical_basis(self):
+        """Omitting the physical basis records the canonical spin-half ordering."""
+        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+        canonical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
+
+        assert source.physical_basis == canonical_basis
+
+
 class TestSparseDecompositionHelpers:
     """Unit tests for the internal sparse decomposition helper functions."""
 
@@ -229,7 +268,13 @@ class TestGenerateMPSSparsePreparationData:
     def test_run_propagates_site_to_orbital_order(self):
         """Circuit parameters place MPS sites on their molecular-orbital qubits."""
         source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
-        mps = AbelianMPSContainer(source.sites, source.orbitals, site_to_orbital_order=[1, 0])
+        mps = AbelianMPSContainer(
+            source.sites,
+            source.orbitals,
+            source.total_num_particles,
+            source.active_num_particles,
+            site_to_orbital_order=[1, 0],
+        )
 
         circuit = MPSSparseStatePreparation().run(Wavefunction(mps))
 
@@ -237,8 +282,15 @@ class TestGenerateMPSSparsePreparationData:
 
     def test_run_requires_one_site_per_orbital(self):
         """State preparation rejects an MPS that covers only an orbital subset."""
-        site = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])]).sites[0]
-        mps = AbelianMPSContainer([site], create_test_orbitals(3), site_to_orbital_order=[2])
+        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
+        site = source.sites[0]
+        mps = AbelianMPSContainer(
+            [site],
+            create_test_orbitals(3),
+            source.total_num_particles,
+            source.active_num_particles,
+            site_to_orbital_order=[2],
+        )
 
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
             MPSSparseStatePreparation().run(Wavefunction(mps))
@@ -250,6 +302,8 @@ class TestGenerateMPSSparsePreparationData:
         mps = AbelianMPSContainer(
             source.sites,
             source.orbitals,
+            source.total_num_particles,
+            source.active_num_particles,
             physical_basis=physical_basis,
         )
 
@@ -264,6 +318,8 @@ class TestGenerateMPSSparsePreparationData:
         mps = AbelianMPSContainer(
             source.sites,
             source.orbitals,
+            source.total_num_particles,
+            source.active_num_particles,
             orthogonality_center=orthogonality_center,
         )
 

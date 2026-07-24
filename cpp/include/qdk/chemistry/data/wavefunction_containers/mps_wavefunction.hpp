@@ -51,8 +51,8 @@ class MPSContainer : public WavefunctionContainer {
   double norm() const override;
 
   /**
-   * @brief Get the total number of particles, if supplied by the producer.
-   * @return Symmetry-blocked total particle count, or nullptr if unavailable.
+   * @brief Get the total number of particles.
+   * @return Symmetry-blocked total particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
   total_num_particles() const override {
@@ -60,8 +60,8 @@ class MPSContainer : public WavefunctionContainer {
   }
 
   /**
-   * @brief Get the active-space particle count, if supplied by the producer.
-   * @return Symmetry-blocked active particle count, or nullptr if unavailable.
+   * @brief Get the active-space particle count.
+   * @return Symmetry-blocked active particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
   active_num_particles() const override {
@@ -132,9 +132,8 @@ class MPSContainer : public WavefunctionContainer {
   }
 
   /**
-   * @brief Get the one-orbital occupation states labeling physical slices.
-   * @return Configurations in physical-slice order, shared by every site, or
-   *         an empty vector if this metadata was not supplied.
+   * @brief Get the spin-half configurations labeling physical slices.
+   * @return Configurations in physical-slice order, shared by every site.
    */
   const std::vector<Configuration>& physical_basis() const {
     return _physical_basis;
@@ -156,14 +155,14 @@ class MPSContainer : public WavefunctionContainer {
   /**
    * @brief Construct the representation-independent portion of an MPS.
    * @param orbitals Orbital basis associated with the MPS.
-   * @param total_num_particles Optional symmetry-blocked total particle count.
-   * @param active_num_particles Optional symmetry-blocked active particle
-   * count.
+   * @param total_num_particles Symmetry-blocked total particle count.
+   * @param active_num_particles Symmetry-blocked active particle count.
    * @param orthogonality_center Optional site containing the orthogonality
    * center. Sites on either side must be left- and right-normalized,
    * respectively.
-   * @param physical_basis Optional one-orbital configurations defining the
-   *        physical-slice order shared by every site.
+   * @param physical_basis Spin-half configurations defining the
+   *        physical-slice order shared by every site. An empty vector selects
+   *        the canonical spin-half order @c (0,u,d,2).
    * @param site_to_orbital_order Unique molecular-orbital indices in MPS chain
    * order. The number of sites may be smaller than the orbital basis size.
    */
@@ -181,8 +180,8 @@ class MPSContainer : public WavefunctionContainer {
    * @param num_sites Number of sites supplied by the concrete container.
    * @param physical_dimension Number of physical slices at each site.
    * @throws std::invalid_argument if there are no sites, orbitals are null,
-   * physical-basis configurations are invalid, or the site-to-orbital order
-   * is not unique and in range.
+   * particle counts are null, physical-basis configurations are invalid, or
+   * the site-to-orbital order is not unique and in range.
    */
   void _validate_common(std::size_t num_sites,
                         std::size_t physical_dimension) const;

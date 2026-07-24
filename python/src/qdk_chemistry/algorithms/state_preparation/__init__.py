@@ -10,9 +10,6 @@ quantum states from classical wavefunctions.
 
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
-from qdk_chemistry.algorithms.state_preparation.mps_sequential import (
-    MPSSequentialStatePreparation,
-)
 from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
     MPSSparseStatePreparation,
 )
@@ -24,9 +21,8 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 )
 
 __all__ = [
-    "MPSSequentialStatePreparation",
-    "MPSSparseStatePreparation",
     "DensePureStatePreparation",
+    "MPSSparseStatePreparation",
     "SparseIsometryGF2XStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",
