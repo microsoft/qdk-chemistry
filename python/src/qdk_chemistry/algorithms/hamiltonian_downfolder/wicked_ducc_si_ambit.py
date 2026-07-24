@@ -262,7 +262,14 @@ def evaluate_bch_ambit(
 
         exec(code, exec_ns)
 
-        result = np.asarray(R.block(active)).copy()
+        block = R.block(active)
+        dims = tuple(block.dims)
+        # Zero-size active blocks (open-shell partitions where an active
+        # sub-space is empty) can't go through numpy's buffer protocol.
+        if 0 in dims:
+            result = np.zeros(dims)
+        else:
+            result = np.asarray(block).copy()
         if ndim == 2:
             fbar[output_spaces] = result
         elif ndim == 4:
@@ -345,5 +352,7 @@ class WickedDuccSIAmbitSolver(Algorithm):
 
         # Step 6: assemble Hamiltonian
         return assemble_active_hamiltonian(
-            fbar, vbar, E0_bch, noa_act, nva_act, input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a
+            fbar, vbar, E0_bch, noa_act, nva_act,
+            nob_act=nob_act, nvb_act=nvb_act,
+            input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a
         )

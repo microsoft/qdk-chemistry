@@ -141,9 +141,7 @@ def _within_shell_m_reorder(basis_set) -> np.ndarray:
     return perm
 
 
-def write_qdk_basis_g94(
-    basis_set, elements: list, basis_data_dir: str | Path, basis_name: str
-) -> Path:
+def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, basis_name: str) -> Path:
     """Write qdk-chemistry's basis as a Gaussian-94 file in qdk's shell order.
 
     ExaChem/Libint2 reads a basis from ``<LIBINT_DATA_PATH>/basis/<name>.g94``.
@@ -164,6 +162,7 @@ def write_qdk_basis_g94(
 
     Returns:
         The ``basis_data_dir`` path, to be used as ``LIBINT_DATA_PATH``.
+
     """
     # Group shell indices by atom (shells are already in qdk's native order).
     atom_shells: dict[int, list[int]] = {}

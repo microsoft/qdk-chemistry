@@ -105,12 +105,18 @@ def build_integrals(hamiltonian, nocc_a, nocc_b):
         for n in range(nocc_b):
             E0 += V[m, n, m, n]
 
-    # Fock matrix: f[p,q] = h[p,q] + Σ_m <pm||qm> + Σ_M <pM|qM>
-    F = h1.copy()
+    # Spin-resolved Fock matrices (ROHF/UHF: F_α ≠ F_β when nocc_a ≠ nocc_b).
+    #   F_α[p,q] = h[p,q] + Σ_{m∈α} <pm||qm> + Σ_{M∈β} <pM|qM>
+    #   F_β[p,q] = h[p,q] + Σ_{m∈α} <pm|qm>  + Σ_{M∈β} <pM||qM>
+    # Same-spin Coulomb-minus-exchange (V_asym), opposite-spin Coulomb-only (V).
+    F_a = h1.copy()
+    F_b = h1.copy()
     for m in range(nocc_a):
-        F += V_asym[:, m, :, m]
+        F_a += V_asym[:, m, :, m]
+        F_b += V[:, m, :, m]
     for m in range(nocc_b):
-        F += V[:, m, :, m]
+        F_a += V[:, m, :, m]
+        F_b += V_asym[:, m, :, m]
 
     # Spin-blocked dictionaries (lowercase=α, uppercase=β)
     oa, va = slice(0, nocc_a), slice(nocc_a, nmo)
@@ -120,8 +126,8 @@ def build_integrals(hamiltonian, nocc_a, nocc_b):
     H = {}
     for c1 in ["o", "v"]:
         for c2 in ["o", "v"]:
-            H[c1 + c2] = F[sl_map[c1], sl_map[c2]]
-            H[c1.upper() + c2.upper()] = F[sl_map[c1.upper()], sl_map[c2.upper()]]
+            H[c1 + c2] = F_a[sl_map[c1], sl_map[c2]]
+            H[c1.upper() + c2.upper()] = F_b[sl_map[c1.upper()], sl_map[c2.upper()]]
     for c1 in ["o", "v"]:
         for c2 in ["o", "v"]:
             for c3 in ["o", "v"]:
@@ -344,6 +350,7 @@ def build_ducc_bch(w, bch_order):
 
 
 def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
+                                nob_act=None, nvb_act=None,
                                 input_orbitals=None, nocc_a=None):
     """Assemble active-space γ tensors, convert γ→χ, and package Hamiltonian.
 
@@ -366,10 +373,21 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
         A qdk-chemistry Hamiltonian object for the active space.
 
     """
-    nact = noa_act + nva_act
+    # Beta active counts default to the alpha values (restricted active space).
+    if nob_act is None:
+        nob_act = noa_act
+    if nvb_act is None:
+        nvb_act = nva_act
+
+    nact = noa_act + nva_act  # == nob_act + nvb_act for a consistent active space
+
+    # Spin-resolved offsets into the active spatial layout: within each spin the
+    # active-occupied orbitals precede the active-virtual ones, so the virtual
+    # offset differs per spin for an open-shell / high-spin partition.
+    _offsets = {"o": 0, "v": noa_act, "O": 0, "V": nob_act}
 
     def _off(c):
-        return 0 if c in ("o", "O") else noa_act
+        return _offsets[c]
 
     # 1-body
     g1_aa = np.zeros((nact, nact))
@@ -405,25 +423,35 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
         g2_bb_raw - g2_bb_raw.transpose(1, 0, 2, 3) - g2_bb_raw.transpose(0, 1, 3, 2) + g2_bb_raw.transpose(1, 0, 3, 2)
     )
 
-    # γ → χ
-    aol = list(range(noa_act))
+    # γ → χ  (subtract the active-occupied mean field, spin-resolved)
+    aol_a = list(range(noa_act))
+    aol_b = list(range(nob_act))
     chi1_aa = (
         g1_aa
-        - np.einsum("pmqm->pq", g2_aa[:, aol, :, :][:, :, :, aol])
-        - np.einsum("pmqm->pq", g2_ab[:, aol, :, :][:, :, :, aol])
+        - np.einsum("pmqm->pq", g2_aa[:, aol_a, :, :][:, :, :, aol_a])
+        - np.einsum("pmqm->pq", g2_ab[:, aol_b, :, :][:, :, :, aol_b])
     )
     chi1_bb = (
         g1_bb
-        - np.einsum("pmqm->pq", g2_bb[:, aol, :, :][:, :, :, aol])
-        - np.einsum("mpmq->pq", g2_ab[np.ix_(aol, range(nact), aol, range(nact))])
+        - np.einsum("pmqm->pq", g2_bb[:, aol_b, :, :][:, :, :, aol_b])
+        - np.einsum("mpmq->pq", g2_ab[np.ix_(aol_a, range(nact), aol_a, range(nact))])
     )
 
-    # Scalar constant
+    # Scalar constant (spin-resolved sums over active-occupied orbitals)
     C = E0_bch
-    for m in aol:
-        C -= chi1_aa[m, m] + chi1_bb[m, m]
-        for n in aol:
-            C -= 0.5 * g2_aa[m, n, m, n] + 0.5 * g2_bb[m, n, m, n] + g2_ab[m, n, m, n]
+    for m in aol_a:
+        C -= chi1_aa[m, m]
+    for m in aol_b:
+        C -= chi1_bb[m, m]
+    for m in aol_a:
+        for n in aol_a:
+            C -= 0.5 * g2_aa[m, n, m, n]
+    for m in aol_b:
+        for n in aol_b:
+            C -= 0.5 * g2_bb[m, n, m, n]
+    for m in aol_a:
+        for n in aol_b:
+            C -= g2_ab[m, n, m, n]
 
     # Package
     from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
