@@ -176,79 +176,79 @@ class WickedDuccSolver(Algorithm):
     def _build_active_chi(self, w, hamiltonian, n_alpha, n_beta, noa, nob, nva, nvb, ducc_level):
         """Steps 1-6 (spin-orbital, open- and closed-shell): active-space χ tensors.
 
-        Builds genuine spin-orbital integrals from the α/β MO coefficients (via
-        GHF), gets native spin-orbital CCSD amplitudes (GCCSD), forms σ_ext, and
-        runs the wicked BCH.  Unlike the collapsed qdk-Hamiltonian path, this
-        preserves the α≠β structure required for open-shell (ROHF/UHF).
+        Builds spin-orbital integrals from the qdk Hamiltonian's spin-blocked
+        MO integrals (``get_one_body_integrals`` → ``(h1_α, h1_β)``,
+        ``get_two_body_integrals`` → ``(V_αααα, V_ααββ, V_ββββ)`` chemist), gets
+        CCSD amplitudes via the shared qdk CC plugin, forms σ_ext, and runs the
+        wicked BCH.  All integrals come from qdk-data — no pyscf integral reads.
 
         Returns:
             ``(chi_1, chi_2, C, meta)`` where *meta* carries active-space
             metadata and the spin-orbital inputs for debugging.
         """
-        from pyscf import cc, scf
-
-        from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
+        from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_common import build_ccsd_amplitudes
 
         orbitals = hamiltonian.get_orbitals()
         nmo = orbitals.get_num_molecular_orbitals()
+        nocc_a, nocc_b = n_alpha, n_beta
+        nvir_a, nvir_b = nmo - nocc_a, nmo - nocc_b
 
-        # ── qdk α/β orbitals → pyscf UHF → GHF (genuine spin-orbitals) ──
-        occ_a = np.zeros(nmo)
-        occ_a[:n_alpha] = 1.0
-        occ_b = np.zeros(nmo)
-        occ_b[:n_beta] = 1.0
-        umf = orbitals_to_scf(orbitals, occ_a, occ_b)
-        umf.mol.verbose = 0
-        gmf = scf.addons.convert_to_ghf(umf)
+        # ── qdk spin-blocked MO integrals (2e in chemist (pq|rs)) ──
+        h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+        h1_a = np.array(h1_alpha).reshape(nmo, nmo)
+        h1_b = np.array(h1_beta).reshape(nmo, nmo)
+        v_aaaa, v_aabb, v_bbbb = hamiltonian.get_two_body_integrals()
+        eri_aa = np.array(v_aaaa).reshape(nmo, nmo, nmo, nmo)
+        eri_bb = np.array(v_bbbb).reshape(nmo, nmo, nmo, nmo)
+        eri_ab = np.array(v_aabb).reshape(nmo, nmo, nmo, nmo)
+        core = hamiltonian.get_core_energy()
 
-        nao = umf.mol.nao_nr()
-        mo = gmf.mo_coeff
-        mo_occ = gmf.mo_occ
+        # ── Spin-orbital layout: occupied-first [α-occ, β-occ, α-vir, β-vir] ──
+        occ_so = [(p, 0) for p in range(nocc_a)] + [(p, 1) for p in range(nocc_b)]
+        vir_so = [(p, 0) for p in range(nocc_a, nmo)] + [(p, 1) for p in range(nocc_b, nmo)]
+        so_list = occ_so + vir_so
+        nso = 2 * nmo
+        nocc_so = nocc_a + nocc_b
+        spin = np.array([s for _, s in so_list])
+        spat = np.array([p for p, _ in so_list])
+        a_idx = np.where(spin == 0)[0]
+        b_idx = np.where(spin == 1)[0]
+        sa, sb = spat[a_idx], spat[b_idx]
 
-        # Reorder occupied-first (keeps GHF energy order within each block; the
-        # GCCSD occ/vir split follows the same mo_coeff order, so amplitudes stay
-        # consistent with the reordered integrals).
-        occ_mask = mo_occ > 0.5
-        order = np.concatenate([np.where(occ_mask)[0], np.where(~occ_mask)[0]])
-        mo = mo[:, order]
-        nso = mo.shape[1]
-        nocc_so = int(occ_mask.sum())
+        # ── Spin-orbital 1e/2e integrals (from spin-blocked qdk integrals) ──
+        h1_so = np.zeros((nso, nso))
+        h1_so[np.ix_(a_idx, a_idx)] = h1_a[np.ix_(sa, sa)]
+        h1_so[np.ix_(b_idx, b_idx)] = h1_b[np.ix_(sb, sb)]
 
-        ca = mo[:nao, :].real  # α AO components of each spin-orbital
-        cb = mo[nao:, :].real  # β AO components of each spin-orbital
-
-        # Spin label of each spin-orbital (collinear GHF: each SO is pure α or β).
-        so_spin = (np.linalg.norm(cb, axis=0) > np.linalg.norm(ca, axis=0)).astype(int)
-
-        # ── Spin-orbital 1e/2e integrals ──
-        hcore = umf.get_hcore()
-        h1_so = ca.T @ hcore @ ca + cb.T @ hcore @ cb
-        eri_ao = umf.mol.intor("int2e")  # chemist (pq|rs)
-        gpq = np.einsum("mnlk,mP,nQ->PQlk", eri_ao, ca, ca) + np.einsum("mnlk,mP,nQ->PQlk", eri_ao, cb, cb)
-        eri_so = np.einsum("PQlk,lR,kS->PQRS", gpq, ca, ca) + np.einsum("PQlk,lR,kS->PQRS", gpq, cb, cb)
+        # Chemist (PQ|RS): nonzero only for σ_P=σ_Q and σ_R=σ_S.
+        eri_so = np.zeros((nso, nso, nso, nso))
+        eri_so[np.ix_(a_idx, a_idx, a_idx, a_idx)] = eri_aa[np.ix_(sa, sa, sa, sa)]
+        eri_so[np.ix_(b_idx, b_idx, b_idx, b_idx)] = eri_bb[np.ix_(sb, sb, sb, sb)]
+        eri_so[np.ix_(a_idx, a_idx, b_idx, b_idx)] = eri_ab[np.ix_(sa, sa, sb, sb)]
+        eri_so[np.ix_(b_idx, b_idx, a_idx, a_idx)] = eri_ab[np.ix_(sa, sa, sb, sb)].transpose(2, 3, 0, 1)
         v_phys = eri_so.transpose(0, 2, 1, 3)  # <PQ|RS> = (PR|QS)
         v_no = v_phys - v_phys.transpose(0, 1, 3, 2)  # <PQ||RS>
 
         occ_idx = list(range(nocc_so))
-        E0_hf = (
-            umf.mol.energy_nuc()
-            + sum(h1_so[m, m] for m in occ_idx)
-            + 0.5 * sum(v_no[m, n, m, n] for m in occ_idx for n in occ_idx)
+        E0_hf = core + sum(h1_so[m, m] for m in occ_idx) + 0.5 * sum(
+            v_no[m, n, m, n] for m in occ_idx for n in occ_idx
         )
         f_no = h1_so.copy()
         for m in occ_idx:
             f_no += v_no[:, m, :, m]
 
-        # ── Native spin-orbital CCSD amplitudes ──
-        gcc = cc.GCCSD(gmf).run()
-        logger.info("GCCSD E_corr: %.10f", gcc.e_corr)
-        t1_so = gcc.t1
-        t2_so = gcc.t2
+        # ── CCSD amplitudes (shared qdk CC plugin, spin-blocked) → spin-orbital ──
+        t_dict = build_ccsd_amplitudes(hamiltonian, nmo, nocc_a, nocc_b)
+        t1_so, t2_so = self._spinblocked_amplitudes_to_so(t_dict, occ_so, vir_so, nocc_a, nocc_b)
 
-        # ── Active space: top (noa+nob) occupied + bottom (nva+nvb) virtual ──
-        n_act_occ = noa + nob
-        n_act_vir = nva + nvb
-        active_so = list(range(nocc_so - n_act_occ, nocc_so)) + list(range(nocc_so, nocc_so + n_act_vir))
+        # ── Active space (per-spin, index-based) in the spin-blocked SO layout ──
+        # α-occ: top noa of [0, nocc_a);         β-occ: top nob of the β-occ block.
+        # α-vir: bottom nva of the α-vir block;  β-vir: bottom nvb of the β-vir block.
+        active_a_occ = list(range(nocc_a - noa, nocc_a))
+        active_b_occ = list(range(nocc_so - nob, nocc_so))
+        active_a_vir = list(range(nocc_so, nocc_so + nva))
+        active_b_vir = list(range(nocc_so + nvir_a, nocc_so + nvir_a + nvb))
+        active_so = sorted(active_a_occ + active_b_occ + active_a_vir + active_b_vir)
 
         # ── σ_ext: zero all-active amplitudes ──
         a_occ = [g for g in active_so if g < nocc_so]
@@ -270,8 +270,8 @@ class WickedDuccSolver(Algorithm):
         )
 
         # Partition active spin-orbitals by spin (local active-space indices).
-        a_local = [k for k, g in enumerate(active_so) if so_spin[g] == 0]
-        b_local = [k for k, g in enumerate(active_so) if so_spin[g] == 1]
+        a_local = [k for k, g in enumerate(active_so) if spin[g] == 0]
+        b_local = [k for k, g in enumerate(active_so) if spin[g] == 1]
         # Active-occupied (electrons) per spin: active SO below the Fermi level.
         n_act_alpha_elec = sum(1 for k in a_local if active_so[k] < nocc_so)
         n_act_beta_elec = sum(1 for k in b_local if active_so[k] < nocc_so)
@@ -289,6 +289,45 @@ class WickedDuccSolver(Algorithm):
             "n_act_beta_elec": n_act_beta_elec,
         }
         return chi_1, chi_2, C, meta
+
+    @staticmethod
+    def _spinblocked_amplitudes_to_so(t_dict, occ_so, vir_so, nocc_a, nocc_b):
+        """Map spin-blocked spatial CCSD amplitudes to the occupied-first SO layout.
+
+        Args:
+            t_dict: Spin-blocked amplitudes ``{"ov", "OV", "oovv", "OOVV", "oOvV"}``
+                (same-spin T2 already antisymmetrized).
+            occ_so, vir_so: SO layout as ``(spatial, spin)`` lists.
+            nocc_a, nocc_b: α/β occupied counts (for the virtual local offset).
+
+        Returns:
+            ``(t1_so, t2_so)`` full spin-orbital amplitudes (t2 antisymmetric).
+        """
+        t1_aa, t1_bb = t_dict["ov"], t_dict["OV"]
+        t2_aa, t2_bb, t2_ab = t_dict["oovv"], t_dict["OOVV"], t_dict["oOvV"]
+        nocc_so, nvir_so = len(occ_so), len(vir_so)
+
+        occ_sg = np.array([s for _, s in occ_so])
+        occ_sp = np.array([p for p, _ in occ_so])
+        vir_sg = np.array([s for _, s in vir_so])
+        vir_lc = np.array([(p - nocc_a) if s == 0 else (p - nocc_b) for p, s in vir_so])
+
+        oa, ob = np.where(occ_sg == 0)[0], np.where(occ_sg == 1)[0]
+        va, vb = np.where(vir_sg == 0)[0], np.where(vir_sg == 1)[0]
+
+        t1_so = np.zeros((nocc_so, nvir_so))
+        t1_so[np.ix_(oa, va)] = t1_aa[np.ix_(occ_sp[oa], vir_lc[va])]
+        t1_so[np.ix_(ob, vb)] = t1_bb[np.ix_(occ_sp[ob], vir_lc[vb])]
+
+        t2_so = np.zeros((nocc_so, nocc_so, nvir_so, nvir_so))
+        t2_so[np.ix_(oa, oa, va, va)] = t2_aa[np.ix_(occ_sp[oa], occ_sp[oa], vir_lc[va], vir_lc[va])]
+        t2_so[np.ix_(ob, ob, vb, vb)] = t2_bb[np.ix_(occ_sp[ob], occ_sp[ob], vir_lc[vb], vir_lc[vb])]
+        ab = t2_ab[np.ix_(occ_sp[oa], occ_sp[ob], vir_lc[va], vir_lc[vb])]  # [i_α, J_β, a_α, B_β]
+        t2_so[np.ix_(oa, ob, va, vb)] = ab
+        t2_so[np.ix_(ob, oa, vb, va)] = ab.transpose(1, 0, 3, 2)
+        t2_so[np.ix_(oa, ob, vb, va)] = -ab.transpose(0, 1, 3, 2)
+        t2_so[np.ix_(ob, oa, va, vb)] = -ab.transpose(1, 0, 2, 3)
+        return t1_so, t2_so
 
     @staticmethod
     def _wicked_bch(w, bch_order, f_no, v_no, t1_ov, t2_oovv, E0_hf, nocc, nso, active_so):
