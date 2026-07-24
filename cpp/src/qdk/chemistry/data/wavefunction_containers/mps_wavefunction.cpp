@@ -44,7 +44,11 @@ void MPSContainer::_validate_common(std::size_t site_count,
   }
   if (std::any_of(_physical_basis.begin(), _physical_basis.end(),
                   [](const Configuration& state) {
-                    return state.bits_per_mode() != 2 || state.capacity() != 1;
+                    if (state.bits_per_mode() != 2) return true;
+                    for (std::size_t i = 1; i < state.capacity(); ++i) {
+                      if (state.get_mode_state(i) != 0) return true;
+                    }
+                    return false;
                   })) {
     throw std::invalid_argument(
         "MPS physical basis states must be one-orbital spin-half "
