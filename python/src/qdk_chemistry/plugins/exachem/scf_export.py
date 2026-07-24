@@ -29,14 +29,13 @@ it via the ``LIBINT_DATA_PATH`` environment variable.  ExaChem then builds its A
 basis with the identical inter-shell order and identical basis parameters, so
 the *only* remaining difference is the within-shell m-component ordering.
 
-That within-shell ordering is **not** encoded in the basis file -- it is a
-property of each code's Libint build (qdk-chemistry links Libint 2.9.0, ExaChem
-links Libint 2.11.2), so feeding the same basis cannot fix it.  Empirically the
-two Libint versions agree on ascending-m ordering (``-l, ..., 0, ..., +l``) for
-every angular momentum **except p (l=1)**: qdk-chemistry orders p as
-``(m=-1, 0, +1)`` while ExaChem consumes it as ``(m=0, +1, -1)``.
-:func:`_within_shell_m_reorder` applies exactly that p-only swap (d/f/g were
-verified to match; permuting them corrupts the imported reference).
+That within-shell ordering is **not** encoded in the basis file -- it reflects a
+qdk-chemistry AO-layout convention: qdk-chemistry represents p orbitals in
+**Cartesian** form (``px, py, pz``) while ExaChem/Libint uses **spherical** p in
+ascending-m order (``m=-1, 0, +1`` = ``py, pz, px``).  Every other angular
+momentum already matches (s is a single function; d/f/g are spherical in both),
+so :func:`_within_shell_m_reorder` applies exactly that p-only swap (permuting
+d/f/g corrupts the imported reference).
 """
 
 from __future__ import annotations
@@ -71,14 +70,13 @@ def _within_shell_m_reorder(basis_set) -> np.ndarray:
     order, see :func:`write_qdk_basis_g94`), so the only remaining difference is
     the ordering of the spherical components *inside* a shell.
 
-    Empirically, qdk-chemistry (Libint 2.9.0) and ExaChem (Libint 2.11.2) agree
-    on the ascending-m ordering (``-l, ..., 0, ..., +l``) for every angular
-    momentum **except p (l=1)**: qdk-chemistry orders p as ``(m=-1, 0, +1)``
-    while ExaChem consumes it as ``(m=0, +1, -1)``.  (d/f/g were verified to
-    match; applying a permutation to them corrupts the imported reference.)
-    Only the p components are therefore reordered.  The permutation is built
-    from qdk-chemistry's AO metadata (``get_atomic_orbital_info`` returns
-    ``(shell_index, m)``) and satisfies ``C_exachem = C_qdk[perm, :]``.
+    qdk-chemistry represents p orbitals in **Cartesian** form (``px, py, pz``)
+    while ExaChem/Libint uses **spherical** p in ascending-m order
+    (``m=-1, 0, +1`` = ``py, pz, px``); s is a single function and d/f/g are
+    spherical in both, so they already match.  Only the p components are
+    therefore reordered.  The permutation is built from qdk-chemistry's AO
+    metadata (``get_atomic_orbital_info`` returns ``(shell_index, m)``) and
+    satisfies ``C_exachem = C_qdk[perm, :]``.
     """
     nao = basis_set.get_num_atomic_orbitals()
     perm = np.arange(nao)
@@ -91,17 +89,17 @@ def _within_shell_m_reorder(basis_set) -> np.ndarray:
         if len(aos) != 3:
             # Only p shells (l=1, three components) need reordering; d/f/g match.
             continue
-        # The p-orbital swap is needed ONLY because qdk-chemistry and ExaChem link
-        # DIFFERENT Libint versions (qdk 2.9.0 vs ExaChem 2.11.2) whose real
-        # solid-harmonic component ordering differs for l=1: qdk emits
-        # (m=-1, 0, +1) while ExaChem consumes (m=0, +1, -1).  This ordering is a
-        # property of the Libint build, not of the .g94 basis file, so feeding the
-        # same basis cannot fix it.
-        # TODO: build qdk-chemistry and ExaChem against the SAME Libint version so
-        # the p ordering matches and this swap can be removed entirely.
-        idxs = [i for _m, i in sorted(aos)]  # ascending m: (m=-1, 0, +1)
+        # The p-orbital swap is needed because qdk-chemistry treats p orbitals as
+        # CARTESIAN (px, py, pz), whereas ExaChem/Libint uses SPHERICAL p in
+        # ascending-m order (m=-1, 0, +1) = (py, pz, px).  qdk-chemistry keeps s
+        # and p Cartesian and makes only d/f/g spherical (see the l >= 2 predicate
+        # in convert_to_libint_shell), which is why d/f/g already match and only p
+        # needs reordering.  For l=1 the Cartesian and spherical p functions span
+        # the same space, so a pure permutation suffices.  (This is a qdk-chemistry
+        # AO-layout convention, not a Libint version difference.)
+        idxs = [i for _m, i in sorted(aos)]  # qdk Cartesian p: (px, py, pz)
         start = idxs[0]
-        # ExaChem p order (m=0, +1, -1) -> qdk indices (1, 2, 0)
+        # ExaChem spherical p (py, pz, px) -> qdk Cartesian indices (1, 2, 0)
         perm[start + 0] = idxs[1]
         perm[start + 1] = idxs[2]
         perm[start + 2] = idxs[0]
