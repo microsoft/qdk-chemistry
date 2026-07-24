@@ -23,7 +23,10 @@ namespace qdk::chemistry::data {
  */
 enum class AxisName {
   /** @brief The spin (@f$S_z@f$) axis carrying @ref SpinValue labels. */
-  Spin
+  Spin,
+  /** @brief The particle-number axis carrying nonnegative particle-count
+   *         labels represented by @ref ParticleNumberValue. */
+  ParticleNumber
 };
 
 /**
@@ -159,6 +162,69 @@ class SpinValue : public SymmetryAxisValue {
    *         polymorphic @ref SymmetryAxisValue base.
    * @throws std::runtime_error if @p j is missing the @f$2 M_s@f$ payload
    *         or it is of the wrong type.
+   */
+  static std::shared_ptr<const SymmetryAxisValue> from_json(
+      const nlohmann::json& j);
+};
+
+/**
+ * @brief Particle-count label for one symmetry sector.
+ *
+ * The stored value identifies states carrying a particular number of
+ * particles. It is a sector label, not the sector extent: a sector labeled
+ * @c 2 may contain any number of basis states that all carry two particles.
+ * For a single spatial orbital, the physical occupation labels are 0, 1, and
+ * 2, with alpha and beta occupations both belonging to the label-1 sector.
+ */
+class ParticleNumberValue : public SymmetryAxisValue {
+  std::size_t _number;
+
+ public:
+  /**
+   * @brief Construct a particle-number label.
+   * @param number The particle count represented by this label.
+   */
+  constexpr explicit ParticleNumberValue(std::size_t number)
+      : _number(number) {}
+
+  /**
+   * @brief Get the particle count represented by this sector label.
+   * @return Nonnegative particle count supplied at construction.
+   */
+  constexpr std::size_t value() const { return _number; }
+
+  /**
+   * @brief The axis this value belongs to.
+   * @return Always @ref AxisName::ParticleNumber.
+   */
+  AxisName axis() const override { return AxisName::ParticleNumber; }
+  /**
+   * @brief Value-equality against another axis value.
+   * @param other Axis value to compare against.
+   * @return @c true iff @p other is a @ref ParticleNumberValue carrying
+   *         the same particle number.
+   */
+  bool equals(const SymmetryAxisValue& other) const override;
+  /**
+   * @brief Hash consistent with @ref equals.
+   * @return Hash value derived from the stored particle number.
+   */
+  std::size_t hash() const override;
+  /**
+   * @brief Serialize this value (subclass payload only).
+   * @return JSON object carrying the particle number under a stable key.
+   */
+  nlohmann::json to_json() const override;
+
+  /**
+   * @brief Reconstruct a @ref ParticleNumberValue from its JSON payload.
+   *
+   * @param j JSON object produced by a prior
+   *          @ref ParticleNumberValue::to_json call.
+   * @return Shared pointer to the deserialized value typed as the
+   *         polymorphic @ref SymmetryAxisValue base.
+   * @throws std::runtime_error if @p j is missing the particle-number
+   *         payload or it is of the wrong type.
    */
   static std::shared_ptr<const SymmetryAxisValue> from_json(
       const nlohmann::json& j);
@@ -733,6 +799,16 @@ namespace axes {
 SymmetryAxis spin(unsigned two_s, bool equivalent = true);
 
 /**
+ * @brief Build a particle-number axis carrying labels from zero through
+ * @p maximum_number, inclusive.
+ *
+ * @param maximum_number Upper bound on the particle count (inclusive).
+ * @return A fully populated @ref SymmetryAxis for the particle-number
+ *         degree of freedom.
+ */
+SymmetryAxis particle_number(std::size_t maximum_number);
+
+/**
  * @brief Interned shared spin-½ value with @f$2 M_s = +1@f$.
  * @return Reference to the global @f$\alpha@f$ instance; safe to capture
  *         by @c shared_ptr.
@@ -755,6 +831,15 @@ const std::shared_ptr<const SpinValue>& beta();
  * @return Shared pointer to the (possibly interned) spin value.
  */
 std::shared_ptr<const SpinValue> spin_value(int two_ms);
+
+/**
+ * @brief Construct a label for a particle-number symmetry sector.
+ * @param number Nonnegative particle count carried by every state in the
+ *        sector.
+ * @return Shared pointer to a particle-number label containing @p number.
+ */
+std::shared_ptr<const ParticleNumberValue> particle_number_value(
+    std::size_t number);
 
 }  // namespace axes
 

@@ -38,10 +38,10 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, Orbitals, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_helpers import create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_orbitals
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit dependencies not available")
@@ -304,6 +304,56 @@ def test_prepare_single_reference_state_error_cases():
 
     with pytest.raises(ValueError, match="Bitstring must contain only 0 and 1 values"):
         test_cls._prepare_single_reference_state([1, 0, 2])
+
+
+def test_asymmetric_active_space_error():
+    """Test error for asymmetric active space in StatePrep."""
+    coefficients = np.eye(4)
+    active_indices = ([0, 1, 2], [0, 1, 2, 3], [3], list[int]())
+    with pytest.warns(DeprecationWarning, match="coefficients_alpha, coefficients_beta"):
+        orbitals = Orbitals(
+            coefficients,
+            coefficients,
+            None,
+            None,
+            None,
+            create_test_basis_set(4),
+            active_indices,
+        )
+
+    class MockWavefunction:
+        """Mock wavefunction for testing asymmetric active space."""
+
+        def get_orbitals(self):
+            """Return mock orbitals."""
+            return orbitals
+
+        def get_active_determinants(self):
+            """Return mock determinants."""
+            return [Configuration.from_spin_half_string("2020000"), Configuration.from_spin_half_string("2200000")]
+
+        def get_coefficient(self, _):
+            """Return mock coefficient."""
+            return 1.0
+
+        def get_coefficients(self):
+            """Return coefficients for all determinants."""
+            return [1.0, 0.5]  # Two coefficients for the two determinants
+
+        def size(self):
+            """Return the number of determinants."""
+            return len(self.get_active_determinants())
+
+    mock_wfn = MockWavefunction()
+    prep = create("state_prep", "qiskit_regular_isometry")
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
+            "alpha and beta orbitals are not supported for state preparation."
+        ),
+    ):
+        prep.run(mock_wfn)
 
 
 def test_find_pivot_row():

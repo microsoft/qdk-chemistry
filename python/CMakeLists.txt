@@ -154,6 +154,7 @@ pybind11_add_module(_core
     src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
     src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
+    src/pybind11/data/mps_wavefunction.cpp
     src/pybind11/data/wavefunction.cpp
     src/pybind11/data/hamiltonian.cpp
     src/pybind11/data/settings.cpp
@@ -181,6 +182,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp
+    src/pybind11/algorithms/unitary_synthesis.cpp
     src/pybind11/utils/logger.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp

@@ -35,6 +35,33 @@ TEST(SymmetryVocabTest, SpinAxisAdmits) {
   EXPECT_FALSE(spin.admits(*axes::spin_value(3)));
 }
 
+TEST(SymmetryVocabTest, ParticleNumberValueAndAxis) {
+  const auto two = axes::particle_number_value(2);
+  EXPECT_EQ(two->axis(), AxisName::ParticleNumber);
+  EXPECT_EQ(two->value(), 2u);
+  EXPECT_EQ(to_string(two->axis()), "particle_number");
+
+  const auto axis = axes::particle_number(3);
+  EXPECT_EQ(axis.name(), AxisName::ParticleNumber);
+  EXPECT_FALSE(axis.equivalent());
+  EXPECT_TRUE(axis.admits(*two));
+  EXPECT_FALSE(axis.admits(*axes::particle_number_value(4)));
+}
+
+TEST(SymmetryVocabTest, RoundTripSpinAndParticleNumberLabelJson) {
+  const SymmetryLabel label({axes::alpha(), axes::particle_number_value(3)});
+  const auto restored = SymmetryLabel::from_json(label.to_json());
+  EXPECT_EQ(restored, label);
+  EXPECT_TRUE(restored.has(AxisName::Spin));
+  EXPECT_TRUE(restored.has(AxisName::ParticleNumber));
+}
+
+TEST(SymmetryVocabTest, RoundTripParticleNumberAxisJson) {
+  const auto original = axes::particle_number(4);
+  const auto restored = SymmetryAxis::from_json(original.to_json());
+  EXPECT_EQ(*restored, original);
+}
+
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {
   SymmetryProduct sym({axes::spin(1, true)});
   EXPECT_TRUE(sym.has_axis(AxisName::Spin));

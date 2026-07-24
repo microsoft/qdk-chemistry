@@ -9,30 +9,31 @@ from pathlib import Path
 import qdk
 from qdk import qsharp
 
-__all__ = ["QSHARP_UTILS"]
+__all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
 
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "CircuitComposition.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "StandardPhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "HadamardTest.qs",
-    Path(__file__).parent / "PauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-    Path(__file__).parent / "PrepSelPrep.qs",
-    Path(__file__).parent / "Select.qs",
-]
+_PROJECT_ROOT = str(Path(__file__).parent)
+_initialized = False
+
+
+def _ensure_qsharp_session():
+    """Ensure the interpreter has the chemistry Q# project loaded."""
+    global _initialized  # noqa: PLW0603
+    try:
+        _ = qdk.code.MPSSequential
+    except AttributeError:
+        _initialized = False
+    if not _initialized:
+        qsharp.init(project_root=_PROJECT_ROOT)
+        _initialized = True
 
 
 def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
-    try:
-        return qdk.code.QDKChemistry.Utils
-    except AttributeError:
-        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
-        qsharp.eval(code)
-        return qdk.code.QDKChemistry.Utils
+    """Returns the Q# namespace for chemistry operations (lazy-loaded).
+
+    Initializes the global Q# interpreter with the chemistry project on first call.
+    """
+    _ensure_qsharp_session()
+    return qdk.code.QDKChemistry.Utils
 
 
 class _QSharpUtilsProxy:
@@ -41,12 +42,20 @@ class _QSharpUtilsProxy:
     def __getattr__(self, name: str):
         """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
 
+        Falls through to MPS namespace for names not found in QDKChemistry.Utils.
+
         Args:
             name: The name of the attribute being accessed on the Q# utilities namespace.
 
         """
-        utils = get_qsharp_utils()
-        return getattr(utils, name)
+        if name == "MPSSequential":
+            _ensure_qsharp_session()
+            return qdk.code.MPSSequential
+        if name == "MPSSparse":
+            _ensure_qsharp_session()
+            return qdk.code.MPSSparse
+        _ensure_qsharp_session()
+        return getattr(qdk.code.QDKChemistry.Utils, name)
 
 
 QSHARP_UTILS = _QSharpUtilsProxy()
