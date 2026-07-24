@@ -102,7 +102,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: Circuit preparing the trial state on the system qubits.
             qubit_hamiltonian: Qubit Hamiltonian whose eigenenergy is estimated.
-            noise: Noise model. Not supported in this MVP and ignored if provided.
+            noise: Optional noise profile applied to every circuit execution.
 
         Returns:
             QpeResult: Result carrying the resolved energy.
@@ -148,7 +148,7 @@ class RobustPhaseEstimation(PhaseEstimation):
 
         Args:
             circuit_set: Lazy circuit collection returned by an RPE circuit builder.
-            noise: Noise model. Not supported in this MVP and ignored if provided.
+            noise: Optional noise profile applied to every X/Y circuit execution.
 
         Returns:
             QpeResult carrying the resolved energy.
@@ -161,9 +161,6 @@ class RobustPhaseEstimation(PhaseEstimation):
             raise TypeError(
                 f"circuit_set must be an instance of RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead."
             )
-        if noise is not None:
-            Logger.warning("RobustPhaseEstimation does not support noise yet; ignoring the noise model.")
-
         Logger.info(
             f"RobustPhaseEstimation: lambda={circuit_set.lambda_norm:.6g}, "
             f"base_time={circuit_set.base_time:.6g}, rounds={circuit_set.num_rounds}, "
@@ -180,10 +177,12 @@ class RobustPhaseEstimation(PhaseEstimation):
                 real_data = circuit_executor.run(
                     experiment.x_circuit,
                     shots=experiment.circuit_multiplicity,
+                    noise=noise,
                 )
                 imag_data = circuit_executor.run(
                     experiment.y_circuit,
                     shots=experiment.circuit_multiplicity,
+                    noise=noise,
                 )
                 real_accumulator += expectation_from_counts(real_data.bitstring_counts)
                 imag_accumulator += expectation_from_counts(imag_data.bitstring_counts)

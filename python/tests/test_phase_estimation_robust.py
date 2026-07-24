@@ -25,7 +25,14 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder im
     _AlgorithmSnapshot,
 )
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import RobustPhaseEstimation
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings, UnitaryRepresentation
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    QuantumErrorProfile,
+    QubitOperator,
+    Settings,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.utils.rpe import num_rounds
 
 if TYPE_CHECKING:
@@ -136,10 +143,18 @@ class _FakeExecutor:
         self._expectation = expectation
         self._resolution = resolution
         self.shot_calls: list[int] = []
+        self.noise_calls: list[QuantumErrorProfile | None] = []
 
-    def run(self, circuit: Circuit, *, shots: int) -> _FakeExecutorData:
+    def run(
+        self,
+        circuit: Circuit,
+        *,
+        shots: int,
+        noise: QuantumErrorProfile | None = None,
+    ) -> _FakeExecutorData:
         """Convert the configured expectation into deterministic counts."""
         self.shot_calls.append(shots)
+        self.noise_calls.append(noise)
         basis, unitary = self._contexts[id(circuit)]
         expectation = self._expectation(unitary, basis)
         n0 = round((1.0 + expectation) / 2.0 * self._resolution)
@@ -361,6 +376,21 @@ def test_executor_uses_declared_circuit_multiplicity(
     else:
         expected = [shots for round_data in circuit_set.rounds for shots in (round_data.shots_per_basis,) * 2]
     assert executor.shot_calls == expected
+
+
+def test_executor_forwards_noise_to_every_x_y_circuit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same noise profile reaches every X and Y circuit execution."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(target_accuracy=0.5)
+    driver = RobustPhaseEstimation()
+    _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
+    noise = QuantumErrorProfile(name="test noise")
+
+    circuit_set = driver.build_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian)
+    driver.execute_circuit_set(circuit_set, noise=noise)
+
+    expected_calls = 2 * sum(round_data.num_draws for round_data in circuit_set.rounds)
+    assert executor.noise_calls == [noise] * expected_calls
 
 
 _NONCOMMUTING_PAULIS = ["ZI", "XI", "IZ", "ZZ"]
