@@ -351,8 +351,9 @@ class WickedDuccSIAmbitSolver(Algorithm):
             ambit.finalize()
 
         # Step 6: assemble Hamiltonian
+        restricted = nocc_a == nocc_b and noa_act == nob_act and nva_act == nvb_act
         return assemble_active_hamiltonian(
             fbar, vbar, E0_bch, noa_act, nva_act,
             nob_act=nob_act, nvb_act=nvb_act,
-            input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a
+            input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a, restricted=restricted
         )

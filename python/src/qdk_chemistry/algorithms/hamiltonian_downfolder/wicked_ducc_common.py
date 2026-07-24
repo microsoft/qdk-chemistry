@@ -76,47 +76,57 @@ def build_integrals(hamiltonian, nocc_a, nocc_b):
     """
     orbitals = hamiltonian.get_orbitals()
     nmo = orbitals.get_num_molecular_orbitals()
-
-    h1_list, _ = hamiltonian.get_one_body_integrals()
-    h1 = np.array(h1_list).reshape(nmo, nmo)
-
-    eri_list, _, _ = hamiltonian.get_two_body_integrals()
-    eri = np.array(eri_list).reshape(nmo, nmo, nmo, nmo)
-
     core_energy = hamiltonian.get_core_energy()
 
-    # Physicist notation: V[p,q,r,s] = <pq|rs> = (pr|qs)_chemist
-    V = eri.swapaxes(1, 2)
-    V_asym = V - V.swapaxes(2, 3)
+    # Spin-blocked MO integrals straight from the (possibly unrestricted) qdk
+    # Hamiltonian.  ``get_one_body_integrals()`` → ``(h1_α, h1_β)`` and
+    # ``get_two_body_integrals()`` → ``(V_αααα, V_ααββ, V_ββββ)`` in CHEMIST
+    # ``(pq|rs)``.  For a restricted Hamiltonian the α/β blocks alias, so every
+    # spin channel coincides (bit-for-bit identical to the single-channel case).
+    # The previous implementation kept only the αα channel, which collapsed the
+    # α≠β structure of an unrestricted reference and produced the restricted-CAS
+    # artifact for open-shell systems.
+    h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+    h1_a = np.array(h1_alpha).reshape(nmo, nmo)
+    h1_b = np.array(h1_beta).reshape(nmo, nmo)
+    v_aaaa, v_aabb, v_bbbb = hamiltonian.get_two_body_integrals()
 
-    # Reference energy E₀
+    # Chemist (pq|rs) → physicist <pq|rs> = (pr|qs) via swapaxes(1, 2).
+    V_aa = np.array(v_aaaa).reshape(nmo, nmo, nmo, nmo).swapaxes(1, 2)  # <pq|rs>_αα
+    V_bb = np.array(v_bbbb).reshape(nmo, nmo, nmo, nmo).swapaxes(1, 2)  # <pq|rs>_ββ
+    V_ab = np.array(v_aabb).reshape(nmo, nmo, nmo, nmo).swapaxes(1, 2)  # <p_α q_β | r_α s_β>
+    V_asym_a = V_aa - V_aa.swapaxes(2, 3)
+    V_asym_b = V_bb - V_bb.swapaxes(2, 3)
+
+    # Reference energy E₀ (spin-resolved).
     E0 = core_energy
     for m in range(nocc_a):
-        E0 += h1[m, m]
+        E0 += h1_a[m, m]
     for m in range(nocc_b):
-        E0 += h1[m, m]
+        E0 += h1_b[m, m]
     for m in range(nocc_a):
         for n in range(nocc_a):
-            E0 += 0.5 * V_asym[m, n, m, n]
+            E0 += 0.5 * V_asym_a[m, n, m, n]
     for m in range(nocc_b):
         for n in range(nocc_b):
-            E0 += 0.5 * V_asym[m, n, m, n]
+            E0 += 0.5 * V_asym_b[m, n, m, n]
     for m in range(nocc_a):
         for n in range(nocc_b):
-            E0 += V[m, n, m, n]
+            E0 += V_ab[m, n, m, n]
 
-    # Spin-resolved Fock matrices (ROHF/UHF: F_α ≠ F_β when nocc_a ≠ nocc_b).
-    #   F_α[p,q] = h[p,q] + Σ_{m∈α} <pm||qm> + Σ_{M∈β} <pM|qM>
-    #   F_β[p,q] = h[p,q] + Σ_{m∈α} <pm|qm>  + Σ_{M∈β} <pM||qM>
-    # Same-spin Coulomb-minus-exchange (V_asym), opposite-spin Coulomb-only (V).
-    F_a = h1.copy()
-    F_b = h1.copy()
+    # Spin-resolved Fock matrices (ROHF/UHF: F_α ≠ F_β).
+    #   F_α[p,q] = h_α[p,q] + Σ_{m∈α} <pm||qm>_αα + Σ_{M∈β} <pM|qM>_αβ
+    #   F_β[p,q] = h_β[p,q] + Σ_{M∈β} <pM||qM>_ββ + Σ_{m∈α} <pm|qm>_βα
+    F_a = h1_a.copy()
+    F_b = h1_b.copy()
     for m in range(nocc_a):
-        F_a += V_asym[:, m, :, m]
-        F_b += V[:, m, :, m]
+        F_a += V_asym_a[:, m, :, m]
     for m in range(nocc_b):
-        F_a += V[:, m, :, m]
-        F_b += V_asym[:, m, :, m]
+        F_a += V_ab[:, m, :, m]
+    for m in range(nocc_b):
+        F_b += V_asym_b[:, m, :, m]
+    for m in range(nocc_a):
+        F_b += V_ab[m, :, m, :]  # <p_β m_α | q_β m_α> = <m_α p_β | m_α q_β>
 
     # Spin-blocked dictionaries (lowercase=α, uppercase=β)
     oa, va = slice(0, nocc_a), slice(nocc_a, nmo)
@@ -132,11 +142,11 @@ def build_integrals(hamiltonian, nocc_a, nocc_b):
         for c2 in ["o", "v"]:
             for c3 in ["o", "v"]:
                 for c4 in ["o", "v"]:
-                    H[c1 + c2 + c3 + c4] = V_asym[sl_map[c1], sl_map[c2], sl_map[c3], sl_map[c4]]
-                    H[c1.upper() + c2.upper() + c3.upper() + c4.upper()] = V_asym[
+                    H[c1 + c2 + c3 + c4] = V_asym_a[sl_map[c1], sl_map[c2], sl_map[c3], sl_map[c4]]
+                    H[c1.upper() + c2.upper() + c3.upper() + c4.upper()] = V_asym_b[
                         sl_map[c1.upper()], sl_map[c2.upper()], sl_map[c3.upper()], sl_map[c4.upper()]
                     ]
-                    H[c1 + c2.upper() + c3 + c4.upper()] = V[
+                    H[c1 + c2.upper() + c3 + c4.upper()] = V_ab[
                         sl_map[c1], sl_map[c2.upper()], sl_map[c3], sl_map[c4.upper()]
                     ]
 
@@ -351,7 +361,7 @@ def build_ducc_bch(w, bch_order):
 
 def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
                                 nob_act=None, nvb_act=None,
-                                input_orbitals=None, nocc_a=None):
+                                input_orbitals=None, nocc_a=None, restricted=True):
     """Assemble active-space γ tensors, convert γ→χ, and package Hamiltonian.
 
     Takes the active-sized 1-body (*fbar*) and 2-body (*vbar*) output from
@@ -456,6 +466,31 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
     # Package
     from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, ModelOrbitals
 
+    # Spin-blocked chemist integrals (pq|rs) = <pr|qs> via swapaxes(1, 2).  For
+    # same-spin, χ₂ only fixes the antisymmetric part → ½·swap (the CI solver
+    # re-antisymmetrizes); opposite-spin is the full Coulomb.
+    if not restricted:
+        from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+
+        v_aaaa = 0.5 * g2_aa.swapaxes(1, 2)
+        v_bbbb = 0.5 * g2_bb.swapaxes(1, 2)
+        v_aabb = g2_ab.swapaxes(1, 2)
+        active_orbitals = ModelOrbitals(nact, SymmetryProduct([axes.spin(1, False)]))
+        return Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                np.ascontiguousarray(chi1_aa),
+                np.ascontiguousarray(chi1_bb),
+                np.ascontiguousarray(v_aaaa).ravel(),
+                np.ascontiguousarray(v_aabb).ravel(),
+                np.ascontiguousarray(v_bbbb).ravel(),
+                active_orbitals,
+                C,
+                np.zeros((nact, nact)),
+                np.zeros((nact, nact)),
+            )
+        )
+
+    # Restricted: single spatial chemist V = full αβ Coulomb slice.
     # Build active-space orbitals: extract the active MO columns from the
     # full coefficient matrix if real orbitals are available.
     active_orbitals = ModelOrbitals(nact)
