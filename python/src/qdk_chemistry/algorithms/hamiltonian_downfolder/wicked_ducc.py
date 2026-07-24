@@ -7,8 +7,8 @@
 
 Uses the `wicked` library for symbolic BCH expansion and Wick contraction
 to downfold a full-space Hamiltonian into an active-space effective
-Hamiltonian. This is an alternative to :class:`NativeDuccSolver` that uses
-wicked's symbolic algebra instead of auto-generated tensor contractions.
+Hamiltonian, generating the tensor contractions from wicked's symbolic
+algebra.
 
 The BCH expansion follows the DUCC paper (Bauman et al., JCP 151, 014107):
 
@@ -72,10 +72,12 @@ class WickedDuccSolver(Algorithm):
 
     @staticmethod
     def type_name() -> str:
+        """Return the algorithm type name ``"hamiltonian_downfolder"``."""
         return "hamiltonian_downfolder"
 
     @staticmethod
     def name() -> str:
+        """Return the algorithm variant name ``"wicked_ducc"``."""
         return "wicked_ducc"
 
     def _run_impl(self, hamiltonian, n_alpha, n_beta):
@@ -104,7 +106,9 @@ class WickedDuccSolver(Algorithm):
         )
 
         # ── Step 7: pack χ into a chemist-notation active-space Hamiltonian ──
-        return self._assemble_hamiltonian(chi_1, chi_2, C, meta, n_alpha, n_beta, nactive_oa, nactive_ob, nactive_va, nactive_vb)
+        return self._assemble_hamiltonian(
+            chi_1, chi_2, C, meta, n_alpha, n_beta, nactive_oa, nactive_ob, nactive_va, nactive_vb
+        )
 
     def _assemble_hamiltonian(self, chi_1, chi_2, C, meta, n_alpha, n_beta, noa, nob, nva, nvb):
         """Step 7: pack spin-orbital χ into a chemist-notation active-space Hamiltonian.
@@ -150,9 +154,7 @@ class WickedDuccSolver(Algorithm):
             # Single spatial chemist V = full αβ Coulomb slice.
             v = np.ascontiguousarray(2.0 * g[np.ix_(a_local, a_local, b_local, b_local)])
             orbitals = ModelOrbitals(na)
-            container = CanonicalFourCenterHamiltonianContainer(
-                h1, v.ravel(), orbitals, C, np.zeros((na, na))
-            )
+            container = CanonicalFourCenterHamiltonianContainer(h1, v.ravel(), orbitals, C, np.zeros((na, na)))
         else:
             h1_a = np.ascontiguousarray(chi_1[np.ix_(a_local, a_local)])
             h1_b = np.ascontiguousarray(chi_1[np.ix_(b_local, b_local)])
@@ -185,13 +187,14 @@ class WickedDuccSolver(Algorithm):
         Returns:
             ``(chi_1, chi_2, C, meta)`` where *meta* carries active-space
             metadata and the spin-orbital inputs for debugging.
+
         """
         from qdk_chemistry.algorithms.hamiltonian_downfolder.wicked_ducc_common import build_ccsd_amplitudes
 
         orbitals = hamiltonian.get_orbitals()
         nmo = orbitals.get_num_molecular_orbitals()
         nocc_a, nocc_b = n_alpha, n_beta
-        nvir_a, nvir_b = nmo - nocc_a, nmo - nocc_b
+        nvir_a = nmo - nocc_a
 
         # ── qdk spin-blocked MO integrals (2e in chemist (pq|rs)) ──
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
@@ -230,9 +233,7 @@ class WickedDuccSolver(Algorithm):
         v_no = v_phys - v_phys.transpose(0, 1, 3, 2)  # <PQ||RS>
 
         occ_idx = list(range(nocc_so))
-        E0_hf = core + sum(h1_so[m, m] for m in occ_idx) + 0.5 * sum(
-            v_no[m, n, m, n] for m in occ_idx for n in occ_idx
-        )
+        E0_hf = core + sum(h1_so[m, m] for m in occ_idx) + 0.5 * sum(v_no[m, n, m, n] for m in occ_idx for n in occ_idx)
         f_no = h1_so.copy()
         for m in occ_idx:
             f_no += v_no[:, m, :, m]
@@ -265,9 +266,7 @@ class WickedDuccSolver(Algorithm):
                         t2_ext[i, j, a, b] = 0.0
 
         # ── Wicked BCH ──
-        chi_1, chi_2, C = self._wicked_bch(
-            w, ducc_level, f_no, v_no, t1_ext, t2_ext, E0_hf, nocc_so, nso, active_so
-        )
+        chi_1, chi_2, C = self._wicked_bch(w, ducc_level, f_no, v_no, t1_ext, t2_ext, E0_hf, nocc_so, nso, active_so)
 
         # Partition active spin-orbitals by spin (local active-space indices).
         a_local = [k for k, g in enumerate(active_so) if spin[g] == 0]
@@ -295,13 +294,15 @@ class WickedDuccSolver(Algorithm):
         """Map spin-blocked spatial CCSD amplitudes to the occupied-first SO layout.
 
         Args:
-            t_dict: Spin-blocked amplitudes ``{"ov", "OV", "oovv", "OOVV", "oOvV"}``
-                (same-spin T2 already antisymmetrized).
-            occ_so, vir_so: SO layout as ``(spatial, spin)`` lists.
-            nocc_a, nocc_b: α/β occupied counts (for the virtual local offset).
+            t_dict: Spin-blocked amplitudes (same-spin T2 already antisymmetrized).
+            occ_so: Occupied SO layout as ``(spatial, spin)`` list.
+            vir_so: Virtual SO layout as ``(spatial, spin)`` list.
+            nocc_a: Number of α occupied orbitals (virtual local offset).
+            nocc_b: Number of β occupied orbitals (virtual local offset).
 
         Returns:
             ``(t1_so, t2_so)`` full spin-orbital amplitudes (t2 antisymmetric).
+
         """
         t1_aa, t1_bb = t_dict["ov"], t_dict["OV"]
         t2_aa, t2_bb, t2_ab = t_dict["oovv"], t_dict["OOVV"], t_dict["oOvV"]
@@ -473,21 +474,20 @@ class WickedDuccSolver(Algorithm):
         # Assemble full-space dressed operators f̄_{pq} and v̄_{pqrs}.
         # The 1-body blocks (oo, ov, vo, vv) form f̄.
         fbar = np.zeros((nso, nso))
-        for k, (rv, ic, blk) in r1b.items():
+        for _key, (_rv, ic, blk) in r1b.items():
             fbar[tuple(slices_map[c] for c in ic)] += blk
 
         # The 2-body blocks are NOT yet antisymmetrized; wicked produces
         # one representative ordering per block. Antisymmetrize:
         # v̄_{pqrs} = r_{pqrs} - r_{qprs} - r_{pqsr} + r_{qpsr}
         vr = np.zeros((nso,) * 4)
-        for k, (rv, ic, blk) in r2b.items():
+        for _key, (_rv, ic, blk) in r2b.items():
             vr[tuple(slices_map[c] for c in ic)] += blk
         vbar = vr - vr.transpose(1, 0, 2, 3) - vr.transpose(0, 1, 3, 2) + vr.transpose(1, 0, 3, 2)
 
         # Restrict to active space → γ (Fermi-vacuum normal-ordered)
         # γ₁[PQ] = f̄[P,Q]  restricted to active indices
         # γ₂[PQRS] = v̄[P,Q,R,S]  restricted to active indices
-        nact = len(active_so)
         gamma_1 = fbar[np.ix_(active_so, active_so)]
         gamma_2 = vbar[np.ix_(active_so, active_so, active_so, active_so)]
         aol = [i for i, g in enumerate(active_so) if g < nocc]

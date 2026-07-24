@@ -249,9 +249,12 @@ def zero_all_active_and_transpose(T, nocc_a, nocc_b, noa_act, nob_act, nva_act, 
 
     Args:
         T: Dict of T-amplitude blocks (modified in place).
-        nocc_a, nocc_b: Occupied orbital counts.
-        noa_act, nob_act: Active occupied counts.
-        nva_act, nvb_act: Active virtual counts.
+        nocc_a: Number of α occupied orbitals.
+        nocc_b: Number of β occupied orbitals.
+        noa_act: Number of active occupied α orbitals.
+        nob_act: Number of active occupied β orbitals.
+        nva_act: Number of active virtual α orbitals.
+        nvb_act: Number of active virtual β orbitals.
 
     Returns:
         ``(act_oa, act_va, act_ob, act_vb)`` — active slices within each space.
@@ -359,9 +362,9 @@ def build_ducc_bch(w, bch_order):
 # ── Step 6: Assemble active-space Hamiltonian ────────────────────────────────
 
 
-def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
-                                nob_act=None, nvb_act=None,
-                                input_orbitals=None, nocc_a=None, restricted=True):
+def assemble_active_hamiltonian(
+    fbar, vbar, E0_bch, noa_act, nva_act, nob_act=None, nvb_act=None, input_orbitals=None, nocc_a=None, restricted=True
+):
     """Assemble active-space γ tensors, convert γ→χ, and package Hamiltonian.
 
     Takes the active-sized 1-body (*fbar*) and 2-body (*vbar*) output from
@@ -376,8 +379,10 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
         input_orbitals: Full-space Orbitals from the input Hamiltonian.
             If provided, the active MO coefficients are extracted and
             attached to the output Hamiltonian.
-        nocc_a: Number of occupied α orbitals (needed to locate active
-            columns when *input_orbitals* is given).
+        nocc_a: Number of occupied α orbitals (needed to locate active columns when *input_orbitals* is given).
+        nob_act: Number of active occupied β orbitals (defaults to *noa_act*).
+        nvb_act: Number of active virtual β orbitals (defaults to *nva_act*).
+        restricted: If True emit a single spatial V; otherwise an unrestricted spin-blocked container.
 
     Returns:
         A qdk-chemistry Hamiltonian object for the active space.
@@ -497,6 +502,7 @@ def assemble_active_hamiltonian(fbar, vbar, E0_bch, noa_act, nva_act,
     if input_orbitals is not None and nocc_a is not None:
         try:
             from qdk_chemistry.data import Orbitals
+
             coeffs, _ = input_orbitals.get_coefficients()
             C_full = np.array(coeffs)
             ncore = nocc_a - noa_act

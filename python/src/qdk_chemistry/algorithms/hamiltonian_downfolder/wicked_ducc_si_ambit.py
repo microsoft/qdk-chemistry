@@ -154,7 +154,6 @@ def build_tensors(ambit, H_dict, T_dict, sl_a, sl_b):
     resolve rank from the index count.
     """
     BT, CT = ambit.BlockedTensor, ambit.TensorType.CoreTensor
-    active_set = {"a", "A", "b", "B"}
 
     # ── H: rank-2 (Fock, all spins) ──
     h1_keys = [c1 + c2 for c1 in "ov" for c2 in "ov"] + [c1 + c2 for c1 in "OV" for c2 in "OV"]
@@ -231,8 +230,23 @@ def evaluate_bch_ambit(
     """Evaluate pre-compiled ambit blocks with active-only output.
 
     Args:
+        ambit: The ambit module.
         compiled_blocks: Output of :func:`compile_ambit_blocks`.
         scalar_key: Block key for the E0 scalar term (or None).
+        mbeq: Many-body equations from wicked (used for the scalar fallback).
+        osi: Orbital-space info from wicked.
+        H: TensorDispatch wrapping the rank-2/4 Hamiltonian tensors.
+        T: TensorDispatch wrapping the rank-2/4 amplitude tensors.
+        E0: Scalar reference energy.
+        H_dict: Spin-blocked Hamiltonian arrays (scalar fallback).
+        T_dict: Spin-blocked amplitude arrays (scalar fallback).
+        nocc_a: Number of α occupied orbitals.
+        nvir_a: Number of α virtual orbitals.
+        nocc_b: Number of β occupied orbitals.
+        nvir_b: Number of β virtual orbitals.
+
+    Returns:
+        ``(fbar, vbar, E0_bch)`` — active 1-body/2-body block dicts and the BCH scalar.
 
     """
     BT, CT = ambit.BlockedTensor, ambit.TensorType.CoreTensor
@@ -306,13 +320,26 @@ class WickedDuccSIAmbitSolver(Algorithm):
 
     @staticmethod
     def type_name() -> str:
+        """Return the algorithm type name ``"hamiltonian_downfolder"``."""
         return "hamiltonian_downfolder"
 
     @staticmethod
     def name() -> str:
+        """Return the algorithm variant name ``"wicked_ducc_si_ambit"``."""
         return "wicked_ducc_si_ambit"
 
     def _run_impl(self, hamiltonian, n_alpha, n_beta):
+        """Run spin-integrated DUCC downfolding and return the active-space Hamiltonian.
+
+        Args:
+            hamiltonian: Full-space qdk-chemistry Hamiltonian (spatial, chemist).
+            n_alpha: Number of alpha electrons.
+            n_beta: Number of beta electrons.
+
+        Returns:
+            Downfolded active-space Hamiltonian (chemist; unrestricted when open-shell).
+
+        """
         w = require_wicked()
         ambit = _require_ambit()
         s = self.settings()
@@ -353,7 +380,14 @@ class WickedDuccSIAmbitSolver(Algorithm):
         # Step 6: assemble Hamiltonian
         restricted = nocc_a == nocc_b and noa_act == nob_act and nva_act == nvb_act
         return assemble_active_hamiltonian(
-            fbar, vbar, E0_bch, noa_act, nva_act,
-            nob_act=nob_act, nvb_act=nvb_act,
-            input_orbitals=hamiltonian.get_orbitals(), nocc_a=nocc_a, restricted=restricted
+            fbar,
+            vbar,
+            E0_bch,
+            noa_act,
+            nva_act,
+            nob_act=nob_act,
+            nvb_act=nvb_act,
+            input_orbitals=hamiltonian.get_orbitals(),
+            nocc_a=nocc_a,
+            restricted=restricted,
         )

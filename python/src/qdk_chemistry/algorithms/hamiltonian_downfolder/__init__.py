@@ -11,13 +11,26 @@ from external orbitals.
 
 Available implementations:
 
-- ``"native_ducc"``: Pure Python/NumPy implementation using PySCF for CCSD amplitudes.
-  No external binary required.
-- ``"reference_ducc"``: OpenFermion-based symbolic BCH implementation using PySCF for CCSD amplitudes.
-  Algebraically exact but limited to small systems (~20 spatial MOs) due to OpenFermion memory scaling.
+- ``"wicked_ducc"``: Spin-orbital symbolic BCH downfolding via the ``wicked`` library.
+- ``"wicked_ducc_si_ambit"``: Spin-integrated variant with the ambit tensor backend.
 - ``"exachem_ducc"``: CLI-based integration with ExaChem's MPI DUCC solver.
   Requires ExaChem binary and MPI runtime.
 """
+
+from qdk_chemistry.algorithms.base import AlgorithmFactory
+
+
+class HamiltonianDownfolderFactory(AlgorithmFactory):
+    """Factory establishing the ``hamiltonian_downfolder`` algorithm type."""
+
+    def algorithm_type_name(self) -> str:
+        """Return ``"hamiltonian_downfolder"``."""
+        return "hamiltonian_downfolder"
+
+    def default_algorithm_name(self) -> str:
+        """Return ``"wicked_ducc"``."""
+        return "wicked_ducc"
+
 
 _loaded = False
 
@@ -30,30 +43,14 @@ def load():
     _loaded = True
 
     from qdk_chemistry.algorithms import register
-    from qdk_chemistry.algorithms.hamiltonian_downfolder.native_ducc import (
-        NativeDuccFactory,
-        NativeDuccSolver,
-    )
-    from qdk_chemistry.algorithms.hamiltonian_downfolder.reference_ducc import (
-        ReferenceDuccFactory,
-        ReferenceDuccSolver,
-    )
     from qdk_chemistry.algorithms.registry import register_factory
 
-    # Register the factory. If ExaChem plugin already registered one, this will
-    # raise ValueError — catch it and just register the algorithm.
+    # Establish the algorithm type. If the ExaChem plugin already registered a
+    # hamiltonian_downfolder factory, this raises ValueError — ignore it.
     try:
-        register_factory(NativeDuccFactory())
+        register_factory(HamiltonianDownfolderFactory())
     except ValueError:
-        pass  # Factory already registered by ExaChem plugin
-
-    try:
-        register_factory(ReferenceDuccFactory())
-    except ValueError:
-        pass
-
-    register(lambda: NativeDuccSolver())
-    register(lambda: ReferenceDuccSolver())
+        pass  # Factory already registered by the ExaChem plugin
 
     # Wicked-based DUCC (requires wicked library)
     try:
