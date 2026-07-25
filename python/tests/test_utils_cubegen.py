@@ -71,4 +71,8 @@ class TestCubegen:
         singlet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
         triplet_cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
 
+        # get first item in map and remove header (which includes current time) to compare only the data
+        singlet_cubes = next(iter(singlet_cubes.values())).splitlines()[2:]
+        triplet_cubes = next(iter(triplet_cubes.values())).splitlines()[2:]
+
         assert singlet_cubes == triplet_cubes
