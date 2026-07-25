@@ -236,13 +236,17 @@ TEST_F(ScfTest, ROHF_RectangularBackTransform_ProjectionIdentity) {
   const int nAO = 4;  // atomic orbitals
   const int nMO = 2;  // molecular orbitals (nMO < nAO = rectangular case)
 
-  // S = identity (simplifies C^T S C = I to C^T C = I)
+  // Use a non-identity overlap so the test fails if the implementation omits S.
   Mat S = Mat::Identity(nAO, nAO);
+  S(0, 0) = 1.2;
+  S(1, 1) = 0.7;
+  S(2, 2) = 1.1;
+  S(3, 3) = 0.9;
 
-  // coeff: nAO x nMO with orthonormal columns (C^T C = I)
+  // coeff: nAO x nMO with S-orthonormal columns (C^T S C = I)
   Mat coeff = Mat::Zero(nAO, nMO);
-  coeff(0, 0) = 1.0;
-  coeff(1, 1) = 1.0;
+  coeff(0, 0) = 1.0 / std::sqrt(S(0, 0));
+  coeff(1, 1) = 1.0 / std::sqrt(S(1, 1));
 
   // Arbitrary symmetric F_MO_eff in MO space
   Mat F_mo = Mat::Zero(nMO, nMO);
