@@ -222,8 +222,6 @@ TEST_F(ScfTest, OH_ROKS_invalid) {
   EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::invalid_argument);
 }
 
-#include <qdk/chemistry/scf/core/scf_algorithm.h>
-
 // Regression test for GitHub issue #543.
 // ROHF crashed with "ROHF build requires number of atomic orbitals to equal
 // number of molecular orbitals!" when n_MO < n_AO due to basis linear
