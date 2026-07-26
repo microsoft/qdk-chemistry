@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace qdk::chemistry::utils::detail {
+namespace qdk::chemistry::utils::unitary_synthesis::detail {
 
 /**
  * @brief Resulting Givens representation of a real orthogonal matrix.
@@ -53,10 +53,6 @@ struct SparseSiteSynthesis {
  * returned layers in increasing index order, followed by the phase signs,
  * reconstructs @p matrix as @f$D L_{k-1}\cdots L_0@f$.
  *
- * Numerically empty layers are omitted. The input dimension need not be a
- * power of two; sparse unitary synthesis decomposes individual symmetry blocks
- * of arbitrary positive dimension.
- *
  * @param matrix Nonempty, finite, square real matrix satisfying
  * @f$\lVert U^T U-I\rVert_F \leq 10^{-8}n@f$, where @f$n@f$ is its dimension.
  * @return Layer angles, shifted-layer flags, and diagonal phase signs.
@@ -91,4 +87,4 @@ GivensDecomposition decompose_block_diagonal_to_givens(
 SparseSiteSynthesis decompose_sparse_site(
     const Eigen::Ref<const Eigen::MatrixXd>& target);
 
-}  // namespace qdk::chemistry::utils::detail
+}  // namespace qdk::chemistry::utils::unitary_synthesis::detail

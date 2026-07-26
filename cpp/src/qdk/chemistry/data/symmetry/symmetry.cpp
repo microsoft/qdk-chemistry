@@ -279,7 +279,7 @@ std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json(const nlohmann::json& j) {
       labels.push_back(symmetry_axis_value_from_json(label_json));
     }
     return std::make_shared<SymmetryAxis>(name, std::move(labels),
-                        j.at("equivalent").get<bool>());
+                                          j.at("equivalent").get<bool>());
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse SymmetryAxis from JSON: " +
                              std::string(e.what()));

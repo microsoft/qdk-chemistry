@@ -15,19 +15,15 @@
 namespace qdk::chemistry::data {
 
 /**
+ * @class AbelianMPSSite
  * @brief One block-sparse site in an Abelian MPS.
  *
  * An MPS site tensor @f$A[l,p,r]@f$ has a left-bond index @f$l@f$, a local
  * physical-state index @f$p@f$, and a right-bond index @f$r@f$. This class
  * stores it as a list of rank-2 matrices @f$A^p[l,r]@f$ per physical state.
  * For a spin-half spatial orbital, the usual four slices represent the empty,
-  nlohmann::json to_json() const override;
  * alpha-occupied, beta-occupied, and doubly occupied states.
- * @ref MPSContainer::physical_basis records the physical-slice ordering when
- * that metadata is available.
  *
- * Each matrix is a symmetry-blocked rank-2 tensor. Its rows and columns are
- * partitioned into labeled Abelian bond sectors, including particle number.
  * Only populated sector pairs are stored; an absent block is interpreted as
  * zero. All physical slices use the same real or complex scalar type and the
  * same definitions of their left and right bond spaces, but they may populate
@@ -42,16 +38,11 @@ class AbelianMPSSite {
   /**
    * @brief Construct a block-sparse Abelian MPS site from physical slices.
    * @param physical_slices Matrices @f$A^p[l,r]@f$ in physical-state order.
-   *        Every slice must use the same scalar type (all real or all complex),
-   *        the same left-bond sectors and extents, and the same right-bond
-   *        sectors and extents. The left and right bond spaces need not equal
-   *        each other.
+   *        Every slice must use the same scalar type (all real or all complex).
    * @param left_sector_order Left-bond sector labels in the order used to
-   *        concatenate their rows into a dense left-bond index. Every declared
-   *        left sector must occur exactly once.
+   *        concatenate their rows into a dense left-bond index.
    * @param right_sector_order Right-bond sector labels in the order used to
-   *        concatenate their columns into a dense right-bond index. Every
-   *        declared right sector must occur exactly once.
+   *        concatenate their columns into a dense right-bond index.
    * @throws std::invalid_argument if no slices are supplied, a slice is null,
    * slices have inconsistent scalar types or bond spaces, or a sector order
    * does not contain every bond sector exactly once.
@@ -93,13 +84,13 @@ class AbelianMPSSite {
   std::size_t physical_dimension() const { return _physical_slices.size(); }
 
   /**
-   * @brief Get the full left-bond dimension across all symmetry sectors.
+   * @brief Get the full left-bond dimension.
    * @return Sum of the left-bond sector extents.
    */
   std::size_t left_bond_dimension() const;
 
   /**
-   * @brief Get the full right-bond dimension across all symmetry sectors.
+   * @brief Get the full right-bond dimension.
    * @return Sum of the right-bond sector extents.
    */
   std::size_t right_bond_dimension() const;
@@ -133,14 +124,10 @@ class AbelianMPSSite {
 };
 
 /**
+ * @class AbelianMPSContainer
  * @brief Immutable Abelian block-sparse MPS wavefunction.
  *
  * Each site stores one symmetry-blocked matrix per local physical basis state.
- * Every left and right bond space carries a particle-number axis. A sector's
- * extent is the number of bond states carrying that particle-number label.
- * Missing sector-pair blocks are zero, while populated blocks hold amplitudes
- * between states within the corresponding sectors. Dense conversion
- * concatenates sectors in each site's explicitly declared sector order.
  */
 class AbelianMPSContainer : public MPSContainer {
  public:

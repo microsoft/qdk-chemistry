@@ -11,10 +11,12 @@
 #include <random>
 #include <stdexcept>
 
-using qdk::chemistry::utils::detail::decompose_block_diagonal_to_givens;
-using qdk::chemistry::utils::detail::decompose_sparse_site;
-using qdk::chemistry::utils::detail::decompose_unitary_to_givens;
-using qdk::chemistry::utils::detail::GivensDecomposition;
+using qdk::chemistry::utils::unitary_synthesis::detail::
+    decompose_block_diagonal_to_givens;
+using qdk::chemistry::utils::unitary_synthesis::detail::decompose_sparse_site;
+using qdk::chemistry::utils::unitary_synthesis::detail::
+    decompose_unitary_to_givens;
+using qdk::chemistry::utils::unitary_synthesis::detail::GivensDecomposition;
 
 namespace detail {
 
@@ -78,10 +80,6 @@ void expect_reconstruction(const Eigen::MatrixXd& matrix,
             decomposition.layer_shifted.size());
 }
 
-}  // namespace detail
-
-namespace detail {
-
 TEST(UnitarySynthesisTest, ReconstructsMixedBlockDiagonalMatrix) {
   const std::vector<Eigen::Index> dimensions{1, 3, 4, 2};
   std::vector<Eigen::MatrixXd> blocks;
@@ -131,22 +129,18 @@ TEST(UnitarySynthesisTest, RejectsInvalidSparseInputs) {
                std::invalid_argument);
 }
 
-TEST(UnitarySynthesisTest, ReconstructsScalarSigns) {
+TEST(UnitarySynthesisTest, ReconstructsStructuredOrthogonalMatrices) {
   expect_reconstruction(Eigen::MatrixXd::Identity(1, 1));
   Eigen::MatrixXd negative(1, 1);
   negative(0, 0) = -1.0;
   expect_reconstruction(negative);
-}
 
-TEST(UnitarySynthesisTest, ReconstructsPlaneRotation) {
   const double angle = 0.37;
   Eigen::MatrixXd rotation(2, 2);
   rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
       std::cos(angle);
   expect_reconstruction(rotation);
-}
 
-TEST(UnitarySynthesisTest, ReconstructsSignedPermutation) {
   Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(4, 4);
   matrix(0, 2) = 1.0;
   matrix(1, 0) = -1.0;

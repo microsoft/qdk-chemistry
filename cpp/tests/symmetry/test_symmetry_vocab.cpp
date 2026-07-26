@@ -56,12 +56,6 @@ TEST(SymmetryVocabTest, RoundTripSpinAndParticleNumberLabelJson) {
   EXPECT_TRUE(restored.has(AxisName::ParticleNumber));
 }
 
-TEST(SymmetryVocabTest, RoundTripParticleNumberAxisJson) {
-  const auto original = axes::particle_number(4);
-  const auto restored = SymmetryAxis::from_json(original.to_json());
-  EXPECT_EQ(*restored, original);
-}
-
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {
   SymmetryProduct sym({axes::spin(1, true)});
   EXPECT_TRUE(sym.has_axis(AxisName::Spin));

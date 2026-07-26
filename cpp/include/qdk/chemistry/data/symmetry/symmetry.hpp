@@ -171,10 +171,7 @@ class SpinValue : public SymmetryAxisValue {
  * @brief Particle-count label for one symmetry sector.
  *
  * The stored value identifies states carrying a particular number of
- * particles. It is a sector label, not the sector extent: a sector labeled
- * @c 2 may contain any number of basis states that all carry two particles.
- * For a single spatial orbital, the physical occupation labels are 0, 1, and
- * 2, with alpha and beta occupations both belonging to the label-1 sector.
+ * particles.
  */
 class ParticleNumberValue : public SymmetryAxisValue {
   std::size_t _number;

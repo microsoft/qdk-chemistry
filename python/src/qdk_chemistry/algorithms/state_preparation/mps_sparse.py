@@ -39,17 +39,23 @@ if TYPE_CHECKING:
 import numpy as np
 from scipy.sparse import csc_array, vstack
 
-from qdk_chemistry._core.utils import decompose_sparse_site
-from qdk_chemistry.data import AbelianMPSSite, MPSContainer, Wavefunction
+from qdk_chemistry.data import AbelianMPSSite, Configuration, MPSContainer, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.unitary_synthesis import decompose_sparse_site
 
-from ._mps_common import GivensLayerData, validate_mps_physical_basis
 from .state_preparation import StatePreparation, StatePreparationSettings
 
 __all__: list[str] = [
     "MPSSparseStatePreparation",
 ]
+
+
+def validate_mps_physical_basis(container: MPSContainer) -> None:
+    """Require the physical-slice order assumed by the Q# operations."""
+    canonical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
+    if container.physical_basis != canonical_basis:
+        raise ValueError("MPS state preparation requires physical basis ordering ('0', 'u', 'd', '2').")
 
 
 class MPSSparseStatePreparationSettings(StatePreparationSettings):
@@ -133,6 +139,15 @@ class MPSSparseStatePreparation(StatePreparation):
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class GivensLayerData:
+    """Result of decomposing a unitary into Givens rotation layers."""
+
+    layer_angles: list[list[float]]
+    layer_shifted: list[bool]
+    phases: list[bool]
 
 
 @dataclass

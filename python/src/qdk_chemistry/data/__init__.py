@@ -69,6 +69,7 @@ from contextlib import suppress
 
 from qdk_chemistry._core.data import (
     AbelianMPSContainer,
+    AbelianMPSSite,
     AlgorithmRef,
     AmplitudeContainer,
     AmplitudeType,
@@ -88,7 +89,6 @@ from qdk_chemistry._core.data import (
     MajoranaMapping,
     ModelOrbitals,
     MPSContainer,
-    AbelianMPSSite,
     NuclearGradients,
     NuclearHessian,
     Orbitals,
@@ -141,6 +141,7 @@ SettingsAreLockedError = SettingsAreLocked
 __all__ = [
     "AOType",
     "AbelianMPSContainer",
+    "AbelianMPSSite",
     "AlgorithmRef",
     "AmplitudeContainer",
     "AmplitudeType",
@@ -166,7 +167,6 @@ __all__ = [
     "LatticeGraph",
     "LayeredPartition",
     "MPSContainer",
-    "AbelianMPSSite",
     "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",

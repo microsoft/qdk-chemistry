@@ -17,6 +17,7 @@
 namespace qdk::chemistry::data {
 
 /**
+ * @class MPSContainer
  * @brief Common interface and metadata for MPS wavefunction representations.
  *
  * Concrete subclasses define the site tensor representation and its bond-space

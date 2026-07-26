@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace qdk::chemistry::utils::detail {
+namespace qdk::chemistry::utils::unitary_synthesis::detail {
 
 constexpr double elimination_tolerance = 1.0e-15;
 constexpr double orthogonality_tolerance = 1.0e-8;
@@ -423,4 +423,4 @@ SparseSiteSynthesis decompose_sparse_site(
   return result;
 }
 
-}  // namespace qdk::chemistry::utils::detail
+}  // namespace qdk::chemistry::utils::unitary_synthesis::detail
