@@ -227,9 +227,9 @@ TEST_F(ScfTest, OH_ROKS_invalid) {
 // number of molecular orbitals!" when n_MO < n_AO due to basis linear
 // dependence. The fix replaces the square-matrix inversion with the
 // overlap-mediated projection  F_eff_AO = S C F_MO_eff C^T S.
-// Deterministic unit test for the rectangular ROHF back-transform.
-// Verifies the projection identity C^T * F_eff_AO * C = F_MO_eff
-// when C^T * S * C = I, without relying on a full SCF run.
+// Deterministic check of the projection identity used in the rectangular
+// (nMO < nAO) ROHF back-transform:
+//   if C^T S C = I, then C^T F_eff_AO C = F_MO_eff.
 TEST_F(ScfTest, ROHF_RectangularBackTransform_ProjectionIdentity) {
   using Mat =
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
