@@ -20,19 +20,19 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @brief Energy, optimized structure, optional wavefunction, and optional
- * Hessian from a geometry optimization run.
+ * @brief Energy, optimized structure, optional Hessian, and optional
+ * wavefunction from a geometry optimization run.
  */
 using GeometryOptimizationResult =
     std::tuple<double, std::shared_ptr<data::Structure>,
-               std::optional<std::shared_ptr<data::Wavefunction>>,
-               std::optional<std::shared_ptr<data::NuclearHessian>>>;
+               std::optional<std::shared_ptr<data::NuclearHessian>>,
+               std::optional<std::shared_ptr<data::Wavefunction>>>;
 
 /**
- * @brief Initial basis-set name, basis, orbitals, or wavefunction seed for a
+ * @brief Initial basis-set name, basis, orbitals, or wavefunction input for a
  * geometry optimization run.
  */
-using GeometryOptimizationSeedType =
+using GeometryOptimizationInputType =
     std::variant<std::shared_ptr<data::Orbitals>,
                  std::shared_ptr<data::BasisSet>,
                  std::shared_ptr<data::Wavefunction>, std::string>;
@@ -52,24 +52,9 @@ class GeometryOptimizerSettings : public data::Settings {
                                    "qdk_finite_difference"),
                 "Nuclear derivative calculator used to evaluate energies and "
                 "gradients during optimization.");
-    set_default("transition_state", false,
-                "Whether to run transition-state optimization instead of "
-                "minimum-energy geometry optimization.");
     set_default("max_iterations", static_cast<int64_t>(300),
                 "Maximum number of geometry optimization steps.",
                 data::BoundConstraint<int64_t>{1, 1000000});
-    set_default("convergence_energy", 1.0e-6,
-                "Energy convergence threshold used by optimizers that expose "
-                "an energy convergence setting.",
-                data::BoundConstraint<double>{0.0, 1.0});
-    set_default("convergence_gradient", 3.0e-4,
-                "Gradient convergence threshold used by optimizers that expose "
-                "a gradient convergence setting.",
-                data::BoundConstraint<double>{0.0, 1.0});
-    set_default("convergence_displacement", 1.2e-3,
-                "Displacement convergence threshold used by optimizers that "
-                "expose a displacement convergence setting.",
-                data::BoundConstraint<double>{0.0, 1.0});
     set_default("compute_hessian", false,
                 "Whether to compute a nuclear Hessian at the optimized "
                 "geometry before returning.");
@@ -82,12 +67,12 @@ class GeometryOptimizerSettings : public data::Settings {
  *
  * Implementations optimize molecular coordinates and derive active-space
  * electron counts for nuclear derivative calculations. Results include the
- * optimized energy and structure plus optional wavefunction and Hessian values.
+ * optimized energy and structure plus optional Hessian and wavefunction values.
  */
 class GeometryOptimizer
     : public Algorithm<GeometryOptimizer, GeometryOptimizationResult,
                        std::shared_ptr<data::Structure>, int, int,
-                       GeometryOptimizationSeedType, unsigned int> {
+                       GeometryOptimizationInputType, unsigned int> {
  public:
   /**
    * @brief Construct a geometry optimizer with shared settings.
@@ -103,18 +88,18 @@ class GeometryOptimizer
    * @param structure Initial molecular structure to optimize.
    * @param charge Total molecular charge.
    * @param spin_multiplicity Spin multiplicity of the molecular system.
-   * @param seed Basis name, basis set, orbitals, or wavefunction seed.
+   * @param input Basis name, basis set, orbitals, or wavefunction input.
    * @param n_inactive_orbitals Number of doubly occupied orbitals excluded from
    * the active space.
-   * @return Optimized energy, structure, optional wavefunction, and optional
-   * Hessian.
+   * @return Optimized energy, structure, optional Hessian, and optional
+   * wavefunction.
    */
   GeometryOptimizationResult run(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, GeometryOptimizationSeedType seed,
+      int spin_multiplicity, GeometryOptimizationInputType input,
       unsigned int n_inactive_orbitals = 0) const override {
-    return Algorithm::run(structure, charge, spin_multiplicity, std::move(seed),
-                          n_inactive_orbitals);
+    return Algorithm::run(structure, charge, spin_multiplicity,
+                          std::move(input), n_inactive_orbitals);
   }
 
   virtual std::string name() const = 0;
@@ -130,7 +115,7 @@ class GeometryOptimizer
    */
   virtual GeometryOptimizationResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, GeometryOptimizationSeedType seed,
+      int spin_multiplicity, GeometryOptimizationInputType input,
       unsigned int n_inactive_orbitals) const = 0;
 };
 

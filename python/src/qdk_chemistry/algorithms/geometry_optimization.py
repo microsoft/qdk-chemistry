@@ -5,6 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import GeometryOptimizer
+from qdk_chemistry._core._algorithms import GeometryOptimizer, GeometryOptimizerSettings
 
-__all__ = ["GeometryOptimizer"]
+__all__ = ["GeometryOptimizer", "GeometryOptimizerSettings"]
