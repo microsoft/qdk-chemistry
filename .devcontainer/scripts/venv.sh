@@ -21,8 +21,8 @@ pip install ipykernel pandas pre-commit rdkit
 
 # Install QDK Chemistry package
 cd ./python
-export CMAKE_BUILD_PARALLEL_LEVEL=4
-QDK_UARCH=native pip install -e .[all]
+export CMAKE_BUILD_PARALLEL_LEVEL=2
+QDK_UARCH=native pip install -v .[all]
 
 # Add venv to bash
 echo "source $HOME/qdk_chemistry_venv/bin/activate" >> $HOME/.bashrc
