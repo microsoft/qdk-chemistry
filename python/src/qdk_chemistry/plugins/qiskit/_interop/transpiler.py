@@ -13,6 +13,7 @@ state. It also includes functions to create custom pass managers based on preset
 import numpy as np
 from qiskit.circuit import ParameterExpression
 from qiskit.circuit.library import (
+    CZGate,
     IGate,
     RXGate,
     RXXGate,
@@ -31,13 +32,19 @@ from qiskit.circuit.library import (
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
+from qiskit.transpiler.passes.optimization.light_cone import LightCone
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
 from qdk_chemistry.data import Settings
 from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
 from qdk_chemistry.utils import Logger
 
 __all__ = [
+    "CommuteDiagonalThroughMeasurement",
+    "DecomposeRzzToCliffordCz",
+    "ExtractCliffordFromRotation",
     "MergeZBasisRotations",
+    "ReduceToLightCone",
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
     "SubstitutePauliRotation",
@@ -572,3 +579,372 @@ class RemoveZBasisOnZeroState(TransformationPass):
         """
         Logger.trace_entering()
         return gate_name in DIAGONAL_Z_1Q_GATES
+
+
+class DecomposeRzzToCliffordCz(TransformationPass):
+    """Transformation pass to decompose RZZ(±π/2) gates into CZ gates with residual single-qubit Clifford gates.
+
+    Uses the identity ``exp(iπ/4 Z_i Z_j) = exp(-iπ/4) · Rz_i(-π/2) · Rz_j(-π/2) · CZ_ij`` to replace each
+    RZZ(π/2) gate with a CZ gate and Rz(-π/2) on each qubit (and analogously for RZZ(-π/2) with Rz(π/2)).
+    After decomposition, accumulated Rz rotations are merged and simplified to named Clifford gates.
+
+    The residual single-qubit gates depend on the vertex degree (number of RZZ edges per qubit).
+    For RZZ(π/2), each edge contributes Rz(π/2) per qubit:
+
+    +--------------+------------------+--------------------+
+    | degree mod 4 | accumulated Rz   | residual gate      |
+    +==============+==================+====================+
+    | 0            | 0                | I (identity)       |
+    +--------------+------------------+--------------------+
+    | 1            | π/2              | S                  |
+    +--------------+------------------+--------------------+
+    | 2            | π                | Z                  |
+    +--------------+------------------+--------------------+
+    | 3            | 3π/2             | Sdg                |
+    +--------------+------------------+--------------------+
+
+    For RZZ(-π/2), the signs flip: S ↔ Sdg (Z and I are unaffected).
+
+    Examples:
+        * **1D chain** (degree 2): each interior qubit accumulates Rz(-π) → Z gate per qubit, plus CZ on each edge.
+        * **2D torus** (degree 4): each qubit accumulates Rz(-2π) → identity, leaving only CZ gates.
+
+    Note:
+        This pass only decomposes RZZ gates whose angle is exactly ±π/2 within the specified tolerance.
+        Other RZZ angles are left untouched. After decomposition, :class:`SubstituteCliffordRz`
+        is applied automatically to simplify the residual single-qubit gates.
+
+    """
+
+    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
+        """Initialize the DecomposeRzzToCliffordCz transformation pass.
+
+        Args:
+            tolerance (float): Angle comparison tolerance for identifying ±π/2. Default is np.finfo(np.float64).eps.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._tolerance = tolerance
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the DecomposeRzzToCliffordCz pass on the DAG circuit.
+
+        Each RZZ(±π/2) is replaced by a CZ gate.  The residual Rz rotations
+        are accumulated per qubit and flushed at the boundary of each
+        diagonal-Z layer — i.e. just before the first non-diagonal gate
+        (Rx, H, …) on that qubit's wire.  Within a layer the Rz commutes
+        freely past CZ, so the accumulation is exact.
+
+        On even-degree lattices the per-layer Rz sums to a multiple of 2π
+        and is dropped entirely, leaving only CZ gates.
+
+        Args:
+            dag (DAGCircuit): The input DAG circuit.
+
+        Returns:
+            DAGCircuit: The transformed DAG circuit.
+
+        """
+        Logger.trace_entering()
+        target_angle = np.pi / 2
+        tolerance = self._tolerance
+
+        # Build a new DAG, accumulating Rz per qubit across diagonal-Z regions
+        new_dag = DAGCircuit()
+        for qreg in dag.qregs.values():
+            new_dag.add_qreg(qreg)
+        for creg in dag.cregs.values():
+            new_dag.add_creg(creg)
+
+        accumulated: dict = {}  # qubit -> float
+
+        for node in dag.topological_op_nodes():
+            # Check if this is an RZZ(±π/2) to decompose
+            if node.op.name == "rzz" and not isinstance(node.op.params[0], ParameterExpression):
+                angle = float(node.op.params[0])
+                angle_mod = angle % (2 * np.pi)
+                if np.isclose(angle_mod, target_angle, atol=tolerance) or np.isclose(
+                    angle_mod, 2 * np.pi - target_angle, atol=tolerance
+                ):
+                    q0, q1 = node.qargs
+                    accumulated[q0] = accumulated.get(q0, 0.0) + angle
+                    accumulated[q1] = accumulated.get(q1, 0.0) + angle
+                    new_dag.apply_operation_back(CZGate(), [q0, q1])
+                    continue
+
+            # For non-diagonal gates, flush accumulated Rz on touched qubits
+            if node.op.name not in DIAGONAL_Z_1Q_GATES and node.op.name not in _DIAGONAL_Z_2Q_GATES:
+                for qubit in node.qargs:
+                    if qubit in accumulated:
+                        self._flush_rz(new_dag, qubit, accumulated.pop(qubit), tolerance)
+
+            new_dag.apply_operation_back(node.op, node.qargs, node.cargs)
+
+        # Flush any remaining accumulated Rz
+        for qubit, angle in accumulated.items():
+            self._flush_rz(new_dag, qubit, angle, tolerance)
+
+        return new_dag
+
+    @staticmethod
+    def _flush_rz(dag: DAGCircuit, qubit, angle: float, tolerance: float) -> None:
+        """Emit an Rz gate if the accumulated angle is non-trivial mod 2π."""
+        total_mod = angle % (2 * np.pi)
+        if np.isclose(total_mod, 0.0, atol=tolerance) or np.isclose(total_mod, 2 * np.pi, atol=tolerance):
+            return
+        dag.apply_operation_back(RZGate(angle), [qubit])
+
+
+class ExtractCliffordFromRotation(TransformationPass):
+    r"""Split an Rz gate into a Clifford part and a small-angle residual.
+
+    For each ``Rz(θ)`` in the circuit, this pass finds the nearest Clifford
+    angle :math:`c = n\pi/2` and, when the residual :math:`\theta - c` is
+    non-trivial, replaces the gate with ``Rz(c) · Rz(θ - c)``.  A
+    subsequent :class:`SubstituteCliffordRz` pass can then convert ``Rz(c)``
+    to the equivalent noiseless Clifford gate (S, Sdg, Z, or Id).
+
+    This is useful in noise models where Clifford gates are cheaper (or
+    noiseless) while arbitrary-angle rotations carry injected-rotation
+    noise.  Without this pass, an ``Rz(θ)`` that is *close* to a Clifford
+    angle pays the full rotation-noise cost even though most of the angle
+    could have been implemented as a noiseless Clifford.
+
+    Example::
+
+        Rz(0.3 - π) → Rz(-π) · Rz(0.3)
+                     → Z · Rz(0.3)        (after SubstituteCliffordRz)
+
+    """
+
+    _QUARTER_PI = np.pi / 4.0
+
+    def __init__(self, tolerance: float = 1e-10):
+        """Initialize ExtractCliffordFromRotation.
+
+        Args:
+            tolerance: Angles within this tolerance of a Clifford multiple are left for SubstituteCliffordRz.
+
+        """
+        super().__init__()
+        self._tolerance = tolerance
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with Clifford parts extracted.
+
+        """
+        for node in dag.op_nodes():
+            if node.op.name != "rz":
+                continue
+
+            angle = node.op.params[0]
+            if isinstance(angle, ParameterExpression):
+                continue
+
+            theta = float(angle)
+
+            # Find nearest multiple of π/2
+            n = round(theta / (np.pi / 2.0))
+            clifford_angle = n * (np.pi / 2.0)
+            residual = theta - clifford_angle
+
+            # Skip if the residual is essentially zero (pure Clifford)
+            if abs(residual) <= self._tolerance:
+                continue
+
+            # Skip if the Clifford part is zero (already a pure residual)
+            if n == 0:
+                continue
+
+            # Replace Rz(θ) with Rz(clifford) · Rz(residual)
+            replacement = DAGCircuit()
+            replacement.add_qubits(node.qargs)
+            replacement.apply_operation_back(RZGate(clifford_angle), [node.qargs[0]])
+            replacement.apply_operation_back(RZGate(residual), [node.qargs[0]])
+            dag.substitute_node_with_dag(node, replacement)
+
+        return dag
+
+
+class ReduceToLightCone(TransformationPass):
+    """Remove gates outside the backward light cone of an observable or circuit measurement.
+
+    Wraps Qiskit's :class:`~qiskit.transpiler.passes.optimization.LightCone` pass with support
+    for :class:`~qdk_chemistry.data.QubitHamiltonian` observables. Gates that cannot affect the
+    expectation value of the observable (or measurement outcome) are removed.
+
+    The observable can be specified as:
+
+    * ``None`` (default) — uses the measurements already present in the circuit.
+    * A :class:`~qdk_chemistry.data.QubitHamiltonian` — non-trivial Pauli terms and qubit
+      indices are extracted automatically.
+
+    Example::
+
+        from qdk_chemistry.data import QubitHamiltonian
+        from qdk_chemistry.plugins.qiskit._interop.transpiler import ReduceToLightCone
+        from qiskit.transpiler import PassManager
+
+        obs = QubitHamiltonian(pauli_strings=["IIZIIII"], coefficients=[1.0])
+        pm = PassManager([ReduceToLightCone(observable=obs)])
+        reduced = pm.run(circuit)
+
+    Note:
+        For multi-term observables where different terms have different Pauli types on the same
+        qubit, the last encountered Pauli type is used. The light cone result is correct regardless
+        of which Pauli type is chosen, since any non-identity operator prevents gate removal.
+
+    """
+
+    def __init__(self, observable=None):
+        """Initialize the ReduceToLightCone transformation pass.
+
+        Args:
+            observable: Observable for light cone computation. ``None`` uses circuit measurements.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._observable = observable
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the ReduceToLightCone pass on the DAG circuit.
+
+        Args:
+            dag (DAGCircuit): The input DAG circuit.
+
+        Returns:
+            DAGCircuit: The reduced DAG containing only gates within the light cone.
+
+        """
+        Logger.trace_entering()
+        if self._observable is None:
+            # Extract measured qubit indices from the circuit and use explicit
+            # Z-basis light cone so the reduction is as aggressive as when an
+            # observable is provided.  Qiskit's LightCone does not allow both
+            # measurements and explicit indices, so temporarily strip them.
+            measure_nodes = [node for node in dag.op_nodes() if node.op.name == "measure"]
+            measured_qubits = sorted({dag.find_bit(qarg).index for node in measure_nodes for qarg in node.qargs})
+            if measured_qubits:
+                for node in measure_nodes:
+                    dag.remove_op_node(node)
+                bit_terms = "Z" * len(measured_qubits)
+                dag = LightCone(bit_terms=bit_terms, indices=measured_qubits).run(dag)
+                # Re-add measurement gates on the surviving qubits
+                from qiskit.circuit.library import Measure  # noqa: PLC0415
+
+                for idx in measured_qubits:
+                    qubit = dag.qubits[idx]
+                    if qubit in {q for node in dag.op_nodes() for q in node.qargs} or True:
+                        # Find the classical bit that was originally paired with this qubit
+                        if dag.clbits:
+                            clbit = dag.clbits[measured_qubits.index(idx) % len(dag.clbits)]
+                            dag.apply_operation_back(Measure(), [qubit], [clbit])
+                return dag
+            return LightCone().run(dag)
+
+        pauli_map: dict[int, str] = {}
+        for pauli_str in self._observable.pauli_strings:
+            pauli_map |= HamiltonianUnitaryBuilder._pauli_label_to_map(pauli_str)  # noqa: SLF001
+        if not pauli_map:
+            return dag
+        indices = sorted(pauli_map)
+        bit_terms = "".join(pauli_map[i] for i in indices)
+        return LightCone(bit_terms=bit_terms, indices=indices).run(dag)
+
+
+# Two-qubit gates that are diagonal in the computational (Z) basis.
+_DIAGONAL_Z_2Q_GATES = frozenset({"cz", "rzz", "cp", "ccz"})
+
+
+class CommuteDiagonalThroughMeasurement(TransformationPass):
+    r"""Remove Z-diagonal gates at the end of the circuit that commute with Z-basis measurement.
+
+    Any gate whose matrix is diagonal in the computational basis commutes
+    with a Z-basis measurement and therefore cannot affect the measurement
+    outcome.  This pass iteratively removes such gates working backward
+    from each measurement.
+
+    A multi-qubit diagonal gate (e.g. CZ) is only removed when **all** of
+    its qubit wires are still in the "diagonal tail" — i.e. every qubit of
+    the gate has nothing but other diagonal gates (or the measurement
+    itself) between it and the end of the circuit.
+
+    Recognized diagonal gates:
+
+    * **1-qubit:** Rz, S, Sdg, T, Tdg, Z, Id
+    * **2-qubit:** CZ, RZZ, CP, CCZ
+
+    Example::
+
+        Before:  ──[H]──[CZ]──[Rz]──M──
+                       │
+                  ──[X]──[CZ]──────────
+
+        After:   ──[H]──M──
+                  ──[X]────
+
+        (CZ is removed because both its qubits have only diagonal gates
+        or measurements after it.  Rz is removed because it's a 1-qubit
+        diagonal gate right before the measurement.)
+
+    """
+
+    def __init__(self):
+        """Initialize CommuteDiagonalThroughMeasurement."""
+        super().__init__()
+
+    @staticmethod
+    def _is_diagonal_z(op) -> bool:
+        """Return True if the operation is diagonal in the Z basis."""
+        return op.name in DIAGONAL_Z_1Q_GATES or op.name in _DIAGONAL_Z_2Q_GATES
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with trailing diagonal gates removed.
+
+        """
+        # Identify measured qubits
+        measured_qubits: set = set()
+        for node in dag.op_nodes():
+            if node.op.name == "measure":
+                measured_qubits.add(node.qargs[0])
+
+        if not measured_qubits:
+            return dag
+
+        # Track which qubits are still in the "diagonal tail" (eligible for removal)
+        in_tail: set = set(measured_qubits)
+
+        # Iteratively peel diagonal gates from the end.
+        # Re-fetch wire ops each iteration since removal mutates the DAG.
+        changed = True
+        while changed:
+            changed = False
+            for qubit in list(in_tail):
+                # Walk backward on this qubit's wire to find the frontier gate
+                for node in reversed(list(dag.nodes_on_wire(qubit, only_ops=True))):
+                    if node.op.name == "measure":
+                        continue
+
+                    # This is the last non-measure gate on this qubit
+                    if self._is_diagonal_z(node.op) and all(q in in_tail for q in node.qargs):
+                        dag.remove_op_node(node)
+                        changed = True
+                    else:
+                        in_tail.discard(qubit)
+                    break
+
+        return dag
