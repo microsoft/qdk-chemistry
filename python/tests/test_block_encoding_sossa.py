@@ -12,11 +12,14 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pytest
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     Configuration,
+    Hamiltonian,
+    MajoranaMapping,
     ModelOrbitals,
     StateVectorContainer,
     Wavefunction,
@@ -35,6 +38,12 @@ from .test_helpers import create_random_factorized_hamiltonian
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _to_sossa_operator(factorized_hamiltonian):
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return create("qubit_mapper").run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def _make_sossa_unitary_representation():
@@ -184,7 +193,7 @@ class TestSOSSAContainer:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Builder tests (using builder.run() with FactorizedHamiltonianContainer)
+# Builder tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -202,7 +211,7 @@ class TestSOSSABuilder:
         n, r, b, c = 4, 3, 2, 2
         fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
         assert container.select.num_orbitals == n
@@ -214,7 +223,7 @@ class TestSOSSABuilder:
         """Test that outer PREPARE statevector is properly normalized."""
         fh = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
         builder = SOSSABuilder()
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
         sv = container.outer_prepare.get_coefficients()
@@ -225,7 +234,7 @@ class TestSOSSABuilder:
         n, r, b, c = 3, 2, 2, 1
         fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
         x_o_dim = n + r * c
@@ -237,7 +246,7 @@ class TestSOSSABuilder:
         n, r, b, c = 3, 2, 2, 1
         fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
         builder = SOSSABuilder()
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
         # DQ angles: [N, N-1]
@@ -249,8 +258,24 @@ class TestSOSSABuilder:
         """Test power parameter passes through to container."""
         fh = create_random_factorized_hamiltonian()
         builder = SOSSABuilder(power=3)
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         assert result.get_container().power == 3
+
+    def test_requires_sossa_qubit_operator(self):
+        fh = create_random_factorized_hamiltonian()
+
+        with pytest.raises(TypeError, match="QubitOperator containing an SOSContainer"):
+            SOSSABuilder().run(fh)
+
+    def test_preserves_operator_scalars(self):
+        fh = create_random_factorized_hamiltonian()
+        operator = _to_sossa_operator(fh)
+        operator_container = operator.get_container()
+
+        container = SOSSABuilder().run(operator).get_container()
+
+        assert container.normalization == pytest.approx(operator_container.normalization)
+        assert container.energy_shift == pytest.approx(operator_container.energy_shift)
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -271,7 +296,7 @@ class TestSOSSABuilder:
             num_copies=num_copies,
         )
         builder = SOSSABuilder()
-        result = builder.run(fh)
+        result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
         assert isinstance(container, SOSSAContainer)
@@ -286,6 +311,12 @@ class TestSOSSABuilder:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.fixture
+def initialize_sossa_qsharp():
+    return get_qsharp_utils(TargetProfile.Unrestricted)
+
+
+@pytest.mark.usefixtures("initialize_sossa_qsharp")
 class TestOuterPrepareQSharp:
     """Test the Q# OuterPrepare sub-operations via dump_machine."""
 
@@ -323,6 +354,7 @@ class TestOuterPrepareQSharp:
         qsharp.eval("ResetAll(qs)")
 
 
+@pytest.mark.usefixtures("initialize_sossa_qsharp")
 class TestInnerPrepareQSharp:
     """Test the Q# InnerPrepare sub-operations via dump_machine."""
 

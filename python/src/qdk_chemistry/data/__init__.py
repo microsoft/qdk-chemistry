@@ -117,9 +117,12 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
-
-# ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
-from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.qubit_operator import PauliLCUContainer, QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.qubit_operator_containers.base import QubitOperatorContainer
+from qdk_chemistry.data.sossa_qubit_operator import (
+    RotatedPauliContainer,
+    SOSContainer,
+)
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -170,6 +173,7 @@ __all__ = [
     "NuclearHessian",
     "OrbitalType",
     "Orbitals",
+    "PauliLCUContainer",
     "PauliOperator",
     "PauliProductFormulaContainer",
     "PauliTermAccumulator",
@@ -177,6 +181,9 @@ __all__ = [
     "QuantumErrorProfile",
     "QubitHamiltonian",
     "QubitOperator",
+    "QubitOperatorContainer",
+    "RotatedPauliContainer",
+    "SOSContainer",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",

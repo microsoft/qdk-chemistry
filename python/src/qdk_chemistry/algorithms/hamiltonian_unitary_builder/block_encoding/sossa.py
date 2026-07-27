@@ -25,12 +25,15 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
 )
 from qdk_chemistry.data import (
     Configuration,
-    FactorizedHamiltonianContainer,
     ModelOrbitals,
+    QubitOperator,
+    RotatedPauliContainer,
+    SOSContainer,
     StateVectorContainer,
     UnitaryRepresentation,
     Wavefunction,
 )
+from qdk_chemistry.data.sossa_qubit_operator import RotatedMode, SOSGenerator, SOSGeneratorKind
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAContainer,
     SOSSAInnerPrepare,
@@ -57,9 +60,7 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
 class SOSSABuilder(HamiltonianUnitaryBuilder):
     r"""SOSSA (Sum of Squares Spectral Amplification) block encoding builder.
 
-    Constructs a SOSSA block encoding from a FactorizedHamiltonianContainer.
-    Unlike LCU which operates on a QubitHamiltonian (Pauli decomposition),
-    SOSSA takes the molecular factorized Hamiltonian directly.
+    Constructs a SOSSA block encoding from a structured SOS ``QubitOperator``.
 
     """
 
@@ -77,68 +78,46 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         self._settings = SOSSASettings()
         self._settings.set("power", power)
 
-    def _run_impl(self, factorized_hamiltonian: FactorizedHamiltonianContainer) -> UnitaryRepresentation:
-        """Build the SOSSA block encoding from a factorized Hamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Build the SOSSA block encoding from structured SOS generators.
 
         Args:
-            factorized_hamiltonian: The factorized Hamiltonian container with
-                U, W, WB matrices and metadata.
+            qubit_hamiltonian: Structured SOS generator family to lower to the SOSSA circuit representation.
 
         Returns:
             UnitaryRepresentation wrapping the SOSSAContainer.
 
         """
-        # Extract dimensions
-        n_orbitals = factorized_hamiltonian.get_num_orbitals()
-        n_ranks = factorized_hamiltonian.get_num_ranks()
-        n_bases = factorized_hamiltonian.get_num_bases()
-        n_copies = factorized_hamiltonian.get_num_copies()
+        sossa_container = self._require_sos_container(qubit_hamiltonian)
+        if sossa_container.encoding != "jordan-wigner" or sossa_container.fermion_mode_order != "blocked":
+            raise ValueError("the SOSSA circuit builder currently supports blocked Jordan-Wigner operators only")
+        if sossa_container.normalization <= self._settings.get("tolerance"):
+            raise ValueError("the SOSSA operator normalization is below the configured tolerance")
 
-        # Extract tensors and reshape from flat storage
-        u_flat = np.array(factorized_hamiltonian.get_u_matrices())  # [R*B*N]
-        w_flat = np.array(factorized_hamiltonian.get_w_matrices())  # [R*B*C]
-        wb = np.array(factorized_hamiltonian.get_wb_matrix())  # [R, C]
+        (
+            outer_arr,
+            inner_arr,
+            one_body_vectors,
+            basis_vectors,
+            num_d1,
+            n_ranks,
+            n_bases,
+            n_copies,
+        ) = self._extract_oracle_data(sossa_container)
+        n_orbitals = sossa_container.num_spatial_orbitals
 
-        basis_vectors = u_flat.reshape(n_ranks, n_bases, n_orbitals)  # U[r, b, p]
-        two_body_weights = w_flat.reshape(n_ranks, n_bases, n_copies)  # W[r, b, c]
-
-        # Compute adjusted one-body matrix (Majorana representation)
-        h1_majorana = np.array(factorized_hamiltonian.get_h1_majorana())  # [N, N]
-
-        # Eigendecompose one-body matrix
-        w_plus, w_minus, u_plus, u_minus = self._compute_one_body_weights(h1_majorana)
-        num_d1 = len(w_plus)
-
-        # Reshape for coefficient computation: [R][C][B] and [R][C]
-        tbw: list[list[list[float]]] = []
-        for r in range(n_ranks):
-            r_list: list[list[float]] = []
-            for c in range(n_copies):
-                r_list.append([float(two_body_weights[r, b, c]) for b in range(n_bases)])
-            tbw.append(r_list)
-
-        iw: list[list[float]] = []
-        for r in range(n_ranks):
-            iw.append([float(wb[r, c]) for c in range(n_copies)])
-
-        # Compute PREPARE coefficients
-        outer_coeffs = self._compute_outer_coefficients(
-            w_plus.tolist(), w_minus.tolist(), tbw, iw, n_orbitals, n_ranks, n_copies
-        )
-        inner_coeffs = self._compute_inner_coefficients(tbw, iw, n_orbitals, n_ranks, n_copies, n_bases)
-
-        # Compute rotation angles
         dq_angles, sf_angles = self._compute_rotation_angles(
-            u_plus.T, u_minus.T, basis_vectors, num_d1, n_orbitals, n_ranks, n_bases
+            one_body_vectors[:num_d1],
+            one_body_vectors[num_d1:],
+            basis_vectors,
+            num_d1,
+            n_orbitals,
+            n_ranks,
+            n_bases,
         )
 
         # Compute free-rider data (G, r encoding for QROM)
         free_rider = self._compute_free_rider_data(num_d1, n_orbitals, n_ranks, n_copies)
-
-        # Compute normalization
-        outer_arr = np.array(outer_coeffs)
-        inner_arr = np.array(inner_coeffs)
-        normalization = self._compute_normalization(outer_arr, inner_arr)
 
         # Build sub-oracles
         xo_dim = n_orbitals + n_ranks * n_copies
@@ -164,22 +143,141 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             num_positive_one_body_terms=num_d1,
         )
 
-        # Energy shift: E_SOS + E_nuc for full energy recovery (Eq. 29, :cite:`Low2025`)
-        # E_SOS = -2·Σw⁻ - ½·Σ|W₀|² + E_BLISS
-        w0 = wb - np.sum(two_body_weights, axis=1)  # [R, C]
-        e_sos = -2.0 * np.sum(w_minus) - 0.5 * float(np.sum(w0**2)) + factorized_hamiltonian.get_bliss_core_shift()
-        energy_shift = e_sos + factorized_hamiltonian.get_core_energy()
-
         container = SOSSAContainer(
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
-            normalization=normalization,
+            normalization=sossa_container.normalization,
             power=self._settings.get("power"),
-            energy_shift=energy_shift,
+            energy_shift=sossa_container.energy_shift,
         )
 
         return UnitaryRepresentation(container=container)
+
+    @staticmethod
+    def _require_sos_container(value: QubitOperator) -> SOSContainer:
+        if not isinstance(value, QubitOperator):
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+        container = value.get_container()
+        if not isinstance(container, SOSContainer):
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+        return container
+
+    @staticmethod
+    def _require_rotated_pauli_container(generator: SOSGenerator) -> RotatedPauliContainer:
+        container = generator.operator.get_container()
+        if not isinstance(container, RotatedPauliContainer):
+            raise TypeError("SOSSABuilder requires each SOS generator to contain a RotatedPauliContainer")
+        return container
+
+    @staticmethod
+    def _rotated_modes(generator: SOSGenerator) -> list[RotatedMode]:
+        modes: list[RotatedMode] = []
+        for term in SOSSABuilder._require_rotated_pauli_container(generator).terms:
+            mode = term.mode
+            if mode is not None:
+                modes.append(mode)
+        return modes
+
+    @staticmethod
+    def _extract_oracle_data(
+        sossa_container: SOSContainer,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, int, int]:
+        """Extract the current SOSSA Q# oracle layout from structured generators."""
+        one_body: dict[tuple[SOSGeneratorKind, int], list[SOSGenerator]] = {}
+        spin_free: dict[tuple[int, int], SOSGenerator] = {}
+
+        for generator in sossa_container.generators:
+            source_index = tuple(generator.source_index)
+            if generator.kind in (SOSGeneratorKind.D1, SOSGeneratorKind.Q1):
+                if len(source_index) != 1:
+                    raise ValueError("D1 and Q1 generators require a one-dimensional source index")
+                one_body.setdefault((generator.kind, source_index[0]), []).append(generator)
+            elif generator.kind == SOSGeneratorKind.SF:
+                if len(source_index) != 2 or source_index in spin_free:
+                    raise ValueError("SF generators require a unique (rank, copy) source index")
+                spin_free[source_index] = generator
+
+        d1_keys = sorted(key for key in one_body if key[0] == SOSGeneratorKind.D1)
+        q1_keys = sorted(key for key in one_body if key[0] == SOSGeneratorKind.Q1)
+        ordered_one_body = d1_keys + q1_keys
+        n_orbitals = sossa_container.num_spatial_orbitals
+        if len(ordered_one_body) != n_orbitals or not spin_free:
+            raise ValueError("the SOSSA circuit layout requires N one-body modes and at least one SF generator")
+
+        one_body_vectors: list[np.ndarray] = []
+        outer_coefficients: list[float] = []
+        for key in ordered_one_body:
+            generators_by_spin: dict[int, SOSGenerator] = {}
+            for generator in one_body[key]:
+                if generator.spin is None or generator.spin in generators_by_spin:
+                    raise ValueError("each D1 or Q1 mode requires one generator per spin channel")
+                generators_by_spin[generator.spin] = generator
+            if set(generators_by_spin) != {0, 1}:
+                raise ValueError("each D1 or Q1 mode requires one generator per spin channel")
+            spin_pair = [generators_by_spin[0], generators_by_spin[1]]
+            modes = SOSSABuilder._rotated_modes(spin_pair[0])
+            if not modes:
+                raise ValueError("a D1 or Q1 generator requires a rotated mode")
+            basis_vector = np.asarray(modes[0].basis_vector, dtype=float)
+            partner_modes = SOSSABuilder._rotated_modes(spin_pair[1])
+            if not partner_modes or not np.allclose(basis_vector, partner_modes[0].basis_vector):
+                raise ValueError("spin-paired D1 or Q1 generators must use the same rotated mode")
+            if not np.isclose(spin_pair[0].lcu_normalization, spin_pair[1].lcu_normalization):
+                raise ValueError("spin-paired D1 or Q1 generators must have equal normalization")
+            one_body_vectors.append(basis_vector)
+            outer_coefficients.append(sqrt(2.0) * spin_pair[0].lcu_normalization)
+
+        n_ranks = max(rank for rank, _ in spin_free) + 1
+        n_copies = max(copy for _, copy in spin_free) + 1
+        if len(spin_free) != n_ranks * n_copies:
+            raise ValueError("SF source indices must form a complete rank-by-copy grid")
+
+        first_terms = SOSSABuilder._require_rotated_pauli_container(spin_free[(0, 0)]).terms
+        if len(first_terms) < 3 or (len(first_terms) - 1) % 2 != 0:
+            raise ValueError("an SF generator requires one identity term and spin-paired rotated terms")
+        n_bases = (len(first_terms) - 1) // 2
+        basis_vectors = np.empty((n_ranks, n_bases, n_orbitals))
+        inner_coefficients = [[1.0] + [0.0] * n_bases for _ in range(n_orbitals)]
+
+        for rank in range(n_ranks):
+            for copy in range(n_copies):
+                generator = spin_free[(rank, copy)]
+                terms = SOSSABuilder._require_rotated_pauli_container(generator).terms
+                if len(terms) != 1 + 2 * n_bases or terms[0].mode is not None:
+                    raise ValueError("all SF generators must share the same spin-paired basis layout")
+                identity_weight = abs(float(terms[0].coefficient.real)) * sqrt(2.0)
+                row: list[float] = []
+                for basis in range(n_bases):
+                    spin_terms = terms[1 + 2 * basis : 3 + 2 * basis]
+                    first_mode = spin_terms[0].mode
+                    second_mode = spin_terms[1].mode
+                    if first_mode is None or second_mode is None or [first_mode.spin, second_mode.spin] != [0, 1]:
+                        raise ValueError("SF rotated terms must be ordered as spin pairs")
+                    vector = np.asarray(first_mode.basis_vector, dtype=float)
+                    if not np.allclose(vector, second_mode.basis_vector):
+                        raise ValueError("spin-paired SF terms must use the same rotated mode")
+                    if copy == 0:
+                        basis_vectors[rank, basis] = vector
+                    elif not np.allclose(basis_vectors[rank, basis], vector):
+                        raise ValueError("SF rotated modes must be independent of the copy index")
+                    coefficient = spin_terms[0].coefficient
+                    if not np.isclose(coefficient.imag, 0.0) or not np.isclose(coefficient, spin_terms[1].coefficient):
+                        raise ValueError("Jordan-Wigner SF spin pairs require equal real coefficients")
+                    row.append(float(coefficient.real) * 2.0 * sqrt(2.0))
+                inner_coefficients.append([*row, identity_weight])
+                outer_coefficients.append(generator.lcu_normalization)
+
+        return (
+            np.asarray(outer_coefficients),
+            np.asarray(inner_coefficients),
+            np.asarray(one_body_vectors),
+            basis_vectors,
+            len(d1_keys),
+            n_ranks,
+            n_bases,
+            n_copies,
+        )
 
     @staticmethod
     def _build_outer_prepare(statevector: np.ndarray, num_qubits: int) -> Wavefunction:
@@ -211,98 +309,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     # =========================================================================
     # Circuit synthesis helpers
     # =========================================================================
-
-    @staticmethod
-    def _compute_one_body_weights(
-        h1_majorana: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        r"""Eigendecompose the adjusted one-body matrix into D1/Q1 generators.
-
-        Args:
-            h1_majorana: Adjusted one-body matrix h'(1), shape [N, N].
-
-        Returns:
-            (w_plus, w_minus, u_plus, u_minus) where:
-                w_plus: positive eigenvalues [N_D1]
-                w_minus: absolute negative eigenvalues [N_Q1]
-                u_plus: eigenvectors for positive eigenvalues [N, N_D1]
-                u_minus: eigenvectors for negative eigenvalues [N, N_Q1]
-
-        """
-        eigvals, eigvecs = np.linalg.eigh(h1_majorana)
-        pos_mask = eigvals > 0
-        neg_mask = eigvals < 0
-        return (
-            eigvals[pos_mask],
-            -eigvals[neg_mask],
-            eigvecs[:, pos_mask],
-            eigvecs[:, neg_mask],
-        )
-
-    @staticmethod
-    def _compute_outer_coefficients(
-        one_body_weights_plus: list[float],
-        one_body_weights_minus: list[float],
-        two_body_weights: list[list[list[float]]],
-        identity_weight: list[list[float]],
-        n_orbitals: int,
-        n_ranks: int,
-        n_copies: int,
-    ) -> list[float]:
-        r"""Compute the outer PREP amplitudes for the :math:`x_o` register.
-
-        Reference: Eq. 84-87, B9 in :cite:`Low2025`.
-        """
-        xo_dim = n_orbitals + n_ranks * n_copies
-        coefficients = [0.0] * xo_dim
-
-        idx = 0
-        for coeff in one_body_weights_plus:
-            coefficients[idx] = sqrt(2.0 * abs(coeff))
-            idx += 1
-        for coeff in one_body_weights_minus:
-            coefficients[idx] = sqrt(2.0 * abs(coeff))
-            idx += 1
-        for r in range(n_ranks):
-            for c in range(n_copies):
-                wb = abs(identity_weight[r][c])
-                ws = sum(abs(w) for w in two_body_weights[r][c])
-                coefficients[idx] = (wb + ws) / sqrt(2)
-                idx += 1
-
-        return coefficients
-
-    @staticmethod
-    def _compute_inner_coefficients(
-        two_body_weights: list[list[list[float]]],
-        identity_weight: list[list[float]],
-        n_orbitals: int,
-        n_ranks: int,
-        n_copies: int,
-        n_bases: int,
-    ) -> list[list[float]]:
-        r"""Compute the inner PREP amplitudes for the b register.
-
-        Shape: [Xo][B+1]. Reference: Appendix B.4 in :cite:`Low2025`.
-        """
-        xo_dim = n_orbitals + n_ranks * n_copies
-        coefficients: list[list[float]] = []
-
-        for _ in range(n_orbitals):
-            row = [0.0] * (n_bases + 1)
-            row[0] = 1.0
-            coefficients.append(row)
-
-        for r in range(n_ranks):
-            for c in range(n_copies):
-                row = [0.0] * (n_bases + 1)
-                for b in range(n_bases):
-                    row[b] = float(two_body_weights[r][c][b])
-                row[n_bases] = float(abs(identity_weight[r][c]))
-                coefficients.append(row)
-
-        assert len(coefficients) == xo_dim
-        return coefficients
 
     @staticmethod
     def _compute_rotation_angles(
@@ -374,24 +380,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             angles[:, j] = np.arctan2(v[:, j + 1], v[:, j])
             v[:, j] = np.hypot(v[:, j], v[:, j + 1])
         return angles
-
-    @staticmethod
-    def _compute_normalization(
-        outer_coefficients: np.ndarray,
-        inner_coefficients: np.ndarray,
-    ) -> float:
-        r"""Compute the SOSSA normalization :math:`\Lambda`.
-
-        .. math::
-
-            \Lambda = \frac{1}{2} \lambda_\text{sqrt}^2
-
-        where :math:`\lambda_\text{sqrt} = \sum_{x_o} |\alpha_{x_o}| \cdot (\sum_b |\beta_{x_o,b}|)`.
-
-        """
-        inner_l1 = np.sum(np.abs(inner_coefficients), axis=1)
-        lambda_sqrt = float(np.sum(np.abs(outer_coefficients) * inner_l1))
-        return 0.5 * lambda_sqrt**2
 
     @staticmethod
     def _compute_free_rider_data(
