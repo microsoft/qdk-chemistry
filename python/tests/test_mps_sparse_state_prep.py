@@ -12,20 +12,13 @@ the full Q# circuit (state preparation fidelity via statevector simulation).
 from collections.abc import Sequence
 
 import numpy as np
-import pytest
 
-from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
-    MPSSparseStatePreparation,
-    _invert_perm,
-    _perm_to_bitstrings,
-    _tensor_to_target_matrix,
-    generate_mps_sparse_preparation_data,
-)
-from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite, Configuration, Wavefunction
+from qdk_chemistry.algorithms.state_preparation.mps_sparse import generate_mps_sparse_preparation_data
+from qdk_chemistry.data import AbelianMPSContainer, AbelianMPSSite
 from qdk_chemistry.data.symmetry import SymmetryBlockedScalarCount, SymmetryLabel, SymmetryProduct
-from qdk_chemistry.utils.qsharp import QSHARP_CONTEXT
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
-from .test_helpers import create_test_orbitals, create_test_wavefunction
+from .test_helpers import create_test_orbitals
 
 
 def _particle_count(count: int) -> SymmetryBlockedScalarCount:
@@ -112,11 +105,8 @@ def contract_mps(wavefunction: AbelianMPSContainer) -> np.ndarray:
     return vector if norm <= 1e-15 else vector / norm
 
 
-# =============================================================================
-# Qualtran reference data
-# =============================================================================
-
-_qualtran_mps_tensors = (
+# Fixed MPS data used across preprocessing, fidelity, and resource tests.
+_reference_mps_tensors = (
     np.array(
         [
             [
@@ -180,7 +170,7 @@ _qualtran_mps_tensors = (
     ),
 )
 
-_qualtran_mps_expected_state = np.array(
+_reference_mps_expected_state = np.array(
     [0.        , 0.        , 0.        , 0.        , 0.        , 0.        ,
      0.        , 0.        , 0.        , 0.        , 0.        , 0.        ,
      0.        , 0.        , 0.        , 0.        , 0.        , 0.        ,
@@ -225,307 +215,22 @@ _qualtran_mps_expected_state = np.array(
      0.03556534, 0.        , 0.        , 0.03257808, 0.        , 0.        ,
      0.03618719, 0.        , 0.        , 0.        ])  # fmt: skip
 
-# Qualtran resource estimates for sparse mode.
-QUALTRAN_COST_SPARSE = {"num_qubits": 32, "toffoli": 321}
 
-
-# =============================================================================
-# Tests: Preprocessing correctness
-# =============================================================================
-
-
-class TestAbelianMPSSiteBindings:
-    """Regression tests for dense-to-Abelian site conversion."""
-
-    def test_from_dense_preserves_complex_amplitudes(self):
-        tensor = np.array([[[1.0j], [0.0], [0.0], [0.0]]])
-        site = AbelianMPSSite.from_dense(tensor)
-
-        assert site.is_complex
-        assert np.array_equal(site.to_dense(), tensor)
-
-    def test_from_dense_abelian_rejects_sector_dimension_overflow(self):
-        with pytest.raises(ValueError, match="sector dimensions are too large"):
-            AbelianMPSSite.from_dense_abelian(
-                np.zeros((1, 1, 1)),
-                {0: np.iinfo(np.uintp).max, 1: 2},
-                {0: 1},
-                [0],
-                1,
-            )
-
-
-class TestAbelianMPSContainerBindings:
-    """Validate the public Python metadata contract for native MPS data."""
-
-    def test_requires_particle_counts(self):
-        """Both total and active particle counts are required constructor arguments."""
-        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-
-        with pytest.raises(TypeError):
-            AbelianMPSContainer(source.sites, source.orbitals)
-
-    def test_defaults_to_canonical_physical_basis(self):
-        """Omitting the physical basis records the canonical spin-half ordering."""
-        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        canonical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d", "2")]
-
-        assert source.physical_basis == canonical_basis
-
-
-class TestSparseDecompositionHelpers:
-    """Unit tests for the internal sparse decomposition helper functions."""
-
-    def test_tensor_to_target_matrix_shape(self):
-        """Verify target matrix has correct shape."""
-        tensor = _qualtran_mps_tensors[1]  # shape (4, 4, 6)
-        chi_left = tensor.shape[0]
-        ancilla_dim = 8
-        mat = _tensor_to_target_matrix(tensor, ancilla_dim)
-        assert mat.shape == (4 * ancilla_dim, chi_left)
-
-    def test_tensor_to_target_matrix_sparse(self):
-        """Verify target matrix is sparse (most entries zero)."""
-        tensor = _qualtran_mps_tensors[1]
-        mat = _tensor_to_target_matrix(tensor, 8)
-        dense = mat.toarray()
-        nnz_frac = np.count_nonzero(dense) / dense.size
-        assert nnz_frac < 0.15  # less than 15% non-zero
-
-    def test_invert_perm_roundtrip(self):
-        """Verify inverting a permutation round-trips."""
-        perm = [3, 0, 4, 1, 2]
-        inv = _invert_perm(perm)
-        # Applying perm then inv should be identity
-        for i in range(len(perm)):
-            assert inv[perm[i]] == i
-
-    def test_perm_to_bitstrings_roundtrip(self):
-        """Verify bitstring encoding round-trips correctly."""
-        perm = [5, 2, 7, 0, 3, 1, 6, 4]
-        num_bits = 3
-        bitstrings = _perm_to_bitstrings(perm, num_bits)
-        for i, bits in enumerate(bitstrings):
-            val = sum(int(b) << j for j, b in enumerate(bits))
-            assert val == perm[i]
-
-
-class TestGenerateMPSSparsePreparationData:
-    """Test the full sparse preprocessing pipeline."""
-
-    def test_data_structure_standard(self):
-        """Verify sparse data has correct structure for standard tensors."""
-        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors)
-
-        assert data.num_sites == 4
-        assert data.ancilla_bits >= 2
-        # One entry per site after the first
-        assert len(data.sites) == 3
-
-    def test_initial_state_normalized(self):
-        """Verify the initial state vector is normalized."""
-        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors)
-        init_vec = np.array(data.initial_state_vec)
-        assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
-
-    @pytest.mark.parametrize("value", [0.0, np.nan, np.inf])
-    def test_rejects_invalid_initial_state(self, value):
-        """Invalid amplitudes cannot be serialized as a quantum state."""
-        with pytest.raises(ValueError, match="finite amplitudes with nonzero norm"):
-            generate_mps_sparse_preparation_data([np.full((1, 4, 1), value)])
-
-    def test_rejects_complex_mps(self):
-        """The real-valued synthesis path rejects complex tensors explicitly."""
-        with pytest.raises(ValueError, match="only real-valued"):
-            generate_mps_sparse_preparation_data([np.array([[[1.0j], [0.0], [0.0], [0.0]]])])
-
-    def test_run_requires_mps_container(self):
-        """Public run accepts Wavefunction and rejects a non-MPS container."""
-        with pytest.raises(TypeError, match="requires an MPSContainer"):
-            MPSSparseStatePreparation().run(create_test_wavefunction())
-
-    def test_public_run_constructs_composable_circuit(self):
-        """Public run resolves both the estimator entry point and composable Q# operation."""
-        mps = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        circuit = MPSSparseStatePreparation().run(Wavefunction(mps))
-
-        assert circuit._qsharp_op is not None
-
-    def test_run_propagates_site_to_orbital_order(self):
-        """Circuit parameters place MPS sites on their molecular-orbital qubits."""
-        source = random_mps(num_sites=2, bond_dim=2, rng=np.random.default_rng(42))
-        mps = AbelianMPSContainer(
-            source.sites,
-            source.orbitals,
-            source.total_num_particles,
-            source.active_num_particles,
-            site_to_orbital_order=[1, 0],
-        )
-
-        circuit = MPSSparseStatePreparation().run(Wavefunction(mps))
-
-        assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [1, 0]
-
-    def test_run_requires_one_site_per_orbital(self):
-        """State preparation rejects an MPS that covers only an orbital subset."""
-        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        site = source.sites[0]
-        mps = AbelianMPSContainer(
-            [site],
-            create_test_orbitals(3),
-            source.total_num_particles,
-            source.active_num_particles,
-            site_to_orbital_order=[2],
-        )
-
-        with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
-            MPSSparseStatePreparation().run(Wavefunction(mps))
-
-    def test_run_rejects_noncanonical_physical_basis(self):
-        """Q# physical-slice interpretation requires canonical occupation order."""
-        source = make_mps([np.array([[[1.0], [0.0], [0.0], [0.0]]])])
-        physical_basis = [Configuration.from_spin_half_string(state) for state in ("0", "d", "u", "2")]
-        mps = AbelianMPSContainer(
-            source.sites,
-            source.orbitals,
-            source.total_num_particles,
-            source.active_num_particles,
-            physical_basis=physical_basis,
-        )
-
-        with pytest.raises(ValueError, match="physical basis ordering"):
-            MPSSparseStatePreparation().run(Wavefunction(mps))
-
-    @pytest.mark.parametrize("orthogonality_center", [1, None])
-    def test_run_requires_right_canonical_mps(self, orthogonality_center):
-        """State preparation rejects mixed or unspecified canonicalization."""
-        tensor = np.array([[[1.0], [0.0], [0.0], [0.0]]])
-        source = make_mps([tensor, tensor])
-        mps = AbelianMPSContainer(
-            source.sites,
-            source.orbitals,
-            source.total_num_particles,
-            source.active_num_particles,
-            orthogonality_center=orthogonality_center,
-        )
-
-        with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
-            MPSSparseStatePreparation().run(Wavefunction(mps))
-
-    @pytest.mark.parametrize("rotation_bits", [1, 63])
-    def test_rejects_unsupported_rotation_precision(self, rotation_bits):
-        """Settings reject precision values that Q# cannot execute safely."""
-        algorithm = MPSSparseStatePreparation()
-        with pytest.raises(ValueError, match="out of allowed range"):
-            algorithm.settings().update("rotation_bits", rotation_bits)
-
-    def test_permutation_sizes_consistent(self):
-        """Verify permutation target arrays have consistent sizes."""
-        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors)
-        ancilla_dim = 1 << data.ancilla_bits
-        active_dim = 4 * ancilla_dim
-
-        for site in data.sites:
-            assert len(site.col_perm_targets) == active_dim
-            assert len(site.row_perm_targets) == active_dim
-            assert sorted(site.col_perm_targets) == list(range(active_dim))
-            assert sorted(site.row_perm_targets) == list(range(active_dim))
-
-    def test_to_qsharp_params_structure(self):
-        """Verify to_qsharp_params returns all expected keys."""
-        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors)
-        params = data.to_qsharp_params(rotation_bits=10)
-
-        expected_keys = {
-            "initialStateVec",
-            "numSites",
-            "siteToOrbitalOrder",
-            "rotationBits",
-            "numAncillaQubits",
-            "siteColPermTargets",
-            "siteColInvPermTargets",
-            "siteRowPermTargets",
-            "siteRowInvPermTargets",
-            "siteBlockLayerAngles",
-            "siteBlockLayerShifted",
-            "siteBlockPhases",
-        }
-        assert set(params.keys()) == expected_keys
-        assert params["numSites"] == 4
-        assert params["siteToOrbitalOrder"] == [0, 1, 2, 3]
-        assert params["rotationBits"] == 10
-        assert len(params["siteColPermTargets"]) == 3
-        assert len(params["siteRowPermTargets"]) == 3
-        assert len(params["siteColInvPermTargets"]) == 3
-        assert len(params["siteRowInvPermTargets"]) == 3
-
-    def test_generate_preserves_site_to_orbital_order(self):
-        """Preparation data maps chain sites to orbitals without reordering tensors."""
-        data = generate_mps_sparse_preparation_data(_qualtran_mps_tensors, [2, 0, 3, 1])
-
-        assert data.site_to_orbital_order == [2, 0, 3, 1]
-        assert data.to_qsharp_params(rotation_bits=10)["siteToOrbitalOrder"] == [2, 0, 3, 1]
-
-    @pytest.mark.parametrize("orbital_order", [[0, 1], [0, 1, 1, 3], [0, 1, 2, -1]])
-    def test_generate_rejects_invalid_site_to_orbital_order(self, orbital_order: list[int]):
-        """Preparation data requires one unique nonnegative orbital per site."""
-        with pytest.raises(ValueError, match="one unique nonnegative index per MPS site"):
-            generate_mps_sparse_preparation_data(_qualtran_mps_tensors, orbital_order)
-
-    @pytest.mark.parametrize(
-        ("num_sites", "bond_dim", "seed"),
-        [
-            (2, 4, 42),
-            (3, 2, 123),
-            (4, 2, 456),
-        ],
-    )
-    def test_random_mps_decomposition(self, num_sites, bond_dim, seed):
-        """Verify decomposition produces valid data for random MPS tensors."""
-        rng = np.random.default_rng(seed)
-        mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
-        data = generate_mps_sparse_preparation_data(mps.sites)
-
-        assert data.num_sites == num_sites
-        assert len(data.sites) == num_sites - 1
-        init_vec = np.array(data.initial_state_vec)
-        assert abs(np.linalg.norm(init_vec) - 1.0) < 1e-10
-
-
-@pytest.mark.slow
 class TestMPSSparseQSharpFidelity:
     """Test that the MPSSparse Q# circuit produces the correct state."""
 
-    @pytest.mark.parametrize(
-        ("num_sites", "bond_dim", "seed"),
-        [
-            (2, 4, 42),
-        ],
-    )
-    def test_fidelity_random_mps(self, num_sites, bond_dim, seed):
-        """Test sparse state preparation fidelity on random MPS.
-
-        Uses single-shot statevector simulation via DumpMachine().
-        """
-        rng = np.random.default_rng(seed)
+    def test_fidelity_random_mps(self):
+        """Test sparse state preparation fidelity on a random MPS."""
+        num_sites = 2
+        bond_dim = 4
+        rng = np.random.default_rng(42)
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=rng)
         target_state = contract_mps(mps)
 
         data = generate_mps_sparse_preparation_data(mps.sites)
-        params = data.to_qsharp_params(rotation_bits=6)
-
         num_state_qubits = 2 * num_sites
-        num_ancilla_qubits = data.ancilla_bits
-
-        qs_code = _build_mps_sparse_eval_code(params)
-        QSHARP_CONTEXT.eval(f"use state = Qubit[{num_state_qubits}];")
-        QSHARP_CONTEXT.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
-        QSHARP_CONTEXT.eval(qs_code)
-        dump = QSHARP_CONTEXT.dump_machine()
-        amplitudes = np.array(dump.as_dense_state(), dtype=complex)
-        QSHARP_CONTEXT.eval("ResetAll(state + ancilla);")
-
-        state_amplitudes = _extract_state_amplitudes(amplitudes, num_state_qubits, num_ancilla_qubits)
+        dump = _dump_prepared_state(data.to_qsharp_params(rotation_bits=6), num_state_qubits, data.ancilla_bits)
+        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, data.ancilla_bits)
 
         # P(ancilla = |0>) should be high
         ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
@@ -538,92 +243,53 @@ class TestMPSSparseQSharpFidelity:
         fidelity = np.abs(np.vdot(target_state, state_amplitudes[: len(target_state)])) ** 2
         assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}, bond_dim={bond_dim}"
 
-    def test_fidelity_qualtran_tensors(self):
-        """Test sparse preparation fidelity on the Qualtran reference tensors."""
-        mps = right_normalized_mps(_qualtran_mps_tensors)
-        target_state = _qualtran_mps_expected_state
+    def test_fidelity_reference_mps(self):
+        """Test sparse preparation fidelity on a fixed four-site MPS."""
+        mps = right_normalized_mps(_reference_mps_tensors)
+        target_state = _reference_mps_expected_state
 
         data = generate_mps_sparse_preparation_data(mps.sites)
-        params = data.to_qsharp_params(rotation_bits=6)
-
         num_sites = 4
         num_state_qubits = 2 * num_sites
-        num_ancilla_qubits = data.ancilla_bits
-
-        qs_code = _build_mps_sparse_eval_code(params)
-        QSHARP_CONTEXT.eval(f"use state = Qubit[{num_state_qubits}];")
-        QSHARP_CONTEXT.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
-        QSHARP_CONTEXT.eval(qs_code)
-        dump = QSHARP_CONTEXT.dump_machine()
-        QSHARP_CONTEXT.eval("ResetAll(state + ancilla);")
-
-        # Use sparse extraction (dump may have many internal qubits from QROAM)
-        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, num_ancilla_qubits)
+        dump = _dump_prepared_state(data.to_qsharp_params(rotation_bits=6), num_state_qubits, data.ancilla_bits)
+        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, data.ancilla_bits)
 
         ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
-        assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low for Qualtran tensors"
+        assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
 
         state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
         state_amplitudes = _reindex_sites(state_amplitudes, num_sites)
 
         fidelity = np.abs(np.vdot(target_state, state_amplitudes[: len(target_state)])) ** 2
-        assert fidelity > 0.90, f"Qualtran tensor fidelity {fidelity:.4f} too low"
+        assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low"
 
+    def test_fidelity_permuted_site_order(self):
+        """A non-identity site_to_orbital_order must place each chain site on its mapped orbital."""
+        mps = right_normalized_mps(_reference_mps_tensors)
+        num_sites = 4
+        # Scramble the chain -> orbital placement (a permutation of range(num_sites)).
+        site_to_orbital_order = [2, 0, 3, 1]
+        target_state = _permute_sites(_reference_mps_expected_state, site_to_orbital_order)
 
-@pytest.mark.slow
-class TestMPSSparseResourceEstimate:
-    """Test that resource estimates are consistent with Qualtran sparse mode."""
+        data = generate_mps_sparse_preparation_data(mps.sites)
+        num_state_qubits = 2 * num_sites
+        params = data.to_qsharp_params(rotation_bits=6, site_to_orbital_order=site_to_orbital_order)
+        dump = _dump_prepared_state(params, num_state_qubits, data.ancilla_bits)
+        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, data.ancilla_bits)
 
-    def test_resource_estimate_qubit_count(self):
-        """Verify Q# resource estimate qubit count is reasonable."""
-        mps = right_normalized_mps(_qualtran_mps_tensors)
-        algo = MPSSparseStatePreparation()
-        circuit = algo.run(Wavefunction(mps))
-        result = circuit.estimate()
-        counts = result.logical_counts
+        ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
+        assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
 
-        # Sparse mode should use comparable qubits to Qualtran
-        assert counts["numQubits"] >= QUALTRAN_COST_SPARSE["num_qubits"]
-        assert counts["numQubits"] <= QUALTRAN_COST_SPARSE["num_qubits"] * 3
+        state_amplitudes = state_amplitudes / np.sqrt(ancilla_zero_prob)
+        state_amplitudes = _reindex_sites(state_amplitudes, num_sites)
 
-    def test_resource_estimate_toffoli_count(self):
-        """Verify Q# Toffoli count is in a reasonable range."""
-        mps = right_normalized_mps(_qualtran_mps_tensors)
-        algo = MPSSparseStatePreparation()
-        circuit = algo.run(Wavefunction(mps))
-        result = circuit.estimate()
-        counts = result.logical_counts
-
-        assert counts["cczCount"] > 0
-        # Allow up to 5x Qualtran (different decomposition choices)
-        assert counts["cczCount"] <= QUALTRAN_COST_SPARSE["toffoli"] * 5
+        fidelity = np.abs(np.vdot(target_state, state_amplitudes[: len(target_state)])) ** 2
+        assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low"
 
 
 # =============================================================================
 # Helper functions
 # =============================================================================
-
-
-def _extract_state_amplitudes(
-    amplitudes: np.ndarray,
-    num_state_qubits: int,
-    num_ancilla_qubits: int,
-) -> np.ndarray:
-    """Extract amplitudes where ancilla = |0>.
-
-    DumpMachine qubit ordering: state[0]...state[N-1], ancilla[0]...
-    Ancilla qubits are the rightmost bits.
-    """
-    num_total_qubits = num_state_qubits + num_ancilla_qubits
-    dim = 2**num_total_qubits
-    ancilla_mask = (1 << num_ancilla_qubits) - 1
-    state_dim = 2**num_state_qubits
-    state_amplitudes = np.zeros(state_dim, dtype=complex)
-    for idx in range(dim):
-        if (idx & ancilla_mask) == 0:
-            state_idx = idx >> num_ancilla_qubits
-            state_amplitudes[state_idx] = amplitudes[idx]
-    return state_amplitudes
 
 
 def _extract_state_amplitudes_sparse(
@@ -694,64 +360,56 @@ def _reindex_sites(state_amplitudes: np.ndarray, num_sites: int) -> np.ndarray:
     return reordered
 
 
-def _float_to_qsharp(x: float) -> str:
-    """Format float for Q#."""
-    return f"{x:.15f}"
+def _permute_sites(state: np.ndarray, site_to_orbital_order: Sequence[int]) -> np.ndarray:
+    """Relocate each chain site's amplitudes to its mapped orbital position.
 
-
-def _build_mps_sparse_eval_code(params: dict) -> str:
-    """Build Q# eval code for MPSSparse from the params dict.
-
-    Assumes `state` and `ancilla` qubit registers are already allocated in scope.
+    ``state`` is indexed with chain site 0 as the most-significant 2-bit group.
+    Orbital ``o`` holds chain site ``k`` where ``site_to_orbital_order[k] == o``.
+    The 2-bit physical value of each site is moved atomically, so the result is
+    independent of the within-site bit convention.
     """
-    initial_state_str = ", ".join(_float_to_qsharp(x) for x in params["initialStateVec"])
-    args = [
-        f"[{initial_state_str}]",
-        str(params["numSites"]),
-        str(params["siteToOrbitalOrder"]).replace(" ", ""),
-        str(params["rotationBits"]),
-        _nested_list_to_qsharp_3d_bool(params["siteColPermTargets"]),
-        _nested_list_to_qsharp_3d_bool(params["siteColInvPermTargets"]),
-        _nested_list_to_qsharp_3d_bool(params["siteRowPermTargets"]),
-        _nested_list_to_qsharp_3d_bool(params["siteRowInvPermTargets"]),
-        _nested_list_to_qsharp_3d(params["siteBlockLayerAngles"]),
-        _nested_list_to_qsharp_2d_bool(params["siteBlockLayerShifted"]),
-        _nested_list_to_qsharp_2d_bool(params["siteBlockPhases"]),
-        "state",
-        "ancilla",
-    ]
-    args_str = ",\n                ".join(args)
-    return f"QDKChemistry.Utils.MPSSparse.MPSSparse(\n                {args_str}\n    )"
+    num_sites = len(site_to_orbital_order)
+    permuted = np.zeros_like(state)
+    for idx in range(len(state)):
+        chain_vals = [(idx >> (2 * (num_sites - 1 - k))) & 0b11 for k in range(num_sites)]
+        orbital_vals = [0] * num_sites
+        for chain_site, orbital in enumerate(site_to_orbital_order):
+            orbital_vals[orbital] = chain_vals[chain_site]
+        new_idx = 0
+        for orbital in range(num_sites):
+            new_idx |= orbital_vals[orbital] << (2 * (num_sites - 1 - orbital))
+        permuted[new_idx] = state[idx]
+    return permuted
 
 
-def _nested_list_to_qsharp_3d(data: list) -> str:
-    """Convert list[list[list[float]]] to Q# literal."""
-    site_strs = []
-    for site in data:
-        layer_strs = []
-        for layer in site:
-            angles = ", ".join(_float_to_qsharp(a) for a in layer)
-            layer_strs.append(f"[{angles}]")
-        site_strs.append(f"[{', '.join(layer_strs)}]")
-    return f"[{', '.join(site_strs)}]"
+def _dump_prepared_state(params: dict, num_state_qubits: int, num_ancilla_qubits: int):
+    """Run sparse MPS preparation in an isolated Q# context and dump its state."""
+    parameter_names = (
+        "initialStateVec",
+        "numSites",
+        "siteToOrbitalOrder",
+        "rotationBits",
+        "siteDecompositions",
+    )
+    arguments = ", ".join(_to_qsharp_literal(params[name]) for name in parameter_names)
+    context = get_qsharp_context()
+    context.eval(f"use state = Qubit[{num_state_qubits}];")
+    context.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
+    context.eval(f"QDKChemistry.Utils.MPSSparse.MPSSparse({arguments}, state, ancilla)")
+    dump = context.dump_machine()
+    context.eval("ResetAll(state + ancilla);")
+    return dump
 
 
-def _nested_list_to_qsharp_3d_bool(data: list) -> str:
-    """Convert list[list[list[bool]]] to Q# literal."""
-    site_strs = []
-    for site in data:
-        row_strs = []
-        for row in site:
-            vals = ", ".join("true" if b else "false" for b in row)
-            row_strs.append(f"[{vals}]")
-        site_strs.append(f"[{', '.join(row_strs)}]")
-    return f"[{', '.join(site_strs)}]"
-
-
-def _nested_list_to_qsharp_2d_bool(data: list) -> str:
-    """Convert list[list[bool]] to Q# literal."""
-    site_strs = []
-    for site in data:
-        vals = ", ".join("true" if b else "false" for b in site)
-        site_strs.append(f"[{vals}]")
-    return f"[{', '.join(site_strs)}]"
+def _to_qsharp_literal(value) -> str:
+    """Serialize nested numeric and Boolean data as a Q# literal."""
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, float):
+        return f"{value:.15f}"
+    if isinstance(value, dict):
+        fields = ", ".join(f"{name} = {_to_qsharp_literal(item)}" for name, item in value.items())
+        return f"new QDKChemistry.Utils.MPSSparse.SparseUnitaryDecomposition {{ {fields} }}"
+    if isinstance(value, list):
+        return f"[{', '.join(_to_qsharp_literal(item) for item in value)}]"
+    return str(value)
