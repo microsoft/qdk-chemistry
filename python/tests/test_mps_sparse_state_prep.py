@@ -230,7 +230,8 @@ class TestMPSSparseQSharpFidelity:
         data = generate_mps_sparse_preparation_data(mps.sites)
         num_state_qubits = 2 * num_sites
         dump = _dump_prepared_state(data.to_qsharp_params(rotation_bits=6), num_state_qubits, data.ancilla_bits)
-        state_amplitudes = _extract_state_amplitudes_sparse(dump, num_state_qubits, data.ancilla_bits)
+        amplitudes = np.array(dump.as_dense_state(), dtype=complex)
+        state_amplitudes = _extract_state_amplitudes(amplitudes, num_state_qubits, data.ancilla_bits)
 
         # P(ancilla = |0>) should be high
         ancilla_zero_prob = np.sum(np.abs(state_amplitudes) ** 2)
@@ -290,6 +291,28 @@ class TestMPSSparseQSharpFidelity:
 # =============================================================================
 # Helper functions
 # =============================================================================
+
+
+def _extract_state_amplitudes(
+    amplitudes: np.ndarray,
+    num_state_qubits: int,
+    num_ancilla_qubits: int,
+) -> np.ndarray:
+    """Extract amplitudes where ancilla = |0>.
+
+    DumpMachine qubit ordering: state[0]...state[N-1], ancilla[0]...
+    Ancilla qubits are the rightmost bits.
+    """
+    num_total_qubits = num_state_qubits + num_ancilla_qubits
+    dim = 2**num_total_qubits
+    ancilla_mask = (1 << num_ancilla_qubits) - 1
+    state_dim = 2**num_state_qubits
+    state_amplitudes = np.zeros(state_dim, dtype=complex)
+    for idx in range(dim):
+        if (idx & ancilla_mask) == 0:
+            state_idx = idx >> num_ancilla_qubits
+            state_amplitudes[state_idx] = amplitudes[idx]
+    return state_amplitudes
 
 
 def _extract_state_amplitudes_sparse(

@@ -94,7 +94,7 @@ QSHARP_UTILS = _ActiveQSharpUtils(BASE_QSHARP_UTILS)
 
 @contextmanager
 def use_qsharp_profile(target_profile: TargetProfile):
-    """Temporarily switch the shared global :data:`QSHARP_UTILS` profile.
+    """Temporarily switch the shared global ``QSHARP_UTILS`` profile.
 
     The active namespace is switched to the one for ``target_profile`` on entry and
     restored to the previous namespace on exit.
