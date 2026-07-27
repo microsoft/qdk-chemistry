@@ -111,7 +111,7 @@ class _QdkDerivativeEngine(Engine):
         spin_multiplicity: int,
         optimizer_input: _GeometryOptimizationInput,
         n_inactive_orbitals: int,
-        derivative_calculator: NuclearDerivativeCalculator,
+        derivative_calculator: NuclearDerivativeCalculator | None,
         molecule: Molecule,
     ):
         super().__init__(molecule)
