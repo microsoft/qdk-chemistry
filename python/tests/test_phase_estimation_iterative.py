@@ -142,7 +142,13 @@ def number_conserving_phase_problem() -> PhaseEstimationProblem:
     eigenstate with eigenvalue ``0``, so the CSWAP-sandwich controlled circuit
     mapper introduces no vacuum-reference phase and agrees exactly with the direct
     controlled-unitary mapper. The prepared state ``(|01> + |10>) / sqrt(2)`` is the
-    single-excitation eigenstate with energy ``+1``.
+    single-excitation eigenstate with eigenvalue ``E = +1``.
+
+    Theory (``U = e^{-iHt}`` with ``t = pi/2``, textbook convention
+    ``phi = (-E t / 2pi) mod 1``):
+        phi = (-1.0 * (pi/2) / 2pi) mod 1 = 3/4 = 0.75
+        MSB-first bitstring = "1100"
+        E = -angle(phi)/t = +1.0  (angle folded into (-pi, pi])
     """
     hamiltonian = QubitOperator(pauli_strings=["XX", "YY"], coefficients=[0.5, 0.5])
     inv_sqrt2 = float(1.0 / np.sqrt(2.0))
@@ -160,7 +166,7 @@ def number_conserving_phase_problem() -> PhaseEstimationProblem:
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
         expected_bits=[1, 1, 0, 0],
-        expected_phase=0.25,
+        expected_phase=0.75,
         expected_energy=1.0,
         expected_bitstring="1100",
         shots_iterative=3,
@@ -338,20 +344,16 @@ def test_iterative_phase_estimation_controlled_mapper_variants(
         builder_name=builder_name,
         controlled_circuit_mapper_name=controlled_circuit_mapper_name,
     )
-    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction,
-        number_conserving_phase_problem.evolution_time,
-        number_conserving_phase_problem.expected_energy,
-    )
 
+    assert result.bitstring_msb_first == number_conserving_phase_problem.expected_bitstring
     assert np.isclose(
-        resolved_phase,
+        result.phase_fraction,
         number_conserving_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        resolved_energy,
+        result.raw_energy,
         number_conserving_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
