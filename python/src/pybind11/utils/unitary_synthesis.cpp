@@ -23,8 +23,8 @@ py::list to_bool_list(const std::vector<std::uint8_t>& values) {
 }  // namespace detail
 
 void bind_unitary_synthesis(py::module& module) {
-  auto unitary_synthesis = module.def_submodule(
-      "unitary_synthesis", "Unitary synthesis utilities.");
+  auto unitary_synthesis =
+      module.def_submodule("unitary_synthesis", "Unitary synthesis utilities.");
 
   unitary_synthesis.def(
       "decompose_sparse_site",

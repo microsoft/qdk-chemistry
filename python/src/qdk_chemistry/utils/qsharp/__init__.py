@@ -7,52 +7,55 @@
 from pathlib import Path
 
 import qdk
-from qdk import qsharp
+from qdk._native import TargetProfile
 
-__all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
+__all__ = ["BASE_QSHARP_CONTEXT", "BASE_QSHARP_UTILS", "QSHARP_CONTEXT", "QSHARP_UTILS", "get_qsharp_utils"]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
-_initialized = False
+_SOURCE_ROOT = Path(__file__).parent / "src"
+_BASE_PROFILE_FILES = [
+    "StatePreparation.qs",
+    "CircuitComposition.qs",
+    "IterativePhaseEstimation.qs",
+    "StandardPhaseEstimation.qs",
+    "ControlledPauliExp.qs",
+    "HadamardTest.qs",
+    "PauliExp.qs",
+    "MeasurementBasis.qs",
+    "PrepSelPrep.qs",
+    "Select.qs",
+]
 
 
-def _ensure_qsharp_session():
-    """Ensure the interpreter has the chemistry Q# project loaded."""
-    global _initialized  # noqa: PLW0603
-    try:
-        _ = qdk.code.MPSSparse
-    except AttributeError:
-        _initialized = False
-    if not _initialized:
-        qsharp.init(project_root=_PROJECT_ROOT)
-        _initialized = True
+def _get_context(target_profile: TargetProfile) -> qdk.Context:
+    """Create a QDK context for the vendored Q# utility project."""
+    if target_profile == TargetProfile.Base:
+        context = qdk.Context(target_profile=target_profile)
+        code = "\n".join((_SOURCE_ROOT / filename).read_text(encoding="utf-8") for filename in _BASE_PROFILE_FILES)
+        context.eval(code)
+        return context
+    return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile)
 
 
-def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded).
+BASE_QSHARP_CONTEXT = _get_context(TargetProfile.Base)
+QSHARP_CONTEXT = _get_context(TargetProfile.Adaptive_RIF)
 
-    Initializes the global Q# interpreter with the chemistry project on first call.
+BASE_QSHARP_UTILS = BASE_QSHARP_CONTEXT.code.QDKChemistry.Utils
+QSHARP_UTILS = QSHARP_CONTEXT.code.QDKChemistry.Utils
+
+
+def get_qsharp_utils(target_profile: TargetProfile = TargetProfile.Adaptive_RIF):
+    """Return the Q# utilities namespace for a supported target profile.
+
+    Args:
+        target_profile: The target profile to use for the Q# interpreter. Defaults to Adaptive RIF.
+
+    Returns:
+        The Q# namespace for chemistry operations.
+
     """
-    _ensure_qsharp_session()
-    return qdk.code.QDKChemistry.Utils
-
-
-class _QSharpUtilsProxy:
-    """Lightweight proxy that lazily resolves the Q# utilities namespace."""
-
-    def __getattr__(self, name: str):
-        """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
-
-        Falls through to MPS namespace for names not found in QDKChemistry.Utils.
-
-        Args:
-            name: The name of the attribute being accessed on the Q# utilities namespace.
-
-        """
-        if name == "MPSSparse":
-            _ensure_qsharp_session()
-            return qdk.code.MPSSparse
-        _ensure_qsharp_session()
-        return getattr(qdk.code.QDKChemistry.Utils, name)
-
-
-QSHARP_UTILS = _QSharpUtilsProxy()
+    if target_profile == TargetProfile.Base:
+        return BASE_QSHARP_UTILS
+    if target_profile == TargetProfile.Adaptive_RIF:
+        return QSHARP_UTILS
+    raise ValueError(f"Unsupported Q# utility target profile: {target_profile}")
