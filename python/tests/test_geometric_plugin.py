@@ -114,7 +114,7 @@ def test_geometric_restores_host_logging_configuration(tmp_path):
         assert root_logger.level == logging.ERROR
         root_logger.error("host logging restored")
         host_handler.flush()
-        assert host_log_path.read_text() == "host logging restored\n"
+        assert host_log_path.read_text().splitlines() == ["host logging restored"]
     finally:
         root_logger.handlers = original_handlers
         root_logger.setLevel(original_level)
