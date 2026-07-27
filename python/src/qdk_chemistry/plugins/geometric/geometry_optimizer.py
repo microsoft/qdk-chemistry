@@ -294,10 +294,10 @@ def _preserve_root_logging() -> Iterator[None]:
                     for handler_ref in original_handler_refs
                     if handler_ref() is not None and id(handler_ref()) not in registered_handler_ids
                 )
-                for handler in original_handlers:
+for handler in original_handlers:
                     if handler.name is not None:
+                        # Trigger re-registration of named handlers in logging's global handler registry.
                         handler.name = handler.name
-
 
 def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine | None) -> np.ndarray:
     """Extract final coordinates from geomeTRIC in Bohr."""
