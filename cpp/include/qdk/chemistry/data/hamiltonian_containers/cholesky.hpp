@@ -128,6 +128,32 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
 
   /**
+   * @brief Transform this Hamiltonian to a rotated active-orbital basis.
+   *
+   * Recovers the orthogonal active-space transformation from the source and
+   * target orbital coefficients, then transforms the one-body integrals,
+   * inactive Fock matrix, and three-center Cholesky factors. The source
+   * container is not modified.
+   *
+   * This initial implementation supports restricted real orbitals with only
+   * spin symmetry. It requires the target to preserve the AO basis, overlap
+   * matrix, active/inactive index-set metadata, and every coefficient outside
+   * the active orbital columns. Optional AO Cholesky vectors are copied into
+   * the returned container when present.
+   *
+   * @param target_orbitals Orbitals defining the target active basis.
+   * @param validation_tolerance Absolute tolerance used only to validate the
+   *        basis relationship. Integral values are not thresholded.
+   * @return New Cholesky container expressed in @p target_orbitals.
+   * @throws std::invalid_argument if the target is incompatible or does not
+   *         represent an orthogonal rotation confined to the active space.
+   * @throws std::runtime_error if this container is unrestricted.
+   */
+  std::unique_ptr<CholeskyHamiltonianContainer> transform_active_orbital_basis(
+      std::shared_ptr<Orbitals> target_orbitals,
+      double validation_tolerance = 1.0e-10) const;
+
+  /**
    * @brief Get specific four-center two-electron integral element
    * @param i First orbital index
    * @param j Second orbital index
