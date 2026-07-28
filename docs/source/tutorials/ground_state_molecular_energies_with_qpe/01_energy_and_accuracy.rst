@@ -1,7 +1,7 @@
 Energy and accuracy
 ###################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 What energy will we calculate, and how accurate must the result be?
 

@@ -1,7 +1,7 @@
 Plugins and interoperability
 ############################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 How can another software package implement a stage of a :term:`QDK`/Chemistry workflow?
 

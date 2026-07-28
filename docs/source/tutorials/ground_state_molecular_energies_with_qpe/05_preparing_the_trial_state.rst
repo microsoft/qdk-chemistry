@@ -1,7 +1,7 @@
 Preparing the trial state
 #########################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 How do we prepare a state that lets phase estimation return the ground-state energy reliably?
 

@@ -7,6 +7,7 @@ Each tutorial states its prerequisites, uses testable Python examples, and links
 .. todo::
 
    Expand this overview as additional tutorials are added.
+   Add the ``titlesonly`` option to the toctree so this page lists tutorial titles without sections from their landing pages.
 
 .. toctree::
    :maxdepth: 2

@@ -1,7 +1,7 @@
 Describing the molecule
 #######################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 How do we specify a molecular system and obtain its first energy estimate?
 

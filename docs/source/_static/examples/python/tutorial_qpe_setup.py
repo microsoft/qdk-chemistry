@@ -1,0 +1,30 @@
+"""Verify the native QDK/Chemistry implementations used by the QPE tutorial."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+# start-cell-verify
+import platform
+import sys
+
+import qdk_chemistry
+from qdk_chemistry.algorithms import create
+
+required_implementations = (
+    create("scf_solver", "qdk"),
+    create("active_space_selector", "qdk_autocas_eos"),
+    create("hamiltonian_constructor", "qdk"),
+    create("multi_configuration_calculator", "macis_cas"),
+    create("qubit_mapper", "qdk"),
+    create("state_prep", "sparse_isometry_gf2x"),
+    create("phase_estimation", "qdk_iterative"),
+    create("circuit_executor", "qdk_full_state_simulator"),
+)
+
+print(f"Python executable: {sys.executable}")
+print(f"Python version: {platform.python_version()}")
+print(f"QDK/Chemistry version: {qdk_chemistry.__version__}")
+print(f"Verified {len(required_implementations)} built-in implementations.")
+# end-cell-verify

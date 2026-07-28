@@ -1,7 +1,7 @@
 Choosing the active space
 #########################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 Which electrons and orbitals must the calculation treat explicitly?
 

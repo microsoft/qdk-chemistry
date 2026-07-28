@@ -24,14 +24,10 @@ Do not overwrite earlier results when a later chapter changes an approximation o
 Setup and provenance
 ====================
 
-Record the environment used for the tutorial.
+Record the package version used for the tutorial and whether the setup check passed.
 
-- Date:
-- Operating system:
-- Processor or computer model:
-- Python version:
 - :term:`QDK`/Chemistry version:
-- Installation method:
+- Built-in implementation verification result:
 
 .. _lab-notebook-goal:
 

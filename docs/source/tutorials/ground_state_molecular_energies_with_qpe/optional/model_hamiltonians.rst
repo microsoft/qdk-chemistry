@@ -1,7 +1,7 @@
 Model hamiltonians
 ##################
 
-.. rubric:: Chapter question
+.. rubric:: Chapter focus
 
 When can a model Hamiltonian replace the molecular electronic Hamiltonian?
 
