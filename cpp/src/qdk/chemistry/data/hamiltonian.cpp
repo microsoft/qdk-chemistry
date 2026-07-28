@@ -909,20 +909,6 @@ std::string Hamiltonian::get_container_type() const {
   return _container->get_container_type();
 }
 
-std::shared_ptr<Hamiltonian> Hamiltonian::transform_active_orbital_basis(
-    std::shared_ptr<Orbitals> target_orbitals,
-    double validation_tolerance) const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_container_type<CholeskyHamiltonianContainer>()) {
-    throw std::runtime_error(
-        "Active-orbital basis transformation is supported only for Cholesky "
-        "Hamiltonians");
-  }
-  const auto& container = get_container<CholeskyHamiltonianContainer>();
-  return std::make_shared<Hamiltonian>(container.transform_active_orbital_basis(
-      std::move(target_orbitals), validation_tolerance));
-}
-
 bool Hamiltonian::is_hermitian() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->is_hermitian();

@@ -485,24 +485,6 @@ class Hamiltonian : public DataClass,
   std::string get_container_type() const;
 
   /**
-   * @brief Transform a Cholesky Hamiltonian to a rotated active-orbital basis.
-   *
-   * The source Hamiltonian is not modified. This operation is currently
-   * supported only for restricted Cholesky Hamiltonian containers.
-   *
-   * @param target_orbitals Orbitals defining the target active basis.
-   * @param validation_tolerance Absolute tolerance used to validate the basis
-   *        relationship. Integral values are not thresholded.
-   * @return New Hamiltonian expressed in @p target_orbitals.
-   * @throws std::invalid_argument if the target orbitals are incompatible.
-   * @throws std::runtime_error if the underlying container is not Cholesky or
-   *         is unrestricted.
-   */
-  std::shared_ptr<Hamiltonian> transform_active_orbital_basis(
-      std::shared_ptr<Orbitals> target_orbitals,
-      double validation_tolerance = 1.0e-10) const;
-
-  /**
    * @brief Get typed reference to the underlying container
    * @tparam T Container type to cast to
    * @return Reference to container as type T

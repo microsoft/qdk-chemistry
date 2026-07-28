@@ -681,6 +681,7 @@ def _register_cpp_factories():
         DynamicalCorrelationCalculatorFactory,
         EffectiveHamiltonianConstructorFactory,
         GeometryOptimizerFactory,
+        HamiltonianBasisTransformerFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
@@ -693,6 +694,7 @@ def _register_cpp_factories():
 
     register_factory(ActiveSpaceSelectorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
+    register_factory(HamiltonianBasisTransformerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)

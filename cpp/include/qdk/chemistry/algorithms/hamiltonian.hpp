@@ -136,4 +136,42 @@ struct HamiltonianConstructorFactory
   static std::string default_algorithm_name() { return "qdk"; }
 };
 
+/**
+ * @brief Re-express a Hamiltonian in a supplied orbital basis.
+ *
+ * Implementations may support different Hamiltonian representations and basis
+ * transformations. The source Hamiltonian is not modified.
+ */
+class HamiltonianBasisTransformer
+    : public Algorithm<
+          HamiltonianBasisTransformer, std::shared_ptr<data::Hamiltonian>,
+          std::shared_ptr<data::Hamiltonian>, std::shared_ptr<data::Orbitals>> {
+ public:
+  HamiltonianBasisTransformer() = default;
+  ~HamiltonianBasisTransformer() override = default;
+
+  using Algorithm::run;
+
+  virtual std::string name() const = 0;
+  std::string type_name() const final {
+    return "hamiltonian_basis_transformer";
+  }
+
+ protected:
+  virtual std::shared_ptr<data::Hamiltonian> _run_impl(
+      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<data::Orbitals> target_orbitals) const = 0;
+};
+
+/** Factory for Hamiltonian basis-transformer implementations. */
+struct HamiltonianBasisTransformerFactory
+    : public AlgorithmFactory<HamiltonianBasisTransformer,
+                              HamiltonianBasisTransformerFactory> {
+  static std::string algorithm_type_name() {
+    return "hamiltonian_basis_transformer";
+  }
+  static void register_default_instances();
+  static std::string default_algorithm_name() { return "qdk"; }
+};
+
 }  // namespace qdk::chemistry::algorithms

@@ -82,50 +82,9 @@ Once properly constructed with all required data, the Hamiltonian object should 
       :start-after: // start-cell-hamiltonian-creation
       :end-before: // end-cell-hamiltonian-creation
 
-Transforming a Cholesky Hamiltonian between active-orbital bases
-----------------------------------------------------------------
-
-A real, restricted, spin-only
-:class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` can be transformed to
-another orthonormal basis of the same active orbital subspace without repeating
-the AO integral evaluation or Cholesky decomposition. The operation returns a
-new immutable Hamiltonian and leaves the source unchanged. Additional spatial
-symmetry labels are not supported by this initial API.
-
-The target orbitals must preserve the AO basis, overlap matrix,
-active/inactive index-set metadata, and every molecular orbital outside the
-active space. The active columns may differ by an orthogonal transformation.
-The validation tolerance checks this relationship; it does not discard or
-threshold integral values. If the source stores the optional AO Cholesky
-vectors, those vectors are copied into the returned immutable container. The
-default Cholesky constructor does not store this optional payload.
-
-.. tab:: Python API
-
-   .. code-block:: python
-
-      no_hamiltonian = canonical_hamiltonian.transform_active_orbital_basis(
-          no_orbitals
-      )
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      auto no_hamiltonian =
-          canonical_hamiltonian->transform_active_orbital_basis(no_orbitals);
-
-For each Cholesky factor :math:`L_Q` and recovered active-space rotation
-:math:`U`, the transformation evaluates
-
-.. math::
-
-   h' = U^T h U, \qquad L'_Q = U^T L_Q U.
-
-The inactive Fock matrix is transformed with the corresponding full-orbital
-block-diagonal rotation, while the core energy is unchanged. Unrestricted
-Hamiltonians and changes to the active/inactive partition are not supported by
-this initial API.
+To re-express an existing Cholesky Hamiltonian in another active-orbital basis,
+use the :doc:`HamiltonianBasisTransformer <../algorithms/hamiltonian_basis_transformer>`
+algorithm.
 
 Accessing Hamiltonian data
 --------------------------
