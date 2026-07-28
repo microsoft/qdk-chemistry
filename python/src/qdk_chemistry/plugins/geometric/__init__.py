@@ -34,4 +34,4 @@ def _register_algorithms():
 
     register(lambda: GeometricOptimizer())
 
-    Logger.debug(f"geomeTRIC plugin loaded: [{GeometricOptimizer().type_name()}: geometric].")
+    Logger.debug("geomeTRIC plugin loaded: [geometry_optimizer: geometric].")
