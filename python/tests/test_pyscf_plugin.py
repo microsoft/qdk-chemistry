@@ -157,6 +157,7 @@ class TestPyscfPlugin:
 
         available_population_analyzers = algorithms.available("population_analyzer")
         assert "pyscf" in available_population_analyzers
+        assert "pyscf_mulliken" not in available_population_analyzers
 
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
@@ -192,6 +193,29 @@ class TestPyscfPlugin:
         """Test creating PySCF population analyzer."""
         population_analyzer = algorithms.create("population_analyzer", "pyscf")
         assert population_analyzer is not None
+        assert population_analyzer.settings().get("method") == "mulliken"
+        with pytest.raises(ValueError, match="Allowed options"):
+            population_analyzer.settings().set("method", "unsupported")
+        scf_solver_ref = population_analyzer.settings().get("scf_solver")
+        assert scf_solver_ref.algorithm_type == "scf_solver"
+        assert scf_solver_ref.algorithm_name == "pyscf"
+
+        population_analyzer.settings().set(
+            "scf_solver",
+            AlgorithmRef("scf_solver", "pyscf", max_iterations=17),
+        )
+        scf_solver = population_analyzer._create_nested("scf_solver")
+        assert scf_solver.settings().get("max_iterations") == 17
+
+    def test_pyscf_population_analysis_requires_basis_set(self):
+        """Test that PySCF population analysis rejects model-system orbitals."""
+        orbitals = data.ModelOrbitals(3)
+        determinant = data.Configuration.from_bitstring("110")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(ValueError, match="requires orbitals with an associated basis set"):
+            analyzer.run(wavefunction, charge=0, spin_multiplicity=1)
 
     def test_pyscf_h2_population_analysis(self):
         """Test PySCF Mulliken electron populations on neutral H2."""
@@ -208,7 +232,10 @@ class TestPyscfPlugin:
         """Test spin-summed PySCF populations from unrestricted orbitals."""
         analyzer = algorithms.create("population_analyzer", "pyscf")
         analyzer.settings().set("basis_set", "sto-3g")
-        analyzer.settings().set("scf_type", "unrestricted")
+        analyzer.settings().set(
+            "scf_solver",
+            AlgorithmRef("scf_solver", "pyscf", scf_type="unrestricted"),
+        )
 
         populations = analyzer.run(create_o2_structure(), charge=0, spin_multiplicity=3)
 

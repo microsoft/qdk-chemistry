@@ -8,10 +8,9 @@
 import numpy as np
 from pyscf.scf.hf import mulliken_pop
 
-from qdk_chemistry.algorithms import PopulationAnalyzer
-from qdk_chemistry.data import Settings, Structure, Wavefunction
+from qdk_chemistry.algorithms import PopulationAnalyzer, ScfSolver
+from qdk_chemistry.data import AlgorithmRef, Settings, Structure, Wavefunction
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
-from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfPopulationAnalysisSettings", "PyscfPopulationAnalyzer"]
@@ -26,11 +25,11 @@ class PyscfPopulationAnalysisSettings(Settings):
         super().__init__()
         self._set_default("method", "string", "mulliken", "Population-analysis method", ["mulliken"])
         self._set_default("basis_set", "string", "def2-svp", "Basis set used for structure inputs")
-        self._set_default("scf_method", "string", "hf", "SCF electronic-structure method")
-        self._set_default("scf_type", "string", "auto", "SCF reference type", ["auto", "restricted", "unrestricted"])
-        self._set_default("convergence_threshold", "double", 1e-7, "SCF convergence threshold")
-        self._set_default("max_iterations", "int", 50, "Maximum SCF iterations", (1, 1000))
-        self._set_default("xc_grid", "int", 3, "Density functional integration grid level", list(range(10)))
+        self._set_default(
+            "scf_solver",
+            "algorithm_ref",
+            AlgorithmRef("scf_solver", "pyscf"),
+        )
 
 
 class PyscfPopulationAnalyzer(PopulationAnalyzer):
@@ -56,43 +55,36 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         if method != "mulliken":
             raise ValueError(f"Unsupported PySCF population-analysis method: {method}")
 
+        scf_solver: ScfSolver = self._create_nested("scf_solver")
         if isinstance(input_data, Structure):
-            solver = self._create_scf_solver()
-            _, wavefunction = solver.run(
+            _, wavefunction = scf_solver.run(
                 input_data,
                 charge,
                 spin_multiplicity,
                 self._settings.get("basis_set"),
             )
-            return self._populations_from_wavefunction(wavefunction)
+            return self._populations_from_wavefunction(wavefunction, scf_solver)
 
         if isinstance(input_data, Wavefunction):
-            return self._populations_from_wavefunction(input_data)
+            return self._populations_from_wavefunction(input_data, scf_solver)
 
         raise TypeError("PySCF population analysis requires a Structure or Wavefunction input.")
 
-    def _create_scf_solver(self) -> PyscfScfSolver:
-        solver = PyscfScfSolver()
-        solver_settings = solver.settings()
-        solver_settings.set("method", self._settings.get("scf_method"))
-        solver_settings.set("scf_type", self._settings.get("scf_type"))
-        solver_settings.set("convergence_threshold", self._settings.get("convergence_threshold"))
-        solver_settings.set("max_iterations", self._settings.get("max_iterations"))
-        solver_settings.set("xc_grid", self._settings.get("xc_grid"))
-        return solver
-
-    def _populations_from_wavefunction(self, wavefunction: Wavefunction) -> list[float]:
+    def _populations_from_wavefunction(self, wavefunction: Wavefunction, scf_solver: ScfSolver) -> list[float]:
         orbitals = wavefunction.get_orbitals()
         if orbitals is None:
             raise ValueError("PySCF population analysis requires a wavefunction with orbitals.")
+        if not orbitals.has_basis_set():
+            raise ValueError("PySCF population analysis requires orbitals with an associated basis set.")
 
         occ_alpha, occ_beta = wavefunction.get_total_orbital_occupations()
+        scf_settings = scf_solver.settings()
         mean_field = orbitals_to_scf(
             orbitals,
             np.asarray(occ_alpha, dtype=float),
             np.asarray(occ_beta, dtype=float),
-            self._settings.get("scf_type"),
-            self._settings.get("scf_method"),
+            scf_settings.get("scf_type"),
+            scf_settings.get("method"),
         )
         density = np.asarray(mean_field.make_rdm1())
         if density.ndim == 3 and density.shape[0] == 2:
@@ -105,7 +97,3 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         """Return the analyzer name."""
         Logger.trace_entering()
         return "pyscf"
-
-    def aliases(self) -> list[str]:
-        """Return accepted analyzer aliases."""
-        return ["pyscf", "pyscf_mulliken"]

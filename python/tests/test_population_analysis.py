@@ -27,6 +27,16 @@ def test_population_analyzer_factory_registered():
     assert isinstance(analyzer, algorithms.PopulationAnalyzer)
     assert isinstance(analyzer, algorithms.QdkPopulationAnalyzer)
     assert analyzer.name() == "qdk"
+    assert analyzer.settings().get("method") == "mulliken"
+
+
+def test_qdk_population_analyzer_has_no_method_aliases():
+    """Population methods are settings rather than analyzer names."""
+    available_analyzers = algorithms.available("population_analyzer")
+
+    assert "qdk" in available_analyzers
+    assert "internal" not in available_analyzers
+    assert "mulliken" not in available_analyzers
 
 
 def test_qdk_population_analyzer_structure_input():
