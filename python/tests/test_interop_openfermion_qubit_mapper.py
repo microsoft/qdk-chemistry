@@ -460,6 +460,56 @@ def test_openfermion_unrestricted_jw_matches_qdk():
     assert max_diff < 1e-10, f"UHF JW max coefficient diff: {max_diff}"
 
 
+@pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
+def test_openfermion_unrestricted_matches_restricted_non_8fold():
+    """Unrestricted converter must handle non-8-fold (dual-4-fold) two-body blocks.
+
+    Regression for a bug where ``_spatial_to_spinorb_two_body`` used a transpose
+    valid only for chemist 8-fold-symmetric integrals, which silently corrupted
+    the same-spin channel of downfolded (e.g. DUCC) Hamiltonians whose blocks have
+    only the "dual 4-fold" symmetry ``(pq|rs)=(rs|pq)=(qp|sr)`` but NOT
+    ``(pq|rs)=(qp|rs)``.  A spin-free unrestricted Hamiltonian (all spin blocks
+    equal) must yield the same energy as its restricted equivalent (which converts
+    via the independent ``spinorb_from_spatial`` path).
+    """
+    n = 3
+    rng = np.random.default_rng(2024)
+    basis = create_test_basis_set(n, "uhf-non8fold")
+
+    raw = rng.standard_normal((n, n)) * 0.3
+    h1 = (raw + raw.T) / 2 + np.diag(np.linspace(1.0, -0.5, n))
+
+    # Two-body tensor with ONLY the dual-4-fold symmetry group
+    # {e, (2,3,0,1), (1,0,3,2), (3,2,1,0)} -- deliberately NOT chemist 8-fold.
+    r = rng.standard_normal((n, n, n, n)) * 0.2
+    v = r + r.transpose(2, 3, 0, 1) + r.transpose(1, 0, 3, 2) + r.transpose(3, 2, 1, 0)
+    assert np.max(np.abs(v - v.transpose(1, 0, 2, 3))) > 1e-3, "test tensor must lack chemist s4 symmetry"
+
+    core = 0.7
+    empty = np.eye(0)
+
+    orbitals_r = Orbitals(np.eye(n), None, None, basis)
+    ham_r = Hamiltonian(CanonicalFourCenterHamiltonianContainer(h1, v.ravel(), orbitals_r, core, empty))
+
+    orbitals_u = Orbitals(np.eye(n), np.eye(n), None, None, None, basis)
+    ham_u = Hamiltonian(
+        CanonicalFourCenterHamiltonianContainer(h1, h1, v.ravel(), v.ravel(), v.ravel(), orbitals_u, core, empty, empty)
+    )
+    assert ham_r.get_orbitals().is_restricted()
+    assert not ham_u.get_orbitals().is_restricted()
+
+    def ground_energy(hamiltonian: Hamiltonian, nelec: int) -> float:
+        iop = hamiltonian_to_interaction_operator(hamiltonian)
+        sparse = of.linalg.get_sparse_operator(iop)
+        energy, _ = of.linalg.jw_get_ground_state_at_particle_number(sparse, nelec)
+        return float(energy)
+
+    for nelec in (2, 3, 4):
+        e_r = ground_energy(ham_r, nelec)
+        e_u = ground_energy(ham_u, nelec)
+        assert abs(e_r - e_u) < 1e-9, f"nelec={nelec}: restricted {e_r} != unrestricted {e_u}"
+
+
 @pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not installed")
 def test_scbk_cross_backend():
     """SCBK through QDK and OpenFermion backends should produce matching eigenvalues."""

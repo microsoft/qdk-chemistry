@@ -362,6 +362,7 @@ def build_ducc_bch(w, bch_order):
 # ── Step 6: Assemble active-space Hamiltonian ────────────────────────────────
 
 
+# Note: DUCC Hamiltonian does NOT have 8-fold symmetry like bare Hamiltonian. It only has a 4-fold symmetry (see https://nwchemgit.github.io/Quantum.html#ducc-hamiltonian)
 def assemble_active_hamiltonian(
     fbar, vbar, E0_bch, noa_act, nva_act, nob_act=None, nvb_act=None, input_orbitals=None, nocc_a=None, restricted=True
 ):
