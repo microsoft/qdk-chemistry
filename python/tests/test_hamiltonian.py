@@ -21,10 +21,108 @@ from qdk_chemistry.data import (
     Orbitals,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
-from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+from qdk_chemistry.data.symmetry import (
+    SymmetryBlockedIndexSet,
+    SymmetryLabel,
+    SymmetryProduct,
+    axes,
+    spin_index_set,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+
+
+def create_rotatable_cholesky_case():
+    """Create a restricted Cholesky Hamiltonian and rotated active basis."""
+    num_orbitals = 4
+    active = [1, 3]
+    inactive = [0]
+    complement_angle = 0.21
+    source_active_angle = -0.29
+    coefficients = np.zeros((num_orbitals, num_orbitals))
+    coefficients[:, 0] = [np.cos(complement_angle), 0, np.sin(complement_angle), 0]
+    coefficients[:, 2] = [-np.sin(complement_angle), 0, np.cos(complement_angle), 0]
+    coefficients[:, 1] = [0, np.cos(source_active_angle), 0, np.sin(source_active_angle)]
+    coefficients[:, 3] = [0, -np.sin(source_active_angle), 0, np.cos(source_active_angle)]
+    overlap = np.eye(num_orbitals)
+    basis_set = create_test_basis_set(num_orbitals, "test-cholesky-rotation")
+    active_set = spin_index_set(num_orbitals, active, active)
+    inactive_set = spin_index_set(num_orbitals, inactive, inactive)
+    source_orbitals = Orbitals(coefficients, None, overlap, basis_set, active_set, inactive_set)
+
+    angle = 0.37
+    rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    target_coefficients = coefficients.copy()
+    target_coefficients[:, active] = coefficients[:, active] @ rotation
+    target_orbitals = Orbitals(target_coefficients, None, overlap, basis_set, active_set, inactive_set)
+
+    source_active = coefficients[:, active]
+    target_active = target_coefficients[:, active]
+    one_body_ao = np.array(
+        [
+            [1.2, -0.3, 0.1, 0.2],
+            [-0.3, 0.7, -0.4, 0.0],
+            [0.1, -0.4, 1.5, 0.6],
+            [0.2, 0.0, 0.6, -0.8],
+        ]
+    )
+    one_body = source_active.T @ one_body_ao @ source_active
+    ao_factor_matrices = (
+        np.array(
+            [
+                [0.9, 0.2, -0.1, 0.3],
+                [0.2, 0.4, 0.5, -0.2],
+                [-0.1, 0.5, 0.7, 0.1],
+                [0.3, -0.2, 0.1, -0.6],
+            ]
+        ),
+        np.array(
+            [
+                [0.1, -0.5, 0.2, 0.0],
+                [-0.5, 0.8, -0.3, 0.4],
+                [0.2, -0.3, 0.6, 0.1],
+                [0.0, 0.4, 0.1, -0.2],
+            ]
+        ),
+        np.array(
+            [
+                [0.6, 0.3, -0.2, 0.1],
+                [0.3, -0.2, 0.4, -0.5],
+                [-0.2, 0.4, 0.9, 0.2],
+                [0.1, -0.5, 0.2, 0.7],
+            ]
+        ),
+    )
+    ao_factors = np.column_stack([matrix.reshape(-1, order="F") for matrix in ao_factor_matrices])
+    three_center = np.column_stack(
+        [(source_active.T @ matrix @ source_active).reshape(-1, order="F") for matrix in ao_factor_matrices]
+    )
+    expected_three_center = np.column_stack(
+        [(target_active.T @ matrix @ target_active).reshape(-1, order="F") for matrix in ao_factor_matrices]
+    )
+    inactive_fock_ao = np.array(
+        [
+            [2.0, 0.1, -0.2, 0.3],
+            [0.1, 1.7, 0.4, -0.1],
+            [-0.2, 0.4, 1.3, 0.2],
+            [0.3, -0.1, 0.2, 0.9],
+        ]
+    )
+    inactive_fock = coefficients.T @ inactive_fock_ao @ coefficients
+    return {
+        "active": active,
+        "rotation": rotation,
+        "source_orbitals": source_orbitals,
+        "target_orbitals": target_orbitals,
+        "one_body": one_body,
+        "three_center": three_center,
+        "inactive_fock": inactive_fock,
+        "ao_factors": ao_factors,
+        "expected_one_body": target_active.T @ one_body_ao @ target_active,
+        "expected_three_center": expected_three_center,
+        "expected_inactive_fock": target_coefficients.T @ inactive_fock_ao @ target_coefficients,
+    }
 
 
 class TestHamiltonian:
@@ -1134,6 +1232,225 @@ class TestCholeskyHamiltonian:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    def test_transform_active_orbital_basis(self):
+        """Transform all Cholesky data and preserve immutable source data."""
+        case = create_rotatable_cholesky_case()
+        container = CholeskyHamiltonianContainer(
+            case["one_body"],
+            case["three_center"],
+            case["source_orbitals"],
+            1.25,
+            case["inactive_fock"],
+            case["ao_factors"],
+        )
+        transformed = container.transform_active_orbital_basis(case["target_orbitals"])
+
+        transformed_one_body = transformed.get_one_body_integrals()
+        transformed_factors = transformed.get_three_center_integrals()
+        transformed_fock = transformed.get_inactive_fock_matrix()
+        np.testing.assert_allclose(transformed_one_body[0], case["expected_one_body"], atol=1e-13)
+        np.testing.assert_allclose(transformed_factors[0], case["expected_three_center"], atol=1e-13)
+        np.testing.assert_allclose(transformed_fock[0], case["expected_inactive_fock"], atol=1e-13)
+        assert np.shares_memory(transformed_one_body[0], transformed_one_body[1])
+        assert np.shares_memory(transformed_factors[0], transformed_factors[1])
+        assert np.shares_memory(transformed_fock[0], transformed_fock[1])
+        source_ao_factors = container.get_ao_cholesky_vectors()
+        transformed_ao_factors = transformed.get_ao_cholesky_vectors()
+        np.testing.assert_array_equal(transformed_ao_factors, case["ao_factors"])
+        assert not source_ao_factors.flags.writeable
+        assert not transformed_ao_factors.flags.writeable
+        with pytest.raises(ValueError, match="read-only"):
+            transformed_ao_factors[0, 0] = -1.0
+        np.testing.assert_array_equal(container.get_one_body_integrals()[0], case["one_body"])
+        np.testing.assert_array_equal(container.get_three_center_integrals()[0], case["three_center"])
+
+    def test_hamiltonian_transform_active_orbital_basis(self):
+        """Expose the Cholesky transformation through the Hamiltonian facade."""
+        case = create_rotatable_cholesky_case()
+        source = Hamiltonian(
+            CholeskyHamiltonianContainer(
+                case["one_body"],
+                case["three_center"],
+                case["source_orbitals"],
+                1.25,
+                case["inactive_fock"],
+            )
+        )
+        transformed = source.transform_active_orbital_basis(case["target_orbitals"])
+
+        expected = Hamiltonian(
+            CholeskyHamiltonianContainer(
+                case["expected_one_body"],
+                case["expected_three_center"],
+                case["target_orbitals"],
+                1.25,
+                case["expected_inactive_fock"],
+            )
+        )
+
+        assert transformed.get_container_type() == "cholesky"
+        assert transformed.is_restricted()
+        assert transformed.get_core_energy() == source.get_core_energy()
+        target_coefficients = spin_channel_matrix(case["target_orbitals"].coefficients(), axes.alpha())
+        transformed_coefficients = spin_channel_matrix(transformed.get_orbitals().coefficients(), axes.alpha())
+        np.testing.assert_array_equal(transformed_coefficients, target_coefficients)
+        np.testing.assert_allclose(transformed.get_one_body_integrals()[0], expected.get_one_body_integrals()[0])
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    for fourth in range(2):
+                        assert transformed.get_two_body_element(i, j, k, fourth) == pytest.approx(
+                            expected.get_two_body_element(i, j, k, fourth), abs=1e-13
+                        )
+
+    def test_transform_active_orbital_basis_without_inactive_fock(self):
+        """Transform a Hamiltonian that has no inactive-space Fock payload."""
+        basis_set = create_test_basis_set(2, "test-cholesky-rotation-no-inactive")
+        source_orbitals = Orbitals(np.eye(2), None, np.eye(2), basis_set)
+        angle = 0.23
+        rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        target_orbitals = Orbitals(rotation, None, np.eye(2), basis_set)
+        one_body = np.array([[1.1, -0.2], [-0.2, 0.6]])
+        factors = np.array([[0.8, 0.1], [0.2, -0.4], [0.2, -0.4], [0.5, 0.7]])
+        source = CholeskyHamiltonianContainer(
+            one_body,
+            factors,
+            source_orbitals,
+            0.75,
+            np.array([]),
+        )
+
+        transformed = source.transform_active_orbital_basis(target_orbitals)
+
+        assert not transformed.has_inactive_fock_matrix()
+        np.testing.assert_allclose(
+            transformed.get_one_body_integrals()[0],
+            rotation.T @ one_body @ rotation,
+            atol=1e-13,
+        )
+
+    @pytest.mark.parametrize("tolerance", [-1.0, np.inf, np.nan])
+    def test_transform_active_orbital_basis_rejects_invalid_tolerance(self, tolerance):
+        """Reject negative and non-finite basis validation tolerances."""
+        case = create_rotatable_cholesky_case()
+        container = CholeskyHamiltonianContainer(
+            case["one_body"],
+            case["three_center"],
+            case["source_orbitals"],
+            1.25,
+            case["inactive_fock"],
+        )
+        with pytest.raises(ValueError, match="tolerance"):
+            container.transform_active_orbital_basis(case["target_orbitals"], tolerance)
+
+    def test_transform_active_orbital_basis_rejects_complement_change(self):
+        """Reject changes to molecular orbitals outside the active columns."""
+        case = create_rotatable_cholesky_case()
+        coefficients = spin_channel_matrix(case["target_orbitals"].coefficients(), axes.alpha()).copy()
+        coefficients[:, 2] *= -1
+        target = Orbitals(
+            coefficients,
+            None,
+            np.eye(4),
+            case["target_orbitals"].get_basis_set(),
+            case["target_orbitals"].active_indices(),
+            case["target_orbitals"].inactive_indices(),
+        )
+        container = CholeskyHamiltonianContainer(
+            case["one_body"],
+            case["three_center"],
+            case["source_orbitals"],
+            1.25,
+            case["inactive_fock"],
+        )
+        with pytest.raises(ValueError, match="outside the active space"):
+            container.transform_active_orbital_basis(target)
+
+    def test_transform_active_orbital_basis_rejects_partition_change(self):
+        """Reject a target with different active orbital indices."""
+        case = create_rotatable_cholesky_case()
+        wrong_active = spin_index_set(4, [1, 2], [1, 2])
+        target = Orbitals(
+            np.eye(4),
+            None,
+            np.eye(4),
+            case["target_orbitals"].get_basis_set(),
+            wrong_active,
+            case["target_orbitals"].inactive_indices(),
+        )
+        container = CholeskyHamiltonianContainer(
+            case["one_body"],
+            case["three_center"],
+            case["source_orbitals"],
+            1.25,
+            case["inactive_fock"],
+        )
+        with pytest.raises(ValueError, match="active-space indices"):
+            container.transform_active_orbital_basis(target)
+
+    def test_transform_active_orbital_basis_rejects_partition_symmetry_change(self):
+        """Reject incompatible active index-set symmetry metadata."""
+        case = create_rotatable_cholesky_case()
+        target_coefficients = spin_channel_matrix(case["target_orbitals"].coefficients(), axes.alpha())
+        trivial_symmetry = SymmetryProduct([])
+        trivial_label = SymmetryLabel([])
+        mismatched_active = SymmetryBlockedIndexSet(
+            trivial_symmetry,
+            {trivial_label: 4},
+            {trivial_label: case["active"]},
+        )
+        target = Orbitals(
+            target_coefficients,
+            None,
+            np.eye(4),
+            case["target_orbitals"].get_basis_set(),
+            mismatched_active,
+            case["target_orbitals"].inactive_indices(),
+        )
+        container = CholeskyHamiltonianContainer(
+            case["one_body"],
+            case["three_center"],
+            case["source_orbitals"],
+            1.25,
+            case["inactive_fock"],
+        )
+        with pytest.raises(ValueError, match="active-space index sets"):
+            container.transform_active_orbital_basis(target)
+
+    def test_transform_active_orbital_basis_rejects_unrestricted(self):
+        """Reject unrestricted Cholesky containers in the initial API."""
+        basis_set = create_test_basis_set(2, "test-cholesky-rotation-unrestricted")
+        alpha = np.eye(2)
+        beta = np.array([[0.0, 1.0], [1.0, 0.0]])
+        orbitals = Orbitals(alpha, beta, None, None, np.eye(2), basis_set)
+        container = CholeskyHamiltonianContainer(
+            np.eye(2),
+            2 * np.eye(2),
+            np.ones((4, 2)),
+            2 * np.ones((4, 2)),
+            orbitals,
+            0.0,
+            np.array([]),
+            np.array([]),
+        )
+        with pytest.raises(RuntimeError, match="restricted"):
+            container.transform_active_orbital_basis(orbitals)
+
+    def test_transform_active_orbital_basis_rejects_non_cholesky_facade(self):
+        """Reject non-Cholesky containers through the Hamiltonian facade."""
+        case = create_rotatable_cholesky_case()
+        source = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                case["one_body"],
+                np.zeros(2**4),
+                case["source_orbitals"],
+                1.25,
+                case["inactive_fock"],
+            )
+        )
+        with pytest.raises(RuntimeError, match="only for Cholesky"):
+            source.transform_active_orbital_basis(case["target_orbitals"])
 
 
 def test_hamiltonian_data_type_name():

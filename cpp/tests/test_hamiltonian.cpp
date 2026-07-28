@@ -1019,6 +1019,51 @@ TEST_F(HamiltonianTest, CholeskyContainerConstruction) {
   EXPECT_TRUE(h.is_restricted());
 }
 
+TEST_F(HamiltonianTest, CholeskyContainerRejectsMalformedThreeCenterLayout) {
+  Eigen::Matrix2d one_body = Eigen::Matrix2d::Identity();
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto one_body_sbt =
+      make_spin_diagonal_rank2_sbt(one_body, one_body, /*restricted=*/true);
+
+  auto orbital_symmetry = orbitals->symmetries();
+  auto auxiliary_symmetry =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> orbital_extents = {
+      {axes::alpha(), 2}, {axes::beta(), 2}};
+  std::unordered_map<SymmetryLabel, std::size_t> auxiliary_extents = {
+      {SymmetryLabel{}, 3}};
+  SymmetryBlockedTensor<3>::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] =
+      std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Random(2, 6));
+  SymmetryBlockedTensor<3> malformed_three_center(
+      {orbital_symmetry, orbital_symmetry, auxiliary_symmetry},
+      {orbital_extents, orbital_extents, auxiliary_extents}, std::move(blocks));
+
+  EXPECT_THROW(CholeskyHamiltonianContainer(std::move(one_body_sbt),
+                                            std::move(malformed_three_center),
+                                            orbitals, 0.0, nullptr),
+               std::invalid_argument);
+
+  one_body_sbt =
+      make_spin_diagonal_rank2_sbt(one_body, one_body, /*restricted=*/true);
+  std::unordered_map<SymmetryLabel, std::size_t> short_row_extents = {
+      {axes::alpha(), 1}, {axes::beta(), 1}};
+  std::unordered_map<SymmetryLabel, std::size_t> long_column_extents = {
+      {axes::alpha(), 4}, {axes::beta(), 4}};
+  SymmetryBlockedTensor<3>::BlockMap extent_mismatch_blocks;
+  extent_mismatch_blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] =
+      std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Random(4, 3));
+  SymmetryBlockedTensor<3> malformed_extents(
+      {orbital_symmetry, orbital_symmetry, auxiliary_symmetry},
+      {short_row_extents, long_column_extents, auxiliary_extents},
+      std::move(extent_mismatch_blocks));
+
+  EXPECT_THROW(CholeskyHamiltonianContainer(std::move(one_body_sbt),
+                                            std::move(malformed_extents),
+                                            orbitals, 0.0, nullptr),
+               std::invalid_argument);
+}
+
 TEST_F(HamiltonianTest, CholeskyContainerUnrestrictedConstruction) {
   // Create unrestricted orbitals
   auto unrestricted_orbitals =
@@ -1133,6 +1178,167 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianTest, CholeskyTransformActiveOrbitalBasis) {
+  const std::vector<size_t> active_indices = {1, 3};
+  const std::vector<size_t> inactive_indices = {0};
+  Eigen::Matrix4d coefficients = Eigen::Matrix4d::Zero();
+  const double complement_angle = 0.21;
+  const double source_active_angle = -0.29;
+  coefficients.col(0) << std::cos(complement_angle), 0.0,
+      std::sin(complement_angle), 0.0;
+  coefficients.col(2) << -std::sin(complement_angle), 0.0,
+      std::cos(complement_angle), 0.0;
+  coefficients.col(1) << 0.0, std::cos(source_active_angle), 0.0,
+      std::sin(source_active_angle);
+  coefficients.col(3) << 0.0, -std::sin(source_active_angle), 0.0,
+      std::cos(source_active_angle);
+  const Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set =
+      testing::create_random_basis_set(4, "test-cholesky-rotation");
+  auto source_orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+
+  const double angle = 0.37;
+  Eigen::Matrix2d rotation;
+  rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
+      std::cos(angle);
+  Eigen::MatrixXd target_coefficients = coefficients;
+  Eigen::MatrixXd source_active(4, 2);
+  source_active.col(0) = coefficients.col(active_indices[0]);
+  source_active.col(1) = coefficients.col(active_indices[1]);
+  const Eigen::MatrixXd target_active = source_active * rotation;
+  target_coefficients.col(active_indices[0]) = target_active.col(0);
+  target_coefficients.col(active_indices[1]) = target_active.col(1);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      std::make_tuple(active_indices, inactive_indices));
+
+  Eigen::Matrix4d one_body_ao;
+  one_body_ao << 1.2, -0.3, 0.1, 0.2, -0.3, 0.7, -0.4, 0.0, 0.1, -0.4, 1.5, 0.6,
+      0.2, 0.0, 0.6, -0.8;
+  const Eigen::Matrix2d one_body =
+      source_active.transpose() * one_body_ao * source_active;
+
+  Eigen::MatrixXd ao_factors(16, 3);
+  Eigen::Matrix4d factor_0;
+  Eigen::Matrix4d factor_1;
+  Eigen::Matrix4d factor_2;
+  factor_0 << 0.9, 0.2, -0.1, 0.3, 0.2, 0.4, 0.5, -0.2, -0.1, 0.5, 0.7, 0.1,
+      0.3, -0.2, 0.1, -0.6;
+  factor_1 << 0.1, -0.5, 0.2, 0.0, -0.5, 0.8, -0.3, 0.4, 0.2, -0.3, 0.6, 0.1,
+      0.0, 0.4, 0.1, -0.2;
+  factor_2 << 0.6, 0.3, -0.2, 0.1, 0.3, -0.2, 0.4, -0.5, -0.2, 0.4, 0.9, 0.2,
+      0.1, -0.5, 0.2, 0.7;
+  Eigen::Map<Eigen::Matrix4d>(ao_factors.col(0).data()) = factor_0;
+  Eigen::Map<Eigen::Matrix4d>(ao_factors.col(1).data()) = factor_1;
+  Eigen::Map<Eigen::Matrix4d>(ao_factors.col(2).data()) = factor_2;
+  Eigen::MatrixXd three_center(4, ao_factors.cols());
+  for (Eigen::Index factor = 0; factor < ao_factors.cols(); ++factor) {
+    Eigen::Map<const Eigen::Matrix4d> ao_matrix(ao_factors.col(factor).data());
+    Eigen::Map<Eigen::Matrix2d> source_matrix(three_center.col(factor).data());
+    source_matrix = source_active.transpose() * ao_matrix * source_active;
+  }
+
+  Eigen::Matrix4d inactive_fock_ao;
+  inactive_fock_ao << 2.0, 0.1, -0.2, 0.3, 0.1, 1.7, 0.4, -0.1, -0.2, 0.4, 1.3,
+      0.2, 0.3, -0.1, 0.2, 0.9;
+  const Eigen::Matrix4d inactive_fock =
+      coefficients.transpose() * inactive_fock_ao * coefficients;
+
+  CholeskyHamiltonianContainer container(
+      one_body, three_center, source_orbitals, 1.25, inactive_fock, ao_factors);
+  auto transformed = container.transform_active_orbital_basis(target_orbitals);
+
+  const Eigen::MatrixXd expected_one_body =
+      target_active.transpose() * one_body_ao * target_active;
+  Eigen::MatrixXd expected_three_center(4, 3);
+  for (Eigen::Index factor = 0; factor < ao_factors.cols(); ++factor) {
+    Eigen::Map<const Eigen::Matrix4d> ao_matrix(ao_factors.col(factor).data());
+    Eigen::Map<Eigen::Matrix2d> expected_matrix(
+        expected_three_center.col(factor).data());
+    expected_matrix = target_active.transpose() * ao_matrix * target_active;
+  }
+  const Eigen::MatrixXd expected_fock =
+      target_coefficients.transpose() * inactive_fock_ao * target_coefficients;
+
+  EXPECT_TRUE(std::get<0>(transformed->get_one_body_integrals())
+                  .isApprox(expected_one_body, 1.0e-13));
+  EXPECT_TRUE(std::get<0>(transformed->get_three_center_integrals())
+                  .isApprox(expected_three_center, 1.0e-13));
+  EXPECT_TRUE(std::get<0>(transformed->get_inactive_fock_matrix())
+                  .isApprox(expected_fock, 1.0e-13));
+  ASSERT_TRUE(transformed->get_ao_cholesky_vectors().has_value());
+  EXPECT_TRUE(transformed->get_ao_cholesky_vectors()->isApprox(ao_factors));
+  const auto cloned = container.clone();
+  const auto* cloned_cholesky =
+      dynamic_cast<const CholeskyHamiltonianContainer*>(cloned.get());
+  ASSERT_NE(cloned_cholesky, nullptr);
+  ASSERT_TRUE(cloned_cholesky->get_ao_cholesky_vectors().has_value());
+  EXPECT_TRUE(cloned_cholesky->get_ao_cholesky_vectors()->isApprox(ao_factors));
+
+  const auto& transformed_one_body = transformed->one_body_integrals();
+  EXPECT_EQ(
+      transformed_one_body.block_ptr({axes::alpha(), axes::alpha()}).get(),
+      transformed_one_body.block_ptr({axes::beta(), axes::beta()}).get());
+  const auto& transformed_fock = transformed->inactive_fock();
+  EXPECT_EQ(transformed_fock.block_ptr({axes::alpha(), axes::alpha()}).get(),
+            transformed_fock.block_ptr({axes::beta(), axes::beta()}).get());
+  const auto& transformed_factors = transformed->three_center();
+  EXPECT_EQ(transformed_factors
+                .block_ptr({axes::alpha(), axes::alpha(), SymmetryLabel{}})
+                .get(),
+            transformed_factors
+                .block_ptr({axes::beta(), axes::beta(), SymmetryLabel{}})
+                .get());
+  EXPECT_TRUE(*transformed_factors.symmetries()[0] ==
+              *target_orbitals->symmetries());
+  EXPECT_TRUE(
+      std::get<0>(container.get_one_body_integrals()).isApprox(one_body));
+  EXPECT_TRUE(std::get<0>(container.get_three_center_integrals())
+                  .isApprox(three_center));
+
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, three_center, source_orbitals, 1.25, inactive_fock));
+  auto transformed_h = h.transform_active_orbital_basis(target_orbitals);
+  EXPECT_EQ(transformed_h->get_container_type(), "cholesky");
+  EXPECT_DOUBLE_EQ(transformed_h->get_core_energy(), h.get_core_energy());
+  EXPECT_EQ(transformed_h->get_orbitals(), target_orbitals);
+  EXPECT_TRUE(std::get<0>(transformed_h->get_one_body_integrals())
+                  .isApprox(expected_one_body, 1.0e-13));
+
+  Hamiltonian canonical(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, Eigen::VectorXd::Zero(16), source_orbitals, 1.25,
+          inactive_fock));
+  EXPECT_THROW(canonical.transform_active_orbital_basis(target_orbitals),
+               std::runtime_error);
+
+  using SBT2 = SymmetryBlockedTensor<2>;
+  auto target_block =
+      std::make_shared<const Eigen::MatrixXd>(target_coefficients);
+  SBT2::BlockMap mismatched_blocks;
+  mismatched_blocks[{axes::alpha(), axes::alpha()}] = target_block;
+  mismatched_blocks[{axes::beta(), axes::beta()}] = target_block;
+  auto unrestricted_spin = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+  const auto source_coefficients = source_orbitals->coefficients();
+  auto mismatched_coefficients = std::make_shared<const SBT2>(
+      SBT2::SymmetriesArray{source_coefficients->symmetries()[0],
+                            unrestricted_spin},
+      SBT2::ExtentsArray{source_coefficients->extents()[0],
+                         source_coefficients->extents()[1]},
+      std::move(mismatched_blocks));
+  auto mismatched_target = std::make_shared<Orbitals>(
+      std::move(mismatched_coefficients),
+      std::shared_ptr<const SymmetryBlockedTensor<1>>{},
+      std::make_optional(overlap), basis_set, source_orbitals->active_indices(),
+      source_orbitals->inactive_indices());
+  ASSERT_TRUE(mismatched_target->is_restricted());
+  EXPECT_THROW(container.transform_active_orbital_basis(mismatched_target),
+               std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, SparseContainerConstructionWithTwoBody) {

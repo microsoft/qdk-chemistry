@@ -4,6 +4,15 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Restricted Cholesky Hamiltonians can be transformed to another orthonormal
+  basis of the same active orbital subspace with
+  ``Hamiltonian.transform_active_orbital_basis``, reusing the existing
+  three-center factors instead of repeating AO integral evaluation and
+  Cholesky decomposition.
+
 Version 2.1.0
 =============
 

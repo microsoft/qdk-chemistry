@@ -429,7 +429,7 @@ Raises:
         // prevents GC.  The reference is valid as long as the container
         // (and thus `self`) is alive; pybind11's prevent-gc mechanism
         // handles that through the `self` capture in the keep-alive.
-        return py::array_t<double>(
+        py::array_t<double> result(
             {mat.rows(), mat.cols()},  // shape
             {static_cast<py::ssize_t>(sizeof(double)),
              static_cast<py::ssize_t>(mat.rows()) *
@@ -437,14 +437,16 @@ Raises:
                                                              // (col-major)
             mat.data(),                                      // data pointer
             py::cast(self));  // prevent GC of self while array is alive
+        result.attr("setflags")(false);
+        return result;
       },
       R"(
 Get the optional AO Cholesky vectors (zero-copy view).
 
 Returns:
     numpy.ndarray or None: AO Cholesky vectors matrix [nao^2 x nchol],
-    or None if not stored. The returned array shares memory with the
-    internal storage and should not be modified.
+    or None if not stored. The returned read-only array shares memory with the
+    internal storage.
 )");
 
   // Two-body integral access (lazily computed from three-center integrals)
@@ -494,6 +496,30 @@ Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
     bool: True if alpha and beta integrals are identical
+)");
+
+  cholesky_container.def(
+      "transform_active_orbital_basis",
+      &CholeskyHamiltonianContainer::transform_active_orbital_basis,
+      py::arg("target_orbitals"), py::arg("validation_tolerance") = 1.0e-10,
+      py::call_guard<py::gil_scoped_release>(), R"(
+Transform this restricted Cholesky Hamiltonian to a new active-orbital basis.
+
+The target must preserve the AO basis, overlap matrix, active/inactive
+partition, and all coefficients outside the active orbital columns. The source
+container is not modified.
+
+Args:
+    target_orbitals (Orbitals): Orbitals defining the target active basis.
+    validation_tolerance (float): Absolute tolerance used to validate the
+        orbital relationship. Integral values are not thresholded.
+
+Returns:
+    CholeskyHamiltonianContainer: A new transformed container.
+
+Raises:
+    ValueError: If the target orbitals are incompatible.
+    RuntimeError: If the source or target is unrestricted.
 )");
 
   // SBT-native three-center accessor
@@ -1206,6 +1232,30 @@ Get the type of the underlying container.
 
 Returns:
     str: Container type identifier (e.g., "canonical_four_center")
+)");
+
+  hamiltonian.def("transform_active_orbital_basis",
+                  &Hamiltonian::transform_active_orbital_basis,
+                  py::arg("target_orbitals"),
+                  py::arg("validation_tolerance") = 1.0e-10,
+                  py::call_guard<py::gil_scoped_release>(), R"(
+Transform a restricted Cholesky Hamiltonian to a new active-orbital basis.
+
+The source Hamiltonian is not modified. The target must preserve the AO basis,
+overlap matrix, active/inactive partition, and all coefficients outside the
+active orbital columns.
+
+Args:
+    target_orbitals (Orbitals): Orbitals defining the target active basis.
+    validation_tolerance (float): Absolute tolerance used to validate the
+        orbital relationship. Integral values are not thresholded.
+
+Returns:
+    Hamiltonian: A new Hamiltonian in the target active basis.
+
+Raises:
+    ValueError: If the target orbitals are incompatible.
+    RuntimeError: If this is not a restricted Cholesky Hamiltonian.
 )");
 
   // Summary
