@@ -22,6 +22,19 @@ using PopulationAnalysisInput =
                  std::shared_ptr<data::Wavefunction>>;
 
 /**
+ * @class PopulationAnalysisSettings
+ * @brief Common settings for particle-population analysis.
+ */
+class PopulationAnalysisSettings : public data::Settings {
+ public:
+  PopulationAnalysisSettings() {
+    set_default("method", std::string("mulliken"),
+                "Particle-population analysis method",
+                data::ListConstraint<std::string>{{"mulliken"}});
+  }
+};
+
+/**
  * @class PopulationAnalyzer
  * @brief Base class for assigning particle populations to centers.
  */
@@ -29,6 +42,10 @@ class PopulationAnalyzer
     : public Algorithm<PopulationAnalyzer, std::vector<double>,
                        PopulationAnalysisInput, int, int, unsigned int> {
  public:
+  PopulationAnalyzer() {
+    _settings = std::make_unique<PopulationAnalysisSettings>();
+  }
+
   virtual ~PopulationAnalyzer() = default;
 
   /**
@@ -100,13 +117,6 @@ class QdkPopulationAnalyzer : public PopulationAnalyzer {
    * @brief Return the implementation name.
    */
   std::string name() const final { return "qdk"; }
-
-  /**
-   * @brief Return accepted aliases for this implementation.
-   */
-  std::vector<std::string> aliases() const final {
-    return {"qdk", "internal", "mulliken"};
-  }
 
  protected:
   /**
