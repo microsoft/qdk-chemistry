@@ -144,6 +144,7 @@ class _FakeExecutor:
         self._resolution = resolution
         self.shot_calls: list[int] = []
         self.noise_calls: list[QuantumErrorProfile | None] = []
+        self.seed_calls: list[int | None] = []
 
     def run(
         self,
@@ -221,8 +222,13 @@ def _install_test_stack(
             return executor
         raise KeyError(setting_key)
 
+    def create_executor(seed: int | None):
+        executor.seed_calls.append(seed)
+        return executor
+
     monkeypatch.setattr(_AlgorithmSnapshot, "create", create_snapshot)
     monkeypatch.setattr(driver, "_create_nested", create_nested)
+    monkeypatch.setattr(driver, "_create_executor", create_executor)
     return unitary_records, executor
 
 
@@ -447,13 +453,30 @@ def test_executor_uses_declared_circuit_multiplicity(
     _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
 
     circuit_set = driver.build_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian)
-    driver.execute_circuit_set(circuit_set)
+    result = driver.execute_circuit_set(circuit_set)
 
     if randomized:
         expected = [1 for round_data in circuit_set.rounds for _ in range(2 * round_data.num_draws)]
     else:
         expected = [shots for round_data in circuit_set.rounds for shots in (round_data.shots_per_basis,) * 2]
     assert executor.shot_calls == expected
+    expected_seeds: list[int | None] = []
+    for round_data in circuit_set.rounds:
+        draw_indices = range(round_data.num_draws) if randomized else (None,)
+        for draw_index in draw_indices:
+            for basis_index in (0, 1):
+                expected_seeds.append(
+                    RobustPhaseEstimation._measurement_seed(
+                        42,
+                        round_data.round_index,
+                        draw_index,
+                        basis_index=basis_index,
+                    )
+                )
+    assert executor.seed_calls == expected_seeds
+    assert len(set(executor.seed_calls)) == len(executor.seed_calls)
+    assert result.metadata["requested_executor_seed"] == 42
+    assert result.metadata["executor_root_seed"] == 42
 
 
 def test_executor_forwards_noise_to_every_x_y_circuit(monkeypatch: pytest.MonkeyPatch) -> None:

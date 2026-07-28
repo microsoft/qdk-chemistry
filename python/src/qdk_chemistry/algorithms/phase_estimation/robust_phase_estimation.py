@@ -21,6 +21,7 @@ References:
 
 import numpy as np
 
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -168,18 +169,33 @@ class RobustPhaseEstimation(PhaseEstimation):
             f"eps_rpe={circuit_set.epsilon_rpe:.3g}, eps_unitary={circuit_set.epsilon_unitary:.3g}."
         )
 
-        circuit_executor = self._create_nested("circuit_executor")
+        requested_executor_seed, executor_root_seed = self._resolve_executor_seed_configuration()
+        shared_executor = self._create_executor(None) if executor_root_seed is None else None
         theta = 0.0
         for round_data in circuit_set.rounds:
             real_accumulator = 0.0
             imag_accumulator = 0.0
             for experiment in circuit_set.iter_round(round_data.round_index):
-                real_data = circuit_executor.run(
+                real_seed = self._measurement_seed(
+                    executor_root_seed,
+                    round_data.round_index,
+                    experiment.draw_index,
+                    basis_index=0,
+                )
+                imag_seed = self._measurement_seed(
+                    executor_root_seed,
+                    round_data.round_index,
+                    experiment.draw_index,
+                    basis_index=1,
+                )
+                real_executor = shared_executor if shared_executor is not None else self._create_executor(real_seed)
+                imag_executor = shared_executor if shared_executor is not None else self._create_executor(imag_seed)
+                real_data = real_executor.run(
                     experiment.x_circuit,
                     shots=experiment.circuit_multiplicity,
                     noise=noise,
                 )
-                imag_data = circuit_executor.run(
+                imag_data = imag_executor.run(
                     experiment.y_circuit,
                     shots=experiment.circuit_multiplicity,
                     noise=noise,
@@ -217,6 +233,8 @@ class RobustPhaseEstimation(PhaseEstimation):
             "energy_correction": circuit_set.energy_correction,
             "requested_seed": circuit_set.requested_seed,
             "root_seed": circuit_set.root_seed,
+            "requested_executor_seed": requested_executor_seed,
+            "executor_root_seed": executor_root_seed,
         }
         return QpeResult.from_energy(
             method=self.name(),
@@ -224,6 +242,49 @@ class RobustPhaseEstimation(PhaseEstimation):
             evolution_time=circuit_set.base_time,
             metadata=metadata,
         )
+
+    def _resolve_executor_seed_configuration(self) -> tuple[int | None, int | None]:
+        """Return the configured executor seed and the concrete root used for measurement streams."""
+        executor_ref = self._settings.get("circuit_executor")
+        if executor_ref.settings is None or not executor_ref.settings.has("seed"):
+            return None, None
+        requested_seed = int(executor_ref.settings.get("seed"))
+        if requested_seed >= 0:
+            return requested_seed, requested_seed
+        root_seed = int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
+        return requested_seed, root_seed
+
+    @staticmethod
+    def _measurement_seed(
+        root_seed: int | None,
+        round_index: int,
+        draw_index: int | None,
+        *,
+        basis_index: int,
+    ) -> int | None:
+        """Derive an independent reproducible executor seed for one measurement stream."""
+        if root_seed is None:
+            return None
+        draw_component = 0 if draw_index is None else draw_index + 1
+        sequence = np.random.SeedSequence([root_seed, round_index, draw_component, basis_index])
+        return int(sequence.generate_state(1, dtype=np.uint32)[0])
+
+    def _create_executor(self, seed: int | None) -> CircuitExecutor:
+        """Create the configured circuit executor, optionally overriding its seed on an independent copy."""
+        if seed is None:
+            executor = self._create_nested("circuit_executor")
+        else:
+            executor_ref = self._settings.get("circuit_executor")
+            if executor_ref.settings is None or not executor_ref.settings.has("seed"):
+                raise RuntimeError("Cannot override the seed of a circuit executor without a seed setting.")
+            settings = Settings.from_json(executor_ref.settings.to_json())
+            settings.set("seed", seed)
+            from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+            executor = create(executor_ref.algorithm_type, executor_ref.algorithm_name, **settings.to_dict())
+        if not isinstance(executor, CircuitExecutor):
+            raise TypeError(f"Expected circuit_executor to be a CircuitExecutor, got {type(executor)} instead.")
+        return executor
 
     @staticmethod
     def _resolve_energy(
