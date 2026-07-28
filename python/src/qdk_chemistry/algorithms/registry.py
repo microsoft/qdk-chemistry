@@ -230,7 +230,9 @@ __factories: list[AlgorithmFactory] = []
 # Deprecated algorithm-type keys mapped to their current names. Accessing a
 # deprecated key still works but emits a DeprecationWarning.
 _DEPRECATED_TYPE_ALIASES: dict[str, str] = {
+    "controlled_evolution_circuit_mapper": "controlled_circuit_mapper",
     "energy_estimator": "expectation_estimator",
+    "time_evolution_builder": "hamiltonian_unitary_builder",
 }
 
 

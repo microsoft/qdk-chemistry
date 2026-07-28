@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import migrate
-from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, QpeResult, Wavefunction
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.migrate import _orbitals, _wavefunction
@@ -79,6 +79,24 @@ def _old_four_center_json(container_type, restricted, h1, h2, fock, orbitals, ch
     return doc
 
 
+def _old_qpe_result_json():
+    return {
+        "version": "0.1.0",
+        "method": "iterative",
+        "evolution_time": 0.25,
+        "phase_fraction": 0.125,
+        "phase_angle": float(np.pi / 4),
+        "canonical_phase_fraction": 0.125,
+        "canonical_phase_angle": float(np.pi / 4),
+        "raw_energy": 3.0,
+        "branching": [-1.0, 3.0, 7.0],
+        "resolved_energy": 3.0,
+        "bits_msb_first": [0, 0, 1],
+        "bitstring_msb_first": "001",
+        "metadata": {"source": "v1"},
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Old-format HDF5 builders (replicate the v1.1.0 C++ layout)
 # --------------------------------------------------------------------------- #
@@ -130,6 +148,42 @@ def _write_old_four_center_h5(group, container_type, restricted, h1, h2, fock, o
     if cholesky is not None:
         _write_matrix(group, "ao_cholesky_vectors", cholesky)
     orb_writer(group.create_group("orbitals"))
+
+
+# --------------------------------------------------------------------------- #
+# QPE result
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_qpe_result(tmp_path, source_format, output_format):
+    source_suffix = "json" if source_format == "json" else "h5"
+    output_suffix = "json" if output_format == "json" else "h5"
+    src = tmp_path / f"qpe_old.qpe_result.{source_suffix}"
+    dst = tmp_path / f"qpe_new.qpe_result.{output_suffix}"
+    old = _old_qpe_result_json()
+
+    if source_format == "json":
+        src.write_text(json.dumps(old))
+    else:
+        with h5py.File(src, "w") as handle:
+            handle.attrs.update(
+                {key: old[key] for key in old if key not in {"branching", "bits_msb_first", "metadata"}}
+            )
+            handle.attrs["metadata"] = json.dumps(old["metadata"])
+            handle.create_dataset("branching", data=old["branching"])
+            handle.create_dataset("bits_msb_first", data=old["bits_msb_first"])
+
+    migrate.convert_file(src, dst)
+    result = QpeResult.from_file(str(dst), output_format)
+
+    expected = {key: value for key, value in old.items() if key != "evolution_time"}
+    expected["version"] = "0.2.0"
+    assert result.to_json() == expected
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(dst, tmp_path / f"qpe_again.qpe_result.{output_suffix}")
 
 
 # --------------------------------------------------------------------------- #
