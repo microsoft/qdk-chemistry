@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <optional>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <variant>
@@ -204,10 +205,33 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   Eigen::VectorXd occupations = eigensolver.eigenvalues().reverse();
   Eigen::MatrixXd no_rotation = eigensolver.eigenvectors().rowwise().reverse();
 
+  // Apply the natural orbital rotation only to the active columns.
   Eigen::MatrixXd no_coeffs = selected_coeffs * no_rotation;
-  Eigen::MatrixXd coeffs = detail::replace_orbital_columns(
-      coeffs_alpha, active_indices_a, no_coeffs);
-  auto new_orbitals = detail::make_transformed_orbitals(orbitals, coeffs);
+  Eigen::MatrixXd coeffs = coeffs_alpha;
+  for (size_t i = 0; i < num_active; ++i) {
+    coeffs.col(active_indices_a[i]) = no_coeffs.col(i);
+  }
+
+  // Create output orbitals, preserving active/inactive metadata.
+  std::shared_ptr<data::Orbitals> new_orbitals;
+  if (orbitals->is_restricted()) {
+    new_orbitals = std::make_shared<data::Orbitals>(
+        coeffs,
+        std::nullopt,  // no energies for natural orbitals
+        orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+        orbitals->active_indices(), orbitals->inactive_indices());
+  } else {
+    const data::Orbitals::RestrictedCASIndices restricted_indices =
+        std::make_tuple(std::vector<size_t>(active_indices_a.begin(),
+                                            active_indices_a.end()),
+                        std::vector<size_t>(inactive_indices_a.begin(),
+                                            inactive_indices_a.end()));
+    new_orbitals = std::make_shared<data::Orbitals>(
+        coeffs,
+        std::nullopt,  // no energies for natural orbitals
+        orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+        restricted_indices);
+  }
 
   Eigen::MatrixXd diagonal_one_rdm = occupations.asDiagonal();
   std::optional<data::ContainerTypes::MatrixVariant> one_rdm_aa;
