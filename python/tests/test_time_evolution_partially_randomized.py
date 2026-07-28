@@ -395,7 +395,7 @@ class TestPartiallyRandomizedScale:
         """Verify E -> phase -> E roundtrip for a known energy."""
         t = 1.0
         energy = -0.4
-        phi = (energy * t / (2 * np.pi)) % 1.0
+        phi = (-energy * t / (2 * np.pi)) % 1.0
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
         builder = PartiallyRandomized(time=t)
         container = builder.run(hamiltonian).get_container()
