@@ -63,7 +63,8 @@ void bind_unitary_synthesis(py::module& module) {
               "Ancilla dimension must be at least the right-bond dimension.");
         }
 
-        const auto& packed = std::get<Eigen::MatrixXd>(site.to_dense());
+        const auto packed_variant = site.to_dense();
+        const auto& packed = std::get<Eigen::MatrixXd>(packed_variant);
         const auto left_dimension =
             static_cast<Eigen::Index>(site.left_bond_dimension());
         const auto physical_dimension =
