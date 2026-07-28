@@ -6,12 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
+from .controlled_foqcs_mapper import ControlledFoqcsMapper
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
 
 __all__ = [
     "ControlledCircuitMapperFactory",
     "ControlledCircuitMapperSettings",
+    "ControlledFoqcsMapper",
     "ControlledPSPMapper",
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",

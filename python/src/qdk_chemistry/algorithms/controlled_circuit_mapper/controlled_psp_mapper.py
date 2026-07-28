@@ -91,12 +91,13 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         r"""Construct a controlled block-encoding circuit.
 
         Args:
-            unitary: The unitary representation containing either an
-                :class:`LCUContainer` (plain block encoding) or an
-                :class:`LCUWalkContainer` (quantum walk).
+            unitary: The unitary representation containing an :class:`LCUContainer` or an :class:`LCUWalkContainer`.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled block encoding.
+
+        Raises:
+            ValueError: If the container is unsupported, or more than one control qubit is requested.
 
         """
         container = unitary.get_container()
@@ -137,16 +138,21 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit
             make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp
 
+        # LCU is symmetric (PREPARE^dagger == conjugate PREPARE) and Babbush-style
+        # (the outer control drives SELECT), so pass prepareConjOp == prepareOp and
+        # controlPrepare == False.
         psp_parameters = {
             "prepareOp": prepare_op,
+            "prepareConjOp": prepare_op,
             "selectOp": select_op,
+            "controlPrepare": False,
             "numSystemQubits": num_system,
             "numAncillaQubits": num_ancilla,
             "power": power,
         }
 
         qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
-        qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
+        qsharp_op = make_op(prepare_op, prepare_op, select_op, False, num_system, num_ancilla, power)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
@@ -176,8 +182,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         and packages them with sign phases into a ``PauliSelectParams`` struct.
 
         Args:
-            select: The SELECT oracle data object containing controlled operations,
-                phases, and qubit layout.
+            select: The SELECT oracle data object containing controlled operations, phases, and qubit layout.
 
         Returns:
             A Q# callable implementing the Pauli SELECT oracle.

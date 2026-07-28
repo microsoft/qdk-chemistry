@@ -810,6 +810,7 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledFoqcsMapper,
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
     )
@@ -818,6 +819,9 @@ def _register_python_algorithms():
         QdkHadamardTestCircuitBuilder,
     )
     from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.foqcs import (  # noqa: PLC0415
+        FoqcsBuilder,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
     )
@@ -846,6 +850,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.dicke import DickeStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -869,9 +874,12 @@ def _register_python_algorithms():
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
+    register(lambda: FoqcsBuilder())
     register(lambda: PauliSequenceMapper())
     register(lambda: ControlledPSPMapper())
+    register(lambda: ControlledFoqcsMapper())
     register(lambda: DensePureStatePreparation())
+    register(lambda: DickeStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())

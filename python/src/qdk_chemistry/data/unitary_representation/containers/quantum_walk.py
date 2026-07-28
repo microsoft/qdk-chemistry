@@ -185,9 +185,15 @@ class LCUWalkContainer(QuantumWalkContainer):
 
         """
         from .block_encoding import LCUContainer  # noqa: PLC0415
+        from .foqcs import FoqcsContainer  # noqa: PLC0415
 
         cls._validate_json_version(cls._serialization_version, json_data)
-        block_encoding = LCUContainer.from_json(json_data["block_encoding"])
+        be_data = json_data["block_encoding"]
+        be_type = be_data.get("container_type")
+        if be_type == "foqcs":
+            block_encoding: BlockEncodingContainer = FoqcsContainer.from_json(be_data)
+        else:
+            block_encoding = LCUContainer.from_json(be_data)
         return cls(
             block_encoding=block_encoding,
             power=json_data.get("power", 1),
@@ -206,8 +212,14 @@ class LCUWalkContainer(QuantumWalkContainer):
 
         """
         from .block_encoding import LCUContainer  # noqa: PLC0415
+        from .foqcs import FoqcsContainer  # noqa: PLC0415
 
-        block_encoding = LCUContainer.from_hdf5(group["block_encoding"])
+        be_group = group["block_encoding"]
+        be_type = be_group.attrs.get("container_type")
+        if be_type == "foqcs":
+            block_encoding: BlockEncodingContainer = FoqcsContainer.from_hdf5(be_group)
+        else:
+            block_encoding = LCUContainer.from_hdf5(be_group)
         power = int(group.attrs["power"])
         return cls(
             block_encoding=block_encoding,

@@ -42,20 +42,32 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// # Summary
-    /// Block encoding: PREPARE† · SELECT · PREPARE.
+    /// Block encoding: PREPARE(c*)^dagger . SELECT . PREPARE(c).
     ///
-    /// Takes `prepareOp` and `selectOp` as callables so they can be swapped
-    /// for different implementations.
-    ///
-    /// When controlled (via `within/apply`), only SELECT is controlled while
-    /// PREPARE and UNPREPARE run unconditionally.
+    /// Takes the forward `prepareOp`, the (possibly distinct) conjugate
+    /// `prepareConjOp` used for the un-preparation, and `selectOp` as callables
+    /// so they can be swapped for different block-encoding schemes.  For the
+    /// standard symmetric case (e.g. LCU) pass `prepareConjOp == prepareOp`.
     ///
     /// $$
-    ///     B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
+    ///     B[H] = \mathrm{PREPARE}(c^*)^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}(c)
     /// $$
+    ///
+    /// ## Controlled specialization
+    /// `controlPrepare` selects which factor carries the outer control:
+    ///   * `false` (Babbush et al., arXiv:1805.03662): only SELECT is
+    ///     controlled; PREPARE / PREPARE^dagger run unconditionally.  Correct
+    ///     when SELECT acts as identity on the all-zero ancilla index only if
+    ///     PREPARE is phase-free (standard LCU).
+    ///   * `true` (FOQCS): only PREPARE / PREPARE^dagger are controlled; the
+    ///     transversal SELECT is self-gated by the ancilla pattern.  Required
+    ///     when the un-PREP uses conjugated phases, which would otherwise leave
+    ///     a phase residue when the outer control is |0>.
     operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         targetRegister : Qubit[],
         ancillaRegister : Qubit[],
     ) : Unit is Adj + Ctl {
@@ -64,52 +76,55 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             if (numAncillaQubits == 0) {
                 selectOp([], targetRegister);
             } else {
-                within {
-                    prepareOp(ancillaRegister);
-                } apply {
-                    selectOp(ancillaRegister, targetRegister);
-                }
+                prepareOp(ancillaRegister);
+                selectOp(ancillaRegister, targetRegister);
+                Adjoint prepareConjOp(ancillaRegister);
             }
         }
         adjoint auto;
         controlled (ctls, ...) {
-            // Per Babbush et al. (arXiv:1805.03662): only SELECT is controlled;
-            // PREPARE and PREPARE† run unconditionally.
             let numAncillaQubits = Length(ancillaRegister);
             if (numAncillaQubits == 0) {
                 Controlled selectOp(ctls, ([], targetRegister));
+            } elif controlPrepare {
+                // FOQCS-style: control PREPARE / PREPARE^dagger; SELECT self-gated.
+                Controlled prepareOp(ctls, ancillaRegister);
+                selectOp(ancillaRegister, targetRegister);
+                Controlled Adjoint prepareConjOp(ctls, ancillaRegister);
             } else {
+                // Babbush-style: control SELECT; PREPARE / PREPARE^dagger unconditional.
                 prepareOp(ancillaRegister);
                 Controlled selectOp(ctls, (ancillaRegister, targetRegister));
-                Adjoint prepareOp(ancillaRegister);
+                Adjoint prepareConjOp(ancillaRegister);
             }
         }
         controlled adjoint auto;
     }
 
     /// # Summary
-    /// PSP-based quantum walk: W = REFLECT · B[H].
+    /// PSP-based quantum walk: W = REFLECT . B[H].
     ///
-    /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
-    /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
-    /// This follows Babbush et al. (arXiv:1805.03662): c-W = c-R · (PREP† · c-SEL · PREP).
+    /// When controlled, both B[H] (via `PrepSelPrep`) and REFLECT are
+    /// controlled following the strategy set by `controlPrepare`.
     ///
     /// $$
-    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
+    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}(c^*)^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}(c)
     /// $$
     operation PSPWalk(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         targetRegister : Qubit[],
         ancillaRegister : Qubit[],
     ) : Unit is Adj + Ctl {
         body ... {
-            PrepSelPrep(prepareOp, selectOp, targetRegister, ancillaRegister);
+            PrepSelPrep(prepareOp, prepareConjOp, selectOp, controlPrepare, targetRegister, ancillaRegister);
             Reflect(ancillaRegister);
         }
         adjoint auto;
         controlled (ctls, ...) {
-            Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
+            Controlled PrepSelPrep(ctls, (prepareOp, prepareConjOp, selectOp, controlPrepare, targetRegister, ancillaRegister));
             Controlled Reflect(ctls, (ancillaRegister));
         }
         controlled adjoint auto;
@@ -122,7 +137,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// becomes entangled with the control qubit during the controlled operation.
     function MakeControlledPrepSelPrepOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
@@ -132,7 +149,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
                 if BeginEstimateCaching("Controlled PrepSelPrep", 0) {
-                    Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                    Controlled PrepSelPrep([control], (prepareOp, prepareConjOp, selectOp, controlPrepare, systems, ancilla));
                     EndEstimateCaching();
                 }
             }
@@ -146,7 +163,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// for allocation since the walk operator leaves ancilla entangled.
     function MakeControlledPSPWalkOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
@@ -156,7 +175,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             let ancilla = allQubits[numSystemQubits...];
             for _ in 0..power - 1 {
                 if BeginEstimateCaching("Controlled PSPWalk", 0) {
-                    Controlled PSPWalk([control], (prepareOp, selectOp, systems, ancilla));
+                    Controlled PSPWalk([control], (prepareOp, prepareConjOp, selectOp, controlPrepare, systems, ancilla));
                     EndEstimateCaching();
                 }
             }
@@ -166,28 +185,32 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// Circuit entry point for prep-sel-prep (allocates qubits).
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakeControlledPrepSelPrepOp(prepareOp, prepareConjOp, selectOp, controlPrepare, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 
     /// Circuit entry point for quantum walk (allocates qubits).
     operation MakeControlledPSPWalkCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
+        prepareConjOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        controlPrepare : Bool,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakeControlledPSPWalkOp(prepareOp, prepareConjOp, selectOp, controlPrepare, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 }

@@ -14,6 +14,7 @@ from qdk_chemistry.data.base import DataClass
 
 from .containers.base import UnitaryContainer
 from .containers.block_encoding import LCUContainer
+from .containers.foqcs import FoqcsContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 from .containers.quantum_walk import LCUWalkContainer
 
@@ -117,6 +118,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_json(json_data)
         elif container_type == "lcu":
             container = LCUContainer.from_json(json_data)
+        elif container_type == "foqcs":
+            container = FoqcsContainer.from_json(json_data)
         elif container_type == "lcu_walk":
             container = LCUWalkContainer.from_json(json_data)
         else:
@@ -140,6 +143,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_hdf5(group)
         elif container_type == "lcu":
             container = LCUContainer.from_hdf5(group)
+        elif container_type == "foqcs":
+            container = FoqcsContainer.from_hdf5(group)
         elif container_type == "lcu_walk":
             container = LCUWalkContainer.from_hdf5(group)
         else:

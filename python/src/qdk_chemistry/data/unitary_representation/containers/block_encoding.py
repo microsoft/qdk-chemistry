@@ -202,6 +202,16 @@ class LCUContainer(BlockEncodingContainer):
         return self.prepare.get_orbitals().num_modes()
 
     @property
+    def num_target_qubits(self) -> int:
+        """Number of target (system) qubits.
+
+        Returns:
+            int: The system qubit count, read from the SELECT oracle.
+
+        """
+        return self.select.num_target_qubits
+
+    @property
     def num_qubits(self) -> int:
         """Total number of qubits (system + ancilla).
 
