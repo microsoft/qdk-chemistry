@@ -167,11 +167,11 @@ def _make_builder(
     unitary_builder_name: str = "trotter",
     unitary_builder_kwargs: dict[str, object] | None = None,
     base_time: float = 0.0,
-    unitary_accuracy_fraction: float = 0.5,
+    unitary_accuracy_fraction: float | None = None,
     energy_correction: str = "auto",
     seed: int = 7,
-    epsilon_rpe: float = 0.0,
-    epsilon_unitary: float = 0.0,
+    epsilon_rpe: float | None = None,
+    epsilon_unitary: float | None = None,
 ) -> QdkRobustPhaseEstimationCircuitBuilder:
     """Create a directly configurable robust circuit builder for tests."""
     return QdkRobustPhaseEstimationCircuitBuilder(
@@ -296,8 +296,8 @@ def test_energy_correction_auto_selection() -> None:
     assert forced._select_correction("partial_randomized") == "qdrift_tangent"
 
 
-def test_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explicit RPE and unitary tolerances yield the requested deterministic bound."""
+def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Non-Trotter explicit RPE and unitary tolerances retain their product bound."""
     epsilon_total = 0.1
     epsilon_unitary = 0.5
     epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
@@ -307,6 +307,7 @@ def test_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -
     hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
     builder = _make_builder(
         target_accuracy=epsilon_total,
+        unitary_builder_name="partially_randomized",
         epsilon_rpe=epsilon_rpe,
         epsilon_unitary=epsilon_unitary,
         energy_correction="linear",
@@ -326,11 +327,88 @@ def test_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -
     assert metadata["epsilon_rpe"] == pytest.approx(epsilon_rpe)
     assert metadata["error_budget_mode"] == "explicit"
     assert metadata["energy_correction"] == "linear"
-    assert metadata["unitary_builder"] == "deterministic_or_exact"
+    assert metadata["unitary_builder"] == "partial_randomized"
     assert metadata["num_rounds"] == final_round + 1
     assert abs(result.resolved_energy - energy) == pytest.approx(exact_energy_bound, rel=1e-3)
     assert propagated_energy_bound == pytest.approx(epsilon_total)
     assert exact_energy_bound <= propagated_energy_bound
+
+
+def test_non_trotter_explicit_fraction_retains_clamping() -> None:
+    """Non-Trotter routing clamps an explicit negative fraction instead of treating it as omitted."""
+    builder = _make_builder(
+        target_accuracy=0.1,
+        unitary_builder_name="partially_randomized",
+        unitary_accuracy_fraction=-0.25,
+    )
+
+    fraction, epsilon_rpe, epsilon_unitary, budget_mode = builder._resolve_budget(
+        "partial_randomized",
+        0.1,
+        is_trotter=False,
+    )
+
+    assert fraction == pytest.approx(0.0)
+    assert epsilon_rpe == pytest.approx(0.1)
+    assert epsilon_unitary == pytest.approx(0.0)
+    assert budget_mode == "fraction"
+
+
+def test_trotter_uses_independent_default_tolerances() -> None:
+    """Trotter uses the full energy target for RPE and an independent unitary tolerance."""
+    target_accuracy = 1e-2
+    hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
+    builder = _make_builder(target_accuracy=target_accuracy)
+
+    circuit_set = builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
+
+    assert circuit_set.epsilon_rpe == pytest.approx(target_accuracy)
+    assert circuit_set.epsilon_unitary == pytest.approx(0.85)
+    assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.0)
+    assert circuit_set.error_budget_mode == "independent_trotter"
+    assert circuit_set.num_rounds == num_rounds(1.0, target_accuracy) + 1
+    for round_data in circuit_set.rounds:
+        ref = round_data.unitary_builder_configuration
+        assert ref.settings is not None
+        assert ref.settings.get("target_accuracy") == pytest.approx(0.85)
+
+
+@pytest.mark.parametrize("epsilon_unitary", [0.5, 0.9, 2.5])
+def test_trotter_accepts_positive_unitary_tolerance(epsilon_unitary: float) -> None:
+    """A positive Trotter unitary tolerance is forwarded without additional policy checks."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(target_accuracy=1e-2, epsilon_unitary=epsilon_unitary)
+
+    circuit_set = builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
+
+    assert circuit_set.epsilon_unitary == pytest.approx(epsilon_unitary)
+    for round_data in circuit_set.rounds:
+        ref = round_data.unitary_builder_configuration
+        assert ref.settings is not None
+        assert ref.settings.get("target_accuracy") == pytest.approx(epsilon_unitary)
+
+
+@pytest.mark.parametrize(
+    ("setting", "value", "message"),
+    [
+        ("unitary_accuracy_fraction", 0.5, "unitary_accuracy_fraction is not supported"),
+        ("epsilon_rpe", 1e-2, "epsilon_rpe is not configurable"),
+        ("epsilon_unitary", 0.0, "epsilon_unitary must be positive"),
+        ("epsilon_unitary", -0.5, "epsilon_unitary must be positive"),
+    ],
+)
+def test_trotter_rejects_legacy_or_nonpositive_tolerances(
+    setting: str,
+    value: float,
+    message: str,
+) -> None:
+    """Trotter rejects dimensional legacy routing and nonpositive sizing inputs."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(target_accuracy=1e-2)
+    builder.settings().set(setting, value)
+
+    with pytest.raises(ValueError, match=message):
+        builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
 
 
 def test_partial_builder_receives_unitary_budget() -> None:
@@ -523,25 +601,23 @@ def test_robust_qpe_within_target_accuracy_classical_signal(
 
 
 @pytest.mark.parametrize(
-    ("epsilon_total", "epsilon_unitary"),
-    [(0.1, 0.5), (1e-3, 0.5)],
+    "epsilon_total",
+    [0.1, 1e-3],
     ids=["tenth-hartree", "one-millihartree"],
 )
-def test_product_budget_bounds_noncommuting_trotter_ground_energy(
+def test_independent_tolerances_bound_noncommuting_trotter_ground_energy(
     monkeypatch: pytest.MonkeyPatch,
     epsilon_total: float,
-    epsilon_unitary: float,
 ) -> None:
-    """Product budgets bound real order-two Trotter ground-energy estimates."""
-    epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
+    """Independent defaults bound real order-two Trotter ground-energy estimates."""
+    epsilon_rpe = epsilon_total
+    epsilon_unitary = 0.85
     hamiltonian, ground_vector, ground_energy = _noncommuting_ground_state_problem()
     lambda_norm = float(np.sum(np.abs(_NONCOMMUTING_COEFFS)))
     builder = _make_builder(
         target_accuracy=epsilon_total,
         unitary_builder_name="trotter",
         unitary_builder_kwargs={"order": 2},
-        epsilon_rpe=epsilon_rpe,
-        epsilon_unitary=epsilon_unitary,
         energy_correction="linear",
     )
     driver = RobustPhaseEstimation()
@@ -562,24 +638,24 @@ def test_product_budget_bounds_noncommuting_trotter_ground_energy(
     energy_error = abs(result.resolved_energy - ground_energy)
     assert result.metadata["num_rounds"] == final_round + 1
     assert result.metadata["unitary_builder"] == "deterministic_or_exact"
-    assert result.metadata["error_budget_mode"] == "explicit"
-    assert product_bound == pytest.approx(epsilon_total)
+    assert result.metadata["epsilon_rpe"] == pytest.approx(epsilon_total)
+    assert result.metadata["epsilon_unitary"] == pytest.approx(epsilon_unitary)
+    assert result.metadata["error_budget_mode"] == "independent_trotter"
+    assert product_bound < epsilon_total
     assert energy_error <= ladder_bound <= epsilon_total
 
 
 def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The explicit product budget reaches one millihartree on H2/STO-3G."""
+    """The independent Trotter tolerances reach one millihartree on H2/STO-3G."""
     epsilon_total = 1e-3
-    epsilon_unitary = 0.5
-    epsilon_rpe = np.pi * epsilon_total / (2.0 * np.arcsin(epsilon_unitary))
+    epsilon_unitary = 0.85
+    epsilon_rpe = epsilon_total
     hamiltonian, ground_vector, ground_energy = _h2_sto3g_ground_state_problem()
     lambda_norm = float(np.sum(np.abs(_H2_STO3G_COEFFS)))
     builder = _make_builder(
         target_accuracy=epsilon_total,
         unitary_builder_name="trotter",
         unitary_builder_kwargs={"order": 2},
-        epsilon_rpe=epsilon_rpe,
-        epsilon_unitary=epsilon_unitary,
         energy_correction="linear",
     )
     driver = RobustPhaseEstimation()
@@ -600,8 +676,10 @@ def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytes
     energy_error = abs(result.resolved_energy - ground_energy)
     assert result.metadata["num_rounds"] == final_round + 1
     assert result.metadata["unitary_builder"] == "deterministic_or_exact"
-    assert result.metadata["error_budget_mode"] == "explicit"
-    assert product_bound == pytest.approx(epsilon_total)
+    assert result.metadata["epsilon_rpe"] == pytest.approx(epsilon_total)
+    assert result.metadata["epsilon_unitary"] == pytest.approx(epsilon_unitary)
+    assert result.metadata["error_budget_mode"] == "independent_trotter"
+    assert product_bound < epsilon_total
     assert energy_error <= ladder_bound <= epsilon_total
 
 
@@ -639,6 +717,7 @@ def _registered_driver(
     unitary_builder: AlgorithmRef,
     energy_correction: str,
     seed: int = -1,
+    unitary_accuracy_fraction: float | None = None,
 ) -> RobustPhaseEstimation:
     """Create a registered robust estimator with nested builder and executor configuration."""
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
@@ -647,11 +726,12 @@ def _registered_driver(
         "robust_phase_estimation_circuit_builder",
         "qdk",
         target_accuracy=target_accuracy,
-        unitary_accuracy_fraction=0.0,
         energy_correction=energy_correction,
         seed=seed,
         unitary_builder=unitary_builder,
     )
+    if unitary_accuracy_fraction is not None:
+        builder_ref.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
     return create(
         "phase_estimation",
         "qdk_robust",
@@ -702,6 +782,7 @@ def test_robust_qpe_qdrift_recovers_gse() -> None:
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
         energy_correction="qdrift_tangent",
         seed=42,
+        unitary_accuracy_fraction=0.0,
     )
 
     result = driver.run(state_preparation=state_preparation, qubit_hamiltonian=hamiltonian)

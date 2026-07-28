@@ -137,6 +137,7 @@ def test_deterministic_round_yields_one_pair_with_shot_multiplicity(
     assert experiments[0].draw_seed is None
     assert experiments[0].circuit_multiplicity == expected_shots
     assert len(unitary_records) == 1
+    assert unitary_records[0]["target_accuracy"] == pytest.approx(0.85)
     assert [basis for basis, _ in hadamard_records] == ["X", "Y"]
     assert hadamard_records[0][1] is hadamard_records[1][1]
 

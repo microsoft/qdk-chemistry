@@ -39,16 +39,45 @@ Configuration
      - Round-zero evolution time. ``0.0`` selects it from the Hamiltonian coefficient norm.
    * - ``unitary_accuracy_fraction``
      - float
-     - Fraction of ``target_accuracy`` assigned to unitary synthesis when the selected builder supports accuracy-based sizing.
-   * - ``epsilon_rpe`` / ``epsilon_unitary``
+     - Legacy fraction used by non-Trotter builders. It is not supported when ``unitary_builder`` selects Trotter.
+   * - ``epsilon_rpe``
      - float
-     - Optional explicit RPE and unitary error budgets. Both must be set together.
+     - Legacy explicit RPE energy tolerance for non-Trotter builders. Trotter always uses ``target_accuracy`` as its RPE tolerance.
+   * - ``epsilon_unitary``
+     - float
+     - Independent positive Trotter sizing tolerance. When omitted, Trotter uses ``0.85``.
    * - ``energy_correction``
      - str
      - Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
    * - ``seed``
      - int
      - Root random seed. ``-1`` chooses one entropy-backed seed when the circuit set is created.
+
+Trotter accuracy routing
+------------------------
+
+When ``unitary_builder`` selects the registered Trotter implementation, the builder uses independent quantities with different units:
+
+.. math::
+
+  \epsilon_{\mathrm{RPE}} = \epsilon_{\mathrm{total}} = \mathtt{target\_accuracy},
+  \qquad
+  \epsilon_u = \mathtt{epsilon\_unitary}.
+
+The default ``epsilon_unitary`` is ``0.85``. It is dimensionless and controls Trotter step sizing; it is not added to the energy-valued ``target_accuracy``.
+``unitary_accuracy_fraction`` and explicit ``epsilon_rpe`` are rejected for Trotter.
+
+For ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round Trotter operator bound, the automatic ladder gives
+
+.. math::
+
+  |\widehat E-E|
+  \leq
+  \frac{2}{\pi}\,\mathtt{target\_accuracy}\,\arcsin(\mathtt{epsilon\_unitary})
+  < \mathtt{target\_accuracy}.
+
+Any positive ``epsilon_unitary`` is accepted as a Trotter step-sizing input, but values at or above ``sin(pi/3)`` do not carry this uniform branch guarantee.
+Other unitary-builder categories retain their existing routing.
 
 .. tab:: Python API
 

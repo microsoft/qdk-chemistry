@@ -30,6 +30,9 @@ __all__ = [
     "RobustPhaseEstimationRound",
 ]
 
+_UNSET_BUDGET_VALUE = -1.0
+_DEFAULT_TROTTER_EPSILON_UNITARY = 0.85
+
 
 @dataclass(frozen=True)
 class _AlgorithmSnapshot:
@@ -243,20 +246,20 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
         self._set_default(
             "unitary_accuracy_fraction",
             "double",
-            0.5,
-            "Fraction of target_accuracy assigned to the unitary builder; ignored for pure qDRIFT.",
+            _UNSET_BUDGET_VALUE,
+            "Optional legacy fraction of target_accuracy assigned to the unitary builder; unsupported for Trotter.",
         )
         self._set_default(
             "epsilon_rpe",
             "double",
-            0.0,
-            "Optional explicit RPE energy tolerance. Set together with epsilon_unitary.",
+            _UNSET_BUDGET_VALUE,
+            "Optional legacy RPE energy tolerance for non-Trotter builders. Set together with epsilon_unitary.",
         )
         self._set_default(
             "epsilon_unitary",
             "double",
-            0.0,
-            "Optional explicit dimensionless unitary signal tolerance. Set together with epsilon_rpe.",
+            _UNSET_BUDGET_VALUE,
+            "Independent positive Trotter sizing tolerance; omitted Trotter values resolve to 0.85.",
         )
         self._set_default(
             "energy_correction",
@@ -280,11 +283,11 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
         self,
         target_accuracy: float = 1e-3,
         base_time: float = 0.0,
-        unitary_accuracy_fraction: float = 0.5,
+        unitary_accuracy_fraction: float | None = None,
         energy_correction: str = "auto",
         seed: int = -1,
-        epsilon_rpe: float = 0.0,
-        epsilon_unitary: float = 0.0,
+        epsilon_rpe: float | None = None,
+        epsilon_unitary: float | None = None,
         unitary_builder: AlgorithmRef | None = None,
         hadamard_test_circuit_builder: AlgorithmRef | None = None,
     ) -> None:
@@ -293,11 +296,11 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
         Args:
             target_accuracy: Requested absolute accuracy on the final energy.
             base_time: Base evolution time; ``0.0`` selects ``pi/(2*lambda)``.
-            unitary_accuracy_fraction: Fraction of ``target_accuracy`` assigned to unitary synthesis.
+            unitary_accuracy_fraction: Optional legacy non-Trotter fraction of ``target_accuracy``.
             energy_correction: Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
             seed: Root random seed; ``-1`` chooses one entropy-backed seed per circuit set.
-            epsilon_rpe: Optional explicit RPE energy tolerance.
-            epsilon_unitary: Optional explicit unitary signal tolerance.
+            epsilon_rpe: Optional legacy RPE energy tolerance for non-Trotter builders.
+            epsilon_unitary: Optional positive Trotter sizing tolerance, with an effective Trotter default of ``0.85``.
             unitary_builder: Optional time-evolution builder reference.
             hadamard_test_circuit_builder: Optional Hadamard-test circuit-builder reference.
 
@@ -306,11 +309,14 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
         self._settings = RobustPhaseEstimationCircuitBuilderSettings()
         self._settings.set("target_accuracy", target_accuracy)
         self._settings.set("base_time", base_time)
-        self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
         self._settings.set("energy_correction", energy_correction)
         self._settings.set("seed", seed)
-        self._settings.set("epsilon_rpe", epsilon_rpe)
-        self._settings.set("epsilon_unitary", epsilon_unitary)
+        if unitary_accuracy_fraction is not None:
+            self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
+        if epsilon_rpe is not None:
+            self._settings.set("epsilon_rpe", epsilon_rpe)
+        if epsilon_unitary is not None:
+            self._settings.set("epsilon_unitary", epsilon_unitary)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if hadamard_test_circuit_builder is not None:
@@ -367,7 +373,11 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         category = self._classify_builder(unitary_snapshot)
         correction = self._select_correction(category)
         epsilon_total = float(self._settings.get("target_accuracy"))
-        fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(category, epsilon_total)
+        fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
+            category,
+            epsilon_total,
+            is_trotter=self._is_trotter_builder(unitary_snapshot),
+        )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
         base_time = float(self._settings.get("base_time"))
@@ -442,6 +452,11 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             return "qdrift"
         return "deterministic_or_exact"
 
+    @staticmethod
+    def _is_trotter_builder(snapshot: _AlgorithmSnapshot) -> bool:
+        """Return whether the snapshot names the registered Trotter builder."""
+        return snapshot.algorithm_type == "hamiltonian_unitary_builder" and snapshot.algorithm_name == "trotter"
+
     def _select_correction(self, category: str) -> str:
         """Resolve the configured phase-to-energy correction."""
         mode = str(self._settings.get("energy_correction"))
@@ -449,11 +464,36 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             return mode
         return "qdrift_tangent" if category == "qdrift" else "linear"
 
-    def _resolve_budget(self, category: str, epsilon_total: float) -> tuple[float, float, float, str]:
+    def _resolve_budget(
+        self,
+        category: str,
+        epsilon_total: float,
+        *,
+        is_trotter: bool,
+    ) -> tuple[float, float, float, str]:
         """Resolve and validate the RPE and unitary error budgets."""
-        fraction = min(max(float(self._settings.get("unitary_accuracy_fraction")), 0.0), 1.0)
+        configured_fraction = float(self._settings.get("unitary_accuracy_fraction"))
         explicit_rpe = float(self._settings.get("epsilon_rpe"))
         explicit_unitary = float(self._settings.get("epsilon_unitary"))
+
+        if is_trotter:
+            if configured_fraction != _UNSET_BUDGET_VALUE:
+                raise ValueError(
+                    "unitary_accuracy_fraction is not supported for Trotter RPE; "
+                    "set target_accuracy and optional epsilon_unitary instead."
+                )
+            if explicit_rpe != _UNSET_BUDGET_VALUE:
+                raise ValueError(
+                    "epsilon_rpe is not configurable for Trotter RPE; target_accuracy sets the RPE energy tolerance."
+                )
+            if explicit_unitary != _UNSET_BUDGET_VALUE and explicit_unitary <= 0.0:
+                raise ValueError("epsilon_unitary must be positive for Trotter RPE.")
+            epsilon_unitary = (
+                _DEFAULT_TROTTER_EPSILON_UNITARY if explicit_unitary == _UNSET_BUDGET_VALUE else explicit_unitary
+            )
+            return 0.0, epsilon_total, epsilon_unitary, "independent_trotter"
+
+        fraction = 0.5 if configured_fraction == _UNSET_BUDGET_VALUE else min(max(configured_fraction, 0.0), 1.0)
         has_explicit_budget = explicit_rpe > 0.0 or explicit_unitary > 0.0
 
         if category == "qdrift":

@@ -65,6 +65,7 @@ robust_circuit_builder = AlgorithmRef(
     "robust_phase_estimation_circuit_builder",
     "qdk",
     target_accuracy=1e-3,
+    epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
     seed=42,
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
 )
