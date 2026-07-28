@@ -260,8 +260,14 @@ def _preserve_root_logging() -> Iterator[None]:
 
         # fileConfig closes every handler registered with logging, including
         # handlers that belong to the host application.
-        handler_list = logging._handlerList  # type: ignore[attr-defined]  # noqa: SLF001
-        logging_lock = logging._lock  # type: ignore[attr-defined]  # noqa: SLF001
+        handler_list = getattr(logging, "_handlerList", [])
+        logging_lock = getattr(logging, "_lock", None)
+        if logging_lock is None:
+            from contextlib import nullcontext  # noqa: PLC0415
+
+            logging_lock = nullcontext()
+
+        original_handler_refs = []
         original_handler_ids = {id(handler) for handler in original_handlers}
         with logging_lock:
             original_handler_refs = [
