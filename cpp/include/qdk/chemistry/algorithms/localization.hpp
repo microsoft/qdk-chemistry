@@ -51,12 +51,18 @@ void warn_if_not_aufbau_determinant_wavefunction(
  * @param wavefunction The original wavefunction providing electron counts.
  * @param new_orbitals The orbitals to attach to the output wavefunction.
  * @param one_rdm_spin_traced Optional spin-traced active-space 1-RDM payload.
+ * @param one_rdm_aa Optional alpha active-space 1-RDM payload.
+ * @param one_rdm_bb Optional beta active-space 1-RDM payload.
  * @return An Aufbau determinant wavefunction with the updated orbitals.
  */
 std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
-    std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced =
+    const std::optional<data::ContainerTypes::MatrixVariant>&
+        one_rdm_spin_traced = std::nullopt,
+    const std::optional<data::ContainerTypes::MatrixVariant>& one_rdm_aa =
+        std::nullopt,
+    const std::optional<data::ContainerTypes::MatrixVariant>& one_rdm_bb =
         std::nullopt);
 }  // namespace detail
 

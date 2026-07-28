@@ -6,8 +6,8 @@
 
 #include <Eigen/Eigenvalues>
 #include <algorithm>
+#include <optional>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
-#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <variant>
@@ -101,6 +101,8 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
 
   // Build the active 1-RDM in the basis being diagonalized.
   Eigen::MatrixXd rdm_subset(num_active, num_active);
+  std::optional<Eigen::MatrixXd> rdm_alpha_subset;
+  std::optional<Eigen::MatrixXd> rdm_beta_subset;
   if (orbitals->is_restricted()) {
     // Restricted inputs already provide a spin-traced active-space 1-RDM.
     if (!wavefunction->has_one_rdm_spin_traced()) {
@@ -121,6 +123,29 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
     }
 
     rdm_subset = *rdm;
+
+    if (!wavefunction->has_one_rdm_spin_dependent()) {
+      throw std::invalid_argument(
+          "NaturalOrbitalLocalizer requires alpha and beta active-space "
+          "1-RDM blocks.");
+    }
+    auto [rdm_alpha_variant, rdm_beta_variant] =
+        wavefunction->get_active_one_rdm_spin_dependent();
+    const auto* rdm_alpha = std::get_if<Eigen::MatrixXd>(&rdm_alpha_variant);
+    const auto* rdm_beta = std::get_if<Eigen::MatrixXd>(&rdm_beta_variant);
+    if (!rdm_alpha || !rdm_beta) {
+      throw std::invalid_argument(
+          "NaturalOrbitalLocalizer requires real-valued active 1-RDM blocks.");
+    }
+    if (static_cast<size_t>(rdm_alpha->rows()) != num_active ||
+        static_cast<size_t>(rdm_alpha->cols()) != num_active ||
+        static_cast<size_t>(rdm_beta->rows()) != num_active ||
+        static_cast<size_t>(rdm_beta->cols()) != num_active) {
+      throw std::invalid_argument(
+          "1-RDM dimensions do not match the orbitals' active-space size.");
+    }
+    rdm_alpha_subset = *rdm_alpha;
+    rdm_beta_subset = *rdm_beta;
   } else {
     // Unrestricted inputs require spin-dependent blocks in different MO bases.
     if (!wavefunction->has_one_rdm_spin_dependent()) {
@@ -145,7 +170,7 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
           "1-RDM dimensions do not match the orbitals' active-space size.");
     }
 
-    // Reconstruct the active spin-summed density in the AO basis.
+    // Reconstruct the active alpha and beta densities in the AO basis.
     Eigen::MatrixXd active_coeffs_alpha(coeffs_alpha.rows(), num_active);
     Eigen::MatrixXd active_coeffs_beta(coeffs_beta.rows(), num_active);
     for (size_t i = 0; i < num_active; ++i) {
@@ -153,14 +178,17 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
       active_coeffs_beta.col(i) = coeffs_beta.col(active_indices_b[i]);
     }
 
-    Eigen::MatrixXd density =
+    Eigen::MatrixXd density_alpha =
         active_coeffs_alpha * (*rdm_alpha) * active_coeffs_alpha.transpose();
-    density +=
+    Eigen::MatrixXd density_beta =
         active_coeffs_beta * (*rdm_beta) * active_coeffs_beta.transpose();
 
     const auto& overlap = orbitals->get_overlap_matrix();
-    rdm_subset = selected_coeffs.transpose() * overlap * density * overlap *
-                 selected_coeffs;
+    rdm_alpha_subset = selected_coeffs.transpose() * overlap * density_alpha *
+                       overlap * selected_coeffs;
+    rdm_beta_subset = selected_coeffs.transpose() * overlap * density_beta *
+                      overlap * selected_coeffs;
+    rdm_subset = *rdm_alpha_subset + *rdm_beta_subset;
   }
 
   // Symmetrize before diagonalization to remove numerical noise.
@@ -176,38 +204,29 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   Eigen::VectorXd occupations = eigensolver.eigenvalues().reverse();
   Eigen::MatrixXd no_rotation = eigensolver.eigenvectors().rowwise().reverse();
 
-  // Apply the natural orbital rotation only to the active columns.
   Eigen::MatrixXd no_coeffs = selected_coeffs * no_rotation;
-  Eigen::MatrixXd coeffs = coeffs_alpha;
-  for (size_t i = 0; i < num_active; ++i) {
-    coeffs.col(active_indices_a[i]) = no_coeffs.col(i);
-  }
-
-  // Create output orbitals, preserving active/inactive metadata.
-  std::shared_ptr<data::Orbitals> new_orbitals;
-  if (orbitals->is_restricted()) {
-    new_orbitals = std::make_shared<data::Orbitals>(
-        coeffs,
-        std::nullopt,  // no energies for natural orbitals
-        orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-        orbitals->active_indices(), orbitals->inactive_indices());
-  } else {
-    const data::Orbitals::RestrictedCASIndices restricted_indices =
-        std::make_tuple(std::vector<size_t>(active_indices_a.begin(),
-                                            active_indices_a.end()),
-                        std::vector<size_t>(inactive_indices_a.begin(),
-                                            inactive_indices_a.end()));
-    new_orbitals = std::make_shared<data::Orbitals>(
-        coeffs,
-        std::nullopt,  // no energies for natural orbitals
-        orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-        restricted_indices);
-  }
+  Eigen::MatrixXd coeffs = detail::replace_orbital_columns(
+      coeffs_alpha, active_indices_a, no_coeffs);
+  auto new_orbitals = detail::make_transformed_orbitals(orbitals, coeffs);
 
   Eigen::MatrixXd diagonal_one_rdm = occupations.asDiagonal();
+  std::optional<data::ContainerTypes::MatrixVariant> one_rdm_aa;
+  std::optional<data::ContainerTypes::MatrixVariant> one_rdm_bb;
+  if (rdm_alpha_subset && rdm_beta_subset) {
+    Eigen::MatrixXd transformed_alpha =
+        no_rotation.transpose() * *rdm_alpha_subset * no_rotation;
+    Eigen::MatrixXd transformed_beta =
+        no_rotation.transpose() * *rdm_beta_subset * no_rotation;
+    transformed_alpha =
+        0.5 * (transformed_alpha + transformed_alpha.transpose());
+    transformed_beta = 0.5 * (transformed_beta + transformed_beta.transpose());
+    one_rdm_aa = data::ContainerTypes::MatrixVariant(transformed_alpha);
+    one_rdm_bb = data::ContainerTypes::MatrixVariant(transformed_beta);
+  }
   return detail::new_aufbau_determinant_wavefunction(
       wavefunction, new_orbitals,
-      data::ContainerTypes::MatrixVariant(diagonal_one_rdm));
+      data::ContainerTypes::MatrixVariant(diagonal_one_rdm), one_rdm_aa,
+      one_rdm_bb);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

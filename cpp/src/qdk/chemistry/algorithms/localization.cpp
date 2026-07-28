@@ -124,10 +124,123 @@ void warn_if_not_aufbau_determinant_wavefunction(
   }
 }
 
+Eigen::MatrixXd replace_orbital_columns(const Eigen::MatrixXd& coefficients,
+                                        const std::vector<size_t>& indices,
+                                        const Eigen::MatrixXd& replacements) {
+  if (replacements.rows() != coefficients.rows() ||
+      replacements.cols() != static_cast<Eigen::Index>(indices.size())) {
+    throw std::invalid_argument(
+        "Replacement orbital coefficient dimensions do not match the "
+        "selected columns");
+  }
+
+  std::vector<bool> seen(static_cast<size_t>(coefficients.cols()), false);
+  Eigen::MatrixXd transformed = coefficients;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    const size_t index = indices[i];
+    if (index >= static_cast<size_t>(coefficients.cols())) {
+      throw std::invalid_argument("Orbital column index is out of bounds");
+    }
+    if (seen[index]) {
+      throw std::invalid_argument("Orbital column indices must be unique");
+    }
+    seen[index] = true;
+    transformed.col(static_cast<Eigen::Index>(index)) =
+        replacements.col(static_cast<Eigen::Index>(i));
+  }
+  return transformed;
+}
+
+std::shared_ptr<data::Orbitals> make_transformed_orbitals(
+    const std::shared_ptr<data::Orbitals>& orbitals,
+    const Eigen::MatrixXd& coefficients_alpha) {
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+
+  const auto& source_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  if (coefficients_alpha.rows() != source_alpha.rows() ||
+      coefficients_alpha.cols() != source_alpha.cols()) {
+    throw std::invalid_argument(
+        "Transformed alpha coefficient dimensions do not match the source "
+        "orbitals");
+  }
+
+  if (!orbitals->is_restricted()) {
+    const auto active_indices_alpha = data::spin_channel_indices(
+        orbitals->active_indices(), data::axes::alpha());
+    const auto active_indices_beta = data::spin_channel_indices(
+        orbitals->active_indices(), data::axes::beta());
+    const auto inactive_indices_alpha = data::spin_channel_indices(
+        orbitals->inactive_indices(), data::axes::alpha());
+    const auto inactive_indices_beta = data::spin_channel_indices(
+        orbitals->inactive_indices(), data::axes::beta());
+    if (active_indices_alpha != active_indices_beta ||
+        inactive_indices_alpha != inactive_indices_beta) {
+      throw std::invalid_argument(
+          "Cannot construct restricted transformed orbitals from mismatched "
+          "alpha and beta active or inactive spaces");
+    }
+    const data::Orbitals::RestrictedCASIndices restricted_indices =
+        std::make_tuple(std::vector<size_t>(active_indices_alpha.begin(),
+                                            active_indices_alpha.end()),
+                        std::vector<size_t>(inactive_indices_alpha.begin(),
+                                            inactive_indices_alpha.end()));
+    return std::make_shared<data::Orbitals>(
+        coefficients_alpha,
+        std::nullopt,  // no energies for transformed orbitals
+        orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+        restricted_indices);
+  }
+
+  return std::make_shared<data::Orbitals>(
+      coefficients_alpha,
+      std::nullopt,  // no energies for transformed orbitals
+      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+      orbitals->active_indices(), orbitals->inactive_indices());
+}
+
+std::shared_ptr<data::Orbitals> make_transformed_orbitals(
+    const std::shared_ptr<data::Orbitals>& orbitals,
+    const Eigen::MatrixXd& coefficients_alpha,
+    const Eigen::MatrixXd& coefficients_beta) {
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+
+  const auto& source_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& source_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
+  if (coefficients_alpha.rows() != source_alpha.rows() ||
+      coefficients_alpha.cols() != source_alpha.cols()) {
+    throw std::invalid_argument(
+        "Transformed alpha coefficient dimensions do not match the source "
+        "orbitals");
+  }
+  if (coefficients_beta.rows() != source_beta.rows() ||
+      coefficients_beta.cols() != source_beta.cols()) {
+    throw std::invalid_argument(
+        "Transformed beta coefficient dimensions do not match the source "
+        "orbitals");
+  }
+
+  return std::make_shared<data::Orbitals>(
+      coefficients_alpha, coefficients_beta,
+      std::nullopt,  // no alpha energies for transformed orbitals
+      std::nullopt,  // no beta energies for transformed orbitals
+      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
+      orbitals->active_indices(), orbitals->inactive_indices());
+}
+
 std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
-    std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced) {
+    const std::optional<data::ContainerTypes::MatrixVariant>&
+        one_rdm_spin_traced,
+    const std::optional<data::ContainerTypes::MatrixVariant>& one_rdm_aa,
+    const std::optional<data::ContainerTypes::MatrixVariant>& one_rdm_bb) {
   QDK_LOG_TRACE_ENTERING();
   if (!wavefunction) {
     throw std::invalid_argument("Wavefunction pointer cannot be nullptr");
@@ -139,13 +252,17 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
   auto aufbau_det = _active_configuration_for_orbitals(
       _aufbau_determinant_configuration(wavefunction, new_orbitals),
       new_orbitals);
-  if (one_rdm_spin_traced) {
+  if (one_rdm_spin_traced || one_rdm_aa || one_rdm_bb) {
     Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(1);
     data::ContainerTypes::DeterminantVector determinants{aufbau_det};
     auto new_container = std::make_unique<data::StateVectorContainer>(
         data::ContainerTypes::VectorVariant(coeffs), determinants, new_orbitals,
-        one_rdm_spin_traced, std::nullopt, "electrons",
-        data::OrbitalEntropies{}, wavefunction->get_type());
+        one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
+        std::nullopt,  // two_rdm_spin_traced
+        std::nullopt,  // two_rdm_aaaa
+        std::nullopt,  // two_rdm_aabb
+        std::nullopt,  // two_rdm_bbbb
+        "electrons", data::OrbitalEntropies{}, wavefunction->get_type());
     return std::make_shared<data::Wavefunction>(std::move(new_container));
   }
 
