@@ -7,7 +7,7 @@
         "num_bases": 2,
         "num_copies": 1,
         "core_energy": 0.0,
-        "bliss_core_shift": 0.0,
+        "bliss_shift": 0.0,
         "energy_gap": 0.5,
         "one_body_integrals": [
             [

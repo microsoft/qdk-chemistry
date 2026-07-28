@@ -1037,7 +1037,7 @@ Args:
     wb_matrix (numpy.ndarray): Identity weights [R x C]
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [N x N]
     orbitals (Orbitals): Molecular orbital data
-    bliss_core_shift (float, optional): BLISS core energy shift (default 0)
+    bliss_shift (float, optional): BLISS core energy shift (default 0)
     energy_gap (float, optional): E_gap for SOS block encoding (default 0)
     type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
 )",
@@ -1045,7 +1045,7 @@ Args:
       py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
       py::arg("one_body_integrals"), py::arg("wb_matrix"),
       py::arg("inactive_fock_matrix"), py::arg("orbitals"),
-      py::arg("bliss_core_shift") = 0.0, py::arg("energy_gap") = 0.0,
+      py::arg("bliss_shift") = 0.0, py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Factorized-specific accessors
@@ -1121,9 +1121,8 @@ Returns:
     int: Number of copies per rank
 )");
 
-  factorized_container.def(
-      "get_bliss_core_shift",
-      &FactorizedHamiltonianContainer::get_bliss_core_shift, R"(
+  factorized_container.def("get_bliss_shift",
+                           &FactorizedHamiltonianContainer::get_bliss_shift, R"(
 BLISS core energy shift.
 
 Returns:
@@ -1132,10 +1131,10 @@ Returns:
 
   factorized_container.def("get_energy_gap",
                            &FactorizedHamiltonianContainer::get_energy_gap, R"(
-Energy gap E_gap for SOS block encoding.
+E_gap for SOS block encoding.
 
 Returns:
-    float: The energy gap value
+    float: The E_gap value
 )");
 
   factorized_container.def("get_lambda",

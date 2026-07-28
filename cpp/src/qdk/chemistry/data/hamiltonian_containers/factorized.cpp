@@ -20,8 +20,8 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
     const Eigen::MatrixXd& one_body_integrals, const Eigen::MatrixXd& wb_matrix,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::shared_ptr<Orbitals> orbitals, double bliss_core_shift,
-    double energy_gap, HamiltonianType type)
+    std::shared_ptr<Orbitals> orbitals, double bliss_shift, double energy_gap,
+    HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _u(u_matrices),
@@ -30,7 +30,7 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
       _num_ranks(num_ranks),
       _num_bases(num_bases),
       _num_copies(num_copies),
-      _bliss_core_shift(bliss_core_shift),
+      _bliss_shift(bliss_shift),
       _energy_gap(energy_gap) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -57,7 +57,7 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
       _num_ranks, _num_bases, _num_copies, _core_energy, _u, _w, h1_alpha, _wb,
-      fock_alpha, _orbitals, _bliss_core_shift, _energy_gap, _type);
+      fock_alpha, _orbitals, _bliss_shift, _energy_gap, _type);
 }
 
 std::string FactorizedHamiltonianContainer::get_container_type() const {
@@ -132,52 +132,36 @@ Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
   size_t R = _num_ranks;
   size_t B = _num_bases;
   size_t C = _num_copies;
-  size_t norb4 = norb * norb * norb * norb;
+  size_t norb2 = norb * norb;
 
-  Eigen::VectorXd h2 = Eigen::VectorXd::Zero(norb4);
+  Eigen::VectorXd h2 = Eigen::VectorXd::Zero(norb2 * norb2);
+  Eigen::Map<
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+      h2_matrix(h2.data(), norb2, norb2);
 
-  // Map flat arrays to 3D views:
-  // U[r][b][p] stored as flat [R*B*N], row-major in (r,b,p)
-  // W[r][b][c] stored as flat [R*B*C], row-major in (r,b,c)
-  auto U = [&](size_t r, size_t b, size_t p) -> double {
-    return _u(r * B * norb + b * norb + p);
-  };
-  auto W = [&](size_t r, size_t b, size_t c) -> double {
-    return _w(r * B * C + b * C + c);
-  };
-
-  // h2_{pqrs} = Σ_r Σ_c (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
-  //                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
   for (size_t r = 0; r < R; ++r) {
-    // Build intermediate: M^r_c[p][q] = Σ_b U^r_{bp} U^r_{bq} W^r_{bc}
-    // Shape: [C][norb][norb]
-    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(C, norb * norb);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        Ur(_u.data() + r * B * norb, B, norb);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        Wr(_w.data() + r * B * C, B, C);
+
+    // K[b, pq] = U[b, p] * U[b, q], with each outer product stored
+    // contiguously in the same pq ordering as the reconstructed tensor.
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        pair_products(B, norb2);
     for (size_t b = 0; b < B; ++b) {
-      for (size_t c = 0; c < C; ++c) {
-        double w_rbc = W(r, b, c);
-        for (size_t p = 0; p < norb; ++p) {
-          double u_rbp = U(r, b, p);
-          for (size_t q = 0; q < norb; ++q) {
-            M(c, p * norb + q) += u_rbp * U(r, b, q) * w_rbc;
-          }
-        }
-      }
+      Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                               Eigen::RowMajor>>
+          pair_product(pair_products.row(b).data(), norb, norb);
+      pair_product.noalias() = Ur.row(b).transpose() * Ur.row(b);
     }
 
-    // h2_{pqrs} += Σ_c M^r_c[p][q] * M^r_c[r][s]
-    // = M^T * M where M is [C x norb^2]
-    // Result is [norb^2 x norb^2], stored in h2
-    for (size_t c = 0; c < C; ++c) {
-      Eigen::Map<const Eigen::MatrixXd> Mc(M.row(c).data(), norb, norb);
-      // Flatten: h2_{pq,rs} += M_c[pq] * M_c[rs]
-      Eigen::Map<const Eigen::VectorXd> Mc_flat(M.row(c).data(), norb * norb);
-      // Outer product: h2 += Mc_flat * Mc_flat^T (as flat norb^4)
-      for (size_t pq = 0; pq < norb * norb; ++pq) {
-        for (size_t rs = 0; rs < norb * norb; ++rs) {
-          h2(pq * norb * norb + rs) += Mc_flat(pq) * Mc_flat(rs);
-        }
-      }
-    }
+    // M[c, pq] = sum_b W[b, c] * K[b, pq], then
+    // h2[pq, rs] += sum_c M[c, pq] * M[c, rs].
+    Eigen::MatrixXd M = Wr.transpose() * pair_products;
+    h2_matrix.noalias() += M.transpose() * M;
   }
 
   return h2;
@@ -219,8 +203,8 @@ size_t FactorizedHamiltonianContainer::get_num_copies() const {
   return _num_copies;
 }
 
-double FactorizedHamiltonianContainer::get_bliss_core_shift() const {
-  return _bliss_core_shift;
+double FactorizedHamiltonianContainer::get_bliss_shift() const {
+  return _bliss_shift;
 }
 
 double FactorizedHamiltonianContainer::get_energy_gap() const {
@@ -257,15 +241,14 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
   double lambda = get_lambda();
-  double eg = _energy_gap;
-  if (eg <= 0.0) {
+  if (_energy_gap <= 0.0) {
     throw std::runtime_error("E_gap must be positive for a valid SOS walk");
   }
-  if (eg >= 2.0 * lambda) {
+  if (_energy_gap >= 2.0 * lambda) {
     throw std::runtime_error(
         "E_gap must be less than 2*Lambda for a valid SOS walk");
   }
-  return std::sqrt(eg * (2.0 * lambda - eg));
+  return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
 }
 
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
@@ -341,7 +324,7 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["num_bases"] = _num_bases;
   j["num_copies"] = _num_copies;
   j["core_energy"] = _core_energy;
-  j["bliss_core_shift"] = _bliss_core_shift;
+  j["bliss_shift"] = _bliss_shift;
   j["energy_gap"] = _energy_gap;
 
   if (has_orbitals()) {
@@ -369,8 +352,8 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   size_t B = j["num_bases"];
   size_t C = j["num_copies"];
   double core_energy = j["core_energy"];
-  double bliss_core_shift = j.value("bliss_core_shift", 0.0);
-  double energy_gap = j.value("energy_gap", 0.0);
+  double bliss_shift = j.value("bliss_shift", 0.0);
+  double energy_gap = j.at("energy_gap");
 
   auto orbitals = Orbitals::from_json(j["orbitals"]);
 
@@ -380,7 +363,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      R, B, C, core_energy, u, w, h1, wb, fock, orbitals, bliss_core_shift,
+      R, B, C, core_energy, u, w, h1, wb, fock, orbitals, bliss_shift,
       energy_gap);
 }
 
@@ -406,9 +389,9 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
   group
-      .createAttribute("bliss_core_shift", H5::PredType::NATIVE_DOUBLE,
+      .createAttribute("bliss_shift", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
-      .write(H5::PredType::NATIVE_DOUBLE, &_bliss_core_shift);
+      .write(H5::PredType::NATIVE_DOUBLE, &_bliss_shift);
   group
       .createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
@@ -472,12 +455,12 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   version_attr.read(string_type, version);
   validate_serialization_version(SERIALIZATION_VERSION, version);
 
-  double core_energy, bliss_core_shift, energy_gap;
+  double core_energy, bliss_shift, energy_gap;
   group.openAttribute("core_energy")
       .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
-  group.openAttribute("bliss_core_shift")
-      .read(H5::PredType::NATIVE_DOUBLE, &bliss_core_shift);
-  group.openAttribute("energy_gap")
+  group.openAttribute("bliss_shift")
+      .read(H5::PredType::NATIVE_DOUBLE, &bliss_shift);
+    group.openAttribute("energy_gap")
       .read(H5::PredType::NATIVE_DOUBLE, &energy_gap);
 
   hsize_t r_val, b_val, c_val;
@@ -523,7 +506,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
 
   return std::make_unique<FactorizedHamiltonianContainer>(
       r_val, b_val, c_val, core_energy, u, w, h1, wb, fock, orbitals,
-      bliss_core_shift, energy_gap);
+      bliss_shift, energy_gap);
 }
 
 // === Validation ===
@@ -564,7 +547,7 @@ void FactorizedHamiltonianContainer::hash_update(
   hash_value(ctx, static_cast<int64_t>(_num_ranks));
   hash_value(ctx, static_cast<int64_t>(_num_bases));
   hash_value(ctx, static_cast<int64_t>(_num_copies));
-  hash_value(ctx, _bliss_core_shift);
+  hash_value(ctx, _bliss_shift);
   hash_value(ctx, _energy_gap);
   hash_value(ctx, _u);
   hash_value(ctx, _w);

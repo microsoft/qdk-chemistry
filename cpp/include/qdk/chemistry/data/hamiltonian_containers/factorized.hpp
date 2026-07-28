@@ -16,37 +16,29 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class FactorizedHamiltonianContainer
- * @brief Hamiltonian container for Double-Factorized Tensor Hypercontraction.
+ * @brief Restricted, spin-free double-factorized THC Hamiltonian container.
  *
- * Stores the factorized two-body integrals:
- *
- *   h2_{pqrs} ≈ Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
- *                        (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
- *
- * along with an identity weight matrix, optional BLISS
- * core energy shift, and other metadata for the sum of square form.
- *
- * This container is always restricted (uses spin-free integrals).
- *
- * Reference: Low et al., arXiv:2502.15882
+ * Stores U, W, identity weights, and SOS metadata. See Low et al.,
+ * arXiv:2502.15882.
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for restricted factorized Hamiltonian.
-   * @param num_ranks R rank.
-   * @param num_bases B rank.
-   * @param num_copies C rank.
-   * @param core_energy Nuclear repulsion + inactive core energy.
-   * @param u_matrices Orbital rotation matrices, flat [R*B*N].
-   * @param w_matrices Two-body weights, flat [R*B*C].
-   * @param one_body_integrals One-body integrals in MO basis [N x N].
-   * @param wb_matrix Identity weights [R x C].
+   * @brief Construct a restricted factorized Hamiltonian.
+   * @param num_ranks Number of ranks R.
+   * @param num_bases Number of bases B.
+   * @param num_copies Number of copies C.
+   * @param core_energy Nuclear and inactive-core energy.
+   * @param u_matrices U factors, flattened as [R,B,N].
+   * @param w_matrices W factors, flattened as [R,B,C].
+   * @param one_body_integrals One-body integrals [N,N].
+   * @param wb_matrix Identity weights [R,C].
    * @param inactive_fock_matrix Inactive Fock matrix.
-   * @param orbitals Orbital data with active space set.
-   * @param bliss_core_shift BLISS core energy shift (default 0).
-   * @param energy_gap E_gap for SOS block encoding (default 0).
+   * @param orbitals Orbitals with an active space.
+   * @param bliss_shift BLISS core shift.
+   * @param energy_gap E_gap for SOS block encoding.
+   * @param type Hamiltonian type.
+   * @throws std::invalid_argument if dimensions or required data are invalid.
    */
   FactorizedHamiltonianContainer(
       size_t num_ranks, size_t num_bases, size_t num_copies, double core_energy,
@@ -54,102 +46,140 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& inactive_fock_matrix,
-      std::shared_ptr<Orbitals> orbitals, double bliss_core_shift = 0.0,
+      std::shared_ptr<Orbitals> orbitals, double bliss_shift = 0.0,
       double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
+  /** @brief Destroy the container. */
   ~FactorizedHamiltonianContainer() override = default;
 
   // === HamiltonianContainer overrides ===
 
+  /** @brief Create a deep copy. */
   std::unique_ptr<HamiltonianContainer> clone() const override final;
+
+  /** @return @c "factorized". */
   std::string get_container_type() const override final;
 
+  /**
+   * @brief Get reconstructed two-body integrals.
+   * @return The same cached vector for the aaaa, aabb, and bbbb channels.
+   * @throws std::runtime_error if U or W is empty.
+   */
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
              const Eigen::VectorXd&>
   get_two_body_integrals() const override;
 
+  /**
+   * @brief Get a reconstructed two-body element.
+   * @param i First orbital index.
+   * @param j Second orbital index.
+   * @param k Third orbital index.
+   * @param l Fourth orbital index.
+   * @param channel Ignored; the integrals are restricted.
+   * @return The element at [i,j,k,l].
+   * @throws std::runtime_error if U or W is empty.
+   * @throws std::out_of_range if an index is outside [0,N).
+   */
   double get_two_body_element(
       unsigned i, unsigned j, unsigned k, unsigned l,
       SpinChannel channel = SpinChannel::aaaa) const override;
 
+  /** @return Whether U and W are nonempty. */
   bool has_two_body_integrals() const override;
+
+  /** @return Always true. */
   bool is_restricted() const override final;
+
+  /** @return Whether required data and factor dimensions are valid. */
   bool is_valid() const override final;
 
+  /** @brief Serialize to JSON. */
   nlohmann::json to_json() const override final;
+
+  /** @brief Serialize into an HDF5 group. */
   void to_hdf5(H5::Group& group) const override final;
 
+  /**
+   * @brief Deserialize from JSON.
+   * @param j Serialized data.
+   * @return The reconstructed container.
+   */
   static std::unique_ptr<FactorizedHamiltonianContainer> from_json(
       const nlohmann::json& j);
+
+  /**
+   * @brief Deserialize from HDF5.
+   * @param group Serialized data.
+   * @return The reconstructed container.
+   */
   static std::unique_ptr<FactorizedHamiltonianContainer> from_hdf5(
       H5::Group& group);
 
   // === Factorized-specific accessors ===
 
-  /** @brief Get U matrices as flat vector [R*B*N]. */
+  /** @return U flattened in [R,B,N] order. */
   const Eigen::VectorXd& get_u_matrices() const;
 
-  /** @brief Get W matrices as flat vector [R*B*C]. */
+  /** @return W flattened in [R,B,C] order. */
   const Eigen::VectorXd& get_w_matrices() const;
 
-  /** @brief Get WB matrix [R x C]. */
+  /** @return Identity weights WB with shape [R,C]. */
   const Eigen::MatrixXd& get_wb_matrix() const;
 
-  /** @brief Number of spatial orbitals (N). */
+  /** @return Number N of active spatial orbitals. */
   size_t get_num_orbitals() const;
 
-  /** @brief Number of ranks (R). */
+  /** @return Number of ranks R. */
   size_t get_num_ranks() const;
 
-  /** @brief Number of bases per rank (B). */
+  /** @return Number of bases B. */
   size_t get_num_bases() const;
 
-  /** @brief Number of copies per rank (C). */
+  /** @return Number of copies C. */
   size_t get_num_copies() const;
 
-  /** @brief BLISS core energy shift. */
-  double get_bliss_core_shift() const;
+  /** @return BLISS energy shift. */
+  double get_bliss_shift() const;
 
-  /** @brief Energy gap E_gap for SOS block encoding. */
+  /** @return Energy gap E_gap for SOS block encoding. */
   double get_energy_gap() const;
 
   /**
-   * @brief Block-encoding normalization Λ. Eq. 35
-   *
+   * @brief Compute the block-encoding normalization (Eq. 35).
    * Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    */
   double get_lambda() const;
 
   /**
-   * @brief Effective lambda for SOS walk. Eq. 13
-   *
+   * @brief Compute the effective SOS normalization (Eq. 13).
    * λ_eff = √(E_gap · (2Λ - E_gap))
-   *
-   * Requires E_gap > 0 and E_gap < 2Λ.
    * @throws std::runtime_error if E_gap is non-positive or >= 2Λ.
    */
   double get_lambda_eff() const;
 
   /**
-   * @brief Adjusted one-body matrix in Majorana basis h'(1). Eq 38
-   *
+   * @brief Compute the adjusted Majorana one-body matrix (Eq. 38).
    * h'(1)_{pq} = h1_{pq} - ½ Σ_{rs} h2_{prrs→pq}
    *              + Σ_{rs} h2_{pqrr}
    *              - Σ_{rc,b} WB^{rc} W^{rc}_b U^r_{bp} U^r_{bq}
+   * @return The [N,N] matrix, contracted directly from the factors.
    */
   Eigen::MatrixXd get_h1_majorana() const;
 
   /**
-   * @brief Reconstruct approximate two-body integrals from factorization.
-   *
+   * @brief Reconstruct the approximate two-body integrals.
    * h2_{pqrs} = Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
    *                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
+   * @return A flat N^4 vector in [p,q,r,s] order.
    */
   Eigen::VectorXd reconstruct_two_body_integrals() const;
 
  private:
+  /** @brief Add all serialized state to a hash. */
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+  /** @throws std::invalid_argument if U, W, or WB dimensions are invalid. */
   void validate_integral_dimensions() const override final;
 
   Eigen::VectorXd _u;   ///< Flat U matrices [R*B*N]
@@ -160,13 +190,14 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   size_t _num_bases;   ///< B
   size_t _num_copies;  ///< C
 
-  double _bliss_core_shift;  ///< BLISS core energy shift
-  double _energy_gap;        ///< E_gap for SOS block encoding
+  double _bliss_shift;  ///< BLISS energy shift
+  double _energy_gap;   ///< E_gap for SOS block encoding
 
   /// Lazily computed four-center integrals (shared for all channels,
   /// restricted)
   mutable std::shared_ptr<Eigen::VectorXd> _cached_two_body;
 
+  /** @brief Reconstruct the shared two-body cache. */
   void _build_two_body_cache() const;
 
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

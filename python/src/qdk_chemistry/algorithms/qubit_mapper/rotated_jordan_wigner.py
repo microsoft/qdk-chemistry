@@ -179,7 +179,7 @@ class RotatedJordanWignerMapper(QubitMapper):
                     w0 -= weights[(rank * num_bases + basis) * num_copies + copy]
                 w0_square_sum += w0 * w0
         energy_shift = (
-            container.get_core_energy() + container.get_bliss_core_shift() - 2.0 * negative_sum - 0.5 * w0_square_sum
+            container.get_core_energy() + container.get_bliss_shift() - 2.0 * negative_sum - 0.5 * w0_square_sum
         )
         return QubitOperator(
             SOSContainer(
