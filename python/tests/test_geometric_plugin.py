@@ -41,7 +41,7 @@ def test_geometric_plugin_registration():
     optimizer = algorithms.create("geometry_optimizer", "geometric")
     assert isinstance(optimizer, algorithms.GeometryOptimizer)
     assert optimizer.name() == "geometric"
-    assert optimizer.settings().get("algorithm") == "tric"
+    assert optimizer.settings().get("optimizer") == "tric"
 
 
 def test_geometric_optimizer_settings():
@@ -58,7 +58,8 @@ def test_geometric_optimizer_settings():
     assert derivative_ref.algorithm_name == "qdk_finite_difference"
 
     assert settings.get("transition_state") is False
-    assert settings.get("algorithm") == "tric"
+    assert settings.get("optimizer") == "tric"
+    assert not settings.has("algorithm")
     assert settings.get("compute_hessian") is False
     assert settings.get("max_iterations") == 300
     assert settings.get("convergence_energy") == pytest.approx(1.0e-6)
@@ -72,7 +73,7 @@ def test_geometric_optimizer_settings():
     with pytest.raises(ValueError, match="convergence_rms_gradient.*out of allowed range"):
         settings.set("convergence_rms_gradient", -1.0e-4)
 
-    settings.set("algorithm", "dlc")
+    settings.set("optimizer", "dlc")
     settings.set("transition_state", True)
     settings.set("convergence_energy", 2.0e-6)
     settings.set("convergence_rms_gradient", 2.0e-4)

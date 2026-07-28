@@ -57,7 +57,7 @@ class GeometricOptimizerSettings(GeometryOptimizerSettings):
             "transition_state", "bool", False, "Run transition-state optimization instead of minimization."
         )
         self._set_default(
-            "algorithm",
+            "optimizer",
             "string",
             "tric",
             "geomeTRIC optimizer algorithm.",
@@ -239,7 +239,7 @@ class GeometricOptimizer(GeometryOptimizer):
     def _geometric_options(self) -> dict[str, Any]:
         return {
             "transition": self._settings["transition_state"],
-            "coordsys": self._settings["algorithm"],
+            "coordsys": self._settings["optimizer"],
             "maxiter": self._settings["max_iterations"],
             "convergence_energy": self._settings["convergence_energy"],
             "convergence_grms": self._settings["convergence_rms_gradient"],
