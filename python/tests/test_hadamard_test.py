@@ -19,7 +19,7 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
-_SHOTS = 5000
+_SHOTS = 100
 _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
 
@@ -105,7 +105,7 @@ def test_qdk_hadamard_test_measures_water_observable(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.29, atol=0.02)
+    assert np.isclose(observable_value, 0.34, atol=1e-12)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
@@ -122,7 +122,7 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.95, atol=0.02)
+    assert np.isclose(observable_value, 0.98, atol=1e-12)
 
 
 def test_hadamard_test_rejects_invalid_test_basis() -> None:

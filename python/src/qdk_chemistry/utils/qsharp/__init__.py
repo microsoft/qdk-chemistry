@@ -14,11 +14,11 @@ __all__ = ["QSHARP_UTILS", "get_qsharp_context"]
 _PROJECT_ROOT = str(Path(__file__).parent)
 
 
-def get_qsharp_context(target_profile: TargetProfile = TargetProfile.Adaptive_RIF) -> qdk.Context:
+def get_qsharp_context(target_profile: TargetProfile = TargetProfile.Base) -> qdk.Context:
     """Create a QDK context for the vendored Q# utility project.
 
     Args:
-        target_profile: The target profile for the context. Defaults to Adaptive RIF.
+        target_profile: The target profile for the context. Defaults to Base.
 
     Returns:
         A :class:`qdk.Context` with the Q# chemistry utilities loaded.
