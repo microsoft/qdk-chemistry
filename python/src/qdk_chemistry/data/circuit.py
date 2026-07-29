@@ -233,6 +233,13 @@ class Circuit(DataClass):
                     *self._qsharp_factory.parameter.values(),
                 )
 
+            if hasattr(context, "estimate"):
+                return context.estimate(
+                    self._qsharp_factory.program,
+                    params,
+                    *self._qsharp_factory.parameter.values(),
+                )
+
             if isinstance(params, EstimatorParams):
                 estimator_params = params.as_dict()["items"] if params.has_items else [params.as_dict()]
             elif params is None:
