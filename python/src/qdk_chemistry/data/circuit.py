@@ -13,6 +13,7 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -160,7 +161,8 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self._qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            compiled_qir = context.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
@@ -195,7 +197,8 @@ class Circuit(DataClass):
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self._qsharp_factory and self.qsharp is None:
-            return qsharp.circuit(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            return context.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
@@ -222,11 +225,31 @@ class Circuit(DataClass):
 
         """
         if self._qsharp_factory is not None:
-            return qsharp.estimate(
-                self._qsharp_factory.program,
-                params,
-                *self._qsharp_factory.parameter.values(),
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            if context is qsharp:
+                return qsharp.estimate(
+                    self._qsharp_factory.program,
+                    params,
+                    *self._qsharp_factory.parameter.values(),
+                )
+
+            if isinstance(params, EstimatorParams):
+                estimator_params = params.as_dict()["items"] if params.has_items else [params.as_dict()]
+            elif params is None:
+                estimator_params = [{}]
+            elif isinstance(params, dict):
+                estimator_params = [params]
+            else:
+                estimator_params = params
+            args = context._python_args_to_interpreter_args(  # noqa: SLF001
+                tuple(self._qsharp_factory.parameter.values())
             )
+            result = context._interpreter.estimate(  # noqa: SLF001
+                json.dumps(estimator_params),
+                callable=getattr(self._qsharp_factory.program, "__global_callable"),
+                args=args,
+            )
+            return EstimatorResult(json.loads(result))
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
 
