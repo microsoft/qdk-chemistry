@@ -19,6 +19,8 @@ target_sources(chemistry PRIVATE
     scf.cpp
     stabilized_scf.cpp
     stability.cpp
+    effective_hamiltonian/swpt2_kernel.cpp
+    effective_hamiltonian/swpt2.cpp
     utils.cpp
 )
 
