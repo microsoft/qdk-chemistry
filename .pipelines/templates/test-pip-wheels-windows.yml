@@ -8,13 +8,36 @@ parameters:
 - name: condition
   type: string
   default: succeeded()
+- name: pythonEnv
+  type: string
+  default: conda
+  values:
+  - conda
+  - venv
+- name: arch
+  type: string
+  default: x64
+  values:
+  - x64
+  - arm64
 
 steps:
+# The venv path tests with the agent's own interpreter, so it has to be
+# provisioned first. Conda test envs bring their own Python and skip this.
+- ${{ if eq(parameters.pythonEnv, 'venv') }}:
+  - task: UsePythonVersion@0
+    displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
+    inputs:
+      versionSpec: '${{ parameters.pythonVersion }}'
+      ${{ if eq(parameters.arch, 'arm64') }}:
+        architecture: 'arm64'
+
 - pwsh: |
     $ErrorActionPreference = 'Stop'
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\test-pip-wheels-windows.ps1" `
       -SrcDir "$(System.DefaultWorkingDirectory)" `
       -PythonVersion '${{ parameters.pythonVersion }}' `
+      -PythonEnv '${{ parameters.pythonEnv }}' `
       -RunSlowTests '${{ parameters.runSlowTests }}'
   displayName: Test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}

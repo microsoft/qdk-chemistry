@@ -46,6 +46,12 @@ parameters:
     arch: x86_64
     march: x86-64-v3
     imageName: windows-2025-1espt
+  - name: windows_aarch64
+    os: windows
+    arch: aarch64
+    march: armv8-a
+    poolName: Azure-Pipelines-DevTools-ARM64-EO
+    imageName: windows-2025-gen2-arm64
   displayName: Target platforms
 - name: pythonVersions
   type: stringList
@@ -129,6 +135,21 @@ extends:
           parameters:
             march: x86-64-v3
 
+      # Same rationale for Windows ARM64. Runs on the 1ES ARM64 pool per the
+      # image guidance from the QDK platform team.
+      - job: Build_windows_aarch64_deps
+        pool:
+          name: Azure-Pipelines-DevTools-ARM64-EO
+          image: windows-2025-gen2-arm64
+          os: windows
+        timeoutInMinutes: 480
+        displayName: Build Windows ARM64 C++ dependencies
+        steps:
+        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+          parameters:
+            march: armv8-a
+            arch: arm64
+
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
           ${{ if eq(target.os, 'macOS') }}:
@@ -138,6 +159,12 @@ extends:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
+          ${{ elseif and(eq(target.os, 'windows'), eq(target.arch, 'aarch64')) }}:
+            dependsOn: Build_windows_aarch64_deps
+            pool:
+              name: ${{ target.poolName }}
+              image: ${{ target.imageName }}
+              os: windows
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: aqe-1es-Dpsd_v5-arm-pool
@@ -163,8 +190,10 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                Py${{ py }}:
-                  pythonVersion: ${{ py }}
+                # CPython ships win-arm64 builds only from 3.11 onwards.
+                ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
+                  Py${{ py }}:
+                    pythonVersion: ${{ py }}
             maxParallel: 5
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
@@ -252,7 +281,7 @@ extends:
                 runSlowTests: ${{ parameters.runSlowTests }}
                 condition: succeeded()
 
-          # Build - Windows x86_64
+          # Build - Windows (x86_64 and ARM64)
           - ${{ if eq(target.os, 'windows') }}:
             - template: .pipelines/templates/build-pip-wheels-windows.yml@self
               parameters:
@@ -261,14 +290,22 @@ extends:
                 enableCoverage: OFF
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
+                ${{ if eq(target.arch, 'aarch64') }}:
+                  arch: arm64
+                  # conda publishes no usable win-arm64 packages, so the ARM64
+                  # wheel is built in a venv on the agent's own interpreter.
+                  pythonEnv: venv
 
-          # Test - Windows x86_64
+          # Test - Windows (x86_64 and ARM64)
           - ${{ if eq(target.os, 'windows') }}:
             - template: .pipelines/templates/test-pip-wheels-windows.yml@self
               parameters:
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
                 condition: succeeded()
+                ${{ if eq(target.arch, 'aarch64') }}:
+                  arch: arm64
+                  pythonEnv: venv
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
@@ -384,6 +421,19 @@ extends:
           - input: pipelineArtifact
             artifactName: windows-x86_64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
+          # No 3.10 entry: CPython ships win-arm64 builds only from 3.11 onwards.
+          - input: pipelineArtifact
+            artifactName: windows-aarch64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.11
+          - input: pipelineArtifact
+            artifactName: windows-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.12
+          - input: pipelineArtifact
+            artifactName: windows-aarch64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.13
+          - input: pipelineArtifact
+            artifactName: windows-aarch64-wheels-python3.14
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels

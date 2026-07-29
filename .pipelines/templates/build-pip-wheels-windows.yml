@@ -17,6 +17,18 @@ parameters:
 - name: devTag
   type: string
   default: 'None'
+- name: arch
+  type: string
+  default: x64
+  values:
+  - x64
+  - arm64
+- name: pythonEnv
+  type: string
+  default: conda
+  values:
+  - conda
+  - venv
 
 steps:
 - checkout: self
@@ -24,6 +36,16 @@ steps:
   path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
+
+# The venv path builds on the agent's own interpreter, so it has to be provisioned
+# first. Conda builds bring their own Python and skip this.
+- ${{ if eq(parameters.pythonEnv, 'venv') }}:
+  - task: UsePythonVersion@0
+    displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
+    inputs:
+      versionSpec: '${{ parameters.pythonVersion }}'
+      ${{ if eq(parameters.arch, 'arm64') }}:
+        architecture: 'arm64'
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
@@ -33,11 +55,11 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
-# Also resolves the MSVC toolset version for the dependency cache key.
-- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
-  displayName: Set up MSVC environment
+# Also resolves the MSVC toolset version and vcpkg triplet for the cache keys.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1 -Arch ${{ parameters.arch }}
+  displayName: Set up MSVC environment (${{ parameters.arch }})
 
 # Restore the dependency build dirs separately to avoid a known Windows issue
 # with Cache@2 multi-line `path`: the task passes both lines as a single tar
@@ -46,7 +68,7 @@ steps:
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
       vcpkg-overlay/**/* |
@@ -58,7 +80,7 @@ steps:
   displayName: Restore/save C++ deps install cache
   inputs:
     key: >-
-      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
@@ -77,6 +99,8 @@ steps:
         -BuildTesting   "${{ parameters.buildTesting }}" `
         -EnableCoverage "${{ parameters.enableCoverage }}" `
         -ClPath         "$(CL_PATH)" `
+        -Triplet        "$(VCPKG_TRIPLET)" `
+        -PythonEnv      "${{ parameters.pythonEnv }}" `
         -PythonVersion  "${{ parameters.pythonVersion }}" `
         -DevTag         "${{ parameters.devTag }}"
   displayName: Build C++ library, run tests, build Python wheel

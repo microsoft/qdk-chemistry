@@ -5,6 +5,12 @@ parameters:
 - name: buildType
   type: string
   default: Release
+- name: arch
+  type: string
+  default: x64
+  values:
+  - x64
+  - arm64
 
 steps:
 - checkout: self
@@ -13,17 +19,17 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
-# Also resolves the MSVC toolset version for the dependency cache key.
-- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
-  displayName: Set up MSVC environment
+# Also resolves the MSVC toolset version and vcpkg triplet for the cache keys.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1 -Arch ${{ parameters.arch }}
+  displayName: Set up MSVC environment (${{ parameters.arch }})
 
 - task: Cache@2
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
       vcpkg-overlay/**/* |
@@ -35,7 +41,7 @@ steps:
   displayName: Restore/save C++ deps install cache
   inputs:
     key: >-
-      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
@@ -48,6 +54,7 @@ steps:
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -BuildType "${{ parameters.buildType }}" `
+        -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)"
   displayName: Build and install C++ dependencies
   condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
