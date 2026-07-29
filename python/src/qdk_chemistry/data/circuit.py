@@ -226,12 +226,6 @@ class Circuit(DataClass):
         """
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
-            if context is qsharp:
-                return qsharp.estimate(
-                    self._qsharp_factory.program,
-                    params,
-                    *self._qsharp_factory.parameter.values(),
-                )
 
             if hasattr(context, "estimate"):
                 return context.estimate(
@@ -240,23 +234,6 @@ class Circuit(DataClass):
                     *self._qsharp_factory.parameter.values(),
                 )
 
-            if isinstance(params, EstimatorParams):
-                estimator_params = params.as_dict()["items"] if params.has_items else [params.as_dict()]
-            elif params is None:
-                estimator_params = [{}]
-            elif isinstance(params, dict):
-                estimator_params = [params]
-            else:
-                estimator_params = params
-            args = context._python_args_to_interpreter_args(  # noqa: SLF001
-                tuple(self._qsharp_factory.parameter.values())
-            )
-            result = context._interpreter.estimate(  # noqa: SLF001
-                json.dumps(estimator_params),
-                callable=getattr(self._qsharp_factory.program, "__global_callable"),
-                args=args,
-            )
-            return EstimatorResult(json.loads(result))
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
 
