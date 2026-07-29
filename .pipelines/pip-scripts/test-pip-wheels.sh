@@ -17,11 +17,14 @@ export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
     # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    # Note: azure.archive.ubuntu.com only carries amd64/i386. Non-x86 architectures
+    # (e.g. arm64) live under ubuntu-ports and must go to azure.ports.ubuntu.com,
+    # otherwise apt gets a 404 for binary-<arch>/Packages and exits with code 100.
     _cfs_apt_redirect() {
         sed -i \
             -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
             -e 's|https\?://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
-            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.ports.ubuntu.com/ubuntu-ports|g' \
             "$1"
     }
     [ -f /etc/apt/sources.list.d/ubuntu.sources ] && _cfs_apt_redirect /etc/apt/sources.list.d/ubuntu.sources

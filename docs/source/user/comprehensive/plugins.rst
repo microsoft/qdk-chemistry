@@ -304,7 +304,7 @@ Defining a new algorithm type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
-This section demonstrates the complete process using a geometry optimizer as an example.
+This section demonstrates the complete process using a molecular descriptor calculator as an example.
 
 .. rubric:: Interface design
 
@@ -313,9 +313,9 @@ The first step is to specify the algorithm's interface:
 Input type
    The data the algorithm operates on (e.g., ``Structure``)
 Output type
-   The data the algorithm produces (e.g., optimized ``Structure``)
+   The data the algorithm produces (e.g., a floating-point molecular descriptor)
 Configuration
-   Required settings (e.g., convergence thresholds, iteration limits)
+   Required settings (e.g., whether to normalize the descriptor)
 
 .. rubric:: Settings class definition
 
@@ -325,15 +325,15 @@ Define a settings class containing all configuration parameters:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-settings
-      :end-before: # end-cell-geometry-settings
+      :start-after: # start-cell-descriptor-settings
+      :end-before: # end-cell-descriptor-settings
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-settings
-      :end-before: // end-cell-geometry-settings
+      :start-after: // start-cell-descriptor-settings
+      :end-before: // end-cell-descriptor-settings
 
 .. rubric:: Base class definition
 
@@ -343,15 +343,15 @@ Define an abstract base class specifying the interface for all implementations:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-base-class
-      :end-before: # end-cell-geometry-base-class
+      :start-after: # start-cell-descriptor-base-class
+      :end-before: # end-cell-descriptor-base-class
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-base-class
-      :end-before: // end-cell-geometry-base-class
+      :start-after: // start-cell-descriptor-base-class
+      :end-before: // end-cell-descriptor-base-class
 
 .. rubric:: Factory definition
 
@@ -361,15 +361,15 @@ The factory manages implementation registration and provides instance creation:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-factory
-      :end-before: # end-cell-geometry-factory
+      :start-after: # start-cell-descriptor-factory
+      :end-before: # end-cell-descriptor-factory
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-factory
-      :end-before: // end-cell-geometry-factory
+      :start-after: // start-cell-descriptor-factory
+      :end-before: // end-cell-descriptor-factory
 
 .. rubric:: Concrete implementations
 
@@ -379,22 +379,22 @@ Implement the algorithm by inheriting from the base class:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-implementations
-      :end-before: # end-cell-geometry-implementations
+      :start-after: # start-cell-descriptor-implementations
+      :end-before: # end-cell-descriptor-implementations
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-implementations
-      :end-before: // end-cell-geometry-implementations
+      :start-after: // start-cell-descriptor-implementations
+      :end-before: // end-cell-descriptor-implementations
 
 Additional implementations follow the same pattern:
 
 .. literalinclude:: ../../_static/examples/python/custom_plugin.py
    :language: python
-   :start-after: # start-cell-steepest-descent
-   :end-before: # end-cell-steepest-descent
+   :start-after: # start-cell-mass-descriptor
+   :end-before: # end-cell-mass-descriptor
 
 .. rubric:: Registration
 
@@ -404,15 +404,15 @@ Register the factory and all implementations:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-registration
-      :end-before: # end-cell-geometry-registration
+      :start-after: # start-cell-descriptor-registration
+      :end-before: # end-cell-descriptor-registration
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-registration
-      :end-before: // end-cell-geometry-registration
+      :start-after: // start-cell-descriptor-registration
+      :end-before: // end-cell-descriptor-registration
 
 .. rubric:: Usage
 
@@ -420,8 +420,8 @@ Following registration, the new algorithm type is accessible through the standar
 
 .. literalinclude:: ../../_static/examples/python/custom_plugin.py
    :language: python
-   :start-after: # start-cell-geometry-usage
-   :end-before: # end-cell-geometry-usage
+   :start-after: # start-cell-descriptor-usage
+   :end-before: # end-cell-descriptor-usage
 
 For additional information on the factory pattern and settings system, refer to the
 :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`settings <algorithms/settings>` documentation.
