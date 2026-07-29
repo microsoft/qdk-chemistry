@@ -11,7 +11,6 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    FactorizedHamiltonianContainer,
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,

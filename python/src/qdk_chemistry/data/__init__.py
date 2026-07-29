@@ -118,8 +118,8 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_operator import PauliLCUContainer, QubitHamiltonian, QubitOperator
-from qdk_chemistry.data.qubit_operator_containers.base import QubitOperatorContainer
-from qdk_chemistry.data.sossa_qubit_operator import (
+from qdk_chemistry.data.qubit_operator.containers import (
+    QubitOperatorContainer,
     RotatedPauliContainer,
     SOSSAContainer,
 )

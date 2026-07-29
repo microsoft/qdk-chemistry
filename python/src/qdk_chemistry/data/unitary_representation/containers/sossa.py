@@ -42,9 +42,6 @@ class SOSSAInnerPrepare:
     num_inner_qubits: int
     r"""Number of qubits in the :math:`b` register: :math:`\lceil\log_2(B+1)\rceil`."""
 
-    num_bases: int
-    """Number of bases B (B+1 entries including identity term)."""
-
     free_rider_data: np.ndarray | None = None
     r"""Optional 2D boolean array, shape :math:`[X_o, n_{\text{fr}}]`.
 
@@ -58,7 +55,6 @@ class SOSSAInnerPrepare:
         data: dict[str, Any] = {
             "conditional_coefficients": self.conditional_coefficients.tolist(),
             "num_inner_qubits": self.num_inner_qubits,
-            "num_bases": self.num_bases,
         }
         if self.free_rider_data is not None:
             data["free_rider_data"] = self.free_rider_data.tolist()
@@ -71,7 +67,6 @@ class SOSSAInnerPrepare:
         return cls(
             conditional_coefficients=np.array(data["conditional_coefficients"], dtype=float),
             num_inner_qubits=data["num_inner_qubits"],
-            num_bases=data["num_bases"],
             free_rider_data=fr_data,
         )
 
@@ -79,7 +74,6 @@ class SOSSAInnerPrepare:
         """Save to HDF5."""
         group.create_dataset("conditional_coefficients", data=self.conditional_coefficients)
         group.attrs["num_inner_qubits"] = self.num_inner_qubits
-        group.attrs["num_bases"] = self.num_bases
         if self.free_rider_data is not None:
             group.create_dataset("free_rider_data", data=self.free_rider_data)
 
@@ -90,7 +84,6 @@ class SOSSAInnerPrepare:
         return cls(
             conditional_coefficients=np.array(group["conditional_coefficients"]),
             num_inner_qubits=int(group.attrs["num_inner_qubits"]),
-            num_bases=int(group.attrs["num_bases"]),
             free_rider_data=free_rider,
         )
 
@@ -110,18 +103,6 @@ class SOSSASelect:
     two_body_rotation_angles: np.ndarray
     r"""Givens rotation angles for SF generators, shape :math:`[R \cdot (B+1), N-1]`."""
 
-    num_orbitals: int
-    """Number of spatial orbitals N (system register size = 2N spin-orbitals)."""
-
-    num_ranks: int
-    """Number of DFTHC ranks R."""
-
-    num_copies: int
-    """Number of copies C."""
-
-    num_bases: int
-    """Number of bases B."""
-
     num_positive_one_body_terms: int
     """Number of D1 entries (indices [0, num_d1) in x_o)."""
 
@@ -130,10 +111,6 @@ class SOSSASelect:
         return {
             "one_body_rotation_angles": self.one_body_rotation_angles.tolist(),
             "two_body_rotation_angles": self.two_body_rotation_angles.tolist(),
-            "num_orbitals": self.num_orbitals,
-            "num_ranks": self.num_ranks,
-            "num_copies": self.num_copies,
-            "num_bases": self.num_bases,
             "num_positive_one_body_terms": self.num_positive_one_body_terms,
         }
 
@@ -143,10 +120,6 @@ class SOSSASelect:
         return cls(
             one_body_rotation_angles=np.array(data["one_body_rotation_angles"], dtype=float),
             two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float),
-            num_orbitals=data["num_orbitals"],
-            num_ranks=data["num_ranks"],
-            num_copies=data["num_copies"],
-            num_bases=data["num_bases"],
             num_positive_one_body_terms=data["num_positive_one_body_terms"],
         )
 
@@ -154,10 +127,6 @@ class SOSSASelect:
         """Save to HDF5."""
         group.create_dataset("one_body_rotation_angles", data=self.one_body_rotation_angles)
         group.create_dataset("two_body_rotation_angles", data=self.two_body_rotation_angles)
-        group.attrs["num_orbitals"] = self.num_orbitals
-        group.attrs["num_ranks"] = self.num_ranks
-        group.attrs["num_copies"] = self.num_copies
-        group.attrs["num_bases"] = self.num_bases
         group.attrs["num_positive_one_body_terms"] = self.num_positive_one_body_terms
 
     @classmethod
@@ -166,10 +135,6 @@ class SOSSASelect:
         return cls(
             one_body_rotation_angles=np.array(group["one_body_rotation_angles"]),
             two_body_rotation_angles=np.array(group["two_body_rotation_angles"]),
-            num_orbitals=int(group.attrs["num_orbitals"]),
-            num_ranks=int(group.attrs["num_ranks"]),
-            num_copies=int(group.attrs["num_copies"]),
-            num_bases=int(group.attrs["num_bases"]),
             num_positive_one_body_terms=int(group.attrs["num_positive_one_body_terms"]),
         )
 
@@ -195,6 +160,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         outer_prepare: "Wavefunction",
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
+        num_orbitals: int,
+        num_ranks: int,
+        num_bases: int,
+        num_copies: int,
         normalization: float,
         power: int = 1,
         energy_shift: float = 0.0,
@@ -205,6 +174,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             outer_prepare: The outer PREPARE Wavefunction.
             inner_prepare: The inner (conditional) PREPARE oracle data.
             select: The SELECT oracle data (Givens rotations + Spin swap + Majorana).
+            num_orbitals: Number of spatial orbitals N (system register = 2N spin-orbitals).
+            num_ranks: Number of DFTHC ranks R.
+            num_bases: Number of bases B (B+1 entries including identity term).
+            num_copies: Number of copies C.
             normalization: The block encoding normalization :math:`\Lambda`.
             power: Number of times to apply the walk operator.
             energy_shift: Energy shift :math:`E_{\text{SOS}} + E_{\text{nuc}}`
@@ -215,6 +188,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         self.outer_prepare = outer_prepare
         self.inner_prepare = inner_prepare
         self.select = select
+        self.num_orbitals = num_orbitals
+        self.num_ranks = num_ranks
+        self.num_bases = num_bases
+        self.num_copies = num_copies
         self.normalization = normalization
         self.energy_shift = energy_shift
 
@@ -234,12 +211,12 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         This doesn't equal the total qubits of SOSSA since the SOSSA circuit allocate
         and free ancillary qubits internally.
         """
-        num_system = 2 * self.select.num_orbitals
+        num_system = 2 * self.num_orbitals
         # Outer register: ceil(log2(x_o_dim))
-        x_o_dim = self.select.num_orbitals + self.select.num_ranks * self.select.num_copies
+        x_o_dim = self.num_orbitals + self.num_ranks * self.num_copies
         num_outer = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
         # Inner register: b bits + free-rider bits
-        num_ranks = self.select.num_ranks
+        num_ranks = self.num_ranks
         rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits  # isSF + dvsq + rank
         num_inner = self.inner_prepare.num_inner_qubits + num_free_rider_bits
@@ -259,6 +236,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             "power": self.power,
             "normalization": self.normalization,
             "energy_shift": self.energy_shift,
+            "num_orbitals": self.num_orbitals,
+            "num_ranks": self.num_ranks,
+            "num_bases": self.num_bases,
+            "num_copies": self.num_copies,
             "outer_prepare": self.outer_prepare.to_json(),
             "inner_prepare": self.inner_prepare.to_json(),
             "select": self.select.to_json(),
@@ -272,6 +253,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         group.attrs["power"] = self.power
         group.attrs["normalization"] = self.normalization
         group.attrs["energy_shift"] = self.energy_shift
+        group.attrs["num_orbitals"] = self.num_orbitals
+        group.attrs["num_ranks"] = self.num_ranks
+        group.attrs["num_bases"] = self.num_bases
+        group.attrs["num_copies"] = self.num_copies
         _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
         self.inner_prepare.to_hdf5(group.create_group("inner_prepare"))
         self.select.to_hdf5(group.create_group("select"))
@@ -291,6 +276,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
+            num_orbitals=json_data["num_orbitals"],
+            num_ranks=json_data["num_ranks"],
+            num_bases=json_data["num_bases"],
+            num_copies=json_data["num_copies"],
             normalization=json_data["normalization"],
             power=json_data.get("power", 1),
             energy_shift=json_data.get("energy_shift", 0.0),
@@ -306,6 +295,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
+            num_orbitals=int(group.attrs["num_orbitals"]),
+            num_ranks=int(group.attrs["num_ranks"]),
+            num_bases=int(group.attrs["num_bases"]),
+            num_copies=int(group.attrs["num_copies"]),
             normalization=float(group.attrs["normalization"]),
             power=int(group.attrs["power"]),
             energy_shift=float(group.attrs.get("energy_shift", 0.0)),
@@ -313,10 +306,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the SOSSA container."""
-        n = self.select.num_orbitals
-        r = self.select.num_ranks
-        b = self.select.num_bases
-        c = self.select.num_copies
+        n = self.num_orbitals
+        r = self.num_ranks
+        b = self.num_bases
+        c = self.num_copies
         return (
             f"SOSSA Container (DFTHC block encoding):\n"
             f"  Power: {self.power}\n"

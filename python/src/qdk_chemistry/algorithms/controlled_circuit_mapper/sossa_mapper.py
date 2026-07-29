@@ -141,15 +141,15 @@ class SOSSAMapper(ControlledCircuitMapper):
         algorithm = self._settings.get("select_algorithm")
         rot_bits = self._settings.get("rotation_bit_precision")
 
-        num_ranks = container.select.num_ranks
+        num_ranks = container.num_ranks
         rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits
 
         select_data = {
-            "numOrbitals": container.select.num_orbitals,
-            "numRanks": container.select.num_ranks,
-            "numBases": container.select.num_bases,
-            "numCopies": container.select.num_copies,
+            "numOrbitals": container.num_orbitals,
+            "numRanks": container.num_ranks,
+            "numBases": container.num_bases,
+            "numCopies": container.num_copies,
             "numPositiveOneBody": container.select.num_positive_one_body_terms,
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
@@ -167,13 +167,13 @@ class SOSSAMapper(ControlledCircuitMapper):
     
     def _compute_register_sizes(self, container: SOSSAWalkContainer) -> dict[str, int]:
         """Compute register sizes from container structure and settings."""
-        num_orbitals = container.select.num_orbitals
+        num_orbitals = container.num_orbitals
         num_system_qubits = 2 * num_orbitals
-        x_o_dim = num_orbitals + container.select.num_ranks * container.select.num_copies
+        x_o_dim = num_orbitals + container.num_ranks * container.num_copies
         xo_bits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
-        num_bases = container.select.num_bases
+        num_bases = container.num_bases
         b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
-        num_ranks = container.select.num_ranks
+        num_ranks = container.num_ranks
         rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits
 
