@@ -13,14 +13,11 @@ from qdk_chemistry.data import (
     QubitOperator,
     QubitOperatorContainer,
     RotatedPauliContainer,
-    SOSContainer,
+    SOSSAContainer,
 )
 from qdk_chemistry.data.sossa_qubit_operator import (
-    FermionParity,
     RotatedMode,
     RotatedPauliTerm,
-    SOSGenerator,
-    SOSGeneratorKind,
     SpinPolicy,
 )
 
@@ -87,7 +84,7 @@ def test_rotated_pauli_container_is_a_qubit_operator_container() -> None:
 
 
 def test_sos_container_nests_qubit_operators() -> None:
-    """SOS generators contain wrapped Pauli representations."""
+    """SOS generators are wrapped Pauli representations carrying spin-policy metadata."""
     mode = RotatedMode(np.array([1.0, 0.0]), spin=0)
     nested = QubitOperator(
         RotatedPauliContainer(
@@ -95,21 +92,16 @@ def test_sos_container_nests_qubit_operators() -> None:
             num_qubits=4,
             encoding="jordan-wigner",
             fermion_mode_order="blocked",
+            spin_policy=SpinPolicy.Specific,
+            source_index=(0,),
         )
     )
-    generator = SOSGenerator(
-        SOSGeneratorKind.D1,
-        FermionParity.Odd,
-        SpinPolicy.Specific,
-        nested,
-        spin=0,
-    )
-    container = SOSContainer(2, 4, 0.0, [generator], "jordan-wigner", "blocked")
+    container = SOSSAContainer(2, 4, 0.0, [nested], "jordan-wigner", "blocked")
     operator = QubitOperator(container)
 
-    assert operator.get_container_type() == "sos"
-    assert container.generators[0].operator is nested
+    assert operator.get_container_type() == "sossa"
+    assert container.generators[0] is nested
     assert container.normalization == pytest.approx(0.125)
     restored = QubitOperator.from_json(operator.to_json())
-    assert restored.get_container_type() == "sos"
-    assert isinstance(restored.get_container().generators[0].operator, QubitOperator)
+    assert restored.get_container_type() == "sossa"
+    assert isinstance(restored.get_container().generators[0], QubitOperator)

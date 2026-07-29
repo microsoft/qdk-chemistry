@@ -12,13 +12,10 @@ import numpy as np
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.sossa_qubit_operator import (
-    FermionParity,
     RotatedMode,
     RotatedPauliContainer,
     RotatedPauliTerm,
-    SOSContainer,
-    SOSGenerator,
-    SOSGeneratorKind,
+    SOSSAContainer,
     SpinPolicy,
 )
 
@@ -49,10 +46,9 @@ class SOSSAQubitMapper(QubitMapper):
         num_orbitals: int,
         weight: float,
         creation: bool,
-        kind: SOSGeneratorKind,
         source_index: int,
-    ) -> SOSGenerator:
-        """Construct one spin component of a D1 or Q1 generator."""
+    ) -> QubitOperator:
+        """Construct one spin component of a one-body (D1 or Q1) generator."""
         mode = spin * num_orbitals
         scale = sqrt(weight) / 2.0
         rotated_mode = RotatedMode(basis_vector, spin)
@@ -64,14 +60,15 @@ class SOSSAQubitMapper(QubitMapper):
                 rotated_mode,
             ),
         )
-        operator = QubitOperator(RotatedPauliContainer(terms, mapping.num_qubits, mapping.name, "blocked"))
-        return SOSGenerator(
-            kind,
-            FermionParity.Odd,
-            SpinPolicy.Specific,
-            operator,
-            spin=spin,
-            source_index=(source_index,),
+        return QubitOperator(
+            RotatedPauliContainer(
+                terms,
+                mapping.num_qubits,
+                mapping.name,
+                "blocked",
+                spin_policy=SpinPolicy.Specific,
+                source_index=(source_index,),
+            )
         )
 
     @classmethod
@@ -90,13 +87,12 @@ class SOSSAQubitMapper(QubitMapper):
             raise ValueError("SOSSAQubitMapper does not support tapered mappings")
 
         eigenvalues, eigenvectors = np.linalg.eigh(np.asarray(container.get_h1_majorana(), dtype=float))
-        generators: list[SOSGenerator] = []
+        generators: list[QubitOperator] = []
         source_index = 0
         for positive in (True, False):
             for index, eigenvalue in enumerate(eigenvalues):
                 if (positive and eigenvalue <= 0.0) or (not positive and eigenvalue >= 0.0):
                     continue
-                kind = SOSGeneratorKind.D1 if positive else SOSGeneratorKind.Q1
                 for spin in (0, 1):
                     generators.append(
                         cls._one_body_generator(
@@ -106,7 +102,6 @@ class SOSSAQubitMapper(QubitMapper):
                             num_orbitals,
                             abs(float(eigenvalue)),
                             creation=not positive,
-                            kind=kind,
                             source_index=source_index,
                         )
                     )
@@ -135,14 +130,16 @@ class SOSSAQubitMapper(QubitMapper):
                                 RotatedMode(basis_vector, spin),
                             )
                         )
-                operator = QubitOperator(RotatedPauliContainer(terms, mapping.num_qubits, mapping.name, "blocked"))
                 generators.append(
-                    SOSGenerator(
-                        SOSGeneratorKind.SF,
-                        FermionParity.Even,
-                        SpinPolicy.Summed,
-                        operator,
-                        source_index=(rank, copy),
+                    QubitOperator(
+                        RotatedPauliContainer(
+                            terms,
+                            mapping.num_qubits,
+                            mapping.name,
+                            "blocked",
+                            spin_policy=SpinPolicy.Summed,
+                            source_index=(rank, copy),
+                        )
                     )
                 )
 
@@ -158,7 +155,7 @@ class SOSSAQubitMapper(QubitMapper):
             container.get_core_energy() + container.get_bliss_shift() - 2.0 * negative_sum - 0.5 * w0_square_sum
         )
         return QubitOperator(
-            SOSContainer(
+            SOSSAContainer(
                 num_orbitals,
                 mapping.num_qubits,
                 energy_shift,

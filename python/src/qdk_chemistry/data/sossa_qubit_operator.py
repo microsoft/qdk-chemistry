@@ -26,34 +26,16 @@ if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_operator import QubitOperator
 
 __all__ = [
-    "FermionParity",
     "RotatedMode",
     "RotatedPauliContainer",
     "RotatedPauliTerm",
-    "SOSContainer",
-    "SOSGenerator",
-    "SOSGeneratorKind",
+    "SOSSAContainer",
     "SpinPolicy",
 ]
 
 
-class SOSGeneratorKind(Enum):
-    """Kind of fermionic sum-of-squares generator."""
-
-    D1 = "d1"
-    Q1 = "q1"
-    SF = "sf"
-
-
-class FermionParity(Enum):
-    """Fermion parity of a sum-of-squares generator."""
-
-    Even = "even"
-    Odd = "odd"
-
-
 class SpinPolicy(Enum):
-    """Spin metadata carried by a sum-of-squares generator."""
+    """Spin treatment of a sum-of-squares generator (per-channel vs. spin-summed)."""
 
     Specific = "specific"
     Summed = "summed"
@@ -108,10 +90,14 @@ class RotatedPauliContainer(QubitOperatorContainer):
         num_qubits: int,
         encoding: str | None,
         fermion_mode_order: str | None,
+        spin_policy: SpinPolicy | None = None,
+        source_index: Sequence[int] = (),
     ) -> None:
         """Initialize a rotated-Pauli container."""
         self.terms = tuple(terms)
         self._num_qubits = num_qubits
+        self.spin_policy = spin_policy
+        self.source_index = tuple(source_index)
         if not self.terms or num_qubits <= 0:
             raise ValueError("a rotated-Pauli container requires terms and positive num_qubits")
         super().__init__(encoding, fermion_mode_order)
@@ -161,6 +147,8 @@ class RotatedPauliContainer(QubitOperatorContainer):
                 "num_qubits": self.num_qubits,
                 "encoding": self.encoding,
                 "fermion_mode_order": str(self.fermion_mode_order) if self.fermion_mode_order is not None else None,
+                "spin_policy": self.spin_policy.value if self.spin_policy is not None else None,
+                "source_index": list(self.source_index),
                 "terms": terms,
             }
         )
@@ -182,7 +170,15 @@ class RotatedPauliContainer(QubitOperatorContainer):
             coefficient = complex(item["coefficient"]["real"], item["coefficient"]["imag"])
             center = {int(key): value for key, value in item["center"].items()}
             terms.append(RotatedPauliTerm(coefficient, center, mode))
-        return cls(terms, json_data["num_qubits"], json_data.get("encoding"), json_data.get("fermion_mode_order"))
+        spin_policy = json_data.get("spin_policy")
+        return cls(
+            terms,
+            json_data["num_qubits"],
+            json_data.get("encoding"),
+            json_data.get("fermion_mode_order"),
+            SpinPolicy(spin_policy) if spin_policy is not None else None,
+            tuple(json_data.get("source_index", ())),
+        )
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> RotatedPauliContainer:
@@ -195,46 +191,19 @@ class RotatedPauliContainer(QubitOperatorContainer):
         return f"Rotated Pauli Operator\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.terms)}\n"
 
 
-@dataclass(frozen=True, eq=False)
-class SOSGenerator:
-    """One generator in a sum-of-squares representation."""
-
-    kind: SOSGeneratorKind
-    parity: FermionParity
-    spin_policy: SpinPolicy
-    operator: QubitOperator
-    spin: int | None = None
-    source_index: tuple[int, ...] = ()
-
-    def __post_init__(self) -> None:
-        """Validate generator metadata and nested operator type."""
-        from qdk_chemistry.data.qubit_operator import QubitOperator  # noqa: PLC0415
-
-        if not isinstance(self.operator, QubitOperator):
-            raise TypeError("SOSGenerator requires a QubitOperator")
-        object.__setattr__(self, "source_index", tuple(self.source_index))
-        is_sf = self.kind == SOSGeneratorKind.SF
-        if is_sf != (self.parity == FermionParity.Even) or is_sf != (self.spin_policy == SpinPolicy.Summed):
-            raise ValueError("generator kind, parity, and spin policy disagree")
-        if (self.spin_policy == SpinPolicy.Specific) != (self.spin is not None):
-            raise ValueError("invalid generator spin metadata")
-        if self.spin is not None and self.spin not in (0, 1):
-            raise ValueError("invalid generator spin metadata")
-
-    @property
-    def lcu_normalization(self) -> float:
-        """Return the nested operator LCU normalization."""
-        container = self.operator.get_container()
-        if not isinstance(container, RotatedPauliContainer):
-            from qdk_chemistry.data.qubit_operator import PauliLCUContainer  # noqa: PLC0415
-
-            if isinstance(container, PauliLCUContainer):
-                return container.schatten_norm
-            raise TypeError("SOS generators require rotated-Pauli or Pauli-LCU containers")
+def _generator_lcu_normalization(operator: QubitOperator) -> float:
+    """Return the LCU normalization of a sum-of-squares generator operator."""
+    container = operator.get_container()
+    if isinstance(container, RotatedPauliContainer):
         return container.lcu_normalization
+    from qdk_chemistry.data.qubit_operator import PauliLCUContainer  # noqa: PLC0415
+
+    if isinstance(container, PauliLCUContainer):
+        return container.schatten_norm
+    raise TypeError("SOS generators require rotated-Pauli or Pauli-LCU containers")
 
 
-class SOSContainer(QubitOperatorContainer):
+class SOSSAContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator."""
 
     def __init__(
@@ -242,25 +211,29 @@ class SOSContainer(QubitOperatorContainer):
         num_spatial_orbitals: int,
         num_qubits: int,
         energy_shift: float,
-        generators: Sequence[SOSGenerator],
+        generators: Sequence[QubitOperator],
         encoding: str | None,
         fermion_mode_order: str | None,
     ) -> None:
         """Initialize a sum-of-squares container."""
+        from qdk_chemistry.data.qubit_operator import QubitOperator  # noqa: PLC0415
+
         self.num_spatial_orbitals = num_spatial_orbitals
         self._num_qubits = num_qubits
         self.energy_shift = float(energy_shift)
         self.generators = tuple(generators)
         if num_spatial_orbitals <= 0 or num_qubits <= 0 or not self.generators or not isfinite(self.energy_shift):
             raise ValueError("invalid sum-of-squares container")
-        if any(generator.operator.num_qubits != num_qubits for generator in self.generators):
+        if any(not isinstance(generator, QubitOperator) for generator in self.generators):
+            raise TypeError("SOSSAContainer generators must be QubitOperators")
+        if any(generator.num_qubits != num_qubits for generator in self.generators):
             raise ValueError("generator dimensions do not match the SOS container")
         super().__init__(encoding, fermion_mode_order)
 
     @property
     def type(self) -> str:
         """Return the container type."""
-        return "sos"
+        return "sossa"
 
     @property
     def num_qubits(self) -> int:
@@ -270,7 +243,7 @@ class SOSContainer(QubitOperatorContainer):
     @property
     def square_root_normalization(self) -> float:
         """Return the square-root normalization."""
-        return float(sqrt(sum(generator.lcu_normalization**2 for generator in self.generators)))
+        return float(sqrt(sum(_generator_lcu_normalization(generator) ** 2 for generator in self.generators)))
 
     @property
     def normalization(self) -> float:
@@ -292,17 +265,7 @@ class SOSContainer(QubitOperatorContainer):
                 "energy_shift": self.energy_shift,
                 "encoding": self.encoding,
                 "fermion_mode_order": str(self.fermion_mode_order) if self.fermion_mode_order is not None else None,
-                "generators": [
-                    {
-                        "kind": generator.kind.value,
-                        "parity": generator.parity.value,
-                        "spin_policy": generator.spin_policy.value,
-                        "operator": generator.operator.to_json(),
-                        "spin": generator.spin,
-                        "source_index": list(generator.source_index),
-                    }
-                    for generator in self.generators
-                ],
+                "generators": [generator.to_json() for generator in self.generators],
             }
         )
 
@@ -313,22 +276,12 @@ class SOSContainer(QubitOperatorContainer):
         group.attrs["payload"] = json.dumps(self.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> SOSContainer:
+    def from_json(cls, json_data: dict[str, Any]) -> SOSSAContainer:
         """Create a sum-of-squares container from JSON."""
         from qdk_chemistry.data.qubit_operator import QubitOperator  # noqa: PLC0415
 
         cls._validate_json_version(cls._serialization_version, json_data)
-        generators = tuple(
-            SOSGenerator(
-                SOSGeneratorKind(item["kind"]),
-                FermionParity(item["parity"]),
-                SpinPolicy(item["spin_policy"]),
-                QubitOperator.from_json(item["operator"]),
-                item.get("spin"),
-                tuple(item.get("source_index", ())),
-            )
-            for item in json_data["generators"]
-        )
+        generators = tuple(QubitOperator.from_json(item) for item in json_data["generators"])
         return cls(
             json_data["num_spatial_orbitals"],
             json_data["num_qubits"],
@@ -339,7 +292,7 @@ class SOSContainer(QubitOperatorContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> SOSContainer:
+    def from_hdf5(cls, group: h5py.Group) -> SOSSAContainer:
         """Create a sum-of-squares container from HDF5."""
         cls._validate_hdf5_version(cls._serialization_version, group)
         return cls.from_json(json.loads(group.attrs["payload"]))

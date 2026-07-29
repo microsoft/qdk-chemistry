@@ -121,7 +121,7 @@ from qdk_chemistry.data.qubit_operator import PauliLCUContainer, QubitHamiltonia
 from qdk_chemistry.data.qubit_operator_containers.base import QubitOperatorContainer
 from qdk_chemistry.data.sossa_qubit_operator import (
     RotatedPauliContainer,
-    SOSContainer,
+    SOSSAContainer,
 )
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
@@ -183,7 +183,7 @@ __all__ = [
     "QubitOperator",
     "QubitOperatorContainer",
     "RotatedPauliContainer",
-    "SOSContainer",
+    "SOSSAContainer",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",

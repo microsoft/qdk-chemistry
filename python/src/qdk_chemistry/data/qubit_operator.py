@@ -17,6 +17,7 @@ import numpy as np
 from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator_containers.base import QubitOperatorContainer
+from qdk_chemistry.data.sossa_qubit_operator import RotatedPauliContainer, SOSSAContainer
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
@@ -780,13 +781,9 @@ class QubitOperator(DataClass):
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
         elif container_type == "rotated_pauli":
-            from qdk_chemistry.data.sossa_qubit_operator import RotatedPauliContainer  # noqa: PLC0415
-
             container = RotatedPauliContainer.from_json(json_data)
-        elif container_type == "sos":
-            from qdk_chemistry.data.sossa_qubit_operator import SOSContainer  # noqa: PLC0415
-
-            container = SOSContainer.from_json(json_data)
+        elif container_type == "sossa":
+            container = SOSSAContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)
@@ -798,13 +795,9 @@ class QubitOperator(DataClass):
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
         elif container_type == "rotated_pauli":
-            from qdk_chemistry.data.sossa_qubit_operator import RotatedPauliContainer  # noqa: PLC0415
-
             container = RotatedPauliContainer.from_hdf5(group)
-        elif container_type == "sos":
-            from qdk_chemistry.data.sossa_qubit_operator import SOSContainer  # noqa: PLC0415
-
-            container = SOSContainer.from_hdf5(group)
+        elif container_type == "sossa":
+            container = SOSSAContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)

@@ -26,7 +26,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .test_helpers import create_test_orbitals
@@ -587,7 +587,7 @@ class TestSOSSAQPEIntegration:
         builder = SOSSABuilder()
         unitary_rep = builder.run(fh)
         container = unitary_rep.get_container()
-        assert isinstance(container, SOSSAContainer)
+        assert isinstance(container, SOSSAWalkContainer)
 
         # Step 2: SOSSAMapper → Circuit
         mapper = SOSSAMapper()

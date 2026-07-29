@@ -26,9 +26,9 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
-    SOSSAContainer,
     SOSSAInnerPrepare,
     SOSSASelect,
+    SOSSAWalkContainer,
 )
 from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
@@ -47,7 +47,7 @@ def _to_sossa_operator(factorized_hamiltonian):
 
 
 def _make_sossa_unitary_representation():
-    """Build a UnitaryRepresentation with SOSSAContainer."""
+    """Build a UnitaryRepresentation with SOSSAWalkContainer."""
     num_orbitals = 2
     num_ranks = 2
     num_bases = 1
@@ -108,7 +108,7 @@ def _make_sossa_unitary_representation():
     lambda_sqrt = np.sum(np.abs(outer_coefficients) * inner_l1)
     normalization = 0.5 * lambda_sqrt**2
 
-    container = SOSSAContainer(
+    container = SOSSAWalkContainer(
         outer_prepare=outer_prepare,
         inner_prepare=inner_prepare,
         select=select,
@@ -124,7 +124,7 @@ def _make_sossa_unitary_representation():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestSOSSAContainer:
+class TestSOSSAWalkContainer:
     """Tests for the SOSSA container serialization."""
 
     def test_json_roundtrip(self):
@@ -133,7 +133,7 @@ class TestSOSSAContainer:
         container = result.get_container()
 
         json_data = container.to_json()
-        restored = SOSSAContainer.from_json(json_data)
+        restored = SOSSAWalkContainer.from_json(json_data)
 
         assert restored.type == container.type
         assert restored.power == container.power
@@ -164,7 +164,7 @@ class TestSOSSAContainer:
             with h5py.File(filepath, "w") as f:
                 container.to_hdf5(f)
             with h5py.File(filepath, "r") as f:
-                restored = SOSSAContainer.from_hdf5(f)
+                restored = SOSSAWalkContainer.from_hdf5(f)
 
         assert restored.type == container.type
         assert restored.power == container.power
@@ -179,8 +179,8 @@ class TestSOSSAContainer:
         json_data = result.to_json()
         restored = UnitaryRepresentation.from_json(json_data)
 
-        assert restored.get_container_type() == "sossa"
-        assert isinstance(restored.get_container(), SOSSAContainer)
+        assert restored.get_container_type() == "sossa_walk"
+        assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
     def test_get_summary(self):
         """Test that get_summary returns a non-empty string."""
@@ -264,7 +264,7 @@ class TestSOSSABuilder:
     def test_requires_sossa_qubit_operator(self):
         fh = create_random_factorized_hamiltonian()
 
-        with pytest.raises(TypeError, match="QubitOperator containing an SOSContainer"):
+        with pytest.raises(TypeError, match="QubitOperator containing an SOSSAContainer"):
             SOSSABuilder().run(fh)
 
     def test_preserves_operator_scalars(self):
@@ -299,7 +299,7 @@ class TestSOSSABuilder:
         result = builder.run(_to_sossa_operator(fh))
         container = result.get_container()
 
-        assert isinstance(container, SOSSAContainer)
+        assert isinstance(container, SOSSAWalkContainer)
         x_o_dim = num_orbitals + num_ranks * num_copies
         assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim

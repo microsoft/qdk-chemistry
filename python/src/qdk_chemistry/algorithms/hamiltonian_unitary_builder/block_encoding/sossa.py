@@ -18,16 +18,16 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     QubitOperator,
     RotatedPauliContainer,
-    SOSContainer,
+    SOSSAContainer,
     StateVectorContainer,
     UnitaryRepresentation,
     Wavefunction,
 )
-from qdk_chemistry.data.sossa_qubit_operator import RotatedMode, SOSGenerator, SOSGeneratorKind
+from qdk_chemistry.data.sossa_qubit_operator import RotatedMode, SpinPolicy
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
-    SOSSAContainer,
     SOSSAInnerPrepare,
     SOSSASelect,
+    SOSSAWalkContainer,
 )
 
 __all__: list[str] = ["SOSSABuilder", "SOSSASettings"]
@@ -68,10 +68,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         """Build the SOSSA block encoding from qubit operator.
 
         Args:
-            qubit_hamiltonian: Qubit operator with SOSContainer.
+            qubit_hamiltonian: Qubit operator with SOSSAContainer.
 
         Returns:
-            UnitaryRepresentation wrapping the SOSSAContainer.
+            UnitaryRepresentation wrapping the SOSSAWalkContainer.
 
         """
         sossa_container = self._require_sos_container(qubit_hamiltonian)
@@ -129,7 +129,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             num_positive_one_body_terms=num_d1,
         )
 
-        container = SOSSAContainer(
+        container = SOSSAWalkContainer(
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
@@ -141,23 +141,23 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _require_sos_container(value: QubitOperator) -> SOSContainer:
+    def _require_sos_container(value: QubitOperator) -> SOSSAContainer:
         if not isinstance(value, QubitOperator):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSSAContainer")
         container = value.get_container()
-        if not isinstance(container, SOSContainer):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+        if not isinstance(container, SOSSAContainer):
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSSAContainer")
         return container
 
     @staticmethod
-    def _require_rotated_pauli_container(generator: SOSGenerator) -> RotatedPauliContainer:
-        container = generator.operator.get_container()
+    def _require_rotated_pauli_container(generator: QubitOperator) -> RotatedPauliContainer:
+        container = generator.get_container()
         if not isinstance(container, RotatedPauliContainer):
             raise TypeError("SOSSABuilder requires each SOS generator to contain a RotatedPauliContainer")
         return container
 
     @staticmethod
-    def _rotated_modes(generator: SOSGenerator) -> list[RotatedMode]:
+    def _rotated_modes(generator: QubitOperator) -> list[RotatedMode]:
         modes: list[RotatedMode] = []
         for term in SOSSABuilder._require_rotated_pauli_container(generator).terms:
             mode = term.mode
@@ -166,26 +166,40 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return modes
 
     @staticmethod
+    def _is_positive_one_body(container: RotatedPauliContainer) -> bool:
+        """Classify a one-body generator as D1 (positive) from its imaginary term sign."""
+        dominant = max(container.terms, key=lambda term: abs(term.coefficient.imag))
+        return dominant.coefficient.imag > 0.0
+
+    @staticmethod
     def _extract_oracle_data(
-        sossa_container: SOSContainer,
+        sossa_container: SOSSAContainer,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, int, int]:
         """Extract the current SOSSA Q# oracle layout from structured generators."""
-        one_body: dict[tuple[SOSGeneratorKind, int], list[SOSGenerator]] = {}
-        spin_free: dict[tuple[int, int], SOSGenerator] = {}
+        one_body: dict[int, list[QubitOperator]] = {}
+        spin_free: dict[tuple[int, int], QubitOperator] = {}
 
         for generator in sossa_container.generators:
-            source_index = tuple(generator.source_index)
-            if generator.kind in (SOSGeneratorKind.D1, SOSGeneratorKind.Q1):
+            container = SOSSABuilder._require_rotated_pauli_container(generator)
+            source_index = tuple(container.source_index)
+            if container.spin_policy == SpinPolicy.Specific:
                 if len(source_index) != 1:
-                    raise ValueError("D1 and Q1 generators require a one-dimensional source index")
-                one_body.setdefault((generator.kind, source_index[0]), []).append(generator)
-            elif generator.kind == SOSGeneratorKind.SF:
+                    raise ValueError("one-body generators require a one-dimensional source index")
+                one_body.setdefault(source_index[0], []).append(generator)
+            elif container.spin_policy == SpinPolicy.Summed:
                 if len(source_index) != 2 or source_index in spin_free:
                     raise ValueError("SF generators require a unique (rank, copy) source index")
                 spin_free[source_index] = generator
+            else:
+                raise ValueError("each SOS generator requires a spin policy")
 
-        d1_keys = sorted(key for key in one_body if key[0] == SOSGeneratorKind.D1)
-        q1_keys = sorted(key for key in one_body if key[0] == SOSGeneratorKind.Q1)
+        d1_keys: list[int] = []
+        q1_keys: list[int] = []
+        for key, generators in one_body.items():
+            container = SOSSABuilder._require_rotated_pauli_container(generators[0])
+            (d1_keys if SOSSABuilder._is_positive_one_body(container) else q1_keys).append(key)
+        d1_keys.sort()
+        q1_keys.sort()
         ordered_one_body = d1_keys + q1_keys
         n_orbitals = sossa_container.num_spatial_orbitals
         if len(ordered_one_body) != n_orbitals or not spin_free:
@@ -194,25 +208,28 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         one_body_vectors: list[np.ndarray] = []
         outer_coefficients: list[float] = []
         for key in ordered_one_body:
-            generators_by_spin: dict[int, SOSGenerator] = {}
+            generators_by_spin: dict[int, QubitOperator] = {}
             for generator in one_body[key]:
-                if generator.spin is None or generator.spin in generators_by_spin:
-                    raise ValueError("each D1 or Q1 mode requires one generator per spin channel")
-                generators_by_spin[generator.spin] = generator
+                modes = SOSSABuilder._rotated_modes(generator)
+                if not modes:
+                    raise ValueError("a one-body generator requires a rotated mode")
+                spin = modes[0].spin
+                if spin in generators_by_spin:
+                    raise ValueError("each one-body mode requires one generator per spin channel")
+                generators_by_spin[spin] = generator
             if set(generators_by_spin) != {0, 1}:
-                raise ValueError("each D1 or Q1 mode requires one generator per spin channel")
+                raise ValueError("each one-body mode requires one generator per spin channel")
             spin_pair = [generators_by_spin[0], generators_by_spin[1]]
-            modes = SOSSABuilder._rotated_modes(spin_pair[0])
-            if not modes:
-                raise ValueError("a D1 or Q1 generator requires a rotated mode")
-            basis_vector = np.asarray(modes[0].basis_vector, dtype=float)
+            basis_vector = np.asarray(SOSSABuilder._rotated_modes(spin_pair[0])[0].basis_vector, dtype=float)
             partner_modes = SOSSABuilder._rotated_modes(spin_pair[1])
             if not partner_modes or not np.allclose(basis_vector, partner_modes[0].basis_vector):
-                raise ValueError("spin-paired D1 or Q1 generators must use the same rotated mode")
-            if not np.isclose(spin_pair[0].lcu_normalization, spin_pair[1].lcu_normalization):
-                raise ValueError("spin-paired D1 or Q1 generators must have equal normalization")
+                raise ValueError("spin-paired one-body generators must use the same rotated mode")
+            norm = SOSSABuilder._require_rotated_pauli_container(spin_pair[0]).lcu_normalization
+            partner_norm = SOSSABuilder._require_rotated_pauli_container(spin_pair[1]).lcu_normalization
+            if not np.isclose(norm, partner_norm):
+                raise ValueError("spin-paired one-body generators must have equal normalization")
             one_body_vectors.append(basis_vector)
-            outer_coefficients.append(sqrt(2.0) * spin_pair[0].lcu_normalization)
+            outer_coefficients.append(sqrt(2.0) * norm)
 
         n_ranks = max(rank for rank, _ in spin_free) + 1
         n_copies = max(copy for _, copy in spin_free) + 1
@@ -252,7 +269,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                         raise ValueError("Jordan-Wigner SF spin pairs require equal real coefficients")
                     row.append(float(coefficient.real) * 2.0 * sqrt(2.0))
                 inner_coefficients.append([*row, identity_weight])
-                outer_coefficients.append(generator.lcu_normalization)
+                outer_coefficients.append(SOSSABuilder._require_rotated_pauli_container(generator).lcu_normalization)
 
         return (
             np.asarray(outer_coefficients),

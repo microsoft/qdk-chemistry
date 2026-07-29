@@ -24,7 +24,7 @@ from .quantum_walk import QuantumWalkContainer
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
 
-__all__ = ["SOSSAContainer", "SOSSAInnerPrepare", "SOSSASelect"]
+__all__ = ["SOSSAInnerPrepare", "SOSSASelect", "SOSSAWalkContainer"]
 
 
 @dataclass(frozen=True)
@@ -174,7 +174,7 @@ class SOSSASelect:
         )
 
 
-class SOSSAContainer(QuantumWalkContainer):
+class SOSSAWalkContainer(QuantumWalkContainer):
     r"""Container for the Sum of Squares Spectral Amplification (SOSSA) block encoding.
 
     The walk operator is (:cite:`Low2025`, Eq. 77):
@@ -199,7 +199,7 @@ class SOSSAContainer(QuantumWalkContainer):
         power: int = 1,
         energy_shift: float = 0.0,
     ) -> None:
-        r"""Initialize a SOSSAContainer.
+        r"""Initialize a SOSSAWalkContainer.
 
         Args:
             outer_prepare: The outer PREPARE Wavefunction.
@@ -250,10 +250,10 @@ class SOSSAContainer(QuantumWalkContainer):
     @property
     def type(self) -> str:
         """Get the type of the unitary container."""
-        return "sossa"
+        return "sossa_walk"
 
     def to_json(self) -> dict[str, Any]:
-        """Save the SOSSAContainer to a JSON-serializable dictionary."""
+        """Save the SOSSAWalkContainer to a JSON-serializable dictionary."""
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
@@ -266,7 +266,7 @@ class SOSSAContainer(QuantumWalkContainer):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the SOSSAContainer to an HDF5 group."""
+        """Save the SOSSAWalkContainer to an HDF5 group."""
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
@@ -277,8 +277,8 @@ class SOSSAContainer(QuantumWalkContainer):
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "SOSSAContainer":
-        """Create a SOSSAContainer from a JSON dictionary."""
+    def from_json(cls, json_data: dict[str, Any]) -> "SOSSAWalkContainer":
+        """Create a SOSSAWalkContainer from a JSON dictionary."""
         cls._validate_json_version(cls._serialization_version, json_data)
 
         from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
@@ -297,8 +297,8 @@ class SOSSAContainer(QuantumWalkContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "SOSSAContainer":
-        """Load a SOSSAContainer from an HDF5 group."""
+    def from_hdf5(cls, group: h5py.Group) -> "SOSSAWalkContainer":
+        """Load a SOSSAWalkContainer from an HDF5 group."""
         outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
@@ -347,11 +347,11 @@ class SOSSAContainer(QuantumWalkContainer):
         phi = phase_fraction % 1.0
         return float(self.normalization * (1.0 + np.cos(2.0 * np.pi * phi)) + self.energy_shift)
 
-    def combine(self, other: "SOSSAContainer") -> "SOSSAContainer":  # type: ignore[override]
+    def combine(self, other: "SOSSAWalkContainer") -> "SOSSAWalkContainer":  # type: ignore[override]
         """Not supported for SOSSA containers.
 
         Raises:
             NotImplementedError: Always.
 
         """
-        raise NotImplementedError("SOSSAContainer does not support combining containers.")
+        raise NotImplementedError("SOSSAWalkContainer does not support combining containers.")

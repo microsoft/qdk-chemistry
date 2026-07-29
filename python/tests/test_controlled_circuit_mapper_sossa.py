@@ -32,7 +32,7 @@ def _build_controlled_unitary(
     *,
     seed: int = 42,
 ) -> UnitaryRepresentation:
-    """Helper: build UnitaryRepresentation with SOSSAContainer from random factorized data."""
+    """Helper: build UnitaryRepresentation with SOSSAWalkContainer from random factorized data."""
     fh = create_random_factorized_hamiltonian(
         num_orbitals=num_orbitals,
         num_ranks=num_ranks,
@@ -276,10 +276,10 @@ class TestSOSSAMapper:
         assert mapper.settings().get("coefficient_bit_precision") == 10
 
     def test_rejects_non_sossa_container(self):
-        """Verify SOSSAMapper raises ValueError for non-SOSSAContainer containers."""
+        """Verify SOSSAMapper raises ValueError for non-SOSSAWalkContainer containers."""
 
         class MockContainer:
-            """Mock container that is not a SOSSAContainer."""
+            """Mock container that is not a SOSSAWalkContainer."""
 
             @property
             def type(self):

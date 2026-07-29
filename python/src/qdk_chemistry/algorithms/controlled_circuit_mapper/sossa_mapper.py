@@ -11,7 +11,7 @@ from typing import Any
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -75,7 +75,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         """Return the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    def build_outer_prep(self, container: SOSSAContainer) -> Any:
+    def build_outer_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# outer PREPARE callable.
 
         Args:
@@ -98,7 +98,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op  # noqa: SLF001
 
-    def build_inner_prep(self, container: SOSSAContainer) -> Any:
+    def build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.
 
         Creates a superposition over bases :math:`b` conditioned on :math:`x_o`.
@@ -124,7 +124,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, free_rider_data, coeff_bits)
         return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
 
-    def build_select(self, container: SOSSAContainer) -> Any:
+    def build_select(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the SELECT step.
 
         Algorithms:
@@ -165,7 +165,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         """Whether a persistent phase gradient register must be allocated."""
         return self._settings.get("select_algorithm") == "qrom_phase_gradient"
     
-    def _compute_register_sizes(self, container: SOSSAContainer) -> dict[str, int]:
+    def _compute_register_sizes(self, container: SOSSAWalkContainer) -> dict[str, int]:
         """Compute register sizes from container structure and settings."""
         num_orbitals = container.select.num_orbitals
         num_system_qubits = 2 * num_orbitals
@@ -216,10 +216,10 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         """
         unitary_container = unitary.get_container()
-        if not isinstance(unitary_container, SOSSAContainer):
+        if not isinstance(unitary_container, SOSSAWalkContainer):
             raise ValueError(
                 f"The {unitary.get_container_type()} container type is not supported. "
-                "SOSSAMapper only supports SOSSAContainer."
+                "SOSSAMapper only supports SOSSAWalkContainer."
             )
 
         control_indices = self._get_control_indices()
@@ -265,7 +265,7 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-    def num_ancillary_qubits(self, container: SOSSAContainer) -> int:
+    def num_ancillary_qubits(self, container: SOSSAWalkContainer) -> int:
         """The number of ancillary qubits used by external algorithms like phase estimation."""
         regs = self._compute_register_sizes(container)
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
