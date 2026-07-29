@@ -60,32 +60,7 @@ class SOSSAMapperSettings(ControlledCircuitMapperSettings):
 
 
 class SOSSAMapper(ControlledCircuitMapper):
-    r"""Controlled circuit mapper for the SOSSA walk operator.
-
-    Composes a controlled SOSSA walk step from three sub-operations built
-    directly as methods on this class:
-
-    1. :meth:`build_outer_prep` — outer PREPARE (amplitude-loading into
-       :math:`x_o` register), resolved via an ``AlgorithmRef`` state_prep setting.
-    2. :meth:`build_inner_prep` — inner (controlled) PREPARE over bases.
-    3. :meth:`build_select` — SELECT (multiplexed Givens rotations + Spin Swap +
-        Majorana).
-
-    The walk operator (:cite:`Low2025`, Eq. 77):
-
-    .. math::
-
-        W = \mathrm{Ref}_{a,B} \cdot U^\dagger \cdot \mathrm{Ref}_B \cdot U
-
-    Configuration:
-        - ``outer_prepare``: AlgorithmRef for state preparation (like LCU).
-          Supports ``"alias_sampling"``, ``"dense_pure_state"``, ``"qrom"``.
-        - ``inner_prepare_algorithm``: ``"controlled_alias_sampling"`` or ``"direct"``.
-        - ``select_algorithm``: ``"qrom_phase_gradient"`` or ``"direct"``.
-        - ``rotation_bit_precision``: bits for Givens angle precision (b_rot).
-        - ``coefficient_bit_precision``: bits for alias sampling coefficients.
-
-    """
+    r"""Controlled circuit mapper for the SOSSA walk operator."""
 
     def __init__(self):
         """Initialize the SOSSAMapper."""
@@ -100,16 +75,8 @@ class SOSSAMapper(ControlledCircuitMapper):
         """Return the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Sub-operation builders
-    # ═══════════════════════════════════════════════════════════════════════════
-
     def build_outer_prep(self, container: SOSSAContainer) -> Any:
         r"""Build the Q# outer PREPARE callable.
-
-        Resolves the ``outer_prepare`` AlgorithmRef setting to a state
-        preparation algorithm, runs it on the container's outer_prepare
-        wavefunction, and returns the Q# callable.
 
         Args:
             container: The SOSSA container with outer_prepare coefficients.
@@ -121,33 +88,15 @@ class SOSSAMapper(ControlledCircuitMapper):
         ref: AlgorithmRef = self._settings.get("outer_prepare")
         if ref.algorithm_name == "dense_pure_state":
             # Use MakeOuterPreparePureState directly to avoid the endianness
-            # mismatch in DensePureStatePreparation. The Wavefunction's
-            # determinant bit encoding does not align with the little-endian
-            # address convention used by Select/ApplyControlledOnInt, causing
-            # outer indices to be loaded with incorrect free-rider data.
+            # mismatch
             coeffs = [float(c) for c in container.outer_prepare.get_coefficients()]
             n_qubits = self._compute_register_sizes(container)["num_outer_qubits"]
             n_padded = 1 << n_qubits
             padded = coeffs + [0.0] * (n_padded - len(coeffs))
             return QSHARP_UTILS.SOSSAWalk.MakeOuterPreparePureState(padded)
         prepare_algorithm = self._create_nested("outer_prepare")
-        # Ensure the alias sampling precision matches the mapper's
-        # coefficient_bit_precision so register sizes are consistent.
-        if self.outer_prepare_needs_alias_reflection and hasattr(prepare_algorithm, "_bits_precision"):
-            prepare_algorithm._bits_precision = self.outer_prepare_coefficient_bits  # noqa: SLF001
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op  # noqa: SLF001
-
-    @property
-    def outer_prepare_needs_alias_reflection(self) -> bool:
-        """Whether the outer prepare uses alias sampling (needs keep/mu reflection)."""
-        ref: AlgorithmRef = self._settings.get("outer_prepare")
-        return ref.algorithm_name == "alias_sampling"
-
-    @property
-    def outer_prepare_coefficient_bits(self) -> int:
-        """Get coefficient bit precision for outer prepare."""
-        return self._settings.get("coefficient_bit_precision")
 
     def build_inner_prep(self, container: SOSSAContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.
@@ -156,7 +105,7 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         Algorithms:
             - ``"controlled_alias_sampling"``: 2D alias sampling with free-rider data.
-            - ``"direct"``: Direct coherent preparation (ControlledPureStatePrep).
+            - ``"direct"``: Direct multiplexed preparation (ControlledPureStatePrep).
 
         Args:
             container: The SOSSA container with inner_prepare coefficients.
@@ -168,25 +117,19 @@ class SOSSAMapper(ControlledCircuitMapper):
         algorithm = self._settings.get("inner_prepare_algorithm")
         coeff_bits = self._settings.get("coefficient_bit_precision")
         coefficients = container.inner_prepare.conditional_coefficients.tolist()
-        fr = container.inner_prepare.free_rider_data
-        fr_data = fr.tolist() if fr is not None else []
+        free_rider_data = container.inner_prepare.free_rider_data
+        free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
-            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, fr_data, coeff_bits)
-        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, fr_data)
-
-    @property
-    def inner_prepare_needs_alias_reflection(self) -> bool:
-        """Whether the inner prepare uses alias sampling (needs keep reflection)."""
-        return self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling"
+            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, free_rider_data, coeff_bits)
+        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
 
     def build_select(self, container: SOSSAContainer) -> Any:
-        r"""Build the Q# SELECT callable (multiplexed Givens rotations).
+        r"""Build the SELECT step.
 
         Algorithms:
-            - ``"qrom_phase_gradient"``: Load angles via QROM, apply via phase
-              gradient adders. (Paper Tables A-D)
-            - ``"direct"``: Direct rotation synthesis. (Paper Table E)
+            - ``"qrom_phase_gradient"``: Load angles via QROM, apply via phase gradient adders.
+            - ``"direct"``: Direct rotation synthesis.
 
         Args:
             container: The SOSSA container with rotation angles and structure.
@@ -218,15 +161,11 @@ class SOSSAMapper(ControlledCircuitMapper):
         return QSHARP_UTILS.SOSSAWalk.MakeSelectDirectRotation(select_data)
 
     @property
-    def select_needs_phase_gradient(self) -> bool:
+    def uses_phase_gradient(self) -> bool:
         """Whether a persistent phase gradient register must be allocated."""
         return self._settings.get("select_algorithm") == "qrom_phase_gradient"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Register size computation
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    def _compute_register_sizes(self, container: SOSSAContainer) -> dict:
+    
+    def _compute_register_sizes(self, container: SOSSAContainer) -> dict[str, int]:
         """Compute register sizes from container structure and settings."""
         num_orbitals = container.select.num_orbitals
         num_system_qubits = 2 * num_orbitals
@@ -238,13 +177,14 @@ class SOSSAMapper(ControlledCircuitMapper):
         rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
         num_free_rider_bits = 2 + rank_bits
 
-        if self.outer_prepare_needs_alias_reflection:
-            mu_outer = self.outer_prepare_coefficient_bits
+        outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
+        if outer_ref.algorithm_name == "alias_sampling":
+            mu_outer = self._settings.get("coefficient_bit_precision")
             num_outer_qubits = 2 * xo_bits + 2 * mu_outer + 1
         else:
             num_outer_qubits = xo_bits
 
-        if self.inner_prepare_needs_alias_reflection:
+        if self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling":
             mu_inner = self._settings.get("coefficient_bit_precision")
             num_inner_qubits = 2 * b_bits + 2 * mu_inner + 3 + num_free_rider_bits
             num_reflect_inner = b_bits + mu_inner + 1
@@ -252,9 +192,8 @@ class SOSSAMapper(ControlledCircuitMapper):
             num_inner_qubits = b_bits + num_free_rider_bits
             num_reflect_inner = b_bits
 
-        # Phase gradient register: allocated by QPE, used by QROM-based SELECT
         num_phase_gradient_qubits = (
-            self._settings.get("rotation_bit_precision") if self.select_needs_phase_gradient else 0
+            self._settings.get("rotation_bit_precision") if self.uses_phase_gradient else 0
         )
 
         return {
@@ -266,16 +205,11 @@ class SOSSAMapper(ControlledCircuitMapper):
             "num_phase_gradient_qubits": num_phase_gradient_qubits,
         }
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Circuit construction
-    # ═══════════════════════════════════════════════════════════════════════════
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled SOSSA walk step circuit.
 
         Args:
-            unitary: The unitary representation containing the SOSSA
-                decomposition (outer/inner PREPARE and SELECT data).
+            unitary: The unitary representation containing the SOSSA decomposition.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled SOSSA walk step.
@@ -290,14 +224,13 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
-            raise ValueError("SOSSAMapper currently only supports a single control qubit.")
+            raise ValueError("SOSSAMapper only supports a single control qubit.")
 
         power = unitary_container.power
 
         outer_prepare_op = self.build_outer_prep(unitary_container)
         inner_prepare_op = self.build_inner_prep(unitary_container)
         select_op = self.build_select(unitary_container)
-
         regs = self._compute_register_sizes(unitary_container)
 
         walk_params = {
@@ -333,75 +266,20 @@ class SOSSAMapper(ControlledCircuitMapper):
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
     def num_ancillary_qubits(self, container: SOSSAContainer) -> int:
-        """Calculate the number of ancillary qubits required for the SOSSA circuit.
-
-        Args:
-            container: The SOSSA container with decomposition data.
-
-        Returns:
-            The number of ancillary qubits required.
-
-        """
+        """The number of ancillary qubits used by external algorithms like phase estimation."""
         regs = self._compute_register_sizes(container)
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
         return regs["num_outer_qubits"] + regs["num_inner_qubits"] + num_spin_qubits + regs["num_phase_gradient_qubits"]
 
     def get_ancilla_prep_op(self) -> Any:
-        """Return the Q# ancilla preparation op for SOSSA (phase gradient init).
+        """Return the Q# ancilla preparation op for external algorithms like phase estimation.
 
         Returns:
             A Q# callable ``Qubit[] => Unit is Adj`` that prepares the phase gradient state
             on the block-encoding ancillas, or a no-op if phase gradient is not needed.
 
         """
-        if self.select_needs_phase_gradient:
+        if self.uses_phase_gradient:
             rot_bits = self._settings.get("rotation_bit_precision")
             return QSHARP_UTILS.PhaseGradient.MakePhaseGradientAncillaPrep(rot_bits)
         return QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
-
-    def build_estimate_circuit(
-        self,
-        container: SOSSAContainer,
-        num_queries: int,
-    ) -> Circuit:
-        """Build a resource-estimation circuit using RepeatEstimates.
-
-        Instead of tracing through each walk step individually (expensive
-        for large query counts), this evaluates a single controlled walk step
-        and multiplies the cost by ``num_queries`` via ``RepeatEstimates``.
-
-        Args:
-            container: The SOSSA container with decomposition data.
-            num_queries: Total number of walk operator queries
-                (e.g. ceil(pi * lambda / (2 * sigma)) for Heisenberg-limited QPE).
-
-        Returns:
-            Circuit with a ``qsharp_factory`` targeting
-            ``EstimateSOSSAWalkCircuit``.
-
-        """
-        outer_prepare_op = self.build_outer_prep(container)
-        inner_prepare_op = self.build_inner_prep(container)
-        select_op = self.build_select(container)
-
-        regs = self._compute_register_sizes(container)
-
-        estimate_params = {
-            "outerPrepareOp": outer_prepare_op,
-            "innerPrepareOp": inner_prepare_op,
-            "selectOp": select_op,
-            "numSystemQubits": regs["num_system_qubits"],
-            "numOuterQubits": regs["num_outer_qubits"],
-            "numOuterIndexQubits": regs["num_outer_index_qubits"],
-            "numInnerQubits": regs["num_inner_qubits"],
-            "numReflectInner": regs["num_reflect_inner"],
-            "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],
-            "numQueries": num_queries,
-        }
-
-        return Circuit(
-            qsharp_factory=QsharpFactoryData(
-                program=QSHARP_UTILS.SOSSAWalk.EstimateSOSSAWalkCircuit,
-                parameter=estimate_params,
-            )
-        )

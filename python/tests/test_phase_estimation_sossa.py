@@ -295,7 +295,7 @@ def _run_sossa_iqpe(num_bits, mapper_kwargs=None):
     result phase, and asserts it matches k_expect from exact diagonalization.
     """
     data = _build_h2_dfthc_data()
-    n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
+    n_orb = data["N"]
 
     # Build reference Hamiltonian matrix and diagonalize
     h_matrix = _build_dfthc_hamiltonian_matrix(
@@ -307,14 +307,11 @@ def _run_sossa_iqpe(num_bits, mapper_kwargs=None):
     orbitals = create_test_orbitals(n_orb)
     inactive_fock = np.zeros((n_orb, n_orb))
     fh = FactorizedHamiltonianContainer(
-        n_ranks,
-        n_bases,
-        n_copies,
         0.0,
         data["basis_vectors"].flatten(),
         data["two_body_weights"].flatten(),
-        data["h1"],
         data["identity_weight"],
+        data["h1"],
         inactive_fock,
         orbitals,
     )
@@ -386,7 +383,7 @@ def _run_sossa_standard_qpe(num_bits, mapper_kwargs=None):
     for individual bitstrings, but merging conjugate pairs resolves the correct phase.
     """
     data = _build_h2_dfthc_data()
-    n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
+    n_orb = data["N"]
 
     # Build reference Hamiltonian matrix and diagonalize
     h_matrix = _build_dfthc_hamiltonian_matrix(
@@ -398,14 +395,11 @@ def _run_sossa_standard_qpe(num_bits, mapper_kwargs=None):
     orbitals = create_test_orbitals(n_orb)
     inactive_fock = np.zeros((n_orb, n_orb))
     fh = FactorizedHamiltonianContainer(
-        n_ranks,
-        n_bases,
-        n_copies,
         0.0,
         data["basis_vectors"].flatten(),
         data["two_body_weights"].flatten(),
-        data["h1"],
         data["identity_weight"],
+        data["h1"],
         inactive_fock,
         orbitals,
     )
@@ -492,7 +486,7 @@ class TestSOSSAQPEIntegration:
         encoding, and verifies the measured energy matches exact diagonalization.
         """
         data = _build_h2_dfthc_data()
-        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
+        n_orb = data["N"]
 
         # Build the Hamiltonian matrix for reference diagonalization
         h_matrix = _build_dfthc_hamiltonian_matrix(
@@ -512,14 +506,11 @@ class TestSOSSAQPEIntegration:
         inactive_fock = np.zeros((n_orb, n_orb))
 
         fh = FactorizedHamiltonianContainer(
-            n_ranks,
-            n_bases,
-            n_copies,
             0.0,
             u_matrices,
             w_matrices,
-            h1,
             wb_matrix,
+            h1,
             inactive_fock,
             orbitals,
         )
@@ -577,20 +568,17 @@ class TestSOSSAQPEIntegration:
         to verify the workflow end-to-end.
         """
         data = _build_h2_dfthc_data()
-        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
+        n_orb = data["N"]
 
         # Create FactorizedHamiltonianContainer
         orbitals = create_test_orbitals(n_orb)
         inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
-            n_ranks,
-            n_bases,
-            n_copies,
             0.0,
             data["basis_vectors"].flatten(),
             data["two_body_weights"].flatten(),
-            data["h1"],
             data["identity_weight"],
+            data["h1"],
             inactive_fock,
             orbitals,
         )
@@ -634,19 +622,16 @@ class TestSOSSAQPEIntegration:
         must satisfy 0 ≤ E ≤ 2Λ.
         """
         data = _build_h2_dfthc_data()
-        n_orb, n_ranks, n_bases, n_copies = data["N"], data["R"], data["B"], data["C"]
+        n_orb = data["N"]
 
         orbitals = create_test_orbitals(n_orb)
         inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
-            n_ranks,
-            n_bases,
-            n_copies,
             0.0,
             data["basis_vectors"].flatten(),
             data["two_body_weights"].flatten(),
-            data["h1"],
             data["identity_weight"],
+            data["h1"],
             inactive_fock,
             orbitals,
         )

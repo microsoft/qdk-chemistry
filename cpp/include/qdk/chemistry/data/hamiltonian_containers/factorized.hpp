@@ -16,23 +16,22 @@
 namespace qdk::chemistry::data {
 
 /**
+ * @class FactorizedHamiltonianContainer
  * @brief Restricted, spin-free double-factorized THC Hamiltonian container.
  *
- * Stores U, W, identity weights, and SOS metadata. See Low et al.,
+ * Stores factorized matrices and metadata. See Low et al.,
  * arXiv:2502.15882.
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Construct a restricted factorized Hamiltonian.
-   * @param num_ranks Number of ranks R.
-   * @param num_bases Number of bases B.
-   * @param num_copies Number of copies C.
+   *                                                                                                                                                                                                                                                            
    * @param core_energy Nuclear and inactive-core energy.
    * @param u_matrices U factors, flattened as [R,B,N].
    * @param w_matrices W factors, flattened as [R,B,C].
-   * @param one_body_integrals One-body integrals [N,N].
    * @param wb_matrix Identity weights [R,C].
+   * @param one_body_integrals One-body integrals [N,N].
    * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
    * @param bliss_shift BLISS core shift.
@@ -41,19 +40,16 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @throws std::invalid_argument if dimensions or required data are invalid.
    */
   FactorizedHamiltonianContainer(
-      size_t num_ranks, size_t num_bases, size_t num_copies, double core_energy,
-      const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
+      double core_energy, const Eigen::VectorXd& u_matrices,
+      const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& inactive_fock_matrix,
       std::shared_ptr<Orbitals> orbitals, double bliss_shift = 0.0,
       double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
-  /** @brief Destroy the container. */
+  /** @brief Destructor. */
   ~FactorizedHamiltonianContainer() override = default;
-
-  // === HamiltonianContainer overrides ===
 
   /** @brief Create a deep copy. */
   std::unique_ptr<HamiltonianContainer> clone() const override final;
@@ -77,7 +73,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param k Third orbital index.
    * @param l Fourth orbital index.
    * @param channel Ignored; the integrals are restricted.
-   * @return The element at [i,j,k,l].
+   * @return Four-center two-electron integral (ij|kl)
    * @throws std::runtime_error if U or W is empty.
    * @throws std::out_of_range if an index is outside [0,N).
    */
@@ -91,7 +87,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Always true. */
   bool is_restricted() const override final;
 
-  /** @return Whether required data and factor dimensions are valid. */
+  /** @return Whether required data and dimensions are valid. */
   bool is_valid() const override final;
 
   /** @brief Serialize to JSON. */
@@ -116,8 +112,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   static std::unique_ptr<FactorizedHamiltonianContainer> from_hdf5(
       H5::Group& group);
 
-  // === Factorized-specific accessors ===
-
   /** @return U flattened in [R,B,N] order. */
   const Eigen::VectorXd& get_u_matrices() const;
 
@@ -130,13 +124,13 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Number N of active spatial orbitals. */
   size_t get_num_orbitals() const;
 
-  /** @return Number of ranks R. */
+  /** @return Number of ranks R, inferred from the WB rows. */
   size_t get_num_ranks() const;
 
-  /** @return Number of bases B. */
+  /** @return Number of bases B, inferred from the U length. */
   size_t get_num_bases() const;
 
-  /** @return Number of copies C. */
+  /** @return Number of copies C, inferred from the WB columns. */
   size_t get_num_copies() const;
 
   /** @return BLISS energy shift. */
@@ -184,12 +178,9 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   Eigen::VectorXd _u;   ///< Flat U matrices [R*B*N]
   Eigen::VectorXd _w;   ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;  ///< Identity weights [R x C]
+  Eigen::MatrixXd _wb;  ///< Identity weights [R*C]
 
-  size_t _num_ranks;   ///< R
-  size_t _num_bases;   ///< B
-  size_t _num_copies;  ///< C
-
+  // TODO: add the full bliss object for one-body/two-body shifts.
   double _bliss_shift;  ///< BLISS energy shift
   double _energy_gap;   ///< E_gap for SOS block encoding
 

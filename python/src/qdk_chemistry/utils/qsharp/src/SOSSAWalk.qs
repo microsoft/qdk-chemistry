@@ -33,7 +33,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.TableLookup.Select;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
-    import Std.ResourceEstimation.RepeatEstimates;
     import Std.ResourceEstimation.SingleVariant;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
     import Std.Arithmetic.RippleCarryCGIncByLE;
@@ -43,7 +42,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Inner PREPARE factories
+    // Inner PREPARE
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Build an inner PREPARE using conditional alias sampling (2D QROM).
@@ -65,8 +64,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let mu = coefficientBitPrecision;
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let qromEnd = 2 * nIndexBits + 2 * mu + 2;
-        // innerReg layout: indexReg[nIdx] + uniformReg[mu] + flag[1]
-        //   + qromOut[mu + nIdx + 2] + freeRiderReg[nFR]
         (outerReg, innerReg) => {
             let indexReg = innerReg[0..nIndexBits - 1];
             let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
@@ -110,13 +107,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 []
             };
 
-            // Step 1: Load free-rider data (G, r) via QROM indexed by x_o.
             if nFreeRider > 0 {
                 Select(freeRiderData, outerReg, freeRiderReg);
             }
 
-            // Step 2: Controlled PreparePureStateD on b register, indexed by x_o.
-            // Only needed for SF terms where there's a nontrivial b-superposition.
             let xo = Length(innerCoefficients);
             for i in 0..xo - 1 {
                 let nPadded = 1 <<< nIndexBits;
@@ -132,7 +126,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // SELECT factories
+    // SELECT
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Parameters for SELECT factory functions.
@@ -154,7 +148,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Build a SELECT using QROM + phase gradient rotation.
     ///
     /// Givens rotations are applied via split OneBody/TwoBody Select QROM + RyViaPhaseGradient.
-    /// This is the production implementation for fault-tolerant resource estimation.
     /// The phase gradient register is allocated and prepared externally by QPE.
     function MakeSelectPhaseGradient(
         params : SelectParams
@@ -222,13 +215,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let sysRegUp = systemReg[N..2 * N - 1];
 
         // Free-rider data from inner PREPARE QROM: [sf_vs_dq(1), d_vs_q(1), r_bits...]
-        // Located at the end of innerReg.
         let nInner = Length(innerReg);
         let nFR = params.numFreeRiderBits;
         let isSF = innerReg[nInner - nFR];       // sf_vs_dq
         let dvsq = innerReg[nInner - nFR + 1];   // d_vs_q
 
-        // Allocate spin ancilla and bEqB flag
         use spin = Qubit();
         use bEqBQubit = Qubit();
 
@@ -280,19 +271,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Walk step composer
+    // Walk step
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Compose the SOSSA walk step from pre-built sub-operation callables.
     ///
     /// W = Ref_{a,B} · U† · Ref_B · U
     /// c-W = c-Ref_{a,B} · U† · c-Ref_B · U (only reflections controlled)
-    ///
-    /// ## Parameters
-    /// ## numReflectInner
-    /// Number of qubits from innerReg to include in reflections (typically bBits,
-    /// excluding freeRider). Qubits beyond this are always |0⟩ at reflection time
-    /// and are excluded to save Toffoli cost.
     operation SOSSAWalkStep(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
@@ -338,34 +323,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
         adjoint auto;
         controlled (ctls, ...) {
-            if BeginEstimateCaching("Controlled_SOSSAWalkStep", SingleVariant()) {
+            if BeginEstimateCaching("Ctrl_SOSSA_Walk", numOuterIndexQubits) {
                 let outerIndexReg = outerReg[0..numOuterIndexQubits - 1];
-
-                // Only reflections are controlled for QPE.
-                // U (uncontrolled)
                 outerPrepareOp(outerReg);
                 H(spinReg[0]);
                 within {
                     innerPrepareOp(outerIndexReg, innerReg);
-                    H(spinReg[1]); // H(spinSF)
+                    H(spinReg[1]);
                 } apply {
                     selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
                 }
-
-                // c-Ref_B
                 Controlled Reflect(ctls, innerReg[0..numReflectInner - 1] + [spinReg[1]]);
-
-                // U† (uncontrolled): inner BE adjoint first, then outer
                 within {
                     innerPrepareOp(outerIndexReg, innerReg);
-                    H(spinReg[1]); // H(spinSF)
+                    H(spinReg[1]);
                 } apply {
                     Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
                 }
                 H(spinReg[0]);
                 Adjoint outerPrepareOp(outerReg);
-
-                // c-Ref_{a,B}
                 Controlled Reflect(ctls, outerReg + innerReg[0..numReflectInner - 1] + spinReg);
                 EndEstimateCaching();
             }
@@ -445,49 +421,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             power,
         );
         op(control, allQubits);
-    }
-
-    /// Resource-estimation entry point: estimates the cost of numQueries
-    /// controlled walk steps using RepeatEstimates.
-    ///
-    /// This avoids tracing through each walk step individually, which is
-    /// expensive for large numQueries. Instead, it evaluates a single
-    /// controlled walk step and multiplies the cost by numQueries.
-    ///
-    /// Register layout matches QPE convention: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
-    operation EstimateSOSSAWalkCircuit(
-        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
-        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numOuterQubits : Int,
-        numOuterIndexQubits : Int,
-        numInnerQubits : Int,
-        numReflectInner : Int,
-        numPhaseGradientQubits : Int,
-        numQueries : Int,
-    ) : Unit {
-        let numSpinQubits = 2;
-        let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits + numPhaseGradientQubits;
-
-        use control = Qubit[1];
-        use allQubits = Qubit[numSystemQubits + totalAncilla];
-        let systemReg = allQubits[0..numSystemQubits - 1];
-        let outerReg = allQubits[numSystemQubits..numSystemQubits + numOuterQubits - 1];
-        let innerReg = allQubits[numSystemQubits + numOuterQubits..numSystemQubits + numOuterQubits + numInnerQubits - 1];
-        let spinReg = allQubits[numSystemQubits + numOuterQubits + numInnerQubits..numSystemQubits + numOuterQubits + numInnerQubits + numSpinQubits - 1];
-        let phaseGradientReg = if numPhaseGradientQubits > 0 {
-            allQubits[numSystemQubits + numOuterQubits + numInnerQubits + numSpinQubits..numSystemQubits + numOuterQubits + numInnerQubits + numSpinQubits + numPhaseGradientQubits - 1]
-        } else {
-            []
-        };
-
-        within { RepeatEstimates(numQueries); } apply {
-            Controlled SOSSAWalkStep(
-                control,
-                (outerPrepareOp, innerPrepareOp, selectOp, numReflectInner, numOuterIndexQubits, outerReg, innerReg, spinReg, systemReg, phaseGradientReg),
-            );
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

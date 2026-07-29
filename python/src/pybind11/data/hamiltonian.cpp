@@ -1000,55 +1000,36 @@ This class stores the factorized two-body integrals:
     h2_{pqrs} = sum_{r,c} (sum_b U^r_{bp} U^r_{bq} W^r_{bc})
                            (sum_b' U^r_{b'r} U^r_{b's} W^r_{b'c})
 
-along with an identity weight matrix WB[R,C] and optional BLISS core energy shift.
-Two-body integrals are lazily reconstructed on first access.
-
+along with an identity weight matrix WB[R,C] and optional BLISS energy shift.
 This container is always restricted (uses spin-free integrals).
-
-Examples:
-    >>> import numpy as np
-    >>> N, R, B, C = 4, 2, 3, 2
-    >>> h1 = np.random.rand(N, N)
-    >>> u = np.random.rand(R * B * N)
-    >>> w = np.random.rand(R * B * C)
-    >>> wb = np.random.rand(R, C)
-    >>> container = FactorizedHamiltonianContainer(
-    ...     R, B, C, 10.5, u, w, h1, wb, fock, orbitals
-    ... )
-    >>> hamiltonian = Hamiltonian(container)
 )");
 
   factorized_container.def(
-      py::init<size_t, size_t, size_t, double, const Eigen::VectorXd&,
-               const Eigen::VectorXd&, const Eigen::MatrixXd&,
+      py::init<double, const Eigen::VectorXd&, const Eigen::VectorXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               std::shared_ptr<Orbitals>, double, double, HamiltonianType>(),
+               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
+               double, HamiltonianType>(),
       R"(
 Constructor for factorized Hamiltonian.
 
 Args:
-    num_ranks (int): Number of ranks R
-    num_bases (int): Number of bases per rank B
-    num_copies (int): Number of copies per rank C
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     u_matrices (numpy.ndarray): Orbital rotation matrices, flat [R*B*N]
     w_matrices (numpy.ndarray): Two-body weights, flat [R*B*C]
-    one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
     wb_matrix (numpy.ndarray): Identity weights [R x C]
+    one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [N x N]
     orbitals (Orbitals): Molecular orbital data
     bliss_shift (float, optional): BLISS core energy shift (default 0)
     energy_gap (float, optional): E_gap for SOS block encoding (default 0)
     type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
 )",
-      py::arg("num_ranks"), py::arg("num_bases"), py::arg("num_copies"),
       py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
-      py::arg("one_body_integrals"), py::arg("wb_matrix"),
+      py::arg("wb_matrix"), py::arg("one_body_integrals"),
       py::arg("inactive_fock_matrix"), py::arg("orbitals"),
       py::arg("bliss_shift") = 0.0, py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 
-  // Factorized-specific accessors
   factorized_container.def("get_u_matrices",
                            &FactorizedHamiltonianContainer::get_u_matrices,
                            py::return_value_policy::reference_internal, R"(
@@ -1083,18 +1064,6 @@ Number of spatial orbitals (N).
 
 Returns:
     int: Number of spatial orbitals
-)");
-
-  factorized_container.def_property_readonly(
-      "num_qubits",
-      [](const FactorizedHamiltonianContainer& self) -> size_t {
-        return 2 * self.get_num_orbitals();
-      },
-      R"(
-Number of qubits (2N spin-orbitals).
-
-Returns:
-    int: Number of qubits required
 )");
 
   factorized_container.def("get_num_ranks",
@@ -1472,10 +1441,6 @@ Returns:
 
 Raises:
     RuntimeError: If the container type is unknown
-
-Examples:
-    >>> container = hamiltonian.get_container()
-    >>> print(container.get_container_type())
 )",
       py::return_value_policy::reference_internal);
 

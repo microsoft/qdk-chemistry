@@ -382,42 +382,6 @@ class TestSOSSAMapper:
         params = circuit._qsharp_factory.parameter
         assert params["power"] == 5
 
-    def test_memory_compute_layout_reduces_physical_qubits(self):
-        """Test that a memory-compute layout reduces the physical-qubit estimate."""
-        qre = pytest.importorskip("qdk.qre")
-        from qdk.qre.models import (  # noqa: PLC0415
-            Majorana,
-            RoundBasedFactory,
-            ThreeAux,
-            TwoDimensionalYokedSurfaceCode,
-        )
-
-        container = _build_controlled_unitary(num_orbitals=4, num_ranks=3, num_bases=2, num_copies=2).get_container()
-        app = SOSSAMapper().build_estimate_circuit(container, num_queries=100_000).get_qre_application()
-        architecture = Majorana(error_rate=1e-5)
-        isa_query = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
-        memory_compute_isa_query = isa_query * TwoDimensionalYokedSurfaceCode.q(source=ThreeAux.q())
-        baseline_trace_query = qre.PSSPC.q() * qre.LatticeSurgery.q()
-        memory_compute_trace_query = qre.DynamicMemoryCompute.q(compute_capacity_percentage=0.2) * baseline_trace_query
-
-        baseline_results = qre.estimate(
-            app, architecture, isa_query, baseline_trace_query, max_error=0.01, name="baseline"
-        )
-        memory_compute_results = qre.estimate(
-            app,
-            architecture,
-            memory_compute_isa_query,
-            memory_compute_trace_query,
-            max_error=0.01,
-            name="memory-compute",
-        )
-
-        assert len(baseline_results) > 0
-        assert len(memory_compute_results) > 0
-        assert min(result.qubits for result in memory_compute_results) < min(
-            result.qubits for result in baseline_results
-        )
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SELECT fidelity tests

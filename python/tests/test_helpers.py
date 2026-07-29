@@ -296,14 +296,11 @@ def create_random_factorized_hamiltonian(
     inactive_fock = np.zeros((n, n))
 
     return FactorizedHamiltonianContainer(
-        r,
-        b,
-        c,
         0.0,
         u_matrices,
         w_matrices,
-        h1,
         wb_matrix,
+        h1,
         inactive_fock,
         orbitals,
     )
