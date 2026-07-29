@@ -18,7 +18,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
-from .block_encoding import BlockEncodingContainer, _wavefunction_from_hdf5, _wavefunction_to_hdf5
+from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
+from .quantum_walk import QuantumWalkContainer
 
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
@@ -173,7 +174,7 @@ class SOSSASelect:
         )
 
 
-class SOSSAContainer(BlockEncodingContainer):
+class SOSSAContainer(QuantumWalkContainer):
     r"""Container for the Sum of Squares Spectral Amplification (SOSSA) block encoding.
 
     The walk operator is (:cite:`Low2025`, Eq. 77):

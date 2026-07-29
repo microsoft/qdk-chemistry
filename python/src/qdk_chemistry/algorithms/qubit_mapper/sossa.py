@@ -1,15 +1,15 @@
-"""Rotated Jordan-Wigner mapper for factorized SOS Hamiltonians."""
+"""SOSSA qubit mapper for factorized SOS Hamiltonians."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from math import isfinite, sqrt
+from math import sqrt
 
 import numpy as np
 
-from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.sossa_qubit_operator import (
     FermionParity,
@@ -25,44 +25,21 @@ from qdk_chemistry.data.sossa_qubit_operator import (
 _INV_SQRT_TWO = 1.0 / sqrt(2.0)
 
 
-class RotatedJordanWignerMapperSettings(QubitMapperSettings):
-    """Settings for the rotated Jordan-Wigner mapper."""
-
-    def __init__(self) -> None:
-        """Initialize mapper settings."""
-        super().__init__()
-        self._set_default("tolerance", "float", 1e-12, "Threshold for discarding negligible one-body modes.")
-
-
-class RotatedJordanWignerMapper(QubitMapper):
+class SOSSAQubitMapper(QubitMapper):
     """Map a factorized Hamiltonian to a qubit operator containing SOS generators."""
-
-    def __init__(self, tolerance: float = 1e-12) -> None:
-        """Initialize the mapper.
-
-        Args:
-            tolerance: Threshold for discarding negligible eigenmodes.
-
-        """
-        super().__init__()
-        self._settings = RotatedJordanWignerMapperSettings()
-        self._settings.set("tolerance", tolerance)
 
     def name(self) -> str:
         """Return the algorithm variant name."""
-        return "rotated-jordan-wigner"
+        return "sossa"
 
     def _run_impl(self, hamiltonian: Hamiltonian, mapping: MajoranaMapping) -> QubitOperator:
         """Convert a factorized Hamiltonian to a structured SOS qubit operator."""
-        tolerance = float(self.settings().get("tolerance"))
-        if tolerance < 0.0 or not isfinite(tolerance):
-            raise ValueError("tolerance must be finite and non-negative")
         if not isinstance(hamiltonian, Hamiltonian):
-            raise TypeError("RotatedJordanWignerMapper requires a Hamiltonian")
+            raise TypeError("SOSSAQubitMapper requires a Hamiltonian")
         container = hamiltonian.get_container()
         if not isinstance(container, FactorizedHamiltonianContainer):
-            raise TypeError("RotatedJordanWignerMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
-        return self._map_factorized_container(container, mapping, tolerance)
+            raise TypeError("SOSSAQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
+        return self._map_factorized_container(container, mapping)
 
     @staticmethod
     def _one_body_generator(
@@ -102,23 +79,22 @@ class RotatedJordanWignerMapper(QubitMapper):
         cls,
         container: FactorizedHamiltonianContainer,
         mapping: MajoranaMapping,
-        tolerance: float,
     ) -> QubitOperator:
         """Map a validated factorized container to the unified qubit operator wrapper."""
         num_orbitals = container.get_num_orbitals()
         if mapping.base_encoding != "jordan-wigner":
-            raise ValueError("RotatedJordanWignerMapper requires a Jordan-Wigner mapping")
+            raise ValueError("SOSSAQubitMapper requires a Jordan-Wigner mapping")
         if not mapping.is_majorana_atomic or mapping.num_modes != 2 * num_orbitals:
             raise ValueError("mapping must provide atomic Majoranas for 2N spin orbitals")
         if mapping.tapering is not None:
-            raise ValueError("RotatedJordanWignerMapper does not support tapered mappings")
+            raise ValueError("SOSSAQubitMapper does not support tapered mappings")
 
         eigenvalues, eigenvectors = np.linalg.eigh(np.asarray(container.get_h1_majorana(), dtype=float))
         generators: list[SOSGenerator] = []
         source_index = 0
         for positive in (True, False):
             for index, eigenvalue in enumerate(eigenvalues):
-                if (positive and eigenvalue <= tolerance) or (not positive and eigenvalue >= -tolerance):
+                if (positive and eigenvalue <= 0.0) or (not positive and eigenvalue >= 0.0):
                     continue
                 kind = SOSGeneratorKind.D1 if positive else SOSGeneratorKind.Q1
                 for spin in (0, 1):
@@ -170,7 +146,7 @@ class RotatedJordanWignerMapper(QubitMapper):
                     )
                 )
 
-        negative_sum = float(-np.sum(eigenvalues[eigenvalues < -tolerance]))
+        negative_sum = float(-np.sum(eigenvalues[eigenvalues < 0.0]))
         w0_square_sum = 0.0
         for rank in range(num_ranks):
             for copy in range(num_copies):

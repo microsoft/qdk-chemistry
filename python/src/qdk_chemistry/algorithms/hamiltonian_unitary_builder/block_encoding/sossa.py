@@ -1,14 +1,4 @@
-r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplification) block encoding.
-
-The SOSSA block encoding implements the walk operator from the DFTHC
-(Density-Fitted Tensor Hypercontraction) decomposition for quantum chemistry
-Hamiltonians, as described in :cite:`Low2025`.
-
-The walk operator is:
-    W = Ref_{a,B} · U† · Ref_B · U
-where
-    U = OuterPREP · within{InnerPREP} apply{SELECT}
-"""
+r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplification) block encoding."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -58,11 +48,7 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
-    r"""SOSSA (Sum of Squares Spectral Amplification) block encoding builder.
-
-    Constructs a SOSSA block encoding from a structured SOS ``QubitOperator``.
-
-    """
+    """SOSSA (Sum of Squares Spectral Amplification) block encoding builder."""
 
     def __init__(
         self,
@@ -79,10 +65,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        """Build the SOSSA block encoding from structured SOS generators.
+        """Build the SOSSA block encoding from qubit operator.
 
         Args:
-            qubit_hamiltonian: Structured SOS generator family to lower to the SOSSA circuit representation.
+            qubit_hamiltonian: Qubit operator with SOSContainer.
 
         Returns:
             UnitaryRepresentation wrapping the SOSSAContainer.

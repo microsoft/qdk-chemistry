@@ -1,4 +1,4 @@
-"""Tests for the rotated Jordan-Wigner qubit mapper."""
+"""Tests for the SOSSA qubit mapper."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -25,19 +25,3 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
     assert result.get_container_type() == "sos"
     assert result.get_container().normalization == pytest.approx(expected_normalization)
     assert all(isinstance(generator.operator, QubitOperator) for generator in result.get_container().generators)
-
-
-@pytest.mark.parametrize("tolerance", [-1.0, float("inf"), float("nan")])
-def test_rejects_invalid_tolerance(tolerance: float) -> None:
-    """Tolerance must be finite and non-negative."""
-    factorized = create_random_factorized_hamiltonian(num_orbitals=2)
-    mapper = create("qubit_mapper", factorized_tolerance=tolerance)
-
-    with pytest.raises(ValueError, match="tolerance must be finite and non-negative"):
-        mapper.run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(4))
-
-
-def test_rotated_mapper_is_not_a_registered_variant() -> None:
-    """Factorized conversion is an option of QubitMapper, not a separate algorithm."""
-    with pytest.raises(KeyError, match="rotated-jordan-wigner"):
-        create("qubit_mapper", "rotated-jordan-wigner")
