@@ -15,11 +15,6 @@ from qdk_chemistry.data import (
     RotatedPauliContainer,
     SOSSAContainer,
 )
-from qdk_chemistry.data.sossa_qubit_operator import (
-    RotatedMode,
-    RotatedPauliTerm,
-    SpinPolicy,
-)
 
 
 def test_qubit_operator_wraps_pauli_lcu_container() -> None:
@@ -60,17 +55,19 @@ def test_qubit_operator_rejects_legacy_constructor() -> None:
 
 def test_rotated_pauli_container_is_a_qubit_operator_container() -> None:
     """Rotated-Pauli data is represented by its own container."""
-    mode = RotatedMode(np.array([1.0, 0.0]), spin=0)
     container = RotatedPauliContainer(
-        [RotatedPauliTerm(0.5, {0: 1}, mode)],
-        num_qubits=4,
+        ["IIIX"],
+        np.array([0.5]),
+        [np.array([1.0, 0.0])],
+        4,
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
     )
     operator = QubitOperator(container)
 
     assert operator.get_container_type() == "rotated_pauli"
-    assert container.lcu_normalization == pytest.approx(0.5)
+    assert container.num_qubits == 4
+    np.testing.assert_allclose(container.coefficients, np.array([0.5]))
     assert QubitOperator.from_json(operator.to_json()).get_container_type() == "rotated_pauli"
 
     for access in (
@@ -83,25 +80,31 @@ def test_rotated_pauli_container_is_a_qubit_operator_container() -> None:
             access()
 
 
-def test_sos_container_nests_qubit_operators() -> None:
-    """SOS generators are wrapped Pauli representations carrying spin-policy metadata."""
-    mode = RotatedMode(np.array([1.0, 0.0]), spin=0)
-    nested = QubitOperator(
-        RotatedPauliContainer(
-            [RotatedPauliTerm(0.5, {0: 1}, mode)],
-            num_qubits=4,
-            encoding="jordan-wigner",
-            fermion_mode_order="blocked",
-            spin_policy=SpinPolicy.Specific,
-            source_index=(0,),
-        )
+def test_sos_container_stores_block_encoding_data() -> None:
+    """The SOS container stores the precomputed PREPARE/SELECT data of the block encoding."""
+    container = SOSSAContainer(
+        num_spatial_orbitals=2,
+        num_qubits=4,
+        energy_shift=-1.5,
+        normalization=3.0,
+        num_ranks=1,
+        num_bases=1,
+        num_copies=1,
+        num_positive_one_body_terms=1,
+        outer_coefficients=np.array([0.4, 0.6, 0.5]),
+        inner_coefficients=np.array([[1.0, 0.0], [1.0, 0.0], [0.3, 0.7]]),
+        one_body_rotation_angles=np.array([[0.1], [0.2]]),
+        two_body_rotation_angles=np.array([[0.3, 0.0], [0.4, 1.0]]),
+        encoding="jordan-wigner",
+        fermion_mode_order="blocked",
     )
-    container = SOSSAContainer(2, 4, 0.0, [nested], "jordan-wigner", "blocked")
     operator = QubitOperator(container)
 
     assert operator.get_container_type() == "sossa"
-    assert container.generators[0] is nested
-    assert container.normalization == pytest.approx(0.125)
-    restored = QubitOperator.from_json(operator.to_json())
-    assert restored.get_container_type() == "sossa"
-    assert isinstance(restored.get_container().generators[0], QubitOperator)
+    assert container.num_positive_one_body_terms == 1
+    assert np.isclose(container.normalization, 3.0)
+    np.testing.assert_allclose(container.outer_coefficients, np.array([0.4, 0.6, 0.5]))
+    restored = QubitOperator.from_json(operator.to_json()).get_container()
+    assert restored.type == "sossa"
+    np.testing.assert_allclose(restored.inner_coefficients, container.inner_coefficients)
+    np.testing.assert_allclose(restored.two_body_rotation_angles, container.two_body_rotation_angles)

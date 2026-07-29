@@ -220,9 +220,7 @@ class TestDensePureStatePreparation:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
-    def test_energy_matches_sparse_isometry(
-        self, wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o, initialize_qsharp_base_profile
-    ):
+    def test_energy_matches_sparse_isometry(self, wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
         """Verify that dense preparation yields the same energy as sparse isometry."""
         from qiskit.quantum_info import SparsePauliOp  # noqa: PLC0415
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415

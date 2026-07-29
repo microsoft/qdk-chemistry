@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 from qdk import TargetProfile, qsharp
 
-from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
 from qdk_chemistry.data import (
     Configuration,
     Hamiltonian,
@@ -43,7 +43,7 @@ from .test_helpers import create_random_factorized_hamiltonian
 def _to_sossa_operator(factorized_hamiltonian):
     num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return create("qubit_mapper").run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def _make_sossa_unitary_representation():
