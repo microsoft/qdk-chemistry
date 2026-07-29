@@ -13,7 +13,6 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
