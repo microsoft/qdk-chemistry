@@ -1,9 +1,9 @@
 Preparing the trial state
 #########################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-How do we prepare a state that lets phase estimation return the ground-state energy reliably?
+   How do we prepare a state that lets phase estimation return the ground-state energy reliably?
 
 Learning objectives
 ===================
@@ -17,11 +17,11 @@ After completing this chapter, you will be able to:
 - Generate a native sparse-isometry state-preparation circuit.
 - Distinguish trial-state quality from state-preparation circuit cost.
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Complete :ref:`lab-notebook-trial-state`.
-Record trial-state fidelity and state-preparation circuit statistics as separate quantities.
-Explain how determinant truncation changes the probability of obtaining the ground-state energy and the cost of preparing the trial state.
+   Complete :ref:`lab-notebook-trial-state`.
+   Record trial-state fidelity and state-preparation circuit statistics as separate quantities.
+   Explain how determinant truncation changes the probability of obtaining the ground-state energy and the cost of preparing the trial state.
 
 Prerequisite concepts
 =====================

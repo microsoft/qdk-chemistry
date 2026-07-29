@@ -1,9 +1,9 @@
 Putting the problem on qubits
 #############################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-How does the active-space electronic problem become a qubit problem?
+   How does the active-space electronic problem become a qubit problem?
 
 Learning objectives
 ===================
@@ -17,11 +17,11 @@ After completing this chapter, you will be able to:
 - Determine the compute-register qubit count for the selected active space.
 - Explain why the core energy must be added to a qubit-Hamiltonian result.
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Complete :ref:`lab-notebook-qubits`.
-Derive the compute-register qubit count from the selected active space before verifying it with code.
-Record the core energy separately and identify every quantity excluded from the compute-register count.
+   Complete :ref:`lab-notebook-qubits`.
+   Derive the compute-register qubit count from the selected active space before verifying it with code.
+   Record the core energy separately and identify every quantity excluded from the compute-register count.
 
 Prerequisite concepts
 =====================

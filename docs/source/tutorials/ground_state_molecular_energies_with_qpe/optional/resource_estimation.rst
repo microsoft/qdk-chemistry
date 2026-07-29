@@ -1,9 +1,9 @@
 Physical resource estimation
 ############################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-What fault-tolerant machine could execute a circuit from the required tutorial?
+   What fault-tolerant machine could execute a circuit from the required tutorial?
 
 Learning objectives
 ===================

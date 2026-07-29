@@ -25,7 +25,8 @@ The possible solutions include the ground state, which has the lowest energy, an
 This tutorial seeks an approximate solution for the ground-state energy of stretched N\ :sub:`2`.
 
 This tutorial uses the `Born--Oppenheimer approximation <https://en.wikipedia.org/wiki/Born%E2%80%93Oppenheimer_approximation>`_, which holds the nuclei at fixed positions while solving for the electrons.
-At a chosen molecular geometry, the electronic Hamiltonian includes the electron kinetic energy and the electrostatic interactions among the electrons and nuclei.
+At a chosen molecular geometry, the electronic Hamiltonian includes the electron kinetic energy, electron--nucleus attraction, and electron--electron repulsion.
+The repulsion among the fixed nuclei contributes separately to the total energy.
 The computational cost of solving its Schrödinger equation grows rapidly with the number of electrons and orbitals, so practical calculations use approximations.
 :doc:`Energy and accuracy <01_energy_and_accuracy>` defines the target energy and the different error comparisons used in the tutorial.
 :doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and basis set and obtains the first Hartree--Fock energy.

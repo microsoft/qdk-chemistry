@@ -1,9 +1,9 @@
 Model hamiltonians
 ##################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-When can a model Hamiltonian replace the molecular electronic Hamiltonian?
+   When can a model Hamiltonian replace the molecular electronic Hamiltonian?
 
 Learning objectives
 ===================

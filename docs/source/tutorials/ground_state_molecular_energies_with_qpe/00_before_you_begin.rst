@@ -1,15 +1,15 @@
 Before you begin
 ################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-What background and software do you need to complete this tutorial?
+   What background and software do you need to complete this tutorial?
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Create a working copy of the :doc:`lab notebook <lab_notebook>`.
-Complete :ref:`lab-notebook-setup` before running a scientific calculation.
-This record identifies the :term:`QDK`/Chemistry version used for the tutorial.
+   Create a working copy of the :doc:`lab notebook <lab_notebook>`.
+   Complete :ref:`lab-notebook-setup` before running a scientific calculation.
+   This record identifies the :term:`QDK`/Chemistry version used for the tutorial.
 
 Audience and prerequisites
 ==========================
@@ -24,7 +24,7 @@ You are ready to begin if you can perform the following tasks with reference mat
 - Explain how quantum gates change qubit states and how measurement produces classical outcomes.
 
 The tutorial does not assume prior knowledge of active-space methods, fermion-to-qubit encodings, quantum state preparation, or quantum phase estimation.
-The introductory page provides the chemistry and quantum-computing context needed to begin, and later chapters develop these methods before using them in calculations.
+The :doc:`tutorial introduction <index>` provides the chemistry and quantum-computing context needed to begin, and the specialized methods are developed before they are used in calculations.
 Use the `Python tutorial <https://docs.python.org/3/tutorial/>`_, the `NumPy fundamentals <https://numpy.org/doc/stable/user/basics.html>`_, and the `quantum-computing concepts overview <https://learn.microsoft.com/azure/quantum/concepts-overview>`_ to refresh prerequisite material.
 
 Required software
@@ -59,10 +59,10 @@ From a terminal, create and activate a virtual environment:
 The activation command above applies to Linux, macOS, and the Windows Subsystem for Linux.
 Install the released :term:`QDK`/Chemistry package into the active environment:
 
-.. code-block:: console
+.. parsed-literal::
 
    python -m pip install --upgrade pip
-   python -m pip install qdk-chemistry==2.0.0
+   python -m pip install qdk-chemistry==\ |ground-state-tutorial-version|
 
 This command installs the :term:`QDK`/Chemistry release that matches this documentation.
 The required workflow does not use the ``all``, ``qiskit-extras``, or ``qre`` optional-dependency groups.
@@ -78,7 +78,7 @@ Download :download:`tutorial_qpe_setup.py <../../_static/examples/python/tutoria
    python tutorial_qpe_setup.py
 
 The script reports the active Python environment to help diagnose setup problems.
-It also verifies that the built-in :term:`QDK`/Chemistry implementations required by later chapters are available:
+It also verifies that the built-in :term:`QDK`/Chemistry implementations required by the tutorial calculations are available:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_qpe_setup.py
    :language: python
@@ -87,11 +87,11 @@ It also verifies that the built-in :term:`QDK`/Chemistry implementations require
 
 The check succeeds when it ends with output similar to the following and does not raise an exception:
 
-.. code-block:: text
+.. parsed-literal::
 
    Python executable: /path/to/.venv/bin/python
    Python version: 3.12.10
-   QDK/Chemistry version: 2.0.0
+   QDK/Chemistry version: |ground-state-tutorial-version|
    Verified 8 built-in implementations.
 
 The path and versions can differ from this example.
@@ -101,25 +101,16 @@ If the import or verification fails, confirm that the ``Python executable`` path
 How to use the tutorial
 =======================
 
-Complete each required chapter in order because later chapters use decisions and results recorded earlier.
+Complete the required chapters in the order listed in the :doc:`tutorial introduction <index>` because each stage uses decisions and results recorded earlier.
 For each chapter:
 
 1. Read the explanation before running its example.
 2. Run the example and compare its output with the stated expectation.
-3. Complete the understanding check.
+3. Complete the understanding check, when present.
 4. Update the linked section of the lab notebook before continuing.
 
 Use links to the reference documentation when you need complete application programming interface (:term:`API`) details.
-The final circuit simulation is the only intentionally long required example; the introductory page gives its expected duration, and the final chapter explains how to monitor its progress.
-
-Check your understanding
-========================
-
-Before continuing, confirm that you can answer the following questions:
-
-1. Which background topics does the tutorial assume, and which specialized methods does it teach?
-2. Which Python environment will run the tutorial examples?
-3. What output demonstrates that the required built-in implementations are available?
+The final circuit simulation is the only intentionally long required example; the :doc:`tutorial introduction <index>` gives its expected duration, and :doc:`Iterative quantum phase estimation <06_iterative_phase_estimation>` explains how to monitor its progress.
 
 Further reading
 ===============

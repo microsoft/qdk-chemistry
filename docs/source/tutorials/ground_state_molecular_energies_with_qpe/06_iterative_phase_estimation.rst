@@ -3,9 +3,9 @@ Iterative quantum phase estimation
 
 This chapter introduces iterative quantum phase estimation (:term:`IQPE`).
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-How do we extract the molecular ground-state energy from the prepared quantum state?
+   How do we extract the molecular ground-state energy from the prepared quantum state?
 
 Learning objectives
 ===================
@@ -19,11 +19,11 @@ After completing this chapter, you will be able to:
 - Run :term:`IQPE` with native :term:`QDK`/Chemistry tools.
 - Reconstruct the total molecular energy and evaluate its error.
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Complete :ref:`lab-notebook-phase-estimation` and :ref:`lab-notebook-conclusion`.
-Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
-Use the completed notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.
+   Complete :ref:`lab-notebook-phase-estimation` and :ref:`lab-notebook-conclusion`.
+   Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
+   Use the completed notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.
 
 Prerequisite concepts
 =====================

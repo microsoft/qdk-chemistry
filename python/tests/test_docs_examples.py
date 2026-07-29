@@ -22,6 +22,14 @@ from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
 
+_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
+_VERSIONS_SPEC = importlib.util.spec_from_file_location("tutorial_versions", _VERSIONS_FILE)
+if _VERSIONS_SPEC is None or _VERSIONS_SPEC.loader is None:
+    raise ImportError(f"Unable to load tutorial versions from {_VERSIONS_FILE}")
+_VERSIONS_MODULE = importlib.util.module_from_spec(_VERSIONS_SPEC)
+_VERSIONS_SPEC.loader.exec_module(_VERSIONS_MODULE)
+GROUND_STATE_TUTORIAL_VERSION: str = _VERSIONS_MODULE.GROUND_STATE_TUTORIAL_VERSION
+
 # Get the examples directory
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
 PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
@@ -152,6 +160,10 @@ class TestExampleScripts(unittest.TestCase):
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
         with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+            if example_file.name == "tutorial_qpe_setup.py":
+                example_env["GROUND_STATE_TUTORIAL_VERSION"] = GROUND_STATE_TUTORIAL_VERSION
+
             result = subprocess.run(
                 [sys.executable, str(example_file)],
                 check=False,
@@ -160,7 +172,7 @@ class TestExampleScripts(unittest.TestCase):
                 encoding="utf-8",
                 timeout=360,
                 cwd=tmpdir,
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                env=example_env,
             )
 
             assert result.returncode == 0, (

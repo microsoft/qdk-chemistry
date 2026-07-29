@@ -1,9 +1,9 @@
 Describing the molecule
 #######################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-How do we specify a molecular system and obtain its first energy estimate?
+   How do we specify a molecular system and obtain its first energy estimate?
 
 Learning objectives
 ===================
@@ -16,11 +16,11 @@ After completing this chapter, you will be able to:
 - Run a native :term:`QDK`/Chemistry self-consistent field calculation.
 - Interpret an energy change caused by changing the basis set.
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Complete :ref:`lab-notebook-molecule`.
-Record the molecular inputs and both Hartree--Fock energies before calculating their difference.
-Interpret the difference as basis-set sensitivity rather than as the total error of either energy.
+   Complete :ref:`lab-notebook-molecule`.
+   Record the molecular inputs and both Hartree--Fock energies before calculating their difference.
+   Interpret the difference as basis-set sensitivity rather than as the total error of either energy.
 
 Prerequisite concepts
 =====================

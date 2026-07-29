@@ -5,11 +5,22 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+
+import qdk_chemistry
+
+# The documentation test harness sets this tutorial version; downloaded copies do not.
+GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
+if GROUND_STATE_TUTORIAL_VERSION is not None:
+    assert qdk_chemistry.__version__ == GROUND_STATE_TUTORIAL_VERSION, (
+        f"Tutorial expects QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION}, "
+        f"but {qdk_chemistry.__version__} is installed."
+    )
+
 # start-cell-verify
 import platform
 import sys
 
-import qdk_chemistry
 from qdk_chemistry.algorithms import create
 
 required_implementations = (

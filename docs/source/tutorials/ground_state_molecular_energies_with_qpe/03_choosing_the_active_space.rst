@@ -1,9 +1,9 @@
 Choosing the active space
 #########################
 
-.. rubric:: Chapter focus
+.. note:: Chapter focus
 
-Which electrons and orbitals must the calculation treat explicitly?
+   Which electrons and orbitals must the calculation treat explicitly?
 
 Learning objectives
 ===================
@@ -17,11 +17,11 @@ After completing this chapter, you will be able to:
 - Explain how orbital entropies can refine an active-space choice.
 - Evaluate the tradeoff between active-space accuracy and problem size.
 
-.. rubric:: Lab notebook assignment
+.. important:: Lab notebook assignment
 
-Complete :ref:`lab-notebook-active-space`.
-Record the evidence used to select the active space, not only the final orbital and electron counts.
-Explain what the energy comparison establishes within the chosen basis and identify the energy that will serve as the algorithmic reference.
+   Complete :ref:`lab-notebook-active-space`.
+   Record the evidence used to select the active space, not only the final orbital and electron counts.
+   Explain what the energy comparison establishes within the chosen basis and identify the energy that will serve as the algorithmic reference.
 
 Prerequisite concepts
 =====================
