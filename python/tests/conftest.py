@@ -29,6 +29,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import qdk
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -40,6 +41,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import QSHARP_PROJECT_ROOT
 
 from .test_helpers import create_test_orbitals
 
@@ -73,6 +75,12 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Initialize a fresh Q# context with all Q# sources loaded."""
+    return qdk.Context(project_root=QSHARP_PROJECT_ROOT)
 
 
 @pytest.fixture

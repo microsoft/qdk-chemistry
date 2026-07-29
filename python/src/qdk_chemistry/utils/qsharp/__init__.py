@@ -10,9 +10,10 @@ import qdk
 from qdk import qsharp
 from qdk._native import TargetProfile
 
-__all__ = ["QSHARP_UTILS", "get_qsharp_utils"]
+__all__ = ["QSHARP_PROJECT_ROOT", "QSHARP_UTILS", "get_qsharp_utils"]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
+QSHARP_PROJECT_ROOT = _PROJECT_ROOT
 _SOURCE_ROOT = Path(__file__).parent / "src"
 _BASE_PROFILE_FILES = [
     "StatePreparation.qs",

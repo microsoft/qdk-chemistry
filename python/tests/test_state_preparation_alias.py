@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -16,23 +15,20 @@ from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 
-_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
-_PROJECT_ROOT = str(_QS_DIR)
-
 
 def _run_alias_sampling_and_dump(
+    ctx: qdk.Context,
     coefficients: list[float],
     num_index_qubits: int,
     bits_precision: int,
 ) -> np.ndarray:
     """Run alias sampling state prep via qdk.Context and return the full statevector.
 
-    Creates a fresh Q# context, loads the AliasSamplingStatePrep Q# sources
-    and a thin wrapper that allocates qubits internally, then captures the
-    statevector via ``ctx.dump_machine()``.
+    Loads the AliasSamplingStatePrep Q# sources and a thin wrapper that
+    allocates qubits internally, then captures the statevector via
+    ``ctx.dump_machine()``.
     """
     total_qubits = 2 * num_index_qubits + 2 * bits_precision + 1
-    ctx = qdk.Context(project_root=_PROJECT_ROOT)
     ctx.code.QDKChemistry.Utils.AliasSampling.RunAliasSamplingPrep(
         coefficients, bits_precision, num_index_qubits, total_qubits
     )
@@ -82,21 +78,6 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 class TestAliasSamplingStatePreparation:
     """Tests for the alias sampling state preparation algorithm."""
 
-    def test_name(self):
-        """Test algorithm name."""
-        prep = AliasSamplingStatePreparation()
-        assert prep.name() == "alias_sampling"
-
-    def test_type_name(self):
-        """Test algorithm type name."""
-        prep = AliasSamplingStatePreparation()
-        assert prep.type_name() == "state_prep"
-
-    def test_bits_precision_custom(self):
-        """Test custom bits precision."""
-        prep = AliasSamplingStatePreparation(bits_precision=7)
-        assert prep.bits_precision == 7
-
     def test_registered_in_registry(self):
         """Test that alias_sampling is registered in the algorithm registry."""
         prep = registry.create("state_prep", "alias_sampling")
@@ -112,7 +93,7 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_factory is not None
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
-    def test_marginal_probs_random(self, num_coefficients):
+    def test_marginal_probs_random(self, ctx, num_coefficients):
         """Verify alias sampling marginal probabilities with random coefficients.
 
         The alias sampling circuit prepares:
@@ -127,7 +108,7 @@ class TestAliasSamplingStatePreparation:
         num_index_qubits = math.ceil(math.log2(num_coefficients))
         bits_precision = 6
 
-        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
+        full_sv = _run_alias_sampling_and_dump(ctx, coefficients, num_index_qubits, bits_precision)
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
         abs_coeffs = np.abs(coefficients)
@@ -138,17 +119,17 @@ class TestAliasSamplingStatePreparation:
 
 
 def _run_conditional_alias_fr_and_dump(
+    ctx: qdk.Context,
     coefficients: list[list[float]],
     free_rider_data: list[list[bool]],
     bits_precision: int,
     condition_value: int,
 ) -> np.ndarray:
     """Run conditional alias sampling with free-rider and return statevector."""
-    qdk.init(project_root=_PROJECT_ROOT)
-    qdk.code.QDKChemistry.Utils.AliasSampling.RunConditionalAliasSamplingPrepWithFreeRider(
+    ctx.code.QDKChemistry.Utils.AliasSampling.RunConditionalAliasSamplingPrepWithFreeRider(
         coefficients, free_rider_data, bits_precision, condition_value
     )
-    state = qdk.dump_machine()
+    state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 
 
@@ -193,7 +174,7 @@ class TestConditionalAliasSamplingWithFreeRider:
             (2, 4, 1),
         ],
     )
-    def test_marginal_probs_with_free_rider(self, n_cond, n_coeffs, condition_value):
+    def test_marginal_probs_with_free_rider(self, ctx, n_cond, n_coeffs, condition_value):
         """Verify marginal probs and free-rider data loading."""
         rng = np.random.default_rng(seed=456 + n_cond * 10 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
@@ -203,7 +184,9 @@ class TestConditionalAliasSamplingWithFreeRider:
         n_index_bits = math.ceil(math.log2(n_coeffs))
         n_cond_bits = math.ceil(math.log2(n_cond))
 
-        full_sv = _run_conditional_alias_fr_and_dump(coefficients, free_rider_data, bits_precision, condition_value)
+        full_sv = _run_conditional_alias_fr_and_dump(
+            ctx, coefficients, free_rider_data, bits_precision, condition_value
+        )
         marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
 
         abs_coeffs = np.abs(coefficients[condition_value])

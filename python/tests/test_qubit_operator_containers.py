@@ -81,20 +81,21 @@ def test_rotated_pauli_container_is_a_qubit_operator_container() -> None:
 
 
 def test_sos_container_stores_block_encoding_data() -> None:
-    """The SOS container stores the precomputed PREPARE/SELECT data of the block encoding."""
+    """The SOS container splits the generators into d1/q1/sf rotated-Pauli combinations."""
+    d1 = RotatedPauliContainer(["IZ"], np.array([0.4]), [np.array([0.1])], 4, "jordan-wigner", "blocked")
+    q1 = RotatedPauliContainer(["ZI"], np.array([0.6]), [np.array([0.2])], 4, "jordan-wigner", "blocked")
+    sf = RotatedPauliContainer(["ZZ"], np.array([0.5]), [np.array([0.3])], 4, "jordan-wigner", "blocked")
     container = SOSSAContainer(
         num_spatial_orbitals=2,
         num_qubits=4,
         energy_shift=-1.5,
-        normalization=3.0,
         num_ranks=1,
         num_bases=1,
         num_copies=1,
-        num_positive_one_body_terms=1,
-        outer_coefficients=np.array([0.4, 0.6, 0.5]),
+        d1=d1,
+        q1=q1,
+        sf=sf,
         inner_coefficients=np.array([[1.0, 0.0], [1.0, 0.0], [0.3, 0.7]]),
-        one_body_rotation_angles=np.array([[0.1], [0.2]]),
-        two_body_rotation_angles=np.array([[0.3, 0.0], [0.4, 1.0]]),
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
     )
@@ -102,9 +103,8 @@ def test_sos_container_stores_block_encoding_data() -> None:
 
     assert operator.get_container_type() == "sossa"
     assert container.num_positive_one_body_terms == 1
-    assert np.isclose(container.normalization, 3.0)
-    np.testing.assert_allclose(container.outer_coefficients, np.array([0.4, 0.6, 0.5]))
+    np.testing.assert_allclose(container.d1.coefficients, np.array([0.4]))
     restored = QubitOperator.from_json(operator.to_json()).get_container()
     assert restored.type == "sossa"
     np.testing.assert_allclose(restored.inner_coefficients, container.inner_coefficients)
-    np.testing.assert_allclose(restored.two_body_rotation_angles, container.two_body_rotation_angles)
+    np.testing.assert_allclose(restored.sf.rotations[0], container.sf.rotations[0])

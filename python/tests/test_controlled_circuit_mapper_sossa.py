@@ -6,22 +6,24 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
-import qdk
-from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit
+from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
+from qdk_chemistry.data import AlgorithmRef, Circuit, Hamiltonian, MajoranaMapping
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
 from .test_helpers import create_random_factorized_hamiltonian
 
-_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
-_PROJECT_ROOT = str(_QS_DIR)
+
+def _to_sossa_operator(factorized_hamiltonian):
+    """Wrap a factorized Hamiltonian in the QubitOperator the SOSSA builder expects."""
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def _build_controlled_unitary(
@@ -41,7 +43,7 @@ def _build_controlled_unitary(
         seed=seed,
     )
     builder = SOSSABuilder()
-    return builder.run(fh)
+    return builder.run(_to_sossa_operator(fh))
 
 
 def _make_sossa_mapper(
@@ -79,7 +81,7 @@ class TestOuterPrep:
         assert op is not None
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
-    def test_build_outer_prep_fidelity(self, algorithm):
+    def test_build_outer_prep_fidelity(self, algorithm, qdk_ctx):
         """Verify build_outer_prep's callable prepares the correct statevector.
 
         Simulates the Q# callable in the global Q# session and checks fidelity
@@ -92,8 +94,6 @@ class TestOuterPrep:
         appears at dump index bit_reverse(k). We account for this by building
         expected in LE-address space.
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
-
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
@@ -102,8 +102,8 @@ class TestOuterPrep:
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
-        state = qsharp.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
+        state = qdk_ctx.dump_machine()
         actual_sv = np.array(state.as_dense_state())
 
         n_states = 2**num_qubits
@@ -122,15 +122,13 @@ class TestOuterPrep:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
-    def test_build_outer_prep_alias_sampling_marginal_probs(self):
+    def test_build_outer_prep_alias_sampling_marginal_probs(self, qdk_ctx):
         """Verify alias sampling prepares the correct marginal probabilities.
 
         The alias sampling op produces |ψ⟩ = Σ_l √(p̃_l) |l⟩|garbage_l⟩.
         We check that the marginal probabilities on the index register match
         p(l) = |c_l| / Σ|c_j|.
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
-
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
         bit_precision = 10
@@ -141,8 +139,8 @@ class TestOuterPrep:
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
         total_qubits = 2 * num_index_qubits + 2 * bit_precision + 1
 
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
-        state = qsharp.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
+        state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
         # Compute marginal probabilities on the index register (top bits, LE)
@@ -165,7 +163,7 @@ class TestInnerPrep:
     """Tests for SOSSAMapper.build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_inner_prep_fidelity(self, algorithm):
+    def test_build_inner_prep_fidelity(self, algorithm, qdk_ctx):
         """Verify inner prep conditional marginals when combined with outer prep.
 
         Applies outer prep (dense_pure, exact) then inner prep on the combined
@@ -174,8 +172,6 @@ class TestInnerPrep:
         match:
             P(b|l) ≈ |c_{l,b}|² / Σ_j |c_{l,j}|²
         """
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
-
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         controlled_unitary = _build_controlled_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = controlled_unitary.get_container()
@@ -207,10 +203,10 @@ class TestInnerPrep:
             num_inner_qubits = n_index_bits + n_fr
 
         # Apply outer + inner prep
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
             outer_op, inner_op, num_outer_qubits, num_inner_qubits
         )
-        state = qsharp.dump_machine()
+        state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
         # Check conditional marginals for each outer value l
@@ -374,7 +370,7 @@ class TestSOSSAMapper:
         """Test that power passes through to walk_params."""
         fh = create_random_factorized_hamiltonian()
         builder = SOSSABuilder(power=5)
-        unitary_rep = builder.run(fh)
+        unitary_rep = builder.run(_to_sossa_operator(fh))
 
         mapper = SOSSAMapper()
         circuit = mapper.run(unitary_rep)
@@ -403,10 +399,8 @@ class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N):  # noqa: N803
+    def test_select_dq_givens_fidelity(self, N, qdk_ctx):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
-
         rng = np.random.default_rng(42 + N)
         dq_angles = []
         for _ in range(N):
@@ -432,8 +426,8 @@ class TestSelectFullFidelity:
             "numFreeRiderBits": 2,
         }
 
-        qdk.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
-        state = qsharp.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
+        state = qdk_ctx.dump_machine()
         sv = np.array(state.as_dense_state())
 
         assert np.sum(np.abs(sv) ** 2) > 0.99, "State normalization check failed"
@@ -473,10 +467,8 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
-    def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
+    def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies, qdk_ctx):
         """Verify numQubits matches the paper formula bounds."""
-        qsharp.init(project_root=_PROJECT_ROOT, target_profile=qsharp.TargetProfile.Adaptive_RIF)
-
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,
             num_ranks=num_ranks,
@@ -492,7 +484,7 @@ class TestSOSSAWalkLogicalCounts:
         circuit = mapper.run(controlled_unitary)
 
         factory = circuit._qsharp_factory
-        lc = qsharp.logical_counts(factory.program, *factory.parameter.values())
+        lc = qdk_ctx.logical_counts(factory.program, *factory.parameter.values())
 
         actual_qubits = lc["numQubits"]
 
@@ -511,11 +503,6 @@ class TestSOSSAWalkLogicalCounts:
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
-
-
-def _make_context():
-    """Create a fresh qdk.Context with all Q# sources loaded."""
-    return qdk.Context(project_root=_PROJECT_ROOT)
 
 
 def _int_to_bools(value: int, width: int) -> list[bool]:
@@ -558,18 +545,16 @@ class TestSelectSwapCorrectness:
             (8, 4, 2),  # 8 entries, 2 swap bits
         ],
     )
-    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits):
+    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits, qdk_ctx):
         """For each address |i⟩, SelectSwap should load data[i] into output."""
         data = _make_random_data_1d(n_data, n_bits)
-        ctx = _make_context()
-        result = ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
         assert result, f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
 
-    def test_1d_auto_lambda(self):
+    def test_1d_auto_lambda(self, qdk_ctx):
         """SelectSwap with numSwapBits=-1 (auto-optimal) should produce correct results."""
         data = _make_random_data_1d(8, 4)
-        ctx = _make_context()
-        result = ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
+        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
         assert result, "SelectSwap 1D with auto lambda failed"
 
     @pytest.mark.parametrize(
@@ -580,11 +565,10 @@ class TestSelectSwapCorrectness:
             (3, 4, 4, 0),  # non-power-of-2 outer
         ],
     )
-    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits):
+    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, qdk_ctx):
         """For each (i, j), Select2DLoad should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
-        ctx = _make_context()
-        result = ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
         assert result, (
             f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )

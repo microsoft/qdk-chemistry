@@ -352,18 +352,18 @@ namespace QDKChemistry.Utils.AliasSampling {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — allocate qubits via QIR.Runtime so they persist for
-    // dump_machine (qubit values cannot cross the Python ↔ Q# boundary).
+    // Test wrappers — apply the preparation to a caller-supplied register so the
+    // resulting state can be captured via dump_operation_on_state.
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Test wrapper: run alias sampling and leave state for dump_machine.
+    /// Test wrapper: run alias sampling on the supplied register.
     operation RunAliasSamplingPrep(
         coefficients : Double[],
         bitsPrecision : Int,
         numIndexQubits : Int,
         numQubits : Int,
+        qs : Qubit[],
     ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(numQubits);
         let params = new AliasSamplingParams {
             coefficients = coefficients,
             bitsPrecision = bitsPrecision,

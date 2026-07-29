@@ -14,7 +14,6 @@ Reference: arXiv:2502.15882v1 (Low et al. 2025)
 
 import math
 from math import sqrt
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -30,10 +29,6 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalk
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .test_helpers import create_test_orbitals
-
-_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
-_PROJECT_ROOT = str(_QS_DIR)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)

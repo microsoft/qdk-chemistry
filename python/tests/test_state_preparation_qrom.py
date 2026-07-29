@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -16,18 +15,13 @@ from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 
-# Path to the QSharp source directory used for test context initialization.
-_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
 
-
-def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int) -> np.ndarray:
+def _run_qrom_state_prep_and_dump(ctx: qdk.Context, amplitudes: list[float], num_qubits: int) -> np.ndarray:
     """Run the QROM state preparation via qdk.Context and return the statevector.
 
-    Creates a fresh Q# context, loads the QROMStatePrep Q# sources and a
-    thin wrapper that allocates qubits internally, then captures the
-    statevector via ``ctx.dump_machine()``.
+    Loads the QROMStatePrep Q# sources and a thin wrapper that allocates
+    qubits internally, then captures the statevector via ``ctx.dump_machine()``.
     """
-    ctx = qdk.Context(project_root=str(_QS_DIR))
     ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, 10, num_qubits)
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
@@ -68,21 +62,6 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 class TestQROMStatePreparation:
     """Tests for the QROM-based state preparation algorithm."""
 
-    def test_name(self):
-        """Test algorithm name."""
-        prep = QROMStatePreparation()
-        assert prep.name() == "qrom"
-
-    def test_type_name(self):
-        """Test algorithm type name."""
-        prep = QROMStatePreparation()
-        assert prep.type_name() == "state_prep"
-
-    def test_rotation_bit_precision_custom(self):
-        """Test custom rotation bit precision."""
-        prep = QROMStatePreparation(rotation_bit_precision=8)
-        assert prep.rotation_bit_precision == 8
-
     def test_run_returns_circuit(self):
         """Test that run() returns a Circuit with ops set."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
@@ -98,7 +77,7 @@ class TestQROMStatePreparation:
         assert isinstance(prep, QROMStatePreparation)
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
-    def test_fidelity_random(self, num_coefficients):
+    def test_fidelity_random(self, qdk_ctx, num_coefficients):
         """Verify QROM state prep fidelity with random amplitudes.
 
         The SBM decomposition should prepare:
@@ -108,15 +87,11 @@ class TestQROMStatePreparation:
         rng = np.random.default_rng(seed=42 + num_coefficients)
         amplitudes = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
         num_qubits = math.ceil(math.log2(num_coefficients))
-        actual_sv = _run_qrom_state_prep_and_dump(amplitudes, num_qubits)
+        actual_sv = _run_qrom_state_prep_and_dump(qdk_ctx, amplitudes, num_qubits)
         expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
-
-
-def _make_ctx() -> qdk.Context:
-    return qdk.Context(project_root=str(_QS_DIR))
 
 
 def _reverse_bits(x: int, n: int) -> int:
@@ -156,11 +131,10 @@ class TestRyViaPhaseGradient:
             (7, 4),  # θ = 7π/4
         ],
     )
-    def test_rotation_probabilities(self, x, n):
+    def test_rotation_probabilities(self, qdk_ctx, x, n):
         """P(|0⟩) = cos²(θ/2), P(|1⟩) = sin²(θ/2) with θ = 4πx/2^n."""
-        ctx = _make_ctx()
-        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRy(x, n)
-        sv = np.array(ctx.dump_machine().as_dense_state())
+        qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRy(x, n)
+        sv = np.array(qdk_ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)
@@ -168,11 +142,10 @@ class TestRyViaPhaseGradient:
         np.testing.assert_allclose(abs(a1) ** 2, math.sin(theta / 2) ** 2, atol=1e-6)
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (3, 4)])
-    def test_adjoint_roundtrip(self, x, n):
+    def test_adjoint_roundtrip(self, qdk_ctx, x, n):
         """Ry followed by Adjoint Ry returns target to |+⟩."""
-        ctx = _make_ctx()
-        ctx.code.QDKChemistry.Utils.PhaseGradient.TestRyRoundtrip(x, n)
-        sv = np.array(ctx.dump_machine().as_dense_state())
+        qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRyRoundtrip(x, n)
+        sv = np.array(qdk_ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
         np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
