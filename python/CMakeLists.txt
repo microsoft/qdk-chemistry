@@ -175,6 +175,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/pmc.cpp
     src/pybind11/algorithms/mcscf.cpp
     src/pybind11/algorithms/hamiltonian.cpp
+    src/pybind11/algorithms/effective_hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/nuclear_derivative.cpp
     src/pybind11/algorithms/geometry_optimization.cpp
