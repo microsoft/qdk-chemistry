@@ -17,6 +17,7 @@ param(
     [string]$PythonVersion  = '3.11',
     [string]$DevTag         = 'None',
     [string]$VcpkgRoot,
+    [string]$Triplet,
     [string]$DepsInstallDir
 )
 $ErrorActionPreference = 'Stop'
@@ -24,7 +25,11 @@ $ErrorActionPreference = 'Stop'
 if (-not $VcpkgRoot) {
     $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
 }
+if (-not $Triplet) {
+    $Triplet = if ($env:VCPKG_TRIPLET) { $env:VCPKG_TRIPLET } else { 'x64-windows-static-md' }
+}
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
+Write-Host "vcpkg triplet: $Triplet"
 
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
@@ -74,7 +79,7 @@ try {
 Write-Host "=== python -m build --wheel ==="
 # Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
 if (-not $env:QDK_CHEMISTRY_RELEASE_BUILD) { $env:QDK_CHEMISTRY_RELEASE_BUILD = '0' }
-$prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\x64-windows-static-md"
+$prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\$Triplet"
 $buildArgs = @(
     'run', '-n', 'buildenv',
     'python', '-m', 'build', '--wheel',
@@ -95,7 +100,7 @@ $buildArgs = @(
     "-C=cmake.define.CMAKE_CXX_COMPILER=$ClPath",
     "-C=cmake.define.CMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-C=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
-    '-C=cmake.define.VCPKG_TARGET_TRIPLET=x64-windows-static-md',
+    "-C=cmake.define.VCPKG_TARGET_TRIPLET=$Triplet",
     "-C=cmake.define.VCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
     "-C=cmake.define.CMAKE_PREFIX_PATH=$prefix",
     '-C=cmake.define.FETCHCONTENT_QUIET=OFF'
@@ -107,7 +112,8 @@ Pop-Location
 if ($wheelCode -ne 0) { throw "python -m build --wheel failed ($wheelCode)" }
 
 # ─── Copy wheel to repaired_wheelhouse ───────────────────────────────────────
-# No wheel repair needed: x64-windows-static-md statically links all vcpkg deps.
+# No wheel repair needed: the *-windows-static-md triplets statically link all
+# vcpkg deps.
 $distDir   = "$SrcDir\python\dist"
 $outputDir = "$SrcDir\python\repaired_wheelhouse"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null

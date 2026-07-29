@@ -759,6 +759,203 @@ jobs:
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
 
+  coverage-windows-arm64:
+    name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
+    # GitHub-hosted Windows-on-Arm runner: free for public repositories and
+    # ships the native ARM64 MSVC toolset (VC.Tools.ARM64), clang-cl, vcpkg,
+    # CMake and Ninja. 6h is the GitHub-hosted per-job ceiling.
+    runs-on: windows-11-arm
+    timeout-minutes: 350
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [msvc, clang-cl]
+    env:
+      VCPKG_TRIPLET: arm64-windows-static-md
+      QDK_UARCH: armv8-a
+      # Bump to force a rebuild of the cached dependencies.
+      DEPS_CACHE_VERSION: v2
+      # The ARM64 runner image ships CMake 4.x, which errors out on projects
+      # declaring cmake_minimum_required below 3.5. Several vendored
+      # dependencies still do; this is the documented escape hatch.
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Set up ${{ matrix.compiler }} environment (ARM64)
+      id: env
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.pipelines\install-scripts\setup-msvc-env.ps1" `
+            -Compiler "${{ matrix.compiler }}" -Arch arm64
+        if ($LASTEXITCODE -ne 0) { throw "setup-msvc-env.ps1 failed ($LASTEXITCODE)" }
+        "toolset=$env:MSVC_TOOLSET" >> $env:GITHUB_OUTPUT
+        "cxx-path=$env:CXX_PATH"    >> $env:GITHUB_OUTPUT
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        # CPython ships win-arm64 builds from 3.11 onwards.
+        python-version: '3.13'
+
+    - name: Set memory-aware build parallelism
+      shell: pwsh
+      run: |
+        # Match the x86_64 job: cap concurrency by available RAM (~4 GB/job) so
+        # that memory-hungry translation units don't exhaust the heap.
+        $cpu = [int]$env:NUMBER_OF_PROCESSORS
+        $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
+        Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+        "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
+        Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
+
+    - name: Restore vcpkg cache
+      id: cache-vcpkg
+      if: ${{ !inputs.rebuild_dep_cache }}
+      uses: actions/cache/restore@v5
+      with:
+        path: vcpkg_installed
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+
+    - name: Restore deps-install cache
+      id: cache-deps
+      if: ${{ !inputs.rebuild_dep_cache }}
+      uses: actions/cache/restore@v5
+      with:
+        path: deps-install-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+
+    - name: Install C++ dependencies
+      if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir        "${{ github.workspace }}" `
+            -ClPath        "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType     RelWithDebInfo `
+            -Triplet       "${{ env.VCPKG_TRIPLET }}" `
+            -DepsInstallDir "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "Dependency install failed ($LASTEXITCODE)" }
+
+    # Saved immediately after the install so a later timeout still leaves a warm
+    # cache for the next run — dependency builds dominate the job's runtime.
+    - name: Save vcpkg cache
+      if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: vcpkg_installed
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+
+    - name: Save deps-install cache
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: deps-install-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+
+    - name: Configure CMake
+      shell: pwsh
+      run: |
+        # Pre-installed deps are found via CMAKE_PREFIX_PATH; FetchContent is disabled.
+        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
+        cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
+          -DQDK_UARCH=${{ env.QDK_UARCH }} `
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+          -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
+          -DMACIS_ENABLE_TESTS=OFF `
+          -DBUILD_SHARED_LIBS=OFF `
+          -DBUILD_TESTING=ON `
+          -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST `
+          -DVCPKG_APPLOCAL_DEPS=OFF `
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+          -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install-${{ matrix.compiler }}" `
+          "-DCMAKE_PREFIX_PATH=$depsInstall;$vcpkgInstalled" `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
+          -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
+          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
+          -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
+          -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
+          -DQDK_ENABLE_OPENMP=OFF `
+          -DFETCHCONTENT_QUIET=OFF
+        if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
+
+    - name: Build C++ library
+      shell: pwsh
+      run: |
+        cmake --build "cpp/build-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
+
+    - name: Run C++ tests
+      shell: pwsh
+      env:
+        OMP_NUM_THREADS: '2'
+      run: |
+        Push-Location "cpp/build-${{ matrix.compiler }}"
+        # Same exclusions as the x86_64 Windows job.
+        ctest --output-on-failure --verbose --timeout 400 `
+          --output-junit ctest_results.xml `
+          -E "MACIS_SERIAL_TEST|libint2/unit"
+        $code = $LASTEXITCODE
+        Pop-Location
+        if ($code -ne 0) { throw "ctest failed ($code)" }
+
+    - name: Install C++ library
+      shell: pwsh
+      run: |
+        cmake --install "cpp/build-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "CMake install failed ($LASTEXITCODE)" }
+
+    - name: Build & install Python package
+      shell: pwsh
+      env:
+        CMAKE_BUILD_TYPE: RelWithDebInfo
+      run: |
+        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        $prefix = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }};${{ github.workspace }}\install-${{ matrix.compiler }};${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        Push-Location python
+        # plugins (pyscf) do not build on Windows; install the test extra only.
+        python -m pip install -v ".[test]" `
+          --config-settings=cmake.args="-GNinja" `
+          --config-settings=cmake.define.CMAKE_PREFIX_PATH="$prefix" `
+          --config-settings=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF `
+          --config-settings=cmake.define.CMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          --config-settings=cmake.define.CMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
+          --config-settings=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
+          --config-settings=cmake.define.VCPKG_TARGET_TRIPLET="${{ env.VCPKG_TRIPLET }}" `
+          --config-settings=cmake.define.VCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed"
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Python package install failed ($LASTEXITCODE)" }
+        python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Python import check failed ($LASTEXITCODE)" }
+        Pop-Location
+
+    - name: Run Python tests
+      shell: pwsh
+      env:
+        OMP_NUM_THREADS: '2'
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
+      run: |
+        Push-Location python
+        pytest -v --tb=short
+        $code = $LASTEXITCODE
+        Pop-Location
+        if ($code -ne 0) { throw "pytest failed ($code)" }
+
   test-with-qdk-branch:
     name: Full Test with QDK Branch
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}

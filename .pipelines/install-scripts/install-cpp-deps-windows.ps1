@@ -21,6 +21,9 @@
 .PARAMETER VcpkgRoot
     Path to the vcpkg installation. Defaults to VCPKG_INSTALLATION_ROOT or C:\vcpkg.
 
+.PARAMETER Triplet
+    vcpkg target triplet. Defaults to VCPKG_TRIPLET or x64-windows-static-md.
+
 .PARAMETER DepsInstallDir
     Install prefix for all cmake-built dependencies. Defaults to $SrcDir\deps-install-msvc.
 
@@ -32,6 +35,7 @@ param(
     [Parameter(Mandatory)] [string]$ClPath,
     [string]$BuildType    = 'RelWithDebInfo',
     [string]$VcpkgRoot,
+    [string]$Triplet,
     [string]$DepsInstallDir,
     [switch]$KeepBuildDir
 )
@@ -41,7 +45,11 @@ if (-not $VcpkgRoot) {
     $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
 }
 if (-not (Test-Path "$VcpkgRoot\vcpkg.exe")) { throw "vcpkg.exe not found under '$VcpkgRoot'" }
+if (-not $Triplet) {
+    $Triplet = if ($env:VCPKG_TRIPLET) { $env:VCPKG_TRIPLET } else { 'x64-windows-static-md' }
+}
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
+Write-Host "vcpkg triplet: $Triplet"
 
 $buildDir = "$SrcDir\deps-build-msvc"
 New-Item -ItemType Directory -Force -Path $DepsInstallDir | Out-Null
@@ -100,7 +108,7 @@ $commonArgs = @(
     "-DCMAKE_INSTALL_PREFIX=$DepsInstallDir",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
-    '-DVCPKG_TARGET_TRIPLET=x64-windows-static-md',
+    "-DVCPKG_TARGET_TRIPLET=$Triplet",
     "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
     '-DFETCHCONTENT_QUIET=OFF'
 )
@@ -129,7 +137,7 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
 $env:X_VCPKG_ASSET_SOURCES = 'x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/'
 Write-Host "=== vcpkg install ==="
 & "$VcpkgRoot\vcpkg.exe" install `
-    --triplet x64-windows-static-md `
+    --triplet $Triplet `
     --x-manifest-root="$SrcDir" `
     --x-install-root="$SrcDir\vcpkg_installed" `
     --overlay-ports="$SrcDir\vcpkg-overlay\ports"

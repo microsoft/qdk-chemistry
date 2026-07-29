@@ -25,6 +25,15 @@ elseif(DYNAMIC_ARCH)
     set(need_target 1) # for C
 elseif(CMAKE_CROSSCOMPILING AND NOT GETARCH_BINARY_DIR)
     set(need_target 1) # for C and for optimized kernel
+elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND
+       (VCPKG_TARGET_ARCHITECTURE MATCHES "^arm" OR
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64|ARM|arm)$"))
+    # QDK overlay change: on a native ARM64 build getarch selects ARMV8, whose
+    # kernels are GNU-syntax .S files that MSVC's armasm64 cannot assemble.
+    # Force target selection so the MSVC branch below picks GENERIC (portable C
+    # kernels). clang-cl understands the GNU dialect and keeps the fast path.
+    message(STATUS "MSVC cannot assemble the ARM64 kernels; forcing a portable target")
+    set(need_target 1)
 else()
     message(STATUS "TARGET: <native> (OpenBLAS getarch/getarch_2nd)")
 endif()
