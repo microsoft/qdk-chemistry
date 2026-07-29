@@ -225,13 +225,11 @@ class Circuit(DataClass):
         """
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
-
-            if hasattr(context, "estimate"):
-                return context.estimate(
-                    self._qsharp_factory.program,
-                    params,
-                    *self._qsharp_factory.parameter.values(),
-                )
+            logical_counts = context.logical_counts(
+                self._qsharp_factory.program,
+                *self._qsharp_factory.parameter.values(),
+            )
+            return logical_counts.estimate(params)
 
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
