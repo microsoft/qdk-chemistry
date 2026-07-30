@@ -265,9 +265,9 @@ class TestSOSSAMapper:
     def test_default_settings(self):
         """Test default settings are correct."""
         mapper = SOSSAMapper()
-        assert mapper.outer_prepare_needs_alias_reflection is True
-        assert mapper.inner_prepare_needs_alias_reflection is True
-        assert mapper.select_needs_phase_gradient is True
+        assert mapper.settings().get("inner_prepare_algorithm") == "controlled_alias_sampling"
+        assert mapper.settings().get("select_algorithm") == "qrom_phase_gradient"
+        assert mapper.uses_phase_gradient is True
         assert mapper.settings().get("rotation_bit_precision") == 10
         assert mapper.settings().get("coefficient_bit_precision") == 10
 
@@ -467,7 +467,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
         ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1", "N4R2B2C2"],
     )
-    def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies, qdk_ctx):
+    def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify numQubits matches the paper formula bounds."""
         controlled_unitary = _build_controlled_unitary(
             num_orbitals=num_orbitals,
@@ -484,7 +484,8 @@ class TestSOSSAWalkLogicalCounts:
         circuit = mapper.run(controlled_unitary)
 
         factory = circuit._qsharp_factory
-        lc = qdk_ctx.logical_counts(factory.program, *factory.parameter.values())
+        ctx = factory.program._qdk_context
+        lc = ctx.logical_counts(factory.program, *factory.parameter.values())
 
         actual_qubits = lc["numQubits"]
 

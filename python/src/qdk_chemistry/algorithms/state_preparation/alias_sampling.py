@@ -115,3 +115,7 @@ class AliasSamplingStatePreparation(StatePreparation):
     def bits_precision(self) -> int:
         """Number of bits for keep-coefficient precision."""
         return self._bits_precision
+
+    @bits_precision.setter
+    def bits_precision(self, value: int) -> None:
+        self._bits_precision = value

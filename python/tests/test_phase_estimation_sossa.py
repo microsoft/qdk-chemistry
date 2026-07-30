@@ -23,12 +23,26 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSS
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import QdkStandardQpeCircuitBuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
-from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    FactorizedHamiltonianContainer,
+    Hamiltonian,
+    MajoranaMapping,
+)
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .test_helpers import create_test_orbitals
+
+
+def _to_sossa_operator(factorized_hamiltonian):
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -312,8 +326,9 @@ def _run_sossa_iqpe(num_bits, mapper_kwargs=None):
     )
 
     # Build SOSSA unitary and get normalization
+    sossa_op = _to_sossa_operator(fh)
     builder = SOSSABuilder()
-    unitary_rep = builder.run(fh)
+    unitary_rep = builder.run(sossa_op)
     container = unitary_rep.get_container()
     lambda_sos = container.normalization
 
@@ -346,7 +361,7 @@ def _run_sossa_iqpe(num_bits, mapper_kwargs=None):
 
     result = iqpe.run(
         state_preparation=state_prep,
-        qubit_hamiltonian=fh,
+        qubit_hamiltonian=sossa_op,
     )
 
     # Convert measured phase to k
@@ -400,8 +415,9 @@ def _run_sossa_standard_qpe(num_bits, mapper_kwargs=None):
     )
 
     # Build SOSSA unitary and get normalization
+    sossa_op = _to_sossa_operator(fh)
     sossa_builder = SOSSABuilder()
-    unitary_rep = sossa_builder.run(fh)
+    unitary_rep = sossa_builder.run(sossa_op)
     container = unitary_rep.get_container()
     lambda_sos = container.normalization
 
@@ -443,7 +459,7 @@ def _run_sossa_standard_qpe(num_bits, mapper_kwargs=None):
         ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
     )
-    circuits = std_builder.run(state_preparation=state_prep, qubit_hamiltonian=fh)
+    circuits = std_builder.run(state_preparation=state_prep, qubit_hamiltonian=sossa_op)
 
     # Execute with enough shots to resolve conjugate phases
     executor = QdkSparseStateSimulator()
@@ -511,8 +527,9 @@ class TestSOSSAQPEIntegration:
         )
 
         # Build SOSSA
+        sossa_op = _to_sossa_operator(fh)
         builder = SOSSABuilder()
-        unitary_rep = builder.run(fh)
+        unitary_rep = builder.run(sossa_op)
         container = unitary_rep.get_container()
         lambda_sos = container.normalization
 
@@ -542,7 +559,7 @@ class TestSOSSAQPEIntegration:
 
         result = iqpe.run(
             state_preparation=state_prep,
-            qubit_hamiltonian=fh,
+            qubit_hamiltonian=sossa_op,
         )
 
         # Verify: for SOS walk, raw_energy = Λ(1 + cos(2πφ)) + energy_shift
@@ -580,7 +597,7 @@ class TestSOSSAQPEIntegration:
 
         # Step 1: SOSSABuilder → UnitaryRepresentation
         builder = SOSSABuilder()
-        unitary_rep = builder.run(fh)
+        unitary_rep = builder.run(_to_sossa_operator(fh))
         container = unitary_rep.get_container()
         assert isinstance(container, SOSSAWalkContainer)
 
@@ -632,7 +649,7 @@ class TestSOSSAQPEIntegration:
         )
 
         builder = SOSSABuilder()
-        unitary_rep = builder.run(fh)
+        unitary_rep = builder.run(_to_sossa_operator(fh))
         container = unitary_rep.get_container()
         lambda_sos = container.normalization
 

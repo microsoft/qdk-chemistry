@@ -95,6 +95,9 @@ class SOSSAMapper(ControlledCircuitMapper):
             padded = coeffs + [0.0] * (n_padded - len(coeffs))
             return QSHARP_UTILS.SOSSAWalk.MakeOuterPreparePureState(padded)
         prepare_algorithm = self._create_nested("outer_prepare")
+        if ref.algorithm_name == "alias_sampling":
+            # Keep the op's precision in sync with the outer register size (see _compute_register_sizes).
+            prepare_algorithm.bits_precision = self._settings.get("coefficient_bit_precision")
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op  # noqa: SLF001
 
@@ -164,7 +167,7 @@ class SOSSAMapper(ControlledCircuitMapper):
     def uses_phase_gradient(self) -> bool:
         """Whether a persistent phase gradient register must be allocated."""
         return self._settings.get("select_algorithm") == "qrom_phase_gradient"
-    
+
     def _compute_register_sizes(self, container: SOSSAWalkContainer) -> dict[str, int]:
         """Compute register sizes from container structure and settings."""
         num_orbitals = container.num_orbitals

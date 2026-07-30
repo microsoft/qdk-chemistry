@@ -93,7 +93,7 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_factory is not None
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
-    def test_marginal_probs_random(self, ctx, num_coefficients):
+    def test_marginal_probs_random(self, qdk_ctx, num_coefficients):
         """Verify alias sampling marginal probabilities with random coefficients.
 
         The alias sampling circuit prepares:
@@ -108,7 +108,7 @@ class TestAliasSamplingStatePreparation:
         num_index_qubits = math.ceil(math.log2(num_coefficients))
         bits_precision = 6
 
-        full_sv = _run_alias_sampling_and_dump(ctx, coefficients, num_index_qubits, bits_precision)
+        full_sv = _run_alias_sampling_and_dump(qdk_ctx, coefficients, num_index_qubits, bits_precision)
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
         abs_coeffs = np.abs(coefficients)
@@ -174,7 +174,7 @@ class TestConditionalAliasSamplingWithFreeRider:
             (2, 4, 1),
         ],
     )
-    def test_marginal_probs_with_free_rider(self, ctx, n_cond, n_coeffs, condition_value):
+    def test_marginal_probs_with_free_rider(self, qdk_ctx, n_cond, n_coeffs, condition_value):
         """Verify marginal probs and free-rider data loading."""
         rng = np.random.default_rng(seed=456 + n_cond * 10 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
@@ -185,7 +185,7 @@ class TestConditionalAliasSamplingWithFreeRider:
         n_cond_bits = math.ceil(math.log2(n_cond))
 
         full_sv = _run_conditional_alias_fr_and_dump(
-            ctx, coefficients, free_rider_data, bits_precision, condition_value
+            qdk_ctx, coefficients, free_rider_data, bits_precision, condition_value
         )
         marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
 
