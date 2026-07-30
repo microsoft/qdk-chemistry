@@ -44,6 +44,7 @@ void bind_valence_space(py::module& m);
 void bind_majorana_mapping(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
+void bind_effective_hamiltonian(py::module& m);
 void bind_logger(py::module& m);
 void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
@@ -101,6 +102,7 @@ PYBIND11_MODULE(_core, m) {
   bind_nuclear_derivative(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
+  bind_effective_hamiltonian(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
   bind_davidson_solver(algorithms);

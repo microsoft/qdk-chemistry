@@ -162,6 +162,12 @@ target_link_libraries(chemistry PUBLIC
     macis::macis
 )
 
+# Link the SeQuant symbolic-algebra stack for the DUCC effective-Hamiltonian
+# dressing. The QDK_HAS_SEQUANT define gates the ducc_level > 0 code path in the
+# DUCC solver.
+target_link_libraries(chemistry PUBLIC SeQuant::SeQuant)
+target_compile_definitions(chemistry PRIVATE QDK_HAS_SEQUANT)
+
 # Conditionally link OpenMP
 if(QDK_ENABLE_OPENMP)
     if(TARGET OpenMP::OpenMP_CXX)
