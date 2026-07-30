@@ -62,6 +62,8 @@ Check your understanding
 .. todo::
 
    Add an exercise that changes one hardware or error-correction assumption and asks the learner to explain the resulting resource tradeoff.
+   Consider a second exercise that compares resource estimates derived from the ``cc-pvdz`` and ``cc-pvtz`` basis choices in :doc:`Describing the molecule <../02_describing_the_molecule>` while holding all estimator assumptions fixed.
+   Use the comparison to show how a larger molecular representation propagates into compute-register, circuit, and physical-resource requirements.
 
 Further reading
 ===============

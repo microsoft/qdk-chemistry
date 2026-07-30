@@ -31,6 +31,8 @@ The computational cost of solving its Schrödinger equation grows rapidly with t
 :doc:`Energy and accuracy <01_energy_and_accuracy>` defines the target energy and the different error comparisons used in the tutorial.
 :doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and basis set and obtains the first Hartree--Fock energy.
 
+.. _tutorial-orbitals-and-determinants:
+
 One useful representation starts with molecular orbitals, which describe the spatial part of one-electron states across the molecule.
 In the spin basis used in this tutorial, the two possible `spin projections <https://en.wikipedia.org/wiki/Spin_(physics)#Spin_projection_quantum_number_and_multiplicity>`_ are labeled :math:`\alpha` and :math:`\beta`.
 A spin orbital combines one spatial molecular orbital with either the :math:`\alpha` or :math:`\beta` spin function.
@@ -95,7 +97,7 @@ Why stretched nitrogen?
 =======================
 
 In `molecular orbital theory <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, occupying a bonding orbital stabilizes a bond, whereas occupying the corresponding antibonding orbital opposes that stabilization.
-Near the equilibrium bond length of N\ :sub:`2`, one electron configuration dominates, and its Slater determinant provides a useful first approximation to the ground-state wavefunction.
+Near the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}` for N\ :sub:`2`, one electron configuration dominates, and its Slater determinant provides a useful first approximation to the ground-state wavefunction.
 As the bond stretches, configurations with different occupations of the bonding and antibonding orbitals become comparable in importance.
 Therefore, no single Slater determinant describes the stretched molecule adequately.
 

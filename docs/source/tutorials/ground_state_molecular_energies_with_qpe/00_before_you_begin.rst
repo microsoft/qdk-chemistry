@@ -30,9 +30,13 @@ Use the `Python tutorial <https://docs.python.org/3/tutorial/>`_, the `NumPy fun
 Required software
 =================
 
-The required examples use Python and implementations provided directly by :term:`QDK`/Chemistry.
+The required examples use `Visual Studio Code <https://code.visualstudio.com/download>`_, Python, and implementations provided directly by :term:`QDK`/Chemistry.
 They do not require Qiskit, OpenFermion, or the Quantum Resource Estimator.
 Optional chapters identify any additional packages they require.
+
+Install the desktop version of Visual Studio Code and the `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_.
+The extension provides the quantum-language, simulation, debugging, and circuit-visualization features used by the tutorial.
+Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 
 Use Python 3.10 or later on a platform supported by :term:`QDK`/Chemistry.
 Released packages support Linux on x86-64 and Arm64, macOS on Apple silicon, and Windows on x86-64 and Arm64 through the Windows Subsystem for Linux.
@@ -49,7 +53,8 @@ Set up the Python environment
 =============================
 
 Use an isolated Python environment so that the tutorial dependencies do not conflict with packages used by other projects.
-From a terminal, create and activate a virtual environment:
+In Visual Studio Code, select **Terminal > New Terminal**.
+From this integrated terminal, create and activate a virtual environment in the tutorial working folder:
 
 .. code-block:: console
 
@@ -71,7 +76,9 @@ Keep the environment active while completing the tutorial.
 Check your setup
 ================
 
-Download :download:`tutorial_qpe_setup.py <../../_static/examples/python/tutorial_qpe_setup.py>`, then run it from the directory where you saved it:
+Download :download:`tutorial_qpe_setup.py <../../_static/examples/python/tutorial_qpe_setup.py>` into the tutorial working folder.
+Open the file in Visual Studio Code and review the complete script, including imports and setup code that may not appear in the excerpts below.
+Then run it from the Visual Studio Code integrated terminal:
 
 .. code-block:: console
 
@@ -85,16 +92,7 @@ It also verifies that the built-in :term:`QDK`/Chemistry implementations require
    :start-after: # start-cell-verify
    :end-before: # end-cell-verify
 
-The check succeeds when it ends with output similar to the following and does not raise an exception:
-
-.. parsed-literal::
-
-   Python executable: /path/to/.venv/bin/python
-   Python version: 3.12.10
-   QDK/Chemistry version: |ground-state-tutorial-version|
-   Verified 8 built-in implementations.
-
-The path and versions can differ from this example.
+The check succeeds when it finishes without an exception, reports a Python executable from the tutorial virtual environment, reports QDK/Chemistry version |ground-state-tutorial-version|, and confirms that all required built-in implementations are available.
 Record the :term:`QDK`/Chemistry version and verification result in :ref:`lab-notebook-setup`.
 If the import or verification fails, confirm that the ``Python executable`` path contains the virtual-environment directory and compare the installation command with the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
@@ -104,10 +102,21 @@ How to use the tutorial
 Complete the required chapters in the order listed in the :doc:`tutorial introduction <index>` because each stage uses decisions and results recorded earlier.
 For each chapter:
 
-1. Read the explanation before running its example.
-2. Run the example and compare its output with the stated expectation.
-3. Complete the understanding check, when present.
-4. Update the linked section of the lab notebook before continuing.
+1. Download the complete Python example and open it in Visual Studio Code.
+2. Read the complete file, including imports and setup code omitted from the excerpts in the chapter.
+3. Read the chapter explanation before running the example.
+4. Run the example in the Visual Studio Code integrated terminal and compare its output with the stated expectation.
+5. Complete the understanding check, when present.
+6. Update the linked section of the lab notebook before continuing.
+
+In a **Check your understanding** section, answer each question before selecting its heading to reveal the suggested answer.
+Select the heading again to hide the answer.
+
+.. admonition:: What happens when you click on a question box (after you've answered the question)?
+   :class: hint
+   :collapsible: closed
+
+   You can check your answer.
 
 Use links to the reference documentation when you need complete application programming interface (:term:`API`) details.
 The final circuit simulation is the only intentionally long required example; the :doc:`tutorial introduction <index>` gives its expected duration, and :doc:`Iterative quantum phase estimation <06_iterative_phase_estimation>` explains how to monitor its progress.
@@ -116,5 +125,7 @@ Further reading
 ===============
 
 - `Installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_
+- `Visual Studio Code <https://code.visualstudio.com/download>`_
+- `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_
 - :doc:`Quickstart <../../user/quickstart>`
 - :doc:`Glossary <../../glossary>`
