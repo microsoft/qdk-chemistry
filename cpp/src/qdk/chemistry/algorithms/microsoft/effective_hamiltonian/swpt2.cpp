@@ -40,6 +40,15 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
 std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     std::shared_ptr<data::Wavefunction> reference,
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
+  // Spin-restricted method: H0 is the spin-averaged diagonal Fock and the
+  // effective two-body is emitted as a single (spin-free) chemist tensor, so an
+  // unrestricted input would be silently collapsed. Reject it up front (matches
+  // the downstream MacisCas/Asci/Pmc solvers, which do the same).
+  if (hamiltonian->is_unrestricted())
+    throw std::runtime_error(
+        "SchriefferWolffPT2 does not support unrestricted orbitals. "
+        "Only restricted orbitals are supported.");
+
   // --- window integrals (spin-restricted) ---
   const auto [h1a, h1b] = hamiltonian->get_one_body_integrals();
   const auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian->get_two_body_integrals();
@@ -109,9 +118,11 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
           "SchriefferWolffPT2: active-orbital ordering in the window does not "
           "match the reference active space (not yet supported)");
 
-  // --- kernel pipeline ---
-  const auto H =
-      kern::build_tensors(h1a, h1b, g_aaaa, g_aabb, g_bbbb, e_core, norb);
+  // --- kernel pipeline (spin-blocked: the antisymmetric two-body tensor is
+  // stored as spatial spin blocks and every element is formed on the fly, so
+  // the dense n_so^4 objects are never materialized) ---
+  const auto blk = kern::build_two_body_blocked(g_aaaa, g_aabb, g_bbbb, norb);
+  const auto f = kern::spin_orbital_one_body(h1a, h1b, norb);
   const auto part = kern::make_partition(norb, active_spatial, occupation);
 
   Eigen::VectorXd na = Eigen::VectorXd::Zero(norb);
@@ -127,7 +138,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   reg.denom_shift = _settings->get<double>("denom_shift");
   reg.denom_flow = _settings->get<double>("denom_flow");
 
-  const auto down = kern::downfold(H, eps, part, reg);
+  const auto down = kern::downfold_blocked(f, blk, eps, part, reg, e_core);
 
   // Intruder warning is gated on the RAW (unregularized) amplitude: the
   // regularizer damps the operator, so warning on regularized amplitudes would

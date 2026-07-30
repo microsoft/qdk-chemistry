@@ -40,9 +40,9 @@ class SchriefferWolffPT2Constructor
   }
   ~SchriefferWolffPT2Constructor() override = default;
 
-  std::string name() const final { return "swpt2"; }
+  std::string name() const final { return "qdk_swpt2"; }
   std::vector<std::string> aliases() const override {
-    return {"swpt2", "sw", "schrieffer_wolff"};
+    return {"qdk_swpt2", "swpt2", "sw", "schrieffer_wolff"};
   }
 
  protected:

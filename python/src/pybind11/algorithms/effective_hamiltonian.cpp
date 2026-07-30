@@ -71,7 +71,7 @@ constructor), otherwise the ``P<->Q`` couplings are already gone.
 
 Examples:
     >>> import qdk_chemistry.algorithms as alg
-    >>> downfolder = alg.create("effective_hamiltonian_constructor", "swpt2")
+    >>> downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
     >>> h_eff = downfolder.run(reference, window_hamiltonian)
 )");
 

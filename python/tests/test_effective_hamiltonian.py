@@ -27,31 +27,31 @@ class TestEffectiveHamiltonianConstructor:
         """swpt2 is registered and resolvable via the factory."""
         available = algorithms.available(_TYPE)
         assert isinstance(available, list)
-        assert "swpt2" in available
+        assert "qdk_swpt2" in available
 
         # default and explicit creation both yield the swpt2 constructor
         default = algorithms.create(_TYPE)
         assert isinstance(default, EffectiveHamiltonianConstructor)
-        assert default.name() == "swpt2"
+        assert default.name() == "qdk_swpt2"
         assert default.type_name() == _TYPE
 
-        explicit = algorithms.create(_TYPE, "swpt2")
-        assert explicit.name() == "swpt2"
+        explicit = algorithms.create(_TYPE, "qdk_swpt2")
+        assert explicit.name() == "qdk_swpt2"
 
         # a nonexistent name raises
         with pytest.raises((KeyError, RuntimeError)):
             algorithms.create(_TYPE, "nonexistent_downfolder")
 
-    @pytest.mark.parametrize("alias", ["sw", "schrieffer_wolff"])
+    @pytest.mark.parametrize("alias", ["swpt2", "sw", "schrieffer_wolff"])
     def test_aliases_resolve(self, alias):
-        """Aliases resolve to the swpt2 implementation."""
-        assert algorithms.create(_TYPE, alias).name() == "swpt2"
+        """Aliases (incl. the legacy `swpt2`) resolve to the qdk_swpt2 implementation."""
+        assert algorithms.create(_TYPE, alias).name() == "qdk_swpt2"
 
     def test_direct_construction(self):
         """The concrete class constructs directly."""
         constructor = QdkSchriefferWolffPT2Constructor()
         assert isinstance(constructor, EffectiveHamiltonianConstructor)
-        assert constructor.name() == "swpt2"
+        assert constructor.name() == "qdk_swpt2"
 
     def test_settings_knobs(self):
         """Denominator/regularization settings expose their defaults and are settable."""

@@ -28,6 +28,12 @@ inline Eigen::Index n4(int M) {
 }
 }  // namespace
 
+// ===========================================================================
+// Shared foundations (used by BOTH the dense reference and the production
+// path): denominator regularization, diagonal-Fock energies, the
+// occupation-change masks, and the projected-commutator Wick machinery.
+// ===========================================================================
+
 double reg_inv(double delta, const RegOptions& reg) {
   if (reg.denom_flow > 0.0) {
     const double d2 = delta * delta;
@@ -40,6 +46,18 @@ double reg_inv(double delta, const RegOptions& reg) {
   if (std::abs(delta) < reg.denom_floor) return 0.0;
   return 1.0 / delta;
 }
+
+// ===========================================================================
+// Dense spin-orbital reference (validation ORACLE; not used in production). A
+// transparent, dense-tensor implementation of the whole downfold, kept as the
+// independent reference the spin-blocked production path is checked against
+// (see the `BlockedDownfoldMatchesSpinOrbital` test). Some shared helpers
+// (`diagonal_fock_energies`, the occupation-change masks, the Wick
+// `project_product_t`) live in this region because the production path below
+// reuses them.
+// ===========================================================================
+
+namespace reference {
 
 SoTensors build_tensors(const Eigen::MatrixXd& h1a, const Eigen::MatrixXd& h1b,
                         const Eigen::VectorXd& g_aaaa,
@@ -91,6 +109,8 @@ SoTensors build_tensors(const Eigen::MatrixXd& h1a, const Eigen::MatrixXd& h1b,
   return h;
 }
 
+}  // namespace reference
+
 Eigen::VectorXd diagonal_fock_energies(const Eigen::MatrixXd& h1a,
                                        const Eigen::VectorXd& g_aaaa,
                                        const Eigen::VectorXd& na,
@@ -132,6 +152,8 @@ inline bool is_od2(const SoPartition& part, int P, int Q, int R, int S) {
          net2(part.is_virtual, P, Q, R, S) != 0;
 }
 }  // namespace
+
+namespace reference {
 
 Generator make_generator(const SoTensors& h, const Eigen::VectorXd& eps,
                          const SoPartition& part, const RegOptions& reg) {
@@ -246,6 +268,8 @@ MeanFieldResult mean_field_fold(const SoTensors& h_bd,
   return res;
 }
 
+}  // namespace reference
+
 // ---------------------------------------------------------------------------
 // Projected commutator 1/2 [S, V] via generalized Wick over the external legs.
 // ---------------------------------------------------------------------------
@@ -311,13 +335,17 @@ int perm_sign(const std::vector<int>& seq) {
 }
 
 // Active-space reference projection of A * B (A left, B right), buffer summed.
-// A/B given as (1-body, 2-body) tensors; contributions emitted (scaled) into
-// `out` over active spin-orbitals. hvec/pvec are the hole/particle propagators.
-void project_product(const Eigen::MatrixXd& A1, const Eigen::VectorXd& A2,
-                     const Eigen::MatrixXd& B1, const Eigen::VectorXd& B2,
-                     const SoPartition& part, double scale,
-                     const Eigen::VectorXd& hvec, const Eigen::VectorXd& pvec,
-                     FermionOp& out) {
+// A/B given as (1-body dense, 2-body element accessor) operators; the 2-body
+// accessors `A2get`/`B2get` are `double(int P,int Q,int R,int S)` so the caller
+// can back them by a dense tensor or compute elements on the fly (spin-blocked
+// path). Contributions are emitted (scaled) into `out` over active
+// spin-orbitals; hvec/pvec are the hole/particle propagators.
+template <class A2Get, class B2Get>
+void project_product_t(const Eigen::MatrixXd& A1, A2Get A2get,
+                       const Eigen::MatrixXd& B1, B2Get B2get,
+                       const SoPartition& part, double scale,
+                       const Eigen::VectorXd& hvec, const Eigen::VectorXd& pvec,
+                       FermionOp& out) {
   const int M = part.n_so;
   // Candidate orbital sets: contracted buffer legs sum only over their support
   // (inactive = particle line, virtual = hole line); output legs are active.
@@ -397,13 +425,11 @@ void project_product(const Eigen::MatrixXd& A1, const Eigen::VectorXd& A2,
           for (int s = 0; s < nslots; ++s)
             sv[s] = (*gcand[slot_group[s]])[idxv[slot_group[s]]];
 
-          const double valA = (rA == 1)
-                                  ? A1(sv[0], sv[1])
-                                  : A2(idx4(sv[0], sv[1], sv[2], sv[3], M));
-          const double valB = (rB == 1)
-                                  ? B1(sv[2 * rA], sv[2 * rA + 1])
-                                  : B2(idx4(sv[2 * rA], sv[2 * rA + 1],
-                                            sv[2 * rA + 2], sv[2 * rA + 3], M));
+          const double valA =
+              (rA == 1) ? A1(sv[0], sv[1]) : A2get(sv[0], sv[1], sv[2], sv[3]);
+          const double valB = (rB == 1) ? B1(sv[2 * rA], sv[2 * rA + 1])
+                                        : B2get(sv[2 * rA], sv[2 * rA + 1],
+                                                sv[2 * rA + 2], sv[2 * rA + 3]);
           if (valA != 0.0 && valB != 0.0) {
             double prop = 1.0;
             for (int g = 0; g < npairs; ++g) {
@@ -432,7 +458,23 @@ void project_product(const Eigen::MatrixXd& A1, const Eigen::VectorXd& A2,
   }
 }
 
+// Dense-tensor projection (oracle path): the 2-body operators are full
+// spin-orbital tensors indexed directly.
+void project_product(const Eigen::MatrixXd& A1, const Eigen::VectorXd& A2,
+                     const Eigen::MatrixXd& B1, const Eigen::VectorXd& B2,
+                     const SoPartition& part, double scale,
+                     const Eigen::VectorXd& hvec, const Eigen::VectorXd& pvec,
+                     FermionOp& out) {
+  const int M = part.n_so;
+  project_product_t(
+      A1, [&](int P, int Q, int R, int S) { return A2(idx4(P, Q, R, S, M)); },
+      B1, [&](int P, int Q, int R, int S) { return B2(idx4(P, Q, R, S, M)); },
+      part, scale, hvec, pvec, out);
+}
+
 }  // namespace
+
+namespace reference {
 
 DownfoldResult downfold(const SoTensors& h, const Eigen::VectorXd& eps,
                         const SoPartition& part, const RegOptions& reg) {
@@ -516,6 +558,277 @@ ActiveHamiltonian to_spatial_chemist(const DownfoldResult& down,
           out.two_body(idx4(p, q, r, s, norb)) =
               -down.v_active(idx4(2 * spatial[p], 2 * spatial[r] + 1,
                                   2 * spatial[q], 2 * spatial[s] + 1, M));
+  return out;
+}
+
+}  // namespace reference
+
+// ===========================================================================
+// Spin-blocked on-the-fly downfold (PRODUCTION): the path wired into the
+// constructor. Stores the two-body as spatial spin blocks and forms every
+// element on demand, so no dense n_so^4 tensor is ever materialized.
+// ===========================================================================
+
+SpinBlocked2B build_two_body_blocked(const Eigen::VectorXd& g_aaaa,
+                                     const Eigen::VectorXd& g_aabb,
+                                     const Eigen::VectorXd& g_bbbb, int norb) {
+  const Eigen::Index n4 = static_cast<Eigen::Index>(norb) * norb * norb * norb;
+  SpinBlocked2B b;
+  b.norb = norb;
+  b.v_aaaa = Eigen::VectorXd::Zero(n4);
+  b.v_bbbb = Eigen::VectorXd::Zero(n4);
+  b.v_abab = Eigen::VectorXd::Zero(n4);
+
+  // Same-spin block: W[A,B,C,D] += 0.5 g[flat(A,D,B,C)], then antisymmetrize
+  // over (P<->Q) and (R<->S). Purely spatial (mirrors build_tensors restricted
+  // to a single all-same-spin channel).
+  const auto build_same = [&](const Eigen::VectorXd& g, Eigen::VectorXd& v) {
+    std::vector<double> W(static_cast<std::size_t>(n4), 0.0);
+    for (int p = 0; p < norb; ++p)
+      for (int q = 0; q < norb; ++q)
+        for (int r = 0; r < norb; ++r)
+          for (int s = 0; s < norb; ++s)
+            W[idx4(p, r, s, q, norb)] += 0.5 * g(idx4(p, q, r, s, norb));
+    for (int P = 0; P < norb; ++P)
+      for (int Q = 0; Q < norb; ++Q)
+        for (int R = 0; R < norb; ++R)
+          for (int S = 0; S < norb; ++S)
+            v(idx4(P, Q, R, S, norb)) =
+                W[idx4(P, Q, R, S, norb)] - W[idx4(Q, P, R, S, norb)] -
+                W[idx4(P, Q, S, R, norb)] + W[idx4(Q, P, S, R, norb)];
+  };
+  build_same(g_aaaa, b.v_aaaa);
+  build_same(g_bbbb, b.v_bbbb);
+
+  // Opposite-spin block v[alpha(p), beta(q), alpha(r), beta(s)]:
+  // the cross-spin W terms vanish under (P<->Q)/(R<->S) except one, giving
+  // v_abab[p,q,r,s] = -g_aabb[flat(p,r,q,s)].
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          b.v_abab(idx4(p, q, r, s, norb)) = -g_aabb(idx4(p, r, q, s, norb));
+  return b;
+}
+
+double so_v_from_blocked(const SpinBlocked2B& b, int P, int Q, int R, int S) {
+  const int n = b.norb;
+  const int sP = P & 1, sQ = Q & 1, sR = R & 1, sS = S & 1;
+  const int p = P >> 1, q = Q >> 1, r = R >> 1, s = S >> 1;
+  if (sP == sQ && sQ == sR && sR == sS)
+    return (sP == 0 ? b.v_aaaa : b.v_bbbb)(idx4(p, q, r, s, n));
+  // Sz conservation: mixed blocks are nonzero only with one alpha and one beta
+  // in each creation/annihilation pair.
+  if (sP + sQ != 1 || sR + sS != 1) return 0.0;
+  if (sP == 0 && sR == 0) return b.v_abab(idx4(p, q, r, s, n));   // abab
+  if (sP == 0 && sR == 1) return -b.v_abab(idx4(p, q, s, r, n));  // abba
+  if (sP == 1 && sR == 0) return -b.v_abab(idx4(q, p, r, s, n));  // baab
+  return b.v_abab(idx4(q, p, s, r, n));                           // baba
+}
+
+Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
+                                      const Eigen::MatrixXd& h1b, int norb) {
+  const int M = 2 * norb;
+  Eigen::MatrixXd f = Eigen::MatrixXd::Zero(M, M);
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q) {
+      f(alpha(p), alpha(q)) = h1a(p, q);
+      f(beta(p), beta(q)) = h1b(p, q);
+    }
+  return f;
+}
+
+ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
+                                      const SpinBlocked2B& blk,
+                                      const Eigen::VectorXd& eps,
+                                      const SoPartition& part,
+                                      const RegOptions& reg, double e_core) {
+  const int M = part.n_so;
+
+  // Active spin-orbitals (ascending) + full -> compact index map, so the
+  // result is stored over the active space only.
+  std::vector<int> active_so;
+  for (int o = 0; o < M; ++o)
+    if (part.is_active[o]) active_so.push_back(o);
+  std::vector<int> so2c(M, -1);
+  for (int c = 0; c < static_cast<int>(active_so.size()); ++c)
+    so2c[active_so[c]] = c;
+
+  // On-the-fly two-body element accessors (no dense n_so^4 storage).
+  const auto v_at = [&](int P, int Q, int R, int S) {
+    return so_v_from_blocked(blk, P, Q, R, S);
+  };
+  const auto od_v_at = [&](int P, int Q, int R, int S) {
+    return is_od2(part, P, Q, R, S) ? v_at(P, Q, R, S) : 0.0;
+  };
+  const auto bd_v_at = [&](int P, int Q, int R, int S) {
+    return is_od2(part, P, Q, R, S) ? 0.0 : v_at(P, Q, R, S);
+  };
+  const auto s2_at = [&](int P, int Q, int R, int S) -> double {
+    if (!is_od2(part, P, Q, R, S)) return 0.0;
+    const double vv = v_at(P, Q, R, S);
+    if (vv == 0.0) return 0.0;
+    const double d = eps(P) + eps(Q) - eps(R) - eps(S);
+    return vv * reg_inv(d, reg);
+  };
+
+  // Generator: s1 dense (cheap), s2 on the fly; plus intruder diagnostics.
+  Eigen::MatrixXd s1 = Eigen::MatrixXd::Zero(M, M);
+  double min_denom = std::numeric_limits<double>::infinity();
+  double max_amp = 0.0;
+  const auto track = [&](double coupling, double delta) {
+    const double ad = std::abs(delta);
+    min_denom = std::min(min_denom, ad);
+    max_amp =
+        std::max(max_amp, std::abs(coupling) / std::max(ad, reg.denom_floor));
+  };
+  for (int P = 0; P < M; ++P)
+    for (int Q = 0; Q < M; ++Q)
+      if (is_od1(part, P, Q) && f(P, Q) != 0.0) {
+        const double d = eps(P) - eps(Q);
+        s1(P, Q) = f(P, Q) * reg_inv(d, reg);
+        track(f(P, Q), d);
+      }
+  for (int P = 0; P < M; ++P)
+    for (int Q = 0; Q < M; ++Q)
+      for (int R = 0; R < M; ++R)
+        for (int S = 0; S < M; ++S) {
+          if (!is_od2(part, P, Q, R, S)) continue;
+          const double vv = v_at(P, Q, R, S);
+          if (vv == 0.0) continue;
+          track(vv, eps(P) + eps(Q) - eps(R) - eps(S));
+        }
+
+  // Block-diagonal / off-diagonal one-body split (dense, cheap).
+  Eigen::MatrixXd od_f = Eigen::MatrixXd::Zero(M, M);
+  Eigen::MatrixXd bd_f = Eigen::MatrixXd::Zero(M, M);
+  for (int P = 0; P < M; ++P)
+    for (int Q = 0; Q < M; ++Q)
+      (is_od1(part, P, Q) ? od_f : bd_f)(P, Q) = f(P, Q);
+
+  // Reference-occupation mean-field fold of the block-diagonal part.
+  Eigen::VectorXd nb = Eigen::VectorXd::Zero(M);
+  for (int P = 0; P < M; ++P)
+    if (part.is_inactive[P]) nb(P) = 1.0;
+
+  ActiveDownfoldResult res;
+  res.active_so = active_so;
+  const int n_ac = static_cast<int>(active_so.size());
+  // The emitted effective operator is spin-restricted, so the active space must
+  // be closed under spin (paired spin-orbitals 2s, 2s+1); only the
+  // opposite-spin block is stored and emitted.
+  const int n_act = n_ac / 2;
+  for (int k = 0; k < n_act; ++k)
+    if (active_so[2 * k] % 2 != 0 ||
+        active_so[2 * k + 1] != active_so[2 * k] + 1)
+      throw std::invalid_argument(
+          "downfold_blocked: active space is not spin-restricted");
+  res.e = e_core;
+  for (int P = 0; P < M; ++P) res.e += bd_f(P, P) * nb(P);
+  for (int P = 0; P < M; ++P)
+    for (int Q = 0; Q < M; ++Q)
+      res.e -= 0.5 * bd_v_at(P, Q, P, Q) * nb(P) * nb(Q);
+
+  res.f_active = Eigen::MatrixXd::Zero(n_ac, n_ac);
+  for (int ci = 0; ci < n_ac; ++ci) {
+    const int i = active_so[ci];
+    for (int cj = 0; cj < n_ac; ++cj) {
+      const int j = active_so[cj];
+      double fold = 0.0;
+      for (int b = 0; b < M; ++b) fold += bd_v_at(i, b, b, j) * nb(b);
+      res.f_active(ci, cj) = bd_f(i, j) + fold;
+    }
+  }
+
+  res.v_abab = Eigen::VectorXd::Zero(n4(n_act));
+  for (int p = 0; p < n_act; ++p)
+    for (int q = 0; q < n_act; ++q)
+      for (int r = 0; r < n_act; ++r)
+        for (int s = 0; s < n_act; ++s)
+          res.v_abab(idx4(p, q, r, s, n_act)) =
+              bd_v_at(active_so[2 * p], active_so[2 * q + 1], active_so[2 * r],
+                      active_so[2 * s + 1]);
+  // Accumulate a commutator contribution into the opposite-spin block (compact
+  // spin-orbital indices; only abab-patterned images are kept -- the same-spin
+  // images are its antisymmetrization and are never read from the emitted
+  // operator).
+  const auto add_abab = [&](int I, int J, int K, int L, double val) {
+    if ((I & 1) == 0 && (J & 1) == 1 && (K & 1) == 0 && (L & 1) == 1)
+      res.v_abab(idx4(I >> 1, J >> 1, K >> 1, L >> 1, n_act)) += val;
+  };
+
+  // reference-occupation propagators: hole line on virtual, particle on
+  // inactive
+  Eigen::VectorXd hvec = Eigen::VectorXd::Zero(M);
+  Eigen::VectorXd pvec = Eigen::VectorXd::Zero(M);
+  for (int P = 0; P < M; ++P) {
+    if (part.is_virtual[P]) hvec(P) = 1.0;
+    if (part.is_inactive[P]) pvec(P) = 1.0;
+  }
+
+  // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
+  FermionOp comm;
+  project_product_t(s1, s2_at, od_f, od_v_at, part, +0.5, hvec, pvec, comm);
+  project_product_t(od_f, od_v_at, s1, s2_at, part, -0.5, hvec, pvec, comm);
+
+  res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
+  res.max_amplitude = max_amp;
+  double higher2 = 0.0;
+  for (const auto& [term, coeff] : comm) {
+    const int len = static_cast<int>(term.size());
+    if (len == 0) {
+      res.e += coeff;
+    } else if (len == 2) {
+      res.f_active(so2c[term[0].first], so2c[term[1].first]) += coeff;
+    } else if (len == 4) {
+      const int c0 = so2c[term[0].first], c1 = so2c[term[1].first];
+      const int a0 = so2c[term[2].first], a1 = so2c[term[3].first];
+      add_abab(c0, c1, a0, a1, +coeff);
+      add_abab(c1, c0, a0, a1, -coeff);
+      add_abab(c0, c1, a1, a0, -coeff);
+      add_abab(c1, c0, a1, a0, +coeff);
+    } else {
+      higher2 += coeff * coeff;
+    }
+  }
+  res.higher_body_norm = std::sqrt(higher2);
+  return res;
+}
+
+ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
+                                     const SoPartition& part) {
+  const int M = part.n_so;
+  std::vector<int> spatial;
+  for (int o = 0; 2 * o + 1 < M; ++o) {
+    const bool a = part.is_active[2 * o], b = part.is_active[2 * o + 1];
+    if (a != b)
+      throw std::invalid_argument(
+          "to_spatial_chemist: active space is not spin-restricted");
+    if (a) spatial.push_back(o);
+  }
+  const int norb = static_cast<int>(spatial.size());
+  const int n_ac = static_cast<int>(down.active_so.size());
+  std::vector<int> so2c(M, -1);
+  for (int c = 0; c < n_ac; ++c) so2c[down.active_so[c]] = c;
+
+  ActiveHamiltonian out;
+  out.norb = norb;
+  out.core_energy = down.e;
+  out.one_body = Eigen::MatrixXd::Zero(norb, norb);
+  out.two_body = Eigen::VectorXd::Zero(n4(norb));
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      out.one_body(p, q) =
+          down.f_active(so2c[2 * spatial[p]], so2c[2 * spatial[q]]);
+
+  // chemist (pq|rs) = -v_abab[p, r, q, s]: the stored opposite-spin block is
+  // indexed by active spatial position (ascending active-orbital order).
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          out.two_body(idx4(p, q, r, s, norb)) =
+              -down.v_abab(idx4(p, r, q, s, norb));
   return out;
 }
 
