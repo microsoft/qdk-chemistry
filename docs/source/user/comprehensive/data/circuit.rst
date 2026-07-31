@@ -102,9 +102,8 @@ Composing a callable from one context into a program owned by another raises ``Q
 Three scenarios cover how users interact with this:
 
 **Using QDK/Chemistry algorithms only.**
-You never touch the Q# context. Every circuit the library builds — including the ``QSHARP_UTILS``
-chemistry operations — is created against one internal shared context, so everything composes
-automatically.
+You never touch the Q# context. Every circuit the library builds is created against one internal 
+shared context, so everything composes automatically.
 
 **Bringing your own Q# operation.**
 When you define your own Q# program (for example, a custom ``BellState`` state preparation) and want
@@ -138,19 +137,18 @@ The four helpers in :mod:`qdk_chemistry.utils.qsharp` that manage this are:
 
 :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
    Returns the shared context that owns ``QSHARP_UTILS``. Build your own operations against it so they
-   compose with the chemistry builders. This is the helper most users reach for.
+   compose with the chemistry builders.
 
 :func:`~qdk_chemistry.utils.qsharp.create_qsharp_context`
    Creates a fresh context preloaded with the chemistry utilities. Forwards ``target_profile`` and any
    other ``qdk.Context`` keyword arguments; use it when you need a non-default configuration.
 
 :func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
-   Installs a caller-supplied context process-wide so ``QSHARP_UTILS`` and your operations share it.
-   Pass ``None`` to reset to the default context.
+   Installs a caller-supplied context process-wide. Pass ``None`` to reset to the default context.
 
 :func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
    A context manager that overrides the active context for the current thread only and restores it
-   on exit — the thread-safe way to switch contexts in concurrent code.
+   on exit.
 
 
 Conversion methods
