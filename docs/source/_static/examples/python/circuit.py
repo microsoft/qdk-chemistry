@@ -93,20 +93,21 @@ circuit.get_qir()  # → qsharp.compile(program, **params)
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import create_qsharp_context, set_qsharp_context
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
-context = create_qsharp_context(target_profile=qdk.TargetProfile.Adaptive_RIF)
-set_qsharp_context(context)
-
+# get_qsharp_context() returns the context QDK/Chemistry uses internally. Define your
+# own Q# operation against it so it composes with the chemistry builders.
+context = get_qsharp_context()
 context.eval(
-    "operation ApplyXToFirstQubit(qs : Qubit[]) : Unit is Adj + Ctl { X(qs[0]); }"
+    "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
 )
-user_op = context.eval("ApplyXToFirstQubit")
+bell_state = context.eval("BellState")
 user_state_prep = Circuit(
-    qsharp_op=user_op,
-    qsharp_factory=QsharpFactoryData(program=user_op, parameter={}),
+    qsharp_op=bell_state,
+    qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
 )
 
+# Feed the user-defined state prep straight into the standard QPE builder.
 builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
 builder.settings().set(
     "controlled_circuit_mapper",
@@ -120,7 +121,6 @@ qpe_circuit = builder.run(
     state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
 )[0]
 qpe_circuit.get_qsharp_circuit()
-set_qsharp_context(None)
 # end-cell-shared-context
 ################################################################################
 
