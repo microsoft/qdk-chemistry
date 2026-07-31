@@ -98,7 +98,7 @@ Shared Q# context
 
 QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
 Composing a callable from one context into a program owned by another raises ``QSharpError: This callable belongs to a different Context``.
-The vendored chemistry utilities (:data:`~qdk_chemistry.utils.qsharp.QSHARP_UTILS`) are owned by a single shared context, so any user-supplied ``qsharp_op`` or operation-valued factory parameter must be built against that same context.
+The vendored chemistry utilities (``QSHARP_UTILS``) are owned by a single shared context, so any user-supplied ``qsharp_op`` or operation-valued factory parameter must be built against that same context.
 
 Three helpers in :mod:`qdk_chemistry.utils.qsharp` manage this:
 
