@@ -23,8 +23,8 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 
 | Example | Install command |
 |---------|----------------|
-| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
-| `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
+| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
+| `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
@@ -33,6 +33,9 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `interoperability/qiskit/` | `pip install 'qdk-chemistry[qiskit-extras]'` |
 | `interoperability/openFermion/` | `pip install 'qdk-chemistry[openfermion-extras]'` |
 | `interoperability/rdkit/` | `pip install rdkit` |
+
+The `qiskit-extras` extra is not supported on Python 3.14. The `qre` extra
+requires Python 3.11 or newer.
 
 To install everything needed for all examples at once:
 
