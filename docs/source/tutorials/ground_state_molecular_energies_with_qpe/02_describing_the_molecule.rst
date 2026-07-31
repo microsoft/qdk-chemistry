@@ -29,6 +29,8 @@ Download :download:`tutorial_describe_n2.py <../../_static/examples/python/tutor
 Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
 The sections below explain the inputs and calculations in this complete executable file before you run it.
 
+.. _tutorial-molecular-system:
+
 Specify the molecular system
 ============================
 
@@ -40,10 +42,10 @@ The molecule is neutral, so its charge is zero and it has 14 electrons.
 `Spin multiplicity <https://en.wikipedia.org/wiki/Multiplicity_(chemistry)>`_ is defined as :math:`2S+1`, where :math:`S` is the total electron spin produced by combining the spins of all electrons.
 Paired electrons contribute no net spin, whereas unpaired electrons can produce :math:`S>0`.
 A multiplicity of one, two, or three is called a singlet, doublet, or triplet, respectively.
-QDK/Chemistry uses the molecular charge and spin multiplicity to determine the numbers of :math:`\alpha` and :math:`\beta` electrons in the calculation.
+:term:`QDK`/Chemistry uses the molecular charge and spin multiplicity to determine the numbers of :math:`\alpha` and :math:`\beta` electrons in the calculation.
 For the target N\ :sub:`2` singlet, :math:`S=0`, so the multiplicity is one and the calculation contains seven :math:`\alpha` and seven :math:`\beta` electrons.
 
-QDK/Chemistry represents a molecular geometry with a :class:`~qdk_chemistry.data.Structure` object.
+:term:`QDK`/Chemistry represents a molecular geometry with a :class:`~qdk_chemistry.data.Structure` object.
 This example constructs the :class:`~qdk_chemistry.data.Structure` object from a string in `XYZ file format <https://en.wikipedia.org/wiki/XYZ_file_format>`_, which contains an atom count, a comment line, and one element symbol with three Cartesian coordinates for each atom:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_describe_n2.py
@@ -51,8 +53,10 @@ This example constructs the :class:`~qdk_chemistry.data.Structure` object from a
    :start-after: # start-cell-molecule
    :end-before: # end-cell-molecule
 
-The XYZ convention used by QDK/Chemistry interprets coordinates as ångström.
-The XYZ format does not specify molecular charge or spin multiplicity, so the example records these values separately.
+The :term:`XYZ` convention used by :term:`QDK`/Chemistry interprets coordinates as ångström.
+The :term:`XYZ` format does not specify molecular charge or spin multiplicity, so the example records these values separately.
+
+.. _tutorial-hartree-fock-wavefunction:
 
 Choose a mean-field wavefunction
 ================================
@@ -73,6 +77,8 @@ The Hartree--Fock energy is the fixed-geometry total energy evaluated with the o
 
 where :math:`\Phi_{\mathrm{HF}}` is the optimized determinant and :math:`E_{\mathrm{nuclear}}` is the repulsion among the fixed nuclei.
 This energy remains approximate because the determinant cannot represent electron correlation.
+
+.. _tutorial-molecular-orbitals:
 
 Represent the orbitals in a finite basis
 ========================================
@@ -120,7 +126,7 @@ The `self-consistent field <https://en.wikipedia.org/wiki/Self-consistent_field>
 3. Solve for an updated set of orbitals.
 4. Repeat until the energy and orbitals satisfy the convergence criteria.
 
-The QDK/Chemistry :class:`~qdk_chemistry.algorithms.ScfSolver` returns the converged fixed-geometry total energy and a wavefunction containing the optimized molecular orbitals.
+The :term:`QDK`/Chemistry :class:`~qdk_chemistry.algorithms.ScfSolver` returns the converged fixed-geometry total energy and a wavefunction containing the optimized molecular orbitals.
 These orbitals provide the starting point for the multi-configurational calculations introduced in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 
 Run the calculation
@@ -132,7 +138,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
    python tutorial_describe_n2.py
 
-The following code runs the built-in QDK/Chemistry Hartree--Fock solver once for each basis set.
+The following code runs the built-in :term:`QDK`/Chemistry Hartree--Fock solver once for each basis set.
 The primary result is the ``cc-pvdz`` wavefunction, whose optimized molecular orbitals serve as the starting point for the multi-configurational calculation in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 The two energies support the basis-set sensitivity exercise that follows.
 
@@ -176,12 +182,12 @@ Check your understanding
    A molecular orbital is a one-electron spatial function used to construct the spin orbitals in a Hartree--Fock determinant.
    Molecular orbitals make the approximate many-electron wavefunction computationally tractable, help interpret bonding and occupations, and provide the starting representation for later multi-configurational calculations.
 
-.. admonition:: Why does a Hartree--Fock calculation require an iterative SCF procedure?
+.. admonition:: Why does a Hartree--Fock calculation require an iterative :term:`SCF` procedure?
    :class: hint
    :collapsible: closed
 
    The molecular orbitals determine the mean field experienced by each electron, while that mean field determines the molecular orbitals.
-   SCF iterations update the orbitals and field until they are mutually consistent.
+   :term:`SCF` iterations update the orbitals and field until they are mutually consistent.
 
 Further reading
 ===============

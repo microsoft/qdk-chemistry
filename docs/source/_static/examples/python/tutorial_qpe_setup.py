@@ -21,6 +21,8 @@ if GROUND_STATE_TUTORIAL_VERSION is not None:
 import platform
 import sys
 
+import ipykernel
+from qdk.widgets import MoleculeViewer
 from qdk_chemistry.algorithms import create
 
 required_implementations = (
@@ -37,5 +39,7 @@ required_implementations = (
 print(f"Python executable: {sys.executable}")
 print(f"Python version: {platform.python_version()}")
 print(f"QDK/Chemistry version: {qdk_chemistry.__version__}")
+print(f"IPython kernel version: {ipykernel.__version__}")
+print(f"Verified widget: {MoleculeViewer.__name__}")
 print(f"Verified {len(required_implementations)} built-in implementations.")
 # end-cell-verify

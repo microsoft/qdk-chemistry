@@ -34,8 +34,8 @@ The required examples use `Visual Studio Code <https://code.visualstudio.com/dow
 They do not require Qiskit, OpenFermion, or the Quantum Resource Estimator.
 Optional chapters identify any additional packages they require.
 
-Install the desktop version of Visual Studio Code and the `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_.
-The extension provides the quantum-language, simulation, debugging, and circuit-visualization features used by the tutorial.
+Install the desktop version of Visual Studio Code, the `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_, the `Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_, and the `Jupyter extension <https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter>`_.
+These extensions provide the quantum-language, Python, notebook, simulation, debugging, and visualization features used by the tutorial.
 Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 
 Use Python 3.10 or later on a platform supported by :term:`QDK`/Chemistry.
@@ -67,9 +67,10 @@ Install the released :term:`QDK`/Chemistry package into the active environment:
 .. parsed-literal::
 
    python -m pip install --upgrade pip
-   python -m pip install qdk-chemistry==\ |ground-state-tutorial-version|
+   python -m pip install qdk-chemistry==\ |ground-state-tutorial-version| "ipykernel>=6.0"
 
-This command installs the :term:`QDK`/Chemistry release that matches this documentation.
+This command installs the :term:`QDK`/Chemistry release that matches this documentation and the Python kernel used to run the interactive notebook.
+QDK/Chemistry already requests QDK's Jupyter support, which supplies the molecular-orbital widget used in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 The required workflow does not use the ``all``, ``qiskit-extras``, or ``qre`` optional-dependency groups.
 Keep the environment active while completing the tutorial.
 
@@ -92,7 +93,7 @@ It also verifies that the built-in :term:`QDK`/Chemistry implementations require
    :start-after: # start-cell-verify
    :end-before: # end-cell-verify
 
-The check succeeds when it finishes without an exception, reports a Python executable from the tutorial virtual environment, reports QDK/Chemistry version |ground-state-tutorial-version|, and confirms that all required built-in implementations are available.
+The check succeeds when it finishes without an exception, reports a Python executable from the tutorial virtual environment, reports :term:`QDK`/Chemistry version |ground-state-tutorial-version|, confirms the IPython kernel and molecular viewer are importable, and confirms that all required built-in implementations are available.
 Record the :term:`QDK`/Chemistry version and verification result in :ref:`lab-notebook-setup`.
 If the import or verification fails, confirm that the ``Python executable`` path contains the virtual-environment directory and compare the installation command with the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
@@ -102,10 +103,10 @@ How to use the tutorial
 Complete the required chapters in the order listed in the :doc:`tutorial introduction <index>` because each stage uses decisions and results recorded earlier.
 For each chapter:
 
-1. Download the complete Python example and open it in Visual Studio Code.
+1. Download the complete example files and open them in Visual Studio Code.
 2. Read the complete file, including imports and setup code omitted from the excerpts in the chapter.
 3. Read the chapter explanation before running the example.
-4. Run the example in the Visual Studio Code integrated terminal and compare its output with the stated expectation.
+4. Run the Python example in the Visual Studio Code integrated terminal, and run any interactive notebook as directed by the chapter.
 5. Complete the understanding check, when present.
 6. Update the linked section of the lab notebook before continuing.
 

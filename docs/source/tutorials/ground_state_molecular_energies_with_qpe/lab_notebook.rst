@@ -72,11 +72,11 @@ Record how the correlated molecular model was chosen.
 - Orbital representation used for selection:
 - Initial active electrons and spatial orbitals:
 - Initial correlated method:
-- Active-space selection evidence:
+- Orbital entropies and entropy-gap evidence used for active-space selection:
 - Selected active electrons and spatial orbitals:
 - Selected active-space energy and units:
 - Comparison with the initial active space:
-- Interpretation of active-space convergence:
+- Interpretation of the active-space energy change and size tradeoff:
 - Algorithmic reference energy and units:
 
 .. _lab-notebook-qubits:

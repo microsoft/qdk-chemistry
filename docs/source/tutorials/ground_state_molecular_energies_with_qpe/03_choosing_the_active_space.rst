@@ -26,28 +26,30 @@ After completing this chapter, you will be able to:
 Download the example
 ====================
 
-Download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and save it in your tutorial working directory.
-Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
-The script repeats the stretched N\ :sub:`2` Hartree--Fock calculation from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining an active space.
+Download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save both files in your tutorial working directory.
+Open both files in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
+The script resumes the stretched N\ :sub:`2` workflow from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining the correlated model.
+Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive notebook use the same tested chemistry workflow rather than duplicate it.
 
 Recognize the limits of one determinant
 =======================================
 
-The Hartree--Fock approximation restricts the wavefunction to one optimized Slater determinant.
-This description is often a useful starting point near an equilibrium geometry, where one electron configuration dominates the ground-state wavefunction.
-Stretching a chemical bond can make several configurations similar in energy because electrons can no longer be assigned adequately to one fixed pattern of occupied and unoccupied orbitals.
-The need to combine these important configurations is called *static correlation*.
+As :ref:`the previous chapter explains <tutorial-hartree-fock-wavefunction>`, the `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ restricts the `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_ to one optimized `Slater determinant <https://en.wikipedia.org/wiki/Slater_determinant>`_.
+This determinant represents one `electron configuration <https://en.wikipedia.org/wiki/Electron_configuration>`_, a pattern of occupied spin orbitals introduced in :ref:`Orbitals and determinants <tutorial-orbitals-and-determinants>`.
+This description is often a useful starting point near an equilibrium geometry, where one configuration dominates the ground-state wavefunction, as discussed for N\ :sub:`2` in :ref:`Specify the molecular system <tutorial-molecular-system>`.
+Stretching a chemical bond can make several configurations similar in energy because electrons can no longer be assigned adequately to one fixed pattern of occupied and unoccupied `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, which :ref:`the previous chapter constructs <tutorial-molecular-orbitals>`.
+The need to combine these important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_.
 Stretched N\ :sub:`2` has enough static correlation to make its one-determinant Hartree--Fock wavefunction inadequate.
 
-A configuration interaction (:term:`CI`) wavefunction addresses this limitation by expanding the wavefunction in multiple Slater determinants:
+A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_interaction>`_ (:term:`CI`) wavefunction addresses this limitation by expanding the wavefunction in multiple Slater determinants:
 
 .. math::
 
-   \vert \Psi \rangle = \sum_I C_I \vert \Phi_I \rangle,
+   \vert \Psi \rangle = \sum_i c_i \vert \Phi_i \rangle,
 
-where :math:`\vert \Phi_I \rangle` is determinant :math:`I` and :math:`C_I` is its coefficient.
+where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
 Allowing every possible determinant in all 28 ``cc-pvdz`` spatial orbitals would be unnecessarily expensive for this tutorial.
-An active-space model instead restricts which orbital occupations may vary.
+An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ instead restricts which orbital occupations may vary, reducing the computational costs.
 
 Define the active space
 =======================
@@ -63,89 +65,94 @@ Active orbitals
 Virtual orbitals
    Remain empty in every determinant and do not participate explicitly in the correlated calculation.
 
-A complete active space containing :math:`n_e` active electrons in :math:`n_o` active spatial orbitals is written CAS\ :math:`(n_e,n_o)`.
+A complete active space containing :math:`n_e` active electrons in :math:`n_o` active spatial orbitals is written :term:`CAS`\ :math:`(n_e,n_o)`.
 Complete active space configuration interaction (:term:`CASCI`) forms every determinant consistent with those active electron and orbital counts while keeping the molecular orbitals fixed.
-Unlike complete active space self-consistent field (:term:`CASSCF`), CASCI does not reoptimize the orbitals.
+Unlike complete active space self-consistent field (:term:`CASSCF`), :term:`CASCI` does not reoptimize the orbitals.
 
-A useful first choice is a generous space containing the valence electrons and the occupied and unoccupied valence orbitals associated with bond formation and breaking.
-The :func:`~qdk_chemistry.utils.compute_valence_space_parameters` utility determines that neutral N\ :sub:`2` has ten valence electrons and eight valence spatial orbitals.
-The ``qdk_valence`` selector places these in an initial CAS\ :math:`(10,8)` space:
+A useful first choice is a generous valence space containing orbitals on both sides of the occupied--virtual boundary.
+The :func:`~qdk_chemistry.utils.compute_valence_space_parameters` function determines the numbers of valence electrons and valence spatial orbitals from the Hartree--Fock wavefunction and molecular charge.
+The ``qdk_valence`` selector uses those numbers to construct an initial active space from orbitals near the :term:`HOMO`--:term:`LUMO` gap:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
+   :dedent: 4
    :start-after: # start-cell-valence-space
    :end-before: # end-cell-valence-space
 
-The script reports active orbital indices 2 through 9, using zero-based indexing.
-At this stage, orbitals 0 and 1 are inactive and the remaining 18 of the 28 ``cc-pvdz`` orbitals are virtual.
-This chemically motivated space is intentionally larger than the final model so that the next calculation can measure which valence orbitals carry the strongest static-correlation signal.
+The script reports the resulting active electron and orbital counts and the zero-based indices of the active orbitals.
+Use these values with the total number of ``cc-pvdz`` molecular orbitals from :doc:`Describing the molecule <02_describing_the_molecule>` to determine the initial partitioning of inactive, active, and virtual orbitals.
 
 Compute a correlated active-space wavefunction
 ==============================================
 
 The active-space selector labels orbitals but does not determine how strongly each orbital participates in correlation.
 That evidence must come from a correlated wavefunction.
-The script constructs the molecular Hamiltonian in the initial CAS\ :math:`(10,8)` space and solves it with the :term:`MACIS` CASCI implementation:
+The script constructs the molecular Hamiltonian in the initial valence space and solves it with the :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023` :term:`CASCI` implementation:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
+   :dedent: 4
    :start-after: # start-cell-initial-casci
    :end-before: # end-cell-initial-casci
 
-For the N\ :sub:`2` singlet, the active space contains five :math:`\alpha` and five :math:`\beta` electrons.
-Choosing which five of the eight :math:`\alpha` spin orbitals are occupied is independent of choosing which five :math:`\beta` spin orbitals are occupied, so the two counts multiply.
-The number of determinants is therefore
+For an active space with :math:`n_o` spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, choosing the occupied :math:`\alpha` and :math:`\beta` spin orbitals gives independent counts that multiply.
+The number of possible determinants in the wavefunction is therefore
 
 .. math::
 
-   \binom{8}{5}\binom{8}{5} = 3136.
+   N_{\mathrm{det}} = \binom{n_o}{n_\alpha}\binom{n_o}{n_\beta}.
 
-This space is small enough to include all 3,136 determinants rather than approximating the wavefunction with a selected subset.
-Larger active-space studies often use selected CI to obtain approximate active-space diagnostics at lower cost, but that additional approximation is unnecessary here.
+The initial valence space in this example is small enough to include every determinant rather than approximating the wavefunction with a selected subset.
+Larger active-space studies often use selected :term:`CI` (:term:`SCI`) to obtain approximate active-space diagnostics at lower cost, but that additional approximation is unnecessary here.
 
 The ``calculate_one_rdm`` and ``calculate_two_rdm`` settings request the one- and two-particle reduced density matrices (:term:`RDMs <RDM>`).
-An RDM compresses information from the many-electron wavefunction into expectation values involving one or two particles.
-The diagonal of the spin-resolved one-particle RDM gives the expected occupation of each spin orbital, while a corresponding diagonal element of the two-particle RDM gives the joint occupation of a pair of spin orbitals.
-Together, these diagonal elements determine the local occupation probabilities needed for the orbital-entanglement diagnostic used below.
+An :term:`RDM` compresses information from the many-electron wavefunction into expectation values involving one or two particles.
+The spin-resolved one-particle :term:`RDM` tracks :math:`\alpha` and :math:`\beta` occupations separately, and its diagonal gives the expected occupation of each spin orbital.
+A corresponding diagonal element of the two-particle :term:`RDM` gives the joint occupation of a pair of spin orbitals.
+Each determinant assigns every spatial orbital one of four *local occupation states*: empty, occupied by one :math:`\alpha` electron, occupied by one :math:`\beta` electron, or doubly occupied.
+Here, a local occupation state describes only one orbital, not the complete electronic state of the molecule.
+For these occupation quantities, each determinant contributes according to the squared magnitude of its coefficient in the correlated wavefunction.
+Together, the :term:`RDM` elements collect these contributions into the probabilities of the four local occupation states.
+If the important determinants give an orbital the same occupation, one probability dominates; if they assign different occupations, the probabilities spread among several local states.
 
 Transform to natural orbitals
 =============================
 
-Molecular orbitals are not unique: unitary rotations among orbitals in the same active subspace change their individual shapes but not the subspace they span.
-For an exact CASCI calculation in a fixed active subspace, such a rotation leaves the total energy unchanged.
+Molecular orbitals are not unique: a unitary rotation applied within an active orbital subspace changes the individual orbital shapes but not the subspace they span.
+For an exact :term:`CASCI` calculation in a fixed active subspace, such a rotation leaves the total energy unchanged.
 Orbital-resolved quantities, however, can change because they describe the chosen orbital representation.
 
-Natural orbitals diagonalize the one-particle RDM :cite:`Lowdin1956`.
+Natural orbitals diagonalize the one-particle :term:`RDM` :cite:`Lowdin1956`.
 Their eigenvalues are natural-orbital occupation numbers between zero and two for spatial orbitals.
+In this basis, the off-diagonal elements vanish, so each occupation number is associated directly with one natural orbital rather than being mixed among several orbitals.
 Occupations near two identify nearly doubly occupied orbitals, occupations near zero identify nearly empty orbitals, and fractional occupations can reveal orbitals that require multiple electron configurations.
-Natural orbitals are not required to compute single-orbital entropies, and they do not make those entropies independent of the orbital basis.
-They provide a useful convention in which the one-particle occupations are directly associated with individual orbitals before applying the orbital-resolved entropy criterion.
+Natural orbitals provide a useful convention in which the one-particle occupations are directly associated with individual orbitals before applying the orbital-resolved entropy criterion.
 
-The supported ``qdk_natural_orbitals`` transformation uses the one-particle RDM from the initial CASCI wavefunction.
-Despite being created through the ``orbital_localizer`` algorithm interface, this operation transforms the active orbitals to natural orbitals; it does not localize them in real space.
-The script then rebuilds and resolves the CAS\ :math:`(10,8)` Hamiltonian so that both RDMs and the orbital diagnostics are expressed consistently in the natural-orbital representation:
+The supported ``qdk_natural_orbitals`` transformation uses the one-particle :term:`RDM` from the initial :term:`CASCI` wavefunction.
+It rotates the active orbitals into the natural-orbital representation described above.
+The script then rebuilds and resolves the initial valence-space Hamiltonian so that both :term:`RDMs <RDM>` and the orbital diagnostics are expressed consistently in the natural-orbital representation:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
+   :dedent: 4
    :start-after: # start-cell-natural-orbitals
    :end-before: # end-cell-natural-orbitals
 
-The two CASCI energies should agree to the displayed precision because both calculations span the same complete active space.
+The two :term:`CASCI` energies should agree to the displayed precision because both calculations span the same complete active space.
 The second calculation is needed for the orbital-resolved selection evidence, not to lower the energy.
 
 Refine the active space with orbital entropies
 ==============================================
 
-The single-orbital entropy measures how uncertain the occupation of one spatial orbital is when that orbital is considered separately from the rest of the correlated system :cite:`Boguslawski2015`.
-A spatial orbital has four possible local occupation states: empty, occupied by one :math:`\alpha` electron, occupied by one :math:`\beta` electron, or doubly occupied.
-If their probabilities are :math:`\omega_{a,i}` for orbital :math:`i`, its single-orbital entropy is
+The single-orbital entropy used here is the `von Neumann entropy <https://en.wikipedia.org/wiki/Von_Neumann_entropy>`_ of the reduced density matrix for one spatial orbital :cite:`Boguslawski2015`.
+Its eigenvalues are the probabilities :math:`\omega_{a,i}` of the four local occupation states, so the entropy has the Shannon form
 
 .. math::
 
    s_i^{(1)} = -\sum_{a=1}^{4} \omega_{a,i}\ln\omega_{a,i}.
 
-These probabilities come from diagonal elements of the spin-resolved one- and two-particle RDMs.
-If :math:`n_{i\alpha}` and :math:`n_{i\beta}` are the one-particle occupations and :math:`d_i` is the probability of simultaneous :math:`\alpha` and :math:`\beta` occupation from the two-particle RDM, then
+These probabilities come from diagonal elements of the spin-resolved one- and two-particle :term:`RDMs <RDM>`.
+If :math:`n_{i\alpha}` and :math:`n_{i\beta}` are the one-particle occupations and :math:`d_i` is the *double-occupancy probability*—the probability that the :math:`\alpha` and :math:`\beta` spin orbitals belonging to spatial orbital :math:`i` are occupied simultaneously—then
 
 .. math::
 
@@ -156,62 +163,66 @@ If :math:`n_{i\alpha}` and :math:`n_{i\beta}` are the one-particle occupations a
    \omega_{\mathrm{double},i} &= d_i.
    \end{aligned}
 
+The one-particle occupation :math:`n_{i\alpha}` includes both the :math:`\alpha`-only and doubly occupied cases, so subtracting :math:`d_i` isolates the :math:`\alpha`-only probability; the same reasoning gives the :math:`\beta`-only probability.
+The empty probability is the remainder after accounting for either spin occupation, with :math:`d_i` added back because double occupation was subtracted twice.
+The four probabilities therefore sum to one.
+
 An entropy near zero means that one local occupation dominates.
-A larger entropy means that several local occupations contribute, indicating that the orbital is more strongly entangled with the rest of the active space and is a stronger candidate for explicit treatment.
-Because the complete CASCI wavefunction is a pure state, uncertainty in the reduced state of one orbital reflects quantum entanglement between that orbital and the remaining active orbitals.
-QDK/Chemistry evaluates these probabilities and entropies from the RDMs stored in the CASCI wavefunction.
+A larger entropy means that several local occupations occur across the important determinants.
+The orbital then changes occupation as the occupations of other orbitals change, indicating stronger coupling and making it a stronger candidate for explicit treatment.
+These high-entropy orbitals carry the strongest static-correlation signal because their occupations vary among the important determinants.
+Freezing a high-entropy orbital would prevent its occupation from changing with the occupations of the other orbitals and would therefore remove an important part of the multi-configurational wavefunction.
+By contrast, a low-entropy orbital remains close to one local occupation state and is a better candidate to freeze as inactive or virtual.
+:term:`QDK`/Chemistry evaluates these probabilities and entropies from the :term:`RDMs <RDM>` stored in the :term:`CASCI` wavefunction.
+The resulting data flow is therefore: the correlated wavefunction determines the local-state probabilities, those probabilities determine one entropy for each orbital, and autoCAS compares the orbital entropies to select the active group.
 
 The entropy-difference autoCAS selector, ``qdk_autocas_eos``, sorts the normalized orbital entropies and tests the consecutive gaps against its entropy and difference thresholds :cite:`Stein2016,Stein2019`.
 It selects the largest high-entropy group separated by a qualifying gap.
+A large gap provides evidence of a natural boundary between orbitals with similarly strong occupation coupling and orbitals whose occupations are much less coupled to the rest of the active space.
+These thresholds are configurable; see :doc:`Active-space selection <../../user/comprehensive/algorithms/active_space>` for their defaults and use with less clearly separated entropy values.
 It then repartitions the orbitals according to the selected group:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
+   :dedent: 4
    :start-after: # start-cell-refine
    :end-before: # end-cell-refine
 
 The asterisks in the script output identify the selected orbitals.
-For stretched N\ :sub:`2`, orbitals 5 through 8 have entropies near 0.31, separated by a large gap from the remaining values of 0.08 or less.
-These four orbitals form the selected high-entropy group and produce a CAS\ :math:`(4,4)` space containing two :math:`\alpha` and two :math:`\beta` electrons.
-The refined partition contains five inactive orbitals, four active orbitals, and 19 virtual orbitals.
-Three orbitals from the initial active space become inactive, consistent with their remaining nearly doubly occupied, while one becomes virtual, consistent with its remaining nearly empty.
+The selected high-entropy group determines the refined active space.
+Among the unselected orbitals, those below the occupied--virtual boundary of the reference determinant become inactive, while those above the boundary become virtual.
+Freezing these low-entropy orbitals is still an approximation because low entropy does not mean that their correlation contribution is exactly zero, so the energy comparison below measures part of its cost.
+Their entropies are small rather than exactly zero, and allowing excitations involving them can still lower the correlated energy.
 
 Compute the algorithmic reference
 =================================
 
-The script finishes by solving the refined CAS\ :math:`(4,4)` Hamiltonian with CASCI:
+The script finishes by solving the refined active-space Hamiltonian with :term:`CASCI`:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
+   :dedent: 4
    :start-after: # start-cell-final-casci
    :end-before: # end-cell-final-casci
 
-The final singlet space contains
-
-.. math::
-
-   \binom{4}{2}\binom{4}{2} = 36
-
-determinants.
-This substantial reduction in problem size is useful for the quantum-computing stages of the tutorial.
-The final CASCI energy is the exact ground-state energy of the selected active-space Hamiltonian, up to numerical solver tolerance, and will be the *algorithmic reference energy* for state preparation and phase estimation.
-It is not the exact energy of N\ :sub:`2` in the ``cc-pvdz`` basis, because the inactive and virtual orbitals cannot change occupation in this model.
+The resulting determinant count quantifies the reduction in problem size for the quantum-computing stages of the tutorial.
+The final :term:`CASCI` energy is the exact ground-state energy of the selected active-space Hamiltonian, up to numerical solver tolerance, and will be the *algorithmic reference energy* for state preparation and phase estimation.
+:term:`CASCI` is a full configuration-interaction calculation within the selected active space, but it is not the exact energy of N\ :sub:`2` in the full ``cc-pvdz`` orbital space: fixing the inactive orbitals as doubly occupied and the virtual orbitals as empty excludes correlation involving those orbitals.
 
 Evaluate the active-space choice
 ================================
 
-The CAS\ :math:`(4,4)` determinant space is a subset of the natural-orbital CAS\ :math:`(10,8)` determinant space.
-Restricting the wavefunction to a subset of the available determinants cannot produce a lower optimized energy because the larger calculation can use every wavefunction available to the smaller calculation and more.
-This consequence of the variational principle applies here because freezing the additional inactive orbitals preserves the same Hamiltonian on that determinant subset.
+The initial valence space includes more orbitals than the refined active space so that the correlated calculation can first measure the entropy of every candidate orbital.
+The refinement then uses this evidence to decide which orbital occupations must remain variable and which can be frozen.
+Freezing additional orbital occupations cannot lower the :term:`CASCI` energy.
+It leaves the energy unchanged only if the removed determinants contribute nothing to the larger-space ground state; otherwise, as in this example, the energy increases.
 The script reports the observed energy increase when reducing the active space.
 
-This increase is much larger than the 1 milliHartree teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`.
-The comparison shows that the compact space does not recover all correlation present in the initial valence space.
-It does not measure the total molecular error: even the CAS\ :math:`(10,8)` calculation excludes correlation involving the two inactive core orbitals and 18 external virtual orbitals, and both calculations retain the finite ``cc-pvdz`` basis and fixed geometry.
+The observed increase, which is much larger than the 1 milliHartree teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`, quantifies correlation lost when reducing the initial valence space.
+The 1 milliHartree target applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference; it does not include active-space, finite-basis, or fixed-geometry errors.
 
-The CAS\ :math:`(4,4)` model is therefore chosen to preserve the strongest static-correlation degrees of freedom while keeping the later quantum calculation small enough to study directly.
-Record both active-space energies and this limitation in the lab notebook.
-The next chapter will determine how the four active spatial orbitals are represented by qubits.
+For this tutorial, the energy loss is accepted because the refined active space preserves the strongest static-correlation signal while reducing the later quantum calculation to a size that can be studied directly.
+The next chapter will determine how the selected active spatial orbitals are represented by qubits.
 
 Run the calculation
 ===================
@@ -222,8 +233,61 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
    python tutorial_choose_active_space.py
 
-Record the orbital representation, initial and refined active-space sizes, selection evidence, determinant counts, and both CASCI energies in the active-space section of the lab notebook.
-Use the final CAS\ :math:`(4,4)` energy as the algorithmic reference, while retaining the larger-space result as evidence of the correlation excluded by the compact model.
+.. admonition:: What initial valence space and determinant count did the script construct?
+   :class: hint
+   :collapsible: closed
+
+   The script reports ten active electrons in eight active spatial orbitals, written :term:`CAS`\ :math:`(10,8)`, with five :math:`\alpha` and five :math:`\beta` active electrons.
+   The active orbital indices are 2 through 9.
+   Of the 28 ``cc-pvdz`` molecular orbitals, indices 0 and 1 are initially inactive and the remaining 18 are virtual.
+   The determinant count is :math:`\binom{8}{5}\binom{8}{5}=3136`.
+
+.. admonition:: Which orbitals did autoCAS retain, and how much did refinement reduce the problem size?
+   :class: hint
+   :collapsible: closed
+
+   Orbitals 5 through 8 have entropies near 0.31, separated by a large gap from the remaining values of 0.08 or less.
+   autoCAS retains these four orbitals in :term:`CAS`\ :math:`(4,4)`, containing two :math:`\alpha` and two :math:`\beta` active electrons.
+   The refined partition has five inactive orbitals, four active orbitals, and 19 virtual orbitals.
+   Its determinant count is :math:`\binom{4}{2}\binom{4}{2}=36`, compared with 3,136 determinants in the initial valence space.
+
+.. admonition:: Did the natural-orbital transformation change the CASCI energy?
+   :class: hint
+   :collapsible: closed
+
+   No change appears at the displayed precision.
+   The script reports the signed energy change after the transformation, which is consistent with numerical roundoff near zero.
+   Both calculations span the same complete active subspace, so changing the orbital representation does not change the exact :term:`CASCI` energy within that subspace.
+
+Record the orbital representation, initial and refined active-space sizes, selection evidence, determinant counts, and both :term:`CASCI` energies in the :ref:`active-space section of the lab notebook <lab-notebook-active-space>`.
+Use the final selected-space energy as the algorithmic reference, while retaining the larger-space result as evidence of the correlation excluded by the compact model.
+
+Visualize the candidate orbitals
+================================
+
+Download and open :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` in Visual Studio Code.
+Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
+Then select **Run All** to execute the shared active-space calculation and generate an interactive molecular-orbital viewer.
+
+The notebook displays every candidate natural orbital from the initial valence space, including orbitals that autoCAS did not retain.
+Use the viewer to inspect the following information:
+
+Orbital menu
+   Selects each candidate natural orbital for comparison.
+   The menu follows increasing molecular-orbital index, which corresponds here to decreasing natural occupation.
+   The menu is not ordered by entropy.
+Isosurface
+   Traces points where the orbital wavefunction has a chosen positive or negative value, revealing its lobes, nodes, and spatial extent.
+   The surface itself does not encode occupation or entropy.
+Natural occupation
+   Reports the average number of electrons in the spatial orbital.
+   A value near two indicates an almost always doubly occupied orbital, a value near zero indicates an almost always empty orbital, and an intermediate value indicates variable occupation across the correlated wavefunction.
+Single-orbital entropy and autoCAS selection
+   Reports the uncertainty in the orbital's local occupation and whether autoCAS retained it.
+   Larger entropy indicates stronger coupling to the occupations of the other active orbitals.
+
+autoCAS selects the strongly coupled group from gaps in the orbital entropies, not from orbital shapes or a cutoff applied to the natural occupations.
+Use the shapes as aids to chemical interpretation, but defend the final active space using the numerical occupation and entropy evidence in the overlays.
 
 Check your understanding
 ========================
@@ -235,27 +299,20 @@ Check your understanding
    An inactive spatial orbital remains doubly occupied in every determinant.
    Its electrons and their interactions contribute to the core part of the active-space Hamiltonian even though the calculation does not vary their occupations.
 
-.. admonition:: Why does autoCAS-EOS require a correlated calculation before it can select orbitals?
+.. admonition:: Why does autoCAS require a correlated calculation before it can select orbitals?
    :class: hint
    :collapsible: closed
 
    The selector uses single-orbital entropies derived from local occupation probabilities.
-   Those probabilities require one- and two-particle RDMs from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
+   Those probabilities require one- and two-particle :term:`RDMs <RDM>` from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
 
-.. admonition:: Why do the two CAS(10,8) energies agree even though their orbitals differ?
+.. admonition:: Why should the energy increase caused by active-space refinement not be judged against the 1 milliHartree teaching target?
    :class: hint
    :collapsible: closed
 
-   The natural-orbital transformation is a unitary rotation within the same eight-orbital active subspace.
-   Complete CI in that fixed subspace spans the same many-electron space before and after the rotation, so its energy is invariant apart from numerical error.
-
-.. admonition:: Does selecting CAS(4,4) establish 1 milliHartree accuracy for the molecule?
-   :class: hint
-   :collapsible: closed
-
-   No.
-   The increase relative to CAS\ :math:`(10,8)` shows that the compact model omits correlation even within the valence space, while both models also retain fixed-geometry and finite-basis approximations.
-   The smaller space is a controlled tutorial model whose exact CASCI energy becomes the reference for testing the later quantum algorithm.
+   The energy increase measures correlation excluded when orbital occupations are frozen during active-space refinement.
+   The 1 milliHartree target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
+   These comparisons measure different approximations.
 
 Further reading
 ===============

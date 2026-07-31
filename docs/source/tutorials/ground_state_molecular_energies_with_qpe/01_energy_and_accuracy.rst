@@ -38,8 +38,8 @@ The electronic contribution includes the electron kinetic energy, electron--nucl
 The nuclear contribution is the repulsion among the fixed nuclei.
 :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains how these contributions are tracked when the molecular Hamiltonian is represented on qubits.
 
-QDK/Chemistry reports molecular energies in `hartree <https://en.wikipedia.org/wiki/Hartree>`_, with symbol :math:`E_{\mathrm{h}}`.
-One milliHartree is :math:`10^{-3}\ E_{\mathrm{h}}`, approximately :math:`2.6255\ \mathrm{kJ\,mol^{-1}}` using the 2022 CODATA constants :cite:`Mohr2025`.
+:term:`QDK`/Chemistry reports molecular energies in `hartree <https://en.wikipedia.org/wiki/Hartree>`_, with symbol :math:`E_{\mathrm{h}}`.
+One milliHartree is :math:`10^{-3}\ E_{\mathrm{h}}`, approximately :math:`2.6255\ \mathrm{kJ\,mol^{-1}}` using the 2022 :term:`CODATA` constants :cite:`Mohr2025`.
 
 Energy differences require context
 ==================================
@@ -94,7 +94,7 @@ A calculation can be precise but inaccurate, or have fine resolution without a s
 The teaching target
 ===================
 
-This tutorial uses 1 milliHartree as a teaching target for the absolute difference between the final QPE total energy and a classical reference energy for the same Hamiltonian.
+This tutorial uses 1 milliHartree as a teaching target for the absolute difference between the final :term:`QPE` total energy and a classical reference energy for the same Hamiltonian.
 The threshold is often associated with the term "chemical accuracy" because it is close to the thermal energy :math:`RT` at room temperature.
 Definitions of chemical accuracy vary, so the tutorial always states the numerical 1 milliHartree target and the two energies being compared.
 Meeting this target shows that the quantum algorithm reproduced its classical reference to the requested tolerance.
@@ -110,7 +110,7 @@ For example:
 - A finite basis set restricts the one-electron functions used to describe the molecule.
 - Classical electronic-structure methods use approximations to obtain tractable solutions of the Schrödinger equation.
 - Hamiltonian time evolution is approximated when the quantum circuit is constructed.
-- Finite phase resolution and measurement sampling limit the reported QPE estimate.
+- Finite phase resolution and measurement sampling limit the reported :term:`QPE` estimate.
 
 .. todo::
 

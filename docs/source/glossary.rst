@@ -44,6 +44,9 @@ Acronym definitions
    CNOT
       Controlled-NOT two-qubit gate used in quantum circuits.
 
+   CODATA
+      Committee on Data of the International Science Council, which publishes recommended values of fundamental physical constants.
+
    DFT
       Density Functional Theory.
 
@@ -67,6 +70,9 @@ Acronym definitions
 
    GGA
       Generalized Gradient Approximation.
+
+   GF(2)+X
+      Sparse-isometry state-preparation method that combines Gaussian elimination over the binary field GF(2) with Pauli-X operations.
 
    HF
       Hartree-Fock.

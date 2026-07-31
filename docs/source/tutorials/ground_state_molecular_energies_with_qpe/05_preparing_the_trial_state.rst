@@ -60,7 +60,7 @@ Generate the preparation circuit
 
 .. todo::
 
-   Explain the native GF(2)+X sparse-isometry method at the depth needed to interpret its inputs and output.
+   Explain the native :term:`GF(2)+X` sparse-isometry method at the depth needed to interpret its inputs and output.
    Do not require or compare against Qiskit in the required chapter.
 
 Evaluate quality and cost separately

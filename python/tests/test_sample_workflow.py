@@ -19,6 +19,9 @@ To run the slow tests (including notebook e2e tests), set the environment variab
 # --------------------------------------------------------------------------------------------
 
 import os
+import sys
+from importlib.util import module_from_spec, spec_from_file_location
+from math import comb
 from pathlib import Path
 
 import pytest
@@ -237,6 +240,84 @@ def _execute_notebook_skip_visualizations(
 
 
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
+DOCS_PYTHON_EXAMPLES_DIR = (
+    Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
+)
+
+
+def test_tutorial_choose_active_space_results():
+    """Check the stable numerical and structural results used by Chapter 3."""
+    script_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.py"
+    module_spec = spec_from_file_location("tutorial_choose_active_space", script_path)
+    assert module_spec is not None
+    assert module_spec.loader is not None
+    tutorial_module = module_from_spec(module_spec)
+    sys.modules[module_spec.name] = tutorial_module
+    module_spec.loader.exec_module(tutorial_module)
+
+    result = tutorial_module.run_active_space_workflow()
+    assert abs(result.hartree_fock_energy - (-108.866810916955)) < 1e-8
+    assert abs(result.valence_energy - (-108.997239708567)) < 1e-8
+    assert abs(result.natural_orbital_energy - result.valence_energy) < 1e-10
+    assert abs(result.refined_energy - (-108.964632065071)) < 1e-8
+    assert result.valence_indices == list(range(2, 10))
+    assert result.num_valence_determinants == comb(8, 5) ** 2 == 3136
+    assert result.inactive_indices == list(range(5))
+    assert result.refined_indices == list(range(5, 9))
+    assert result.num_refined_electrons == 4
+    assert result.num_virtual_orbitals == 19
+    assert result.num_refined_determinants == comb(4, 2) ** 2 == 36
+    assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
+
+    cube_data = tutorial_module.generate_active_orbital_cube_data(
+        result,
+        grid_size=(8, 8, 8),
+        margin=4.0,
+    )
+    assert len(cube_data) == 8
+    assert sum(
+        orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()
+    ) == 4
+    assert all(
+        set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"}
+        for orbital in cube_data.values()
+    )
+
+
+@_requires_notebook_deps
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_choose_active_space_notebook():
+    """Test the Chapter 3 notebook chemistry and visualization-data cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        timeout=360,
+        cell_patches={
+            5: {
+                "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
+            },
+        },
+    )
 
 
 @_requires_notebook_deps
