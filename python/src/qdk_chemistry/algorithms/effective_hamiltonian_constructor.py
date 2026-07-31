@@ -11,5 +11,8 @@ concrete implementations so that consumers can import them directly from
 
 from qdk_chemistry._core._algorithms import (  # noqa: F401 - re-export
     EffectiveHamiltonianConstructor,
+    EffectiveHamiltonianDiagnostics,
+    EffectiveHamiltonianResult,
     QdkSchriefferWolffPT2Constructor,
+    SchriefferWolffPT2Diagnostics,
 )

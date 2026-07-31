@@ -62,7 +62,7 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
 }
 
-std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
+EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
     std::shared_ptr<data::Wavefunction> reference,
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   if (!reference || !hamiltonian)
@@ -332,10 +332,17 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   // --- emit over P, reusing the reference orbitals (active_indices == P) ---
   const Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  return std::make_shared<data::Hamiltonian>(
+  auto effective_hamiltonian = std::make_shared<data::Hamiltonian>(
       std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
           active.one_body, active.two_body, ref_orbitals, active.core_energy,
           empty_fock));
+  auto diagnostics = std::make_shared<SchriefferWolffPT2Diagnostics>(
+      regularizer, reg.denom_floor,
+      regularizer == "shift" ? reg.denom_shift : 0.0,
+      regularizer == "flow" ? reg.denom_flow : 0.0, down.min_denominator,
+      down.max_amplitude, down.higher_body_norm,
+      semicanonical_rotation_applied);
+  return {std::move(effective_hamiltonian), std::move(diagnostics)};
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

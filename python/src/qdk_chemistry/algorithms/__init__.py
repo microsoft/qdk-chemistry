@@ -27,7 +27,10 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCi
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
 from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
     EffectiveHamiltonianConstructor,
+    EffectiveHamiltonianDiagnostics,
+    EffectiveHamiltonianResult,
     QdkSchriefferWolffPT2Constructor,
+    SchriefferWolffPT2Diagnostics,
 )
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
@@ -78,6 +81,8 @@ __all__ = [
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
+    "EffectiveHamiltonianDiagnostics",
+    "EffectiveHamiltonianResult",
     "ExpectationEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
     "GeometryOptimizer",
@@ -115,6 +120,7 @@ __all__ = [
     "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",
+    "SchriefferWolffPT2Diagnostics",
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",

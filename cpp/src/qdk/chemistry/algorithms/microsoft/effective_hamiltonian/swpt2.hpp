@@ -24,6 +24,48 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
   ~SchriefferWolffPT2Settings() override = default;
 };
 
+class SchriefferWolffPT2Diagnostics final
+    : public qdk::chemistry::algorithms::EffectiveHamiltonianDiagnostics {
+ public:
+  SchriefferWolffPT2Diagnostics(std::string regularizer,
+                                double denominator_floor,
+                                double denominator_shift, double flow_parameter,
+                                double min_denominator,
+                                double max_raw_amplitude,
+                                double higher_body_norm,
+                                bool semicanonical_rotation_applied)
+      : regularizer_(std::move(regularizer)),
+        denominator_floor_(denominator_floor),
+        denominator_shift_(denominator_shift),
+        flow_parameter_(flow_parameter),
+        min_denominator_(min_denominator),
+        max_raw_amplitude_(max_raw_amplitude),
+        higher_body_norm_(higher_body_norm),
+        semicanonical_rotation_applied_(semicanonical_rotation_applied) {}
+
+  std::string method() const override { return "swpt2"; }
+  const std::string& regularizer() const { return regularizer_; }
+  double denominator_floor() const { return denominator_floor_; }
+  double denominator_shift() const { return denominator_shift_; }
+  double flow_parameter() const { return flow_parameter_; }
+  double min_denominator() const { return min_denominator_; }
+  double max_raw_amplitude() const { return max_raw_amplitude_; }
+  double higher_body_norm() const { return higher_body_norm_; }
+  bool semicanonical_rotation_applied() const {
+    return semicanonical_rotation_applied_;
+  }
+
+ private:
+  std::string regularizer_;
+  double denominator_floor_;
+  double denominator_shift_;
+  double flow_parameter_;
+  double min_denominator_;
+  double max_raw_amplitude_;
+  double higher_body_norm_;
+  bool semicanonical_rotation_applied_;
+};
+
 /**
  * @brief Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian
  * downfold with semicanonical generalized-Fock orbital-energy denominators.
@@ -38,8 +80,8 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * ROHF, and spin-adapted CAS references. Every singly occupied ROHF orbital
  * must be active. Noncanonical orbitals are semicanonicalized independently
  * within inactive, active, and virtual blocks. The kernel computes intruder
- * and discarded-body diagnostics internally; the public result currently
- * exposes only the effective Hamiltonian and logs a large-amplitude warning.
+ * and discarded-body diagnostics and returns them with the effective
+ * Hamiltonian. A large-amplitude warning is also logged.
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor
@@ -56,7 +98,7 @@ class SchriefferWolffPT2Constructor
   }
 
  protected:
-  std::shared_ptr<data::Hamiltonian> _run_impl(
+  qdk::chemistry::algorithms::EffectiveHamiltonianResult _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
       std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
 };
