@@ -73,11 +73,12 @@ Returns:
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
       m, "OrbitalLocalizer", R"(
-Abstract base class for orbital localizers.
+Abstract base class for orbital localization and transformation algorithms.
 
-This class defines the interface for localizing molecular orbitals.
-Localization transforms canonical molecular orbitals into localized orbitals that are spatially confined to specific regions or bonds.
-Concrete implementations should inherit from this class and implement the localize method.
+This class defines the interface for selecting and transforming molecular orbitals.
+Implementations may produce spatially localized orbitals or other representations,
+such as natural orbitals. Concrete implementations should inherit from this class
+and implement the _run_impl method.
 
 Examples:
     >>> # To create a custom orbital localizer, inherit from this class.
@@ -109,22 +110,22 @@ Examples:
 
   localizer.def("run", &Localizer::run,
                 R"(
-Localize molecular orbitals in the given wavefunction.
+Transform selected molecular orbitals in the given wavefunction.
 
 Args:
-    wavefunction (qdk_chemistry.data.Wavefunction): The canonical molecular wavefunction to localize
-    loc_indices_a (list[int]): Indices of alpha orbitals to localize (empty for no localization)
-    loc_indices_b (list[int]): Indices of beta orbitals to localize (empty for no localization)
+    wavefunction (qdk_chemistry.data.Wavefunction): The molecular wavefunction to transform
+    loc_indices_a (list[int]): Indices of alpha orbitals to transform
+    loc_indices_b (list[int]): Indices of beta orbitals to transform
 
 Notes:
     For restricted orbitals, ``loc_indices_b`` must match ``loc_indices_a``.
 
 Returns:
-    qdk_chemistry.data.Wavefunction: The localized molecular wavefunction
+    qdk_chemistry.data.Wavefunction: The output wavefunction with transformed orbitals
 
 Raises:
     ValueError: If orbital indices are invalid or inconsistent
-    RuntimeError: If localization fails due to numerical issues
+    RuntimeError: If the transformation fails due to numerical issues
 
 )",
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
