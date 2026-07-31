@@ -244,9 +244,9 @@ TEST(Swpt2Kernel, SecondOrderShiftInactive) {
 // The reference is a self-contained bitmask full-CI over the *same*
 // spin-orbital tensors the kernel uses (no external tool, no convention
 // translation). The *absolute* residual is O(lambda^2), NOT O(lambda^3): the
-// kernel uses orbital-energy (Moller-Plesset) denominators, which are the exact
-// excitation energies only for a self-consistent canonical-HF reference. This
-// synthetic (non-HF) reference carries an O(1) denominator error, so the
+// kernel uses orbital-energy (Moller-Plesset-like) denominators, which are
+// exact excitation energies only for a self-consistent canonical-HF reference.
+// This synthetic (non-HF) reference carries an O(1) denominator error, so the
 // coupling correlation is captured only to O(lambda^2). This is the expected
 // MP-denominator limitation (why CASPT2/NEVPT2 use Dyall denominators), not a
 // kernel defect -- the single-orbital tests above are exact.
@@ -303,6 +303,132 @@ Ladder apply_two(std::uint64_t mask, int P, int Q, int R, int S) {
   r = apply_ladder(r.mask, P, true);
   if (!r.ok) return r;
   return {r.mask, sign * r.sign, true};
+}
+
+void add_term_matrix(Eigen::MatrixXd& matrix, int n_so, double coefficient,
+                     const std::vector<int>& create,
+                     const std::vector<int>& annihilate) {
+  if (coefficient == 0.0) return;
+  const std::uint64_t dimension = std::uint64_t{1} << n_so;
+  for (std::uint64_t ket = 0; ket < dimension; ++ket) {
+    Ladder state{ket, 1, true};
+    for (auto it = annihilate.rbegin(); it != annihilate.rend(); ++it) {
+      const Ladder next = apply_ladder(state.mask, *it, false);
+      if (!next.ok) {
+        state.ok = false;
+        break;
+      }
+      state.mask = next.mask;
+      state.sign *= next.sign;
+    }
+    if (!state.ok) continue;
+    for (auto it = create.rbegin(); it != create.rend(); ++it) {
+      const Ladder next = apply_ladder(state.mask, *it, true);
+      if (!next.ok) {
+        state.ok = false;
+        break;
+      }
+      state.mask = next.mask;
+      state.sign *= next.sign;
+    }
+    if (state.ok)
+      matrix(static_cast<int>(state.mask), static_cast<int>(ket)) +=
+          coefficient * state.sign;
+  }
+}
+
+bool changes_external_count(const std::vector<int>& create,
+                            const std::vector<int>& annihilate,
+                            const std::vector<char>& role) {
+  int change = 0;
+  for (int orbital : create) change += role[orbital];
+  for (int orbital : annihilate) change -= role[orbital];
+  return change != 0;
+}
+
+struct MatrixSwParts {
+  Eigen::MatrixXd block_diagonal;
+  Eigen::MatrixXd off_diagonal;
+  Eigen::MatrixXd generator;
+};
+
+// Build H_BD, H_OD, and S directly in determinant space from restricted
+// chemist integrals. This is separate from the kernel's antisymmetric tensors
+// and projected-Wick implementation.
+MatrixSwParts build_matrix_sw_parts(const Eigen::MatrixXd& h1,
+                                    const Eigen::VectorXd& g,
+                                    const Eigen::VectorXd& eps,
+                                    const sw::SoPartition& part,
+                                    double core_energy) {
+  const int norb = static_cast<int>(h1.rows());
+  const int n_so = 2 * norb;
+  const int dimension = 1 << n_so;
+  MatrixSwParts result{Eigen::MatrixXd::Zero(dimension, dimension),
+                       Eigen::MatrixXd::Zero(dimension, dimension),
+                       Eigen::MatrixXd::Zero(dimension, dimension)};
+  result.block_diagonal.diagonal().array() += core_energy;
+
+  const auto add = [&](double coefficient, const std::vector<int>& create,
+                       const std::vector<int>& annihilate) {
+    if (coefficient == 0.0) return;
+    const bool off_diagonal =
+        changes_external_count(create, annihilate, part.is_inactive) ||
+        changes_external_count(create, annihilate, part.is_virtual);
+    add_term_matrix(off_diagonal ? result.off_diagonal : result.block_diagonal,
+                    n_so, coefficient, create, annihilate);
+    if (!off_diagonal) return;
+    double denominator = 0.0;
+    for (int orbital : create) denominator += eps(orbital);
+    for (int orbital : annihilate) denominator -= eps(orbital);
+    if (std::abs(denominator) <= 1e-12)
+      throw std::runtime_error("matrix reference has a zero denominator");
+    add_term_matrix(result.generator, n_so, coefficient / denominator, create,
+                    annihilate);
+  };
+
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int spin = 0; spin < 2; ++spin)
+        add(h1(p, q), {2 * p + spin}, {2 * q + spin});
+
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s) {
+          const double value = g(sw::idx4(p, q, r, s, norb));
+          for (int spin = 0; spin < 2; ++spin)
+            add(0.5 * value, {2 * p + spin, 2 * r + spin},
+                {2 * s + spin, 2 * q + spin});
+          add(value, {2 * p, 2 * r + 1}, {2 * s + 1, 2 * q});
+        }
+  return result;
+}
+
+Eigen::MatrixXd spatial_chemist_matrix(
+    const sw::ActiveHamiltonian& hamiltonian) {
+  const int norb = hamiltonian.norb;
+  const int n_so = 2 * norb;
+  const int dimension = 1 << n_so;
+  Eigen::MatrixXd matrix =
+      hamiltonian.core_energy * Eigen::MatrixXd::Identity(dimension, dimension);
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int spin = 0; spin < 2; ++spin)
+        add_term_matrix(matrix, n_so, hamiltonian.one_body(p, q),
+                        {2 * p + spin}, {2 * q + spin});
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s) {
+          const double value = hamiltonian.two_body(sw::idx4(p, q, r, s, norb));
+          for (int spin = 0; spin < 2; ++spin)
+            add_term_matrix(matrix, n_so, 0.5 * value,
+                            {2 * p + spin, 2 * r + spin},
+                            {2 * s + spin, 2 * q + spin});
+          add_term_matrix(matrix, n_so, value, {2 * p, 2 * r + 1},
+                          {2 * s + 1, 2 * q});
+        }
+  return matrix;
 }
 
 // Lowest eigenvalue of  e0 + sum_PQ f_PQ a^dag_P a_Q
@@ -374,7 +500,7 @@ CiProbe downfold_vs_fci(double lam) {
   // Single-determinant active reference |0^2>: active orbital 0 doubly
   // occupied, orbital 1 empty, with NO active-active coupling, so |0^2> is an
   // exact active eigenstate at lambda = 0 and the active space decouples from
-  // the environment there. The orbital-energy (Moller-Plesset) denominators are
+  // the environment there. The orbital-energy denominators are
   // not those of a self-consistent HF reference, so the *absolute* second-order
   // residual is O(lambda^2); the physics under test is that each order of the
   // downfold (mean-field fold -> 1-body commutator -> 2-body commutator)
@@ -460,6 +586,88 @@ TEST(Swpt2Kernel, ConvergesToFullCI) {
   // for this non-self-consistent reference).
   const CiProbe ph = downfold_vs_fci(0.04);
   EXPECT_LT(ph.err_sw, 0.35 * p.err_sw);
+}
+
+// Independent coefficient-level validation. Build the SW transformation as
+// ordinary matrices over the complete window Fock space, project the inactive
+// orbitals occupied and the virtual orbitals empty, and compare with the
+// production kernel's emitted active operator. Zero-, one-, and two-particle
+// active sectors identify every retained scalar, one-body, and two-body
+// coefficient while excluding the intentionally discarded >=3-body terms.
+TEST(Swpt2Kernel, ProductionMatchesIndependentFockSpaceMatrix) {
+  const int norb = 4;
+  const int n_so = 2 * norb;
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  h1.diagonal() << -0.8, 0.35, -2.7, 3.4;
+  h1(0, 3) = h1(3, 0) = 0.13;
+  h1(1, 2) = h1(2, 1) = -0.09;
+  h1(2, 3) = h1(3, 2) = 0.07;
+
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  set_sym_eri(g, 0, 0, 0, 0, norb, 0.60);
+  set_sym_eri(g, 1, 1, 1, 1, norb, 0.52);
+  set_sym_eri(g, 2, 2, 2, 2, norb, 0.48);
+  set_sym_eri(g, 0, 0, 2, 2, norb, 0.21);
+  set_sym_eri(g, 1, 1, 2, 2, norb, 0.17);
+  set_sym_eri(g, 0, 0, 3, 3, norb, 0.14);
+  set_sym_eri(g, 1, 1, 3, 3, norb, 0.12);
+  set_sym_eri(g, 0, 3, 1, 2, norb, 0.08);
+  set_sym_eri(g, 0, 2, 1, 3, norb, -0.06);
+  set_sym_eri(g, 0, 3, 0, 0, norb, 0.05);
+  set_sym_eri(g, 1, 2, 1, 1, norb, -0.04);
+
+  const auto part = sw::make_partition(norb, /*active=*/{0, 1},
+                                       /*occupation=*/{2.0, 0.0, 2.0, 0.0});
+  Eigen::VectorXd eps(n_so);
+  eps << -0.8, -0.8, 0.35, 0.35, -2.7, -2.7, 3.4, 3.4;
+  const double core_energy = 0.23;
+
+  const MatrixSwParts reference =
+      build_matrix_sw_parts(h1, g, eps, part, core_energy);
+  const Eigen::MatrixXd reference_effective =
+      reference.block_diagonal +
+      0.5 * (reference.generator * reference.off_diagonal -
+             reference.off_diagonal * reference.generator);
+
+  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+  const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+  const auto downfolded = sw::downfold_blocked(one_body, blocked, eps, part,
+                                               sw::RegOptions{}, core_energy);
+  const auto emitted = sw::to_spatial_chemist(downfolded, part);
+  const Eigen::MatrixXd production = spatial_chemist_matrix(emitted);
+
+  const std::uint64_t external_reference =
+      (std::uint64_t{1} << 4) | (std::uint64_t{1} << 5);
+  double max_error = 0.0;
+  double max_correction = 0.0;
+  for (std::uint64_t bra = 0; bra < 16; ++bra) {
+    if (__builtin_popcountll(bra) > 2) continue;
+    for (std::uint64_t ket = 0; ket < 16; ++ket) {
+      if (__builtin_popcountll(ket) > 2) continue;
+      const int full_bra = static_cast<int>(external_reference | bra);
+      const int full_ket = static_cast<int>(external_reference | ket);
+      max_error = std::max(
+          max_error,
+          std::abs(reference_effective(full_bra, full_ket) -
+                   production(static_cast<int>(bra), static_cast<int>(ket))));
+      max_correction =
+          std::max(max_correction,
+                   std::abs(reference_effective(full_bra, full_ket) -
+                            reference.block_diagonal(full_bra, full_ket)));
+    }
+  }
+  double max_two_body_dressing = 0.0;
+  for (int p = 0; p < emitted.norb; ++p)
+    for (int q = 0; q < emitted.norb; ++q)
+      for (int r = 0; r < emitted.norb; ++r)
+        for (int s = 0; s < emitted.norb; ++s)
+          max_two_body_dressing = std::max(
+              max_two_body_dressing,
+              std::abs(emitted.two_body(sw::idx4(p, q, r, s, emitted.norb)) -
+                       g(sw::idx4(p, q, r, s, norb))));
+  EXPECT_GT(max_correction, 1e-6);
+  EXPECT_GT(max_two_body_dressing, 1e-6);
+  EXPECT_LT(max_error, 1e-10);
 }
 
 // ---------------------------------------------------------------------------
@@ -813,11 +1021,28 @@ TEST(Swpt2Kernel, SpinBlockedTwoBodyRoundTrip) {
   EXPECT_LT(max_dev, 1e-12);
 }
 
+TEST(Swpt2Kernel, RestrictedSpinBlockedStorageReusesSameSpinBlock) {
+  const int norb = 3;
+  Eigen::VectorXd g(norb * norb * norb * norb);
+  for (int i = 0; i < g.size(); ++i) g(i) = 0.03 * std::sin(0.17 * i + 0.4);
+
+  const auto general = sw::build_two_body_blocked(g, g, g, norb);
+  const auto restricted = sw::build_two_body_blocked_restricted(g, norb);
+  EXPECT_EQ(restricted.v_bbbb.size(), 0);
+  for (int P = 0; P < 2 * norb; ++P)
+    for (int Q = 0; Q < 2 * norb; ++Q)
+      for (int R = 0; R < 2 * norb; ++R)
+        for (int S = 0; S < 2 * norb; ++S)
+          EXPECT_DOUBLE_EQ(sw::so_v_from_blocked(restricted, P, Q, R, S),
+                           sw::so_v_from_blocked(general, P, Q, R, S));
+}
+
 // The on-the-fly (spin-blocked) downfold reproduces the dense spin-orbital
-// oracle: the emitted effective Hamiltonian (core energy, active one-body,
-// active chemist two-body) is identical, as are the intruder diagnostics and
-// the discarded higher-body norm. Arbitrary distinct aa/ab/bb integrals
-// exercise all spin blocks.
+// reference representation: the emitted effective Hamiltonian (core energy,
+// active one-body, active chemist two-body) is identical, as are the intruder
+// diagnostics and discarded higher-body norm. This validates the blocked
+// storage/access path; both routes share the projected-Wick implementation.
+// Arbitrary distinct aa/ab/bb integrals exercise all spin blocks.
 TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   const int norb = 4;
   const int n4 = norb * norb * norb * norb;
@@ -853,8 +1078,8 @@ TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   const auto got = sw::downfold_blocked(f, blk, eps, part, reg, e_core);
 
   // Compare the emitted effective Hamiltonians (representation-independent:
-  // the oracle stores a full spin-orbital tensor, `got` a spatial spin block)
-  // plus the diagnostics carried on the result structs.
+  // the reference stores a full spin-orbital tensor, `got` a spatial spin
+  // block) plus the diagnostics carried on the result structs.
   const auto ref_ham = sw::reference::to_spatial_chemist(ref, part);
   const auto got_ham = sw::to_spatial_chemist(got, part);
   ASSERT_EQ(got_ham.norb, ref_ham.norb);

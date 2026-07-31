@@ -48,10 +48,10 @@ double reg_inv(double delta, const RegOptions& reg) {
 }
 
 // ===========================================================================
-// Dense spin-orbital reference (validation ORACLE; not used in production). A
-// transparent, dense-tensor implementation of the whole downfold, kept as the
-// independent reference the spin-blocked production path is checked against
-// (see the `BlockedDownfoldMatchesSpinOrbital` test). Some shared helpers
+// Dense spin-orbital reference representation (validation only; not called by
+// the constructor). It checks the blocked storage and access paths, but shares
+// the projected-Wick implementation with production and is not an independent
+// mathematical oracle. Some shared helpers
 // (`diagonal_fock_energies`, the occupation-change masks, the Wick
 // `project_product_t`) live in this region because the production path below
 // reuses them.
@@ -568,7 +568,7 @@ void project_product_t(const Eigen::MatrixXd& A1, A2Get A2get,
   }
 }
 
-// Dense-tensor projection (oracle path): the 2-body operators are full
+// Dense-tensor projection (reference path): the 2-body operators are full
 // spin-orbital tensors indexed directly.
 void project_product(const Eigen::MatrixXd& A1, const Eigen::VectorXd& A2,
                      const Eigen::MatrixXd& B1, const Eigen::VectorXd& B2,
@@ -721,12 +721,45 @@ SpinBlocked2B build_two_body_blocked(const Eigen::VectorXd& g_aaaa,
   return b;
 }
 
+SpinBlocked2B build_two_body_blocked_restricted(const Eigen::VectorXd& g,
+                                                int norb) {
+  const Eigen::Index n4 = static_cast<Eigen::Index>(norb) * norb * norb * norb;
+  SpinBlocked2B b;
+  b.norb = norb;
+  b.v_aaaa = Eigen::VectorXd::Zero(n4);
+  b.v_abab = Eigen::VectorXd::Zero(n4);
+
+  std::vector<double> W(static_cast<std::size_t>(n4), 0.0);
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          W[idx4(p, r, s, q, norb)] += 0.5 * g(idx4(p, q, r, s, norb));
+  for (int P = 0; P < norb; ++P)
+    for (int Q = 0; Q < norb; ++Q)
+      for (int R = 0; R < norb; ++R)
+        for (int S = 0; S < norb; ++S)
+          b.v_aaaa(idx4(P, Q, R, S, norb)) =
+              W[idx4(P, Q, R, S, norb)] - W[idx4(Q, P, R, S, norb)] -
+              W[idx4(P, Q, S, R, norb)] + W[idx4(Q, P, S, R, norb)];
+
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          b.v_abab(idx4(p, q, r, s, norb)) = -g(idx4(p, r, q, s, norb));
+  return b;
+}
+
 double so_v_from_blocked(const SpinBlocked2B& b, int P, int Q, int R, int S) {
   const int n = b.norb;
   const int sP = P & 1, sQ = Q & 1, sR = R & 1, sS = S & 1;
   const int p = P >> 1, q = Q >> 1, r = R >> 1, s = S >> 1;
-  if (sP == sQ && sQ == sR && sR == sS)
-    return (sP == 0 ? b.v_aaaa : b.v_bbbb)(idx4(p, q, r, s, n));
+  if (sP == sQ && sQ == sR && sR == sS) {
+    const auto& same_spin =
+        sP == 0 || b.v_bbbb.size() == 0 ? b.v_aaaa : b.v_bbbb;
+    return same_spin(idx4(p, q, r, s, n));
+  }
   // Sz conservation: mixed blocks are nonzero only with one alpha and one beta
   // in each creation/annihilation pair.
   if (sP + sQ != 1 || sR + sS != 1) return 0.0;

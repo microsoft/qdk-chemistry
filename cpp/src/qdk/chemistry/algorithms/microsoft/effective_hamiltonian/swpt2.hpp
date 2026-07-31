@@ -14,10 +14,9 @@ namespace qdk::chemistry::algorithms::microsoft {
 /**
  * @brief Settings for the second-order Schrieffer-Wolff downfold.
  *
- * `regularizer` selects flow (default), shift, or bare denominators; the
- * corresponding numeric setting controls the selected scheme. The denominator
- * *scheme* (Fock now, approximate-Dyall later) is intended to be a setting too,
- * so it is not part of the method name.
+ * `regularizer` selects flow (default), shift, or bare inverse denominators;
+ * the corresponding numeric setting controls the selected scheme. The current
+ * denominator operator is a semicanonical, spin-free generalized Fock.
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
@@ -27,16 +26,21 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
 
 /**
  * @brief Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian
- * downfold with orbital-energy (Moller-Plesset) denominators.
+ * downfold with semicanonical generalized-Fock orbital-energy denominators.
  *
- * A single-commutator canonical transformation
- * `H_eff = H_BD + 1/2 [S, H_OD]`, truncated to <= 2-body, folding the external
- * space Q of the window onto the reference active space P. A separate diagonal
- * generalized-Fock operator defines the generator denominators. The current
- * implementation assumes a common restricted MO basis, supporting RHF, ROHF,
- * and spin-adapted CAS references. Every singly occupied ROHF orbital must be
- * active. Noncanonical orbitals are semicanonicalized independently within
- * inactive, active, and virtual blocks. See `swpt2_kernel.hpp` for the math.
+ * Computes `H_eff = H_BD + 1/2 [S, H_OD]`, truncated to <= 2-body, folding the
+ * external space Q of the window onto the reference active space P. With bare
+ * denominators, S solves `[F0, S] = H_OD` for a diagonal generalized-Fock F0;
+ * flow and shift settings replace `1/Delta` by a regularized inverse and hence
+ * define regularized variants of that generator.
+ *
+ * The implementation assumes a common restricted MO basis, supporting RHF,
+ * ROHF, and spin-adapted CAS references. Every singly occupied ROHF orbital
+ * must be active. Noncanonical orbitals are semicanonicalized independently
+ * within inactive, active, and virtual blocks. The kernel computes intruder
+ * and discarded-body diagnostics internally; the public result currently
+ * exposes only the effective Hamiltonian and logs a large-amplitude warning.
+ * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

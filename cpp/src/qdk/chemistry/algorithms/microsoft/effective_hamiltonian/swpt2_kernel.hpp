@@ -2,18 +2,16 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// Second-order Schrieffer-Wolff downfolding — foundation kernel.
+// Second-order Schrieffer-Wolff downfolding kernel.
 //
-// Implements the operator-level second-order Schrieffer-Wolff downfolding as
-// closed-form tensor contractions. Split H into buffer-block-diagonal H_BD and
-// occupation-changing H_OD. A separate diagonal generalized-Fock operator F0
-// defines the anti-Hermitian generator through [F0, S] = H_OD; the effective
-// operator is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference buffer
-// occupation and truncated to <= 2-body. This header covers the *foundation*:
-// antisymmetric spin-orbital tensor build from qdk (chemist) integrals,
-// diagonal-Fock energies, the generator S = V/Delta, and the block-diagonal
-// reference- occupation mean-field fold. The second-order commutator channels
-// are added next.
+// Implements an orbital, diagonal-Fock second-order Schrieffer-Wolff downfold.
+// Split H into buffer-block-diagonal H_BD and occupation-changing H_OD. For
+// bare denominators, a separate diagonal generalized-Fock operator F0 defines
+// the anti-Hermitian generator through [F0, S] = H_OD. The flow and shift
+// options instead use a regularized generator. In either case the implemented
+// approximation is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
+// buffer occupation and truncated to <= 2-body. The projected commutator is
+// evaluated by bounded-rank generalized-Wick contractions over buffer legs.
 //
 // Representation (spin-orbital, n_so = 2 * norb; interleaved alpha(p)=2p,
 // beta(p)=2p+1):
@@ -40,7 +38,8 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
 // path).
 // ===========================================================================
 
-/// SW energy-denominator regularization (precedence: flow > shift > floor).
+/// SW energy-denominator options. Callers select one scheme by setting either
+/// flow or shift positive; otherwise the floor-guarded bare inverse is used.
 struct RegOptions {
   double denom_floor = 1e-8;  ///< hard cutoff: skip couplings with |D| < floor
   double denom_shift = 0.0;   ///< CASPT2-like shift: 1/D -> D / (D^2 + shift^2)
@@ -110,22 +109,13 @@ struct ActiveHamiltonian {
   Eigen::VectorXd two_body;  ///< (norb^4,) chemist (pq|rs), C-order
 };
 
-/// Build a spin-orbital partition over a window of `norb` spatial orbitals:
-/// `active_spatial` become active (the kept space P); the rest split by
-/// reference `occupation` (per spatial orbital) into inactive (occ >= 1, i.e.
-/// doubly-occupied domo) or virtual (empty). The external space must be
-/// closed-shell (occ ~ 0 or 2); put open-shell/magnetic orbitals in the active
-/// space.
-SoPartition make_partition(int norb, const std::vector<int>& active_spatial,
-                           const std::vector<double>& occupation);
-
 // ===========================================================================
-// Dense spin-orbital reference (validation ORACLE; NOT used in production).
-// A transparent, dense-tensor downfold kept as the independent reference the
-// spin-blocked production path is checked against (see the
-// `BlockedDownfoldMatchesSpinOrbital` test). Grouped in `namespace reference`
-// to mark its test-only status; the names are re-exported into the parent
-// namespace below for existing call sites.
+// Dense spin-orbital reference representation (validation only; not called by
+// the constructor). It checks the blocked storage and element-access paths in
+// `BlockedDownfoldMatchesSpinOrbital`, but shares the generalized-Wick
+// projection machinery with production and is therefore a regression
+// reference, not an independent mathematical oracle. Independent validation is
+// provided by the determinant-space matrix test described in the design.
 // ===========================================================================
 
 namespace reference {
@@ -216,14 +206,17 @@ ActiveHamiltonian to_spatial_chemist(const DownfoldResult& down,
 // ===========================================================================
 
 /// Spin-blocked *spatial* storage of the antisymmetric two-body tensor: the
-/// independent nonzero spin blocks (memory ~ 3*norb^4 vs 16*norb^4 for the
-/// dense spin-orbital `v`). Every other nonzero spin pattern is obtained from
-/// these by antisymmetry (see `so_v_from_blocked`). This is the memory-lean
-/// backing store for the spin-blocked (production) downfold path.
+/// independent nonzero spin blocks (memory ~ 3*norb^4 generally and 2*norb^4
+/// for restricted storage, versus 16*norb^4 for dense spin-orbital `v`). Every
+/// other nonzero spin pattern is obtained from these by antisymmetry (see
+/// `so_v_from_blocked`). This is the memory-lean backing store for the
+/// spin-blocked (production) downfold path.
 struct SpinBlocked2B {
   int norb = 0;
   Eigen::VectorXd v_aaaa;  ///< (norb^4,) all-alpha antisymmetric block
-  Eigen::VectorXd v_bbbb;  ///< (norb^4,) all-beta  antisymmetric block
+  /// (norb^4,) all-beta antisymmetric block; empty for restricted storage,
+  /// where `v_aaaa` supplies both same-spin channels.
+  Eigen::VectorXd v_bbbb;
   Eigen::VectorXd v_abab;  ///< (norb^4,) opposite-spin block v[pa,qb,ra,sb]
 };
 
@@ -232,6 +225,11 @@ struct SpinBlocked2B {
 SpinBlocked2B build_two_body_blocked(const Eigen::VectorXd& g_aaaa,
                                      const Eigen::VectorXd& g_aabb,
                                      const Eigen::VectorXd& g_bbbb, int norb);
+
+/// Build the spin blocks for a restricted chemist tensor, storing only one
+/// same-spin block because the alpha and beta blocks are identical.
+SpinBlocked2B build_two_body_blocked_restricted(const Eigen::VectorXd& g,
+                                                int norb);
 
 /// Reconstruct a single spin-orbital element `v[P,Q,R,S]` (interleaved spin,
 /// alpha=2p, beta=2p+1) from the spin blocks -- bridges the blocked store to
@@ -270,8 +268,8 @@ struct ActiveDownfoldResult {
 /// result is stored as the spatial opposite-spin block over the active
 /// *spatial* orbitals (`ActiveDownfoldResult::v_abab`, O(n_act^4) --
 /// spin-restriction makes that single block the whole effective two-body).
-/// Numerically identical to `reference::downfold` on the active block
-/// (validated against it); `f` is the spin-orbital one-body from
+/// Numerically identical to `reference::downfold` on the active block in the
+/// regression tests; `f` is the spin-orbital one-body from
 /// `spin_orbital_one_body`, `e_core` the scalar core energy.
 ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,

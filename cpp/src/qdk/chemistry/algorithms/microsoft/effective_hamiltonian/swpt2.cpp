@@ -41,8 +41,10 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
   set_default(
       "denom_flow", 1.0,
-      "DSRG-style flow-parameter regularizer 1/D -> (1-exp(-s*D^2))/D "
-      "(units Eh^-2), used when regularizer='flow'.",
+      "Flow-parameter denominator regularizer "
+      "1/D -> (1-exp(-s*D^2))/D (units Eh^-2), used when "
+      "regularizer='flow'. This borrows the DSRG damping form; it does not "
+      "turn the downfold into a full DSRG calculation.",
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
   set_default(
       "intruder_warn_amplitude", 1.0,
@@ -79,13 +81,13 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   // --- window integrals (spin-restricted) ---
   const auto [h1a_input, h1b_input] = hamiltonian->get_one_body_integrals();
-  const auto [g_aaaa_input, g_aabb_input, g_bbbb_input] =
-      hamiltonian->get_two_body_integrals();
+  const auto two_body_inputs = hamiltonian->get_two_body_integrals();
+  const auto& g_aaaa_input = std::get<0>(two_body_inputs);
   Eigen::MatrixXd h1a = h1a_input;
   Eigen::MatrixXd h1b = h1b_input;
+  // Restricted Hamiltonians alias all three spin channels. Keep one spatial
+  // chemist tensor so semicanonicalization performs one N^4 copy/rotation.
   Eigen::VectorXd g_aaaa = g_aaaa_input;
-  Eigen::VectorXd g_aabb = g_aabb_input;
-  Eigen::VectorXd g_bbbb = g_bbbb_input;
   const double e_core = hamiltonian->get_core_energy();
   const int norb = static_cast<int>(h1a.rows());
 
@@ -205,17 +207,18 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         "SchriefferWolffPT2: the reference active space is not fully "
         "contained in the window Hamiltonian.");
 
-  // The emitted active integrals are ordered by window index; the reused
-  // reference orbitals expect them in reference-active order. Require the two
-  // to agree (both ascending) -- general reordering is not yet supported.
+  // The emitted active integrals follow window order, while the reused
+  // reference orbitals expect reference-active order. Require them to agree;
+  // permutation into a different reference order is not implemented.
   for (int k = 0; k < static_cast<int>(active_spatial.size()); ++k)
     if (W_global[active_spatial[k]] != P_global[k])
       throw std::runtime_error(
           "SchriefferWolffPT2: active-orbital ordering in the window does not "
-          "match the reference active space (not yet supported)");
+          "match the reference active-space ordering");
 
   Eigen::MatrixXd semicanonical_rotation =
       Eigen::MatrixXd::Identity(norb, norb);
+  bool semicanonical_rotation_applied = false;
   Eigen::VectorXd eps;
   if (_settings->get<bool>("semicanonicalize")) {
     const double tolerance = _settings->get<double>("semicanonical_tolerance");
@@ -226,14 +229,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     const auto fock = kern::generalized_fock_matrix(h1a, g_aaaa, density, norb);
     semicanonical_rotation = kern::semicanonical_rotation(
         fock, {inactive_spatial, active_spatial, virtual_spatial}, tolerance);
-    h1a = kern::rotate_one_body(h1a, semicanonical_rotation);
-    h1b = kern::rotate_one_body(h1b, semicanonical_rotation);
-    g_aaaa = kern::rotate_two_body(g_aaaa, semicanonical_rotation, norb);
-    g_aabb = kern::rotate_two_body(g_aabb, semicanonical_rotation, norb);
-    g_bbbb = kern::rotate_two_body(g_bbbb, semicanonical_rotation, norb);
-    density = kern::rotate_one_body(density, semicanonical_rotation);
-    const auto fock_rotated =
-        kern::rotate_one_body(fock, semicanonical_rotation);
+    semicanonical_rotation_applied = !semicanonical_rotation.isIdentity(0.0);
+    Eigen::MatrixXd fock_rotated = fock;
+    if (semicanonical_rotation_applied) {
+      h1a = kern::rotate_one_body(h1a, semicanonical_rotation);
+      h1b = kern::rotate_one_body(h1b, semicanonical_rotation);
+      g_aaaa = kern::rotate_two_body(g_aaaa, semicanonical_rotation, norb);
+      density = kern::rotate_one_body(density, semicanonical_rotation);
+      fock_rotated = kern::rotate_one_body(fock, semicanonical_rotation);
+    }
     eps = Eigen::VectorXd::Zero(2 * norb);
     for (int i = 0; i < norb; ++i) {
       occupation[i] = density(i, i);
@@ -245,7 +249,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   // --- kernel pipeline (spin-blocked: the antisymmetric two-body tensor is
   // stored as spatial spin blocks and every element is formed on the fly, so
   // the dense n_so^4 objects are never materialized) ---
-  const auto blk = kern::build_two_body_blocked(g_aaaa, g_aabb, g_bbbb, norb);
+  const auto blk = kern::build_two_body_blocked_restricted(g_aaaa, norb);
   const auto f = kern::spin_orbital_one_body(h1a, h1b, norb);
   const auto part = kern::make_partition(norb, active_spatial, occupation);
 
@@ -313,7 +317,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   }
 
   auto active = kern::to_spatial_chemist(down, part);
-  if (_settings->get<bool>("semicanonicalize")) {
+  if (semicanonical_rotation_applied) {
     const int nactive = static_cast<int>(active_spatial.size());
     Eigen::MatrixXd active_rotation(nactive, nactive);
     for (int i = 0; i < nactive; ++i)

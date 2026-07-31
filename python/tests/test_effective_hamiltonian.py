@@ -44,7 +44,7 @@ class TestEffectiveHamiltonianConstructor:
 
     @pytest.mark.parametrize("alias", ["swpt2", "sw", "schrieffer_wolff"])
     def test_aliases_resolve(self, alias):
-        """Aliases (incl. the legacy `swpt2`) resolve to the qdk_swpt2 implementation."""
+        """Aliases resolve to the qdk_swpt2 implementation."""
         assert algorithms.create(_TYPE, alias).name() == "qdk_swpt2"
 
     def test_direct_construction(self):
