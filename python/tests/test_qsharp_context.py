@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
     QdkStandardQpeCircuitBuilder,
@@ -140,7 +141,7 @@ class TestCrossContextComposition:
 
     def test_bring_your_own_context_composes(self) -> None:
         """A caller can install their own context so ops and utils share it."""
-        user_context = create_qsharp_context()
+        user_context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)
         set_qsharp_context(user_context)
         state_prep = _make_state_prep_from_context(user_context)
         circuit = _build_standard_qpe(state_prep)

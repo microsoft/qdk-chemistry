@@ -100,13 +100,16 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import (
     create_qsharp_context,
-    get_qsharp_context,
     set_qsharp_context,
     use_qsharp_context,
 )
 
-# Option A — build your operation against the shared owning context.
-context = get_qsharp_context()  # the cached context that owns QSHARP_UTILS
+# Option A — build your operation against a context you own. Pick any target
+# profile you need (here Adaptive_RIF) and register it so QSHARP_UTILS composes
+# against the same context (otherwise a "callable belongs to a different Context"
+# error is raised).
+context = create_qsharp_context(target_profile=qdk.TargetProfile.Adaptive_RIF)
+set_qsharp_context(context)  # the context now owns QSHARP_UTILS
 state_prep_params = {
     "rowMap": [1, 0],
     "stateVector": [0.6, 0.0, 0.0, 0.8],
