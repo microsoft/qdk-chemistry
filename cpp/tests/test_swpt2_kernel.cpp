@@ -1040,8 +1040,8 @@ TEST(Swpt2Kernel, RestrictedSpinBlockedStorageReusesSameSpinBlock) {
 // The on-the-fly (spin-blocked) downfold reproduces the dense spin-orbital
 // reference representation: the emitted effective Hamiltonian (core energy,
 // active one-body, active chemist two-body) is identical, as are the intruder
-// diagnostics and discarded higher-body norm. This validates the blocked
-// storage/access path; both routes share the projected-Wick implementation.
+// diagnostics and discarded higher-body norm. This validates the production
+// BLAS matching kernels against the scalar projected-Wick regression path.
 // Arbitrary distinct aa/ab/bb integrals exercise all spin blocks.
 TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   const int norb = 4;
@@ -1076,6 +1076,8 @@ TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   const auto blk = sw::build_two_body_blocked(gaa, gab, gbb, norb);
   const auto f = sw::spin_orbital_one_body(h1, h1, norb);
   const auto got = sw::downfold_blocked(f, blk, eps, part, reg, e_core);
+  const auto without_higher_body =
+      sw::downfold_blocked(f, blk, eps, part, reg, e_core, false);
 
   // Compare the emitted effective Hamiltonians (representation-independent:
   // the reference stores a full spin-orbital tensor, `got` a spatial spin
@@ -1089,6 +1091,20 @@ TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   EXPECT_NEAR(got.min_denominator, ref.min_denominator, 1e-10);
   EXPECT_NEAR(got.max_amplitude, ref.max_amplitude, 1e-10);
   EXPECT_NEAR(got.higher_body_norm, ref.higher_body_norm, 1e-10);
+  const auto without_higher_body_ham =
+      sw::to_spatial_chemist(without_higher_body, part);
+  EXPECT_NEAR(without_higher_body_ham.core_energy, got_ham.core_energy, 1e-10);
+  EXPECT_LT((without_higher_body_ham.one_body - got_ham.one_body)
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-10);
+  EXPECT_LT((without_higher_body_ham.two_body - got_ham.two_body)
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-10);
+  EXPECT_NEAR(without_higher_body.min_denominator, got.min_denominator, 1e-10);
+  EXPECT_NEAR(without_higher_body.max_amplitude, got.max_amplitude, 1e-10);
+  EXPECT_TRUE(std::isnan(without_higher_body.higher_body_norm));
 }
 
 }  // namespace

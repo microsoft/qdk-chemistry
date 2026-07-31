@@ -79,9 +79,10 @@ class SchriefferWolffPT2Diagnostics final
  * The implementation assumes a common restricted MO basis, supporting RHF,
  * ROHF, and spin-adapted CAS references. Every singly occupied ROHF orbital
  * must be active. Noncanonical orbitals are semicanonicalized independently
- * within inactive, active, and virtual blocks. The kernel computes intruder
- * and discarded-body diagnostics and returns them with the effective
- * Hamiltonian. A large-amplitude warning is also logged.
+ * within inactive, active, and virtual blocks. The kernel returns intruder
+ * diagnostics with the effective Hamiltonian; the discarded-body norm is
+ * optional because storing the active rank-three operator is expensive. A
+ * large-amplitude warning is also logged.
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor

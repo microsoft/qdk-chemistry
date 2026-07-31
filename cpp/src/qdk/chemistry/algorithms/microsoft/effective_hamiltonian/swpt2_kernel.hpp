@@ -265,7 +265,11 @@ struct ActiveDownfoldResult {
 /// spatial two-body store (`SpinBlocked2B`) and computes every antisymmetric
 /// two-body element on the fly, so the dense n_so^4 tensors (`v`, generator
 /// `s2`, the block-diagonal / off-diagonal split) are never materialized. The
-/// result is stored as the spatial opposite-spin block over the active
+/// nonempty Wick contractions are evaluated as BLAS matrix products over
+/// flattened active and buffer tuples; operand-internal reference contractions
+/// are reduced while packing those panels. Disconnected highest-rank products
+/// are canceled before evaluation. The result is stored as the
+/// spatial opposite-spin block over the active
 /// *spatial* orbitals (`ActiveDownfoldResult::v_abab`, O(n_act^4) --
 /// spin-restriction makes that single block the whole effective two-body).
 /// Numerically identical to `reference::downfold` on the active block in the
@@ -275,7 +279,8 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,
                                       const Eigen::VectorXd& eps,
                                       const SoPartition& part,
-                                      const RegOptions& reg, double e_core);
+                                      const RegOptions& reg, double e_core,
+                                      bool compute_higher_body_norm = true);
 
 /// Relabel the compact `ActiveDownfoldResult` active block to compact spatial
 /// chemist integrals for a qdk CanonicalFourCenter Hamiltonian.

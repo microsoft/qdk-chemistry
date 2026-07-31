@@ -60,6 +60,9 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
       "Skip a block rotation when its largest off-diagonal Fock element does "
       "not exceed this threshold.",
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+  set_default("compute_higher_body_norm", false,
+              "Compute the norm of discarded rank-three terms. Disabled by "
+              "default to avoid storing the active rank-three operator.");
 }
 
 EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
@@ -288,7 +291,9 @@ EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
     reg.denom_shift = 0.0;
   }
 
-  const auto down = kern::downfold_blocked(f, blk, eps, part, reg, e_core);
+  const auto down =
+      kern::downfold_blocked(f, blk, eps, part, reg, e_core,
+                             _settings->get<bool>("compute_higher_body_norm"));
 
   // Intruder warning is gated on the RAW (unregularized) amplitude: the
   // regularizer damps the operator, so warning on regularized amplitudes would

@@ -232,10 +232,12 @@ reference basis. ROHF uses the spin-traced density and common spin-free
 orbital energies, preserving spin symmetry while the active solve selects the
 desired spin sector.
 
-The result includes raw intruder-amplitude, minimum-denominator, discarded
-higher-body diagnostics, selected regularizer metadata, and whether a
-semicanonical rotation was applied. A warning is also logged when the raw
-amplitude exceeds ``intruder_warn_amplitude``.
+The result includes raw intruder-amplitude, minimum-denominator, selected
+regularizer metadata, and whether a semicanonical rotation was applied. The
+discarded higher-body norm is disabled by default; set
+``compute_higher_body_norm=True`` to compute it. Otherwise
+``higher_body_norm`` is NaN. A warning is also logged when the raw amplitude
+exceeds ``intruder_warn_amplitude``.
 
 Typical usage:
 

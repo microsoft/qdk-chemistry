@@ -163,6 +163,7 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
   EXPECT_DOUBLE_EQ(settings.get<double>("intruder_warn_amplitude"), 1.0);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
   EXPECT_DOUBLE_EQ(settings.get<double>("semicanonical_tolerance"), 1e-10);
+  EXPECT_FALSE(settings.get<bool>("compute_higher_body_norm"));
   EXPECT_ANY_THROW(settings.set("regularizer", std::string("unknown")));
   EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
 
@@ -233,7 +234,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   EXPECT_DOUBLE_EQ(diagnostics->denominator_shift(), 0.0);
   EXPECT_GT(diagnostics->max_raw_amplitude(), 0.0);
   EXPECT_GT(diagnostics->min_denominator(), 0.0);
-  EXPECT_GE(diagnostics->higher_body_norm(), 0.0);
+  EXPECT_TRUE(std::isnan(diagnostics->higher_body_norm()));
   auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, 2, 2);
 
@@ -278,6 +279,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   // which are exact for this canonical closed-shell reference.)
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("swpt2");
   swpt2_bare->settings().set("regularizer", std::string("bare"));
+  swpt2_bare->settings().set("compute_higher_body_norm", true);
   auto bare_result = swpt2_bare->run(reference, H_window);
   auto H_eff_bare = bare_result.hamiltonian();
   auto bare_diagnostics =
@@ -285,6 +287,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
           bare_result.diagnostics());
   ASSERT_NE(bare_diagnostics, nullptr);
   EXPECT_EQ(bare_diagnostics->regularizer(), "bare");
+  EXPECT_TRUE(std::isfinite(bare_diagnostics->higher_body_norm()));
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2

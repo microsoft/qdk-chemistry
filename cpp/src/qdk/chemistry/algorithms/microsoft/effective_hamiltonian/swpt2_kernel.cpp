@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <blas.hh>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -392,7 +393,8 @@ using FermionOp = std::map<Term, double>;
 
 // Normal-order a raw operator string (anticommutation), accumulating into
 // `out`.
-void normalize(Term ops, double coeff, FermionOp& out) {
+void normalize(Term ops, double coeff, FermionOp& out,
+               int max_output_length = 8) {
   const int n = static_cast<int>(ops.size());
   for (int i = 0; i + 1 < n; ++i) {
     const int ai = ops[i].first, aa = ops[i].second;
@@ -401,19 +403,20 @@ void normalize(Term ops, double coeff, FermionOp& out) {
     if (wrong) {
       Term swapped = ops;
       std::swap(swapped[i], swapped[i + 1]);
-      normalize(swapped, -coeff, out);  // a b = -b a + {a, b}
-      if (aa != ba && ai == bi) {       // contraction {a, b} = 1
+      normalize(swapped, -coeff, out,
+                max_output_length);  // a b = -b a + {a, b}
+      if (aa != ba && ai == bi) {    // contraction {a, b} = 1
         Term c;
         c.reserve(n - 2);
         for (int k = 0; k < n; ++k)
           if (k != i && k != i + 1) c.push_back(ops[k]);
-        normalize(c, coeff, out);
+        normalize(c, coeff, out, max_output_length);
       }
       return;
     }
     if (aa == ba && ai == bi) return;  // repeated operator -> 0
   }
-  out[ops] += coeff;
+  if (n <= max_output_length) out[ops] += coeff;
 }
 
 // All disjoint-pair matchings (i < j) of `slots`, including the empty matching.
@@ -444,7 +447,413 @@ int perm_sign(const std::vector<int>& seq) {
   return s;
 }
 
-// Active-space reference projection of A * B (A left, B right), buffer summed.
+bool is_two_body_between_matching(
+    int rA, int rB, const std::vector<std::pair<int, int>>& match) {
+  if (rA != 2 || rB != 2 || match.size() != 2) return false;
+  return std::all_of(match.begin(), match.end(), [](const auto& pair) {
+    return (pair.first < 4) != (pair.second < 4);
+  });
+}
+
+bool is_one_line_between_matching(
+    int rA, int rB, const std::vector<std::pair<int, int>>& match) {
+  if (match.size() != 1) return false;
+  const int boundary = 2 * rA;
+  return (match[0].first < boundary) != (match[0].second < boundary);
+}
+
+Eigen::Index integer_power(Eigen::Index base, int exponent) {
+  Eigen::Index result = 1;
+  for (int i = 0; i < exponent; ++i) result *= base;
+  return result;
+}
+
+void assign_active_slots(std::array<int, 8>& slots,
+                         const std::vector<int>& external_slots,
+                         Eigen::Index row,
+                         const std::vector<int>& active_list) {
+  const Eigen::Index nactive = active_list.size();
+  for (auto slot = external_slots.rbegin(); slot != external_slots.rend();
+       ++slot) {
+    slots[*slot] = active_list[row % nactive];
+    row /= nactive;
+  }
+}
+
+// Every one-cross-line product is a matrix multiplication after flattening
+// the active legs remaining on each operator into rows and the buffer line
+// into the shared column. This covers retained and discarded-body channels.
+template <class A2Get, class B2Get>
+void project_one_line_between_blas(const Eigen::MatrixXd& A1, A2Get A2get,
+                                   const Eigen::MatrixXd& B1, B2Get B2get,
+                                   const SoPartition& part, double scale,
+                                   int max_output_length, FermionOp& out) {
+  std::vector<int> active_list, inactive_list, virtual_list;
+  for (int orbital = 0; orbital < part.n_so; ++orbital) {
+    if (part.is_active[orbital]) active_list.push_back(orbital);
+    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
+    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
+  }
+  if (active_list.empty()) return;
+
+  for (const auto [rA, rB] :
+       {std::pair{1, 1}, std::pair{1, 2}, std::pair{2, 1}, std::pair{2, 2}}) {
+    const int boundary = 2 * rA;
+    const int nslots = boundary + 2 * rB;
+    std::array<int, 8> is_cre{};
+    for (int slot = 0; slot < rA; ++slot) is_cre[slot] = 1;
+    for (int slot = 0; slot < rB; ++slot) is_cre[boundary + slot] = 1;
+
+    std::vector<int> slots(nslots);
+    std::iota(slots.begin(), slots.end(), 0);
+    std::vector<std::vector<std::pair<int, int>>> matches;
+    enum_matchings(slots, {}, matches);
+    for (const auto& match : matches) {
+      if (!is_one_line_between_matching(rA, rB, match)) continue;
+      const auto [left, right] = match[0];
+      if (is_cre[left] == is_cre[right]) continue;
+
+      std::vector<int> ext, ext_a, ext_b;
+      for (int slot = 0; slot < nslots; ++slot) {
+        if (slot == left || slot == right) continue;
+        ext.push_back(slot);
+        (slot < boundary ? ext_a : ext_b).push_back(slot);
+      }
+      std::vector<int> order{left, right};
+      order.insert(order.end(), ext.begin(), ext.end());
+      const double normA = rA == 2 ? 0.25 : 1.0;
+      const double normB = rB == 2 ? 0.25 : 1.0;
+      const double prefactor = scale * perm_sign(order) * normA * normB;
+      const auto& buffer_list = is_cre[left] ? inactive_list : virtual_list;
+      if (buffer_list.empty()) continue;
+
+      const Eigen::Index nactive = active_list.size();
+      const Eigen::Index nrow_a = integer_power(nactive, ext_a.size());
+      const Eigen::Index nrow_b = integer_power(nactive, ext_b.size());
+      const Eigen::Index nbuffer = buffer_list.size();
+      Eigen::MatrixXd a(nrow_a, nbuffer);
+      Eigen::MatrixXd b(nrow_b, nbuffer);
+      for (Eigen::Index row = 0; row < nrow_a; ++row) {
+        for (Eigen::Index q = 0; q < nbuffer; ++q) {
+          std::array<int, 8> values{};
+          assign_active_slots(values, ext_a, row, active_list);
+          values[left] = values[right] = buffer_list[q];
+          a(row, q) = rA == 1
+                          ? A1(values[0], values[1])
+                          : A2get(values[0], values[1], values[2], values[3]);
+        }
+      }
+      for (Eigen::Index row = 0; row < nrow_b; ++row) {
+        for (Eigen::Index q = 0; q < nbuffer; ++q) {
+          std::array<int, 8> values{};
+          assign_active_slots(values, ext_b, row, active_list);
+          values[left] = values[right] = buffer_list[q];
+          b(row, q) = rB == 1
+                          ? B1(values[boundary], values[boundary + 1])
+                          : B2get(values[boundary], values[boundary + 1],
+                                  values[boundary + 2], values[boundary + 3]);
+        }
+      }
+
+      Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 nrow_a, nrow_b, nbuffer, 1.0, a.data(), nrow_a, b.data(),
+                 nrow_b, 0.0, product.data(), nrow_a);
+      for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
+        for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b) {
+          const double coeff = prefactor * product(row_a, row_b);
+          if (coeff == 0.0) continue;
+          std::array<int, 8> values{};
+          assign_active_slots(values, ext_a, row_a, active_list);
+          assign_active_slots(values, ext_b, row_b, active_list);
+          Term ops;
+          ops.reserve(ext.size());
+          for (int slot : ext) ops.push_back({values[slot], is_cre[slot]});
+          normalize(ops, coeff, out, max_output_length);
+        }
+      }
+    }
+  }
+}
+
+// Two cross-operator contractions in A2 * B2 leave two active legs on each
+// tensor. Flattening each active pair into a row and the two buffer indices
+// into a column turns every Wick matching into one matrix multiplication.
+template <class A2Get, class B2Get>
+void project_two_body_between_blas(A2Get A2get, B2Get B2get,
+                                   const SoPartition& part, double scale,
+                                   const Eigen::VectorXd& hvec,
+                                   const Eigen::VectorXd& pvec,
+                                   FermionOp& out) {
+  std::vector<int> active_list, inactive_list, virtual_list;
+  for (int orbital = 0; orbital < part.n_so; ++orbital) {
+    if (part.is_active[orbital]) active_list.push_back(orbital);
+    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
+    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
+  }
+  if (active_list.empty()) return;
+
+  constexpr int nslots = 8;
+  const std::array<int, nslots> is_cre{1, 1, 0, 0, 1, 1, 0, 0};
+  std::vector<int> slots(nslots);
+  std::iota(slots.begin(), slots.end(), 0);
+  std::vector<std::vector<std::pair<int, int>>> matches;
+  enum_matchings(slots, {}, matches);
+
+  for (const auto& match : matches) {
+    if (!is_two_body_between_matching(2, 2, match)) continue;
+    if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
+          return is_cre[pair.first] == is_cre[pair.second];
+        }))
+      continue;
+
+    std::array<char, nslots> contracted{};
+    for (const auto& pair : match) {
+      contracted[pair.first] = 1;
+      contracted[pair.second] = 1;
+    }
+    std::vector<int> ext, ext_a, ext_b;
+    for (int slot = 0; slot < nslots; ++slot) {
+      if (contracted[slot]) continue;
+      ext.push_back(slot);
+      (slot < 4 ? ext_a : ext_b).push_back(slot);
+    }
+
+    std::vector<int> order;
+    for (const auto& pair : match) {
+      order.push_back(pair.first);
+      order.push_back(pair.second);
+    }
+    order.insert(order.end(), ext.begin(), ext.end());
+    const double prefactor = scale * perm_sign(order) / 16.0;
+
+    std::array<const std::vector<int>*, 2> buffer_lists{};
+    bool empty_buffer = false;
+    for (int pair = 0; pair < 2; ++pair) {
+      buffer_lists[pair] =
+          is_cre[match[pair].first] ? &inactive_list : &virtual_list;
+      empty_buffer = empty_buffer || buffer_lists[pair]->empty();
+    }
+    if (empty_buffer) continue;
+
+    const Eigen::Index nactive = active_list.size();
+    const Eigen::Index nrow = nactive * nactive;
+    const Eigen::Index nbuffer0 = buffer_lists[0]->size();
+    const Eigen::Index nbuffer1 = buffer_lists[1]->size();
+    const Eigen::Index ncol = nbuffer0 * nbuffer1;
+    Eigen::MatrixXd a = Eigen::MatrixXd::Zero(nrow, ncol);
+    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(nrow, ncol);
+
+    for (Eigen::Index i = 0; i < nactive; ++i) {
+      for (Eigen::Index j = 0; j < nactive; ++j) {
+        const Eigen::Index row = i * nactive + j;
+        for (Eigen::Index q0 = 0; q0 < nbuffer0; ++q0) {
+          for (Eigen::Index q1 = 0; q1 < nbuffer1; ++q1) {
+            const Eigen::Index col = q0 * nbuffer1 + q1;
+            std::array<int, nslots> sv{};
+            sv[ext_a[0]] = active_list[i];
+            sv[ext_a[1]] = active_list[j];
+            sv[match[0].first] = sv[match[0].second] = (*buffer_lists[0])[q0];
+            sv[match[1].first] = sv[match[1].second] = (*buffer_lists[1])[q1];
+            double prop = is_cre[match[0].first] ? pvec(sv[match[0].first])
+                                                 : hvec(sv[match[0].first]);
+            prop *= is_cre[match[1].first] ? pvec(sv[match[1].first])
+                                           : hvec(sv[match[1].first]);
+            a(row, col) = A2get(sv[0], sv[1], sv[2], sv[3]) * prop;
+
+            sv[ext_b[0]] = active_list[i];
+            sv[ext_b[1]] = active_list[j];
+            b(row, col) = B2get(sv[4], sv[5], sv[6], sv[7]);
+          }
+        }
+      }
+    }
+
+    Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow, nrow);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, nrow,
+               nrow, ncol, 1.0, a.data(), nrow, b.data(), nrow, 0.0,
+               product.data(), nrow);
+
+    for (Eigen::Index row_a = 0; row_a < nrow; ++row_a) {
+      for (Eigen::Index row_b = 0; row_b < nrow; ++row_b) {
+        const double coeff = prefactor * product(row_a, row_b);
+        if (coeff == 0.0) continue;
+        std::array<int, nslots> sv{};
+        sv[ext_a[0]] = active_list[row_a / nactive];
+        sv[ext_a[1]] = active_list[row_a % nactive];
+        sv[ext_b[0]] = active_list[row_b / nactive];
+        sv[ext_b[1]] = active_list[row_b % nactive];
+        Term ops;
+        ops.reserve(ext.size());
+        for (int slot : ext) ops.push_back({sv[slot], is_cre[slot]});
+        normalize(ops, coeff, out);
+      }
+    }
+  }
+}
+
+// All remaining nonempty matchings factor into two operand-local panels.
+// External active legs form the rows, cross-operator buffer lines form the
+// shared column, and contractions internal to one operand are reduced while
+// packing that operand's panel. Matchings owned by the specialized one- and
+// two-line kernels above are excluded.
+template <class A2Get, class B2Get>
+void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
+                            const Eigen::MatrixXd& B1, B2Get B2get,
+                            const SoPartition& part, double scale,
+                            int max_output_length, FermionOp& out) {
+  std::vector<int> active_list, inactive_list, virtual_list;
+  for (int orbital = 0; orbital < part.n_so; ++orbital) {
+    if (part.is_active[orbital]) active_list.push_back(orbital);
+    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
+    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
+  }
+  if (active_list.empty()) return;
+
+  for (const auto [rA, rB] :
+       {std::pair{1, 1}, std::pair{1, 2}, std::pair{2, 1}, std::pair{2, 2}}) {
+    const int boundary = 2 * rA;
+    const int nslots = boundary + 2 * rB;
+    std::array<int, 8> is_cre{};
+    for (int slot = 0; slot < rA; ++slot) is_cre[slot] = 1;
+    for (int slot = 0; slot < rB; ++slot) is_cre[boundary + slot] = 1;
+
+    std::vector<int> slots(nslots);
+    std::iota(slots.begin(), slots.end(), 0);
+    std::vector<std::vector<std::pair<int, int>>> matches;
+    enum_matchings(slots, {}, matches);
+    for (const auto& match : matches) {
+      if (match.empty() || is_one_line_between_matching(rA, rB, match) ||
+          is_two_body_between_matching(rA, rB, match))
+        continue;
+      if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
+            return is_cre[pair.first] == is_cre[pair.second];
+          }))
+        continue;
+
+      std::vector<int> cross_pairs, internal_a_pairs, internal_b_pairs;
+      std::array<char, 8> contracted{};
+      for (int pair = 0; pair < static_cast<int>(match.size()); ++pair) {
+        const auto [left, right] = match[pair];
+        contracted[left] = contracted[right] = 1;
+        if ((left < boundary) != (right < boundary))
+          cross_pairs.push_back(pair);
+        else if (left < boundary)
+          internal_a_pairs.push_back(pair);
+        else
+          internal_b_pairs.push_back(pair);
+      }
+
+      std::vector<int> ext, ext_a, ext_b;
+      for (int slot = 0; slot < nslots; ++slot) {
+        if (contracted[slot]) continue;
+        ext.push_back(slot);
+        (slot < boundary ? ext_a : ext_b).push_back(slot);
+      }
+      std::vector<int> order;
+      for (const auto& pair : match) {
+        order.push_back(pair.first);
+        order.push_back(pair.second);
+      }
+      order.insert(order.end(), ext.begin(), ext.end());
+      const double normA = rA == 2 ? 0.25 : 1.0;
+      const double normB = rB == 2 ? 0.25 : 1.0;
+      const double prefactor = scale * perm_sign(order) * normA * normB;
+
+      std::vector<const std::vector<int>*> pair_lists(match.size());
+      bool empty_buffer = false;
+      for (int pair = 0; pair < static_cast<int>(match.size()); ++pair) {
+        pair_lists[pair] =
+            is_cre[match[pair].first] ? &inactive_list : &virtual_list;
+        empty_buffer = empty_buffer || pair_lists[pair]->empty();
+      }
+      if (empty_buffer) continue;
+
+      const auto combination_count = [&](const std::vector<int>& pairs) {
+        Eigen::Index count = 1;
+        for (int pair : pairs) count *= pair_lists[pair]->size();
+        return count;
+      };
+      const Eigen::Index nactive = active_list.size();
+      const Eigen::Index nrow_a = integer_power(nactive, ext_a.size());
+      const Eigen::Index nrow_b = integer_power(nactive, ext_b.size());
+      const Eigen::Index ncol = combination_count(cross_pairs);
+      Eigen::MatrixXd a(nrow_a, ncol);
+      Eigen::MatrixXd b(nrow_b, ncol);
+
+      const auto assign_pairs = [&](std::array<int, 8>& values,
+                                    const std::vector<int>& pairs,
+                                    Eigen::Index combination) {
+        for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
+          const int pair = *it;
+          const auto& candidates = *pair_lists[pair];
+          const int value = candidates[combination % candidates.size()];
+          combination /= candidates.size();
+          values[match[pair].first] = values[match[pair].second] = value;
+        }
+      };
+      const auto panel_value = [&](bool left_operand,
+                                   std::array<int, 8> values) {
+        const auto& internal_pairs =
+            left_operand ? internal_a_pairs : internal_b_pairs;
+        const Eigen::Index count = combination_count(internal_pairs);
+        double sum = 0.0;
+        for (Eigen::Index combination = 0; combination < count; ++combination) {
+          assign_pairs(values, internal_pairs, combination);
+          if (left_operand) {
+            const double value =
+                rA == 1 ? A1(values[0], values[1])
+                        : A2get(values[0], values[1], values[2], values[3]);
+            sum += value;
+          } else {
+            const double value =
+                rB == 1 ? B1(values[boundary], values[boundary + 1])
+                        : B2get(values[boundary], values[boundary + 1],
+                                values[boundary + 2], values[boundary + 3]);
+            sum += value;
+          }
+        }
+        return sum;
+      };
+
+      for (Eigen::Index col = 0; col < ncol; ++col) {
+        std::array<int, 8> cross_values{};
+        assign_pairs(cross_values, cross_pairs, col);
+        for (Eigen::Index row = 0; row < nrow_a; ++row) {
+          auto values = cross_values;
+          assign_active_slots(values, ext_a, row, active_list);
+          a(row, col) = panel_value(true, values);
+        }
+        for (Eigen::Index row = 0; row < nrow_b; ++row) {
+          auto values = cross_values;
+          assign_active_slots(values, ext_b, row, active_list);
+          b(row, col) = panel_value(false, values);
+        }
+      }
+
+      Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 nrow_a, nrow_b, ncol, 1.0, a.data(), nrow_a, b.data(), nrow_b,
+                 0.0, product.data(), nrow_a);
+      for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
+        for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b) {
+          const double coeff = prefactor * product(row_a, row_b);
+          if (coeff == 0.0) continue;
+          std::array<int, 8> values{};
+          assign_active_slots(values, ext_a, row_a, active_list);
+          assign_active_slots(values, ext_b, row_b, active_list);
+          Term ops;
+          ops.reserve(ext.size());
+          for (int slot : ext) ops.push_back({values[slot], is_cre[slot]});
+          normalize(ops, coeff, out, max_output_length);
+        }
+      }
+    }
+  }
+}
+
+// Scalar active-space reference projection of A * B (A left, B right), buffer
+// summed. This is used only by the dense regression implementation.
 // A/B given as (1-body dense, 2-body element accessor) operators; the 2-body
 // accessors `A2get`/`B2get` are `double(int P,int Q,int R,int S)` so the caller
 // can back them by a dense tensor or compute elements on the fly (spin-blocked
@@ -785,7 +1194,8 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,
                                       const Eigen::VectorXd& eps,
                                       const SoPartition& part,
-                                      const RegOptions& reg, double e_core) {
+                                      const RegOptions& reg, double e_core,
+                                      bool compute_higher_body_norm) {
   const int M = part.n_so;
 
   // Active spin-orbitals (ascending) + full -> compact index map, so the
@@ -911,8 +1321,17 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
 
   // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
   FermionOp comm;
-  project_product_t(s1, s2_at, od_f, od_v_at, part, +0.5, hvec, pvec, comm);
-  project_product_t(od_f, od_v_at, s1, s2_at, part, -0.5, hvec, pvec, comm);
+  project_two_body_between_blas(s2_at, od_v_at, part, +0.5, hvec, pvec, comm);
+  project_two_body_between_blas(od_v_at, s2_at, part, -0.5, hvec, pvec, comm);
+  const int max_output_length = compute_higher_body_norm ? 8 : 4;
+  project_one_line_between_blas(s1, s2_at, od_f, od_v_at, part, +0.5,
+                                max_output_length, comm);
+  project_one_line_between_blas(od_f, od_v_at, s1, s2_at, part, -0.5,
+                                max_output_length, comm);
+  project_remaining_blas(s1, s2_at, od_f, od_v_at, part, +0.5,
+                         max_output_length, comm);
+  project_remaining_blas(od_f, od_v_at, s1, s2_at, part, -0.5,
+                         max_output_length, comm);
 
   res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
   res.max_amplitude = max_amp;
@@ -934,7 +1353,9 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
       higher2 += coeff * coeff;
     }
   }
-  res.higher_body_norm = std::sqrt(higher2);
+  res.higher_body_norm = compute_higher_body_norm
+                             ? std::sqrt(higher2)
+                             : std::numeric_limits<double>::quiet_NaN();
   return res;
 }
 
