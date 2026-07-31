@@ -36,7 +36,7 @@ A :class:`~qdk_chemistry.data.Circuit` wraps a quantum circuit that may be repre
    * - ``qsharp``
      - A compiled ``qdk._native.Circuit`` object for inspection and visualization.
    * - ``qsharp_op``
-     - A Q# callable — a native Q# operation that can be composed with other Q# operations.
+     - A Q# callable — a native Q# operation that can be composed with other Q# operations **owned by the same context** (see `Shared Q# context`_).
    * - ``qsharp_factory``
      - A ``QsharpFactoryData`` — a deferred Q# program that compiles on demand (see `Q# factory harness`_ below).
 
@@ -89,6 +89,36 @@ The standard pattern for building a factory is:
 
 
 This pattern is what enables end-to-end Q# composition: because the factory stores Q# callables rather than serialized gate sequences, multi-stage circuits compose natively in the Q# runtime without intermediate format conversions.
+
+
+.. _shared-qsharp-context:
+
+Shared Q# context
+-----------------
+
+QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
+Composing a callable from one context into a program owned by another raises ``QSharpError: This callable belongs to a different Context``.
+The vendored chemistry utilities (:data:`~qdk_chemistry.utils.qsharp.QSHARP_UTILS`) are owned by a single shared context, so any user-supplied ``qsharp_op`` or operation-valued factory parameter must be built against that same context.
+
+Three helpers in :mod:`qdk_chemistry.utils.qsharp` manage this:
+
+:func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
+   Returns the cached context that owns ``QSHARP_UTILS``. Build your own operations against it (``get_qsharp_context().code...``) so they compose with the chemistry builders.
+
+:func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+   Installs a caller-supplied context process-wide so ``QSHARP_UTILS`` and your operations share it. Pass ``None`` to reset to the default context.
+
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
+   A context manager that overrides the active context for the **current thread only** and restores it on exit — the thread-safe way to switch contexts in concurrent code.
+
+Operations created through the global ``qsharp`` interpreter or an unrelated context will not compose; always construct them via ``get_qsharp_context()`` or ``set_qsharp_context()``.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-shared-context
+      :end-before: # end-cell-shared-context
 
 
 Conversion methods

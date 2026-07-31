@@ -89,6 +89,72 @@ circuit.get_qir()  # → qsharp.compile(program, **params)
 ################################################################################
 
 ################################################################################
+# start-cell-shared-context
+# Composed Q# operations must all belong to the *same* qdk.Context. Build your
+# own operations against the context that owns QSHARP_UTILS so they compose with
+# the chemistry builders without a "callable belongs to a different Context" error.
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
+    QdkStandardQpeCircuitBuilder,
+)
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.utils.qsharp import (
+    create_qsharp_context,
+    get_qsharp_context,
+    set_qsharp_context,
+    use_qsharp_context,
+)
+
+# Option A — build your operation against the shared owning context.
+context = get_qsharp_context()  # the cached context that owns QSHARP_UTILS
+state_prep_params = {
+    "rowMap": [1, 0],
+    "stateVector": [0.6, 0.0, 0.0, 0.8],
+    "expansionOps": [],
+    "numQubits": 2,
+}
+user_state_prep = Circuit(
+    qsharp_factory=QsharpFactoryData(
+        program=context.code.QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit,
+        parameter=state_prep_params,
+    ),
+    qsharp_op=context.code.QDKChemistry.Utils.StatePreparation.MakeStatePreparationOp(
+        state_prep_params
+    ),
+)
+
+# Compose the user operation with a chemistry builder — both share `context`,
+# so compilation lowers cleanly.
+builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+builder.settings().set(
+    "controlled_circuit_mapper",
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+)
+builder.settings().set(
+    "unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0)
+)
+hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+qpe_circuit = builder.run(
+    state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
+)[0]
+qpe_circuit.get_qsharp_circuit()  # composed factory compiles in one context
+
+# Option B — bring your own context. Register it so QSHARP_UTILS uses it too.
+my_context = create_qsharp_context()  # a fresh, isolated context with the utilities
+set_qsharp_context(my_context)
+# ... build operations against `my_context`; QSHARP_UTILS now resolves there ...
+set_qsharp_context(None)  # reset back to the default shared context
+
+# Option C — scope a context to the current thread only (auto-restored on exit).
+# This is the thread-safe way to switch contexts inside concurrent code.
+with use_qsharp_context(create_qsharp_context()):
+    ...  # QSHARP_UTILS resolves against the scoped context for this thread only
+# Ops made through the global `qsharp` interpreter or an unrelated context will
+# not compose — always construct them via get_qsharp_context()/set_qsharp_context().
+# end-cell-shared-context
+################################################################################
+
+################################################################################
 # start-cell-conversion
 import numpy as np
 from qdk_chemistry.algorithms import create
