@@ -35,7 +35,12 @@ _shared = _SharedContext()
 _thread_local = threading.local()
 
 
-def create_qsharp_context(target_profile: TargetProfile = TargetProfile.Base, **kwargs) -> qdk.Context:
+def create_qsharp_context(
+    target_profile: TargetProfile = TargetProfile.Base,
+    target_name: str | None = None,
+    language_features: list[str] | None = None,
+    qdk_config: dict[str, int | float | str | bool] | None = None,
+) -> qdk.Context:
     """Create a new, isolated ``qdk.Context`` preloaded with the Q# chemistry utilities.
 
     Every call returns a *fresh* context with its own Q# interpreter. Most users never
@@ -44,13 +49,23 @@ def create_qsharp_context(target_profile: TargetProfile = TargetProfile.Base, **
     (for example a non-default ``target_profile``); then register it with
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
-    ``target_profile`` defaults to ``TargetProfile.Base``. Any additional keyword
-    arguments are forwarded to :class:`qdk.Context` (``target_name``,
-    ``language_features``, ``qdk_config``, ...). ``project_root`` is fixed to the vendored
-    Q# utility project and cannot be overridden.
+    :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
+        ``TargetProfile.Base``.
+    :param target_name: Optional target machine name used to infer a compatible profile.
+    :param language_features: Optional list of experimental Q# language feature flags.
+    :param qdk_config: Optional configuration values exposed to Q# code via
+        ``Std.Core.ConfigValue`` (values must be ``int``, ``float``, ``str``, or ``bool``).
+
+    ``project_root`` is intentionally not exposed: it is fixed to the vendored Q# utility
+    project so the chemistry utilities are always available on the returned context.
     """
-    if "project_root" in kwargs:
-        raise TypeError("project_root is fixed to the Q# chemistry utility project and cannot be overridden")
+    kwargs: dict = {}
+    if target_name is not None:
+        kwargs["target_name"] = target_name
+    if language_features is not None:
+        kwargs["language_features"] = language_features
+    if qdk_config is not None:
+        kwargs["qdk_config"] = qdk_config
     return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
 
 
