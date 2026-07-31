@@ -14,9 +14,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 /**
  * @brief Settings for the second-order Schrieffer-Wolff downfold.
  *
- * Exposes the energy-denominator knobs of the kernel `RegOptions`. The
- * denominator *scheme* (Fock now, approximate-Dyall later) is intended to be a
- * setting too, so it is not part of the method name.
+ * `regularizer` selects flow (default), shift, or bare denominators; the
+ * corresponding numeric setting controls the selected scheme. The denominator
+ * *scheme* (Fock now, approximate-Dyall later) is intended to be a setting too,
+ * so it is not part of the method name.
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
@@ -28,9 +29,12 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * @brief Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian
  * downfold with orbital-energy (Moller-Plesset) denominators.
  *
- * A single-commutator canonical transformation `H_eff = H0 + 1/2 [S, V]`,
- * truncated to <= 2-body, folding the external space Q of the window onto the
- * reference active space P. See `swpt2_kernel.hpp` for the math.
+ * A single-commutator canonical transformation
+ * `H_eff = H_BD + 1/2 [S, H_OD]`, truncated to <= 2-body, folding the external
+ * space Q of the window onto the reference active space P. A separate diagonal
+ * generalized-Fock operator defines the generator denominators. The current
+ * implementation assumes a common restricted MO basis and does not
+ * semicanonicalize noncanonical orbitals. See `swpt2_kernel.hpp` for the math.
  */
 class SchriefferWolffPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

@@ -154,10 +154,18 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
   auto ctor = EffectiveHamiltonianConstructorFactory::create("swpt2");
   auto& settings = ctor->settings();
   // denominator knobs: flow regularization is on by default at this layer
+  EXPECT_EQ(settings.get<std::string>("regularizer"), "flow");
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_floor"), 1e-8);
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_shift"), 0.0);
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_flow"), 1.0);
   EXPECT_DOUBLE_EQ(settings.get<double>("intruder_warn_amplitude"), 1.0);
+  EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
+  EXPECT_DOUBLE_EQ(settings.get<double>("semicanonical_tolerance"), 1e-10);
+  EXPECT_ANY_THROW(settings.set("regularizer", std::string("unknown")));
+  EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
+
+  auto invalid = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  EXPECT_THROW(invalid->run(nullptr, nullptr), std::invalid_argument);
 }
 
 // End-to-end smoke test: SCF -> window Hamiltonian over W -> CAS reference over
@@ -198,6 +206,15 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   // window Hamiltonian over W = P + one virtual to fold
   auto w_orbitals = testing::with_active_space(orbitals, window, core);
   auto H_window = ham->run(w_orbitals);
+
+  // Every reference-active orbital must be represented in the window. A
+  // missing trailing orbital used to be silently dropped by the index map.
+  auto incomplete_w_orbitals =
+      testing::with_active_space(orbitals, {3, 4, 6}, core);
+  auto H_incomplete = ham->run(incomplete_w_orbitals);
+  auto swpt2_invalid = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  EXPECT_THROW(swpt2_invalid->run(reference, H_incomplete),
+               std::invalid_argument);
 
   // downfold the window onto P, then CAS on the effective Hamiltonian
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
@@ -246,7 +263,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   // active/external -- NOT the container/solver, and NOT the MP denominators,
   // which are exact for this canonical closed-shell reference.)
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  swpt2_bare->settings().set("denom_flow", -1.0);
+  swpt2_bare->settings().set("regularizer", std::string("bare"));
   auto H_eff_bare = swpt2_bare->run(reference, H_window);
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
@@ -301,5 +318,28 @@ TEST(SchriefferWolffPT2, AcceptsMeanFieldHfReference) {
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, static_cast<unsigned int>(na),
                                     static_cast<unsigned int>(nb));
   EXPECT_TRUE(std::isfinite(E_sw));
+}
+
+TEST(SchriefferWolffPT2, RejectsUnrestrictedHfReference) {
+  auto oxygen = testing::create_o2_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [energy, reference] = scf->run(oxygen, 0, 3, "sto-3g");
+  ASSERT_TRUE(reference->get_orbitals()->is_unrestricted());
+  auto [restricted_energy, restricted_reference] =
+      scf->run(oxygen, 0, 1, "sto-3g");
+  ASSERT_TRUE(restricted_reference->get_orbitals()->is_restricted());
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto window_hamiltonian = ham->run(restricted_reference->get_orbitals());
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
+
+  try {
+    swpt2->run(reference, window_hamiltonian);
+    FAIL() << "Expected an unrestricted-reference error";
+  } catch (const std::invalid_argument& error) {
+    EXPECT_NE(std::string(error.what())
+                  .find("does not support unrestricted reference orbitals"),
+              std::string::npos);
+  }
 }
 }  // namespace

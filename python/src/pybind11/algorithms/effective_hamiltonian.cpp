@@ -163,15 +163,20 @@ Returns:
       m, "QdkSchriefferWolffPT2Constructor", R"(
 Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian downfold.
 
-A single-commutator canonical transformation ``H_eff = H0 + 1/2 [S, V]``,
-truncated to ``<= 2``-body, folding the external space ``Q`` of the window onto
-the reference active space ``P`` with orbital-energy (Moller-Plesset)
-denominators. Registered as ``"swpt2"`` (aliases ``"sw"``,
-``"schrieffer_wolff"``).
+A single-commutator canonical transformation
+``H_eff = H_BD + 1/2 [S, H_OD]``, truncated to ``<= 2``-body, folding the
+external space ``Q`` of the window onto the reference active space ``P``. A
+separate diagonal generalized-Fock operator defines the generator denominators.
+The reference and window must use the same restricted MO basis. Registered as
+``"qdk_swpt2"`` (aliases ``"sw"``, ``"schrieffer_wolff"``).
 
-Settings expose the energy-denominator knobs ``denom_floor`` / ``denom_shift``
-/ ``denom_flow`` (regularization; a denominator shift lifts near-degenerate
-intruder channels).
+The ``regularizer`` setting selects ``"flow"`` (default), ``"shift"``, or
+``"bare"``. The corresponding ``denom_flow`` / ``denom_shift`` parameter
+controls that scheme; ``denom_floor`` is the bare-denominator cutoff.
+``semicanonicalize`` is enabled by default and diagonalizes the generalized
+Fock independently within inactive, active, and virtual orbital blocks before
+forming denominators; the emitted Hamiltonian is rotated back to the original
+reference basis.
 
 Typical usage:
 
@@ -179,7 +184,8 @@ Typical usage:
 
     import qdk_chemistry.algorithms as alg
 
-    downfolder = alg.create("effective_hamiltonian_constructor", "swpt2")
+    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
+    downfolder.settings().set("regularizer", "shift")
     downfolder.settings().set("denom_shift", 0.5)
     h_eff = downfolder.run(reference, window_hamiltonian)
 
@@ -191,7 +197,7 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes a Schrieffer-Wolff PT2 downfold with default settings (bare
-second-order PT; regularization off).
+Initializes a Schrieffer-Wolff PT2 downfold with flow regularization enabled by
+default. Set ``regularizer`` to ``"bare"`` for unregularized second-order PT.
 )");
 }

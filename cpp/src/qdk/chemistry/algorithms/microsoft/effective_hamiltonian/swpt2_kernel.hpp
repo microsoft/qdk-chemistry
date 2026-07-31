@@ -5,10 +5,11 @@
 // Second-order Schrieffer-Wolff downfolding — foundation kernel.
 //
 // Implements the operator-level second-order Schrieffer-Wolff downfolding as
-// closed-form tensor contractions. Given H = H0 + V with a diagonal-Fock H0,
-// the anti-Hermitian generator S solves [H0, S] = V and the effective operator
-// is H_eff = H0 + 1/2 [S, V], projected onto the reference buffer occupation
-// and truncated to <= 2-body. This header covers the *foundation*:
+// closed-form tensor contractions. Split H into buffer-block-diagonal H_BD and
+// occupation-changing H_OD. A separate diagonal generalized-Fock operator F0
+// defines the anti-Hermitian generator through [F0, S] = H_OD; the effective
+// operator is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference buffer
+// occupation and truncated to <= 2-body. This header covers the *foundation*:
 // antisymmetric spin-orbital tensor build from qdk (chemist) integrals,
 // diagonal-Fock energies, the generator S = V/Delta, and the block-diagonal
 // reference- occupation mean-field fold. The second-order commutator channels
@@ -76,6 +77,29 @@ Eigen::VectorXd diagonal_fock_energies(const Eigen::MatrixXd& h1a,
                                        const Eigen::VectorXd& g_aaaa,
                                        const Eigen::VectorXd& na,
                                        const Eigen::VectorXd& nb, int norb);
+
+/// Spin-free generalized Fock matrix
+/// F_pq = h_pq + sum_rs D_rs [(pq|rs) - 1/2 (pr|sq)].
+Eigen::MatrixXd generalized_fock_matrix(const Eigen::MatrixXd& h1,
+                                        const Eigen::VectorXd& two_body,
+                                        const Eigen::MatrixXd& density,
+                                        int norb);
+
+/// Block-diagonal orthogonal rotation that diagonalizes each Fock sub-block.
+/// Blocks contain spatial-orbital indices and must be disjoint. Blocks whose
+/// off-diagonal max norm does not exceed `tolerance` are left unchanged.
+Eigen::MatrixXd semicanonical_rotation(
+    const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
+    double tolerance);
+
+/// Transform h' = U^T h U for new orbitals C' = C U.
+Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
+                                const Eigen::MatrixXd& rotation);
+
+/// Transform chemist integrals
+/// (pq|rs)' = U_ap U_bq U_cr U_ds (ab|cd), retaining the full dense tensor.
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& rotation, int norb);
 
 /// Downfolded active-space operator as compact spatial (chemist) integrals,
 /// ready to feed a qdk CanonicalFourCenter Hamiltonian.

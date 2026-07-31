@@ -58,12 +58,17 @@ class TestEffectiveHamiltonianConstructor:
         constructor = algorithms.create(_TYPE, "swpt2")
         settings = constructor.settings()
         # flow regularization is on by default at the constructor layer
+        assert settings.get("regularizer") == "flow"
         assert settings.get("denom_floor") == pytest.approx(1e-8)
         assert settings.get("denom_shift") == pytest.approx(0.0)
         assert settings.get("denom_flow") == pytest.approx(1.0)
         assert settings.get("intruder_warn_amplitude") == pytest.approx(1.0)
+        assert settings.get("semicanonicalize") is True
+        assert settings.get("semicanonical_tolerance") == pytest.approx(1e-10)
 
+        settings.set("regularizer", "shift")
         settings.set("denom_shift", 0.5)
+        assert constructor.settings().get("regularizer") == "shift"
         assert constructor.settings().get("denom_shift") == pytest.approx(0.5)
 
     def test_accepts_mean_field_hf_reference(self):

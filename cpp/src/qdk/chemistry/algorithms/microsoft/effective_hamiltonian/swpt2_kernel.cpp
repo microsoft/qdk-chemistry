@@ -134,6 +134,116 @@ Eigen::VectorXd diagonal_fock_energies(const Eigen::MatrixXd& h1a,
   return eps;
 }
 
+Eigen::MatrixXd generalized_fock_matrix(const Eigen::MatrixXd& h1,
+                                        const Eigen::VectorXd& two_body,
+                                        const Eigen::MatrixXd& density,
+                                        int norb) {
+  if (h1.rows() != norb || h1.cols() != norb || density.rows() != norb ||
+      density.cols() != norb || two_body.size() != n4(norb))
+    throw std::invalid_argument(
+        "generalized_fock_matrix: inconsistent tensor dimensions");
+
+  Eigen::MatrixXd fock = h1;
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          fock(p, q) +=
+              density(r, s) * (two_body(flat(p, q, r, s, norb)) -
+                               0.5 * two_body(flat(p, r, s, q, norb)));
+  return 0.5 * (fock + fock.transpose()).eval();
+}
+
+Eigen::MatrixXd semicanonical_rotation(
+    const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
+    double tolerance) {
+  if (fock.rows() != fock.cols() || !std::isfinite(tolerance) ||
+      tolerance < 0.0)
+    throw std::invalid_argument(
+        "semicanonical_rotation: invalid Fock matrix or tolerance");
+
+  const int norb = static_cast<int>(fock.rows());
+  Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(norb, norb);
+  std::vector<char> used(norb, 0);
+  for (const auto& block : blocks) {
+    for (int p : block) {
+      if (p < 0 || p >= norb || used[p])
+        throw std::invalid_argument(
+            "semicanonical_rotation: invalid or repeated block index");
+      used[p] = 1;
+    }
+    if (block.size() < 2) continue;
+
+    Eigen::MatrixXd sub(block.size(), block.size());
+    double max_offdiag = 0.0;
+    for (int i = 0; i < static_cast<int>(block.size()); ++i)
+      for (int j = 0; j < static_cast<int>(block.size()); ++j) {
+        sub(i, j) = fock(block[i], block[j]);
+        if (i != j) max_offdiag = std::max(max_offdiag, std::abs(sub(i, j)));
+      }
+    if (max_offdiag <= tolerance) continue;
+
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
+        0.5 * (sub + sub.transpose()).eval());
+    if (solver.info() != Eigen::Success)
+      throw std::runtime_error(
+          "semicanonical_rotation: Fock block diagonalization failed");
+    for (int i = 0; i < static_cast<int>(block.size()); ++i)
+      for (int j = 0; j < static_cast<int>(block.size()); ++j)
+        rotation(block[i], block[j]) = solver.eigenvectors()(i, j);
+  }
+  return rotation;
+}
+
+Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
+                                const Eigen::MatrixXd& rotation) {
+  if (one_body.rows() != one_body.cols() ||
+      rotation.rows() != one_body.rows() || rotation.cols() != one_body.cols())
+    throw std::invalid_argument("rotate_one_body: inconsistent dimensions");
+  return rotation.transpose() * one_body * rotation;
+}
+
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& rotation, int norb) {
+  if (rotation.rows() != norb || rotation.cols() != norb ||
+      two_body.size() != n4(norb))
+    throw std::invalid_argument("rotate_two_body: inconsistent dimensions");
+
+  Eigen::VectorXd tmp1 = Eigen::VectorXd::Zero(n4(norb));
+  Eigen::VectorXd tmp2 = Eigen::VectorXd::Zero(n4(norb));
+  Eigen::VectorXd tmp3 = Eigen::VectorXd::Zero(n4(norb));
+  Eigen::VectorXd out = Eigen::VectorXd::Zero(n4(norb));
+  for (int p = 0; p < norb; ++p)
+    for (int b = 0; b < norb; ++b)
+      for (int c = 0; c < norb; ++c)
+        for (int d = 0; d < norb; ++d)
+          for (int a = 0; a < norb; ++a)
+            tmp1(flat(p, b, c, d, norb)) +=
+                rotation(a, p) * two_body(flat(a, b, c, d, norb));
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int c = 0; c < norb; ++c)
+        for (int d = 0; d < norb; ++d)
+          for (int b = 0; b < norb; ++b)
+            tmp2(flat(p, q, c, d, norb)) +=
+                rotation(b, q) * tmp1(flat(p, b, c, d, norb));
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int d = 0; d < norb; ++d)
+          for (int c = 0; c < norb; ++c)
+            tmp3(flat(p, q, r, d, norb)) +=
+                rotation(c, r) * tmp2(flat(p, q, c, d, norb));
+  for (int p = 0; p < norb; ++p)
+    for (int q = 0; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = 0; s < norb; ++s)
+          for (int d = 0; d < norb; ++d)
+            out(flat(p, q, r, s, norb)) +=
+                rotation(d, s) * tmp3(flat(p, q, r, d, norb));
+  return out;
+}
+
 namespace {
 // net occupation change of a role set for a one-body a^dag_P a_Q.
 inline int net1(const std::vector<char>& role, int P, int Q) {

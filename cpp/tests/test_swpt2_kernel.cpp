@@ -619,6 +619,168 @@ TEST(Swpt2Kernel, MakePartitionRolesFromOccupation) {
   EXPECT_THROW(sw::make_partition(2, {5}, {1.0, 1.0}), std::invalid_argument);
 }
 
+TEST(Swpt2Kernel, SemicanonicalPrimitivesAreCovariantAndReversible) {
+  const int norb = 4;
+  Eigen::MatrixXd h(norb, norb);
+  h << -1.2, 0.08, -0.03, 0.02, 0.08, -0.4, 0.11, -0.01, -0.03, 0.11, 0.5, 0.07,
+      0.02, -0.01, 0.07, 1.4;
+  Eigen::VectorXd g(norb * norb * norb * norb);
+  for (int i = 0; i < g.size(); ++i) g(i) = 0.02 * std::sin(0.37 * i + 0.2);
+  Eigen::MatrixXd density = Eigen::MatrixXd::Zero(norb, norb);
+  density.diagonal() << 2.0, 1.4, 0.6, 0.0;
+  density(1, 2) = density(2, 1) = 0.15;
+
+  const double angle = 0.37;
+  Eigen::MatrixXd basis = Eigen::MatrixXd::Identity(norb, norb);
+  basis(1, 1) = basis(2, 2) = std::cos(angle);
+  basis(1, 2) = -std::sin(angle);
+  basis(2, 1) = std::sin(angle);
+
+  const auto fock = sw::generalized_fock_matrix(h, g, density, norb);
+  const auto h_rot = sw::rotate_one_body(h, basis);
+  const auto g_rot = sw::rotate_two_body(g, basis, norb);
+  const auto d_rot = sw::rotate_one_body(density, basis);
+  const auto fock_rot = sw::generalized_fock_matrix(h_rot, g_rot, d_rot, norb);
+  EXPECT_LT((fock_rot - basis.transpose() * fock * basis).cwiseAbs().maxCoeff(),
+            1e-11);
+
+  const auto semi = sw::semicanonical_rotation(fock_rot, {{0}, {1, 2}, {3}},
+                                               /*tolerance=*/1e-14);
+  const auto diagonal = sw::rotate_one_body(fock_rot, semi);
+  EXPECT_NEAR(diagonal(1, 2), 0.0, 1e-12);
+  EXPECT_LT((semi.transpose() * semi - Eigen::MatrixXd::Identity(norb, norb))
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-12);
+
+  const auto h_roundtrip =
+      sw::rotate_one_body(sw::rotate_one_body(h, basis), basis.transpose());
+  const auto g_roundtrip = sw::rotate_two_body(
+      sw::rotate_two_body(g, basis, norb), basis.transpose(), norb);
+  EXPECT_LT((h_roundtrip - h).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((g_roundtrip - g).cwiseAbs().maxCoeff(), 1e-12);
+
+  const auto no_op = sw::semicanonical_rotation(diagonal, {{0}, {1, 2}, {3}},
+                                                /*tolerance=*/1e-10);
+  EXPECT_EQ(no_op, Eigen::MatrixXd::Identity(norb, norb));
+}
+
+TEST(Swpt2Kernel, SemicanonicalDownfoldIsBlockRotationInvariant) {
+  const int norb = 6;
+  const std::vector<int> inactive = {0, 1};
+  const std::vector<int> active = {2, 3};
+  const std::vector<int> virt = {4, 5};
+  Eigen::MatrixXd h = Eigen::MatrixXd::Zero(norb, norb);
+  h.diagonal() << -2.3, -1.8, -0.6, 0.35, 1.2, 2.1;
+  h(0, 1) = h(1, 0) = 0.06;
+  h(2, 3) = h(3, 2) = 0.09;
+  h(4, 5) = h(5, 4) = -0.07;
+  h(2, 4) = h(4, 2) = 0.05;
+  h(3, 5) = h(5, 3) = -0.04;
+
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  set_sym_eri(g, 0, 0, 0, 0, norb, 0.70);
+  set_sym_eri(g, 1, 1, 1, 1, norb, 0.66);
+  set_sym_eri(g, 2, 2, 2, 2, norb, 0.62);
+  set_sym_eri(g, 3, 3, 3, 3, norb, 0.55);
+  set_sym_eri(g, 4, 4, 4, 4, norb, 0.42);
+  set_sym_eri(g, 5, 5, 5, 5, norb, 0.38);
+  set_sym_eri(g, 0, 0, 1, 1, norb, 0.27);
+  set_sym_eri(g, 0, 0, 2, 2, norb, 0.24);
+  set_sym_eri(g, 1, 1, 3, 3, norb, 0.21);
+  set_sym_eri(g, 2, 2, 4, 4, norb, 0.18);
+  set_sym_eri(g, 3, 3, 5, 5, norb, 0.16);
+  set_sym_eri(g, 2, 4, 3, 5, norb, 0.08);
+  set_sym_eri(g, 2, 5, 2, 3, norb, -0.06);
+
+  Eigen::MatrixXd density = Eigen::MatrixXd::Zero(norb, norb);
+  density(0, 0) = 2.0;
+  density(1, 1) = 2.0;
+  density(2, 2) = 1.35;
+  density(3, 3) = 0.65;
+  density(2, 3) = density(3, 2) = 0.17;
+
+  struct Result {
+    sw::ActiveHamiltonian hamiltonian;
+    double min_denominator;
+    double max_amplitude;
+    double higher_body_norm;
+  };
+  const auto run = [&](const Eigen::MatrixXd& h_in, const Eigen::VectorXd& g_in,
+                       const Eigen::MatrixXd& density_in) {
+    const auto fock = sw::generalized_fock_matrix(h_in, g_in, density_in, norb);
+    const auto rotation = sw::semicanonical_rotation(
+        fock, {inactive, active, virt}, /*tolerance=*/1e-14);
+    const auto h_semi = sw::rotate_one_body(h_in, rotation);
+    const auto g_semi = sw::rotate_two_body(g_in, rotation, norb);
+    const auto density_semi = sw::rotate_one_body(density_in, rotation);
+    const auto fock_semi = sw::rotate_one_body(fock, rotation);
+    Eigen::VectorXd eps(2 * norb);
+    std::vector<double> occupation(norb);
+    for (int p = 0; p < norb; ++p) {
+      eps(2 * p) = eps(2 * p + 1) = fock_semi(p, p);
+      occupation[p] = density_semi(p, p);
+    }
+    const auto part = sw::make_partition(norb, active, occupation);
+    const auto blocked =
+        sw::build_two_body_blocked(g_semi, g_semi, g_semi, norb);
+    const auto one_body = sw::spin_orbital_one_body(h_semi, h_semi, norb);
+    sw::RegOptions reg;
+    reg.denom_flow = 1.0;
+    const auto down =
+        sw::downfold_blocked(one_body, blocked, eps, part, reg, 0.3);
+    auto effective = sw::to_spatial_chemist(down, part);
+    Eigen::MatrixXd active_rotation(active.size(), active.size());
+    for (int i = 0; i < static_cast<int>(active.size()); ++i)
+      for (int j = 0; j < static_cast<int>(active.size()); ++j)
+        active_rotation(i, j) = rotation(active[i], active[j]);
+    effective.one_body =
+        sw::rotate_one_body(effective.one_body, active_rotation.transpose());
+    effective.two_body = sw::rotate_two_body(
+        effective.two_body, active_rotation.transpose(), effective.norb);
+    return Result{effective, down.min_denominator, down.max_amplitude,
+                  down.higher_body_norm};
+  };
+
+  const Result reference = run(h, g, density);
+  Eigen::MatrixXd basis = Eigen::MatrixXd::Identity(norb, norb);
+  const double inactive_angle = 0.19, active_angle = 0.31,
+               virtual_angle = -0.27;
+  basis(0, 0) = basis(1, 1) = std::cos(inactive_angle);
+  basis(0, 1) = -std::sin(inactive_angle);
+  basis(1, 0) = std::sin(inactive_angle);
+  basis(2, 2) = basis(3, 3) = std::cos(active_angle);
+  basis(2, 3) = -std::sin(active_angle);
+  basis(3, 2) = std::sin(active_angle);
+  basis(4, 4) = basis(5, 5) = std::cos(virtual_angle);
+  basis(4, 5) = -std::sin(virtual_angle);
+  basis(5, 4) = std::sin(virtual_angle);
+
+  Result rotated =
+      run(sw::rotate_one_body(h, basis), sw::rotate_two_body(g, basis, norb),
+          sw::rotate_one_body(density, basis));
+  Eigen::MatrixXd active_basis(2, 2);
+  active_basis << basis(2, 2), basis(2, 3), basis(3, 2), basis(3, 3);
+  rotated.hamiltonian.one_body = sw::rotate_one_body(
+      rotated.hamiltonian.one_body, active_basis.transpose());
+  rotated.hamiltonian.two_body = sw::rotate_two_body(
+      rotated.hamiltonian.two_body, active_basis.transpose(), 2);
+
+  EXPECT_NEAR(rotated.hamiltonian.core_energy,
+              reference.hamiltonian.core_energy, 1e-10);
+  EXPECT_LT((rotated.hamiltonian.one_body - reference.hamiltonian.one_body)
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-10);
+  EXPECT_LT((rotated.hamiltonian.two_body - reference.hamiltonian.two_body)
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-10);
+  EXPECT_NEAR(rotated.min_denominator, reference.min_denominator, 1e-10);
+  EXPECT_NEAR(rotated.max_amplitude, reference.max_amplitude, 1e-10);
+  EXPECT_NEAR(rotated.higher_body_norm, reference.higher_body_norm, 1e-10);
+}
+
 // ---------------------------------------------------------------------------
 // Spin-blocked spatial storage (production path, Increment 1): the independent
 // spin blocks reconstruct the dense spin-orbital antisymmetric tensor exactly.
