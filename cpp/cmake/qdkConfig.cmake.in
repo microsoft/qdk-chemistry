@@ -47,13 +47,8 @@ find_dependency(LAPACK REQUIRED)
 find_dependency(gauxc REQUIRED)
 find_dependency(Threads REQUIRED)
 
-# SeQuant symbolic-algebra stack for the DUCC effective-Hamiltonian dressing.
-# range-v3 and BTAS must be imported BEFORE SeQuant: the installed sequant-config
-# guards its dependency checks with "AND NOT TARGET <dep>", so importing them
-# first makes SeQuant reuse them and skips its hardcoded btas-config path check.
-find_dependency(range-v3 REQUIRED)
-
-# BTAS's installed config requires a `blaspp_headers` INTERFACE target -- a shim the
+# BTAS: the dense-tensor numeric backend for the DUCC effective-Hamiltonian
+# dressing. Its installed config requires a `blaspp_headers` INTERFACE target -- a shim the
 # ValeevGroup linear-algebra kit generates alongside BTAS. The kit installs it under
 # this prefix (lib/cmake/blaspp/blaspp_headers-targets.cmake), but BTAS's config only
 # re-scans the system blaspp directory (e.g. /usr/local) where it is absent, then hard
@@ -62,7 +57,6 @@ find_dependency(range-v3 REQUIRED)
 include("${CMAKE_CURRENT_LIST_DIR}/../blaspp/blaspp_headers-targets.cmake" OPTIONAL)
 
 find_dependency(BTAS REQUIRED)
-find_dependency(SeQuant REQUIRED)
 
 if(QDK_CHEMISTRY_ENABLE_DFTD3)
   find_dependency(s-dftd3 REQUIRED)

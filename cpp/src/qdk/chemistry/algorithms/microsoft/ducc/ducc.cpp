@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -21,49 +22,18 @@
 #include <variant>
 #include <vector>
 
-// ── SeQuant + BTAS backend (level>0 BCH dressing; DUCC step 2b) ──
-// SeQuant supplies the symbolic unitary Baker-Campbell-Hausdorff transform and
-// partial-Wick contraction; the BTAS backend evaluates the resulting tensor
-// network. Always linked (SeQuant::SeQuant carries SEQUANT_HAS_BTAS=1), so this
-// is compiled unconditionally.
+// ── BTAS backend (level>0 BCH dressing; DUCC step 2b) ──
+// The symbolic Baker-Campbell-Hausdorff transform and partial-Wick contraction
+// are performed OFFLINE by the SeQuant-based code generator
+// (ducc/export_ducc_btas.cpp), whose output is checked in as
+// ducc_equations.inc. This translation unit therefore needs no symbolic algebra
+// library at all: it only supplies tensor blocks to the generated code and
+// executes it with BTAS.
 #include <btas/btas.h>
 #include <btas/tensor.h>
 
-#include <SeQuant/core/binary_node.hpp>
-#include <SeQuant/core/context.hpp>
-#include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
-#include <SeQuant/core/eval/backends/btas/result.hpp>
-#include <SeQuant/core/eval/eval.hpp>
-#include <SeQuant/core/expr.hpp>
-#include <SeQuant/core/expressions/tensor.hpp>
-#include <SeQuant/core/op.hpp>
-#include <SeQuant/core/optimize/optimize.hpp>
-#include <SeQuant/core/runtime.hpp>
-#include <SeQuant/core/tensor_canonicalizer.hpp>
-#include <SeQuant/core/wick.hpp>
-#include <SeQuant/domain/mbpt/context.hpp>
-#include <SeQuant/domain/mbpt/convention.hpp>
-#include <SeQuant/domain/mbpt/op.hpp>
-#include <SeQuant/domain/mbpt/utils.hpp>
-#include <SeQuant/domain/mbpt/vac_av.hpp>
 #include <map>
-#include <mutex>
 #include <numeric>
-#include <range/v3/range/conversion.hpp>
-#include <set>
-
-// SeQuant's op-level partial-Wick expectation-value driver. It is not declared
-// in a public header, but is an exported (external-linkage) symbol of
-// libSeQuant-mbpt; declare it here to drive a rank-uncapped partial Wick
-// (full_contractions=false) that the local post-filter then truncates to
-// <=2-body. Signature matches upstream SeQuant (no max_ops rank-cap parameter).
-namespace sequant::mbpt::op {
-ExprPtr expectation_value_impl(ExprPtr expr,
-                               const OpConnections<std::wstring>& connect,
-                               const OpConnections<std::wstring>& avoid,
-                               bool use_topology, bool screen, bool skip_clone,
-                               bool full_contractions);
-}  // namespace sequant::mbpt::op
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -352,13 +322,24 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
     if (active_so[i] < nocc_so) aol.push_back(i);  // active-occupied
   }
 
-  const std::vector<double>& F = dressed.F;  // fbar [nso, nso]
-  const std::vector<double>& V = dressed.V;  // vbar <PQ||RS> [nso^4]
+  const std::vector<double>& F = dressed.F;  // fbar
+  const std::vector<double>& V = dressed.V;  // vbar <PQ||RS>
+  // dressed.F/V are either full-space [nso] or already restricted to the active
+  // space [nact] in this same ascending active_so order (what the generated
+  // DUCC equations produce). The two are distinguished by size; when
+  // nact == nso the active list is the identity permutation, so the two
+  // readings coincide and the choice is immaterial.
+  const bool compact = F.size() == nact * nact;
+  if (!compact && F.size() != nso * nso)
+    throw std::runtime_error(
+        "ducc: dressed one-body has neither full-space (nso^2) nor "
+        "active-space (nact^2) extent.");
   // gamma = F/V restricted to the active space (indices into active_so)
   auto g1 = [&](std::size_t i, std::size_t j) {
-    return F[active_so[i] * nso + active_so[j]];
+    return compact ? F[i * nact + j] : F[active_so[i] * nso + active_so[j]];
   };
   auto g2 = [&](std::size_t i, std::size_t j, std::size_t k, std::size_t l) {
+    if (compact) return V[((i * nact + j) * nact + k) * nact + l];
     return V[((active_so[i] * nso + active_so[j]) * nso + active_so[k]) * nso +
              active_so[l]];
   };
@@ -403,7 +384,8 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
   // (utils::antisymmetrized_to_chemist), whose antisymmetrization recovers the
   // physical <PQ||RS>; the qdk / MACIS solvers and QPE assume only 4-fold
   // symmetry and re-antisymmetrize the same-spin block. Per spin block the qdk
-  // packing is same-spin g, opposite-spin 2g (matching wicked_ducc). At
+  // packing is same-spin g, opposite-spin 2g (matching the wicked-based DUCC
+  // reference). At
   // ducc_level 0 this reproduces the CASCI energy of the input restricted to
   // the active space; unlike raw chemist it is computable at any BCH level from
   // the antisymmetrized two-body alone.
@@ -481,530 +463,338 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
 namespace {
 
 // ─────────────────────────────────────────────────────────────────────────
-// SeQuant + BTAS DUCC machinery (level>0 BCH dressing). Ported from the
-// validated standalone prototype (ducc/ducc_sequant.cpp), fed from the
-// in-memory spin-orbital data rather than files, and emitting the full
-// spin-orbital effective Hamiltonian (assemble_active_hamiltonian performs the
-// active-space restriction, so no active-space slicing is needed here).
+// DUCC BCH dressing (level > 0), evaluated by GENERATED BTAS code.
+//
+// All symbolic work -- the unitary transform bar{H} = e^{-sigma} H e^{sigma}
+// with sigma = T - T^dagger, its DUCC F-split BCH truncation, the partial Wick
+// contraction, the truncation to <=2-body and the contraction-order
+// optimization -- is done OFFLINE by the SeQuant-based code generator
+// ducc/export_ducc_btas.cpp. Its output is checked in as ducc_equations.inc,
+// which defines run_all_L0 / run_all_L1 / run_all_L2: these pull tensor blocks
+// from the TensorProvider below, contract them with BTAS, and push the dressed
+// blocks back. This translation unit therefore links no symbolic-algebra
+// library and its per-run cost is BTAS contractions only.
+//
+// The generated equations write ACTIVE-sized output blocks directly (their free
+// legs carry active extents), so the effective Hamiltonian is never
+// materialized over the full spin-orbital space.
 // ─────────────────────────────────────────────────────────────────────────
-using namespace sequant;
 using BTensorD = btas::Tensor<double>;
 
-// One-time SeQuant global setup: spaces (2-space spin-orbital occ/virt,
-// wicked-equivalent; active/frozen/external distinctions are imposed
-// numerically, not symbolically, so hole/particle stay base-directional and
-// [H,T] survives), Fermi (SingleProduct) vacuum, canonicalizer, mbpt registry.
-void ensure_sequant_setup() {
-  static std::once_flag flag;
-  std::call_once(flag, [] {
-    static sequant::detail::OpIdRegistrar op_id_registrar;
-    auto isr = mbpt::make_min_sr_spaces(mbpt::SpinConvention::None);
-    set_default_context(Context({.index_space_registry_shared_ptr = isr,
-                                 .vacuum = Vacuum::SingleProduct}));
-    TensorCanonicalizer::register_instance(
-        std::make_shared<DefaultTensorCanonicalizer>());
-    mbpt::set_default_mbpt_context(mbpt::Context::Options{
-        .op_registry_ptr = mbpt::make_minimal_registry()});
-  });
-}
+/// Placement of one index space inside the compact active output.
+struct Rng {
+  std::size_t off, ext;
+};
 
-// residual FNOperators appearing in a Wick-result term
-std::vector<const FNOperator*> collect_fnops(const ExprPtr& term) {
-  std::vector<const FNOperator*> ops;
-  auto visit = [&ops](const ExprPtr& e) {
-    if (e.is<FNOperator>()) ops.push_back(&e.as<FNOperator>());
-  };
-  if (term.is<Product>()) {
-    for (const auto& f : term.as<Product>().factors()) visit(f);
-  } else {
-    visit(term);
+/// Supplies -- and accumulates -- the tensor blocks referenced by the generated
+/// DUCC equations, slicing the shared full-space spin-orbital F/V/T1/T2.
+///
+/// Index conventions. Leg space letters are 'o' (occupied), 'v' (virtual) and
+/// 'p' (complete). Occupied space-local indices coincide with spin-orbital
+/// indices; a virtual space-local index @c a is spin-orbital @c nocc+a. The
+/// per-leg @c mask marks legs the generator restricted to the active space
+/// ('A') versus legs kept at full extent ('-').
+class TensorProvider {
+ public:
+  /// @param data Full-space spin-orbital data (occ-first blocked layout).
+  /// @param active_occ Active occupied spin-orbital indices, ascending.
+  /// @param active_virt Active virtual indices (spin-orbital - nocc),
+  /// ascending.
+  TensorProvider(const SpinOrbitalData& data,
+                 std::vector<std::size_t> active_occ,
+                 std::vector<std::size_t> active_virt)
+      : m_nocc(data.nocc_so),
+        m_nvirt(data.nvir_so),
+        m_nmo(data.nso),
+        m_act_occ(std::move(active_occ)),
+        m_act_virt(std::move(active_virt)),
+        m_nao(m_act_occ.size()),
+        m_nav(m_act_virt.size()),
+        m_nact(m_nao + m_nav),
+        m_F(data.F),
+        m_V(data.V),
+        m_T1(data.T1),
+        m_T2(data.T2) {}
+
+  /// @param mask per-leg active flags: 'A' restrict to active, '-' keep full.
+  BTensorD get(const std::string& label, const std::string& tags,
+               const std::string& mask) {
+    // The mask belongs in the cache key: the same leaf is requested with
+    // different active-slice patterns by terms with different free legs.
+    const std::string key = label + "_" + tags + "#" + mask;
+    if (auto it = m_store.find(key); it != m_store.end()) return it->second;
+    BTensorD t = make(label, tags, mask);
+    m_store.emplace(key, t);
+    return t;
   }
-  return ops;
-}
 
-// Keep only terms whose single residual normal operator is <= body_cap-body
-// (rank-0 scalars kept). Applied BEFORE simplify(), this reproduces a
-// rank-capped partial Wick (wicked's contract(...,0,4) / a patched
-// WickTheorem::max_ops) with no SeQuant source change.
-ExprPtr keep_up_to_body(const ExprPtr& nh, std::size_t body_cap) {
-  auto keep = [&](const ExprPtr& t) {
-    auto ops = collect_fnops(t);
-    if (ops.empty()) return true;  // scalar (rank 0)
-    if (ops.size() > 1)
-      return false;  // >1 residual operator (should not occur)
-    return ops.front()->ncreators() <= body_cap;
-  };
-  if (!nh) return nh;
-  if (!nh.is<Sum>()) return keep(nh) ? nh : ex<Constant>(rational{0});
-  std::vector<ExprPtr> kept;
-  for (const auto& t : nh.as<Sum>().summands())
-    if (keep(t)) kept.push_back(t);
-  return ex<Sum>(kept.begin(), kept.end());
-}
+  void put(const std::string& label, const std::string& tags,
+           const std::string& mask, const BTensorD& value) {
+    m_store[label + "_" + tags + "#" + mask] = value;
+  }
 
-// coefficient of a term = the term with its residual FNOperator removed
-ExprPtr coeff_of(const ExprPtr& term) {
-  if (!term.is<Product>()) return term;
-  const auto& p = term.as<Product>();
-  auto out = ex<Product>(p.scalar(), ExprPtrList{});
-  auto& op = out->as<Product>();
-  for (const auto& f : p.factors())
-    if (!f.is<FNOperator>()) op.append(1, f, Product::Flatten::No);
+  double get_scalar(const std::string& label) { return m_scalars[label]; }
+  void put_scalar(const std::string& label, double value) {
+    m_scalars[label] = value;
+  }
+
+  /// Gather the accumulated Fbar/Vbar blocks into the compact active output and
+  /// add the bare H = F + 1/4 V over the active block.
+  ///
+  /// The partial Wick returns only the vacuum expectation value of the lone
+  /// bare operator, but bar{H} = H + commutators contains H with coefficient 1,
+  /// so H is added back here. The 1/4 becomes 1 under the antisymmetrizer
+  /// applied downstream.
+  void assemble(BTensorD& Fbar, BTensorD& Vbar) const {
+    const std::size_t nt = m_nact;
+    Fbar = BTensorD{btas::Range{nt, nt}};
+    Vbar = BTensorD{btas::Range{nt, nt, nt, nt}};
+    Fbar.fill(0.0);
+    Vbar.fill(0.0);
+
+    for (const auto& [key, block] : m_store) {
+      const auto us = key.find('_');
+      const auto hash = key.find('#');
+      const std::string label = key.substr(0, us);
+      if (label != "Fbar" && label != "Vbar") continue;
+      const std::string tags = key.substr(us + 1, hash - us - 1);
+
+      std::vector<Rng> r;
+      for (char c : tags) r.push_back(active_range(c));
+
+      if (label == "Fbar") {
+        for (std::size_t a = 0; a < r[0].ext; ++a)
+          for (std::size_t b = 0; b < r[1].ext; ++b)
+            Fbar(r[0].off + a, r[1].off + b) += block(a, b);
+      } else {
+        for (std::size_t a = 0; a < r[0].ext; ++a)
+          for (std::size_t b = 0; b < r[1].ext; ++b)
+            for (std::size_t c = 0; c < r[2].ext; ++c)
+              for (std::size_t d = 0; d < r[3].ext; ++d)
+                Vbar(r[0].off + a, r[1].off + b, r[2].off + c, r[3].off + d) +=
+                    block(a, b, c, d);
+      }
+    }
+
+    const auto a2so = active_gather('p');  // compact position -> spin-orbital
+    const std::size_t n = m_nmo;
+    for (std::size_t p = 0; p < nt; ++p)
+      for (std::size_t q = 0; q < nt; ++q)
+        Fbar(p, q) += m_F[a2so[p] * n + a2so[q]];
+    for (std::size_t p = 0; p < nt; ++p)
+      for (std::size_t q = 0; q < nt; ++q)
+        for (std::size_t r = 0; r < nt; ++r)
+          for (std::size_t s = 0; s < nt; ++s)
+            Vbar(p, q, r, s) +=
+                0.25 *
+                m_V[((a2so[p] * n + a2so[q]) * n + a2so[r]) * n + a2so[s]];
+  }
+
+ private:
+  std::size_t full_extent(char c) const {
+    if (c == 'o') return m_nocc;
+    if (c == 'v') return m_nvirt;
+    return m_nmo;  // 'p'
+  }
+
+  /// Space-local indices kept for an active leg. For 'p' the active occupied
+  /// and active virtual pieces are concatenated, which is ascending in the
+  /// spin-orbital index because every occupied index precedes every virtual
+  /// one -- the same ordering assemble_active_hamiltonian's sorted active
+  /// spin-orbital list has, so the compact layouts agree by construction.
+  std::vector<std::size_t> active_gather(char c) const {
+    if (c == 'o') return m_act_occ;
+    if (c == 'v') return m_act_virt;
+    std::vector<std::size_t> g = m_act_occ;
+    for (std::size_t a : m_act_virt) g.push_back(m_nocc + a);
+    return g;
+  }
+
+  /// Placement of a space within the compact active output.
+  Rng active_range(char c) const {
+    if (c == 'o') return {0, m_nao};
+    if (c == 'v') return {m_nao, m_nav};
+    return {0, m_nact};  // 'p'
+  }
+
+  /// Space-local index -> spin-orbital index.
+  std::size_t to_so(char c, std::size_t local) const {
+    return c == 'v' ? m_nocc + local : local;
+  }
+
+  /// Whether a space-local index lies inside the active space.
+  bool in_active(char c, std::size_t local) const {
+    if (c == 'o')
+      return std::binary_search(m_act_occ.begin(), m_act_occ.end(), local);
+    if (c == 'v')
+      return std::binary_search(m_act_virt.begin(), m_act_virt.end(), local);
+    return false;
+  }
+
+  BTensorD make(const std::string& label, const std::string& tags,
+                const std::string& mask) const {
+    const std::size_t rank = tags.size();
+
+    // per-leg map: output index -> space-local source index
+    std::vector<std::vector<std::size_t>> src(rank);
+    std::vector<std::size_t> ext(rank);
+    for (std::size_t k = 0; k < rank; ++k) {
+      if (k < mask.size() && mask[k] == 'A') {
+        src[k] = active_gather(tags[k]);
+      } else {
+        src[k].resize(full_extent(tags[k]));
+        std::iota(src[k].begin(), src[k].end(), std::size_t{0});
+      }
+      ext[k] = src[k].size();
+    }
+
+    BTensorD out{btas::Range{ext}};
+    out.fill(0.0);
+    if (label == "Fbar" || label == "Vbar") return out;  // zeroed accumulator
+
+    const std::size_t n = m_nmo;
+    std::vector<std::size_t> idx(rank, 0);
+    for (std::size_t flat = 0; flat < out.size(); ++flat) {
+      if (label == "f") {
+        out.data()[flat] = m_F[to_so(tags[0], src[0][idx[0]]) * n +
+                               to_so(tags[1], src[1][idx[1]])];
+      } else if (label == "g") {
+        out.data()[flat] = m_V[((to_so(tags[0], src[0][idx[0]]) * n +
+                                 to_so(tags[1], src[1][idx[1]])) *
+                                    n +
+                                to_so(tags[2], src[2][idx[2]])) *
+                                   n +
+                               to_so(tags[3], src[3][idx[3]])];
+      } else if (label == "t" || label == "t_") {
+        out.data()[flat] = amplitude(tags, src, idx);
+      } else {
+        throw std::runtime_error("ducc: unsupported leaf tensor '" + label +
+                                 "'");
+      }
+      for (std::size_t k = rank; k-- > 0;) {
+        if (++idx[k] < ext[k]) break;
+        idx[k] = 0;
+      }
+    }
+    return out;
+  }
+
+  /// Amplitude blocks in space-local coordinates: "vo" = T1[a,i], "ov" = its
+  /// adjoint, "vvoo" = T2[a,b,i,j], "oovv" = its adjoint.
+  ///
+  /// T_ext: DUCC's cluster operator carries only EXTERNAL excitations, so an
+  /// amplitude all of whose indices are active is structurally zero. With every
+  /// orbital active this kills T entirely, sigma = 0, and bar{H} collapses to
+  /// H -- the level > 0 result then reduces to the bare level-0 one.
+  double amplitude(const std::string& tags,
+                   const std::vector<std::vector<std::size_t>>& src,
+                   const std::vector<std::size_t>& idx) const {
+    const std::size_t no = m_nocc, nv = m_nvirt;
+    std::vector<std::size_t> loc(tags.size());
+    bool all_active = true;
+    for (std::size_t k = 0; k < tags.size(); ++k) {
+      loc[k] = src[k][idx[k]];
+      all_active = all_active && in_active(tags[k], loc[k]);
+    }
+    if (all_active) return 0.0;
+
+    if (tags == "vo") return m_T1[loc[0] * no + loc[1]];
+    if (tags == "ov") return m_T1[loc[1] * no + loc[0]];
+    if (tags == "vvoo")
+      return m_T2[((loc[0] * nv + loc[1]) * no + loc[2]) * no + loc[3]];
+    if (tags == "oovv")
+      return m_T2[((loc[2] * nv + loc[3]) * no + loc[0]) * no + loc[1]];
+    throw std::runtime_error("ducc: unsupported cluster block '" + tags + "'");
+  }
+
+  std::size_t m_nocc, m_nvirt, m_nmo;
+  std::vector<std::size_t> m_act_occ, m_act_virt;
+  std::size_t m_nao, m_nav, m_nact;
+  const std::vector<double>&m_F, &m_V, &m_T1, &m_T2;  // row-major, not owned
+  std::map<std::string, BTensorD> m_store;
+  std::map<std::string, double> m_scalars;
+};
+
+// Generated DUCC equations (run_all_L0 / run_all_L1 / run_all_L2) plus the
+// qdk_btas permute/scal/dot adapters they use. It re-includes <btas/btas.h>,
+// <btas/tensor.h>, <cmath> and <vector>; those are all included at the top of
+// this file, so their include guards make the re-inclusion a no-op and nothing
+// is actually declared at this (anonymous-namespace) scope but the equations.
+#include "ducc_equations.inc"
+
+/// A[V]_pqrs = V_pqrs - V_qprs - V_pqsr + V_qpsr.
+///
+/// Turns the canonical generator the Wick expansion produces into the physical
+/// antisymmetric <PQ||RS>. Unnormalized (coefficient 1), matching the
+/// wicked-based DUCC reference's active-Hamiltonian assembly; applied to an
+/// already
+/// antisymmetric tensor it yields 4x that tensor, so the bare 1/4 V of
+/// TensorProvider::assemble recovers exactly V.
+///
+/// Applied to the ASSEMBLED tensor, not per block: A permutes bra and ket
+/// indices and the DUCC blocks have mixed index spaces (oovp, opvp, ...), so a
+/// per-block A would move elements into a different block. Fbar needs no
+/// counterpart -- at rank 2 the antisymmetrizer is the identity.
+BTensorD antisymmetrize_2body(const BTensorD& V) {
+  BTensorD out{V.range()};
+  out.fill(0.0);
+  qdk_btas::accumulate(1.0, V, {'p', 'q', 'r', 's'}, out, {'p', 'q', 'r', 's'});
+  qdk_btas::accumulate(-1.0, V, {'q', 'p', 'r', 's'}, out,
+                       {'p', 'q', 'r', 's'});
+  qdk_btas::accumulate(-1.0, V, {'p', 'q', 's', 'r'}, out,
+                       {'p', 'q', 'r', 's'});
+  qdk_btas::accumulate(1.0, V, {'q', 'p', 's', 'r'}, out, {'p', 'q', 'r', 's'});
   return out;
 }
 
-// [A,B] = A*B - B*A (operator commutator)
-inline ExprPtr commutator(const ExprPtr& A, const ExprPtr& B) {
-  return A * B - B * A;
-}
-
-// DUCC F-split BCH (matches wicked_ducc._wicked_bch): the Fock part sits one
-// commutator order higher than the two-body part (the DUCC truncation).
-//   L1: H + [H,s] + 1/2 [[F,s],s]
-//   L2: H + [H,s] + 1/2 [[H,s],s] + 1/6 [[[F,s],s],s]
-// H = mbpt::H() (f + 1/4 g over the complete space), F = mbpt::F(),
-// s = sigma = T - T^dagger.
-ExprPtr ducc_fsplit_bch(std::size_t level, const ExprPtr& H, const ExprPtr& F,
-                        const ExprPtr& sigma) {
-  if (level == 0) return H;
-  auto c1 = commutator(H, sigma);
-  if (level == 1) {
-    auto c2F = commutator(commutator(F, sigma), sigma);
-    return H + c1 + ex<Constant>(rational{1, 2}) * c2F;
-  }
-  if (level == 2) {
-    auto c2H = commutator(commutator(H, sigma), sigma);
-    auto c3F = commutator(commutator(commutator(F, sigma), sigma), sigma);
-    return H + c1 + ex<Constant>(rational{1, 2}) * c2H +
-           ex<Constant>(rational{1, 6}) * c3F;
-  }
-  throw std::runtime_error("ducc: F-split BCH level must be 0, 1, or 2");
-}
-
-// full-MO range of an index: occ (base "i") -> [0,nocc); virt (base "a") ->
-// [nocc,nmo); complete (base "p") -> [0,nmo).
-struct SpaceRange {
-  std::size_t off, ext;
-};
-inline SpaceRange space_range(const Index& idx, std::size_t nocc,
-                              std::size_t nvirt) {
-  const auto bk = idx.space().base_key();
-  if (bk == L"i") return {0, nocc};
-  if (bk == L"a") return {nocc, nvirt};
-  if (bk == L"p") return {0, nocc + nvirt};
-  throw std::runtime_error("ducc: unsupported index space in Wick residual");
-}
-inline char space_letter(const Index& idx) {
-  const auto bk = idx.space().base_key();
-  if (bk == L"i") return 'o';
-  if (bk == L"a") return 'v';
-  if (bk == L"p") return 'p';
-  return '?';
-}
-
-// BTAS leaf yielder backed by the in-memory spin-orbital F/V/T1/T2. Slices the
-// shared full tensors to whatever o/v/p leg block a leaf tensor requests
-// (treating "p" as the full range avoids symbolic p-leg resolution).
-class DataYielder {
-  std::size_t nocc_, nvirt_, nmo_;
-  const std::vector<double>&F_, &V_, &T1_, &T2_;  // row-major, not owned
-  mutable std::map<std::string, ResultPtr> cache_;
-  // b1' active-output restriction: when active_, each residual term's free
-  // (output) legs are sliced to the active block so BTAS evaluates only it
-  // (contracted/internal legs stay full). The active spin-orbital indices are
-  // split into occupied (< nocc_) and virtual (>= nocc_) partitions.
-  bool active_ = false;
-  std::vector<std::size_t> active_occ_so_, active_virt_so_;
-  mutable std::set<std::wstring>
-      free_labels_;  // current term's free-leg labels
-
-  std::string key_of(const Tensor& t) const {
-    std::string k;
-    for (wchar_t wc : std::wstring(t.label())) k += static_cast<char>(wc);
-    k += '_';
-    for (auto&& idx : t.const_braket_indices()) k += space_letter(idx);
-    return k;
-  }
-
-  // fresh BTensorD block for leaf tensor `t` by slicing the full data
-  BTensorD make_block(const Tensor& t, const std::string& key) const {
-    std::vector<Index> idx(t.const_braket_indices().begin(),
-                           t.const_braket_indices().end());
-    std::vector<SpaceRange> sr;
-    std::vector<std::size_t> ext;
-    for (auto&& i : idx) {
-      auto r = space_range(i, nocc_, nvirt_);
-      sr.push_back(r);
-      ext.push_back(r.ext);
-    }
-    const std::string lbl(key.begin(), key.begin() + key.find('_'));
-    BTensorD out{btas::Range{ext}};
-
-    if (lbl == "f") {  // Fock F[nmo,nmo]
-      for (std::size_t a = 0; a < ext[0]; ++a)
-        for (std::size_t b = 0; b < ext[1]; ++b)
-          out(a, b) = F_[(sr[0].off + a) * nmo_ + (sr[1].off + b)];
-    } else if (lbl == "g") {  // antisymmetrized two-body V[nmo,nmo,nmo,nmo]
-      for (std::size_t a = 0; a < ext[0]; ++a)
-        for (std::size_t b = 0; b < ext[1]; ++b)
-          for (std::size_t c = 0; c < ext[2]; ++c)
-            for (std::size_t d = 0; d < ext[3]; ++d)
-              out(a, b, c, d) =
-                  V_[(((sr[0].off + a) * nmo_ + (sr[1].off + b)) * nmo_ +
-                      (sr[2].off + c)) *
-                         nmo_ +
-                     (sr[3].off + d)];
-    } else if (lbl == "t") {  // cluster amplitudes / adjoint blocks
-      std::string sp;
-      for (auto&& i : idx) sp += space_letter(i);
-      if (sp == "vo") {  // T1[a,i]
-        for (std::size_t a = 0; a < nvirt_; ++a)
-          for (std::size_t i = 0; i < nocc_; ++i)
-            out(a, i) = T1_[a * nocc_ + i];
-      } else if (sp == "ov") {  // T1^dagger[i,a]
-        for (std::size_t i = 0; i < nocc_; ++i)
-          for (std::size_t a = 0; a < nvirt_; ++a)
-            out(i, a) = T1_[a * nocc_ + i];
-      } else if (sp == "vvoo") {  // T2[a,b,i,j]
-        std::copy(T2_.begin(), T2_.end(), out.begin());
-      } else if (sp == "oovv") {  // T2^dagger[i,j,a,b] = T2[a,b,i,j]
-        for (std::size_t i = 0; i < nocc_; ++i)
-          for (std::size_t j = 0; j < nocc_; ++j)
-            for (std::size_t a = 0; a < nvirt_; ++a)
-              for (std::size_t b = 0; b < nvirt_; ++b)
-                out(i, j, a, b) =
-                    T2_[((a * nvirt_ + b) * nocc_ + i) * nocc_ + j];
-      } else {
-        throw std::runtime_error("ducc: unsupported cluster block '" + sp +
-                                 "'");
-      }
-    } else {
-      throw std::runtime_error("ducc: unsupported leaf tensor '" + lbl + "'");
-    }
-    return out;
-  }
-
-  // leaf-local indices to KEEP for a free leg of space letter `sl` (occ
-  // leaf-local == SO index; virt leaf-local == SO - nocc_; complete leaf-local
-  // == SO index).
-  std::vector<std::size_t> active_gather(char sl) const {
-    std::vector<std::size_t> g;
-    if (sl == 'o') {
-      g = active_occ_so_;
-    } else if (sl == 'v') {
-      g.reserve(active_virt_so_.size());
-      for (std::size_t so : active_virt_so_) g.push_back(so - nocc_);
-    } else if (sl == 'p') {
-      g = active_occ_so_;
-      g.insert(g.end(), active_virt_so_.begin(), active_virt_so_.end());
-    }
-    return g;
-  }
-
-  bool is_free_active(const Index& i) const {
-    return active_ && free_labels_.count(std::wstring(i.full_label())) > 0;
-  }
-
-  // Gather-slice a full leaf to active on its free legs (contracted legs stay
-  // full). A cheap leaf-sized copy so the downstream BTAS contraction runs at
-  // active extents on the free legs.
-  BTensorD gather_slice(const BTensorD& full,
-                        const std::vector<Index>& idx) const {
-    const std::size_t n = idx.size();
-    std::vector<std::vector<std::size_t>> g(n);
-    std::vector<std::size_t> oext(n), fext(n);
-    for (std::size_t k = 0; k < n; ++k) {
-      fext[k] = full.extent(k);
-      if (is_free_active(idx[k])) {
-        g[k] = active_gather(space_letter(idx[k]));
-      } else {
-        g[k].resize(fext[k]);
-        std::iota(g[k].begin(), g[k].end(), std::size_t{0});
-      }
-      oext[k] = g[k].size();
-    }
-    BTensorD out{btas::Range{oext}};
-    std::vector<std::size_t> fstr(n, 1);
-    for (std::size_t k = n; k-- > 1;) fstr[k - 1] = fstr[k] * fext[k];
-    std::vector<std::size_t> oi(n, 0);
-    const std::size_t osize = out.size();
-    for (std::size_t flat = 0; flat < osize; ++flat) {
-      std::size_t foff = 0;
-      for (std::size_t k = 0; k < n; ++k) foff += g[k][oi[k]] * fstr[k];
-      out.data()[flat] = full.data()[foff];
-      for (std::size_t k = n; k-- > 0;) {
-        if (++oi[k] < oext[k]) break;
-        oi[k] = 0;
-      }
-    }
-    return out;
-  }
-
- public:
-  DataYielder(std::size_t nocc, std::size_t nvirt, const std::vector<double>& F,
-              const std::vector<double>& V, const std::vector<double>& T1,
-              const std::vector<double>& T2)
-      : nocc_(nocc),
-        nvirt_(nvirt),
-        nmo_(nocc + nvirt),
-        F_(F),
-        V_(V),
-        T1_(T1),
-        T2_(T2) {}
-
-  std::size_t nmo() const { return nmo_; }
-  std::size_t nocc() const { return nocc_; }
-  std::size_t nvirt() const { return nvirt_; }
-
-  // b1' active-output controls. `active_occ_so` / `active_virt_so` are the
-  // active spin-orbital indices in the occupied ([0,nocc_)) and virtual
-  // ([nocc_,nmo_)) blocks respectively.
-  void set_active(std::vector<std::size_t> active_occ_so,
-                  std::vector<std::size_t> active_virt_so) {
-    active_ = true;
-    active_occ_so_ = std::move(active_occ_so);
-    active_virt_so_ = std::move(active_virt_so);
-  }
-  bool active() const { return active_; }
-
-  // Scatter map (evaluated position -> full spin-orbital index) for a free leg
-  // of space letter `sl`; matches active_gather's ordering.
-  std::vector<std::size_t> active_scatter(char sl) const {
-    if (sl == 'o') return active_occ_so_;
-    if (sl == 'v') return active_virt_so_;
-    std::vector<std::size_t> g =
-        active_occ_so_;  // 'p': active-occ ++ active-virt
-    g.insert(g.end(), active_virt_so_.begin(), active_virt_so_.end());
-    return g;
-  }
-
-  // Set the current term's free (residual-operator) leg labels.
-  template <typename Range>
-  void set_free_active(const Range& fi) const {
-    free_labels_.clear();
-    for (auto&& i : fi) free_labels_.insert(std::wstring(i.full_label()));
-  }
-
-  // Add the bare Hamiltonian H = F + 1/4 V over the full MO range.
-  // expectation_value_impl returns only the VEV of the lone bare operator
-  // (dropping its 1-/2-body parts), but Hbar = H + commutators contains H with
-  // coefficient 1, so it is added back explicitly.
-  void add_bare_H(BTensorD& Fbar, BTensorD& Vbar) const {
-    const std::size_t n = nmo_;
-    for (std::size_t p = 0; p < n; ++p)
-      for (std::size_t q = 0; q < n; ++q) Fbar(p, q) += F_[p * n + q];
-    for (std::size_t p = 0; p < n; ++p)
-      for (std::size_t q = 0; q < n; ++q)
-        for (std::size_t r = 0; r < n; ++r)
-          for (std::size_t s = 0; s < n; ++s)
-            Vbar(p, q, r, s) += 0.25 * V_[((p * n + q) * n + r) * n + s];
-  }
-
-  ResultPtr operator()(const Tensor& t) const {
-    const std::string base = key_of(t);
-    std::vector<Index> idx(t.const_braket_indices().begin(),
-                           t.const_braket_indices().end());
-    // The cache key carries the per-leg active-slice pattern so a leaf reused
-    // across terms with different free-leg sets is not aliased.
-    std::string ck = base;
-    bool sliced = false;
-    if (active_) {
-      ck += '#';
-      for (auto&& i : idx) {
-        const bool fa = is_free_active(i);
-        ck += fa ? 'A' : '-';
-        sliced = sliced || fa;
-      }
-    }
-    if (auto it = cache_.find(ck); it != cache_.end()) return it->second;
-    BTensorD blk = make_block(t, base);
-    if (sliced) blk = gather_slice(blk, idx);
-    auto res = eval_result<ResultTensorBTAS<BTensorD>>(std::move(blk));
-    cache_.emplace(ck, res);
-    return res;
-  }
-
-  ResultPtr operator()(sequant::meta::can_evaluate auto const& node) const {
-    if (node->result_type() == ResultType::Tensor)
-      return (*this)(node->expr()->template as<Tensor>());
-    return eval_result<ResultScalar<double>>(
-        node->as_constant().template value<double>());
-  }
-};
-
-// Sum the fully-contracted (scalar) terms of a Wick result via BTAS eval.
-double eval_scalar_sum(const ExprPtr& nh, const DataYielder& yield) {
-  SEQUANT_PRAGMA_IGNORE_DEPRECATED_BEGIN
-  auto eval_term = [&](const ExprPtr& term) -> double {
-    if (!term) return 0.0;
-    if (term.is<Constant>()) return term.as<Constant>().value<double>();
-    auto node = binarize<EvalExprBTAS>(sequant::optimize(term));
-    return evaluate(node, container::svector<long>{}, yield)->get<double>();
-  };
-  auto is_scalar = [](const ExprPtr& term) {
-    return collect_fnops(term).empty();
-  };
-  double total = 0.0;
-  if (nh.is<Sum>()) {
-    for (const auto& t : nh.as<Sum>().summands())
-      if (is_scalar(t)) total += eval_term(t);
-  } else if (nh && is_scalar(nh)) {
-    total += eval_term(nh);
-  }
-  SEQUANT_PRAGMA_IGNORE_DEPRECATED_END
-  return total;
-}
-
-// Evaluate each residual term's coefficient with the residual operator's legs
-// as target indices, accumulating the 1-body (Fbar) and 2-body (Vbar) effective
-// Hamiltonian over the full MO range.
-void assemble_effective_H(const ExprPtr& nh, const DataYielder& yield,
-                          BTensorD& Fbar, BTensorD& Vbar) {
-  const std::size_t nocc = yield.nocc(), nvirt = yield.nvirt();
-  SEQUANT_PRAGMA_IGNORE_DEPRECATED_BEGIN
-  auto process = [&](const ExprPtr& term) {
-    auto ops = collect_fnops(term);
-    if (ops.size() != 1) return;  // scalar or (unexpected) multi-operator
-    const auto& o = *ops.front();
-    const std::size_t r = o.ncreators();
-    if (r < 1 || r > 2) return;  // DUCC keeps <=2-body
-    container::svector<Index> fi;
-    for (auto&& c : o.creators()) fi.push_back(c.index());
-    for (auto&& a : o.annihilators()) fi.push_back(a.index());
-    // b1': restrict this term's free (output) legs to the active block so the
-    // BTAS contraction runs at active extents; the internal sums stay full.
-    if (yield.active()) yield.set_free_active(fi);
-    auto node = binarize<EvalExprBTAS>(sequant::optimize(coeff_of(term)));
-    container::svector<long> target =
-        EvalExprBTAS::index_hash(fi) | ranges::to<container::svector<long>>;
-    auto blk = evaluate(node, target, yield)->get<BTensorD>();
-    // Map each free leg's evaluated positions to full spin-orbital indices: the
-    // active spin-orbital list under b1', else the full space range.
-    std::vector<std::vector<std::size_t>> amap;
-    amap.reserve(fi.size());
-    for (auto&& idx : fi) {
-      if (yield.active()) {
-        amap.push_back(yield.active_scatter(space_letter(idx)));
-      } else {
-        const auto s = space_range(idx, nocc, nvirt);
-        std::vector<std::size_t> m(s.ext);
-        std::iota(m.begin(), m.end(), s.off);
-        amap.push_back(std::move(m));
-      }
-    }
-    if (r == 1) {
-      for (std::size_t a = 0; a < amap[0].size(); ++a)
-        for (std::size_t b = 0; b < amap[1].size(); ++b)
-          Fbar(amap[0][a], amap[1][b]) += blk(a, b);
-    } else {
-      for (std::size_t a = 0; a < amap[0].size(); ++a)
-        for (std::size_t b = 0; b < amap[1].size(); ++b)
-          for (std::size_t c = 0; c < amap[2].size(); ++c)
-            for (std::size_t d = 0; d < amap[3].size(); ++d)
-              Vbar(amap[0][a], amap[1][b], amap[2][c], amap[3][d]) +=
-                  blk(a, b, c, d);
-    }
-  };
-  if (nh.is<Sum>())
-    for (const auto& t : nh.as<Sum>().summands()) process(t);
-  else if (nh)
-    process(nh);
-  SEQUANT_PRAGMA_IGNORE_DEPRECATED_END
-}
-
-// physical antisymmetric two-body <PQ||RS> from the raw-canonical Vbar:
-//   A[V]_pqrs = V_pqrs - V_qprs - V_pqsr + V_qpsr
-// (applied to an already-antisymmetric tensor it yields 4x that tensor, so the
-// bare 1/4 V contribution recovers exactly V; the residual raw-canonical blocks
-// become their physical antisymmetrization). Matches the reference
-// wicked_ducc_common.assemble_active_hamiltonian.
-std::vector<double> asym4(const std::vector<double>& V, std::size_t n) {
-  std::vector<double> A(V.size());
-  auto id = [n](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * n + q) * n + r) * n + s;
-  };
-  for (std::size_t p = 0; p < n; ++p)
-    for (std::size_t q = 0; q < n; ++q)
-      for (std::size_t r = 0; r < n; ++r)
-        for (std::size_t s = 0; s < n; ++s)
-          A[id(p, q, r, s)] = V[id(p, q, r, s)] - V[id(q, p, r, s)] -
-                              V[id(p, q, s, r)] + V[id(q, p, s, r)];
-  return A;
-}
-
-// BCH-dress the spin-orbital F/V/scalar for DUCC level>0. sigma is built from
-// the EXTERNAL cluster amplitudes only (the all-active T block is zeroed), so
-// the transform folds external correlation into the active space. Returns a
-// copy of @p data with F/V/scalar replaced by the level-@p level DUCC effective
-// values over the full spin-orbital space (assemble_active_hamiltonian then
-// restricts to the active space).
+/// BCH-dress the spin-orbital F/V/scalar for DUCC level > 0.
+///
+/// sigma is built from the EXTERNAL cluster amplitudes only (see
+/// TensorProvider::amplitude), so the transform folds external correlation into
+/// the active space. Returns a copy of @p data whose scalar/F/V are the
+/// level-@p level DUCC effective values restricted to the ACTIVE space: F is
+/// [nact, nact] and V is [nact^4], indexed by the ascending active
+/// spin-orbital order that assemble_active_hamiltonian also uses.
 SpinOrbitalData ducc_bch_dress(const SpinOrbitalData& data, int level,
                                const std::vector<std::size_t>& active_so) {
-  ensure_sequant_setup();
-  const std::size_t nso = data.nso, nocc = data.nocc_so, nvirt = data.nvir_so;
-
-  // T_ext: zero the all-active block of T1/T2 (occ position i -> spin-orbital
-  // i; virtual position a -> spin-orbital nocc + a).
-  std::vector<double> T1 = data.T1, T2 = data.T2;
-  std::vector<char> is_active(nso, 0);
-  for (std::size_t so : active_so)
-    if (so < nso) is_active[so] = 1;
-  for (std::size_t a = 0; a < nvirt; ++a)
-    for (std::size_t i = 0; i < nocc; ++i)
-      if (is_active[nocc + a] && is_active[i]) T1[a * nocc + i] = 0.0;
-  for (std::size_t a = 0; a < nvirt; ++a)
-    for (std::size_t b = 0; b < nvirt; ++b)
-      for (std::size_t i = 0; i < nocc; ++i)
-        for (std::size_t j = 0; j < nocc; ++j)
-          if (is_active[nocc + a] && is_active[nocc + b] && is_active[i] &&
-              is_active[j])
-            T2[((a * nvirt + b) * nocc + i) * nocc + j] = 0.0;
-
-  // Symbolic DUCC F-split BCH over the whole spin-orbital space.
-  auto H = mbpt::H();
-  auto Top = mbpt::T(2);
-  auto sigma = Top - adjoint(Top);
-  auto hbar =
-      ducc_fsplit_bch(static_cast<std::size_t>(level), H, mbpt::F(), sigma);
-
-  // Partial Wick (full_contractions=false; unscreened -- DUCC connectedness
-  // comes from the commutator structure, not Wick screening), truncated to
-  // <=2-body by the post-filter, then simplified.
-  auto nh = mbpt::op::expectation_value_impl(
-      hbar, /*connect=*/{}, /*avoid=*/{}, /*use_topology=*/true,
-      /*screen=*/false, /*skip_clone=*/false, /*full_contractions=*/false);
-  nh = keep_up_to_body(nh, 2);
-  simplify(nh);
-
-  // BTAS numeric evaluation. b1' active-output optimization: each residual
-  // term's free (output) legs are sliced to the active block so the BTAS
-  // contractions run at active extents (real FLOP reduction), while the
-  // internal sums stay full (external correlation, incl. frozen core). The
-  // active block is scattered into the full-space Fbar/Vbar -- all that
-  // assemble_active_hamiltonian reads.
-  DataYielder yield(nocc, nvirt, data.F, data.V, T1, T2);
-  std::vector<std::size_t> active_occ_so, active_virt_so;
+  const std::size_t nocc = data.nocc_so, nvirt = data.nvir_so, nmo = data.nso;
+  std::vector<std::size_t> act_occ, act_virt;
   for (std::size_t so : active_so) {
     if (so < nocc)
-      active_occ_so.push_back(so);
+      act_occ.push_back(so);
     else
-      active_virt_so.push_back(so);
+      act_virt.push_back(so - nocc);
   }
-  yield.set_active(std::move(active_occ_so), std::move(active_virt_so));
-  const double scalar_bch = eval_scalar_sum(nh, yield);
-  BTensorD Fbar{btas::Range{nso, nso}};
-  BTensorD Vbar{btas::Range{nso, nso, nso, nso}};
-  Fbar.fill(0.0);
-  Vbar.fill(0.0);
-  assemble_effective_H(nh, yield, Fbar, Vbar);
-  yield.add_bare_H(Fbar, Vbar);
+  std::sort(act_occ.begin(), act_occ.end());
+  std::sort(act_virt.begin(), act_virt.end());
+  const std::size_t nao = act_occ.size(), nav = act_virt.size();
+  const std::size_t nact = nao + nav;
+
+  TensorProvider provider(data, std::move(act_occ), std::move(act_virt));
+  switch (level) {
+    case 1:
+      run_all_L1(provider, nocc, nvirt, nmo, nao, nav, nact);
+      break;
+    case 2:
+      run_all_L2(provider, nocc, nvirt, nmo, nao, nav, nact);
+      break;
+    default:
+      throw std::runtime_error(
+          "ducc: ducc_level " + std::to_string(level) +
+          " is not supported; the generated DUCC equations cover levels 0-2.");
+  }
+
+  BTensorD Fbar, Vbar;
+  provider.assemble(Fbar, Vbar);
+  Vbar = antisymmetrize_2body(Vbar);
 
   // Pack into the extraction convention: F = Fock, V = antisymmetrized
-  // <PQ||RS>, scalar = reference energy + BCH scalar correction.
+  // <PQ||RS>, scalar = reference energy + BCH scalar correction -- all over the
+  // active space.
   SpinOrbitalData dressed = data;
-  dressed.scalar = data.scalar + scalar_bch;
-  dressed.F.assign(Fbar.begin(), Fbar.end());
-  dressed.V = asym4(std::vector<double>(Vbar.begin(), Vbar.end()), nso);
+  dressed.scalar = data.scalar + provider.get_scalar("E0");
+  dressed.F = std::vector<double>(Fbar.begin(), Fbar.end());
+  dressed.V = std::vector<double>(Vbar.begin(), Vbar.end());
   return dressed;
 }
 
@@ -1069,8 +859,8 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
 
   // Step 2b: BCH dressing for levels 1-2 -- bar{H} = e^{-sigma} H e^{sigma}
   // with sigma = T_ext - T_ext^dagger (external cluster amplitudes only),
-  // evaluated symbolically + numerically with SeQuant/BTAS. Level 0 skips this
-  // and uses the bare spin-orbital data directly.
+  // evaluated by the generated BTAS equations. Level 0 skips this and uses the
+  // bare spin-orbital data directly.
   SpinOrbitalData effective = data;
   if (ducc_level > 0) {
     // Active spin-orbitals (occ-first blocked layout) that drive the external

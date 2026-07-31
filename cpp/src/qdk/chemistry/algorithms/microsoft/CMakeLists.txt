@@ -9,6 +9,7 @@ target_sources(chemistry PRIVATE
     localization/natural_orbitals.cpp
     localization/pipek_mezey.cpp
     localization/vvhv.cpp
+    ducc/ducc.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
     macis_asci.cpp
@@ -16,7 +17,6 @@ target_sources(chemistry PRIVATE
     macis_cas.cpp
     macis_pmc.cpp
     mp2.cpp
-    ducc.cpp
     scf.cpp
     stabilized_scf.cpp
     stability.cpp

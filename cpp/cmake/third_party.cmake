@@ -129,93 +129,36 @@ handle_dependency(gauxc
   REQUIRED
 )
 
-# SeQuant provides the symbolic Baker-Campbell-Hausdorff machinery for the DUCC
-# effective-Hamiltonian dressing (ducc_level > 0). Pinned to the upstream commit
-# the DUCC backend targets (no local patch: the >2-body pruning uses the public
-# keep_up_to_body filter).
+# BTAS (header-only dense tensor library) is the numeric backend for the DUCC
+# effective-Hamiltonian dressing (ducc_level > 0). The symbolic
+# Baker-Campbell-Hausdorff transform and Wick contraction are derived OFFLINE by
+# the SeQuant-based generator in ducc/, whose output is checked in as
+# ducc_equations.inc, so qdk-chemistry itself needs no symbolic-algebra library
+# at build or run time.
 #
-# SeQuant's numeric deps BTAS and range-v3 are fetched + installed by qdk here
-# (via handle_dependency, before SeQuant) rather than left to SeQuant's own
-# FindOrFetch modules. SeQuant fetches them with EXCLUDE_FROM_ALL, so their
-# install() rules never run: the *installed* sequant-config then points at a
-# btas-config.cmake / range-v3-config.cmake that was never written -- a hard
-# FATAL_ERROR for anything that consumes the installed qdk (the two-phase
-# build/install then find_package(qdk) path). Owning them here makes them install
-# normally; SeQuant's FindOrFetch{BTAS,RangeV3} short-circuit on the pre-existing
-# BTAS::BTAS / range-v3::range-v3 targets and reuse them (SEQUANT_HAS_BTAS still
-# turns on, so the eval-btas backend is built against qdk's BTAS::BTAS).
+# BTAS is fetched + installed by qdk here (via handle_dependency) so its
+# install() rules actually run: the installed qdk config does
+# find_dependency(BTAS), which is a hard error for anything consuming the
+# installed qdk (the two-phase build/install then find_package(qdk) path) if the
+# dependency was only ever fetched EXCLUDE_FROM_ALL.
 #
 # Boost is not a first-class qdk-chemistry dependency (it only arrives
-# transitively via libint2). BTAS and SeQuant both need a wider set of Boost
-# components (locale, regex, hana, ...), so discover the modular Boost here
-# first: this defines Boost_CONFIG, which routes SeQuant's FindOrFetchBoost to
-# reuse the same Boost libint2 uses instead of fetching a second modular copy
-# (which collides on the Boost::headers target). No Fortran compiler is required:
-# BTAS and SeQuant are C++/header-only and the blaspp/lapackpp wrappers are
-# reused prebuilt (they need only the libgfortran runtime, not the compiler).
+# transitively via libint2). BTAS needs a wider set of Boost components, so
+# discover the modular Boost here first: this defines Boost_CONFIG, so BTAS
+# reuses the same Boost libint2 uses instead of fetching a second modular copy
+# (which collides on the Boost::headers target). No Fortran compiler is
+# required: BTAS is C++/header-only and the blaspp/lapackpp wrappers are reused
+# prebuilt (they need only the libgfortran runtime, not the compiler).
 find_package(Boost CONFIG REQUIRED)
 set(Boost_FETCH_IF_MISSING OFF CACHE BOOL "" FORCE)
 
-# range-v3 (header-only): pinned to SeQuant's SEQUANT_TRACKED_RANGEV3_TAG. Not a
-# top-level project here, so tests/examples/perf default off; force them off
-# regardless so nothing extra builds.
-set(RANGE_V3_TESTS    OFF CACHE BOOL "" FORCE)
-set(RANGE_V3_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(RANGE_V3_PERF     OFF CACHE BOOL "" FORCE)
-set(RANGE_V3_DOCS     OFF CACHE BOOL "" FORCE)
-handle_dependency(range-v3
-  GIT_REPOSITORY https://github.com/ericniebler/range-v3.git
-  GIT_TAG 0.12.0
-  BUILD_TARGET range-v3::range-v3
-  INSTALL_TARGET range-v3::range-v3
-  ${DEPENDENCY_BUILD_FLAGS}
-  REQUIRED
-)
-
-# BTAS and SeQuant both FetchContent ValeevGroup's kit-cmake toolkit under the
-# name "vg_cmake_kit", pinned to different commits. FetchContent uses the first
-# declaration, and qdk builds BTAS before SeQuant, so BTAS's older pin would win
-# and SeQuant's newer CheckCXXFeatures module would be missing (SeQuant's
-# include(CheckCXXFeatures) then FATALs). Pre-declare it at SeQuant's (newer) pin
-# so both reuse a compatible toolkit. Declare only -- whichever of BTAS/SeQuant
-# is fetched first populates it from this declaration.
-include(FetchContent)
-FetchContent_Declare(
-  vg_cmake_kit
-  GIT_REPOSITORY https://github.com/ValeevGroup/kit-cmake.git
-  GIT_TAG 256d9462bb765787f5acb69be154b26d6efba8b6
-)
-
-# BTAS (header-only tensor library, the DUCC evaluator's numeric backend): pinned
-# to SeQuant's SEQUANT_TRACKED_BTAS_TAG. Reuses the prebuilt blaspp/lapackpp and
-# the Boost discovered above. Do NOT set BLA_VENDOR (it flips BTAS onto the
-# standard-linalg-kit path that needs an explicit Fortran mangling convention).
+# Do NOT set BLA_VENDOR (it flips BTAS onto the standard-linalg-kit path that
+# needs an explicit Fortran mangling convention).
 handle_dependency(BTAS
   GIT_REPOSITORY https://github.com/BTAS/btas.git
   GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
   BUILD_TARGET BTAS
   INSTALL_TARGET BTAS::BTAS
-  ${DEPENDENCY_BUILD_FLAGS}
-  REQUIRED
-)
-
-# Library only: skip benchmarks, utilities, and the python module; enable the
-# BTAS numeric backend (reuses the BTAS::BTAS target above). SEQUANT_TESTS=OFF
-# drops SeQuant's test executables and CTest registration. (SeQuant still
-# compiles a few test *object* libraries unconditionally -- they are not gated by
-# SEQUANT_TESTS upstream -- but the heavier executable links are skipped;
-# removing them entirely would require patching the pinned dependency.)
-set(SEQUANT_BTAS       ON  CACHE BOOL "SeQuant BTAS eval backend" FORCE)
-set(SEQUANT_TESTS      OFF CACHE BOOL "SeQuant unit tests"        FORCE)
-set(SEQUANT_BENCHMARKS OFF CACHE BOOL "SeQuant benchmarks"        FORCE)
-set(SEQUANT_UTILITIES  OFF CACHE BOOL "SeQuant utility programs"  FORCE)
-set(SEQUANT_PYTHON     OFF CACHE BOOL "SeQuant python module"     FORCE)
-
-handle_dependency(SeQuant
-  GIT_REPOSITORY https://github.com/ValeevGroup/SeQuant.git
-  GIT_TAG 1e033dfc3bf21aaa30eaef9afb02ab382f6d6a07
-  BUILD_TARGET SeQuant::SeQuant
-  INSTALL_TARGET SeQuant::SeQuant
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )

@@ -5,12 +5,12 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include "microsoft/ducc.hpp"
+#include "microsoft/ducc/ducc.hpp"
 
 namespace qdk::chemistry::algorithms {
 
 /**
- * @brief Factory function to create the SeQuant + BTAS DUCC solver.
+ * @brief Factory function to create the BTAS DUCC solver.
  */
 std::unique_ptr<EffectiveHamiltonian> make_ducc_solver() {
   QDK_LOG_TRACE_ENTERING();

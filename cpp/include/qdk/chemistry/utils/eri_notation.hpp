@@ -21,7 +21,7 @@ namespace qdk::chemistry::utils {
  * PQ|RS\rangle
  *   - \langle PQ|SR\rangle@f$ — Dirac ordering, antisymmetric under @f$P
  *   \leftrightarrow Q@f$ and @f$R \leftrightarrow S@f$, produced by the DUCC /
- *   coupled-cluster many-body algebra (e.g. the SeQuant backend).
+ *   coupled-cluster many-body algebra.
  *
  * All tensors are dense, row-major (C order), with a common extent @p n along
  * every mode (index @f$((P n + Q) n + R) n + S@f$).

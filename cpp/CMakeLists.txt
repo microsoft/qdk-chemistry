@@ -162,11 +162,11 @@ target_link_libraries(chemistry PUBLIC
     macis::macis
 )
 
-# Link the SeQuant symbolic-algebra stack for the DUCC effective-Hamiltonian
-# dressing. The QDK_HAS_SEQUANT define gates the ducc_level > 0 code path in the
-# DUCC solver.
-target_link_libraries(chemistry PUBLIC SeQuant::SeQuant)
-target_compile_definitions(chemistry PRIVATE QDK_HAS_SEQUANT)
+# BTAS evaluates the DUCC effective-Hamiltonian dressing. The symbolic
+# Baker-Campbell-Hausdorff / Wick work is done offline by the SeQuant-based
+# generator in ducc/, whose output is checked in as ducc_equations.inc, so the
+# library itself needs only the dense-tensor backend at build and run time.
+target_link_libraries(chemistry PUBLIC BTAS::BTAS)
 
 # Conditionally link OpenMP
 if(QDK_ENABLE_OPENMP)

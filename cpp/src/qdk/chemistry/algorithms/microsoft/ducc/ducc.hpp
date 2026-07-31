@@ -101,7 +101,10 @@ SpinOrbitalData extract_spinorbital_data(
  * given by the per-spin active spatial-MO index sets (empty means "all MOs").
  *
  * @param dressed Spin-orbital data (F/V/scalar + dimensions); F/V may be the
- *        bare extraction (level 0) or the BCH-transformed values.
+ *        bare full-space extraction (level 0, extents @c nso) or the
+ *        BCH-transformed values already restricted to the active space (level
+ *        > 0, extents @c nact, in ascending active spin-orbital order). The two
+ *        are distinguished by extent; when @c nact == @c nso they coincide.
  * @param active_a_spatial Active alpha spatial-MO indices.
  * @param active_b_spatial Active beta spatial-MO indices.
  * @param restricted Whether the underlying Hamiltonian is spin-restricted; a
@@ -128,33 +131,36 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
 
 /**
  * @class DuccSolver
- * @brief DUCC effective-Hamiltonian builder evaluated with SeQuant + BTAS.
+ * @brief DUCC effective-Hamiltonian builder evaluated with generated BTAS code.
  *
  * Builds the active-space effective Hamiltonian by a truncated
  * Baker-Campbell-Hausdorff (BCH) expansion of the unitarily
  * similarity-transformed Hamiltonian @f$ \bar H = e^{-\sigma} H e^{\sigma} @f$
- * with anti-Hermitian generator @f$ \sigma = T - T^\dagger @f$ (DUCC). The
- * symbolic transformation and partial Wick contraction are performed with the
- * SeQuant many-body algebra library (full-H Lie transform, `unitary=true`);
- * the resulting tensor network is evaluated numerically with the BTAS backend.
+ * with anti-Hermitian generator @f$ \sigma = T - T^\dagger @f$ (DUCC).
  *
- * Design notes carried over from the validated standalone prototype:
- * - **No SeQuant source patch.** The @f$ \le 2 @f$-body truncation is imposed
- * by a public-API post-filter on the residual-operator rank (applied before
- *   `simplify`), reproducing a rank-capped partial Wick exactly.
- * - **Active-only output.** Only the active block of @f$ \bar H @f$ is
- *   evaluated: the residual (free) legs are restricted to the active space so
- *   the BTAS contractions run at active extents (real work reduction, not
- *   compute-then-slice).
+ * The symbolic transformation, partial Wick contraction, @f$ \le 2 @f$-body
+ * truncation and contraction-order optimization are performed OFFLINE by the
+ * SeQuant-based code generator in `ducc/export_ducc_btas.cpp`. Its output --
+ * plain BTAS contraction code -- is checked in as `ducc_equations.inc`, so the
+ * library carries no symbolic-algebra dependency and the per-run cost is dense
+ * tensor contractions only.
+ *
+ * Design notes:
+ * - **Active-only evaluation.** Only the active block of @f$ \bar H @f$ is
+ *   computed: the residual (free) legs carry active extents in the generated
+ *   contractions, so this is a real work reduction, not compute-then-slice.
+ *   The dressed one-/two-body output is likewise active-sized.
+ * - **External amplitudes only.** @f$ \sigma @f$ is built from @f$ T_{ext} @f$:
+ *   an amplitude all of whose indices are active is zeroed, so with an
+ *   all-active space @f$ \sigma = 0 @f$ and every level reduces to level 0.
  *
  * The active space and reference coupled-cluster amplitudes are taken from the
  * input @ref data::Wavefunction; the BCH truncation level is the sole setting
  * (`ducc_level`).
  *
  * @note Level 0 (the bare active-space Hamiltonian, no BCH dressing) is served
- *       directly in C++. Levels 1-2 build the transformed @f$\bar H@f$ with the
- *       SeQuant/BTAS numeric backend (always linked). Both are validated to
- *       machine precision against the wicked-based DUCC reference.
+ *       directly in C++. Levels 1-2 run the generated equations. Both are
+ *       validated to machine precision against the wicked-based DUCC reference.
  */
 class DuccSolver : public qdk::chemistry::algorithms::EffectiveHamiltonian {
  public:
@@ -177,8 +183,7 @@ class DuccSolver : public qdk::chemistry::algorithms::EffectiveHamiltonian {
 
  protected:
   /**
-   * @brief Build the DUCC effective active-space Hamiltonian via SeQuant +
-   * BTAS.
+   * @brief Build the DUCC effective active-space Hamiltonian.
    *
    * @param hamiltonian The full-space Hamiltonian to transform.
    * @param wavefunction Full-space wavefunction supplying the reference

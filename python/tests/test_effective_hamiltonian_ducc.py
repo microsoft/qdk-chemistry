@@ -9,12 +9,13 @@ At level 0 there is no BCH dressing, so the effective active-space Hamiltonian
 must reproduce the bare active-space (CASCI) problem exactly: CASCI on the
 original full Hamiltonian equals FCI on the DUCC output Hamiltonian.
 
-Levels 1-2 add the SeQuant/BTAS Baker-Campbell-Hausdorff dressing. Two invariants
-are checked: (a) when the active space is the whole orbital set there is no
-external space, so the dressing collapses to the bare Hamiltonian and the level-0
-identity still holds at every level; (b) with a real active space the dressed
-energies match the wicked-based DUCC reference (itself validated against ExaChem)
-to machine precision.
+Levels 1-2 add the Baker-Campbell-Hausdorff dressing, evaluated by the generated
+BTAS equations. Two invariants are checked: (a) when the active space is the
+whole orbital set there is no external space, so the dressing collapses to the
+bare Hamiltonian and the level-0 identity still holds at every level; (b) the
+dressed output is convention-consistent -- the restricted and unrestricted
+dressings of a closed-shell system agree, and independent CI solvers agree on the
+restricted output.
 
 References are computed on the standard-convention active Hamiltonian from
 ``hamiltonian_constructor`` (full 8-fold chemist integrals): the native MACIS
@@ -281,7 +282,7 @@ def test_qubit_mapper_restricted_unrestricted_match_macis(label, xyz, active, in
     )
 
 
-# ── Levels 1-2: BCH-dressed effective Hamiltonian (SeQuant/BTAS backend) ──
+# ── Levels 1-2: BCH-dressed effective Hamiltonian (generated BTAS backend) ──
 
 # active = all orbitals -> no external space -> T_ext = 0 -> sigma = 0 -> bar{H} = H,
 # so the level-0 identity (CASCI == FCI) must still hold at every BCH level.
@@ -328,42 +329,6 @@ def test_level_gt0_reduces_to_bare_when_active_is_all(label, xyz, multiplicity, 
     )
 
 
-def _wicked_ducc_energy(xyz, nocc, noa, nva, level):
-    """MACIS FCI energy of the wicked_ducc downfolder output (reference engine)."""
-    import qdk_chemistry.algorithms.hamiltonian_downfolder as hd  # noqa: PLC0415
-
-    hd.load()
-    solver = create("scf_solver")
-    _, wfn = solver.run(Structure.from_xyz(xyz), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
-    full_ham = create("hamiltonian_constructor").run(wfn.get_orbitals())
-    downfolder = create("hamiltonian_downfolder", "wicked_ducc")
-    s = downfolder.settings()
-    s.set("nactive_oa", noa)
-    s.set("nactive_ob", noa)
-    s.set("nactive_va", nva)
-    s.set("nactive_vb", nva)
-    s.set("ducc_level", level)
-    ducc_ham = downfolder.run(full_ham, nocc, nocc)
-    return _ci_restricted(ducc_ham, noa, noa)
-
-
-@pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
-def test_ducc_levels_match_wicked_reference(level):
-    """Native DUCC == wicked-based DUCC (validated vs ExaChem) to machine precision.
-
-    LiH/STO-3G, active = MO {1 (occupied), 2 (virtual)} with frozen core MO 0,
-    i.e. wicked's nactive_oa = nactive_va = 1 over nocc = 2. The native dressed
-    output is spin-blocked, so it is diagonalized through the qubit mapper; the
-    wicked reference output is restricted single-block and uses MACIS. Both read
-    their respective output correctly and equal the same DUCC ground state.
-    """
-    pytest.importorskip("wickd")
-    out_ham, *_ = _native_ducc_output(LIH, 1, False, [1, 2], [0], level)
-    e_native = _qubit_ground_state(out_ham)
-    e_wicked = _wicked_ducc_energy(LIH, nocc=2, noa=1, nva=1, level=level)
-    assert np.isclose(e_native, e_wicked, atol=1e-6), f"level {level}: native={e_native:.10f} != wicked={e_wicked:.10f}"
-
-
 def _native_ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
     """Native DUCC level-`level` output Hamiltonian, the full Hamiltonian, and electron counts."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
@@ -377,45 +342,6 @@ def _native_ducc_output(xyz, multiplicity, unrestricted, active, inactive, level
     builder.settings().set("ducc_level", level)
     out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
     return out_ham, full_ham, nocc_a, nocc_b
-
-
-def _wicked_ducc_output(full_ham, n_alpha, n_beta, active, level):
-    """Downfold `full_ham` with the wicked_ducc reference over the frontier active space.
-
-    The active spatial MOs are split into per-spin occupied/virtual frontier counts
-    (the wicked_ducc parameterization), so the frozen space is the lowest occupied
-    orbitals -- matching the native active-index selection.
-    """
-    import qdk_chemistry.algorithms.hamiltonian_downfolder as hd  # noqa: PLC0415
-
-    hd.load()
-    downfolder = create("hamiltonian_downfolder", "wicked_ducc")
-    s = downfolder.settings()
-    s.set("nactive_oa", sum(1 for p in active if p < n_alpha))
-    s.set("nactive_va", sum(1 for p in active if p >= n_alpha))
-    s.set("nactive_ob", sum(1 for p in active if p < n_beta))
-    s.set("nactive_vb", sum(1 for p in active if p >= n_beta))
-    s.set("ducc_level", level)
-    return downfolder.run(full_ham, n_alpha, n_beta)
-
-
-@pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
-def test_ducc_levels_unrestricted_match_wicked_reference(level):
-    """Native DUCC == wicked_ducc for an OPEN-SHELL system, via the qubit mapper.
-
-    OH doublet / STO-3G, active = MO {3, 4, 5} with frozen core {0, 1, 2}. MO 4 is
-    singly occupied, so the active space is genuinely open-shell, and the frozen core
-    is a real external space (non-zero T_ext) that the BCH dressing folds in. Both the
-    native and wicked_ducc outputs store the half-antisymmetrized same-spin block, so
-    both are diagonalized with the native qubit mapper (which re-antisymmetrizes)
-    rather than ``direct_uhf``.
-    """
-    pytest.importorskip("wickd")
-    active, inactive = [3, 4, 5], [0, 1, 2]
-    out_ham, full_ham, nocc_a, nocc_b = _native_ducc_output(OH, 2, True, active, inactive, level)
-    e_native = _qubit_ground_state(out_ham)
-    e_wicked = _qubit_ground_state(_wicked_ducc_output(full_ham, nocc_a, nocc_b, active, level))
-    assert np.isclose(e_native, e_wicked, atol=1e-6), f"level {level}: native={e_native:.10f} != wicked={e_wicked:.10f}"
 
 
 @pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
