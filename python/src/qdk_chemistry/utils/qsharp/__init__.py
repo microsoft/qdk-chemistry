@@ -57,8 +57,8 @@ def create_qsharp_context(target_profile: TargetProfile = TargetProfile.Base, **
 def get_qsharp_context() -> qdk.Context:
     """Return the shared ``qdk.Context`` that QDK/Chemistry uses for all Q# composition.
 
-    Call it when you want to define your *own* Q# operation (e.g. a custom state 
-    preparation) and compose it with a chemistry builder. The context is created lazily 
+    Call it when you want to define your *own* Q# operation (e.g. a custom state
+    preparation) and compose it with a chemistry builder. The context is created lazily
     on first use and access is thread-safe.
     """
     override = getattr(_thread_local, "context", None)

@@ -102,7 +102,7 @@ Composing a callable from one context into a program owned by another raises ``Q
 Three scenarios cover how users interact with this:
 
 **Using QDK/Chemistry algorithms only.**
-You never touch the Q# context. Every circuit the library builds is created against one internal 
+You never touch the Q# context. Every circuit the library builds is created against one internal
 shared context, so everything composes automatically.
 
 **Bringing your own Q# operation.**
