@@ -90,9 +90,7 @@ circuit.get_qir()  # → qsharp.compile(program, **params)
 
 ################################################################################
 # start-cell-shared-context
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
-    QdkStandardQpeCircuitBuilder,
-)
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import create_qsharp_context, set_qsharp_context
@@ -109,7 +107,7 @@ user_state_prep = Circuit(
     qsharp_factory=QsharpFactoryData(program=user_op, parameter={}),
 )
 
-builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
 builder.settings().set(
     "controlled_circuit_mapper",
     AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),

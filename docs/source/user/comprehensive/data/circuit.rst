@@ -36,7 +36,7 @@ A :class:`~qdk_chemistry.data.Circuit` wraps a quantum circuit that may be repre
    * - ``qsharp``
      - A compiled ``qdk._native.Circuit`` object for inspection and visualization.
    * - ``qsharp_op``
-     - A Q# callable — a native Q# operation that can be composed with other Q# operations **owned by the same context** (see `Shared Q# context`_).
+     - A Q# callable — a native Q# operation that can be composed with other Q# operations.
    * - ``qsharp_factory``
      - A ``QsharpFactoryData`` — a deferred Q# program that compiles on demand (see `Q# factory harness`_ below).
 
@@ -97,8 +97,8 @@ Shared Q# context
 -----------------
 
 QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
-Composing a callable from one context into a program owned by another raises ``QSharpError: This callable belongs to a different Context``.
-The vendored chemistry utilities (``QSHARP_UTILS``) are owned by a single shared context, so any user-supplied ``qsharp_op`` or operation-valued factory parameter must be built against that same context.
+Composing a callable from one context into a program owned by another raises ``QSharpError``.
+The Q# chemistry operations (``QSHARP_UTILS``) are owned by a single shared context, so any user-supplied ``qsharp_op`` or operation-valued factory parameter must be built against that same context.
 
 Three helpers in :mod:`qdk_chemistry.utils.qsharp` manage this:
 
@@ -109,7 +109,7 @@ Three helpers in :mod:`qdk_chemistry.utils.qsharp` manage this:
    Installs a caller-supplied context process-wide so ``QSHARP_UTILS`` and your operations share it. Pass ``None`` to reset to the default context.
 
 :func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
-   A context manager that overrides the active context for the **current thread only** and restores it on exit — the thread-safe way to switch contexts in concurrent code.
+   A context manager that overrides the active context for the current thread only and restores it on exit.
 
 Operations created through the global ``qsharp`` interpreter or an unrelated context will not compose; always construct them via ``get_qsharp_context()`` or ``set_qsharp_context()``.
 
