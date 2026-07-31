@@ -167,7 +167,9 @@ A single-commutator canonical transformation
 ``H_eff = H_BD + 1/2 [S, H_OD]``, truncated to ``<= 2``-body, folding the
 external space ``Q`` of the window onto the reference active space ``P``. A
 separate diagonal generalized-Fock operator defines the generator denominators.
-The reference and window must use the same restricted MO basis. Registered as
+The reference and window must use the same restricted MO basis. RHF, ROHF, and
+spin-adapted CAS references are supported; every singly occupied ROHF orbital
+must belong to the active space. UHF orbitals are not supported. Registered as
 ``"qdk_swpt2"`` (aliases ``"sw"``, ``"schrieffer_wolff"``).
 
 The ``regularizer`` setting selects ``"flow"`` (default), ``"shift"``, or
@@ -176,7 +178,9 @@ controls that scheme; ``denom_floor`` is the bare-denominator cutoff.
 ``semicanonicalize`` is enabled by default and diagonalizes the generalized
 Fock independently within inactive, active, and virtual orbital blocks before
 forming denominators; the emitted Hamiltonian is rotated back to the original
-reference basis.
+reference basis. ROHF uses the spin-traced density and common spin-free
+orbital energies, preserving spin symmetry while the active solve selects the
+desired spin sector.
 
 Typical usage:
 

@@ -122,6 +122,17 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         "SchriefferWolffPT2: window active-space size does not match the "
         "Hamiltonian integral dimensions.");
 
+  const auto [total_alpha, total_beta] = reference->get_total_num_electrons();
+  const auto [active_alpha, active_beta] =
+      reference->get_active_num_electrons();
+  if (active_alpha > total_alpha || active_beta > total_beta ||
+      total_alpha - active_alpha != inact_global.size() ||
+      total_beta - active_beta != inact_global.size())
+    throw std::invalid_argument(
+        "SchriefferWolffPT2 requires all singly occupied orbitals in an "
+        "open-shell reference to belong to the active space; inactive "
+        "orbitals must be doubly occupied.");
+
   std::unordered_map<std::size_t, int> p_pos;
   for (int k = 0; k < static_cast<int>(P_global.size()); ++k)
     p_pos[P_global[k]] = k;
@@ -129,6 +140,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
                                                   inact_global.end());
 
   // Reference active-space occupations (per active orbital, spin-traced).
+  // For ROHF this maps each singly occupied active orbital to occupation one;
+  // the spin-free H0 then preserves S^2 and the active solve selects the
+  // desired spin sector.
   // A correlated reference exposes them as its active 1-RDM diagonal (MO
   // basis); a mean-field/HF single-determinant reference has no 1-RDM, but its
   // occupations are read directly from the reference determinant.

@@ -33,8 +33,10 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * `H_eff = H_BD + 1/2 [S, H_OD]`, truncated to <= 2-body, folding the external
  * space Q of the window onto the reference active space P. A separate diagonal
  * generalized-Fock operator defines the generator denominators. The current
- * implementation assumes a common restricted MO basis and does not
- * semicanonicalize noncanonical orbitals. See `swpt2_kernel.hpp` for the math.
+ * implementation assumes a common restricted MO basis, supporting RHF, ROHF,
+ * and spin-adapted CAS references. Every singly occupied ROHF orbital must be
+ * active. Noncanonical orbitals are semicanonicalized independently within
+ * inactive, active, and virtual blocks. See `swpt2_kernel.hpp` for the math.
  */
 class SchriefferWolffPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

@@ -320,6 +320,54 @@ TEST(SchriefferWolffPT2, AcceptsMeanFieldHfReference) {
   EXPECT_TRUE(std::isfinite(E_sw));
 }
 
+TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
+  auto hydroxyl = testing::create_oh_structure();
+  auto scf = ScfSolverFactory::create();
+  scf->settings().set("enable_gdm", false);
+  scf->settings().set("method", std::string("hf"));
+  scf->settings().set("scf_type", std::string("restricted"));
+  auto [E_rohf, wfn_rohf] = scf->run(hydroxyl, 0, 2, "sto-3g");
+  ASSERT_TRUE(wfn_rohf->get_orbitals()->is_restricted());
+
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
+  selector->settings().set("num_active_electrons", 1);
+  selector->settings().set("num_active_orbitals", 1);
+  auto reference = selector->run(wfn_rohf);
+  ASSERT_FALSE(reference->has_active_one_rdm());
+  const auto [occ_a, occ_b] = reference->get_active_orbital_occupations();
+  ASSERT_EQ(occ_a.size(), 1);
+  ASSERT_EQ(occ_b.size(), 1);
+  EXPECT_DOUBLE_EQ(occ_a(0) + occ_b(0), 1.0);
+
+  namespace qcd = qdk::chemistry::data;
+  const auto orbitals = wfn_rohf->get_orbitals();
+  const auto ref_orbitals = reference->get_orbitals();
+  const auto active = qcd::spin_channel_indices(ref_orbitals->active_indices(),
+                                                qcd::axes::alpha());
+  const auto inactive = qcd::spin_channel_indices(
+      ref_orbitals->inactive_indices(), qcd::axes::alpha());
+  std::set<size_t> used(active.begin(), active.end());
+  used.insert(inactive.begin(), inactive.end());
+  std::vector<size_t> window(active.begin(), active.end());
+  for (size_t i = 0; i < orbitals->get_num_molecular_orbitals(); ++i)
+    if (!used.count(i)) {
+      window.push_back(i);
+      break;
+    }
+  std::sort(window.begin(), window.end());
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto H_window = ham->run(testing::with_active_space(
+      orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto H_eff = swpt2->run(reference, H_window);
+  ASSERT_NE(H_eff, nullptr);
+
+  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 0);
+  EXPECT_TRUE(std::isfinite(E_sw));
+}
+
 TEST(SchriefferWolffPT2, RejectsUnrestrictedHfReference) {
   auto oxygen = testing::create_o2_structure();
   auto scf = ScfSolverFactory::create();
