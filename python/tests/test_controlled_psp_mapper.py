@@ -13,7 +13,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu imp
 from qdk_chemistry.data import Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
@@ -193,7 +193,7 @@ class TestPrepareSelectMapper:
         Uses an isolated Q# context to inspect the quantum state after applying
         Reflect.
         """
-        context = get_qsharp_context()
+        context = create_qsharp_context()
 
         # Allocate a qubit (persists across eval calls in the interpreter session)
         context.eval("use q = Qubit();")

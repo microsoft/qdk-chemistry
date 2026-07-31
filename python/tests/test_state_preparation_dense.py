@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
 from .test_helpers import create_test_orbitals
@@ -49,7 +49,7 @@ def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
         f" numQubits = {n_qubits} }}"
     )
 
-    context = get_qsharp_context()
+    context = create_qsharp_context()
     context.eval(f"use qs = Qubit[{n_qubits}];")
     context.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
 
