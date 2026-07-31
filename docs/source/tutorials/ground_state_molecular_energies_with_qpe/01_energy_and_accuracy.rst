@@ -1,7 +1,8 @@
 Energy and accuracy
 ###################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    What energy will we calculate, and how accurate must the result be?
 

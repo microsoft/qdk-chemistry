@@ -3,7 +3,8 @@ Iterative quantum phase estimation
 
 This chapter introduces iterative quantum phase estimation (:term:`IQPE`).
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    How do we extract the molecular ground-state energy from the prepared quantum state?
 

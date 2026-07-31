@@ -1,7 +1,8 @@
 Choosing the active space
 #########################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    Which electrons and orbitals must the calculation treat explicitly?
 

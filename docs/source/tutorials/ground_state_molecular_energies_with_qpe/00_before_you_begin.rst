@@ -1,7 +1,8 @@
 Before you begin
 ################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    What background and software do you need to complete this tutorial?
 

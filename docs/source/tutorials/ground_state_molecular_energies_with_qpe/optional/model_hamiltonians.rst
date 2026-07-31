@@ -1,7 +1,8 @@
 Model hamiltonians
 ##################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    When can a model Hamiltonian replace the molecular electronic Hamiltonian?
 

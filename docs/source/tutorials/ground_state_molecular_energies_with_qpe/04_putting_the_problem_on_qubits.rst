@@ -1,7 +1,8 @@
 Putting the problem on qubits
 #############################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    How does the active-space electronic problem become a qubit problem?
 

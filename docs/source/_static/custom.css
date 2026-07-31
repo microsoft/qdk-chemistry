@@ -40,3 +40,14 @@ a.bibtex.internal {
 a.bibtex.internal:hover {
     text-decoration: underline;
 }
+
+/* Distinguish tutorial chapter orientation from notes, assignments, and hints. */
+.rst-content .admonition.chapter-focus {
+    background-color: #f7f2fa;
+    border-left: 4px solid #6d3f8c;
+}
+
+.rst-content .admonition.chapter-focus > .admonition-title {
+    background-color: #6d3f8c;
+    color: #ffffff;
+}

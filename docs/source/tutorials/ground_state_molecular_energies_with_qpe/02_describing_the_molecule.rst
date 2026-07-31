@@ -1,7 +1,8 @@
 Describing the molecule
 #######################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    How do we specify a molecular system and construct the starting wavefunction for the correlated calculation?
 

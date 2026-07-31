@@ -1,7 +1,8 @@
 Physical resource estimation
 ############################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    What fault-tolerant machine could execute a circuit from the required tutorial?
 

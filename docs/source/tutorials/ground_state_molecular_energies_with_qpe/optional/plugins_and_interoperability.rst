@@ -1,7 +1,8 @@
 Plugins and interoperability
 ############################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    How can another software package implement a stage of a :term:`QDK`/Chemistry workflow?
 

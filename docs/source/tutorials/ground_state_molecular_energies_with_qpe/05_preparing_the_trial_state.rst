@@ -1,7 +1,8 @@
 Preparing the trial state
 #########################
 
-.. note:: Chapter focus
+.. admonition:: Chapter focus
+   :class: chapter-focus
 
    How do we prepare a state that lets phase estimation return the ground-state energy reliably?
 
