@@ -17,7 +17,7 @@ After completing this chapter, you will be able to:
 - Determine which steps of the required molecular workflow still apply.
 - State the assumptions introduced by using a model.
 
-Choose the model and its degrees of freedom
+The model and its degrees of freedom
 ===========================================
 
 .. todo::
@@ -25,14 +25,14 @@ Choose the model and its degrees of freedom
    Introduce fermionic and spin models through one concrete scientific question.
    Define sites, edges, boundary conditions, and model parameters before using the corresponding :term:`QDK`/Chemistry data structures.
 
-Construct the lattice
+The lattice
 =====================
 
 .. todo::
 
    Introduce ``LatticeGraph`` and construct a small lattice suitable for a fast executable example.
 
-Construct and solve the Hamiltonian
+Model construction and solution
 ===================================
 
 .. todo::
@@ -40,7 +40,7 @@ Construct and solve the Hamiltonian
    Build one model Hamiltonian with native :term:`QDK`/Chemistry tools.
    Explain whether it produces a fermionic Hamiltonian requiring a qubit mapping or a qubit operator directly.
 
-Connect the model to the required tutorial
+Connection to the required tutorial
 ==========================================
 
 .. todo::
@@ -48,7 +48,7 @@ Connect the model to the required tutorial
    Identify which required-tutorial steps are reused, skipped, or reinterpreted.
    State the physical information discarded when replacing the molecular Hamiltonian with the chosen model.
 
-Check your understanding
+Knowledge check
 ========================
 
 .. todo::

@@ -6,7 +6,8 @@ Before you begin
 
    What background and software do you need to complete this tutorial?
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Create a working copy of the :doc:`lab notebook <lab_notebook>`.
    Complete :ref:`lab-notebook-setup` before running a scientific calculation.
@@ -50,7 +51,7 @@ Check the version before creating the environment:
 
 Continue if the command reports Python 3.10 or later.
 
-Set up the Python environment
+Python environment setup
 =============================
 
 Use an isolated Python environment so that the tutorial dependencies do not conflict with packages used by other projects.
@@ -75,7 +76,7 @@ QDK/Chemistry already requests QDK's Jupyter support, which supplies the molecul
 The required workflow does not use the ``all``, ``qiskit-extras``, or ``qre`` optional-dependency groups.
 Keep the environment active while completing the tutorial.
 
-Check your setup
+Setup check
 ================
 
 Download :download:`tutorial_qpe_setup.py <../../_static/examples/python/tutorial_qpe_setup.py>` into the tutorial working folder.
@@ -115,7 +116,7 @@ In a **Check your understanding** section, answer each question before selecting
 Select the heading again to hide the answer.
 
 .. admonition:: What happens when you click on a question box (after you've answered the question)?
-   :class: hint
+   :class: quiz-question
    :collapsible: closed
 
    You can check your answer.

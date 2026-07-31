@@ -16,7 +16,7 @@ After completing this chapter, you will be able to:
 - Replace one native implementation with a compatible plugin implementation.
 - Identify the dependency and provenance information needed for reproducibility.
 
-Understand interchangeable implementations
+Interchangeable implementations
 ==========================================
 
 .. todo::
@@ -24,7 +24,7 @@ Understand interchangeable implementations
    Explain the distinction among an algorithm interface, a named implementation, its settings, and a plugin.
    Connect the explanation to the native factory calls used throughout the required tutorial.
 
-Discover the current environment
+The current environment
 ================================
 
 .. todo::
@@ -32,7 +32,7 @@ Discover the current environment
    Add a short Python example that lists implementations and settings.
    Explain why optional implementations may be absent when their dependencies are not installed.
 
-Extend the classical workflow
+Classical-workflow extensions
 =============================
 
 .. todo::
@@ -40,7 +40,7 @@ Extend the classical workflow
    Decide whether to teach density functional theory or a Python-based Simulations of Chemistry Framework (:term:`PySCF`) implementation as the primary chemistry plugin example.
    State how the substituted method changes the scientific approximation and provenance.
 
-Consider quantum-framework interoperability
+Quantum-framework interoperability
 ============================================
 
 .. todo::
@@ -49,14 +49,14 @@ Consider quantum-framework interoperability
    If included, isolate its installation, version constraints, and application programming interface (:term:`API`) from the required native workflow.
    Do not require Qiskit elsewhere in the tutorial.
 
-Record reproducibility information
+Reproducibility information
 ==================================
 
 .. todo::
 
    Define the package versions, implementation names, settings, and citations that a learner must record when combining :term:`QDK`/Chemistry with plugins.
 
-Check your understanding
+Knowledge check
 ========================
 
 .. todo::

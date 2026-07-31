@@ -20,7 +20,8 @@ After completing this chapter, you will be able to:
 - Run :term:`IQPE` with native :term:`QDK`/Chemistry tools.
 - Reconstruct the total molecular energy and evaluate its error.
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-phase-estimation` and :ref:`lab-notebook-conclusion`.
    Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
@@ -34,7 +35,7 @@ Prerequisite concepts
    Recall the qubit Hamiltonian, core energy, trial state, and fidelity.
    Link to an external phase-estimation refresher for learners who need to review the basic circuit model.
 
-Encode energy as a phase
+Energy-to-phase encoding
 ========================
 
 .. todo::
@@ -42,7 +43,7 @@ Encode energy as a phase
    Derive the relationship among the Hamiltonian, time-evolution operator, eigenphase, evolution time, and energy.
    Reconcile the sign convention used by the documentation, circuit implementation, and QpeResult conversion before publishing this derivation.
 
-Measure one phase bit at a time
+One phase bit at a time
 ===============================
 
 .. todo::
@@ -50,7 +51,7 @@ Measure one phase bit at a time
    Explain the iterative circuit, controlled evolution, phase feedback, and single readout ancilla.
    Mention standard multi-ancilla phase estimation only as a contrast, not as a second required algorithm.
 
-Choose the numerical controls
+Numerical controls
 =============================
 
 .. todo::
@@ -58,7 +59,7 @@ Choose the numerical controls
    Explain evolution time, Hamiltonian-simulation approximation, number of phase bits, shots per bit, and number of trials.
    Connect each control to the error taxonomy introduced in the first chapter.
 
-Run iterative phase estimation
+Iterative phase estimation
 ==============================
 
 .. todo::
@@ -67,7 +68,7 @@ Run iterative phase estimation
    Use short circuit-construction and inspection steps before the final simulation so learners do not repeat the expensive calculation unnecessarily.
    Base the scientific workflow on ``examples/qpe_stretched_n2.ipynb`` without carrying its Qiskit comparison or resource-estimation section into the required tutorial.
 
-Interpret repeated trials
+Repeated trials
 =========================
 
 .. todo::
@@ -75,7 +76,7 @@ Interpret repeated trials
    Explain why imperfect overlap and finite sampling can produce different trial outcomes.
    Define the aggregation rule and report enough information to distinguish energy resolution from statistical confidence.
 
-Reconstruct the molecular energy
+Molecular-energy reconstruction
 ================================
 
 .. todo::
@@ -88,7 +89,7 @@ Reconstruct the molecular energy
    Update the phase-estimation and conclusion sections of the lab notebook.
    Attribute the remaining error to the approximations used in the workflow.
 
-Complete the workflow
+The complete workflow
 =====================
 
 .. todo::
@@ -100,7 +101,7 @@ Complete the workflow
    State the environment, command, expected output, and criteria for successful completion.
    Mark the final example as a slow integration test and keep shorter tests for the individual components.
 
-Check your understanding
+Knowledge check
 ========================
 
 .. todo::

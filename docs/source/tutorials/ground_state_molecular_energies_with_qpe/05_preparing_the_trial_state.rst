@@ -18,7 +18,8 @@ After completing this chapter, you will be able to:
 - Generate a native sparse-isometry state-preparation circuit.
 - Distinguish trial-state quality from state-preparation circuit cost.
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-trial-state`.
    Record trial-state fidelity and state-preparation circuit statistics as separate quantities.
@@ -40,7 +41,7 @@ Phase estimation needs a trial state
    Explain that phase estimation samples eigenvalues represented in the input state and does not independently search for the ground state.
    Connect this fact to the multi-configurational wavefunction from the active-space chapter.
 
-Measure trial-state quality
+Trial-state quality
 ===========================
 
 .. todo::
@@ -48,7 +49,7 @@ Measure trial-state quality
    Define the overlap amplitude and fidelity.
    State precisely how ground-state fidelity affects the probability of obtaining the ground-state energy in an ideal phase-estimation trial.
 
-Build a sparse trial wavefunction
+A sparse trial wavefunction
 =================================
 
 .. todo::
@@ -56,7 +57,7 @@ Build a sparse trial wavefunction
    Select important determinants from the correlated reference.
    Explain the fidelity lost by truncation and the classical projected calculation used to obtain a normalized trial wavefunction.
 
-Generate the preparation circuit
+The preparation circuit
 ================================
 
 .. todo::
@@ -64,7 +65,7 @@ Generate the preparation circuit
    Explain the native :term:`GF(2)+X` sparse-isometry method at the depth needed to interpret its inputs and output.
    Do not require or compare against Qiskit in the required chapter.
 
-Evaluate quality and cost separately
+Trial-state quality and cost
 ====================================
 
 .. todo::
@@ -72,14 +73,14 @@ Evaluate quality and cost separately
    Report trial-state fidelity and circuit statistics as different quantities.
    Explain that state preparation does not change the compute-register problem size but can change circuit cost and the number of phase-estimation trials.
 
-Run the preparation
-===================
+Running the preparation
+=======================
 
 .. todo::
 
    Add a standalone native Python example that truncates the correlated wavefunction, computes fidelity, builds the sparse-isometry circuit, and checks its register size.
 
-Check your understanding
+Knowledge check
 ========================
 
 .. todo::

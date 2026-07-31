@@ -245,15 +245,25 @@ DOCS_PYTHON_EXAMPLES_DIR = (
 )
 
 
-def test_tutorial_choose_active_space_results():
-    """Check the stable numerical and structural results used by Chapter 3."""
-    script_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.py"
-    module_spec = spec_from_file_location("tutorial_choose_active_space", script_path)
+def _load_tutorial_module(module_name: str):
+    """Load a course script whose neighboring scripts may be imported."""
+    script_path = DOCS_PYTHON_EXAMPLES_DIR / f"{module_name}.py"
+    module_spec = spec_from_file_location(module_name, script_path)
     assert module_spec is not None
     assert module_spec.loader is not None
     tutorial_module = module_from_spec(module_spec)
     sys.modules[module_spec.name] = tutorial_module
-    module_spec.loader.exec_module(tutorial_module)
+    sys.path.insert(0, str(DOCS_PYTHON_EXAMPLES_DIR))
+    try:
+        module_spec.loader.exec_module(tutorial_module)
+    finally:
+        sys.path.pop(0)
+    return tutorial_module
+
+
+def test_tutorial_choose_active_space_results():
+    """Check the stable numerical and structural results used by Chapter 3."""
+    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
 
     result = tutorial_module.run_active_space_workflow()
     assert abs(result.hartree_fock_energy - (-108.866810916955)) < 1e-8
@@ -282,6 +292,36 @@ def test_tutorial_choose_active_space_results():
         set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"}
         for orbital in cube_data.values()
     )
+
+
+def test_tutorial_map_n2_to_qubits_results():
+    """Check the stable Jordan-Wigner mapping results used by Chapter 4."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_map_n2_to_qubits")
+
+    result = tutorial_module.run_qubit_mapping_workflow()
+    assert result.active_space_result.refined_indices == list(range(5, 9))
+    assert result.num_active_spatial_orbitals == 4
+    assert result.num_active_spin_orbitals == 8
+    assert result.num_compute_qubits == 8
+    assert result.num_pauli_terms == 161
+    assert result.qubit_hamiltonian.encoding == "jordan-wigner"
+    assert result.qubit_hamiltonian.fermion_mode_order.value == "blocked"
+    assert abs(result.core_energy - (-103.7027930993334)) < 1e-8
+    assert result.num_fixed_electron_states == 36
+    assert abs(result.mapped_active_energy - (-5.261838965737397)) < 1e-8
+    assert abs(result.mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
+    assert abs(result.mapping_energy_difference) < 1e-10
+
+    preview_terms = tutorial_module.representative_pauli_terms(result.qubit_hamiltonian)
+    assert len(preview_terms) == 8
+    assert preview_terms[0][0] == "I" * result.num_compute_qubits
+    assert all(set(pauli_string).issubset({"I", "Z"}) for pauli_string, _ in preview_terms[1:4])
+    assert all("X" in pauli_string or "Y" in pauli_string for pauli_string, _ in preview_terms[4:])
+    assert tutorial_module.format_pauli_string("IXXIIXXI") == (
+        "X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)"
+    )
+
 
 
 @_requires_notebook_deps

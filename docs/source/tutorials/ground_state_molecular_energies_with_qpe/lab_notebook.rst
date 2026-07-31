@@ -85,13 +85,21 @@ Qubit representation
 ====================
 
 Record how the selected electronic Hamiltonian was represented on qubits.
+The :ref:`compute register <tutorial-compute-register>` contains the qubits that store the encoded active-space fermionic state.
+Each qubit in this register is a compute-register qubit.
+Ancilla qubits assist with algorithmic tasks such as control, workspace, or readout and are recorded separately.
 
 - Fermion-to-qubit encoding:
 - Number of active spatial orbitals:
 - Number of active spin orbitals:
 - Number of compute-register qubits:
 - Number of Pauli terms in the qubit Hamiltonian:
+- :ref:`Fixed-electron-number subspace <tutorial-fixed-electron-number-subspace>` (:math:`n_\alpha`, :math:`n_\beta`, and number of basis states):
 - Core energy and units:
+- Mapped active-space ground-state energy and units:
+- Mapped selected-space total energy and units:
+- Difference from the :ref:`selected-space algorithmic reference <tutorial-selected-space-reference>` and units:
+- Interpretation of the energy comparison:
 - Quantities excluded from the compute-register qubit count:
 
 .. _lab-notebook-trial-state:

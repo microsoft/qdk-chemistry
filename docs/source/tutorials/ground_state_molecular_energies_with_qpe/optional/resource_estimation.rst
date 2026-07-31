@@ -33,7 +33,7 @@ From problem size to machine size
    Define compute-register qubits, algorithm ancillas, logical qubits, physical qubits, logical operations, and runtime.
    Explain why a compute-register count is not a hardware estimate.
 
-State the estimation assumptions
+Estimation assumptions
 ================================
 
 .. todo::
@@ -41,7 +41,7 @@ State the estimation assumptions
    Introduce the hardware architecture, error rates, error-correction scheme, magic-state factory, and total error budget.
    Explain that the output is conditional on these inputs rather than a prediction of a specific machine.
 
-Build the estimation application
+The estimation application
 ================================
 
 .. todo::
@@ -49,7 +49,7 @@ Build the estimation application
    Select a representative circuit from the required tutorial and convert it with ``Circuit.get_qre_application()``.
    Explain whether the circuit represents one :term:`IQPE` iteration, one trial, or the complete algorithmic workload.
 
-Run and interpret the estimator
+Estimator workflow
 ===============================
 
 .. todo::
@@ -57,7 +57,7 @@ Run and interpret the estimator
    Add a standalone Python example using the optional ``qre`` dependency.
    Present the Pareto-optimal estimates and interpret physical qubits, runtime, and factory requirements without conflating them with the molecular problem size.
 
-Check your understanding
+Knowledge check
 ========================
 
 .. todo::

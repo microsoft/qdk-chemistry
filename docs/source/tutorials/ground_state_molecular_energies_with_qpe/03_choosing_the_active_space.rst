@@ -18,13 +18,14 @@ After completing this chapter, you will be able to:
 - Explain how orbital entropies can refine an active-space choice.
 - Evaluate the tradeoff between active-space accuracy and problem size.
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-active-space`.
    Record the evidence used to select the active space, not only the final orbital and electron counts.
    Explain what the energy comparison establishes within the chosen basis and identify the energy that will serve as the algorithmic reference.
 
-Download the example
+Example download
 ====================
 
 Download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save both files in your tutorial working directory.
@@ -32,7 +33,7 @@ Open both files in Visual Studio Code and review the complete script, including 
 The script resumes the stretched N\ :sub:`2` workflow from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining the correlated model.
 Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive notebook use the same tested chemistry workflow rather than duplicate it.
 
-Recognize the limits of one determinant
+The limits of one determinant
 =======================================
 
 As :ref:`the previous chapter explains <tutorial-hartree-fock-wavefunction>`, the `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ restricts the `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_ to one optimized `Slater determinant <https://en.wikipedia.org/wiki/Slater_determinant>`_.
@@ -52,7 +53,9 @@ where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is i
 Allowing every possible determinant in all 28 ``cc-pvdz`` spatial orbitals would be unnecessarily expensive for this tutorial.
 An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ instead restricts which orbital occupations may vary, reducing the computational costs.
 
-Define the active space
+.. _tutorial-active-space-definition:
+
+The active space
 =======================
 
 An active-space calculation partitions the spatial molecular orbitals into three groups:
@@ -65,6 +68,13 @@ Active orbitals
    The calculation treats correlation among the active electrons explicitly.
 Virtual orbitals
    Remain empty in every determinant and do not participate explicitly in the correlated calculation.
+
+.. admonition:: Why can an inactive orbital still contribute to the molecular energy?
+   :class: quiz-question
+   :collapsible: closed
+
+   An inactive spatial orbital remains doubly occupied in every determinant.
+   Its electrons and their interactions contribute to the core part of the active-space Hamiltonian even though the calculation does not vary their occupations.
 
 A complete active space containing :math:`n_e` active electrons in :math:`n_o` active spatial orbitals is written :term:`CAS`\ :math:`(n_e,n_o)`.
 Complete active space configuration interaction (:term:`CASCI`) forms every determinant consistent with those active electron and orbital counts while keeping the molecular orbitals fixed.
@@ -83,7 +93,7 @@ The ``qdk_valence`` selector uses those numbers to construct an initial active s
 The script reports the resulting active electron and orbital counts and the zero-based indices of the active orbitals.
 Use these values with the total number of ``cc-pvdz`` molecular orbitals from :doc:`Describing the molecule <02_describing_the_molecule>` to determine the initial partitioning of inactive, active, and virtual orbitals.
 
-Compute a correlated active-space wavefunction
+A correlated active-space wavefunction
 ==============================================
 
 The active-space selector labels orbitals but does not determine how strongly each orbital participates in correlation.
@@ -98,6 +108,8 @@ The script constructs the molecular Hamiltonian in the initial valence space and
 
 For an active space with :math:`n_o` spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, choosing the occupied :math:`\alpha` and :math:`\beta` spin orbitals gives independent counts that multiply.
 The number of possible determinants in the wavefunction is therefore
+
+.. _tutorial-determinant-count:
 
 .. math::
 
@@ -116,8 +128,8 @@ For these occupation quantities, each determinant contributes according to the s
 Together, the :term:`RDM` elements collect these contributions into the probabilities of the four local occupation states.
 If the important determinants give an orbital the same occupation, one probability dominates; if they assign different occupations, the probabilities spread among several local states.
 
-Transform to natural orbitals
-=============================
+Natural-orbital transformation
+==============================
 
 Molecular orbitals are not unique: a unitary rotation applied within an active orbital subspace changes the individual orbital shapes but not the subspace they span.
 For an exact :term:`CASCI` calculation in a fixed active subspace, such a rotation leaves the total energy unchanged.
@@ -142,7 +154,7 @@ The script then rebuilds and resolves the initial valence-space Hamiltonian so t
 The two :term:`CASCI` energies should agree to the displayed precision because both calculations span the same complete active space.
 The second calculation is needed for the orbital-resolved selection evidence, not to lower the energy.
 
-Refine the active space with orbital entropies
+Active-space refinement with orbital entropies
 ==============================================
 
 The single-orbital entropy used here is the `von Neumann entropy <https://en.wikipedia.org/wiki/Von_Neumann_entropy>`_ of the reduced density matrix for one spatial orbital :cite:`Boguslawski2015`.
@@ -178,6 +190,13 @@ By contrast, a low-entropy orbital remains close to one local occupation state a
 :term:`QDK`/Chemistry evaluates these probabilities and entropies from the :term:`RDMs <RDM>` stored in the :term:`CASCI` wavefunction.
 The resulting data flow is therefore: the correlated wavefunction determines the local-state probabilities, those probabilities determine one entropy for each orbital, and autoCAS compares the orbital entropies to select the active group.
 
+.. admonition:: Why does autoCAS require a correlated calculation before it can select orbitals?
+   :class: quiz-question
+   :collapsible: closed
+
+   The selector uses single-orbital entropies derived from local occupation probabilities.
+   Those probabilities require one- and two-particle :term:`RDMs <RDM>` from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
+
 The entropy-difference autoCAS selector, ``qdk_autocas_eos``, sorts the normalized orbital entropies and tests the consecutive gaps against its entropy and difference thresholds :cite:`Stein2016,Stein2019`.
 It selects the largest high-entropy group separated by a qualifying gap.
 A large gap provides evidence of a natural boundary between orbitals with similarly strong occupation coupling and orbitals whose occupations are much less coupled to the rest of the active space.
@@ -196,7 +215,9 @@ Among the unselected orbitals, those below the occupied--virtual boundary of the
 Freezing these low-entropy orbitals is still an approximation because low entropy does not mean that their correlation contribution is exactly zero, so the energy comparison below measures part of its cost.
 Their entropies are small rather than exactly zero, and allowing excitations involving them can still lower the correlated energy.
 
-Compute the algorithmic reference
+.. _tutorial-selected-space-reference:
+
+The algorithmic reference
 =================================
 
 The script finishes by solving the refined active-space Hamiltonian with :term:`CASCI`:
@@ -211,7 +232,7 @@ The resulting determinant count quantifies the reduction in problem size for the
 The final :term:`CASCI` energy is the exact ground-state energy of the selected active-space Hamiltonian, up to numerical solver tolerance, and will be the *algorithmic reference energy* for state preparation and phase estimation.
 :term:`CASCI` is a full configuration-interaction calculation within the selected active space, but it is not the exact energy of N\ :sub:`2` in the full ``cc-pvdz`` orbital space: fixing the inactive orbitals as doubly occupied and the virtual orbitals as empty excludes correlation involving those orbitals.
 
-Evaluate the active-space choice
+The active-space choice
 ================================
 
 The initial valence space includes more orbitals than the refined active space so that the correlated calculation can first measure the entropy of every candidate orbital.
@@ -223,11 +244,19 @@ The script reports the observed energy increase when reducing the active space.
 The observed increase, which is much larger than the 1 milliHartree teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`, quantifies correlation lost when reducing the initial valence space.
 The 1 milliHartree target applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference; it does not include active-space, finite-basis, or fixed-geometry errors.
 
+.. admonition:: Why should the energy increase caused by active-space refinement not be judged against the 1 milliHartree teaching target?
+   :class: quiz-question
+   :collapsible: closed
+
+   The energy increase measures correlation excluded when orbital occupations are frozen during active-space refinement.
+   The 1 milliHartree target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
+   These comparisons measure different approximations.
+
 For this tutorial, the energy loss is accepted because the refined active space preserves the strongest static-correlation signal while reducing the later quantum calculation to a size that can be studied directly.
 The next chapter will determine how the selected active spatial orbitals are represented by qubits.
 
-Run the calculation
-===================
+Running the calculation
+=======================
 
 With the Python environment from :doc:`Before you begin <00_before_you_begin>` active, run the complete script from the Visual Studio Code integrated terminal:
 
@@ -236,7 +265,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_choose_active_space.py
 
 .. admonition:: What initial valence space and determinant count did the script construct?
-   :class: hint
+   :class: quiz-question
    :collapsible: closed
 
    The script reports ten active electrons in eight active spatial orbitals, written :term:`CAS`\ :math:`(10,8)`, with five :math:`\alpha` and five :math:`\beta` active electrons.
@@ -245,7 +274,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    The determinant count is :math:`\binom{8}{5}\binom{8}{5}=3136`.
 
 .. admonition:: Which orbitals did autoCAS retain, and how much did refinement reduce the problem size?
-   :class: hint
+   :class: quiz-question
    :collapsible: closed
 
    Orbitals 5 through 8 have entropies near 0.31, separated by a large gap from the remaining values of 0.08 or less.
@@ -254,7 +283,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    Its determinant count is :math:`\binom{4}{2}\binom{4}{2}=36`, compared with 3,136 determinants in the initial valence space.
 
 .. admonition:: Did the natural-orbital transformation change the CASCI energy?
-   :class: hint
+   :class: quiz-question
    :collapsible: closed
 
    No change appears at the displayed precision.
@@ -264,7 +293,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 Record the orbital representation, initial and refined active-space sizes, selection evidence, determinant counts, and both :term:`CASCI` energies in the :ref:`active-space section of the lab notebook <lab-notebook-active-space>`.
 Use the final selected-space energy as the algorithmic reference, while retaining the larger-space result as evidence of the correlation excluded by the compact model.
 
-Visualize the candidate orbitals
+Candidate-orbital visualization
 ================================
 
 Download and open :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` in Visual Studio Code.
@@ -290,31 +319,6 @@ Single-orbital entropy and autoCAS selection
 
 autoCAS selects the strongly coupled group from gaps in the orbital entropies, not from orbital shapes or a cutoff applied to the natural occupations.
 Use the shapes as aids to chemical interpretation, but defend the final active space using the numerical occupation and entropy evidence in the overlays.
-
-Check your understanding
-========================
-
-.. admonition:: Why can an inactive orbital still contribute to the molecular energy?
-   :class: hint
-   :collapsible: closed
-
-   An inactive spatial orbital remains doubly occupied in every determinant.
-   Its electrons and their interactions contribute to the core part of the active-space Hamiltonian even though the calculation does not vary their occupations.
-
-.. admonition:: Why does autoCAS require a correlated calculation before it can select orbitals?
-   :class: hint
-   :collapsible: closed
-
-   The selector uses single-orbital entropies derived from local occupation probabilities.
-   Those probabilities require one- and two-particle :term:`RDMs <RDM>` from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
-
-.. admonition:: Why should the energy increase caused by active-space refinement not be judged against the 1 milliHartree teaching target?
-   :class: hint
-   :collapsible: closed
-
-   The energy increase measures correlation excluded when orbital occupations are frozen during active-space refinement.
-   The 1 milliHartree target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
-   These comparisons measure different approximations.
 
 Further reading
 ===============

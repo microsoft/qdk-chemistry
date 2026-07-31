@@ -69,9 +69,17 @@ At a fixed ratio of electrons to orbitals, this number grows exponentially with 
 Approximate classical methods can reach larger spaces by retaining or compressing selected information, but their accuracy depends on preserving the correlations that matter.
 When many configurations contribute substantially, omitted correlations can cause significant errors in the calculated energy.
 
+.. _tutorial-occupation-encoding:
+
 An occupation-number encoding assigns one qubit to each spin orbital to record whether that orbital is unoccupied or occupied.
 The amplitudes of the possible occupations are represented by the quantum state rather than stored as an explicit classical list.
-:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of the compute register formed by these qubits.
+
+.. _tutorial-compute-register:
+
+A *quantum register* is a group of qubits treated as one part of a computation because they serve the same role.
+The occupation-encoding qubits form the *compute register*, which stores the encoded fermionic state and is acted on by the qubit Hamiltonian.
+`Ancilla qubits <https://en.wikipedia.org/wiki/Ancilla_bit>`_ are additional qubits used for tasks such as control, temporary workspace, or readout; they do not represent additional spin orbitals and are counted separately.
+:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of this register.
 During Hamiltonian time evolution, each energy eigenstate acquires a phase determined by its energy.
 Quantum phase estimation estimates this phase and converts it to an energy eigenvalue :cite:`AspuruGuzik2005,vonBurg2021`.
 This representation does not make the calculation automatically efficient.

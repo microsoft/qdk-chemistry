@@ -16,7 +16,8 @@ After completing this chapter, you will be able to:
 - Explain why each energy comparison requires a clearly defined reference.
 - Identify the main approximations that affect the final energy estimate.
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-goal`.
    Record the target quantity, the 1 milliHartree teaching target, and the reference used to evaluate that target.
@@ -39,6 +40,12 @@ The electronic contribution includes the electron kinetic energy, electron--nucl
 The nuclear contribution is the repulsion among the fixed nuclei.
 :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains how these contributions are tracked when the molecular Hamiltonian is represented on qubits.
 
+.. admonition:: Which contributions make up the fixed-geometry total energy reported by this tutorial?
+   :class: quiz-question
+   :collapsible: closed
+
+   The fixed-geometry total energy is the sum of the electronic energy and the repulsion energy among the fixed nuclei.
+
 :term:`QDK`/Chemistry reports molecular energies in `hartree <https://en.wikipedia.org/wiki/Hartree>`_, with symbol :math:`E_{\mathrm{h}}`.
 One milliHartree is :math:`10^{-3}\ E_{\mathrm{h}}`, approximately :math:`2.6255\ \mathrm{kJ\,mol^{-1}}` using the 2022 :term:`CODATA` constants :cite:`Mohr2025`.
 
@@ -58,6 +65,13 @@ Accurate electronic energies are necessary inputs to predictions of chemical equ
 At constant temperature and pressure, these predictions depend on `Gibbs free-energy <https://en.wikipedia.org/wiki/Gibbs_free_energy>`_ differences that also include `zero-point energy <https://en.wikipedia.org/wiki/Zero-point_energy>`_, thermal, entropic, and environmental contributions.
 This tutorial calculates only the fixed-geometry electronic and nuclear components of the energy; it does not calculate a free energy.
 
+.. admonition:: Why does an accurate electronic energy not, by itself, determine an equilibrium constant or rate?
+   :class: quiz-question
+   :collapsible: closed
+
+   Electronic and nuclear energies are only some of the contributions to a free energy.
+   Zero-point, thermal, entropic, and environmental contributions can also affect an equilibrium constant or reaction rate.
+
 The dimensionless `equilibrium constant <https://en.wikipedia.org/wiki/Equilibrium_constant>`_ :math:`K` is related to the standard reaction Gibbs free energy :math:`\Delta G^\circ` by
 
 .. math::
@@ -75,6 +89,13 @@ Both relations depend exponentially on a free-energy difference; therefore, the 
 At :math:`298.15\ \mathrm{K}`, :math:`RT \approx 2.479\ \mathrm{kJ\,mol^{-1}}`, an error of 1 milliHartree can produce a factor of approximately :math:`2.88` in a predicted equilibrium constant or rate if the other free-energy contributions are exact.
 An error of approximately :math:`5.71\ \mathrm{kJ\,mol^{-1}}`, or :math:`2.17` milliHartree, produces a factor of ten.
 These estimates illustrate why errors of only a few milliHartrees can have a significant impact on accuracy.
+
+.. admonition:: Why can a small free-energy error cause a large error in a predicted equilibrium constant or reaction rate?
+   :class: quiz-question
+   :collapsible: closed
+
+   Equilibrium constants and reaction rates depend exponentially on reaction and activation free-energy differences.
+   A small error in a free-energy difference can therefore multiply the predicted equilibrium constant or rate by a large factor.
 
 Accuracy, precision, and other definitions
 ==========================================
@@ -118,29 +139,6 @@ For example:
    Verify as later chapters are drafted that each approximation is introduced where it first enters the calculation.
 
 Each approximation is introduced where it first enters the calculation, and the corresponding comparison is recorded before proceeding.
-
-Check your understanding
-========================
-
-.. admonition:: Which contributions make up the fixed-geometry total energy reported by this tutorial?
-   :class: hint
-   :collapsible: closed
-
-   The fixed-geometry total energy is the sum of the electronic energy and the repulsion energy among the fixed nuclei.
-
-.. admonition:: Why can a small free-energy error cause a large error in a predicted equilibrium constant or reaction rate?
-   :class: hint
-   :collapsible: closed
-
-   Equilibrium constants and reaction rates depend exponentially on reaction and activation free-energy differences.
-   A small error in a free-energy difference can therefore multiply the predicted equilibrium constant or rate by a large factor.
-
-.. admonition:: Why does an accurate electronic energy not, by itself, determine an equilibrium constant or rate?
-   :class: hint
-   :collapsible: closed
-
-   Electronic and nuclear energies are only some of the contributions to a free energy.
-   Zero-point, thermal, entropic, and environmental contributions can also affect an equilibrium constant or reaction rate.
 
 Further reading
 ===============

@@ -17,13 +17,14 @@ After completing this chapter, you will be able to:
 - Generate a Hartree--Fock wavefunction with the built-in :term:`QDK`/Chemistry self-consistent field solver.
 - Interpret an energy change caused by changing the basis set.
 
-.. important:: Lab notebook assignment
+.. admonition:: Lab notebook assignment
+   :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-molecule` in the lab notebook as you work through this chapter.
    Record the molecular inputs and both Hartree--Fock energies before calculating their difference.
    Interpret the difference as basis-set sensitivity rather than as the total error of either energy.
 
-Download the example
+Example download
 ====================
 
 Download :download:`tutorial_describe_n2.py <../../_static/examples/python/tutorial_describe_n2.py>` and save it in your tutorial working directory.
@@ -32,7 +33,7 @@ The sections below explain the inputs and calculations in this complete executab
 
 .. _tutorial-molecular-system:
 
-Specify the molecular system
+The molecular system
 ============================
 
 An electronic-structure calculation requires the identities and positions of the nuclei, the number of electrons, and the target spin state.
@@ -59,7 +60,7 @@ The :term:`XYZ` format does not specify molecular charge or spin multiplicity, s
 
 .. _tutorial-hartree-fock-wavefunction:
 
-Choose a mean-field wavefunction
+The mean-field wavefunction
 ================================
 
 The `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ approximates the many-electron wavefunction with one :ref:`Slater determinant <tutorial-orbitals-and-determinants>`.
@@ -81,7 +82,7 @@ This energy remains approximate because the determinant cannot represent electro
 
 .. _tutorial-molecular-orbitals:
 
-Represent the orbitals in a finite basis
+Finite-basis orbital representation
 ========================================
 
 The Hartree--Fock wavefunction :math:`\Phi_{\mathrm{HF}}` is a determinant constructed from occupied spin orbitals.
@@ -90,6 +91,14 @@ The molecular orbitals are functions of position that provide the spatial parts 
 Changing the occupied molecular orbitals changes the Hartree--Fock determinant and its many-electron wavefunction.
 Because the Hartree--Fock determinant is built from one-electron functions, optimizing the many-electron wavefunction reduces to optimizing these molecular orbitals.
 Their spatial shapes and occupations also help identify bonding and antibonding interactions, and the optimized orbitals provide the starting representation for later multi-configurational calculations.
+
+.. admonition:: What is a molecular orbital, and why is it useful?
+   :class: quiz-question
+   :collapsible: closed
+
+   A molecular orbital is a one-electron spatial function used to construct the spin orbitals in a Hartree--Fock determinant.
+   Molecular orbitals make the approximate many-electron wavefunction computationally tractable, help interpret bonding and occupations, and provide the starting representation for later multi-configurational calculations.
+
 A computer cannot optimize arbitrary functions directly.
 Electronic-structure calculations instead expand each molecular orbital :math:`\phi_p` in a finite collection of known basis functions :math:`\{\chi_\mu\}`:
 
@@ -114,7 +123,14 @@ The comparison between basis functions in this chapter does not determine the ex
 Instead, it measures how much the calculated energy changes between two related basis choices while the geometry and electronic-structure method (Hartree--Fock) remain fixed.
 This change is the basis-set sensitivity for this comparison.
 
-Optimize the wavefunction self-consistently
+.. admonition:: Which molecular inputs remain fixed when comparing the two basis sets?
+   :class: quiz-question
+   :collapsible: closed
+
+   The atomic elements and coordinates, molecular charge, spin multiplicity, and Hartree--Fock method remain fixed.
+   Only the basis set changes.
+
+Self-consistent wavefunction optimization
 ===========================================
 
 The occupied molecular orbitals determine the average distribution of the electrons in the Hartree--Fock determinant.
@@ -130,8 +146,15 @@ The `self-consistent field <https://en.wikipedia.org/wiki/Self-consistent_field>
 The :term:`QDK`/Chemistry :class:`~qdk_chemistry.algorithms.ScfSolver` returns the converged fixed-geometry total energy and a wavefunction containing the optimized molecular orbitals.
 These orbitals provide the starting point for the multi-configurational calculations introduced in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 
-Run the calculation
-===================
+.. admonition:: Why does a Hartree--Fock calculation require an iterative :term:`SCF` procedure?
+   :class: quiz-question
+   :collapsible: closed
+
+   The molecular orbitals determine the mean field experienced by each electron, while that mean field determines the molecular orbitals.
+   :term:`SCF` iterations update the orbitals and field until they are mutually consistent.
+
+Running the calculation
+=======================
 
 With the Python environment from :doc:`Before you begin <00_before_you_begin>` active, run the complete script from the Visual Studio Code integrated terminal:
 
@@ -152,7 +175,7 @@ Run the complete script and record both fixed-geometry total energies and the nu
 The reported energies include both the electronic energy and the repulsion among the fixed nuclei.
 
 .. admonition:: What should you observe after running the Hartree--Fock calculations?
-   :class: hint
+   :class: quiz-question
    :collapsible: closed
 
    The script should report one negative total energy for each basis set and the number of molecular orbitals in the ``cc-pvdz`` wavefunction.
@@ -165,30 +188,6 @@ Therefore, do not compare this basis-set sensitivity with the 1 milliHartree tea
 For the rest of this tutorial, we will use the ``cc-pvdz`` basis set, for the purposes of faster execution of the examples.
 The ``cc-pvtz`` calculation is used only for the basis-set comparison in this chapter, avoiding its greater cost in every later stage.
 Because stretched N\ :sub:`2` cannot be described adequately by one determinant, :doc:`Choosing the active space <03_choosing_the_active_space>` next identifies which electrons and orbitals must be treated in a multi-configurational wavefunction.
-
-Check your understanding
-========================
-
-.. admonition:: Which molecular inputs remain fixed when comparing the two basis sets?
-   :class: hint
-   :collapsible: closed
-
-   The atomic elements and coordinates, molecular charge, spin multiplicity, and Hartree--Fock method remain fixed.
-   Only the basis set changes.
-
-.. admonition:: What is a molecular orbital, and why is it useful?
-   :class: hint
-   :collapsible: closed
-
-   A molecular orbital is a one-electron spatial function used to construct the spin orbitals in a Hartree--Fock determinant.
-   Molecular orbitals make the approximate many-electron wavefunction computationally tractable, help interpret bonding and occupations, and provide the starting representation for later multi-configurational calculations.
-
-.. admonition:: Why does a Hartree--Fock calculation require an iterative :term:`SCF` procedure?
-   :class: hint
-   :collapsible: closed
-
-   The molecular orbitals determine the mean field experienced by each electron, while that mean field determines the molecular orbitals.
-   :term:`SCF` iterations update the orbitals and field until they are mutually consistent.
 
 Further reading
 ===============
