@@ -273,13 +273,6 @@ The lowest eigenvalue in this subspace is obtained directly from the mapped qubi
 
 Adding :math:`E_{\mathrm{core}}` to this mapped active-space eigenvalue gives a total energy that can be compared with the selected-space :term:`CASCI` reference.
 Exact diagonalization is practical for this compact teaching example; it is not a scalable method for solving larger qubit Hamiltonians.
-The script reports the validation quantities separately:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_map_n2_to_qubits.py
-   :language: python
-   :dedent: 4
-   :start-after: # start-cell-core-energy
-   :end-before: # end-cell-core-energy
 
 Running the mapping
 ===================
