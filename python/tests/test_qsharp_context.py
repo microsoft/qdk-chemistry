@@ -97,19 +97,11 @@ class TestContextApi:
 
 def _make_state_prep_from_context(context: qdk.Context) -> Circuit:
     """Build a state-preparation Circuit whose Q# op comes from *context*."""
-    utils = context.code.QDKChemistry.Utils
-    state_prep_params = {
-        "rowMap": [1, 0],
-        "stateVector": [0.6, 0.0, 0.0, 0.8],
-        "expansionOps": [],
-        "numQubits": 2,
-    }
+    context.eval("operation ApplyXToFirstQubit(qs : Qubit[]) : Unit is Adj + Ctl { X(qs[0]); }")
+    user_op = context.eval("ApplyXToFirstQubit")
     return Circuit(
-        qsharp_factory=QsharpFactoryData(
-            program=utils.StatePreparation.MakeStatePreparationCircuit,
-            parameter=state_prep_params,
-        ),
-        qsharp_op=utils.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        qsharp_op=user_op,
+        qsharp_factory=QsharpFactoryData(program=user_op, parameter={}),
     )
 
 
