@@ -17,7 +17,8 @@ namespace qdk::chemistry::utils {
  * Two spin-orbital conventions appear throughout the code:
  * - **chemist** @f$(PQ|RS)@f$ — Mulliken ordering, 8-fold permutation
  *   symmetric, used by the Hamiltonian containers / CI solvers.
- * - **physicist antisymmetrized** @f$\langle PQ\|RS\rangle = \langle PQ|RS\rangle
+ * - **physicist antisymmetrized** @f$\langle PQ\|RS\rangle = \langle
+ * PQ|RS\rangle
  *   - \langle PQ|SR\rangle@f$ — Dirac ordering, antisymmetric under @f$P
  *   \leftrightarrow Q@f$ and @f$R \leftrightarrow S@f$, produced by the DUCC /
  *   coupled-cluster many-body algebra (e.g. the SeQuant backend).
@@ -35,7 +36,8 @@ namespace qdk::chemistry::utils {
  *
  * @param chemist Chemist integrals @f$(PQ|RS)@f$, size @f$n^4@f$.
  * @param n Extent of each mode.
- * @return Antisymmetrized integrals @f$\langle PQ\|RS\rangle@f$, size @f$n^4@f$.
+ * @return Antisymmetrized integrals @f$\langle PQ\|RS\rangle@f$, size
+ * @f$n^4@f$.
  * @throws std::invalid_argument if @p chemist is not of size @f$n^4@f$.
  */
 std::vector<double> chemist_to_antisymmetrized(

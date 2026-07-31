@@ -61,10 +61,10 @@ def spatial_to_spinorb_eri(eri_spatial):
 # ── Active-space configurations (spatial: n_active_occ, n_active_vir) ──
 # LiH/STO-3G: 2 occupied + 4 virtual spatial orbitals.
 CONFIGS = [
-    ("full active (FCI)",       2, 4),
-    ("frozen core only",        1, 4),
-    ("frozen virtual only",     2, 1),
-    ("frozen core + virtual",   1, 1),
+    ("full active (FCI)", 2, 4),
+    ("frozen core only", 1, 4),
+    ("frozen virtual only", 2, 1),
+    ("frozen core + virtual", 1, 1),
     ("frozen core + 2 virtual", 1, 2),
 ]
 
@@ -76,17 +76,18 @@ def build_qdk_original():
     structure = Structure(coords_bohr, [Element.Li, Element.H])
 
     scf_solver = create("scf_solver")
-    e_hf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1,
-                               basis_or_guess="sto-3g")
+    e_hf, wfn = scf_solver.run(
+        structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+    )
 
     ham_ctor = create("hamiltonian_constructor")
     ham = ham_ctor.run(wfn.get_orbitals())
 
     nmo = wfn.get_orbitals().get_num_molecular_orbitals()
-    h1_a, _ = ham.get_one_body_integrals()                # spatial chemist 1e
-    eri_flat, _, _ = ham.get_two_body_integrals()         # spatial chemist 2e
+    h1_a, _ = ham.get_one_body_integrals()  # spatial chemist 1e
+    eri_flat, _, _ = ham.get_two_body_integrals()  # spatial chemist 2e
     eri = np.array(eri_flat).reshape(nmo, nmo, nmo, nmo)  # (pq|rs)
-    e_nuc = ham.get_core_energy()                         # nuclear repulsion
+    e_nuc = ham.get_core_energy()  # nuclear repulsion
 
     return structure, wfn, ham, np.array(h1_a), eri, e_nuc, nmo, e_hf
 
@@ -118,11 +119,13 @@ def sequant_downfold(h_full, v_full, m_idx, x_idx, i_idx):
     h_mm = h_full[np.ix_(m_idx, m_idx)]
 
     # gamma_1 (active Fock), gamma_2, gamma_0 (scalar) -- SeQuant einsum
-    gamma_xx = np.einsum("mxma->xa", v_mxmx, optimize=True) \
-        + np.einsum("xa->xa", h_xx, optimize=True)
+    gamma_xx = np.einsum("mxma->xa", v_mxmx, optimize=True) + np.einsum(
+        "xa->xa", h_xx, optimize=True
+    )
     gamma_xxxx = 1 / 4 * np.einsum("xabc->xacb", v_xxxx, optimize=True)
-    gamma_0 = np.einsum("mm->", h_mm, optimize=True) \
-        + 0.5 * np.einsum("mnmn->", v_mmmm, optimize=True)
+    gamma_0 = np.einsum("mm->", h_mm, optimize=True) + 0.5 * np.einsum(
+        "mnmn->", v_mmmm, optimize=True
+    )
 
     # Reconstruct active v from gamma_2 (1/4 v reordered)
     v_act = -4.0 * gamma_xxxx
@@ -157,7 +160,8 @@ def chi_to_qdk_hamiltonian(chi_1, chi_2, core_energy):
 
     orbitals = ModelOrbitals(n_sp, True)
     container = CanonicalFourCenterHamiltonianContainer(
-        h1_sp, h2_sp.ravel(), orbitals, core_energy, np.zeros((n_sp, n_sp)))
+        h1_sp, h2_sp.ravel(), orbitals, core_energy, np.zeros((n_sp, n_sp))
+    )
     return Hamiltonian(container)
 
 
@@ -173,13 +177,13 @@ def run_config(label, n_act_occ, n_act_vir, wfn, h1, eri, e_nuc, nmo, macis):
 
     # SeQuant downfolding -> chi + scalar
     chi_1, chi_2, gamma_0, act_occ_pos = sequant_downfold(
-        h_full, v_full, m_idx, x_idx, i_idx)
+        h_full, v_full, m_idx, x_idx, i_idx
+    )
 
     # Core energy = E_nuc + gamma_0 (SCF electronic) - active reference(chi)
     e_ref = e_nuc + gamma_0
     active_ref = sum(chi_1[p, p] for p in act_occ_pos)
-    active_ref += 0.5 * sum(chi_2[p, q, p, q]
-                            for p in act_occ_pos for q in act_occ_pos)
+    active_ref += 0.5 * sum(chi_2[p, q, p, q] for p in act_occ_pos for q in act_occ_pos)
     core_energy = e_ref - active_ref
 
     # Build chi qdk Hamiltonian and run MACIS FCI (active space)
@@ -199,8 +203,10 @@ def run_config(label, n_act_occ, n_act_vir, wfn, h1, eri, e_nuc, nmo, macis):
     diff = abs(e_chi - e_casci)
     ok = diff < 1e-8
     status = "PASS" if ok else "FAIL"
-    print(f"  [{status}] {label:26s} CAS({2*n_act_occ}e,{n_act_occ+n_act_vir}o)  "
-          f"chi-FCI={e_chi:.8f}  CASCI={e_casci:.8f}  diff={diff:.1e}")
+    print(
+        f"  [{status}] {label:26s} CAS({2 * n_act_occ}e,{n_act_occ + n_act_vir}o)  "
+        f"chi-FCI={e_chi:.8f}  CASCI={e_casci:.8f}  diff={diff:.1e}"
+    )
     return ok
 
 
@@ -216,8 +222,10 @@ def main():
         ok = run_config(label, n_occ, n_vir, wfn, h1, eri, e_nuc, nmo, macis)
         all_ok = all_ok and ok
 
-    print(f"\n  {'ALL PASS' if all_ok else 'SOME FAILED'}: "
-          f"SeQuant downfold (MACIS FCI) = qdk-chemistry MACIS CASCI")
+    print(
+        f"\n  {'ALL PASS' if all_ok else 'SOME FAILED'}: "
+        f"SeQuant downfold (MACIS FCI) = qdk-chemistry MACIS CASCI"
+    )
     return 0 if all_ok else 1
 
 

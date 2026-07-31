@@ -81,6 +81,20 @@ SpinOrbitalData extract_spinorbital_data(
  * is valid at every BCH level -- it is computed from the antisymmetrized
  * two-body alone.
  *
+ * Output container form. A restricted @c ducc_level-0 result retains full
+ * 8-fold two-body symmetry and is emitted as a single-block restricted
+ * container, matching the @c hamiltonian_constructor input format. The BCH
+ * dressing
+ * (@c ducc_level > 0) lowers the two-body to 4-fold symmetry, which a single
+ * restricted block cannot convey to consumers that assume 8-fold symmetry (e.g.
+ * the qubit mapper's restricted fast path). A dressed result is therefore
+ * always emitted in spin-blocked (@f$aaaa/bbbb/aabb@f$) form -- with identical
+ * alpha/beta blocks for a restricted system -- so every consumer reads the
+ * reduced-symmetry two-body through its unrestricted path. Consequently a
+ * restricted @c ducc_level > 0 output is an unrestricted-type container
+ * consumed by the qubit mapper (or PySCF @c direct_uhf), not the
+ * restricted-only MACIS solver.
+ *
  * For @c ducc_level 0 (no BCH) @c dressed is the bare extraction, so the output
  * reproduces the input Hamiltonian restricted to the active space to CI-energy
  * accuracy: CASCI on the input equals FCI on the output. The active space is
@@ -90,7 +104,12 @@ SpinOrbitalData extract_spinorbital_data(
  *        bare extraction (level 0) or the BCH-transformed values.
  * @param active_a_spatial Active alpha spatial-MO indices.
  * @param active_b_spatial Active beta spatial-MO indices.
- * @param restricted Emit a restricted (single spin block) container if true.
+ * @param restricted Whether the underlying Hamiltonian is spin-restricted; a
+ *        single-block container is emitted only together with @c ducc_level 0
+ *        (see "Output container form").
+ * @param ducc_level BCH truncation level of @p dressed; 0 emits a restricted
+ *        single-block container (when @p restricted), > 0 always emits the
+ *        spin-blocked container.
  * @param active_orbitals The active-space @ref data::Orbitals carried through
  * to the output container, so the effective Hamiltonian retains the real
  *        orbital type/coefficients/basis of the active-space input (matching
@@ -105,7 +124,7 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
     const SpinOrbitalData& dressed,
     const std::vector<std::size_t>& active_a_spatial,
     const std::vector<std::size_t>& active_b_spatial, bool restricted,
-    std::shared_ptr<data::Orbitals> active_orbitals);
+    int ducc_level, std::shared_ptr<data::Orbitals> active_orbitals);
 
 /**
  * @class DuccSolver
@@ -133,12 +152,9 @@ std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
  * (`ducc_level`).
  *
  * @note Level 0 (the bare active-space Hamiltonian, no BCH dressing) is served
- *       directly in C++ and needs no external backend. Levels 1-2 build the
- *       transformed @f$\bar H@f$ and require the SeQuant/BTAS numeric backend
- *       (compiled in when the project is built with those dependencies,
- *       `QDK_HAS_SEQUANT`); until that backend is ported, requesting a level
- *       @f$>0@f$ throws a clear diagnostic. The interface and registration are
- *       stable across builds.
+ *       directly in C++. Levels 1-2 build the transformed @f$\bar H@f$ with the
+ *       SeQuant/BTAS numeric backend (always linked). Both are validated to
+ *       machine precision against the wicked-based DUCC reference.
  */
 class DuccSolver : public qdk::chemistry::algorithms::EffectiveHamiltonian {
  public:

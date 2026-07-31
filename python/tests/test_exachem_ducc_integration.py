@@ -188,6 +188,7 @@ def _run_ducc_comparison(
 
         result = subprocess.run(
             ["mpirun", "-np", "2", _exachem_path, input_path],
+            check=False,
             cwd=p2_dir,
             capture_output=True,
             text=True,
@@ -595,6 +596,7 @@ def _run_ducc_hamiltonian_comparison(
 
         result = subprocess.run(
             ["mpirun", "-np", "2", _exachem_path, input_path],
+            check=False,
             cwd=p2_dir,
             capture_output=True,
             text=True,

@@ -366,7 +366,8 @@ std::vector<ResultExpr> spintrace_blocks(
         [&](const ExprPtr& e) {
           if (e->is<Tensor>()) {
             for (const Index& idx : e->as<Tensor>().const_indices()) {
-              if (idx.space().type() == active_type && idx.ordinal().has_value())
+              if (idx.space().type() == active_type &&
+                  idx.ordinal().has_value())
                 ord_spin[idx.ordinal().value()] = index_spin(idx);
             }
           }
@@ -426,7 +427,8 @@ int main() {
   set_default_context({.index_space_registry_shared_ptr = reg,
                        .vacuum = Vacuum::SingleProduct});
 
-  // Build H with complete-space p operators (identical to spin-orbital pipeline)
+  // Build H with complete-space p operators (identical to spin-orbital
+  // pipeline)
   auto h_coeff = ex<Tensor>(L"h", bra{L"p_1"}, ket{L"p_2"}, Symmetry::Nonsymm);
   auto H1_ops = fcrex(L"p_1") * fannx(L"p_2");
   auto v_coeff = ex<Tensor>(L"v", bra{L"p_1", L"p_3"}, ket{L"p_2", L"p_4"},

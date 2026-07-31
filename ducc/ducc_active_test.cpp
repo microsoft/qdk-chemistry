@@ -119,17 +119,19 @@ ExprPtr relabel_free_to_active(const ExprPtr& expr,
 
   auto relabel_term = [&](const ExprPtr& term) -> ExprPtr {
     container::map<Index, Index> repl;
-    term->visit([&](const ExprPtr& e) {
-      if (e->is<OpType>()) {
-        auto& nop = e->as<OpType>();
-        for (auto it = nop.cbegin(); it != nop.cend(); ++it) {
-          Index old = it->index();
-          if (old.ordinal().has_value()) {
-            repl[old] = Index(active, old.ordinal().value());
+    term->visit(
+        [&](const ExprPtr& e) {
+          if (e->is<OpType>()) {
+            auto& nop = e->as<OpType>();
+            for (auto it = nop.cbegin(); it != nop.cend(); ++it) {
+              Index old = it->index();
+              if (old.ordinal().has_value()) {
+                repl[old] = Index(active, old.ordinal().value());
+              }
+            }
           }
-        }
-      }
-    }, true);
+        },
+        true);
     if (repl.empty()) return term->clone();
     return transform_expr(term, repl);
   };
@@ -167,25 +169,27 @@ ExprPtr filter_and_project_active(const ExprPtr& expr,
   auto process_term = [&](const ExprPtr& term) -> ExprPtr {
     container::map<Index, Index> repl;
     bool drop = false;
-    term->visit([&](const ExprPtr& e) {
-      if (e->is<OpType>()) {
-        auto& nop = e->as<OpType>();
-        for (auto it = nop.cbegin(); it != nop.cend(); ++it) {
-          Index leg = it->index();
-          auto leg_type = leg.space().type();
-          auto inter = leg_type.intersection(active_type);
-          if (!inter) {
-            drop = true;  // strictly inactive (o, g)
-          } else if (leg_type == inter) {
-            // leg subset of active (i, a, or x): keep as-is
-          } else {
-            // leg broader than active (complete p): project to active x
-            if (leg.ordinal().has_value())
-              repl[leg] = Index(active, leg.ordinal().value());
+    term->visit(
+        [&](const ExprPtr& e) {
+          if (e->is<OpType>()) {
+            auto& nop = e->as<OpType>();
+            for (auto it = nop.cbegin(); it != nop.cend(); ++it) {
+              Index leg = it->index();
+              auto leg_type = leg.space().type();
+              auto inter = leg_type.intersection(active_type);
+              if (!inter) {
+                drop = true;  // strictly inactive (o, g)
+              } else if (leg_type == inter) {
+                // leg subset of active (i, a, or x): keep as-is
+              } else {
+                // leg broader than active (complete p): project to active x
+                if (leg.ordinal().has_value())
+                  repl[leg] = Index(active, leg.ordinal().value());
+              }
+            }
           }
-        }
-      }
-    }, true);
+        },
+        true);
     if (drop) return ex<Constant>(0);  // dropped marker
     if (repl.empty()) return term->clone();
     return transform_expr(term, repl);
@@ -221,8 +225,10 @@ ExprPtr strip_normalop(const ExprPtr& expr, Tensor& result_tensor) {
         auto& nop = factor->as<OpType>();
         size_t nc = nop.ncreators(), idx = 0;
         for (auto it = nop.cbegin(); it != nop.cend(); ++it, ++idx) {
-          if (idx < nc) bra_idx.push_back(it->index());
-          else ket_idx.push_back(it->index());
+          if (idx < nc)
+            bra_idx.push_back(it->index());
+          else
+            ket_idx.push_back(it->index());
         }
         continue;
       }
@@ -252,16 +258,20 @@ ExprPtr extract_by_rank(const ExprPtr& expr, int target_rank) {
   ExprPtr result;
   if (!expr->is<Sum>()) {
     int rank = -1;
-    expr->visit([&](const ExprPtr& e) {
-      if (e->is<OpType>()) rank = (int)e->as<OpType>().ncreators();
-    }, true);
+    expr->visit(
+        [&](const ExprPtr& e) {
+          if (e->is<OpType>()) rank = (int)e->as<OpType>().ncreators();
+        },
+        true);
     return (rank == target_rank) ? expr->clone() : ex<Constant>(0);
   }
   for (auto& term : *expr) {
     int rank = -1;
-    term->visit([&](const ExprPtr& e) {
-      if (e->is<OpType>()) rank = (int)e->as<OpType>().ncreators();
-    }, true);
+    term->visit(
+        [&](const ExprPtr& e) {
+          if (e->is<OpType>()) rank = (int)e->as<OpType>().ncreators();
+        },
+        true);
     if (rank == target_rank) result = result ? result + term : term->clone();
   }
   return result ? result : ex<Constant>(0);
@@ -290,9 +300,10 @@ std::string export_einsum(const Tensor& result_tensor, ExprPtr coeff,
 // Export a SCALAR (rank-0) coefficient as numpy einsum.
 //
 // Proper BCH contractions (order >= 1) fully contract H_N against sigma_ext, so
-// all indices pair legs of DIFFERENT tensors -> proper inter-tensor contractions
-// (NO self-traces). The generator's rank-0 Tensor result handles these correctly,
-// INCLUDING multi-step contractions with intermediate tensors, e.g.
+// all indices pair legs of DIFFERENT tensors -> proper inter-tensor
+// contractions (NO self-traces). The generator's rank-0 Tensor result handles
+// these correctly, INCLUDING multi-step contractions with intermediate tensors,
+// e.g.
 //     I_mmee += np.einsum('ma,bc->mcab', f_me, t_em)
 //     g0     += 1/2 * np.einsum('mabc,bcma->', I_mmee, t_eemm)
 //
@@ -363,9 +374,11 @@ int main() {
   simplify(g2_coeff);
 
   std::wcout << L"\n=== gamma_1 result + coeff ===" << std::endl;
-  std::wcout << to_latex(g1_result) << L" = " << to_latex(g1_coeff) << std::endl;
+  std::wcout << to_latex(g1_result) << L" = " << to_latex(g1_coeff)
+             << std::endl;
   std::wcout << L"\n=== gamma_2 result + coeff ===" << std::endl;
-  std::wcout << to_latex(g2_result) << L" = " << to_latex(g2_coeff) << std::endl;
+  std::wcout << to_latex(g2_result) << L" = " << to_latex(g2_coeff)
+             << std::endl;
   std::wcout << L"\n=== gamma_0 scalar = <Phi|H|Phi> ===" << std::endl;
   std::wcout << to_latex(g0_clean) << std::endl;
 
@@ -391,7 +404,8 @@ int main() {
   ofs << "# === gamma_1 einsum ===\n" << g1_einsum << "\n";
   ofs << "# === gamma_2 einsum ===\n" << g2_einsum << "\n";
   ofs.close();
-  std::wcout << L"\n[einsum written to /tmp/ducc_active_einsum.txt]" << std::endl;
+  std::wcout << L"\n[einsum written to /tmp/ducc_active_einsum.txt]"
+             << std::endl;
 
   return 0;
 }

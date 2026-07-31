@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/utils/eri_notation.hpp>
-
 #include <cstddef>
+#include <qdk/chemistry/utils/eri_notation.hpp>
 #include <stdexcept>
 #include <vector>
 
@@ -46,8 +45,7 @@ std::vector<double> antisymmetrized_to_chemist(
     for (std::size_t q = 0; q < n; ++q)
       for (std::size_t r = 0; r < n; ++r)
         for (std::size_t s = 0; s < n; ++s)
-          out[idx4(p, q, r, s, n)] =
-              0.5 * antisymmetrized[idx4(p, r, q, s, n)];
+          out[idx4(p, q, r, s, n)] = 0.5 * antisymmetrized[idx4(p, r, q, s, n)];
   return out;
 }
 

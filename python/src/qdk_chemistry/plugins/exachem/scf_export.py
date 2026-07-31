@@ -184,7 +184,7 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
             exps = list(sh.exponents)
             coeffs = list(sh.coefficients)
             lines.append(f"{_L_SYMBOL[l]}   {len(exps)}   1.00")
-            for e, c in zip(exps, coeffs):
+            for e, c in zip(exps, coeffs, strict=False):
                 lines.append(f"{e: .14E}   {c: .14E}")
         blocks.append("\n".join(lines))
 

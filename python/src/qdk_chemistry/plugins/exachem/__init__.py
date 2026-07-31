@@ -26,7 +26,6 @@ def load():
 
     from qdk_chemistry.algorithms import register
     from qdk_chemistry.algorithms.registry import register_factory
-
     from qdk_chemistry.plugins.exachem.ducc_solver import ExachemDuccSolver, HamiltonianDownfolderFactory
 
     register_factory(HamiltonianDownfolderFactory())

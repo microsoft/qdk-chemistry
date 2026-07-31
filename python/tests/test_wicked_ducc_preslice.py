@@ -144,7 +144,7 @@ def _preslice_bch_si(w, bch_order, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b, act
 
             # Build per-equation mapping: output index char → space char
             idx_to_space = {}
-            for idx_ch, space_ch in zip(output_str, output_space_chars):
+            for idx_ch, space_ch in zip(output_str, output_space_chars, strict=False):
                 idx_to_space[idx_ch] = space_ch
 
             # Extract tensor references
@@ -168,7 +168,7 @@ def _preslice_bch_si(w, bch_order, H, T, E0, nocc_a, nvir_a, nocc_b, nvir_b, act
 
             # Slice tensors along free-index dimensions
             sliced = []
-            for part, tensor in zip(input_parts, tensors):
+            for part, tensor in zip(input_parts, tensors, strict=False):
                 if np.isscalar(tensor):
                     sliced.append(tensor)
                     continue
