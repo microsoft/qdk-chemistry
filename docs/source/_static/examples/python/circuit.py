@@ -102,7 +102,7 @@ context.eval(
     "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
 )
 bell_state = context.eval("BellState")
-user_state_prep = Circuit(
+custom_state_prep = Circuit(
     qsharp_op=bell_state,
     qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
 )
@@ -118,7 +118,7 @@ builder.settings().set(
 )
 hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
 qpe_circuit = builder.run(
-    state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
+    state_preparation=custom_state_prep, qubit_hamiltonian=hamiltonian
 )[0]
 qpe_circuit.get_qsharp_circuit()
 # end-cell-byo-operation
@@ -145,7 +145,7 @@ with use_qsharp_context(custom_context):
         "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
     )
     bell_state = context.eval("BellState")
-    user_state_prep = Circuit(
+    custom_state_prep = Circuit(
         qsharp_op=bell_state,
         qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
     )
@@ -160,7 +160,7 @@ with use_qsharp_context(custom_context):
     )
     hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     qpe_circuit = builder.run(
-        state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
+        state_preparation=custom_state_prep, qubit_hamiltonian=hamiltonian
     )[0]
     qpe_circuit.get_qsharp_circuit()
 
