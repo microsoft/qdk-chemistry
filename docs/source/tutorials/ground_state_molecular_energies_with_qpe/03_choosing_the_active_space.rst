@@ -169,7 +169,8 @@ The four probabilities therefore sum to one.
 
 An entropy near zero means that one local occupation dominates.
 A larger entropy means that several local occupations occur across the important determinants.
-The orbital then changes occupation as the occupations of other orbitals change, indicating stronger coupling and making it a stronger candidate for explicit treatment.
+In other words, the important determinants assign different occupations to this orbital together with corresponding occupation differences elsewhere in the active space.
+This correlated variation makes the orbital a stronger candidate for explicit treatment.
 These high-entropy orbitals carry the strongest static-correlation signal because their occupations vary among the important determinants.
 Freezing a high-entropy orbital would prevent its occupation from changing with the occupations of the other orbitals and would therefore remove an important part of the multi-configurational wavefunction.
 By contrast, a low-entropy orbital remains close to one local occupation state and is a better candidate to freeze as inactive or virtual.
