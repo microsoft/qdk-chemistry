@@ -99,43 +99,58 @@ Shared Q# context
 QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
 Composing a callable from one context into a program owned by another raises ``QSharpError``.
 
-There are two ways users interact with this:
+Three scenarios cover how users interact with this:
 
-- **Using QDK/Chemistry algorithms only.** You never touch the Q# context. Every circuit the
-  library builds — including the ``QSHARP_UTILS`` chemistry operations — is created against one
-  internal shared context, so everything composes automatically.
-- **Bringing your own Q# operation.** When you define your own Q# program (for example, a custom
-  ``BellState`` state preparation) and want to compose it with a chemistry builder such as QPE, it
-  must be built against that same shared context. Obtain the context with
-  :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`, define your operation on it, and pass the
-  resulting callable to the builder.
+**Using QDK/Chemistry algorithms only.**
+You never touch the Q# context. Every circuit the library builds — including the ``QSHARP_UTILS``
+chemistry operations — is created against one internal shared context, so everything composes
+automatically.
 
-Three helpers in :mod:`qdk_chemistry.utils.qsharp` manage this:
-
-:func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
-   Returns the shared context that owns ``QSHARP_UTILS``. Build your own operations against it
-   (``get_qsharp_context().eval(...)``) so they compose with the chemistry builders. This is the
-   helper most users reach for.
-
-:func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
-   Installs a caller-supplied context process-wide so ``QSHARP_UTILS`` and your operations share it.
-   Use it when you built a context yourself via
-   :func:`~qdk_chemistry.utils.qsharp.create_qsharp_context` (e.g. to select a non-default target
-   profile). Pass ``None`` to reset to the default context.
-
-:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
-   A context manager that overrides the active context for the current thread only and restores it
-   on exit — the thread-safe way to switch contexts in concurrent code.
-
-The example below shows the second scenario: a user-defined ``BellState`` operation composed into
-the standard QPE builder.
+**Bringing your own Q# operation.**
+When you define your own Q# program (for example, a custom ``BellState`` state preparation) and want
+to compose it with a chemistry builder such as QPE, it must be built against that same shared
+context. Obtain the context with :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`, define your
+operation on it, and pass the resulting callable to the builder.
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/circuit.py
       :language: python
-      :start-after: # start-cell-shared-context
-      :end-before: # end-cell-shared-context
+      :start-after: # start-cell-byo-operation
+      :end-before: # end-cell-byo-operation
+
+**Bringing your own Q# context.**
+If you want to change the target profile — or any other ``qdk.Context`` option — build a context with
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context` (it keeps the chemistry utilities loaded on
+the project root), then make the library use it: :func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+installs it process-wide (pass ``None`` to restore the default), while
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context` switches to it temporarily on the current
+thread and restores it automatically on exit.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-byo-context
+      :end-before: # end-cell-byo-context
+
+The four helpers in :mod:`qdk_chemistry.utils.qsharp` that manage this are:
+
+:func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
+   Returns the shared context that owns ``QSHARP_UTILS``. Build your own operations against it so they
+   compose with the chemistry builders. This is the helper most users reach for.
+
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context`
+   Creates a fresh context preloaded with the chemistry utilities. Forwards ``target_profile`` and any
+   other ``qdk.Context`` keyword arguments; use it when you need a non-default configuration.
+
+:func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+   Installs a caller-supplied context process-wide so ``QSHARP_UTILS`` and your operations share it.
+   Pass ``None`` to reset to the default context.
+
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
+   A context manager that overrides the active context for the current thread only and restores it
+   on exit — the thread-safe way to switch contexts in concurrent code.
 
 
 Conversion methods

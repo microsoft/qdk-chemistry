@@ -89,7 +89,7 @@ circuit.get_qir()  # → qsharp.compile(program, **params)
 ################################################################################
 
 ################################################################################
-# start-cell-shared-context
+# start-cell-byo-operation
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -121,7 +121,52 @@ qpe_circuit = builder.run(
     state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
 )[0]
 qpe_circuit.get_qsharp_circuit()
-# end-cell-shared-context
+# end-cell-byo-operation
+################################################################################
+
+################################################################################
+# start-cell-byo-context
+from qdk import TargetProfile
+from qdk_chemistry.utils.qsharp import (
+    create_qsharp_context,
+    get_qsharp_context,
+    use_qsharp_context,
+)
+
+# create_qsharp_context forwards target_profile (and any other qdk.Context kwargs)
+# while keeping the Q# chemistry utilities loaded on the project root.
+custom_context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)
+
+# use_qsharp_context temporarily makes it the shared context on this thread, so the
+# chemistry utilities and your own operations both resolve against it inside the block.
+with use_qsharp_context(custom_context):
+    context = get_qsharp_context()  # -> custom_context
+    context.eval(
+        "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
+    )
+    bell_state = context.eval("BellState")
+    user_state_prep = Circuit(
+        qsharp_op=bell_state,
+        qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
+    )
+    builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+    builder.settings().set(
+        "controlled_circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+    )
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    qpe_circuit = builder.run(
+        state_preparation=user_state_prep, qubit_hamiltonian=hamiltonian
+    )[0]
+    qpe_circuit.get_qsharp_circuit()
+
+# For a permanent, process-wide switch use set_qsharp_context(custom_context) instead,
+# and set_qsharp_context(None) to restore the default.
+# end-cell-byo-context
 ################################################################################
 
 ################################################################################
