@@ -266,17 +266,30 @@ def test_tutorial_choose_active_space_results():
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
 
     result = tutorial_module.run_active_space_workflow()
-    assert abs(result.hartree_fock_energy - (-108.866810916955)) < 1e-8
-    assert abs(result.valence_energy - (-108.997239708567)) < 1e-8
+    assert abs(result.hartree_fock_energy - (-108.418633697214)) < 1e-8
+    assert abs(result.valence_energy - (-108.778369520882)) < 1e-8
     assert abs(result.natural_orbital_energy - result.valence_energy) < 1e-10
-    assert abs(result.refined_energy - (-108.964632065071)) < 1e-8
+    assert abs(result.refined_energy - (-108.771051792900)) < 1e-8
     assert result.valence_indices == list(range(2, 10))
     assert result.num_valence_determinants == comb(8, 5) ** 2 == 3136
-    assert result.inactive_indices == list(range(5))
-    assert result.refined_indices == list(range(5, 9))
-    assert result.num_refined_electrons == 4
-    assert result.num_virtual_orbitals == 19
-    assert result.num_refined_determinants == comb(4, 2) ** 2 == 36
+    assert result.inactive_indices == list(range(4))
+    assert result.refined_indices == list(range(4, 10))
+    assert result.num_refined_electrons == 6
+    assert result.num_virtual_orbitals == 18
+    assert result.num_refined_determinants == comb(6, 3) ** 2 == 400
+    assert result.orbital_entropies == pytest.approx(
+        [
+            0.021695655,
+            0.029962803,
+            0.547855061,
+            0.963884097,
+            0.963884097,
+            0.966011090,
+            0.966011090,
+            0.554008809,
+        ],
+        abs=1e-8,
+    )
     assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
 
     cube_data = tutorial_module.generate_active_orbital_cube_data(
@@ -287,7 +300,7 @@ def test_tutorial_choose_active_space_results():
     assert len(cube_data) == 8
     assert sum(
         orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()
-    ) == 4
+    ) == 6
     assert all(
         set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"}
         for orbital in cube_data.values()
@@ -300,16 +313,16 @@ def test_tutorial_map_n2_to_qubits_results():
     tutorial_module = _load_tutorial_module("tutorial_map_n2_to_qubits")
 
     result = tutorial_module.run_qubit_mapping_workflow()
-    assert result.active_space_result.refined_indices == list(range(5, 9))
-    assert result.num_active_spatial_orbitals == 4
-    assert result.num_active_spin_orbitals == 8
-    assert result.num_compute_qubits == 8
-    assert result.num_pauli_terms == 161
+    assert result.active_space_result.refined_indices == list(range(4, 10))
+    assert result.num_active_spatial_orbitals == 6
+    assert result.num_active_spin_orbitals == 12
+    assert result.num_compute_qubits == 12
+    assert result.num_pauli_terms == 383
     assert result.qubit_hamiltonian.encoding == "jordan-wigner"
     assert result.qubit_hamiltonian.fermion_mode_order.value == "blocked"
-    assert abs(result.core_energy - (-103.7027930993334)) < 1e-8
-    assert result.num_fixed_electron_states == 36
-    assert abs(result.mapped_active_energy - (-5.261838965737397)) < 1e-8
+    assert abs(result.core_energy - (-99.117775949333)) < 1e-8
+    assert result.num_fixed_electron_states == 400
+    assert abs(result.mapped_active_energy - (-9.653275843566)) < 1e-8
     assert abs(result.mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
     assert abs(result.mapping_energy_difference) < 1e-10
 
@@ -318,9 +331,7 @@ def test_tutorial_map_n2_to_qubits_results():
     assert preview_terms[0][0] == "I" * result.num_compute_qubits
     assert all(set(pauli_string).issubset({"I", "Z"}) for pauli_string, _ in preview_terms[1:4])
     assert all("X" in pauli_string or "Y" in pauli_string for pauli_string, _ in preview_terms[4:])
-    assert tutorial_module.format_pauli_string("IXXIIXXI") == (
-        "X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)"
-    )
+    assert tutorial_module.format_pauli_string("IXYI") == "Y(qubit 1) X(qubit 2)"
 
 def test_tutorial_prepare_trial_state_results():
     """Check the trial-state quality and cost results used by Chapter 5."""
@@ -328,29 +339,29 @@ def test_tutorial_prepare_trial_state_results():
     tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
 
     result = tutorial_module.run_trial_state_workflow()
-    assert result.active_space_result.num_refined_determinants == 36
+    assert result.active_space_result.num_refined_determinants == 400
     assert len(result.reference_determinants) == 8
-    assert result.reference_determinants[0].occupation == "2200"
-    assert abs(result.reference_determinants[0].amplitude - (-0.950999927816)) < 1e-10
-    assert abs(result.reference_determinants[0].weight - 0.9044008627068755) < 1e-10
-    assert result.reference_determinants[1].occupation == "2020"
-    assert result.reference_determinants[2].occupation == "0202"
-    assert abs(result.reference_determinants[2].cumulative_weight - 0.961127081374) < 1e-10
+    assert result.reference_determinants[0].occupation == "222000"
+    assert abs(result.reference_determinants[0].amplitude - (-0.694657450061)) < 1e-10
+    assert abs(result.reference_determinants[0].weight - 0.482548972925) < 1e-10
+    assert result.reference_determinants[1].occupation == "202020"
+    assert result.reference_determinants[2].occupation == "220200"
+    assert abs(result.reference_determinants[2].cumulative_weight - 0.691383326350) < 1e-10
     assert len(result.trial_states) == 3
 
     one_determinant, two_determinants, four_determinants = result.trial_states
     assert one_determinant.num_determinants == 1
-    assert abs(one_determinant.fidelity - 0.9044008627068755) < 1e-10
-    assert one_determinant.num_compute_qubits == 8
-    assert one_determinant.num_logical_gates == 4
-    assert one_determinant.logical_gate_counts == {"X": 4}
+    assert abs(one_determinant.fidelity - 0.482548972925) < 1e-10
+    assert one_determinant.num_compute_qubits == 12
+    assert one_determinant.num_logical_gates == 6
+    assert one_determinant.logical_gate_counts == {"X": 6}
 
     assert two_determinants.num_determinants == 2
-    assert abs(two_determinants.fidelity - 0.9298526307840264) < 1e-10
-    assert two_determinants.num_compute_qubits == 8
-    assert two_determinants.num_logical_gates == 12
+    assert abs(two_determinants.fidelity - 0.578050111416) < 1e-10
+    assert two_determinants.num_compute_qubits == 12
+    assert two_determinants.num_logical_gates == 14
     assert two_determinants.logical_gate_counts == {
-        "CNOT": 4,
+        "CNOT": 6,
         "H": 2,
         "Rz": 2,
         "S": 2,
@@ -358,15 +369,15 @@ def test_tutorial_prepare_trial_state_results():
     }
 
     assert four_determinants.num_determinants == 4
-    assert abs(four_determinants.fidelity - 0.9699313656153719) < 1e-10
-    assert four_determinants.num_compute_qubits == 8
-    assert four_determinants.num_logical_gates == 58
+    assert abs(four_determinants.fidelity - 0.717362840569) < 1e-10
+    assert four_determinants.num_compute_qubits == 12
+    assert four_determinants.num_logical_gates == 30
     assert four_determinants.logical_gate_counts == {
-        "CNOT": 35,
-        "H": 6,
-        "Rz": 10,
-        "S": 6,
-        "X": 1,
+        "CNOT": 16,
+        "H": 4,
+        "Rz": 4,
+        "S": 4,
+        "X": 2,
     }
 
 

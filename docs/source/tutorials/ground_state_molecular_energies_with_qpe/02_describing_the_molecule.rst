@@ -39,7 +39,7 @@ The molecular system
 An electronic-structure calculation requires the identities and positions of the nuclei, the number of electrons, and the target spin state.
 This chapter specifies those inputs for the stretched N\ :sub:`2` molecule introduced on the :doc:`tutorial landing page <index>`.
 
-The molecular geometry contains two nitrogen atoms separated by :math:`1.270025\ \text{Å}`, compared with the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}`.
+The molecular geometry contains two nitrogen atoms separated by :math:`1.85\ \text{Å}`, compared with the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}`.
 The molecule is neutral, so its charge is zero and it has 14 electrons.
 `Spin multiplicity <https://en.wikipedia.org/wiki/Multiplicity_(chemistry)>`_ is defined as :math:`2S+1`, where :math:`S` is the total electron spin produced by combining the spins of all electrons.
 Paired electrons contribute no net spin, whereas unpaired electrons can produce :math:`S>0`.
@@ -187,7 +187,8 @@ Therefore, do not compare this basis-set sensitivity with the 1 milliHartree tea
 
 For the rest of this tutorial, we will use the ``cc-pvdz`` basis set, for the purposes of faster execution of the examples.
 The ``cc-pvtz`` calculation is used only for the basis-set comparison in this chapter, avoiding its greater cost in every later stage.
-Because stretched N\ :sub:`2` cannot be described adequately by one determinant, :doc:`Choosing the active space <03_choosing_the_active_space>` next identifies which electrons and orbitals must be treated in a multi-configurational wavefunction.
+Bond stretching can increase static correlation and weaken a one-determinant description.
+:doc:`Choosing the active space <03_choosing_the_active_space>` next evaluates this effect for the selected N\ :sub:`2` geometry and identifies which electrons and orbitals must be treated in a multi-configurational wavefunction.
 
 Further reading
 ===============

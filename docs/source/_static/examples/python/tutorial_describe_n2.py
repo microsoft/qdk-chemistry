@@ -19,7 +19,7 @@ structure = Structure.from_xyz("""\
 2
 Stretched N2 molecule for the ground-state QPE tutorial
 N    0.000000    0.000000    0.000000
-N    0.000000    0.000000    1.270025
+N    0.000000    0.000000    1.850000
 """)
 # The target is neutral N2 in its singlet ground state, where all electrons are
 # paired and the spin multiplicity 2S + 1 equals one.
@@ -69,7 +69,7 @@ print(f"Absolute difference: {absolute_difference_kj_mol:.6f} kJ/mol")
 ################################################################################
 
 # Numerical guards run in the documentation example test but are not displayed.
-assert abs(energies["cc-pvdz"] - (-108.866810916955)) < 1e-8
-assert abs(energies["cc-pvtz"] - (-108.891507935778)) < 1e-8
-assert abs(signed_difference - (-0.024697018823)) < 2e-8
+assert abs(energies["cc-pvdz"] - (-108.418633697214)) < 1e-8
+assert abs(energies["cc-pvtz"] - (-108.445215657498)) < 1e-8
+assert abs(signed_difference - (-0.026581960284)) < 2e-8
 assert num_cc_pvdz_orbitals == 28

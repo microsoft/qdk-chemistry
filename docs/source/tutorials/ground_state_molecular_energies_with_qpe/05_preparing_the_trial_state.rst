@@ -36,9 +36,9 @@ The notebook runs that workflow, renders the one-, two-, and four-determinant lo
 Connection to the selected-space workflow
 =========================================
 
-The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction containing 36 Slater determinants.
-Each determinant represents one pattern of occupations among the eight active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
-The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the eight-qubit compute register.
+The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the fixed-electron-number determinant basis identified in :doc:`Choosing the active space <03_choosing_the_active_space>`.
+Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
+The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
 
 Why phase estimation needs a trial state
 ========================================
@@ -110,7 +110,7 @@ The script ranks its determinants by coefficient magnitude and retains the large
 In a larger problem where exact :term:`CASCI` is unavailable, an approximate classical method must supply the candidate determinants and amplitudes for the trial state.
 
 The script first prints the leading terms in the selected-space wavefunction.
-Each occupation string lists the four active spatial orbitals: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
+Each occupation string contains one symbol for each selected active spatial orbital: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
 The amplitude is the signed coefficient :math:`c_i` in :math:`\vert\Psi_0\rangle=\sum_i c_i\vert\Phi_i\rangle`, while the weight :math:`\left\vert c_i\right\vert^2` is that determinant's contribution to the squared norm.
 The cumulative weight shows how much of the norm is captured by the listed determinants.
 
@@ -203,7 +203,7 @@ Trial-state quality
 Preparation cost
    The generated logical circuit's gates describe work needed to load that trial state before phase estimation begins.
 
-All three trial states occupy the same eight-qubit compute register because they describe the same eight active spin orbitals.
+All three trial states describe the same selected active spin-orbital space, so they use the same compute register size.
 Changing the number of retained determinants changes amplitudes and logical-circuit structure, not the number of spin orbitals represented.
 
 .. admonition:: Does retaining more determinants require more compute qubits?
@@ -211,7 +211,7 @@ Changing the number of retained determinants changes amplitudes and logical-circ
    :collapsible: closed
 
    No.
-   Each trial state uses the same eight occupation qubits because the selected active spin-orbital space is unchanged.
+   Each trial state represents the same selected active spin-orbital space, so the compute-register size is unchanged.
    The number of retained determinants affects state-preparation operations rather than the compute-register size.
 
 Running the preparation
@@ -227,23 +227,23 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :class: quiz-question
    :collapsible: closed
 
-   The one-, two-, and four-determinant fidelities are approximately :math:`0.9044`, :math:`0.9299`, and :math:`0.9699`, respectively.
-   Their generated logical circuits have preparation logical gate counts of 4, 12, and 58, respectively, while every logical circuit uses eight compute qubits.
+   The one-, two-, and four-determinant fidelities are approximately :math:`0.4825`, :math:`0.5781`, and :math:`0.7174`, respectively.
+   Their generated logical circuits have preparation logical gate counts of 6, 14, and 30, respectively, while every logical circuit uses twelve compute qubits.
 
-.. admonition:: Is the single-determinant trial state a poor approximation for this example?
+.. admonition:: What does the single-determinant fidelity reveal about multireference character?
    :class: quiz-question
    :collapsible: closed
 
-   It is the lowest-fidelity trial in the comparison, but a fidelity of approximately :math:`0.9044` is still high.
-   The printed reference expansion shows why: the ``2200`` determinant alone carries approximately 90.44% of the squared norm.
-   One determinant therefore remains dominant at this geometry even though additional determinants improve the correlated wavefunction.
+   Its fidelity is approximately :math:`0.4825`, equal to the weight of the leading ``222000`` determinant.
+   No single determinant therefore carries a majority of the selected-space ground-state weight at this geometry.
+   The substantial weight distributed among additional determinants provides direct evidence of multireference character.
 
 .. todo::
 
    Investigate a more elongated N\ :sub:`2` geometry with stronger multireference character, then re-evaluate the active-space selection, determinant weights, trial-state fidelities, logical-circuit costs, and runtime throughout the tutorial before changing the running geometry.
 
 Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the :ref:`trial-state section of the lab notebook <lab-notebook-trial-state>`.
-Explain why the single determinant performs better than a generic strongly correlated example might suggest, and distinguish the quality improvement from the increased logical-circuit cost.
+Explain what the leading determinant weight reveals about multireference character, and distinguish the fidelity improvement from the increased logical-circuit cost.
 
 Further reading
 ===============

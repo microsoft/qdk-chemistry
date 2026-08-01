@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, Hamiltonian, Wavefunction
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger
 from tutorial_choose_active_space import ActiveSpaceResult, run_active_space_workflow
 
@@ -60,6 +61,10 @@ def leading_determinant_contributions(
     """Return amplitudes and weights for the leading reference determinants."""
     cumulative_weight = 0.0
     contributions = []
+    alpha_channel = SymmetryLabel([axes.alpha()])
+    num_active_spatial_orbitals = len(
+        wavefunction.get_orbitals().active_indices().indices(alpha_channel)
+    )
     for determinant, coefficient in wavefunction.get_top_determinants(
         max_determinants=max_determinants
     ).items():
@@ -71,7 +76,9 @@ def leading_determinant_contributions(
         cumulative_weight += weight
         contributions.append(
             DeterminantContribution(
-                occupation=determinant.to_string(),
+                # Configuration capacity may include zero-valued storage padding;
+                # display only the physical selected active spatial orbitals.
+                occupation=determinant.to_string()[:num_active_spatial_orbitals],
                 amplitude=amplitude,
                 weight=weight,
                 cumulative_weight=cumulative_weight,

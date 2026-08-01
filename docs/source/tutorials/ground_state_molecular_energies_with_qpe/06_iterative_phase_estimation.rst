@@ -96,7 +96,7 @@ The complete workflow
 
    End with a complete, executable molecule-to-energy calculation assembled from the chapter examples.
    Make the final circuit simulation the only intentionally long required example.
-   State that the expected duration is approximately 20 minutes on a typical student laptop and that the actual duration depends on the computer.
+   State that the expected duration is tens of minutes and report a measured duration with reference-hardware context after the final settings are fixed.
    Report progress during the simulation so the learner can distinguish a long calculation from a stalled process.
    State the environment, command, expected output, and criteria for successful completion.
    Mark the final example as a slow integration test and keep shorter tests for the individual components.

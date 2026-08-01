@@ -175,18 +175,19 @@ Those additional resources depend on later algorithm and hardware choices rather
    :class: quiz-question
    :collapsible: closed
 
-   The selected space contains four active spatial orbitals and therefore eight active spin orbitals.
-   Jordan--Wigner uses one qubit per spin orbital, so the compute register contains eight qubits.
+   The selected space contains six active spatial orbitals and therefore twelve active spin orbitals.
+   Jordan--Wigner uses one qubit per spin orbital, so the compute register contains twelve qubits.
 
 Record your predicted compute-register qubit count and the excluded qubit categories in the :ref:`qubit-representation section of the lab notebook <lab-notebook-qubits>` before continuing.
 You will verify the count when you run the mapping script.
 
-.. admonition:: How many compute qubits would Jordan--Wigner require for six active spatial orbitals?
+.. admonition:: How does adding one active spatial orbital change the compute-qubit count?
    :class: quiz-question
    :collapsible: closed
 
-   Six spatial orbitals correspond to twelve spin orbitals, so Jordan--Wigner requires twelve compute qubits.
-   This count does not include algorithm ancillas or error-correction overhead.
+   Each added spatial orbital contributes one :math:`\alpha` and one :math:`\beta` spin orbital.
+   Jordan--Wigner therefore requires two additional compute qubits.
+   This change does not include algorithm ancillas or error-correction overhead.
 
 Qubit Hamiltonian in Pauli form
 ======================================
@@ -262,7 +263,7 @@ This scalar must therefore be added to the measured active-space eigenvalue to r
    The qubit mapper encodes only the active fermionic Hamiltonian.
    Nuclear repulsion and constant frozen-orbital contributions are stored separately in the core energy, so adding that scalar reconstructs the selected-space total energy.
 
-This eight-qubit example is small enough to validate the mapping by exact matrix diagonalization.
+The fixed-electron-number sector in this teaching example is small enough to validate the mapping by exact matrix diagonalization.
 
 .. _tutorial-fixed-electron-number-subspace:
 
@@ -280,7 +281,8 @@ The lowest eigenvalue in this subspace is obtained directly from the mapped qubi
    :end-before: # end-cell-validate-mapping
 
 Adding :math:`E_{\mathrm{core}}` to this mapped active-space eigenvalue gives a total energy that can be compared with the selected-space :term:`CASCI` reference.
-Exact diagonalization is practical for this compact teaching example; it is not a scalable method for solving larger qubit Hamiltonians.
+The script constructs the full qubit matrix sparsely and densifies only the fixed-electron-number sector for exact diagonalization.
+This selected-sector validation is practical for the compact teaching example; it is not a scalable method for solving larger qubit Hamiltonians.
 
 Running the mapping
 ===================
@@ -295,24 +297,23 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :class: quiz-question
    :collapsible: closed
 
-   The subspace with two active :math:`\alpha` and two active :math:`\beta` electrons contains 36 occupation-basis states, matching the 36 determinants in the selected active space.
+   The subspace with three active :math:`\alpha` and three active :math:`\beta` electrons contains :math:`\binom{6}{3}\binom{6}{3}=400` occupation-basis states, matching the 400 determinants in the selected active space.
 
 .. admonition:: What operator size and core energy does the script report?
    :class: quiz-question
    :collapsible: closed
 
-   The mapped Hamiltonian contains 161 Pauli terms on eight compute qubits.
-   The separately stored core energy is approximately :math:`-103.702793099333` Hartree.
+   The mapped Hamiltonian contains 383 Pauli terms on twelve compute qubits.
+   The separately stored core energy is approximately :math:`-99.117775949333` Hartree.
    These counts use the mapper's default numerical thresholds.
 
 .. admonition:: Does the mapped qubit Hamiltonian reproduce the selected-space algorithmic reference?
    :class: quiz-question
    :collapsible: closed
 
-   The mapped active-space ground-state energy is :math:`-5.261838965737` Hartree.
-   Adding the core energy of :math:`-103.702793099333` Hartree gives :math:`-108.964632065071` Hartree when the unrounded values are used.
-   This matches the :ref:`selected-space CASCI reference <tutorial-selected-space-reference>` to the reported precision.
-   Manually adding the displayed component values gives :math:`-108.964632065070` Hartree; the final-digit discrepancy is caused only by rounding those displayed components.
+   Yes.
+   The mapped active-space ground-state energy plus the separately stored core energy reproduces the :ref:`selected-space CASCI reference <tutorial-selected-space-reference>` with a validation difference indistinguishable from zero at the displayed precision.
+   The script reports the component energies and their full-precision validation difference for the lab notebook.
 
 This agreement validates the Jordan--Wigner mapping and fixed-electron-number subspace construction for this selected Hamiltonian within numerical precision.
 Compare the reported qubit count with your prediction, then complete the :ref:`qubit-representation section of the lab notebook <lab-notebook-qubits>` with the encoding, confirmed orbital and qubit counts, Pauli-term count, fixed-electron-number subspace, mapped energy, reconstructed total, and comparison with the selected-space reference.

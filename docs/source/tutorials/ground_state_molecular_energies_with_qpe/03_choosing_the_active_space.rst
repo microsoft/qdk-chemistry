@@ -41,7 +41,8 @@ This determinant represents one `electron configuration <https://en.wikipedia.or
 This description is often a useful starting point near an equilibrium geometry, where one configuration dominates the ground-state wavefunction, as discussed for N\ :sub:`2` in :ref:`Specify the molecular system <tutorial-molecular-system>`.
 Stretching a chemical bond can make several configurations similar in energy because electrons can no longer be assigned adequately to one fixed pattern of occupied and unoccupied `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, which :ref:`the previous chapter constructs <tutorial-molecular-orbitals>`.
 The need to combine these important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_.
-Stretched N\ :sub:`2` has enough static correlation to make its one-determinant Hartree--Fock wavefunction inadequate.
+The selected stretched N\ :sub:`2` geometry is intended to expose this regime.
+The correlated calculations below evaluate it by constructing a multi-determinant wavefunction and measuring orbital-occupation entropies.
 
 A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_interaction>`_ (:term:`CI`) wavefunction addresses this limitation by expanding the wavefunction in multiple Slater determinants:
 
@@ -242,8 +243,8 @@ Freezing additional orbital occupations cannot lower the :term:`CASCI` energy.
 It leaves the energy unchanged only if the removed determinants contribute nothing to the larger-space ground state; otherwise, as in this example, the energy increases.
 The script reports the observed energy increase when reducing the active space.
 
-The observed increase, which is much larger than the 1 milliHartree teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`, quantifies correlation lost when reducing the initial valence space.
-The 1 milliHartree target applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference; it does not include active-space, finite-basis, or fixed-geometry errors.
+The observed increase quantifies correlation excluded when reducing the initial valence space.
+This active-space model error is separate from the 1 milliHartree teaching target, which applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference.
 
 .. admonition:: Why should the energy increase caused by active-space refinement not be judged against the 1 milliHartree teaching target?
    :class: quiz-question
@@ -253,7 +254,8 @@ The 1 milliHartree target applies only to the later quantum algorithm's agreemen
    The 1 milliHartree target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
    These comparisons measure different approximations.
 
-For this tutorial, the energy loss is accepted because the refined active space preserves the strongest static-correlation signal while reducing the later quantum calculation to a size that can be studied directly.
+For this tutorial, the refined active space is accepted as a compact model because it retains the orbitals with the strongest entropy-based correlation evidence while producing a tractable Hamiltonian for validating the quantum workflow.
+The energy difference from the initial valence-space calculation remains documented as model error.
 The next chapter will determine how the selected active spatial orbitals are represented by qubits.
 
 Running the calculation
@@ -278,10 +280,10 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :class: quiz-question
    :collapsible: closed
 
-   Orbitals 5 through 8 have entropies near 0.31, separated by a large gap from the remaining values of 0.08 or less.
-   autoCAS retains these four orbitals in :term:`CAS`\ :math:`(4,4)`, containing two :math:`\alpha` and two :math:`\beta` active electrons.
-   The refined partition has five inactive orbitals, four active orbitals, and 19 virtual orbitals.
-   Its determinant count is :math:`\binom{4}{2}\binom{4}{2}=36`, compared with 3,136 determinants in the initial valence space.
+   Orbitals 4 through 9 have entropies from approximately 0.548 to 0.966, separated by a large gap from the remaining values of approximately 0.030 or less.
+   autoCAS retains these six orbitals in :term:`CAS`\ :math:`(6,6)`, containing three :math:`\alpha` and three :math:`\beta` active electrons.
+   The refined partition has four inactive orbitals, six active orbitals, and 18 virtual orbitals.
+   Its determinant count is :math:`\binom{6}{3}\binom{6}{3}=400`, compared with 3,136 determinants in the initial valence space.
 
 .. admonition:: Did the natural-orbital transformation change the CASCI energy?
    :class: quiz-question

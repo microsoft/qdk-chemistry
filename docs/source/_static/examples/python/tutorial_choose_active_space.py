@@ -52,7 +52,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
 2
 Stretched N2 molecule for the ground-state QPE tutorial
 N    0.000000    0.000000    0.000000
-N    0.000000    0.000000    1.270025
+N    0.000000    0.000000    1.850000
 """)
     charge = 0
     spin_multiplicity = 1

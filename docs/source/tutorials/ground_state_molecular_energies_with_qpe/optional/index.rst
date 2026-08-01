@@ -1,16 +1,10 @@
 Optional topics
 ###############
 
-The optional chapters extend the required molecular-energy workflow.
-They are not prerequisites for completing the tutorial.
-
-.. todo::
-
-   Revise this introduction after the scope and order of the optional chapters have been approved.
+The optional chapter extends the required molecular-energy workflow with software interoperability.
+It is not a prerequisite for completing the tutorial.
 
 .. toctree::
    :maxdepth: 2
 
-   resource_estimation
-   model_hamiltonians
    plugins_and_interoperability

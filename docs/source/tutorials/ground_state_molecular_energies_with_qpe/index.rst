@@ -109,13 +109,14 @@ Why stretched nitrogen?
 
 In `molecular orbital theory <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, occupying a bonding orbital stabilizes a bond, whereas occupying the corresponding antibonding orbital opposes that stabilization.
 Near the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}` for N\ :sub:`2`, one electron configuration dominates, and its Slater determinant provides a useful first approximation to the ground-state wavefunction.
-As the bond stretches, configurations with different occupations of the bonding and antibonding orbitals become comparable in importance.
-Therefore, no single Slater determinant describes the stretched molecule adequately.
+Bond stretching can make configurations with different occupations of the bonding and antibonding orbitals comparable in importance, increasing the multiconfigurational character of the ground state.
+The selected stretched N\ :sub:`2` geometry is chosen to make this effect visible.
+Later chapters quantify it through orbital entropies and determinant weights.
 
 Tutorial scope and structure
 ============================
 
-The stretched N\ :sub:`2` calculation in this tutorial is small enough to solve exactly within its selected active space on a classical computer.
+The tutorial deliberately selects a compact active-space model that can be solved exactly on a classical computer so each quantum stage can be checked against a classical reference.
 The quantum circuits are also executed on a classical simulator.
 The tutorial therefore does not demonstrate quantum advantage.
 Instead, the classical result provides a reference for validating each step of a workflow intended for future fault-tolerant quantum computers and larger active spaces.
@@ -125,9 +126,8 @@ The tutorial uses 1 milliHartree (often referred to as "chemical accuracy") as a
 
 Each required chapter introduces one stage of the calculation, provides a testable Python example where appropriate, and ends with questions and an assignment.
 Most examples are short.
-The final circuit simulation is the only intentionally long required example and is expected to take approximately 20 minutes on a typical student laptop.
-The actual duration depends on the computer.
-Optional chapters address physical resource estimation, model Hamiltonians, and software interoperability without adding dependencies to the required workflow.
+The final circuit simulation is the only intentionally long required example and may take tens of minutes, depending on the computer.
+An optional chapter addresses software interoperability without adding dependencies to the required workflow.
 
 Cumulative assignment
 =====================
@@ -141,7 +141,6 @@ At the end, use the completed notebook to explain the final energy estimate and 
    :maxdepth: 2
 
    00_before_you_begin
-   lab_notebook
    01_energy_and_accuracy
    02_describing_the_molecule
    03_choosing_the_active_space
@@ -149,3 +148,4 @@ At the end, use the completed notebook to explain the final energy estimate and 
    05_preparing_the_trial_state
    06_iterative_phase_estimation
    optional/index
+   lab_notebook

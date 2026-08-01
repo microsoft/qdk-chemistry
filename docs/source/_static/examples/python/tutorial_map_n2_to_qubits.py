@@ -99,14 +99,12 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
         and (state >> num_active_spatial_orbitals).bit_count() == num_beta
     ]
 
-    # Exact diagonalization is practical for this compact teaching example,
-    # but it is not a scalable way to solve larger qubit Hamiltonians.
-    qubit_matrix = qubit_hamiltonian.to_matrix()
-    # np.ix_ forms matching row and column index grids, extracting the square
-    # matrix restricted to the fixed-electron-number basis states.
-    fixed_electron_matrix = qubit_matrix[
-        np.ix_(fixed_electron_basis_indices, fixed_electron_basis_indices)
-    ]
+    # Construct the full operator sparsely, extract the physical sector, and
+    # densify only that compact matrix for exact diagonalization.
+    qubit_matrix = qubit_hamiltonian.to_matrix(sparse=True)
+    fixed_electron_matrix = qubit_matrix[fixed_electron_basis_indices][
+        :, fixed_electron_basis_indices
+    ].toarray()
     mapped_active_energy = float(np.linalg.eigvalsh(fixed_electron_matrix)[0])
     mapped_total_energy = core_energy + mapped_active_energy
     mapping_energy_difference = mapped_total_energy - active_space_result.refined_energy
