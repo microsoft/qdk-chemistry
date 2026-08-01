@@ -54,7 +54,8 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
 
 LIH = "2\nLiH\nLi 0 0 0\nH 0 0 1.595\n"
@@ -93,21 +94,20 @@ def _active_orbitals(base, nmo, active, inactive, unrestricted):
     active_idx = spin_index_set(nmo, active, active, equivalent=equivalent)
     inactive_idx = spin_index_set(nmo, inactive, inactive, equivalent=equivalent)
     if unrestricted:
-        ca, cb = base.get_coefficients()
-        ea, eb = base.get_energies()
+        coefficients, energies = base.coefficients(), base.energies()
         return Orbitals(
-            coefficients_alpha=np.array(ca),
-            coefficients_beta=np.array(cb),
-            energies_alpha=np.array(ea),
-            energies_beta=np.array(eb),
+            coefficients_alpha=spin_channel_matrix(coefficients, axes.alpha()),
+            coefficients_beta=spin_channel_matrix(coefficients, axes.beta()),
+            energies_alpha=spin_channel_vector(energies, axes.alpha()),
+            energies_beta=spin_channel_vector(energies, axes.beta()),
             ao_overlap=np.array(base.get_overlap_matrix()),
             basis_set=base.get_basis_set(),
             active_indices=active_idx,
             inactive_indices=inactive_idx,
         )
     return Orbitals(
-        coefficients=np.array(base.get_coefficients()[0]),
-        energies=np.array(base.get_energies()[0]),
+        coefficients=spin_channel_matrix(base.coefficients(), axes.alpha()),
+        energies=spin_channel_vector(base.energies(), axes.alpha()),
         ao_overlap=np.array(base.get_overlap_matrix()),
         basis_set=base.get_basis_set(),
         active_indices=active_idx,
@@ -157,7 +157,7 @@ def _ducc0_output(xyz, multiplicity, unrestricted, active, inactive):
     """Build the DUCC level-0 output Hamiltonian and its active electron counts."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
@@ -192,7 +192,7 @@ def test_casci_equals_fci_at_level0(label, xyz, multiplicity, unrestricted, acti
     """CASCI on the full Hamiltonian == FCI on the DUCC level-0 active Hamiltonian."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
@@ -225,15 +225,15 @@ def test_active_orbitals_must_be_subset_of_wavefunction():
     """The active orbitals must share the wavefunction's MO basis (subset assertion)."""
     wfn_hf = _scf(LIH, 1, False)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
 
     # Active orbitals with perturbed coefficients do not match the wavefunction's.
     bad = Orbitals(
-        coefficients=np.array(orbitals.get_coefficients()[0]) * 1.5,
-        energies=np.array(orbitals.get_energies()[0]),
+        coefficients=spin_channel_matrix(orbitals.coefficients(), axes.alpha()) * 1.5,
+        energies=spin_channel_vector(orbitals.energies(), axes.alpha()),
         ao_overlap=np.array(orbitals.get_overlap_matrix()),
         basis_set=orbitals.get_basis_set(),
         active_indices=spin_index_set(nmo, [1, 2], [1, 2], equivalent=True),
@@ -303,7 +303,7 @@ def test_level_gt0_reduces_to_bare_when_active_is_all(label, xyz, multiplicity, 
     """With every orbital active, the BCH dressing collapses to the bare Hamiltonian."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
@@ -333,7 +333,7 @@ def _native_ducc_output(xyz, multiplicity, unrestricted, active, inactive, level
     """Native DUCC level-`level` output Hamiltonian, the full Hamiltonian, and electron counts."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
@@ -369,7 +369,7 @@ def _restricted_ducc_output(xyz, active, inactive, level):
     """Restricted DUCC output, its active-space orbitals, and active electron counts."""
     wfn_hf = _scf(xyz, 1, False)
     orbitals = wfn_hf.get_orbitals()
-    nmo = np.array(orbitals.get_coefficients()[0]).shape[1]
+    nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
