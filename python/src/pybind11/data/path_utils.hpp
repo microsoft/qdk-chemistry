@@ -24,28 +24,26 @@ namespace qdk::chemistry::python::utils {
 inline std::string to_string_path(const pybind11::object& path_obj) {
   namespace py = pybind11;
 
-  // Try to cast directly to string first (works for strings)
-  try {
+  // Dispatch on the object's type rather than by letting a failed cast throw.
+  // The exception-driven form relied on py::cast_error propagating out of
+  // pybind11 for every pathlib.Path argument, which crashed with an access
+  // violation under clang-cl on Windows ARM64. Testing the type first is also
+  // cheaper: the common paths no longer throw and catch an exception at all.
+  if (py::isinstance<py::str>(path_obj) || py::isinstance<py::bytes>(path_obj)) {
     return path_obj.cast<std::string>();
-  } catch (const py::cast_error&) {
-    // If that fails, try to use __fspath__() method (for pathlib objects)
-    try {
-      if (py::hasattr(path_obj, "__fspath__")) {
-        py::object fspath_result = path_obj.attr("__fspath__")();
-        return fspath_result.cast<std::string>();
-      }
-    } catch (const py::cast_error&) {
-      // Ignore and continue
-    }
+  }
 
-    // Try str() conversion as final fallback
-    try {
-      return py::str(path_obj).cast<std::string>();
-    } catch (const py::cast_error&) {
-      throw std::runtime_error(
-          "Path argument must be a string or pathlib Path object");
+  // os.PathLike (pathlib.Path and friends) expose __fspath__().
+  if (py::hasattr(path_obj, "__fspath__")) {
+    py::object fspath_result = path_obj.attr("__fspath__")();
+    if (py::isinstance<py::str>(fspath_result) ||
+        py::isinstance<py::bytes>(fspath_result)) {
+      return fspath_result.cast<std::string>();
     }
   }
+
+  throw std::runtime_error(
+      "Path argument must be a string or pathlib Path object");
 }
 
 }  // namespace qdk::chemistry::python::utils
