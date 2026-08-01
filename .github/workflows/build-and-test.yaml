@@ -901,9 +901,70 @@ jobs:
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
     # TEMPORARY (diagnostic): every MacisAsciTest hangs on ARM64 while the same
-    # tests pass on x86_64. SCF reaches the first GDM step and then stops
-    # emitting output, so run one case under a hard cap with debug logging to
-    # find where it stalls. Remove once the hang is fixed.
+    # tests pass on x86_64. Captured output shows SCF completing its DIIS steps
+    # normally and then stopping inside matrix_exp, immediately after it logs a
+    # perfectly sane norm/scaling factor -- i.e. inside the blas::gemm /
+    # lapack::getrf calls in pade_approximation. Everything before that point
+    # goes through Eigen, so this is likely the first OpenBLAS entry point in
+    # the process. Isolate OpenBLAS from all qdk code to confirm.
+    - name: Diagnose OpenBLAS on ARM64
+      shell: pwsh
+      continue-on-error: true
+      timeout-minutes: 12
+      run: |
+        $inc = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\include"
+        $lib = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\lib\openblas.lib"
+        Write-Host "include: $inc"
+        Write-Host "lib    : $lib (exists: $(Test-Path $lib))"
+
+        $src = @(
+          '#include <stdio.h>',
+          '#include <cblas.h>',
+          'extern void dgetrf_(int*, int*, double*, int*, int*, int*);',
+          '#define N 24',
+          'static double a[N*N], b[N*N], c[N*N], m[N*N];',
+          'static int ipiv[N];',
+          'int main(void) {',
+          '    for (int i = 0; i < N*N; ++i) { a[i] = 1.0; b[i] = 2.0; c[i] = 0.0; }',
+          '    printf("before openblas_get_num_procs\n"); fflush(stdout);',
+          '    printf("num_procs = %d\n", openblas_get_num_procs()); fflush(stdout);',
+          '    printf("before cblas_dgemm\n"); fflush(stdout);',
+          '    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,',
+          '                N, N, N, 1.0, a, N, b, N, 0.0, c, N);',
+          '    printf("after cblas_dgemm, c[0] = %.1f (expect 48.0)\n", c[0]); fflush(stdout);',
+          '    for (int i = 0; i < N*N; ++i) m[i] = 0.0;',
+          '    for (int i = 0; i < N; ++i) m[i*N+i] = 2.0;',
+          '    int n = N, lda = N, info = 0;',
+          '    printf("before dgetrf\n"); fflush(stdout);',
+          '    dgetrf_(&n, &n, m, &lda, ipiv, &info);',
+          '    printf("after dgetrf, info = %d\n", info); fflush(stdout);',
+          '    printf("ALL OPENBLAS CALLS COMPLETED\n"); fflush(stdout);',
+          '    return 0;',
+          '}'
+        )
+        $srcPath = Join-Path $env:RUNNER_TEMP 'ob_smoke.c'
+        Set-Content -Path $srcPath -Value $src -Encoding ascii
+
+        Push-Location $env:RUNNER_TEMP
+        cl /nologo /I "$inc" $srcPath "$lib" /Fe:ob_smoke.exe
+        if ($LASTEXITCODE -ne 0) { Write-Host "compile failed"; Pop-Location; exit 0 }
+
+        $p = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP 'ob_smoke.exe') `
+          -PassThru -NoNewWindow `
+          -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'ob.out') `
+          -RedirectStandardError  (Join-Path $env:RUNNER_TEMP 'ob.err')
+        if (-not $p.WaitForExit(120000)) {
+          Write-Host "=== OPENBLAS SMOKE TEST HUNG (>120s); killing ==="
+          $p.Kill(); $p.WaitForExit()
+        } else {
+          Write-Host "=== exited with code $($p.ExitCode) ==="
+        }
+        Write-Host "--- stdout ---"; Get-Content (Join-Path $env:RUNNER_TEMP 'ob.out') -EA SilentlyContinue
+        Write-Host "--- stderr ---"; Get-Content (Join-Path $env:RUNNER_TEMP 'ob.err') -EA SilentlyContinue
+        Pop-Location
+
+    # TEMPORARY (diagnostic): run one affected qdk test under a hard cap with
+    # debug logging. Remove together with the OpenBLAS probe above.
     - name: Diagnose MACIS hang (ARM64)
       shell: pwsh
       continue-on-error: true
