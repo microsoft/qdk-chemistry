@@ -29,14 +29,15 @@ Install from PyPI with all optional dependencies:
 For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
 Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64).
-On Windows, `WSL <https://learn.microsoft.com/windows/wsl/install>`_ is supported as well and is the
-simplest path on arm64; inside it, follow the Linux instructions.
+Windows arm64 is supported and tested from source; `WSL <https://learn.microsoft.com/windows/wsl/install>`_
+is supported as well, and inside it you follow the Linux instructions.
 
 .. note::
 
    PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so it is
    skipped on native Windows. This also affects ``jupyter``, ``test``, and ``all``, which depend on
-   ``plugins``. See :ref:`pyscf-plugin-details` and the
+   ``plugins``. On Windows arm64, Qiskit, PennyLane and RDKit are skipped as well, because they
+   require ``rustworkx``, which publishes no win-arm64 wheels. See :ref:`pyscf-plugin-details` and the
    `Windows notes <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users>`_.
 
 End-to-end example

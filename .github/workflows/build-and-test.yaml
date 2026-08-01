@@ -899,10 +899,12 @@ jobs:
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
-    # Verifies the OpenBLAS ARM64 fix end to end: confirms the library reports an
-    # ARMV8 kernel set rather than the generic one, and that dgetrf now returns
-    # above the getf2 crossover instead of looping forever. Cheap (about a
-    # minute) and fails loudly if the target ever silently regresses to GENERIC.
+    # Guards the OpenBLAS ARM64 build: confirms the library reports an ARMV8
+    # kernel set rather than the generic one, and that dgetrf returns above the
+    # getf2 crossover instead of looping forever. Both failure modes are silent
+    # -- the library builds, links, and computes dgemm correctly -- so without
+    # this check a regression surfaces only as the whole test suite timing out.
+    # Costs about a minute.
     - name: Verify OpenBLAS on ARM64
       shell: pwsh
       timeout-minutes: 15
@@ -987,23 +989,6 @@ jobs:
         # GENERIC is the fallback whose blocking parameters hang getrf.
         if ($out -match 'corename = generic') { throw "OpenBLAS selected the GENERIC kernel set on ARM64" }
         Write-Host "OpenBLAS ARM64 verification passed."
-
-    # Artifacts are retrievable as soon as the upload finishes, whereas job logs
-    # only become available once the whole job ends -- over an hour later for
-    # these jobs. TEMPORARY, together with the diagnostics above.
-    - name: Upload ARM64 diagnostics
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: arm64-diagnostics-${{ matrix.compiler }}
-        path: |
-          ${{ runner.temp }}/ob.out
-          ${{ runner.temp }}/ob.err
-          ${{ runner.temp }}/ob_smoke.c
-          ${{ runner.temp }}/macis-diag.out
-          ${{ runner.temp }}/macis-diag.err
-        if-no-files-found: warn
-        retention-days: 5
 
     - name: Run C++ tests
       shell: pwsh
