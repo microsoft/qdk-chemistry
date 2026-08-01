@@ -84,25 +84,25 @@ Examples:
     >>> # To create a custom orbital localizer, inherit from this class.
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     # Implement the _run_impl method
     ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
-    ...         # Custom localization implementation
-    ...         return localized_wavefunction
+    ...         # Custom orbital transformation implementation
+    ...         return transformed_wavefunction
 )");
 
   localizer.def(py::init<>(),
                 R"(
-Create a Localizer instance.
+Create an OrbitalLocalizer instance.
 
 Default constructor for the abstract base class.
 This should typically be called from derived class constructors.
 
 Examples:
     >>> # In a derived class:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
 
@@ -114,11 +114,12 @@ Transform selected molecular orbitals in the given wavefunction.
 
 Args:
     wavefunction (qdk_chemistry.data.Wavefunction): The molecular wavefunction to transform
-    loc_indices_a (list[int]): Indices of alpha orbitals to transform
-    loc_indices_b (list[int]): Indices of beta orbitals to transform
+    loc_indices_a (list[int]): Indices of alpha orbitals to transform; empty selects none
+    loc_indices_b (list[int]): Indices of beta orbitals to transform; empty selects none
 
 Notes:
     For restricted orbitals, ``loc_indices_b`` must match ``loc_indices_a``.
+    If both index lists are empty, the orbital transformation is a no-op.
 
 Returns:
     qdk_chemistry.data.Wavefunction: The output wavefunction with transformed orbitals
@@ -156,7 +157,7 @@ Internal settings object property.
 This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
 Examples:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings

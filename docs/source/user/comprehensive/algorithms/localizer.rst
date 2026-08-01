@@ -49,10 +49,12 @@ Wavefunction
    A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be transformed.
 
 Alpha orbital indices (``loc_indices_a``)
-   A list/vector of indices specifying which alpha orbitals to include in the transformation. Indices must be sorted in ascending order.
+   A list/vector of indices specifying which alpha orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no alpha orbitals.
 
 Beta orbital indices (``loc_indices_b``)
-   A list/vector of indices specifying which beta orbitals to include in the transformation. Indices must be sorted in ascending order.
+   A list/vector of indices specifying which beta orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no beta orbitals.
+
+If both index lists are empty, the orbital transformation is a no-op.
 
 
 .. rubric:: Creating a localizer

@@ -105,10 +105,11 @@ class Localizer
    *
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to transform
+   * @param wavefunction The wavefunction containing the orbitals to transform
    * @param loc_indices_a Indices of alpha orbitals to transform (must be
-   * sorted)
-   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted)
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
    *
    * @return The output wavefunction with transformed orbital coefficients.
@@ -164,10 +165,11 @@ class Localizer
    * called by run() after settings have been locked.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to transform
+   * @param wavefunction The wavefunction containing the orbitals to transform
    * @param loc_indices_a Indices of alpha orbitals to transform (must be
-   * sorted)
-   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted)
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
    * @return The output wavefunction with transformed orbitals
    */
