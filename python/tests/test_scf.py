@@ -132,10 +132,10 @@ class TestScfSolver:
         assert np.isclose(energy, -75.9229032345, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
         # Check that orbitals have expected properties
-        coeffs = orbitals.get_coefficients()
-        assert coeffs is not None
+        coefficients = orbitals.coefficients()
+        assert coefficients is not None
 
-        energies = orbitals.get_energies()
+        energies = orbitals.energies()
         assert energies is not None
 
     def test_scf_solver_water_def2_tzvp(self):

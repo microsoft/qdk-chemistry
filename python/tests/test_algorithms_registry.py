@@ -37,6 +37,7 @@ class TestRegistryShowDefault:
         expected_types = [
             "active_space_selector",
             "dynamical_correlation_calculator",
+            "geometry_optimizer",
             "hamiltonian_constructor",
             "orbital_localizer",
             "multi_configuration_calculator",
@@ -44,7 +45,7 @@ class TestRegistryShowDefault:
             "projected_multi_configuration_calculator",
             "scf_solver",
             "stability_checker",
-            "energy_estimator",
+            "expectation_estimator",
             "state_prep",
             "qubit_mapper",
             "circuit_executor",
@@ -92,10 +93,10 @@ class TestRegistryShowDefault:
         assert isinstance(default_circuit_executor, str)
         assert default_circuit_executor == "qdk_sparse_state_simulator"
 
-        # Test for energy estimator
-        default_energy_estimator = registry.show_default("energy_estimator")
-        assert isinstance(default_energy_estimator, str)
-        assert default_energy_estimator == "qdk"
+        # Test for expectation estimator
+        default_expectation_estimator = registry.show_default("expectation_estimator")
+        assert isinstance(default_expectation_estimator, str)
+        assert default_expectation_estimator == "qdk"
 
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")
@@ -125,6 +126,8 @@ class TestRegistryShowDefault:
         for algorithm_type, default_name in defaults.items():
             # Each default should be in the available list for that type
             assert algorithm_type in available, f"Algorithm type '{algorithm_type}' not in available algorithms"
+            if algorithm_type == "geometry_optimizer" and not available[algorithm_type]:
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             assert default_name in available[algorithm_type], (
@@ -137,6 +140,8 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
+            if algorithm_type == "geometry_optimizer" and default_name not in registry.available(algorithm_type):
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             # Should be able to create the default algorithm
@@ -288,6 +293,8 @@ class TestRegistryAvailable:
         all_algorithms = registry.available()
         for algorithm_type, algorithms in all_algorithms.items():
             assert isinstance(algorithms, list), f"Expected list for {algorithm_type}"
+            if algorithm_type == "geometry_optimizer" and not algorithms:
+                continue  # geomeTRIC-backed optimizer is optional
             assert len(algorithms) > 0, f"No algorithms available for {algorithm_type}"
 
     def test_available_algorithms_can_be_created(self):

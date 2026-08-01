@@ -12,6 +12,8 @@ from pathlib import Path
 from pyscf.tools import cubegen
 
 from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -55,11 +57,16 @@ def generate_cubefiles_from_orbitals(
         output_folder = Path(output_folder)
         output_folder.mkdir(parents=True, exist_ok=True)
 
-    mol = basis_to_pyscf_mol(orbitals.get_basis_set())
+    basis_set = orbitals.get_basis_set()
+    try:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1)
+    except RuntimeError:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=2)
     nmo = orbitals.get_num_molecular_orbitals()
     mo_range = range(nmo)
     nx, ny, nz = grid_size
-    mo_a, mo_b = orbitals.get_coefficients()
+    mo_a = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+    mo_b = spin_channel_matrix(orbitals.coefficients(), axes.beta())
 
     cubefile_paths: list[str] | dict[str, str] = [] if output_folder is not None else {}
 

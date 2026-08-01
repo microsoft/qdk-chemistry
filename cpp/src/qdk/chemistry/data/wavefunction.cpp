@@ -11,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -326,7 +327,9 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
     auto bbbb = extract(axes::beta(), axes::beta(), axes::beta(), axes::beta());
     auto two_rdm_ss_part = detail::add_vector_variants(aaaa, bbbb);
     auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-        aabb, get_orbitals()->get_active_space_indices().first.size());
+        aabb,
+        spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+            .size());
     auto two_rdm_os_part =
         detail::add_vector_variants(aabb, *two_rdm_spin_bbaa);
 
@@ -879,7 +882,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -899,7 +902,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // implemented (bypassing the version gate above), existing cas/sci files
     // will load through this path without additional changes.
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
@@ -907,7 +910,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       throw std::runtime_error(
           "Unrecognized container_type '" + container_type +
           "' in WavefunctionContainer::from_json. Expected 'state_vector', "
-          "'cas', or 'sci'.");
+          "'cas', 'sci', or 'sd'.");
     }
   } catch (const std::exception& e) {
     throw std::runtime_error("JSON error: " + std::string(e.what()));
@@ -1088,8 +1091,8 @@ Configuration Wavefunction::get_active_determinant(
     return total_determinant;
   }
 
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
@@ -1122,12 +1125,12 @@ Configuration Wavefunction::get_total_determinant(
     return active_determinant;
   }
 
-  auto [alpha_inactive, beta_inactive] = orbitals->get_inactive_space_indices();
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  const auto inactive_indices =
+      spin_channel_indices(orbitals->inactive_indices(), axes::alpha());
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
   auto [alpha_virtual, beta_virtual] = orbitals->get_virtual_space_indices();
 
-  const auto& inactive_indices = alpha_inactive;
-  const auto& active_indices = alpha_active;
   const auto& virtual_indices = alpha_virtual;
 
   size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
@@ -1909,7 +1912,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -1920,14 +1923,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     }
 
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
-          "state_vector/cas/sci. Expected delegation to container-specific "
+          "state_vector/cas/sci/sd. Expected delegation to container-specific "
           "methods.");
     }
   } catch (const H5::Exception& e) {

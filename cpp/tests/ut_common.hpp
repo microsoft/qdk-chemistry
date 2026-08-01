@@ -197,14 +197,17 @@ inline std::shared_ptr<Orbitals> with_active_space(
     const std::shared_ptr<Orbitals> existing,
     const std::vector<size_t>& active_indices,
     const std::vector<size_t>& inactive_indices) {
-  // Get existing data
-  auto [alpha_coeffs, beta_coeffs] = existing->get_coefficients();
+  // Get existing data (access the symmetry-blocked coefficient tensor per spin)
+  auto coefficients = existing->coefficients();
+  const auto& alpha_coeffs =
+      coefficients->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs = coefficients->block({axes::beta(), axes::beta()});
 
   std::optional<Eigen::VectorXd> alpha_energies, beta_energies;
   if (existing->has_energies()) {
-    auto [e_a, e_b] = existing->get_energies();
-    alpha_energies = e_a;
-    beta_energies = e_b;
+    auto energies = existing->energies();
+    alpha_energies = energies->block({axes::alpha()});
+    beta_energies = energies->block({axes::beta()});
   }
 
   std::optional<Eigen::MatrixXd> ao_overlap;

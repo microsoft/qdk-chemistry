@@ -33,7 +33,8 @@ from pyscf.mcscf import avas
 
 from qdk_chemistry.algorithms import ActiveSpaceSelector
 from qdk_chemistry.data import Configuration, Orbitals, Settings, StateVectorContainer, Wavefunction
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -209,8 +210,8 @@ class PyscfAVAS(ActiveSpaceSelector):
 
             # Get old and new active space indices
             old_orbitals = wavefunction.get_orbitals()
-            old_active_indices = old_orbitals.get_active_space_indices()[0]
-            new_active_indices = active_orbitals.get_active_space_indices()[0]
+            old_active_indices = spin_channel_indices(old_orbitals.active_indices(), axes.alpha())
+            new_active_indices = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
 
             # Map from old active space to new active space
             # The old determinant is already shortened to the old active space

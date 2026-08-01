@@ -26,6 +26,7 @@ from qdk_chemistry.data import (
     Wavefunction,
     WavefunctionType,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import (
     AxisName,
     SymmetryBlockedScalarCount,
@@ -98,7 +99,7 @@ class TestWavefunction:
         assert orbitals is not None
 
         # Should be the same orbital object
-        alpha_coeffs, _ = orbitals.get_coefficients()
+        alpha_coeffs = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         assert alpha_coeffs.shape == (3, 2)
 
     def test_wavefunction_electron_counts(self, cas_wavefunction):

@@ -23,8 +23,7 @@ class QdkNuclearDerivativeCalculator : public NuclearDerivativeCalculator {
   NuclearDerivativeResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity, NuclearDerivativeSeedType seed_or_basis,
-      unsigned int n_active_alpha_electrons,
-      unsigned int n_active_beta_electrons) const override;
+      unsigned int n_inactive_orbitals) const override;
 };
 
 std::unique_ptr<NuclearDerivativeCalculator>

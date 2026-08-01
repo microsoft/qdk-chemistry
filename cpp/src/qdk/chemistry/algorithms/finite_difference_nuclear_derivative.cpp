@@ -20,8 +20,7 @@ namespace qdk::chemistry::algorithms {
 NuclearDerivativeResult FiniteDifferenceNuclearDerivativeCalculator::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge,
     int spin_multiplicity, NuclearDerivativeSeedType seed,
-    unsigned int n_active_alpha_electrons,
-    unsigned int n_active_beta_electrons) const {
+    unsigned int n_inactive_orbitals) const {
   std::optional<utils::ScopedLogLevel> scoped_log_level;
   if (_settings->get<bool>("suppress_child_algorithm_logging")) {
     scoped_log_level.emplace(utils::LogLevel::error);
@@ -29,6 +28,9 @@ NuclearDerivativeResult FiniteDifferenceNuclearDerivativeCalculator::_run_impl(
   if (!structure) {
     throw std::invalid_argument("Structure must not be null");
   }
+  const auto [n_active_alpha_electrons, n_active_beta_electrons] =
+      detail::active_electron_counts(structure, charge, spin_multiplicity, seed,
+                                     n_inactive_orbitals);
   const double step = _settings->get<double>("finite_difference_step");
   const bool compute_hessian = _settings->get<bool>("compute_hessian");
   const auto dimension =

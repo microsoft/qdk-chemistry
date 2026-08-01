@@ -89,9 +89,13 @@ TEST_F(OrbitalsEdgeCasesTest, SingleOrbitalSingleBasis) {
   EXPECT_EQ(1, orb.get_num_atomic_orbitals());
   EXPECT_EQ(1, orb.get_num_molecular_orbitals());
 
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_NEAR(1.0, alpha_coeffs(0, 0), testing::numerical_zero_tolerance);
-  const auto& [alpha_energies, beta_energies] = orb.get_energies();
+  const auto& alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb.energies()->block({axes::beta()});
   EXPECT_NEAR(-1.0, alpha_energies(0), testing::numerical_zero_tolerance);
 }
 
@@ -112,7 +116,10 @@ TEST_F(OrbitalsEdgeCasesTest, AsymmetricDimensions) {
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   // Test coefficient matrix dimensions
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(n_basis, alpha_coeffs.rows());
   EXPECT_EQ(n_orbitals, alpha_coeffs.cols());
 }
@@ -129,12 +136,16 @@ TEST_F(OrbitalsEdgeCasesTest, ExtremeValues) {
                extreme_basis);
 
   // Test preservation of extreme values
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_NEAR(1e-15, alpha_coeffs(0, 0),
               testing::small_value_lower_bound_tolerance);
   EXPECT_NEAR(1e15, alpha_coeffs(0, 1),
               testing::small_value_upper_bound_tolerance);
-  const auto& [alpha_energies, beta_energies] = orb.get_energies();
+  const auto& alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb.energies()->block({axes::beta()});
   EXPECT_NEAR(-1000.0, alpha_energies(0), testing::numerical_zero_tolerance);
   EXPECT_NEAR(1000.0, alpha_energies(1), testing::numerical_zero_tolerance);
 }
@@ -150,7 +161,10 @@ TEST_F(OrbitalsEdgeCasesTest, SpecialMatrices) {
                special_basis);
 
   // Check orthogonality
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
   for (int i = 0; i < n; ++i) {
     for (int j = 0; j < n; ++j) {
       if (i == j) {
@@ -285,8 +299,12 @@ TEST_F(OrbitalsEdgeCasesTest, SpinComponentConsistency) {
   Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, spin_basis);
 
   // For restricted calculation, alpha and beta should be identical
-  const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
-  const auto& [alpha_energies, beta_energies] = orb.get_energies();
+  const auto& alpha_coeffs =
+      orb.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orb.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb.energies()->block({axes::beta()});
 
   EXPECT_TRUE((alpha_coeffs.array() == beta_coeffs.array()).all());
   EXPECT_TRUE((alpha_energies.array() == beta_energies.array()).all());
@@ -329,12 +347,15 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
   EXPECT_EQ(2, orb4.get_num_atomic_orbitals());
   EXPECT_EQ(2, orb4.get_num_molecular_orbitals());
   // Should have coefficients but no energies
-  const auto& [alpha_coeffs, beta_coeffs] = orb4.get_coefficients();
+  const auto& alpha_coeffs =
+      orb4.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb4.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
   EXPECT_TRUE(coeffs.isApprox(beta_coeffs, testing::numerical_zero_tolerance));
 
   // Should throw for missing energies when requested
-  EXPECT_THROW(orb4.get_energies(), std::runtime_error);
+  EXPECT_THROW(orb4.energies()->block({axes::alpha()}), std::runtime_error);
 }
 
 TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
@@ -367,15 +388,17 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
   EXPECT_FALSE(orb2.is_restricted());
 
   // Verify all data copied correctly
-  const auto& [copied_alpha_coeffs, copied_beta_coeffs] =
-      orb2.get_coefficients();
+  const auto& copied_alpha_coeffs =
+      orb2.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& copied_beta_coeffs =
+      orb2.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(alpha_coeffs.isApprox(copied_alpha_coeffs,
                                     testing::numerical_zero_tolerance));
   EXPECT_TRUE(beta_coeffs.isApprox(copied_beta_coeffs,
                                    testing::numerical_zero_tolerance));
 
-  const auto& [copied_alpha_energies, copied_beta_energies] =
-      orb2.get_energies();
+  const auto& copied_alpha_energies = orb2.energies()->block({axes::alpha()});
+  const auto& copied_beta_energies = orb2.energies()->block({axes::beta()});
   EXPECT_TRUE(alpha_energies.isApprox(copied_alpha_energies,
                                       testing::numerical_zero_tolerance));
   EXPECT_TRUE(beta_energies.isApprox(copied_beta_energies,
@@ -388,8 +411,10 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
       alpha_coeffs, beta_coeffs, std::make_optional(alpha_energies),
       std::make_optional(beta_energies), std::nullopt, unrestricted_basis);
 
-  const auto& [unchanged_alpha_coeffs, unchanged_beta_coeffs] =
-      orb2.get_coefficients();
+  const auto& unchanged_alpha_coeffs =
+      orb2.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& unchanged_beta_coeffs =
+      orb2.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_NEAR(0.1, unchanged_alpha_coeffs(0, 0),
               testing::numerical_zero_tolerance);  // Should be unchanged
 }
@@ -420,9 +445,12 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorWithNullPointers) {
   EXPECT_EQ(2, orb2.get_num_molecular_orbitals());
 
   // Should have coefficients but missing energies
-  const auto& [alpha_coeffs, beta_coeffs] = orb2.get_coefficients();
+  const auto& alpha_coeffs =
+      orb2.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb2.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
-  EXPECT_THROW(orb2.get_energies(), std::runtime_error);
+  EXPECT_THROW(orb2.energies()->block({axes::alpha()}), std::runtime_error);
 }
 
 TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorUnrestrictedPaths) {
@@ -460,15 +488,17 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorUnrestrictedPaths) {
   EXPECT_FALSE(orb2.is_restricted());
 
   // Verify all data copied correctly
-  const auto& [assigned_alpha_coeffs, assigned_beta_coeffs] =
-      orb2.get_coefficients();
+  const auto& assigned_alpha_coeffs =
+      orb2.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& assigned_beta_coeffs =
+      orb2.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(alpha_coeffs.isApprox(assigned_alpha_coeffs,
                                     testing::numerical_zero_tolerance));
   EXPECT_TRUE(beta_coeffs.isApprox(assigned_beta_coeffs,
                                    testing::numerical_zero_tolerance));
 
-  const auto& [assigned_alpha_energies, assigned_beta_energies] =
-      orb2.get_energies();
+  const auto& assigned_alpha_energies = orb2.energies()->block({axes::alpha()});
+  const auto& assigned_beta_energies = orb2.energies()->block({axes::beta()});
   EXPECT_TRUE(alpha_energies.isApprox(assigned_alpha_energies,
                                       testing::numerical_zero_tolerance));
   EXPECT_TRUE(beta_energies.isApprox(assigned_beta_energies,
@@ -520,13 +550,17 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorRestrictedToRestricted) {
   EXPECT_TRUE(orb2.is_restricted());
 
   // Verify data copied correctly
-  const auto& [alpha_coeffs, beta_coeffs] = orb2.get_coefficients();
+  const auto& alpha_coeffs =
+      orb2.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb2.coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
   EXPECT_TRUE(alpha_coeffs.isApprox(
       beta_coeffs, testing::numerical_zero_tolerance));  // Should be identical
                                                          // for restricted
 
-  const auto& [alpha_energies, beta_energies] = orb2.get_energies();
+  const auto& alpha_energies = orb2.energies()->block({axes::alpha()});
+  const auto& beta_energies = orb2.energies()->block({axes::beta()});
   EXPECT_TRUE(
       energies.isApprox(alpha_energies, testing::numerical_zero_tolerance));
   EXPECT_TRUE(alpha_energies.isApprox(
@@ -687,13 +721,17 @@ TEST_F(OrbitalsEdgeCasesTest, HDF5BasisSetTemporaryFileOperations) {
   auto orb_load = Orbitals::from_hdf5_file("test_basis_temp.orbitals.h5");
 
   // Verify data loaded correctly
-  const auto& [loaded_alpha_coeffs, loaded_beta_coeffs] =
-      orb_load->get_coefficients();
+  const auto& loaded_alpha_coeffs =
+      orb_load->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& loaded_beta_coeffs =
+      orb_load->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(
       coeffs.isApprox(loaded_alpha_coeffs, testing::numerical_zero_tolerance));
 
-  const auto& [loaded_alpha_energies, loaded_beta_energies] =
-      orb_load->get_energies();
+  const auto& loaded_alpha_energies =
+      orb_load->energies()->block({axes::alpha()});
+  const auto& loaded_beta_energies =
+      orb_load->energies()->block({axes::beta()});
   EXPECT_TRUE(energies.isApprox(loaded_alpha_energies,
                                 testing::numerical_zero_tolerance));
 
@@ -750,11 +788,15 @@ TEST_F(OrbitalsEdgeCasesTest, HDF5DatasetExistenceChecks) {
   auto orb_minimal = Orbitals::from_hdf5_file("minimal_test.orbitals.h5");
 
   // Should have coefficients and occupations (occupations are always saved)
-  const auto& [alpha_coeffs, beta_coeffs] = orb_minimal->get_coefficients();
+  const auto& alpha_coeffs =
+      orb_minimal->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orb_minimal->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
 
   // Should throw for missing energies only
-  EXPECT_THROW(orb_minimal->get_energies(), std::runtime_error);
+  EXPECT_THROW(orb_minimal->energies()->block({axes::alpha()}),
+               std::runtime_error);
 
   // Should not have optional components
   EXPECT_FALSE(orb_minimal->has_overlap_matrix());

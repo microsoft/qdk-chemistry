@@ -170,7 +170,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from circuit execution
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Often paired with a circuit for energy estimation
+- :class:`~qdk_chemistry.data.QubitOperator`: Often paired with a circuit for energy estimation
 
 Further reading
 ---------------

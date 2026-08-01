@@ -93,7 +93,7 @@ Related classes
 - :doc:`Wavefunction <wavefunction>`: Source of active-space electron counts via :meth:`~qdk_chemistry.data.Symmetries.from_wavefunction`
 - :doc:`Ansatz <ansatz>`: Combined Hamiltonian + Wavefunction container, used with :meth:`~qdk_chemistry.data.Symmetries.from_ansatz`
 - :doc:`Hamiltonian <hamiltonian>`: Input to qubit mapping algorithms
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Output of qubit mapping algorithms
+- :class:`~qdk_chemistry.data.QubitOperator`: Output of qubit mapping algorithms
 
 Further reading
 ---------------

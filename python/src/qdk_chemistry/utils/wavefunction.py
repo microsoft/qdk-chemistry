@@ -9,6 +9,8 @@ import numpy as np
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Hamiltonian, StateVectorContainer, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -35,8 +37,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
     orbitals = wavefunction.get_orbitals()
     num_orbital_chars = 0
     if orbitals.has_active_space():
-        alpha_indices = orbitals.get_active_space_indices()[0]
-        num_orbital_chars = len(alpha_indices)
+        num_orbital_chars = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
 
     for det, coeff in wavefunction.get_top_determinants(max_determinants=max_determinants).items():
         det_string = det.to_string()

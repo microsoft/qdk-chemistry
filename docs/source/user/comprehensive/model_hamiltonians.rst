@@ -20,7 +20,7 @@ Fermionic models
    * **Pariser-Parr-Pople (PPP)** — extends Hubbard with long-range intersite Coulomb interactions
 
 Spin models
-   Operate on spin-½ degrees of freedom and produce :class:`~qdk_chemistry.data.QubitHamiltonian` objects expressed as sums of Pauli operators.
+   Operate on spin-½ degrees of freedom and produce :class:`~qdk_chemistry.data.QubitOperator` objects expressed as sums of Pauli operators.
 
    * **Heisenberg** — anisotropic spin-spin coupling with external magnetic fields
    * **Ising** — special case of Heisenberg with ZZ coupling and transverse X field
@@ -51,11 +51,11 @@ For a more detailed description of each model Hamiltonian and their parameters, 
      - Hubbard + long-range Coulomb interactions
    * - ``create_heisenberg_hamiltonian``
      - Spin
-     - QubitHamiltonian
+     - QubitOperator
      - Anisotropic spin coupling + external fields
    * - ``create_ising_hamiltonian``
      - Spin
-     - QubitHamiltonian
+     - QubitOperator
      - ZZ coupling + transverse X field
 
 Fermionic models
@@ -277,7 +277,7 @@ Geometry-aware term grouping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Both :func:`~qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian` and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian` accept an ``include_term_groups`` flag (default ``True``).
-When enabled, the builder consults the lattice's edge coloring and stores the resulting group-and-layer structure on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
+When enabled, the builder consults the lattice's edge coloring and stores the resulting group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
 
 * each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
@@ -324,7 +324,7 @@ Fermionic model Hamiltonians produce :doc:`Hamiltonian <data/hamiltonian>` objec
 * :doc:`Qubit mapping <algorithms/qubit_mapper>` (Jordan-Wigner, Bravyi-Kitaev, etc.)
 * :doc:`Phase estimation <algorithms/phase_estimation>` (:term:`IQPE`, standard :term:`QPE`)
 
-Spin model Hamiltonians produce :class:`~qdk_chemistry.data.QubitHamiltonian` objects directly, which can be used with quantum algorithms without an intermediate qubit mapping step.
+Spin model Hamiltonians produce :class:`~qdk_chemistry.data.QubitOperator` objects directly, which can be used with quantum algorithms without an intermediate qubit mapping step.
 
 .. rubric:: Example: exact diagonalization of the Hubbard model
 
@@ -356,7 +356,7 @@ Related classes
 
 - :doc:`data/lattice_graph` — Lattice topology defining site connectivity
 - :doc:`data/hamiltonian` — Hamiltonian data class produced by fermionic models
-- :class:`~qdk_chemistry.data.QubitHamiltonian` — Qubit Hamiltonian produced by spin models
+- :class:`~qdk_chemistry.data.QubitOperator` — Qubit Hamiltonian produced by spin models
 - :doc:`data/orbitals` — Full Orbitals class documentation
 
 Further reading

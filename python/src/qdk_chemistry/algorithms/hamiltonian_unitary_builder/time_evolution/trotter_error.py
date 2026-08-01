@@ -37,7 +37,7 @@ from qdk_chemistry.utils.pauli_commutation import (
 )
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import QubitOperator
 
 __all__: list[str] = [
     "trotter_steps_commutator",
@@ -46,7 +46,7 @@ __all__: list[str] = [
 
 
 def trotter_steps_naive(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     time: float,
     target_accuracy: float,
     *,
@@ -101,7 +101,7 @@ def trotter_steps_naive(
 
 
 def trotter_steps_commutator(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     time: float,
     target_accuracy: float,
     *,

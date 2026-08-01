@@ -21,6 +21,7 @@ from pathlib import Path
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 from qdk_chemistry.utils.wavefunction import (
     calculate_sparse_wavefunction,
@@ -185,7 +186,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             for key, value in overrides.items():
                 autocas_selector.settings().set(key, value)
         refined_wfn = autocas_selector.run(wfn_cas)
-        indices, _ = refined_wfn.get_orbitals().get_active_space_indices()
+        indices = list(
+            refined_wfn.get_orbitals()
+            .active_indices()
+            .indices(SymmetryLabel([axes.alpha()]))
+        )
         Logger.info(f"autoCAS selected active space with indices: {indices}")
         if len(indices) == 0:
             Logger.warn(

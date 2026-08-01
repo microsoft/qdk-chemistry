@@ -463,8 +463,12 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
 
   // Get the coefficients and other data from SCF result
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Create unrestricted orbitals with different active electron counts (3
   // alpha, 1 beta)
@@ -507,8 +511,12 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
 
   // Get the coefficients and other data from SCF result
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Set different active spaces for alpha and beta to exercise merge logic
   std::vector<size_t> alpha_indices = {1, 2, 3};
@@ -1297,8 +1305,12 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
   const auto& calc_name = GetParam();
 
   auto orbitals_scf = water_scf_wavefunction_->get_orbitals();
-  auto [alpha_coeffs, beta_coeffs] = orbitals_scf->get_coefficients();
-  auto [alpha_energies, beta_energies] = orbitals_scf->get_energies();
+  const auto& alpha_coeffs =
+      orbitals_scf->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& beta_coeffs =
+      orbitals_scf->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& alpha_energies = orbitals_scf->energies()->block({axes::alpha()});
+  const auto& beta_energies = orbitals_scf->energies()->block({axes::beta()});
 
   // Perturb beta coefficients and energies to ensure truly unrestricted
   auto beta_coeffs_mod = beta_coeffs;

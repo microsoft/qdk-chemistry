@@ -17,7 +17,7 @@ from qdk_chemistry.data import (
     FlatPartition,
     LatticeGraph,
     LayeredPartition,
-    QubitHamiltonian,
+    QubitOperator,
 )
 from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 
@@ -25,9 +25,9 @@ from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 class TestDrivenQubitHamiltonianValidation:
     """Tests for DrivenQubitHamiltonian construction validation."""
 
-    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitHamiltonian:
+    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitOperator:
         labels = ["Z" + "I" * (num_qubits - 1)]
-        return QubitHamiltonian(labels, np.array([1.0]))
+        return QubitOperator(labels, np.array([1.0]))
 
     def _constant_drive(self, _t: float) -> float:
         return 1.0
@@ -47,8 +47,8 @@ class TestDrivenQubitHamiltonianValidation:
 
     def test_evaluate_applies_drive(self):
         """evaluate() should return H0 + f(t) * H1."""
-        h0 = QubitHamiltonian(["ZI"], np.array([1.0]))
-        h1 = QubitHamiltonian(["IZ"], np.array([2.0]))
+        h0 = QubitOperator(["ZI"], np.array([1.0]))
+        h1 = QubitOperator(["IZ"], np.array([2.0]))
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
         snap = td.evaluate(0.5)
         assert snap.pauli_strings == ["ZI", "IZ"]
@@ -58,11 +58,11 @@ class TestDrivenQubitHamiltonianValidation:
 class TestDrivenQubitHamiltonianDriveFunctions:
     """Tests for DrivenQubitHamiltonian with various drive functions."""
 
-    def _h0(self) -> QubitHamiltonian:
-        return QubitHamiltonian(["ZI", "IZ"], np.array([1.0, 0.5]))
+    def _h0(self) -> QubitOperator:
+        return QubitOperator(["ZI", "IZ"], np.array([1.0, 0.5]))
 
-    def _h1(self) -> QubitHamiltonian:
-        return QubitHamiltonian(["XX", "YY"], np.array([1.0, 1.0]))
+    def _h1(self) -> QubitOperator:
+        return QubitOperator(["XX", "YY"], np.array([1.0, 1.0]))
 
     def test_sinusoidal_drive(self):
         """Sinusoidal drive f(t) = sin(t) should modulate H1 coefficients."""
@@ -142,10 +142,10 @@ class TestDrivenQubitHamiltonianPartition:
 
     def test_evaluate_preserves_flat_partition(self):
         """evaluate() should carry through a merged FlatPartition when both h0 and h1 have one."""
-        h0 = QubitHamiltonian(
+        h0 = QubitOperator(
             ["ZI", "IZ"], np.array([1.0, 1.0]), term_partition=FlatPartition(strategy="s", groups=((0, 1),))
         )
-        h1 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        h1 = QubitOperator(["XX"], np.array([0.5]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
         snap = td.evaluate(2.0)
         assert snap.term_partition is not None
@@ -154,10 +154,10 @@ class TestDrivenQubitHamiltonianPartition:
 
     def test_evaluate_preserves_layered_partition(self):
         """evaluate() should carry through a merged LayeredPartition when both h0 and h1 have one."""
-        h0 = QubitHamiltonian(
+        h0 = QubitOperator(
             ["ZI", "IZ"], np.array([1.0, 1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,), (1,)),))
         )
-        h1 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        h1 = QubitOperator(["XX"], np.array([0.5]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 1.0)
         snap = td.evaluate(0.0)
         assert snap.term_partition is not None
@@ -167,8 +167,8 @@ class TestDrivenQubitHamiltonianPartition:
 
     def test_evaluate_no_partition_when_missing(self):
         """evaluate() should return no partition when h0 or h1 lacks one."""
-        h0 = QubitHamiltonian(["ZI"], np.array([1.0]))
-        h1 = QubitHamiltonian(["IX"], np.array([0.5]))
+        h0 = QubitOperator(["ZI"], np.array([1.0]))
+        h1 = QubitOperator(["IX"], np.array([0.5]))
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 1.0)
         snap = td.evaluate(0.0)
         assert snap.term_partition is None

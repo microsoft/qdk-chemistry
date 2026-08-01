@@ -74,7 +74,7 @@ Parity Transformation :cite:`Seeley2012`
 
 QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
 See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
-QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit operators using natural mathematical notation.
 
 .. _qubit-mapper-highlights:
 
@@ -100,13 +100,13 @@ This generally involves the following steps:
    Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
    QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the ``term_grouper`` algorithm
    (e.g., ``registry.create("term_grouper", "qubit_wise_commuting")``), which attaches a
-   :class:`~qdk_chemistry.data.FlatPartition` to a :class:`~qdk_chemistry.data.QubitHamiltonian` for downstream consumers.
+   :class:`~qdk_chemistry.data.FlatPartition` to a :class:`~qdk_chemistry.data.QubitOperator` for downstream consumers.
 2. **Circuit Execution and Measurement**:
    Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
 3. **Classical Post-Processing**:
    The measurement results are processed classically to estimate the expectation value of the operator.
 
-See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
+See :doc:`comprehensive/algorithms/expectation_estimator` for further details about available observable sampling methods and implementations.
 
 
 Model Hamiltonians
@@ -119,7 +119,7 @@ Fermionic Models
    Hückel (tight-binding), Hubbard, and Pariser-Parr-Pople (:term:`PPP`) models return :class:`~qdk_chemistry.data.Hamiltonian` objects compatible with all QDK/Chemistry algorithms, including :doc:`qubit mapping <comprehensive/algorithms/qubit_mapper>` and :doc:`multi-configuration methods <comprehensive/algorithms/mc_calculator>`.
 
 Spin Models
-   Ising and Heisenberg models return :class:`~qdk_chemistry.data.QubitHamiltonian` objects directly, bypassing the fermion-to-qubit mapping step.
+   Ising and Heisenberg models return :class:`~qdk_chemistry.data.QubitOperator` objects directly, bypassing the fermion-to-qubit mapping step.
 
 All builders operate on a :doc:`LatticeGraph <comprehensive/data/lattice_graph>` that defines site connectivity, with built-in support for common lattice topologies (chain, square, triangular, honeycomb, kagome) and custom geometries.
 Parameters accept either scalars (uniform) or per-site/per-bond arrays for inhomogeneous systems.

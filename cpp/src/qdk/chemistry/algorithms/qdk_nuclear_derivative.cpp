@@ -19,10 +19,7 @@ namespace qdk::chemistry::algorithms {
 NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge,
     int spin_multiplicity, NuclearDerivativeSeedType seed,
-    unsigned int n_active_alpha_electrons,
-    unsigned int n_active_beta_electrons) const {
-  (void)n_active_alpha_electrons;
-  (void)n_active_beta_electrons;
+    unsigned int n_inactive_orbitals) const {
   std::optional<utils::ScopedLogLevel> scoped_log_level;
   if (_settings->get<bool>("suppress_child_algorithm_logging")) {
     scoped_log_level.emplace(utils::LogLevel::error);
@@ -44,6 +41,13 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
         "The QDK analytic nuclear derivative calculator requires "
         "energy_calculator to reference scf_solver/qdk.");
   }
+  if (n_inactive_orbitals != 0) {
+    throw std::invalid_argument(
+        "The QDK analytic nuclear derivative calculator does not use an "
+        "active space; n_inactive_orbitals must be 0");
+  }
+  (void)detail::active_electron_counts(structure, charge, spin_multiplicity,
+                                       seed, n_inactive_orbitals);
 
   microsoft::ScfSolver solver;
   if (ref.get_settings()) {

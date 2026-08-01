@@ -879,8 +879,12 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   EXPECT_EQ(shells2.size(), shells1.size());
 
   // Verify the basis set structure can be used to create valid orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals1->get_coefficients();
-  auto [energies_alpha, energies_beta] = orbitals1->get_energies();
+  const auto& coeff_alpha =
+      orbitals1->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals1->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& energies_alpha = orbitals1->energies()->block({axes::alpha()});
+  const auto& energies_beta = orbitals1->energies()->block({axes::beta()});
   auto overlap = orbitals1->get_overlap_matrix();
 
   // Create orbitals with the deserialized basis set - this validates
@@ -962,7 +966,10 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // Verify the orbital count is consistent with valence electrons
   // With 20 valence electrons and restricted calculation, we expect 10 occupied
   // orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals->get_coefficients();
+  const auto& coeff_alpha =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_atomic_orbitals());
 }
 

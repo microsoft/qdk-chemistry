@@ -26,13 +26,13 @@ import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import QubitOperator
 
 __all__: list[str] = ["qdrift_samples_campbell"]
 
 
 def qdrift_samples_campbell(
-    hamiltonian: QubitHamiltonian,
+    hamiltonian: QubitOperator,
     time: float,
     target_accuracy: float,
     *,

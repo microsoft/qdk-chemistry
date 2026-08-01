@@ -118,7 +118,7 @@ To accomplish this, the :class:`~qdk_chemistry.algorithms.time_evolution.evoluti
 
    Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``
 
-   The evolution builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+   The evolution builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
 **Nested Algorithm 3: Circuit Mapper**
    Reference setting: ``"circuit_mapper"``
