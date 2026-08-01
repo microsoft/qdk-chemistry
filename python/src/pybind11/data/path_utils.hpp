@@ -29,7 +29,8 @@ inline std::string to_string_path(const pybind11::object& path_obj) {
   // pybind11 for every pathlib.Path argument, which crashed with an access
   // violation under clang-cl on Windows ARM64. Testing the type first is also
   // cheaper: the common paths no longer throw and catch an exception at all.
-  if (py::isinstance<py::str>(path_obj) || py::isinstance<py::bytes>(path_obj)) {
+  if (py::isinstance<py::str>(path_obj) ||
+      py::isinstance<py::bytes>(path_obj)) {
     return path_obj.cast<std::string>();
   }
 
