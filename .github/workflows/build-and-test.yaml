@@ -890,7 +890,6 @@ jobs:
           -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
           -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
           -DQDK_ENABLE_OPENMP=OFF `
-          -DQDK_CHEMISTRY_LOG_LEVEL=1 `
           -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
 
@@ -900,15 +899,12 @@ jobs:
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
-    # TEMPORARY (diagnostic): the standalone probe proved OpenBLAS itself hangs
-    # with no qdk code involved -- openblas_get_num_procs and dgemm return the
-    # correct result, then dgetrf never returns. Narrow it further: report the
-    # build configuration OpenBLAS chose (target/kernel set), and bisect by
-    # problem size and by routine to separate "the LAPACK layer is broken" from
-    # "the blocked algorithm above some crossover is broken".
-    - name: Diagnose OpenBLAS on ARM64
+    # Verifies the OpenBLAS ARM64 fix end to end: confirms the library reports an
+    # ARMV8 kernel set rather than the generic one, and that dgetrf now returns
+    # above the getf2 crossover instead of looping forever. Cheap (about a
+    # minute) and fails loudly if the target ever silently regresses to GENERIC.
+    - name: Verify OpenBLAS on ARM64
       shell: pwsh
-      continue-on-error: true
       timeout-minutes: 15
       run: |
         $lib = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\lib\openblas.lib"
@@ -973,48 +969,24 @@ jobs:
 
         Push-Location $env:RUNNER_TEMP
         cl /nologo $srcPath "$lib" /Fe:ob_smoke.exe
-        if ($LASTEXITCODE -ne 0) { Write-Host "compile failed"; Pop-Location; exit 0 }
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "OpenBLAS probe failed to compile" }
 
         $p = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP 'ob_smoke.exe') `
           -PassThru -NoNewWindow `
           -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'ob.out') `
           -RedirectStandardError  (Join-Path $env:RUNNER_TEMP 'ob.err')
-        if (-not $p.WaitForExit(120000)) {
-          Write-Host "=== OPENBLAS SMOKE TEST HUNG (>120s); killing ==="
-          $p.Kill(); $p.WaitForExit()
-        } else {
-          Write-Host "=== exited with code $($p.ExitCode) ==="
-        }
-        Write-Host "--- stdout ---"; Get-Content (Join-Path $env:RUNNER_TEMP 'ob.out') -EA SilentlyContinue
+        $hung = -not $p.WaitForExit(120000)
+        if ($hung) { $p.Kill(); $p.WaitForExit() }
+        $out = Get-Content (Join-Path $env:RUNNER_TEMP 'ob.out') -Raw -EA SilentlyContinue
+        Write-Host "--- stdout ---"; Write-Host $out
         Write-Host "--- stderr ---"; Get-Content (Join-Path $env:RUNNER_TEMP 'ob.err') -EA SilentlyContinue
         Pop-Location
 
-    # TEMPORARY (diagnostic): run one affected qdk test under a hard cap with
-    # debug logging. Remove together with the OpenBLAS probe above.
-    - name: Diagnose MACIS hang (ARM64)
-      shell: pwsh
-      continue-on-error: true
-      run: |
-        $testsDir = "${{ github.workspace }}\cpp\build-${{ matrix.compiler }}\tests"
-        $exe = Join-Path $testsDir 'test_macis.exe'
-        if (-not (Test-Path $exe)) { Write-Host "test_macis.exe not found"; exit 0 }
-        $out = Join-Path $env:RUNNER_TEMP 'macis-diag.out'
-        $err = Join-Path $env:RUNNER_TEMP 'macis-diag.err'
-        $p = Start-Process -FilePath $exe `
-          -ArgumentList '--gtest_filter=MacisAsciTest.FactoryAvailability' `
-          -WorkingDirectory $testsDir -PassThru -NoNewWindow `
-          -RedirectStandardOutput $out -RedirectStandardError $err
-        if (-not $p.WaitForExit(240000)) {
-          Write-Host "=== still running after 240s; killing ==="
-          $p.Kill()
-          $p.WaitForExit()
-        } else {
-          Write-Host "=== exited with code $($p.ExitCode) ==="
-        }
-        Write-Host "=== stdout (last 250 lines) ==="
-        if (Test-Path $out) { Get-Content $out -Tail 250 }
-        Write-Host "=== stderr (last 50 lines) ==="
-        if (Test-Path $err) { Get-Content $err -Tail 50 }
+        if ($hung) { throw "OpenBLAS hung: the ARM64 build is not usable (see output above)" }
+        if ($out -notmatch 'ALL OPENBLAS CALLS COMPLETED') { throw "OpenBLAS probe did not run to completion" }
+        # GENERIC is the fallback whose blocking parameters hang getrf.
+        if ($out -match 'corename = generic') { throw "OpenBLAS selected the GENERIC kernel set on ARM64" }
+        Write-Host "OpenBLAS ARM64 verification passed."
 
     # Artifacts are retrievable as soon as the upload finishes, whereas job logs
     # only become available once the whole job ends -- over an hour later for
@@ -1040,15 +1012,10 @@ jobs:
         OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
-        # Same exclusions as the x86_64 Windows job, plus the SCF/LAPACK-bound
-        # suites that hang on ARM64 (TEMPORARY -- all are symptoms of the single
-        # OpenBLAS dgetrf hang under investigation; each costs a 400s timeout, so
-        # excluding them keeps a diagnostic cycle to minutes rather than burning
-        # 75+, while still reporting on the rest of the suite).
-        # Dropping --verbose keeps the debug-level build's output to failures.
-        ctest --output-on-failure --timeout 400 `
+        # Same exclusions as the x86_64 Windows job.
+        ctest --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
-          -E "MACIS_SERIAL_TEST|libint2/unit|MacisAsciTest|AnsatzEnergyCalculationTest|BasisSetTest|HamiltonianTest|HamiltonianConstructorTest"
+          -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "ctest failed ($code)" }
