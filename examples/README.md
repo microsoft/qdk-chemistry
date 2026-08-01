@@ -34,8 +34,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `interoperability/openFermion/` | `pip install 'qdk-chemistry[openfermion-extras]'` |
 | `interoperability/rdkit/` | `pip install rdkit` |
 
-The `qiskit-extras` extra is not supported on Python 3.14. The `qre` extra
-requires Python 3.11 or newer.
+The `qiskit-extras` extra is not supported on Python 3.14.
 
 To install everything needed for all examples at once:
 
