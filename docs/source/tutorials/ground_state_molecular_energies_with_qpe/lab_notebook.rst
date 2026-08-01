@@ -110,11 +110,13 @@ Trial state
 Record the approximation prepared on the compute register.
 
 - Source wavefunction:
-- Determinant-selection rule:
-- Number of retained determinants:
-- Retained norm or fidelity:
+- Leading reference determinants, amplitudes, weights, and cumulative weights:
+- Determinant-selection rule used before :term:`PMC` re-optimization:
+- Determinant counts compared:
+- Fidelity for each trial state:
 - State-preparation method:
-- State-preparation circuit statistics:
+- Compute qubits for each trial state:
+- Preparation logical gate count and logical gate-family counts for each trial state:
 - Interpretation of the fidelity and circuit cost:
 
 .. _lab-notebook-phase-estimation:

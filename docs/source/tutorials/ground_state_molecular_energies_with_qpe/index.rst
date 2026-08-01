@@ -89,15 +89,18 @@ Before running :term:`QPE`, a state-preparation circuit loads an approximate wav
 The trial state can be expressed as a combination of the eigenstates of the qubit Hamiltonian.
 :term:`QPE` can return the energy of any eigenstate represented in that combination; it does not independently find or prepare the ground state.
 
+.. _tutorial-trial-state-fidelity:
+
 Let :math:`\vert\Psi_0\rangle` denote the exact ground state of the active-space Hamiltonian and :math:`\vert\Psi_{\mathrm{trial}}\rangle` denote the prepared trial state.
-In ideal phase estimation, the probability of obtaining the ground-state energy is
+Their squared overlap is the ground-state fidelity
 
 .. math::
 
-   P_0 = \left\vert \langle\Psi_0 \vert \Psi_{\mathrm{trial}}\rangle \right\vert^2.
+   F = \left\vert \langle\Psi_0 \vert \Psi_{\mathrm{trial}}\rangle \right\vert^2.
 
-This squared overlap is the ground-state fidelity of the trial state.
-A higher fidelity makes the desired energy more likely in each run and reduces the number of independent trials needed to observe it reliably.
+Fidelity measures the weight of the ground state in the trial state.
+In an ideal coherent phase-estimation measurement that uses one prepared system state to produce one complete phase result, :math:`F` is the probability of sampling the ground-state eigenphase.
+The iterative implementation used by this tutorial instead prepares a new system state for each phase-bit circuit, so fidelity influences its bit statistics but does not by itself determine a complete-run success probability or trial count.
 For this classically tractable teaching example, the classical active-space calculation supplies the important determinants and coefficients used to construct the trial state and later validate the quantum result.
 :doc:`Preparing the trial state <05_preparing_the_trial_state>` develops overlap and fidelity, and :doc:`Iterative quantum phase estimation <06_iterative_phase_estimation>` explains how the energy is measured.
 

@@ -25,6 +25,8 @@ import ipykernel
 from qdk.widgets import MoleculeViewer
 from qdk_chemistry.algorithms import create
 
+# create() instantiates each required implementation without running a
+# calculation; completing this tuple verifies that every plugin is available.
 required_implementations = (
     create("scf_solver", "qdk"),
     create("active_space_selector", "qdk_autocas_eos"),

@@ -90,6 +90,7 @@ The ``qdk_valence`` selector uses those numbers to construct an initial active s
    :start-after: # start-cell-valence-space
    :end-before: # end-cell-valence-space
 
+For this restricted calculation, matching :math:`\alpha` and :math:`\beta` channels describe the same spatial orbitals, so the code reads one channel and counts each spatial orbital once.
 The script reports the resulting active electron and orbital counts and the zero-based indices of the active orbitals.
 Use these values with the total number of ``cc-pvdz`` molecular orbitals from :doc:`Describing the molecule <02_describing_the_molecule>` to determine the initial partitioning of inactive, active, and virtual orbitals.
 

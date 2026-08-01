@@ -322,6 +322,54 @@ def test_tutorial_map_n2_to_qubits_results():
         "X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)"
     )
 
+def test_tutorial_prepare_trial_state_results():
+    """Check the trial-state quality and cost results used by Chapter 5."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
+
+    result = tutorial_module.run_trial_state_workflow()
+    assert result.active_space_result.num_refined_determinants == 36
+    assert len(result.reference_determinants) == 8
+    assert result.reference_determinants[0].occupation == "2200"
+    assert abs(result.reference_determinants[0].amplitude - (-0.950999927816)) < 1e-10
+    assert abs(result.reference_determinants[0].weight - 0.9044008627068755) < 1e-10
+    assert result.reference_determinants[1].occupation == "2020"
+    assert result.reference_determinants[2].occupation == "0202"
+    assert abs(result.reference_determinants[2].cumulative_weight - 0.961127081374) < 1e-10
+    assert len(result.trial_states) == 3
+
+    one_determinant, two_determinants, four_determinants = result.trial_states
+    assert one_determinant.num_determinants == 1
+    assert abs(one_determinant.fidelity - 0.9044008627068755) < 1e-10
+    assert one_determinant.num_compute_qubits == 8
+    assert one_determinant.num_logical_gates == 4
+    assert one_determinant.logical_gate_counts == {"X": 4}
+
+    assert two_determinants.num_determinants == 2
+    assert abs(two_determinants.fidelity - 0.9298526307840264) < 1e-10
+    assert two_determinants.num_compute_qubits == 8
+    assert two_determinants.num_logical_gates == 12
+    assert two_determinants.logical_gate_counts == {
+        "CNOT": 4,
+        "H": 2,
+        "Rz": 2,
+        "S": 2,
+        "X": 2,
+    }
+
+    assert four_determinants.num_determinants == 4
+    assert abs(four_determinants.fidelity - 0.9699313656153719) < 1e-10
+    assert four_determinants.num_compute_qubits == 8
+    assert four_determinants.num_logical_gates == 58
+    assert four_determinants.logical_gate_counts == {
+        "CNOT": 35,
+        "H": 6,
+        "Rz": 10,
+        "S": 6,
+        "X": 1,
+    }
+
+
 
 
 @_requires_notebook_deps
@@ -358,6 +406,34 @@ def test_tutorial_choose_active_space_notebook():
             },
         },
     )
+
+
+@_requires_notebook_deps
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_prepare_trial_state_notebook():
+    """Test the Chapter 5 notebook circuit data and validation cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_prepare_trial_state.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    _execute_notebook_skip_visualizations(notebook_path, timeout=360)
 
 
 @_requires_notebook_deps

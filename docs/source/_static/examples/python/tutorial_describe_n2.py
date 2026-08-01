@@ -21,6 +21,8 @@ Stretched N2 molecule for the ground-state QPE tutorial
 N    0.000000    0.000000    0.000000
 N    0.000000    0.000000    1.270025
 """)
+# The target is neutral N2 in its singlet ground state, where all electrons are
+# paired and the spin multiplicity 2S + 1 equals one.
 charge = 0
 spin_multiplicity = 1
 # end-cell-molecule
@@ -29,9 +31,12 @@ spin_multiplicity = 1
 ################################################################################
 # start-cell-hartree-fock
 basis_sets = ("cc-pvdz", "cc-pvtz")
+# Store each result under its basis-set name so the values from the shared loop
+# can be compared afterward without repeating either calculation.
 energies = {}
 wavefunctions = {}
 
+# Change only the basis set so the energy difference measures basis-set sensitivity.
 for basis_set in basis_sets:
     solver = create("scf_solver", "qdk")
     energy, wavefunction = solver.run(
@@ -52,6 +57,8 @@ print(f"cc-pvdz wavefunction: {num_cc_pvdz_orbitals} molecular orbitals")
 ################################################################################
 # start-cell-compare
 signed_difference = energies["cc-pvtz"] - energies["cc-pvdz"]
+
+# Report the same absolute energy difference in chemically familiar units.
 absolute_difference_millihartree = abs(signed_difference) * 1000
 absolute_difference_kj_mol = abs(signed_difference) * HARTREE_TO_KJ_PER_MOL
 

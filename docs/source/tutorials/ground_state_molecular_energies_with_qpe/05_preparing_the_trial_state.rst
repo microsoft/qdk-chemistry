@@ -13,79 +13,237 @@ After completing this chapter, you will be able to:
 
 - Explain why phase estimation requires an input state.
 - Define state overlap and fidelity.
-- Relate ground-state fidelity to the probability of measuring its energy.
+- Explain how ground-state fidelity measures target-state weight and influences phase-estimation outcomes.
 - Construct a sparse trial wavefunction from important determinants.
-- Generate a native sparse-isometry state-preparation circuit.
-- Distinguish trial-state quality from state-preparation circuit cost.
+- Generate a state-preparation logical circuit with the QDK/Chemistry sparse-isometry implementation.
+- Distinguish trial-state quality from state-preparation logical circuit cost.
 
 .. admonition:: Lab notebook assignment
    :class: lab-notebook-assignment
 
    Complete :ref:`lab-notebook-trial-state`.
-   Record trial-state fidelity and state-preparation circuit statistics as separate quantities.
-   Explain how determinant truncation changes the probability of obtaining the ground-state energy and the cost of preparing the trial state.
+   Record trial-state fidelity and state-preparation logical circuit statistics as separate quantities.
+   Explain how determinant truncation changes the ground-state weight, its influence on phase-estimation outcomes, and the cost of preparing the trial state.
 
-Prerequisite concepts
+Example download
+================
+
+Download :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>`, and save both files in the tutorial working directory that contains ``tutorial_choose_active_space.py``.
+Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
+The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and :term:`CASCI` reference.
+The notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.
+
+Connection to the selected-space workflow
+=========================================
+
+The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction containing 36 Slater determinants.
+Each determinant represents one pattern of occupations among the eight active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
+The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the eight-qubit compute register.
+
+Why phase estimation needs a trial state
+========================================
+
+Quantum phase estimation (:term:`QPE`) estimates an eigenphase of a unitary operator.
+For molecular energies, that unitary represents evolution under the Hamiltonian: each Hamiltonian eigenstate is also an eigenstate of the time-evolution operator, and its phase depends on its energy.
+The phase-to-energy relationship and the :term:`QPE` logical circuit are developed in the next chapter; this chapter needs only the algorithm's input-state requirement.
+
+Before phase estimation begins, a state-preparation logical circuit must initialize the compute register in a chosen normalized quantum state.
+This input is the *trial state*.
+It is an approximation intended to contain a substantial contribution from the target ground state; :term:`QPE` cannot begin from an unspecified state or create the ground state by searching through all possible wavefunctions.
+
+The trial state can be written as a linear combination of the eigenstates :math:`\{\vert\Psi_j\rangle\}` of the active-space Hamiltonian:
+
+.. math::
+
+   \vert\Psi_{\mathrm{trial}}\rangle
+   = \sum_j a_j\vert\Psi_j\rangle,
+   \qquad
+   \sum_j \left\vert a_j\right\vert^2=1.
+
+To isolate the effect of the input state, first assume that the requested trial state is prepared exactly, time evolution is exact, and phase readout has enough resolution to distinguish the relevant eigenphases.
+Under these assumptions, an input eigenstate :math:`\vert\Psi_j\rangle` produces the phase corresponding to :math:`E_j`.
+For a trial state containing several eigenstates, a textbook coherent phase-estimation measurement samples the energy :math:`E_j` with probability :math:`\left\vert a_j\right\vert^2` :cite:`vonBurg2021`.
+This probability statement assumes that one prepared system state produces one complete phase result.
+
+.. admonition:: Why can phase estimation return an excited-state energy even when the ground-state energy is the target?
+   :class: quiz-question
+   :collapsible: closed
+
+   A trial state can contain both ground- and excited-state eigenvectors.
+   Under the assumptions above, phase estimation returns each represented eigenvalue with probability equal to the squared magnitude of that eigenstate's amplitude in the trial state.
+
+Ground-state fidelity
 =====================
 
-.. todo::
+As :ref:`introduced in the tutorial overview <tutorial-trial-state-fidelity>`, the ground-state fidelity is the squared overlap
 
-   Recall the correlated active-space wavefunction, determinant amplitudes, and compute-register encoding.
-   Define any additional state-vector notation before introducing overlap.
+.. math::
 
-Phase estimation needs a trial state
-====================================
+   F
+   = \left\vert
+       \langle\Psi_0\vert\Psi_{\mathrm{trial}}\rangle
+     \right\vert^2.
 
-.. todo::
+Both states are normalized, so :math:`0\leq F\leq 1`.
+The fidelity :math:`F` is the weight of the target ground state in the trial-state eigenstate expansion.
+For the textbook coherent measurement described above, it is also the probability of sampling the ground-state eigenphase.
 
-   Explain that phase estimation samples eigenvalues represented in the input state and does not independently search for the ground state.
-   Connect this fact to the multi-configurational wavefunction from the active-space chapter.
+The QDK/Chemistry :term:`IQPE` implementation used later performs a different sampling procedure.
+It builds a separate circuit for each phase bit, and every circuit execution freshly prepares the trial state.
+Each phase bit is selected by a majority vote over a specified number of circuit executions, then used as feedback for the next bit.
+The final bit string therefore combines bitwise decisions from many state preparations rather than recording one eigenstate sample.
 
-Trial-state quality
-===========================
+Fidelity remains a useful trial-state quality measure because it controls the ground-state contribution to those bit statistics.
+However, it is not by itself the probability that one complete implemented :term:`IQPE` run returns the ground-state energy, so it does not determine a trial count.
+The complete result also depends on the other eigenstate weights and phases, the number of phase bits, shots per bit, phase feedback, and the Hamiltonian-simulation approximation.
+The next chapter develops this bitwise sampling procedure and evaluates repeated complete :term:`IQPE` runs.
 
-.. todo::
-
-   Define the overlap amplitude and fidelity.
-   State precisely how ground-state fidelity affects the probability of obtaining the ground-state energy in an ideal phase-estimation trial.
+Imperfect logical state preparation can also change the state actually loaded.
+Residual logical faults after error correction can introduce further errors on a fault-tolerant machine, but they are not modeled by this tutorial's simulator.
+These effects should be evaluated separately from the fidelity of the intended trial state.
 
 A sparse trial wavefunction
-=================================
+===========================
 
-.. todo::
+The selected-space :term:`CASCI` wavefunction is classically tractable in this teaching example, so it provides a controlled reference for comparing trial states.
+The script ranks its determinants by coefficient magnitude and retains the largest one, two, or four.
+In a larger problem where exact :term:`CASCI` is unavailable, an approximate classical method must supply the candidate determinants and amplitudes for the trial state.
 
-   Select important determinants from the correlated reference.
-   Explain the fidelity lost by truncation and the classical projected calculation used to obtain a normalized trial wavefunction.
+The script first prints the leading terms in the selected-space wavefunction.
+Each occupation string lists the four active spatial orbitals: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
+The amplitude is the signed coefficient :math:`c_i` in :math:`\vert\Psi_0\rangle=\sum_i c_i\vert\Phi_i\rangle`, while the weight :math:`\left\vert c_i\right\vert^2` is that determinant's contribution to the squared norm.
+The cumulative weight shows how much of the norm is captured by the listed determinants.
 
-The preparation circuit
-================================
+The helper computes these quantities directly from the leading :term:`CASCI` coefficients:
 
-.. todo::
+.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
+   :language: python
+   :start-after: # start-cell-determinant-weights
+   :end-before: # end-cell-determinant-weights
 
-   Explain the native :term:`GF(2)+X` sparse-isometry method at the depth needed to interpret its inputs and output.
-   Do not require or compare against Qiskit in the required chapter.
+Simply discarding coefficients and renormalizing would not optimize the wavefunction within the retained determinant space because the full-space amplitudes are not generally the amplitudes that minimize energy after determinants are removed.
+A projected multi-configuration (:term:`PMC`) calculation is a configuration-interaction calculation restricted to a user-specified set of determinants.
+The QDK/Chemistry :term:`PMC` calculator instead constructs the Hamiltonian matrix in the retained determinant space and solves its eigenvalue problem for the lowest-energy normalized eigenvector.
+The resulting projected wavefunction has zero amplitude on every omitted determinant.
+When using the projected wavefunction as a trial state, its overlap with the complete selected-space :term:`CASCI` wavefunction therefore quantifies how much fidelity is retained after determinant truncation.
 
-Trial-state quality and cost
-====================================
+The script constructs each projected trial state, forms the reference and trial coefficient vectors on the retained determinant support, and evaluates their squared inner product directly:
 
-.. todo::
+.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
+   :language: python
+   :dedent: 8
+   :start-after: # start-cell-sparse-trial
+   :end-before: # end-cell-sparse-trial
 
-   Report trial-state fidelity and circuit statistics as different quantities.
-   Explain that state preparation does not change the compute-register problem size but can change circuit cost and the number of phase-estimation trials.
+.. admonition:: Why must fidelity be calculated separately from the PMC energy?
+   :class: quiz-question
+   :collapsible: closed
+
+   The :term:`PMC` calculation chooses the lowest-energy wavefunction within the retained determinant space, but it does not directly maximize overlap with the complete selected-space ground state.
+   Energy and overlap measure different properties, so the script evaluates fidelity explicitly.
+
+The trial state preparation logical circuit
+===========================================
+
+The QDK/Chemistry sparse-isometry implementation converts the retained determinants into a binary matrix whose rows represent qubits and whose columns represent occupied-or-unoccupied patterns.
+The method uses binary row operations to reduce the determinant patterns while recording controlled-NOT (CNOT) and X operations, prepares the reduced set of amplitudes, and reverses the recorded operations to expand the state across the compute register, in an optimized version of approaches introduced by Malvetti et al. :cite:`Malvetti2021`.
+Students do not need to reproduce this synthesis by hand; it is implemented natively in QDK/Chemistry.
+The important input is the normalized sparse wavefunction and the output is a logical circuit that prepares its amplitudes on the corresponding occupation states.
+
+Some compute-register wires may have no gates in the state-preparation circuit.
+The register begins in the all-zero occupation state, so a wire needs no preparation operation when the selected sparse wavefunction does not require that occupation bit to change or become entangled.
+This does not make the qubit unnecessary: every compute qubit represents an active spin orbital on which the mapped active-space Hamiltonian acts.
+The later controlled time evolution in :term:`QPE` therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the fixed-electron-number sector.
+Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.
+
+Before answering the next question, download and open :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` in Visual Studio Code.
+Save it in the tutorial working directory alongside ``tutorial_prepare_trial_state.py`` and ``tutorial_choose_active_space.py``.
+Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
+Then select **Run All** to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
+Compare the gate types and circuit structure before revealing the answer below.
+
+.. admonition:: Why does one-determinant state preparation look so different from multi-determinant preparation?
+   :class: quiz-question
+   :collapsible: closed
+
+   One determinant is one occupation bit string and therefore one computational-basis state.
+   Starting from the all-zero state, X gates only need to flip the qubits representing occupied spin orbitals.
+   A multi-determinant wavefunction is instead a coherent superposition of distinct occupation bit strings.
+   Because X gates can only map one basis state to another, rotations are needed to create amplitudes, phase operations establish relative signs or phases, and entangling gates correlate occupation changes across qubits.
+   The exact gate sequence depends on the synthesis method, but the distinction between preparing one basis state and preparing a coherent superposition is general.
+
+To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, retains leaf gates, identifies controlled X gates as CNOT gates, and counts each logical gate type:
+
+.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
+   :language: python
+   :start-after: # start-cell-circuit-statistics
+   :end-before: # end-cell-circuit-statistics
+
+The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
+The factory key ``sparse_isometry_gf2x`` is the implementation's current API identifier:
+
+.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
+   :language: python
+   :dedent: 8
+   :start-after: # start-cell-preparation-circuit
+   :end-before: # end-cell-preparation-circuit
+
+The reported *preparation logical gate count* is the number of leaf gates in the generated Q# logical-circuit representation after the state-preparation operation has been decomposed.
+Here, *logical* means gates in the generated algorithmic circuit before error-correction code synthesis and hardware mapping; this software-level logical gate count is not logical-circuit depth, a fault-tolerant resource estimate, or a physical-resource estimate.
+It can change if the state-preparation or circuit-decomposition implementation changes; error correction affects downstream fault-tolerant and physical costs instead.
+
+Trial-state quality and preparation cost
+========================================
+
+Retaining more determinants gives the projected calculation more flexibility and can improve fidelity, but loading more nonzero amplitudes generally requires a more complex preparation logical circuit.
+These are different quantities:
+
+Trial-state quality
+   Fidelity measures the ground-state weight in the intended trial state and influences the implemented :term:`IQPE` bit statistics, but it does not alone determine a complete-run success probability.
+Preparation cost
+   The generated logical circuit's gates describe work needed to load that trial state before phase estimation begins.
+
+All three trial states occupy the same eight-qubit compute register because they describe the same eight active spin orbitals.
+Changing the number of retained determinants changes amplitudes and logical-circuit structure, not the number of spin orbitals represented.
+
+.. admonition:: Does retaining more determinants require more compute qubits?
+   :class: quiz-question
+   :collapsible: closed
+
+   No.
+   Each trial state uses the same eight occupation qubits because the selected active spin-orbital space is unchanged.
+   The number of retained determinants affects state-preparation operations rather than the compute-register size.
 
 Running the preparation
 =======================
 
+With the Python environment from :doc:`Before you begin <00_before_you_begin>` active, run the complete script from the Visual Studio Code integrated terminal:
+
+.. code-block:: console
+
+   python tutorial_prepare_trial_state.py
+
+.. admonition:: How do fidelity and preparation cost change as determinants are retained?
+   :class: quiz-question
+   :collapsible: closed
+
+   The one-, two-, and four-determinant fidelities are approximately :math:`0.9044`, :math:`0.9299`, and :math:`0.9699`, respectively.
+   Their generated logical circuits have preparation logical gate counts of 4, 12, and 58, respectively, while every logical circuit uses eight compute qubits.
+
+.. admonition:: Is the single-determinant trial state a poor approximation for this example?
+   :class: quiz-question
+   :collapsible: closed
+
+   It is the lowest-fidelity trial in the comparison, but a fidelity of approximately :math:`0.9044` is still high.
+   The printed reference expansion shows why: the ``2200`` determinant alone carries approximately 90.44% of the squared norm.
+   One determinant therefore remains dominant at this geometry even though additional determinants improve the correlated wavefunction.
+
 .. todo::
 
-   Add a standalone native Python example that truncates the correlated wavefunction, computes fidelity, builds the sparse-isometry circuit, and checks its register size.
+   Investigate a more elongated N\ :sub:`2` geometry with stronger multireference character, then re-evaluate the active-space selection, determinant weights, trial-state fidelities, logical-circuit costs, and runtime throughout the tutorial before changing the running geometry.
 
-Knowledge check
-========================
-
-.. todo::
-
-   Add an exercise that compares two determinant truncations and asks the learner to explain the quality-cost tradeoff.
+Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the :ref:`trial-state section of the lab notebook <lab-notebook-trial-state>`.
+Explain why the single determinant performs better than a generic strongly correlated example might suggest, and distinguish the quality improvement from the increased logical-circuit cost.
 
 Further reading
 ===============

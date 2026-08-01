@@ -10,11 +10,11 @@ from dataclasses import dataclass
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger
 from tutorial_choose_active_space import (
     ActiveSpaceResult,
     run_active_space_workflow,
-    spatial_indices,
 )
 
 Logger.set_global_level(Logger.LogLevel.off)
@@ -49,14 +49,19 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     selected_orbitals = active_space_result.refined_wavefunction.get_orbitals()
     hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
     active_hamiltonian = hamiltonian_constructor.run(selected_orbitals)
+
+    # Nuclear repulsion and frozen inactive-orbital contributions stay outside
+    # the mapped active Hamiltonian as one separately stored scalar.
     core_energy = active_hamiltonian.get_core_energy()
     # end-cell-active-hamiltonian
     ################################################################################
 
     ################################################################################
     # start-cell-count-qubits
+    # Count one spin channel to obtain spatial orbitals, then include both spins.
+    alpha_channel = SymmetryLabel([axes.alpha()])
     num_active_spatial_orbitals = len(
-        spatial_indices(selected_orbitals.active_indices())
+        selected_orbitals.active_indices().indices(alpha_channel)
     )
     num_active_spin_orbitals = 2 * num_active_spatial_orbitals
     # end-cell-count-qubits
@@ -68,6 +73,8 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     qubit_mapper = create("qubit_mapper", "qdk")
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
+    # The mapper returns a weighted Pauli sum whose string length is the
+    # compute-register size.
     num_compute_qubits = qubit_hamiltonian.num_qubits
     num_pauli_terms = len(qubit_hamiltonian.pauli_strings)
     # end-cell-map-hamiltonian
@@ -78,9 +85,13 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     num_alpha, num_beta = (
         active_space_result.refined_wavefunction.get_active_num_electrons()
     )
+
+    # Blocked ordering stores alpha occupations in the low bits and beta
+    # occupations in the high bits. Shifting 1 left and subtracting 1 creates a
+    # binary mask with one low bit for each alpha occupation.
     alpha_mask = (1 << num_active_spatial_orbitals) - 1
-    # Keep only occupation-basis states with the required alpha and beta
-    # electron counts.
+    # Enumerate all compute-register bit strings, then keep only states with the
+    # required numbers of set alpha and beta occupation bits.
     fixed_electron_basis_indices = [
         state
         for state in range(1 << num_compute_qubits)
@@ -91,6 +102,8 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     # Exact diagonalization is practical for this compact teaching example,
     # but it is not a scalable way to solve larger qubit Hamiltonians.
     qubit_matrix = qubit_hamiltonian.to_matrix()
+    # np.ix_ forms matching row and column index grids, extracting the square
+    # matrix restricted to the fixed-electron-number basis states.
     fixed_electron_matrix = qubit_matrix[
         np.ix_(fixed_electron_basis_indices, fixed_electron_basis_indices)
     ]
@@ -116,8 +129,12 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     )
 
 
+################################################################################
+# start-cell-pauli-preview-helpers
 def format_pauli_string(pauli_string: str) -> str:
     """Format a stored Pauli string with explicit qubit indices."""
+    # Stored strings place qubit 0 at the right, so reverse the characters before
+    # enumerate() attaches the corresponding qubit index.
     factors = [
         f"{operator}(qubit {qubit_index})"
         for qubit_index, operator in enumerate(reversed(pauli_string))
@@ -144,8 +161,12 @@ def representative_pauli_terms(
     identity_string = "I" * qubit_operator.num_qubits
 
     def by_magnitude(term: tuple[str, complex]) -> tuple[float, str]:
+        # sorted() is ascending, so a negative magnitude places the largest
+        # coefficients first; the formatted string gives deterministic ties.
         return (-round(abs(term[1]), 12), format_pauli_string(term[0]))
 
+    # Separate the constant shift, occupation-diagonal terms, and determinant
+    # couplings before selecting the largest coefficients in each family.
     identity_terms = [term for term in terms if term[0] == identity_string]
     diagonal_terms = sorted(
         (
@@ -164,6 +185,10 @@ def representative_pauli_terms(
         + diagonal_terms[:num_diagonal_terms]
         + off_diagonal_terms[:num_off_diagonal_terms]
     )
+    # end-cell-pauli-preview-helpers
+
+
+################################################################################
 
 
 def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
@@ -173,6 +198,8 @@ def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
         f"Representative Pauli terms ({len(terms)} of {len(qubit_operator.pauli_strings)}):"
     )
     identity_string = "I" * qubit_operator.num_qubits
+    # Pair each display heading with a predicate so one loop can classify and
+    # print all three Pauli-term families consistently.
     categories = (
         ("Constant shift", lambda pauli_string: pauli_string == identity_string),
         (

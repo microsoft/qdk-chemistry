@@ -160,7 +160,7 @@ For :math:`n_o` active spatial orbitals, Jordan--Wigner therefore requires
 
 Calculate the compute-register count from the active space selected in Chapter 3 before running the script:
 
-Because this restricted calculation has matching :math:`\alpha` and :math:`\beta` active spaces, the ``spatial_indices`` helper reads the :math:`\alpha`-channel entries, one for each active spatial orbital.
+Because this restricted calculation has matching :math:`\alpha` and :math:`\beta` active spaces, the code reads the :math:`\alpha`-channel entries directly, one for each active spatial orbital.
 
 .. literalinclude:: ../../_static/examples/python/tutorial_map_n2_to_qubits.py
    :language: python
@@ -199,7 +199,7 @@ Substituting the Jordan--Wigner expressions into :math:`\hat{H}_{\mathrm{active}
 
 where coefficient :math:`c_k` multiplies a tensor product :math:`P_k` of :math:`I`, :math:`X`, :math:`Y`, and :math:`Z` operators.
 The index :math:`k` labels Pauli terms, not spin orbitals or qubits.
-The number of Pauli terms describes the size of this operator representation; it is not a circuit gate count or a physical-resource estimate.
+The number of Pauli terms describes the size of this operator representation; it is not a logical gate count or a physical-resource estimate.
 The exact count also depends on the mapper's numerical thresholds because terms with sufficiently small coefficients are omitted.
 
 The script creates a Jordan--Wigner mapping for the active spin orbitals and passes it to the native :term:`QDK`/Chemistry mapper:
@@ -226,6 +226,14 @@ All-identity term
 Terms containing :math:`X` or :math:`Y`
    Are off-diagonal in the occupation-number basis and connect basis states with different orbital occupations, corresponding to couplings among Slater determinants.
    A complete mapped hopping or excitation operator generally contains a coordinated sum of several Pauli strings, so one displayed string should not be interpreted as an entire chemical excitation by itself.
+
+The preview helpers make this classification explicit.
+They pair each Pauli string with its coefficient, select terms by operator content, rank terms by coefficient magnitude, and convert the stored strings to qubit-indexed notation:
+
+.. literalinclude:: ../../_static/examples/python/tutorial_map_n2_to_qubits.py
+   :language: python
+   :start-after: # start-cell-pauli-preview-helpers
+   :end-before: # end-cell-pauli-preview-helpers
 
 Printing every Pauli term would obscure these patterns, so the complete script displays the all-identity term, three of the largest :math:`I`- and :math:`Z`-only terms, and four of the largest terms containing :math:`X` or :math:`Y`.
 The preview writes, for example, ``X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)`` for a tensor product that applies :math:`X` to qubits 1, 2, 5, and 6 and applies :math:`I` to every unlisted qubit.

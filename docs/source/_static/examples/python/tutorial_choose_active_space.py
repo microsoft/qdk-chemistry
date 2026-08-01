@@ -17,11 +17,6 @@ from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 Logger.set_global_level(Logger.LogLevel.off)
 
 
-def spatial_indices(index_set):
-    """Return the alpha-channel indices for a restricted orbital space."""
-    return list(index_set.indices(SymmetryLabel([axes.alpha()])))
-
-
 @dataclass
 class ActiveSpaceResult:
     """Results needed by both the command-line example and visualization notebook."""
@@ -85,7 +80,13 @@ N    0.000000    0.000000    1.270025
         num_active_orbitals=num_valence_orbitals,
     )
     valence_wavefunction = valence_selector.run(hartree_fock_wavefunction)
-    valence_indices = spatial_indices(valence_wavefunction.get_orbitals().active_indices())
+
+    # Restricted alpha and beta channels contain the same spatial-orbital indices,
+    # so read one channel to count each spatial orbital once.
+    alpha_channel = SymmetryLabel([axes.alpha()])
+    valence_indices = list(
+        valence_wavefunction.get_orbitals().active_indices().indices(alpha_channel)
+    )
     num_valence_alpha, num_valence_beta = valence_wavefunction.get_active_num_electrons()
     # end-cell-valence-space
     ################################################################################
@@ -96,6 +97,7 @@ N    0.000000    0.000000    1.270025
     casci_solver = create(
         "multi_configuration_calculator",
         "macis_cas",
+        # autoCAS entropies require both one- and two-particle RDMs.
         calculate_one_rdm=True,
         calculate_two_rdm=True,
     )
@@ -112,6 +114,8 @@ N    0.000000    0.000000    1.270025
 
     ################################################################################
     # start-cell-natural-orbitals
+    # Rotate the valence orbitals using the CASCI one-particle RDM so each
+    # natural orbital has a well-defined correlated occupation.
     natural_orbital_localizer = create("orbital_localizer", "qdk_natural_orbitals")
     natural_orbital_wavefunction = natural_orbital_localizer.run(
         valence_casci_wavefunction,
@@ -119,12 +123,16 @@ N    0.000000    0.000000    1.270025
         valence_indices,
     )
 
+    # Rebuild and solve in the rotated basis so the RDMs and orbital entropies
+    # describe the same natural-orbital representation.
     natural_orbital_hamiltonian = hamiltonian_constructor.run(natural_orbital_wavefunction.get_orbitals())
     natural_orbital_energy, natural_orbital_casci_wavefunction = casci_solver.run(
         natural_orbital_hamiltonian,
         num_valence_alpha,
         num_valence_beta,
     )
+    # Store ordinary Python floats rather than library scalar types so the
+    # values can be printed and passed to the visualization notebook directly.
     orbital_entropies = [
         float(value) for value in natural_orbital_casci_wavefunction.get_single_orbital_entropies()
     ]
@@ -133,11 +141,16 @@ N    0.000000    0.000000    1.270025
 
     ################################################################################
     # start-cell-refine
+    # autoCAS uses the RDM-derived orbital entropies to retain the orbitals that
+    # carry the strongest correlation in a smaller active space.
     autocas_selector = create("active_space_selector", "qdk_autocas_eos")
     refined_wavefunction = autocas_selector.run(natural_orbital_casci_wavefunction)
     refined_orbitals = refined_wavefunction.get_orbitals()
-    refined_indices = spatial_indices(refined_orbitals.active_indices())
-    inactive_indices = spatial_indices(refined_orbitals.inactive_indices())
+
+    # Summarize the inactive, selected active, and virtual spatial-orbital spaces.
+    alpha_channel = SymmetryLabel([axes.alpha()])
+    refined_indices = list(refined_orbitals.active_indices().indices(alpha_channel))
+    inactive_indices = list(refined_orbitals.inactive_indices().indices(alpha_channel))
     num_refined_alpha, num_refined_beta = refined_wavefunction.get_active_num_electrons()
     num_refined_electrons = num_refined_alpha + num_refined_beta
     num_refined_orbitals = len(refined_indices)
@@ -222,7 +235,13 @@ def generate_active_orbital_cube_data(
     wavefunction = result.natural_orbital_casci_wavefunction
     orbitals = wavefunction.get_orbitals()
     occupation_alpha, occupation_beta = wavefunction.get_active_orbital_occupations()
-    active_position = {orbital_index: position for position, orbital_index in enumerate(result.valence_indices)}
+
+    # Occupation arrays use active-space positions, while cube-file labels use
+    # the original molecular-orbital indices; this dictionary connects them.
+    active_position = {
+        orbital_index: position
+        for position, orbital_index in enumerate(result.valence_indices)
+    }
     raw_cube_data = cast(
         dict[str, str],
         generate_cubefiles_from_orbitals(
@@ -235,8 +254,12 @@ def generate_active_orbital_cube_data(
 
     cube_data = {}
     for raw_label, cube_file in raw_cube_data.items():
+        # Cube labels number orbitals from one, while QDK/Chemistry indices start
+        # from zero, so convert before looking up occupations and entropies.
         orbital_index = int(raw_label.split("_")[1]) - 1
         position = active_position[orbital_index]
+        # Add the alpha and beta occupations to report the total occupation of
+        # each spatial orbital in the viewer.
         occupation = float(occupation_alpha[position]) + float(occupation_beta[position])
         cube_data[f"Orbital {orbital_index}"] = {
             "data": cube_file,
