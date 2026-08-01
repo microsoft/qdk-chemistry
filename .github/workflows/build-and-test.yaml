@@ -914,27 +914,34 @@ jobs:
       run: |
         $inc = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\include"
         $lib = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\lib\openblas.lib"
-        Write-Host "include: $inc"
-        Write-Host "lib    : $lib (exists: $(Test-Path $lib))"
+        Write-Host "lib: $lib (exists: $(Test-Path $lib))"
+        Write-Host "--- cblas/openblas headers found ---"
+        Get-ChildItem -Path $inc -Recurse -Filter '*blas*.h' -EA SilentlyContinue |
+          ForEach-Object { Write-Host "  $($_.FullName)" }
 
+        # Declare the Fortran entry points directly: no vendor header needed, and
+        # this is the same f77 interface blaspp itself calls.
         $src = @(
           '#include <stdio.h>',
-          '#include <cblas.h>',
+          'extern int  openblas_get_num_procs(void);',
+          'extern void dgemm_(char*, char*, int*, int*, int*, double*, double*, int*,',
+          '                   double*, int*, double*, double*, int*);',
           'extern void dgetrf_(int*, int*, double*, int*, int*, int*);',
           '#define N 24',
           'static double a[N*N], b[N*N], c[N*N], m[N*N];',
           'static int ipiv[N];',
           'int main(void) {',
+          '    char no = 78; /* ASCII N, i.e. "no transpose" */',
+          '    int n = N, lda = N, info = 0;',
+          '    double alpha = 1.0, beta = 0.0;',
           '    for (int i = 0; i < N*N; ++i) { a[i] = 1.0; b[i] = 2.0; c[i] = 0.0; }',
           '    printf("before openblas_get_num_procs\n"); fflush(stdout);',
           '    printf("num_procs = %d\n", openblas_get_num_procs()); fflush(stdout);',
-          '    printf("before cblas_dgemm\n"); fflush(stdout);',
-          '    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,',
-          '                N, N, N, 1.0, a, N, b, N, 0.0, c, N);',
-          '    printf("after cblas_dgemm, c[0] = %.1f (expect 48.0)\n", c[0]); fflush(stdout);',
+          '    printf("before dgemm\n"); fflush(stdout);',
+          '    dgemm_(&no, &no, &n, &n, &n, &alpha, a, &lda, b, &lda, &beta, c, &lda);',
+          '    printf("after dgemm, c[0] = %.1f (expect 48.0)\n", c[0]); fflush(stdout);',
           '    for (int i = 0; i < N*N; ++i) m[i] = 0.0;',
           '    for (int i = 0; i < N; ++i) m[i*N+i] = 2.0;',
-          '    int n = N, lda = N, info = 0;',
           '    printf("before dgetrf\n"); fflush(stdout);',
           '    dgetrf_(&n, &n, m, &lda, ipiv, &info);',
           '    printf("after dgetrf, info = %d\n", info); fflush(stdout);',
@@ -946,7 +953,7 @@ jobs:
         Set-Content -Path $srcPath -Value $src -Encoding ascii
 
         Push-Location $env:RUNNER_TEMP
-        cl /nologo /I "$inc" $srcPath "$lib" /Fe:ob_smoke.exe
+        cl /nologo $srcPath "$lib" /Fe:ob_smoke.exe
         if ($LASTEXITCODE -ne 0) { Write-Host "compile failed"; Pop-Location; exit 0 }
 
         $p = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP 'ob_smoke.exe') `
