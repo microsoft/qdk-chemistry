@@ -34,12 +34,19 @@ $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
 if (-not (Test-Path $vcvarsall)) { throw "vcvarsall.bat not found at $vcvarsall" }
 
 # vcvarsall takes "<host>_<target>", or just "<target>" when they are equal.
-$hostArch = switch ($env:PROCESSOR_ARCHITECTURE) {
+# PROCESSOR_ARCHITECTURE reports the architecture of the *current process*, so a
+# 32-bit or x64-emulated process on an ARM64 machine reports x86/AMD64. Windows
+# sets PROCESSOR_ARCHITEW6432 to the real machine architecture in that case, so
+# prefer it when present; otherwise a natively-capable agent would silently be
+# treated as a cross-compile host.
+$hostRaw = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$hostArch = switch ($hostRaw) {
     'ARM64' { 'arm64' }
     default { 'x64' }
 }
 $vcvarsArg = if ($hostArch -eq $Arch) { $Arch } else { "${hostArch}_${Arch}" }
-Write-Host "Host: $hostArch  Target: $Arch  ->  vcvarsall $vcvarsArg"
+Write-Host "Host: $hostArch (PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE, PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432)"
+Write-Host "Target: $Arch  ->  vcvarsall $vcvarsArg"
 
 # Snapshot env, run vcvarsall, diff to capture changes.
 $before = @{}
