@@ -96,7 +96,8 @@ plugins = [
 ]
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
-  "qiskit-aer; python_version < '3.14'",
+  # qiskit-aer publishes no win-arm64 wheels; QDK_CHEMISTRY_HAS_QISKIT_AER guards its use.
+  "qiskit-aer; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
   "qiskit-nature; python_version < '3.14'",
   "qiskit-qasm3-import; python_version < '3.14'",
@@ -111,7 +112,8 @@ test = [
   "nbclient",
   "nbformat",
   "pennylane",
-  "rdkit",
+  # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
+  "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "requests>=2.33.0"
 ]
 
