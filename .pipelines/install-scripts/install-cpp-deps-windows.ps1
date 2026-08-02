@@ -51,6 +51,31 @@ if (-not $Triplet) {
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
 Write-Host "vcpkg triplet: $Triplet"
 
+# ─── Prerequisite check ──────────────────────────────────────────────────────
+# Verify the tools the dependency builds need before starting. Several of these
+# fail in ways that only surface hours in and are hard to read: without a Python
+# interpreter, for example, ecpint's configure silently generates an empty
+# source list and dies with "add_custom_command Wrong syntax", and gau2grid
+# generates its sources the same way. Checking up front turns a multi-hour build
+# into a one-minute failure that names the missing tool.
+$required = @(
+    @{ Name = 'cmake';  Args = @('--version') },
+    @{ Name = 'ninja';  Args = @('--version') },
+    @{ Name = 'git';    Args = @('--version') },
+    @{ Name = 'python'; Args = @('--version') }
+)
+$missing = @()
+foreach ($tool in $required) {
+    $cmd = Get-Command $tool.Name -ErrorAction SilentlyContinue
+    if (-not $cmd) { $missing += $tool.Name; continue }
+    $ver = (& $cmd.Source @($tool.Args) 2>&1 | Select-Object -First 1)
+    Write-Host ("  {0,-8} {1}  ({2})" -f $tool.Name, $ver, $cmd.Source)
+}
+if ($missing) {
+    throw ("Missing required build tools: {0}. The dependency builds need these on PATH; " -f ($missing -join ', ')) +
+          "provision them in the pipeline rather than relying on the agent image."
+}
+
 $buildDir = "$SrcDir\deps-build-msvc"
 New-Item -ItemType Directory -Force -Path $DepsInstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $buildDir       | Out-Null

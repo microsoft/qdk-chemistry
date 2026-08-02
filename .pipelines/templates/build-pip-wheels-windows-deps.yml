@@ -19,6 +19,17 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
+# ecpint and gau2grid generate their sources with Python at configure time, so
+# a Python interpreter has to be on PATH for the dependency build. The x86_64
+# image happens to ship one; the ARM64 image does not, so provision it
+# explicitly rather than depending on what the image contains.
+- task: UsePythonVersion@0
+  displayName: Use Python (${{ parameters.arch }})
+  inputs:
+    versionSpec: '3.13'
+    ${{ if eq(parameters.arch, 'arm64') }}:
+      architecture: 'arm64'
+
 # Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
 # Also resolves the MSVC toolset version and vcpkg triplet for the cache keys.
