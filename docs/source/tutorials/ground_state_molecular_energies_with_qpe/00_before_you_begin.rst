@@ -33,7 +33,8 @@ Use the `Python tutorial <https://docs.python.org/3/tutorial/>`_, the `NumPy fun
 
    Add minimum and recommended machine requirements after the tutorial geometry and final simulation workflow are fixed.
    Specify memory requirements, storage needs if material, and expected runtime ranges for short chapter examples and the final :term:`IQPE` simulation.
-   Ground the guidance in measured reference systems and report enough context to remain meaningful, including processor family or model, approximate generation, core count, and memory.
+   Ground the guidance in measured runs on representative systems, but do not identify an author's device or operating system.
+   Report broad hardware classes and enough aggregate context to make runtime ranges meaningful without publishing machine-specific details.
    Summarize supported hardware generically for students, such as recent x86-64 Intel/AMD processors and recent Arm64 processors including Apple silicon, without implying that processor architecture alone predicts runtime.
 
 Required software
@@ -41,7 +42,6 @@ Required software
 
 The required examples use `Visual Studio Code <https://code.visualstudio.com/download>`_, Python, and implementations provided directly by :term:`QDK`/Chemistry.
 They do not require Qiskit, OpenFermion, or the Quantum Resource Estimator.
-Optional chapters identify any additional packages they require.
 
 Install the desktop version of Visual Studio Code, the `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_, the `Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_, and the `Jupyter extension <https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter>`_.
 These extensions provide the quantum-language, Python, notebook, simulation, debugging, and visualization features used by the tutorial.
@@ -49,7 +49,7 @@ These extensions provide the quantum-language, Python, notebook, simulation, deb
 .. _tutorial-qsharp:
 
 `Q# <https://learn.microsoft.com/azure/quantum/qsharp-overview>`_ is the :term:`QDK`'s primary quantum programming language for expressing, inspecting, and executing logical circuits.
-The :term:`QDK` also supports quantum programs built with Python frameworks such as `Qiskit <https://learn.microsoft.com/azure/quantum/quickstart-microsoft-qiskit>`_ and `Cirq <https://learn.microsoft.com/azure/quantum/quickstart-microsoft-cirq>`_.
+The :term:`QDK` also supports quantum programs built with Python frameworks such as `Qiskit <https://www.ibm.com/quantum/qiskit>`_ and `Cirq <hhttps://quantumai.google/cirq>`_.
 The :term:`QDK` extension provides Q# language support, while the required tutorial's Python scripts use QDK/Chemistry to generate the Q# circuit representations examined in later chapters.
 Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 

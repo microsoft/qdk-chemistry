@@ -127,7 +127,6 @@ The tutorial uses 1 milliHartree (often referred to as "chemical accuracy") as a
 Each required chapter introduces one stage of the calculation, provides a testable Python example where appropriate, and ends with questions and an assignment.
 Most examples are short.
 The final circuit simulation is the only intentionally long required example and may take tens of minutes, depending on the computer.
-An optional chapter addresses software interoperability without adding dependencies to the required workflow.
 
 Cumulative assignment
 =====================
@@ -147,5 +146,4 @@ At the end, use the completed notebook to explain the final energy estimate and 
    04_putting_the_problem_on_qubits
    05_preparing_the_trial_state
    06_iterative_phase_estimation
-   optional/index
    lab_notebook

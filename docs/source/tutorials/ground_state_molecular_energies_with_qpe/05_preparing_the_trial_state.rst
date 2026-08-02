@@ -238,10 +238,6 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    No single determinant therefore carries a majority of the selected-space ground-state weight at this geometry.
    The substantial weight distributed among additional determinants provides direct evidence of multireference character.
 
-.. todo::
-
-   Investigate a more elongated N\ :sub:`2` geometry with stronger multireference character, then re-evaluate the active-space selection, determinant weights, trial-state fidelities, logical-circuit costs, and runtime throughout the tutorial before changing the running geometry.
-
 Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the :ref:`trial-state section of the lab notebook <lab-notebook-trial-state>`.
 Explain what the leading determinant weight reveals about multireference character, and distinguish the fidelity improvement from the increased logical-circuit cost.
 

@@ -16,7 +16,7 @@ After completing this chapter, you will be able to:
 - Relate a Hamiltonian eigenvalue to a time-evolution eigenphase.
 - Describe how :term:`IQPE` measures phase bits.
 - Explain the roles of the compute register and readout ancilla.
-- Relate phase bits, shots per bit, and repeated trials to the energy estimate.
+- Relate phase bits, shots per bit, and repeated complete runs to the energy estimate.
 - Run :term:`IQPE` with native :term:`QDK`/Chemistry tools.
 - Reconstruct the total molecular energy and evaluate its error.
 
@@ -27,86 +27,412 @@ After completing this chapter, you will be able to:
    Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
    Use the completed notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.
 
+Example download
+================
+
+Download :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and save it in the tutorial working directory alongside :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>`, :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>`, and :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>`.
+Also download :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to the same directory.
+Open the files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
+The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.
+The notebook constructs and renders the shortest iteration circuit without executing the simulator.
+
 Prerequisite concepts
 =====================
 
-.. todo::
+An :term:`IQPE` calculation requires four kinds of information:
 
-   Recall the qubit Hamiltonian, core energy, trial state, and fidelity.
-   Link to an external phase-estimation refresher for learners who need to review the basic circuit model.
+Qubit Hamiltonian
+   A Hermitian operator whose eigenvalue is sought, represented on the compute register.
+Trial state
+   A normalized state with nonzero weight on the target Hamiltonian eigenstate.
+Time-evolution implementation
+   A logical circuit approximating :math:`e^{-i\hat Ht}` and controlled powers of that unitary.
+Numerical and sampling controls
+   An evolution time, number of phase bits, shots per bit, and number of complete runs.
+
+The previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
+They also recorded the core energy needed to reconstruct the molecular total and the classical :term:`CASCI` reference used to validate the final estimate; those two quantities are bookkeeping and validation data rather than inputs to the phase-estimation circuit.
+
+The compute register stores the encoded active-space wavefunction.
+This chapter adds one *readout ancilla*, a qubit used to extract phase information without representing another spin orbital.
+The `quantum phase estimation overview <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ provides an optional refresher on the basic controlled-unitary circuit model.
 
 Energy-to-phase encoding
 ========================
 
-.. todo::
+Let :math:`\vert\Psi_j\rangle` be an eigenstate of the qubit Hamiltonian with active-space energy :math:`E_j`:
 
-   Derive the relationship among the Hamiltonian, time-evolution operator, eigenphase, evolution time, and energy.
-   Reconcile the sign convention used by the documentation, circuit implementation, and QpeResult conversion before publishing this derivation.
+.. math::
+
+   \hat H_{\mathrm{qubit}}\vert\Psi_j\rangle
+   = E_j\vert\Psi_j\rangle.
+
+In atomic units, the evolution time :math:`t` is expressed in inverse Hartree, :math:`E_{\mathrm{h}}^{-1}`, so the product :math:`E_jt` is dimensionless.
+The time-evolution unitary is
+
+.. math::
+
+   U(t)=e^{-i\hat H_{\mathrm{qubit}}t}.
+
+Because every power of the Hamiltonian acting on :math:`\vert\Psi_j\rangle` contributes the corresponding power of :math:`E_j`, the exponential acts on that eigenstate as
+
+.. math::
+
+   U(t)\vert\Psi_j\rangle
+   =e^{-i\hat H_{\mathrm{qubit}}t}\vert\Psi_j\rangle
+   =e^{-iE_jt}\vert\Psi_j\rangle.
+
+The physical eigenphase in the exponential is therefore :math:`-E_jt` modulo :math:`2\pi`.
+Define the corresponding physical phase fraction as
+
+.. math::
+
+   \varphi_j^{\mathrm{physical}}
+   =\left(\frac{-E_jt}{2\pi}\right)\bmod 1.
+
+The QDK/Chemistry circuit's readout convention reverses this orientation, so the reported fraction is
+
+.. math::
+
+   \varphi_j^{\mathrm{QDK}}
+   =\left(-\varphi_j^{\mathrm{physical}}\right)\bmod 1
+   =\left(\frac{E_jt}{2\pi}\right)\bmod 1.
+
+The QDK/Chemistry result object handles the circuit's readout orientation and modulo wrapping automatically.
+It converts the measured phase fraction to a signed angle between :math:`-\pi` and :math:`\pi`, divides by :math:`t`, and returns the signed value.
+The tutorial script uses this value directly rather than manually applying a sign conversion.
+To avoid aliasing, the target energy must lie in the signed interval :math:`[-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
+
+With :math:`m` measured phase bits, the representable fractions are multiples of :math:`2^{-m}`, so adjacent energy-grid points are separated by
+
+.. math::
+
+   \Delta E_{\mathrm{grid}}=\frac{2\pi}{t2^m}.
+
+The number of phase bits is a runtime choice in this classically simulated tutorial.
+Six bits require six iteration circuits and a largest controlled power of :math:`U^{32}`; which keeps the runtime manageable.
+Ten bits would require a largest power of :math:`U^{512}` and an annoyingly long runtime for classical simulation.
+The choice :math:`m=6` therefore keeps the required twenty-run calculation within tens of minutes; it does not by itself provide milliHartree resolution.
+
+The evolution time is computed from quantities already produced by the classically tractable example chosen for this tutorial.
+If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h_\ell P_\ell` and define
+
+.. math::
+
+   \lambda=\sum_\ell\lvert h_\ell\rvert.
+
+For this Hamiltonian, :math:`\lambda=20.185236582112\ E_{\mathrm{h}}`.
+Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice
+
+.. math::
+
+   t_{\mathrm{bound}}=\frac{\pi}{\lambda}
+   =0.155638138835\ E_{\mathrm{h}}^{-1}
+
+keeps the spectrum within the signed, unaliased phase interval.
+Using the active-space reference from :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653275843566\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
+
+.. math::
+
+   \varphi_{\mathrm{bound}}
+   =\left(\frac{t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
+   \approx0.760882767.
+
+The nearest six-bit fraction is :math:`49/64=0.765625`, represented by ``110001``.
+Its signed angle is :math:`2\pi(49/64-1)=-15\pi/32`.
+Finally, we can choose the evolution time so that this grid point reconstructs an energy :math:`\delta=0.001\ E_{\mathrm{h}}` above the known reference:
+
+.. math::
+
+   t
+   =\frac{-15\pi/32}{E_{\mathrm{ref}}+\delta}
+   =0.152567288817\ E_{\mathrm{h}}^{-1}.
+
+Using this time, the reference phase fraction is approximately :math:`0.765600718`, only about :math:`2.43\times10^{-5}` below the selected grid point.
+The grid point therefore reconstructs an active energy exactly :math:`1` milliHartree above the classical reference to the displayed precision.
+
+**Please note**:  this use of the already known classical energy is circular.
+It is useful for this tutorial, but it is not a generally available strategy when the target energy is unknown.
+For the chosen :math:`t`, the ordinary six-bit grid spacing is approximately :math:`0.6435\ E_{\mathrm{h}}`; the milliHartree result comes from alignment with the known target, not from six-bit resolution across the full energy interval.
+
+.. admonition:: Why does six-bit phase estimation meet a 1 milliHartree target here even though adjacent grid points are much farther apart?
+   :class: quiz-question
+   :collapsible: closed
+
+   The classically known reference energy was used to tune the evolution time so the target lies almost exactly on one six-bit grid point.
+   Six bits do not provide milliHartree resolution for arbitrary energies with this evolution time.
 
 One phase bit at a time
 ===============================
 
-.. todo::
+Standard phase estimation uses several readout ancillas and an inverse quantum Fourier transform to obtain a complete phase in one coherent circuit.
+The QDK/Chemistry iterative implementation (:term:`IQPE`) instead reuses a single readout ancilla across a sequence of independently executed circuits.
 
-   Explain the iterative circuit, controlled evolution, phase feedback, and single readout ancilla.
-   Mention standard multi-ancilla phase estimation only as a contrast, not as a second required algorithm.
+For iterations over :math:`k=0,1,\ldots,m-1`, the circuit builder uses the controlled power
+
+.. math::
+
+   U^{2^{m-k-1}}.
+
+With :math:`m=6`, the six iteration circuits therefore apply powers :math:`32,16,8,4,2,1`.
+For an input eigenstate, the first H gate prepares the readout ancilla in :math:`(\vert0\rangle+\vert1\rangle)/\sqrt{2}`.
+The feedback rotation applies a corrective phase determined by earlier iterations.
+The controlled power then produces *phase kickback*: the :math:`\vert1\rangle` branch acquires the eigenphase of :math:`U^{2^{m-k-1}}`, while the :math:`\vert0\rangle` branch does not.
+Together, the feedback and kickback phases cancel the contribution already determined by earlier iterations.
+After the second H gate, the remaining relative phase changes the probabilities of measuring zero or one, revealing the next phase bit.
+
+If iteration :math:`k` selects bit :math:`b_k`, QDK/Chemistry updates its accumulated feedback angle according to
+
+.. math::
+
+   \Phi_{k+1}=\frac{\Phi_k}{2}+\frac{\pi b_k}{2},
+   \qquad \Phi_0=0.
+
+After the last iteration, the reported phase fraction is :math:`\Phi_m/\pi`.
+Each circuit performs the following steps:
+
+1. Freshly prepare the selected trial state on the compute register.
+2. Apply an H gate to the readout ancilla.
+3. Apply a classically determined phase-feedback rotation to that ancilla.
+4. Apply the controlled time-evolution power between the readout ancilla and compute register.
+5. Apply a second H gate and measure the readout ancilla.
+
+The same iteration circuit is executed several times from a fresh initial state.
+The majority measurement determines one bit, and a classical recurrence incorporates that bit into the phase feedback for the next iteration.
+After all iterations, the feedback accumulator determines the final phase fraction.
+
+Each iteration circuit contains twelve compute qubits and one readout ancilla, for thirteen logical qubits in the simulated circuit.
+The readout ancilla does not represent an additional molecular spin orbital.
+
+.. admonition:: Why is trial-state preparation included in every IQPE iteration circuit?
+   :class: quiz-question
+   :collapsible: closed
+
+   Each phase bit is measured by executing a separate circuit, and every shot begins with newly allocated qubits in the all-zero state.
+   The state-preparation logical circuit must therefore reload the trial state before each controlled evolution.
+
+The script configures the native iterative circuit builder and first-order Trotter unitary through nested :class:`~qdk_chemistry.data.AlgorithmRef` objects:
+
+.. literalinclude:: ../../_static/examples/python/tutorial_run_iqpe.py
+   :language: python
+   :start-after: # start-cell-iqpe-settings
+   :end-before: # end-cell-iqpe-settings
 
 Numerical controls
 =============================
 
-.. todo::
+Five controls determine the approximation and sampling behavior of this workflow:
 
-   Explain evolution time, Hamiltonian-simulation approximation, number of phase bits, shots per bit, and number of trials.
-   Connect each control to the error taxonomy introduced in the first chapter.
+Evolution time
+   The value :math:`t` sets the signed energy interval and spacing of the phase grid, as described above.
+   Here it is tuned with the known classical reference to produce a :math:`1` milliHartree grid error.
+Hamiltonian simulation
+   The qubit Hamiltonian is a sum of Pauli terms that generally do not commute.
+   A first-order `Trotter product formula <https://en.wikipedia.org/wiki/Lie_product_formula>`_ approximates evolution under that sum by applying the exponential of each Pauli term in sequence.
+   For :math:`\hat H=\sum_\ell h_\ell P_\ell`, using :math:`r` Trotter divisions gives
+
+   .. math::
+
+      e^{-i\hat Ht}
+      \approx
+      \left[\prod_\ell e^{-ih_\ell P_\ell t/r}\right]^r.
+
+   One division (:math:`r=1`) is used for each base evolution in this tutorial.
+   Increasing :math:`r` shortens each simulated time step and generally reduces product-formula error, but repeats the Pauli-term sequence more times and increases circuit cost.
+   The repeated-power strategy implemented by QDK/Chemistry constructs each controlled power :math:`U^{2^{m-k-1}}` by repeating that same approximate base unitary, preserving one consistent approximation across the IQPE iterations.
+Phase bits
+   Six bits produce six iteration circuits and :math:`2^6=64` representable phase fractions.
+   Increasing this count refines the grid but causes the largest controlled power, circuit size, and simulator runtime to grow exponentially for the repeated-power strategy.
+Shots per bit
+   Each iteration circuit is executed three times.
+   The odd shot count prevents a tied bit vote, but finite sampling can still select the less probable bit.
+Complete runs
+   The full six-bit procedure is repeated twenty times with simulator seeds 42 through 61.
+   Each complete run returns one reconstructed bitstring and energy, and the final estimate uses the most frequent complete bitstring.
+
+The default workflow therefore executes :math:`6\times3\times20=360` iteration-circuit shots.
+Phase-grid error, Trotter error, and sampling variation have different causes and should not be combined with basis-set or active-space model error.
+
+.. admonition:: Which control changes energy-grid spacing without changing the molecular Hamiltonian?
+   :class: quiz-question
+   :collapsible: closed
+
+   The number of phase bits changes how finely the phase interval is discretized.
+   The evolution time also rescales the grid in energy units, but it simultaneously changes the unaliased energy interval and the simulated evolution.
+
+IQPE circuit visualization
+==========================
+
+Before running the simulator, open :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` in Visual Studio Code.
+Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
+Then select **Run All** to construct the six iteration circuits and render the shortest, power-one circuit.
+The notebook does not execute a quantum simulation.
+
+The rendered circuit is still long because it contains the four-determinant state preparation and controlled first-order Trotter evolution for a 383-term Hamiltonian.
+Before opening the answers below, trace the operations on each wire to infer its role and compare the dimensions reported for all six iteration circuits.
+Record the evidence you used in the notebook's interpretation task.
+
+.. admonition:: How can you identify the readout ancilla in the rendered circuit?
+   :class: quiz-question
+   :collapsible: closed
+
+   The q0 wire receives the H gates and feedback rotation, controls the Hamiltonian evolution, and is measured to obtain the phase bit.
+   The other twelve wires hold the prepared molecular state and form the compute register.
+
+.. admonition:: Why do all six iteration circuits have the same width but different lengths?
+   :class: quiz-question
+   :collapsible: closed
+
+   Every iteration uses the same twelve-qubit compute register and one readout ancilla, so each circuit has thirteen logical qubits.
+   Different controlled powers repeat the approximate time-evolution unitary different numbers of times, changing the logical gate count rather than the register size.
 
 Iterative phase estimation
 ==============================
 
-.. todo::
+The script prepares the mapped Hamiltonian and four-determinant trial state, applies the reference-guided evolution-time choice, and constructs all six iteration circuits before starting any simulation.
+This separation lets you inspect settings and circuit counts without accidentally repeating the expensive calculation.
 
-   Add a standalone native Python example that composes the trial-state circuit, Jordan--Wigner Hamiltonian, Trotter unitary builder, iterative circuit builder, and native simulator.
-   Use short circuit-construction and inspection steps before the final simulation so learners do not repeat the expensive calculation unnecessarily.
-   Base the scientific workflow on ``examples/qpe_stretched_n2.ipynb`` without carrying its Qiskit comparison or resource-estimation section into the required tutorial.
+The shortest iteration circuit uses controlled :math:`U` rather than a higher repeated power.
+It still contains the state-preparation operations, twelve-wire compute register, one-wire readout ancilla, feedback rotation, controlled Trotter evolution, and ancilla measurement shared by every iteration.
+The companion circuit notebook introduced below renders this circuit without simulating it.
 
-Repeated trials
-=========================
+One complete IQPE run then invokes the native phase-estimation algorithm with one simulator seed:
 
-.. todo::
+.. literalinclude:: ../../_static/examples/python/tutorial_run_iqpe.py
+   :language: python
+   :start-after: # start-cell-run-iqpe
+   :end-before: # end-cell-run-iqpe
 
-   Explain why imperfect overlap and finite sampling can produce different trial outcomes.
-   Define the aggregation rule and report enough information to distinguish energy resolution from statistical confidence.
+Each iteration contributes one measured phase bit to the complete IQPE result.
 
-Molecular-energy reconstruction
+.. admonition:: How does IQPE use the result from each iteration to construct the final bitstring and phase fraction?
+   :class: quiz-question
+   :collapsible: closed
+
+   The majority measurement for one iteration selects a phase bit, which updates the classical phase feedback used by the next iteration.
+   After all six iterations, the feedback calculation combines the measured bits into one phase fraction.
+   The script writes that fraction as a conventional six-bit string, with the most significant bit first.
+
+Repeated complete runs
+======================
+
+One complete run can differ from another because every phase bit is selected from a finite number of simulator shots and the trial state contains several Hamiltonian eigenstates.
+The workflow therefore repeats the complete six-bit procedure with twenty deterministic simulator seeds.
+
+The final aggregation rule selects the most frequent complete bitstring, or *mode*.
+This differs from the majority vote used inside one complete run: a per-bit majority chooses one bit from three shots, whereas the complete-run mode chooses one reconstructed bitstring from twenty runs.
+If several bitstrings tie for the highest count, the script reports that no unique mode exists instead of silently choosing one.
+
+The aggregation helper makes this rule explicit:
+
+.. literalinclude:: ../../_static/examples/python/tutorial_run_iqpe.py
+   :language: python
+   :start-after: # start-cell-aggregate-runs
+   :end-before: # end-cell-aggregate-runs
+
+In the measured workflow, ``110001`` appears 19 times and its neighboring grid point ``110010`` appears once.
+The mode is therefore ``110001``.
+
+.. admonition:: Why should the final aggregation use complete bitstrings rather than vote on each bit across complete runs?
+   :class: quiz-question
+   :collapsible: closed
+
+   Each complete bitstring represents one phase-grid point and its corresponding energy.
+   Voting independently on bits could assemble a bitstring that was never produced by any complete run and would discard the observed joint distribution.
+
+Molecular energy reconstruction
 ================================
 
-.. todo::
+After the repeated complete runs, the script selects the bitstring observed most often.
+Interpret this bitstring as a binary integer :math:`b`.
+If the calculation measures :math:`m` phase bits, convert :math:`b` to the phase fraction
 
-   Add the core energy to the qubit-Hamiltonian result.
-   Compare the total energy with the :term:`CASCI` energy of the same selected active-space Hamiltonian.
-   Interpret this difference as algorithmic error from Hamiltonian simulation, finite phase resolution, and sampling.
-   Evaluate the difference against the 1 milliHartree teaching target.
-   State that meeting this target does not remove basis-set or active-space error and does not establish agreement with experiment.
-   Update the phase-estimation and conclusion sections of the lab notebook.
-   Attribute the remaining error to the approximations used in the workflow.
+.. math::
+
+   \varphi=\frac{b}{2^m}.
+
+QDK/Chemistry converts :math:`2\pi\varphi` to its equivalent signed angle :math:`\alpha` between :math:`-\pi` and :math:`\pi`.
+Dividing that angle by the evolution time maps the measured phase to the active-space energy:
+
+.. math::
+
+   E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{\alpha}{t}.
+
+This is the eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+As :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
+The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
+Because these contributions are not measured by phase estimation, the script adds them classically:
+
+.. math::
+
+   E_{\mathrm{total}}^{\mathrm{IQPE}}
+   =E_{\mathrm{active}}^{\mathrm{IQPE}}+E_{\mathrm{core}}.
+
+Finally, compare this reconstructed total with the :term:`CASCI` energy of the same selected-space Hamiltonian:
+
+.. math::
+
+   \Delta E_{\mathrm{algorithm}}
+   =E_{\mathrm{total}}^{\mathrm{IQPE}}-E_{\mathrm{CASCI}}.
+
+The workflow meets the teaching target when :math:`\lvert\Delta E_{\mathrm{algorithm}}\rvert\leq1` milliHartree.
+This comparison evaluates the configured quantum algorithm against its classical reference; it does not measure basis-set or active-space model error.
+
+.. admonition:: Which energy comparison determines whether the IQPE workflow meets the teaching target?
+   :class: quiz-question
+   :collapsible: closed
+
+   Compare the reconstructed IQPE total energy with the :term:`CASCI` energy of the same selected active-space Hamiltonian.
+   Comparing with experiment or a larger orbital space would mix algorithmic error with model error.
 
 The complete workflow
 =====================
 
-.. todo::
+With the Python environment from :doc:`Before you begin <00_before_you_begin>` active, run the script from the Visual Studio Code integrated terminal:
 
-   End with a complete, executable molecule-to-energy calculation assembled from the chapter examples.
-   Make the final circuit simulation the only intentionally long required example.
-   State that the expected duration is tens of minutes and report a measured duration with reference-hardware context after the final settings are fixed.
-   Report progress during the simulation so the learner can distinguish a long calculation from a stalled process.
-   State the environment, command, expected output, and criteria for successful completion.
-   Mark the final example as a slow integration test and keep shorter tests for the individual components.
+.. code-block:: console
+
+   python tutorial_run_iqpe.py
+
+The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
+Do not interrupt the process merely because one run takes roughly half a minute.
+The twenty-run simulation phase took approximately ten minutes in one development run; total duration depends on the computer and may be tens of minutes.
+A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
+
+.. admonition:: What bitstring distribution and energy estimate did the script produce?
+   :class: quiz-question
+   :collapsible: closed
+
+   The bitstring ``110001`` appeared 19 times and ``110010`` appeared once, so ``110001`` was the most frequent result.
+   It produced an active-space energy of :math:`-9.652275843566\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792900\ E_{\mathrm{h}}` after adding the core energy.
+
+.. admonition:: Does the result meet the teaching target, and what does that establish?
+   :class: quiz-question
+   :collapsible: closed
+
+   The reconstructed total is :math:`+1` milliHartree above the selected-space :term:`CASCI` reference, meeting the teaching target at its boundary.
+   That offset was deliberately set by the reference-guided phase-grid alignment, while Trotter approximation and finite sampling can still affect which bitstring is selected.
+   The result therefore validates this configured teaching workflow; it does not remove molecular-model error, establish agreement with experiment, or demonstrate quantum advantage.
+
+Record all settings, bitstring counts, energies, error, and observed runtime in the :ref:`phase-estimation section of the lab notebook <lab-notebook-phase-estimation>`.
+Then complete the :ref:`conclusion <lab-notebook-conclusion>` by separating basis-set, active-space, and quantum-algorithm limitations.
 
 Knowledge check
 ========================
 
-.. todo::
+.. admonition:: What changes if the number of phase bits increases while the repeated-power strategy remains fixed?
+   :class: quiz-question
+   :collapsible: closed
 
-   Add an exercise that changes one precision or sampling parameter and asks the learner to predict and explain its effect.
+   The phase grid becomes finer, but an additional iteration circuit is required and the largest controlled-unitary power doubles.
+   For repeated-power Trotter evolution, that larger power increases circuit size and simulator runtime substantially.
+
+.. admonition:: Would increasing shots per bit make the phase grid finer?
+   :class: quiz-question
+   :collapsible: closed
+
+   No.
+   More shots can make each bit majority more stable, but grid spacing is controlled by the evolution time and number of phase bits.
 
 Further reading
 ===============

@@ -130,8 +130,10 @@ Record the algorithm settings and final result.
 - Hamiltonian-simulation method and settings:
 - Number of phase bits:
 - Shots per bit:
-- Number of trials:
+- Number of complete IQPE runs:
 - Readout ancillas:
+- Complete-run bitstring counts:
+- Modal bitstring:
 - Measured active-space energy and units:
 - Core energy added after phase estimation:
 - Total molecular energy estimate and units:

@@ -381,6 +381,98 @@ def test_tutorial_prepare_trial_state_results():
     }
 
 
+def test_tutorial_run_iqpe_configuration(capsys):
+    """Check the fast IQPE configuration and phase-grid values used by Chapter 6."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    _load_tutorial_module("tutorial_map_n2_to_qubits")
+    _load_tutorial_module("tutorial_prepare_trial_state")
+    tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
+
+    problem = tutorial_module.prepare_iqpe_problem()
+    assert problem.mapping.num_compute_qubits == 12
+    assert problem.trial_state.num_determinants == 4
+    assert abs(problem.trial_state.fidelity - 0.717362840569) < 1e-10
+    assert problem.num_phase_bits == 6
+    assert problem.shots_per_bit == 3
+    assert len(problem.iteration_circuits) == 6
+    assert problem.evolution_time.grid_bitstring == "110001"
+    assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
+    assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
+    assert problem.evolution_time.grid_phase_fraction == 49 / 64
+    assert (
+        abs(
+            problem.evolution_time.grid_active_energy_hartree
+            - problem.mapping.mapped_active_energy
+            - 1e-3
+        )
+        < 1e-12
+    )
+
+    first_run = tutorial_module.IqpeRun(
+        seed=1,
+        bitstring="110001",
+        phase_fraction=49 / 64,
+        active_energy_hartree=-9.652275843566,
+        total_energy_hartree=-108.770051792900,
+        error_hartree=1e-3,
+        runtime_seconds=1.0,
+    )
+    neighboring_run = tutorial_module.IqpeRun(
+        seed=2,
+        bitstring="110010",
+        phase_fraction=50 / 64,
+        active_energy_hartree=-9.008790787328,
+        total_energy_hartree=-108.126566736662,
+        error_hartree=0.644485056238,
+        runtime_seconds=1.0,
+    )
+    counts, mode = tutorial_module.select_unique_mode(
+        [first_run, neighboring_run, first_run]
+    )
+    assert counts == {"110001": 2, "110010": 1}
+    assert mode is first_run
+    with pytest.raises(RuntimeError, match="no unique mode"):
+        tutorial_module.select_unique_mode([first_run, neighboring_run])
+
+    tutorial_module.print_iqpe_settings(
+        problem,
+        num_complete_runs=20,
+        first_seed=42,
+    )
+    settings_output = capsys.readouterr().out
+    for expected_text in (
+        "Trial determinants: 4",
+        "Readout ancillas: 1",
+        "Phase bits: 6",
+        "Shots per bit: 3",
+        "Complete runs: 20",
+        "Simulator seeds: 42-61",
+        "first-order Trotter product formula",
+        "Trotter divisions: 1",
+        "repeated approximate base unitary",
+        "0.152567288817 Hartree^-1",
+    ):
+        assert expected_text in settings_output
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+def test_tutorial_run_iqpe_simulation():
+    """Check one complete simulator run from the final Chapter 6 workflow."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    _load_tutorial_module("tutorial_map_n2_to_qubits")
+    _load_tutorial_module("tutorial_prepare_trial_state")
+    tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
+
+    problem = tutorial_module.prepare_iqpe_problem()
+    run = tutorial_module.run_complete_iqpe(problem, seed=42)
+    assert run.bitstring == "110001"
+    assert abs(run.error_hartree - 1e-3) < 1e-10
+
+
 
 
 @_requires_notebook_deps
@@ -439,6 +531,35 @@ def test_tutorial_prepare_trial_state_notebook():
     assert notebook.metadata.get("language_info", {}) == {"name": "python"}
     for cell in notebook.cells:
         expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+
+
+@_requires_notebook_deps
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_visualize_iqpe_circuit_notebook():
+    """Test the Chapter 6 notebook circuit construction and validation cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_visualize_iqpe_circuit.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("id") == cell.id
         assert cell.metadata.get("language") == expected_language
         if cell.cell_type == "code":
             assert cell.execution_count is None

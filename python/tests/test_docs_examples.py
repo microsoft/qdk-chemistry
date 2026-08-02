@@ -138,6 +138,10 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
+    # Individual examples can declare intentionally long execution explicitly.
+    if "# docs-example: slow" in content:
+        is_slow = True
+
     return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
 
 
@@ -163,6 +167,11 @@ class TestExampleScripts(unittest.TestCase):
             example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
             if example_file.name == "tutorial_qpe_setup.py":
                 example_env["GROUND_STATE_TUTORIAL_VERSION"] = GROUND_STATE_TUTORIAL_VERSION
+            example_timeout = (
+                1200
+                if "# docs-example: slow" in example_file.read_text(encoding="utf-8")
+                else 360
+            )
 
             result = subprocess.run(
                 [sys.executable, str(example_file)],
@@ -170,7 +179,7 @@ class TestExampleScripts(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=360,
+                timeout=example_timeout,
                 cwd=tmpdir,
                 env=example_env,
             )
@@ -203,7 +212,7 @@ def _create_test_methods():
             ) = check_example_requirements(example_file)
 
             # Create the test method
-            def make_test(
+            def make_test(  # noqa: PLR0917
                 filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion, slow
             ):
                 """Create a test method for the given example file."""
