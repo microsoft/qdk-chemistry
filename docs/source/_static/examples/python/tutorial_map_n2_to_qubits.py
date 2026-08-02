@@ -17,8 +17,6 @@ from tutorial_choose_active_space import (
     run_active_space_workflow,
 )
 
-Logger.set_global_level(Logger.LogLevel.off)
-
 
 @dataclass
 class QubitMappingResult:
@@ -268,6 +266,7 @@ def print_qubit_mapping_results(result: QubitMappingResult) -> None:
 
 def main() -> None:
     """Run and report the command-line version of the mapping workflow."""
+    Logger.set_global_level(Logger.LogLevel.off)
     result = run_qubit_mapping_workflow()
     print_qubit_mapping_results(result)
 

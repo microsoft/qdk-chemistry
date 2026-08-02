@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils import Logger
 
 # Optional dependencies for notebook execution
 try:
@@ -256,9 +257,40 @@ def _load_tutorial_module(module_name: str):
     sys.path.insert(0, str(DOCS_PYTHON_EXAMPLES_DIR))
     try:
         module_spec.loader.exec_module(tutorial_module)
+    except BaseException:
+        sys.modules.pop(module_spec.name, None)
+        raise
     finally:
         sys.path.pop(0)
     return tutorial_module
+
+
+def test_load_tutorial_module_removes_failed_import(tmp_path, monkeypatch):
+    """Do not cache a partially initialized tutorial module after import failure."""
+    module_name = "tutorial_failing_import"
+    (tmp_path / f"{module_name}.py").write_text("raise RuntimeError('failed import')\n")
+    monkeypatch.setattr(sys.modules[__name__], "DOCS_PYTHON_EXAMPLES_DIR", tmp_path)
+
+    with pytest.raises(RuntimeError, match="failed import"):
+        _load_tutorial_module(module_name)
+
+    assert module_name not in sys.modules
+
+
+def test_tutorial_module_imports_preserve_global_logging():
+    """Reusable tutorial imports must not change process-wide logging."""
+    previous_level = Logger.get_global_level()
+    Logger.set_global_level(Logger.LogLevel.warn)
+    try:
+        for module_name in (
+            "tutorial_choose_active_space",
+            "tutorial_map_n2_to_qubits",
+            "tutorial_prepare_trial_state",
+        ):
+            _load_tutorial_module(module_name)
+        assert Logger.get_global_level() == "warn"
+    finally:
+        Logger.set_global_level(previous_level)
 
 
 def test_tutorial_choose_active_space_results():

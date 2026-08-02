@@ -14,8 +14,6 @@ from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
-Logger.set_global_level(Logger.LogLevel.off)
-
 
 @dataclass
 class ActiveSpaceResult:
@@ -274,6 +272,7 @@ def generate_active_orbital_cube_data(
 
 def main() -> None:
     """Run and report the command-line version of the example."""
+    Logger.set_global_level(Logger.LogLevel.off)
     # Earlier tutorial scripts execute one linear calculation. This chapter also
     # provides an interactive notebook, so functions keep both versions on the
     # same tested chemistry workflow instead of duplicating the calculation.

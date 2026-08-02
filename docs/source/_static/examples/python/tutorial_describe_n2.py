@@ -10,7 +10,8 @@ from qdk_chemistry.constants import HARTREE_TO_KJ_PER_MOL
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import Logger
 
-Logger.set_global_level(Logger.LogLevel.off)
+if __name__ == "__main__":
+    Logger.set_global_level(Logger.LogLevel.off)
 
 ################################################################################
 # docs:xyz ../data/tutorial_stretched_n2.structure.xyz

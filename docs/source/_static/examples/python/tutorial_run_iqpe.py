@@ -14,6 +14,7 @@ from time import perf_counter
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.utils import Logger
 from tutorial_map_n2_to_qubits import QubitMappingResult, run_qubit_mapping_workflow
 from tutorial_prepare_trial_state import TrialStateResult, run_trial_state_workflow
 
@@ -391,6 +392,7 @@ def print_iqpe_results(result: IqpeWorkflowResult) -> None:
 
 def main() -> None:
     """Run the complete tutorial IQPE workflow."""
+    Logger.set_global_level(Logger.LogLevel.off)
     result = run_iqpe_workflow()
     print_iqpe_results(result)
 

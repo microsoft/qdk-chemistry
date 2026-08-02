@@ -17,8 +17,6 @@ from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger
 from tutorial_choose_active_space import ActiveSpaceResult, run_active_space_workflow
 
-Logger.set_global_level(Logger.LogLevel.off)
-
 
 @dataclass
 class DeterminantContribution:
@@ -248,6 +246,7 @@ def print_trial_state_results(result: TrialStateWorkflowResult) -> None:
 
 def main() -> None:
     """Run and report the command-line trial-state workflow."""
+    Logger.set_global_level(Logger.LogLevel.off)
     result = run_trial_state_workflow()
     print_trial_state_results(result)
 
