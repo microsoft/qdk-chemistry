@@ -1,10 +1,6 @@
 Ground-state molecular energies with quantum phase estimation
 #############################################################
 
-.. todo::
-
-   Revisit this chapter after drafting the later sections, possibly trimming the overview and moving detailed explanations closer to where they are used.
-
 This tutorial uses `quantum phase estimation <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ (:term:`QPE`) and the Quantum Development Kit (:term:`QDK`) Chemistry library, called :term:`QDK`/Chemistry in this documentation, to estimate the ground-state electronic energy of a stretched nitrogen molecule, N\ :sub:`2`.
 It is intended for advanced undergraduate and early-stage graduate students who have introductory knowledge of quantum computing and chemistry.
 :doc:`Before you begin <00_before_you_begin>` describes the prerequisites, software environment, and cumulative lab notebook assignment.

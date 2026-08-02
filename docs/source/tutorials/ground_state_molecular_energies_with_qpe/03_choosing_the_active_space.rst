@@ -38,13 +38,13 @@ The limits of one determinant
 
 As :ref:`the previous chapter explains <tutorial-hartree-fock-wavefunction>`, the `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ restricts the `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_ to one optimized `Slater determinant <https://en.wikipedia.org/wiki/Slater_determinant>`_.
 This determinant represents one `electron configuration <https://en.wikipedia.org/wiki/Electron_configuration>`_, a pattern of occupied spin orbitals introduced in :ref:`Orbitals and determinants <tutorial-orbitals-and-determinants>`.
-This description is often a useful starting point near an equilibrium geometry, where one configuration dominates the ground-state wavefunction, as discussed for N\ :sub:`2` in :ref:`Specify the molecular system <tutorial-molecular-system>`.
-Stretching a chemical bond can make several configurations similar in energy because electrons can no longer be assigned adequately to one fixed pattern of occupied and unoccupied `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, which :ref:`the previous chapter constructs <tutorial-molecular-orbitals>`.
-The need to combine these important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_.
-The selected stretched N\ :sub:`2` geometry is intended to expose this regime.
-The correlated calculations below evaluate it by constructing a multi-determinant wavefunction and measuring orbital-occupation entropies.
+This description is often a useful starting point near an equilibrium geometry, where one configuration dominates the ground-state wavefunction, as discussed for N\ :sub:`2` in :ref:`Specify the molecular system <tutorial-molecular-system>` chapter.
+Stretching a chemical bond can make several configurations similar in energy because electrons can no longer be assigned adequately to one fixed pattern of occupied and unoccupied `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_.
+The need to combine these multiple important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_.
+The stretched N\ :sub:`2` geometry has been selected to demonstrate this regime.
+The correlated calculations below evaluate static correlation by constructing a multi-determinant wavefunction and measuring orbital-occupation entropies.
 
-A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_interaction>`_ (:term:`CI`) wavefunction addresses this limitation by expanding the wavefunction in multiple Slater determinants:
+A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_interaction>`_ (:term:`CI`) calculation addresses this limitation by calculating a wavefunction expanded in multiple Slater determinants:
 
 .. math::
 
@@ -52,7 +52,7 @@ A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_intera
 
 where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
 Allowing every possible determinant in all 28 ``cc-pvdz`` spatial orbitals would be unnecessarily expensive for this tutorial.
-An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ instead restricts which orbital occupations may vary, reducing the computational costs.
+An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ restricts which orbital occupations are allowed to vary, reducing the computational costs.
 
 .. _tutorial-active-space-definition:
 

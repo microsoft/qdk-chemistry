@@ -55,8 +55,8 @@ This example constructs the :class:`~qdk_chemistry.data.Structure` object from a
    :start-after: # start-cell-molecule
    :end-before: # end-cell-molecule
 
-The :term:`XYZ` convention used by :term:`QDK`/Chemistry interprets coordinates as ångström.
-The :term:`XYZ` format does not specify molecular charge or spin multiplicity, so the example records these values separately.
+The :term:`XYZ` format used by :term:`QDK`/Chemistry interprets coordinates in ångström units.
+However, this format does not specify molecular charge or spin multiplicity, so the example records these values separately.
 
 .. _tutorial-hartree-fock-wavefunction:
 
@@ -99,8 +99,7 @@ Their spatial shapes and occupations also help identify bonding and antibonding 
    A molecular orbital is a one-electron spatial function used to construct the spin orbitals in a Hartree--Fock determinant.
    Molecular orbitals make the approximate many-electron wavefunction computationally tractable, help interpret bonding and occupations, and provide the starting representation for later multi-configurational calculations.
 
-A computer cannot optimize arbitrary functions directly.
-Electronic-structure calculations instead expand each molecular orbital :math:`\phi_p` in a finite collection of known basis functions :math:`\{\chi_\mu\}`:
+Electronic-structure calculations expand each molecular orbital :math:`\phi_p` in a finite collection of known basis functions :math:`\{\chi_\mu\}`:
 
 .. math::
 
@@ -123,7 +122,7 @@ The comparison between basis functions in this chapter does not determine the ex
 Instead, it measures how much the calculated energy changes between two related basis choices while the geometry and electronic-structure method (Hartree--Fock) remain fixed.
 This change is the basis-set sensitivity for this comparison.
 
-.. admonition:: Which molecular inputs remain fixed when comparing the two basis sets?
+.. admonition:: Which basis set gives a lower energy and why?
    :class: quiz-question
    :collapsible: closed
 

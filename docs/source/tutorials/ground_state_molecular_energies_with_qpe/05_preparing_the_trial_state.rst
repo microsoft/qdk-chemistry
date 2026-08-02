@@ -45,9 +45,10 @@ Why phase estimation needs a trial state
 
 Quantum phase estimation (:term:`QPE`) estimates an eigenphase of a unitary operator.
 For molecular energies, that unitary represents evolution under the Hamiltonian: each Hamiltonian eigenstate is also an eigenstate of the time-evolution operator, and its phase depends on its energy.
-The phase-to-energy relationship and the :term:`QPE` logical circuit are developed in the next chapter; this chapter needs only the algorithm's input-state requirement.
+The phase-to-energy relationship and the :term:`QPE` logical circuit are developed in the next chapter.
+For now, the important point is that the compute register must contain a chosen quantum state before phase estimation can begin.
 
-Before phase estimation begins, a state-preparation logical circuit must initialize the compute register in a chosen normalized quantum state.
+A state-preparation logical circuit initializes the compute register in this chosen normalized quantum state.
 This input is the *trial state*.
 It is an approximation intended to contain a substantial contribution from the target ground state; :term:`QPE` cannot begin from an unspecified state or create the ground state by searching through all possible wavefunctions.
 
@@ -113,13 +114,7 @@ The script first prints the leading terms in the selected-space wavefunction.
 Each occupation string contains one symbol for each selected active spatial orbital: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
 The amplitude is the signed coefficient :math:`c_i` in :math:`\vert\Psi_0\rangle=\sum_i c_i\vert\Phi_i\rangle`, while the weight :math:`\left\vert c_i\right\vert^2` is that determinant's contribution to the squared norm.
 The cumulative weight shows how much of the norm is captured by the listed determinants.
-
-The helper computes these quantities directly from the leading :term:`CASCI` coefficients:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
-   :language: python
-   :start-after: # start-cell-determinant-weights
-   :end-before: # end-cell-determinant-weights
+The script computes these quantities directly from the leading :term:`CASCI` coefficients.
 
 Simply discarding coefficients and renormalizing would not optimize the wavefunction within the retained determinant space because the full-space amplitudes are not generally the amplitudes that minimize energy after determinants are removed.
 A projected multi-configuration (:term:`PMC`) calculation is a configuration-interaction calculation restricted to a user-specified set of determinants.
@@ -172,15 +167,9 @@ Compare the gate types and circuit structure before revealing the answer below.
    Because X gates can only map one basis state to another, rotations are needed to create amplitudes, phase operations establish relative signs or phases, and entangling gates correlate occupation changes across qubits.
    The exact gate sequence depends on the synthesis method, but the distinction between preparing one basis state and preparing a coherent superposition is general.
 
-To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, retains leaf gates, identifies controlled X gates as CNOT gates, and counts each logical gate type:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
-   :language: python
-   :start-after: # start-cell-circuit-statistics
-   :end-before: # end-cell-circuit-statistics
-
+To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, retains leaf gates, identifies controlled X gates as CNOT gates, and counts each logical gate type.
 The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
-The factory key ``sparse_isometry_gf2x`` is the implementation's current API identifier:
+The factory key ``sparse_isometry_gf2x`` is the implementation's current API identifier using a helper function to count gates:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
    :language: python
@@ -196,12 +185,6 @@ Trial-state quality and preparation cost
 ========================================
 
 Retaining more determinants gives the projected calculation more flexibility and can improve fidelity, but loading more nonzero amplitudes generally requires a more complex preparation logical circuit.
-These are different quantities:
-
-Trial-state quality
-   Fidelity measures the ground-state weight in the intended trial state and influences the implemented :term:`IQPE` bit statistics, but it does not alone determine a complete-run success probability.
-Preparation cost
-   The generated logical circuit's gates describe work needed to load that trial state before phase estimation begins.
 
 All three trial states describe the same selected active spin-orbital space, so they use the same compute register size.
 Changing the number of retained determinants changes amplitudes and logical-circuit structure, not the number of spin orbitals represented.
@@ -240,6 +223,8 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
 Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the :ref:`trial-state section of the lab notebook <lab-notebook-trial-state>`.
 Explain what the leading determinant weight reveals about multireference character, and distinguish the fidelity improvement from the increased logical-circuit cost.
+The final :term:`IQPE` calculation uses the four-determinant trial state.
+In the lab notebook, use your measured fidelities and preparation logical gate counts to evaluate this choice and describe what would be gained or lost by using one of the smaller trial states instead.
 
 Further reading
 ===============

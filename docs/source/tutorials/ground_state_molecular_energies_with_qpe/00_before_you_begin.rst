@@ -29,13 +29,18 @@ The tutorial does not assume prior knowledge of active-space methods, fermion-to
 The :doc:`tutorial introduction <index>` provides the chemistry and quantum-computing context needed to begin, and the specialized methods are developed before they are used in calculations.
 Use the `Python tutorial <https://docs.python.org/3/tutorial/>`_, the `NumPy fundamentals <https://numpy.org/doc/stable/user/basics.html>`_, and the `quantum-computing concepts overview <https://learn.microsoft.com/azure/quantum/concepts-overview>`_ to refresh prerequisite material.
 
-.. todo::
+Computer requirements
+=====================
 
-   Add minimum and recommended machine requirements after the tutorial geometry and final simulation workflow are fixed.
-   Specify memory requirements, storage needs if material, and expected runtime ranges for short chapter examples and the final :term:`IQPE` simulation.
-   Ground the guidance in measured runs on representative systems, but do not identify an author's device or operating system.
-   Report broad hardware classes and enough aggregate context to make runtime ranges meaningful without publishing machine-specific details.
-   Summarize supported hardware generically for students, such as recent x86-64 Intel/AMD processors and recent Arm64 processors including Apple silicon, without implying that processor architecture alone predicts runtime.
+These are practical requirements for completing the tutorial rather than the full package support matrix.
+A supported 64-bit computer with at least 8 GiB of memory and 3 GiB of free storage is the minimum recommended configuration.
+For the final simulator workflow, 16 GiB of memory and a recent multicore processor provide more comfortable headroom.
+A GPU is not required.
+
+The installed tutorial environment occupies approximately 1.5 GiB.
+The short chapter Python scripts generally finish within a minute, while the Jupyter notebooks can take longer.
+The final twenty-run :term:`IQPE` simulation took approximately ten minutes in a measured development run.
+Allow tens of minutes depending on processor performance and other system activity.
 
 Required software
 =================
@@ -49,7 +54,7 @@ These extensions provide the quantum-language, Python, notebook, simulation, deb
 .. _tutorial-qsharp:
 
 `Q# <https://learn.microsoft.com/azure/quantum/qsharp-overview>`_ is the :term:`QDK`'s primary quantum programming language for expressing, inspecting, and executing logical circuits.
-The :term:`QDK` also supports quantum programs built with Python frameworks such as `Qiskit <https://www.ibm.com/quantum/qiskit>`_ and `Cirq <hhttps://quantumai.google/cirq>`_.
+The :term:`QDK` also supports quantum programs built with Python frameworks such as `Qiskit <https://www.ibm.com/quantum/qiskit>`_ and `Cirq <https://quantumai.google/cirq>`_.
 The :term:`QDK` extension provides Q# language support, while the required tutorial's Python scripts use QDK/Chemistry to generate the Q# circuit representations examined in later chapters.
 Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 
@@ -62,7 +67,7 @@ Check the version before creating the environment:
 
    python3 --version
 
-Continue if the command reports Python 3.10 or later.
+Continue if the command reports Python 3.10 or later; otherwise, install a newer version of Python.
 
 Python environment setup
 =============================
@@ -101,12 +106,7 @@ Then run it from the Visual Studio Code integrated terminal:
    python tutorial_qpe_setup.py
 
 The script reports the active Python environment to help diagnose setup problems.
-It also verifies that the built-in :term:`QDK`/Chemistry implementations required by the tutorial calculations are available:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_qpe_setup.py
-   :language: python
-   :start-after: # start-cell-verify
-   :end-before: # end-cell-verify
+It also verifies that the built-in :term:`QDK`/Chemistry implementations required by the tutorial calculations are available.
 
 The check succeeds when it finishes without an exception, reports a Python executable from the tutorial virtual environment, reports :term:`QDK`/Chemistry version |ground-state-tutorial-version|, confirms the IPython kernel and molecular viewer are importable, and confirms that all required built-in implementations are available.
 Record the :term:`QDK`/Chemistry version and verification result in :ref:`lab-notebook-setup`.

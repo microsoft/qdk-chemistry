@@ -395,7 +395,10 @@ def test_tutorial_run_iqpe_configuration(capsys):
     assert problem.num_phase_bits == 6
     assert problem.shots_per_bit == 3
     assert len(problem.iteration_circuits) == 6
+    assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 20.185236582112) < 1e-10
     assert problem.evolution_time.grid_bitstring == "110001"
+    assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.155638138835) < 1e-12
+    assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.760882767) < 1e-9
     assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
     assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
     assert problem.evolution_time.grid_phase_fraction == 49 / 64
@@ -450,6 +453,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
         "first-order Trotter product formula",
         "Trotter divisions: 1",
         "repeated approximate base unitary",
+        "0.760882766860",
         "0.152567288817 Hartree^-1",
     ):
         assert expected_text in settings_output

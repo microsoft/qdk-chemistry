@@ -5,15 +5,10 @@ Use this lab notebook to record the inputs, decisions, results, and interpretati
 Each required chapter adds information to the same record.
 The completed notebook should make the calculation reproducible and should distinguish changes in the molecular model from errors introduced by the quantum algorithm.
 
-.. todo::
-
-   Decide whether to provide this worksheet as a downloadable template in addition to the rendered page.
-   Add a completed example after the tutorial calculations and reference values have been finalized.
-
 How to use the notebook
 =======================
 
-Create a copy of the headings and prompts below in your preferred note-taking format.
+Download :download:`the blank Markdown template <../../_static/examples/ground_state_qpe_lab_notebook_template.md>` or create a copy of the headings and prompts below in your preferred note-taking format.
 Record values with units and enough significant figures to support later comparisons.
 Record the software version and settings associated with each result.
 Keep observations separate from interpretations.
@@ -118,6 +113,7 @@ Record the approximation prepared on the compute register.
 - Compute qubits for each trial state:
 - Preparation logical gate count and logical gate-family counts for each trial state:
 - Interpretation of the fidelity and circuit cost:
+- Trial state selected for IQPE and rationale:
 
 .. _lab-notebook-phase-estimation:
 
@@ -132,6 +128,7 @@ Record the algorithm settings and final result.
 - Shots per bit:
 - Number of complete IQPE runs:
 - Readout ancillas:
+- Simulator seed range:
 - Complete-run bitstring counts:
 - Modal bitstring:
 - Measured active-space energy and units:

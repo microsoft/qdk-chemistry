@@ -134,10 +134,6 @@ For example:
 - Hamiltonian time evolution is approximated when the quantum circuit is constructed.
 - Finite phase resolution and measurement sampling limit the reported :term:`QPE` estimate.
 
-.. todo::
-
-   Verify as later chapters are drafted that each approximation is introduced where it first enters the calculation.
-
 Each approximation is introduced where it first enters the calculation, and the corresponding comparison is recorded before proceeding.
 
 Further reading

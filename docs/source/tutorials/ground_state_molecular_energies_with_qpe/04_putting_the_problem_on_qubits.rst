@@ -135,7 +135,6 @@ Acting on mode :math:`p` crosses the occupied lower-indexed modes in the chosen 
 The parity string supplies their combined sign, so the mapped operators satisfy the fermionic anticommutation relations.
 
 Because the parity strings depend on mode ordering, the ordering must be specified: :term:`QDK`/Chemistry places all active :math:`\alpha` modes before all active :math:`\beta` modes, a convention called *blocked ordering*.
-Another ordering would change the parity strings but not the energy spectrum.
 
 .. admonition:: Why does Jordan--Wigner need a string of Pauli Z operators?
    :class: quiz-question
@@ -227,14 +226,6 @@ All-identity term
 Terms containing :math:`X` or :math:`Y`
    Are off-diagonal in the occupation-number basis and connect basis states with different orbital occupations, corresponding to couplings among Slater determinants.
    A complete mapped hopping or excitation operator generally contains a coordinated sum of several Pauli strings, so one displayed string should not be interpreted as an entire chemical excitation by itself.
-
-The preview helpers make this classification explicit.
-They pair each Pauli string with its coefficient, select terms by operator content, rank terms by coefficient magnitude, and convert the stored strings to qubit-indexed notation:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_map_n2_to_qubits.py
-   :language: python
-   :start-after: # start-cell-pauli-preview-helpers
-   :end-before: # end-cell-pauli-preview-helpers
 
 Printing every Pauli term would obscure these patterns, so the complete script displays the all-identity term, three of the largest :math:`I`- and :math:`Z`-only terms, and four of the largest terms containing :math:`X` or :math:`Y`.
 The preview writes, for example, ``X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)`` for a tensor product that applies :math:`X` to qubits 1, 2, 5, and 6 and applies :math:`I` to every unlisted qubit.

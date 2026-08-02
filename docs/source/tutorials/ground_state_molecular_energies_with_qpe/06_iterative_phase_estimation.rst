@@ -101,7 +101,7 @@ The QDK/Chemistry circuit's readout convention reverses this orientation, so the
 The QDK/Chemistry result object handles the circuit's readout orientation and modulo wrapping automatically.
 It converts the measured phase fraction to a signed angle between :math:`-\pi` and :math:`\pi`, divides by :math:`t`, and returns the signed value.
 The tutorial script uses this value directly rather than manually applying a sign conversion.
-To avoid aliasing, the target energy must lie in the signed interval :math:`[-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
+To avoid aliasing, the active-space Hamiltonian eigenenergy :math:`E_j` being estimated must lie in the signed interval :math:`[-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
 
 With :math:`m` measured phase bits, the representable fractions are multiples of :math:`2^{-m}`, so adjacent energy-grid points are separated by
 
@@ -121,7 +121,8 @@ If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h
 
    \lambda=\sum_\ell\lvert h_\ell\rvert.
 
-For this Hamiltonian, :math:`\lambda=20.185236582112\ E_{\mathrm{h}}`.
+The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient sum as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
+For this Hamiltonian, the reported value is :math:`\lambda=20.185236582112\ E_{\mathrm{h}}`.
 Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice
 
 .. math::
@@ -130,14 +131,16 @@ Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, th
    =0.155638138835\ E_{\mathrm{h}}^{-1}
 
 keeps the spectrum within the signed, unaliased phase interval.
+The script reports this value as the ``Initial unaliased time bound`` in its pre-simulation settings.
 Using the active-space reference from :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653275843566\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
 
 .. math::
 
    \varphi_{\mathrm{bound}}
    =\left(\frac{t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
-   \approx0.760882767.
+   \approx0.760882766860.
 
+The script reports this value as the ``Reference phase at initial time bound``.
 The nearest six-bit fraction is :math:`49/64=0.765625`, represented by ``110001``.
 Its signed angle is :math:`2\pi(49/64-1)=-15\pi/32`.
 Finally, we can choose the evolution time so that this grid point reconstructs an energy :math:`\delta=0.001\ E_{\mathrm{h}}` above the known reference:
@@ -148,12 +151,15 @@ Finally, we can choose the evolution time so that this grid point reconstructs a
    =\frac{-15\pi/32}{E_{\mathrm{ref}}+\delta}
    =0.152567288817\ E_{\mathrm{h}}^{-1}.
 
+The script reports this adjusted value as the ``Selected evolution time``.
 Using this time, the reference phase fraction is approximately :math:`0.765600718`, only about :math:`2.43\times10^{-5}` below the selected grid point.
 The grid point therefore reconstructs an active energy exactly :math:`1` milliHartree above the classical reference to the displayed precision.
 
 **Please note**:  this use of the already known classical energy is circular.
 It is useful for this tutorial, but it is not a generally available strategy when the target energy is unknown.
-For the chosen :math:`t`, the ordinary six-bit grid spacing is approximately :math:`0.6435\ E_{\mathrm{h}}`; the milliHartree result comes from alignment with the known target, not from six-bit resolution across the full energy interval.
+For the chosen :math:`t`, adjacent energies represented by the six-bit phase grid differ by approximately :math:`0.6435\ E_{\mathrm{h}}`, not :math:`0.001\ E_{\mathrm{h}}`.
+The smaller value, :math:`0.001\ E_{\mathrm{h}}` or one milliHartree, is the accuracy target adopted for this tutorial.
+The question below asks why one grid point can nevertheless reconstruct this particular reference energy within that target.
 
 .. admonition:: Why does six-bit phase estimation meet a 1 milliHartree target here even though adjacent grid points are much farther apart?
    :class: quiz-question
@@ -175,6 +181,7 @@ For iterations over :math:`k=0,1,\ldots,m-1`, the circuit builder uses the contr
    U^{2^{m-k-1}}.
 
 With :math:`m=6`, the six iteration circuits therefore apply powers :math:`32,16,8,4,2,1`.
+In this implementation, the first :math:`U^{32}` iteration determines the least-significant phase bit and the final :math:`U` iteration determines the most-significant bit.
 For an input eigenstate, the first H gate prepares the readout ancilla in :math:`(\vert0\rangle+\vert1\rangle)/\sqrt{2}`.
 The feedback rotation applies a corrective phase determined by earlier iterations.
 The controlled power then produces *phase kickback*: the :math:`\vert1\rangle` branch acquires the eigenphase of :math:`U^{2^{m-k-1}}`, while the :math:`\vert0\rangle` branch does not.
@@ -323,16 +330,6 @@ The final aggregation rule selects the most frequent complete bitstring, or *mod
 This differs from the majority vote used inside one complete run: a per-bit majority chooses one bit from three shots, whereas the complete-run mode chooses one reconstructed bitstring from twenty runs.
 If several bitstrings tie for the highest count, the script reports that no unique mode exists instead of silently choosing one.
 
-The aggregation helper makes this rule explicit:
-
-.. literalinclude:: ../../_static/examples/python/tutorial_run_iqpe.py
-   :language: python
-   :start-after: # start-cell-aggregate-runs
-   :end-before: # end-cell-aggregate-runs
-
-In the measured workflow, ``110001`` appears 19 times and its neighboring grid point ``110010`` appears once.
-The mode is therefore ``110001``.
-
 .. admonition:: Why should the final aggregation use complete bitstrings rather than vote on each bit across complete runs?
    :class: quiz-question
    :collapsible: closed
@@ -433,6 +430,17 @@ Knowledge check
 
    No.
    More shots can make each bit majority more stable, but grid spacing is controlled by the evolution time and number of phase bits.
+
+What you accomplished
+=====================
+
+You completed an end-to-end molecular-energy workflow: defining stretched N\ :sub:`2` in an orbital basis, selecting an active space, mapping its Hamiltonian to qubits, preparing a multiconfigurational trial state, simulating iterative phase estimation, and reconstructing the molecular total energy by adding the core energy.
+
+The final comparison shows that this configured :term:`IQPE` workflow reproduces the matching selected-space :term:`CASCI` reference within the tutorial's one-milliHartree target.
+It does not establish agreement with experiment or quantum advantage, because basis-set, active-space, and quantum-algorithm limitations remain distinct.
+
+Your lab notebook records where those choices enter and what evidence supports the result.
+A useful next investigation would change one layer at a time: enlarge the molecular model, choose a different trial state, or vary the phase-estimation controls, then identify which accuracy and cost measures respond.
 
 Further reading
 ===============

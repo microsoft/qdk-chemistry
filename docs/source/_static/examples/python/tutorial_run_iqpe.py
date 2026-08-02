@@ -28,6 +28,8 @@ TARGET_ENERGY_ERROR_HARTREE = 1e-3
 class EvolutionTimeChoice:
     """Reference-guided evolution-time choice for the teaching workflow."""
 
+    bound_time_hartree_inverse: float
+    bound_reference_phase_fraction: float
     time_hartree_inverse: float
     reference_phase_fraction: float
     grid_phase_fraction: float
@@ -87,6 +89,8 @@ def choose_reference_guided_evolution_time(
 
     # Start from a time whose signed, unaliased interval contains the entire
     # Hamiltonian spectrum, then identify the nearest finite-bit grid point.
+    # QubitOperator.schatten_norm is the sum of absolute Pauli coefficients,
+    # denoted lambda in the chapter's evolution-time derivation.
     bound_time = np.pi / qubit_hamiltonian.schatten_norm
     reference_phase = (
         bound_time * reference_active_energy_hartree / (2 * np.pi)
@@ -109,6 +113,8 @@ def choose_reference_guided_evolution_time(
         evolution_time * reference_active_energy_hartree / (2 * np.pi)
     ) % 1.0
     return EvolutionTimeChoice(
+        bound_time_hartree_inverse=float(bound_time),
+        bound_reference_phase_fraction=float(reference_phase),
         time_hartree_inverse=float(evolution_time),
         reference_phase_fraction=float(aligned_reference_phase),
         grid_phase_fraction=float(grid_phase),
@@ -289,7 +295,19 @@ def print_iqpe_settings(
     print("  Trotter divisions: 1")
     print("  Controlled powers: repeated approximate base unitary")
     print(
-        "  Evolution time: "
+        "  Hamiltonian coefficient sum (lambda): "
+        f"{problem.mapping.qubit_hamiltonian.schatten_norm:.12f} Hartree"
+    )
+    print(
+        "  Initial unaliased time bound: "
+        f"{problem.evolution_time.bound_time_hartree_inverse:.12f} Hartree^-1"
+    )
+    print(
+        "  Reference phase at initial time bound: "
+        f"{problem.evolution_time.bound_reference_phase_fraction:.12f}"
+    )
+    print(
+        "  Selected evolution time: "
         f"{problem.evolution_time.time_hartree_inverse:.12f} Hartree^-1"
     )
 
