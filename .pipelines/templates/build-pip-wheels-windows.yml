@@ -68,24 +68,37 @@ steps:
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
-      vcpkg-overlay/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+      vcpkg-overlay/**/*
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
+# These keys must stay in step with build-pip-wheels-windows-deps.yml, which is
+# what populates the caches. The final phase token differs by architecture
+# because that is where the complete install tree ends up: x86_64 builds the
+# whole set in one job under "all", while ARM64 splits the work and finishes
+# under "rest".
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
   inputs:
-    key: >-
-      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
-      cpp/manifest/qdk-chemistry/cgmanifest.json |
-      external/macis/manifest/cgmanifest.json |
-      cpp/cmake/patches/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
-      .pipelines/toolchains/windows.cmake
+    ${{ if eq(parameters.arch, 'arm64') }}:
+      key: >-
+        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+        cpp/manifest/qdk-chemistry/cgmanifest.json |
+        external/macis/manifest/cgmanifest.json |
+        cpp/cmake/patches/**/* |
+        .pipelines/toolchains/windows.cmake |
+        "rest"
+    ${{ else }}:
+      key: >-
+        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+        cpp/manifest/qdk-chemistry/cgmanifest.json |
+        external/macis/manifest/cgmanifest.json |
+        cpp/cmake/patches/**/* |
+        .pipelines/toolchains/windows.cmake |
+        "all"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
