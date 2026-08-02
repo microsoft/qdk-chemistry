@@ -5,6 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Sequence
+
+import numpy as np
+
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
@@ -51,11 +55,13 @@ class StatePreparation(Algorithm):
         """Return the algorithm type name as state_prep."""
         return "state_prep"
 
-    def run(self, wavefunction: Wavefunction) -> Circuit:
+    def run(self, wavefunction: Wavefunction | Sequence[float] | np.ndarray) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction.
 
         Args:
-            wavefunction: The target wavefunction to prepare.
+            wavefunction: The target wavefunction to prepare. Implementations may
+                additionally accept a dense amplitude vector; see
+                :class:`~qdk_chemistry.algorithms.state_preparation.dense_pure_state.DensePureStatePreparation`.
 
         Returns:
             A Circuit object containing an OpenQASM3 string of the quantum circuit that prepares the wavefunction.

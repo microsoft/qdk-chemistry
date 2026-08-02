@@ -903,3 +903,58 @@ def test_gf2x_with_tracking_edge_case_pseudo_diagonal():
 
     # Should have some operations recorded
     assert len(elimination_results.operations) > 0, "Should have recorded some operations"
+
+
+def test_dense_pure_state_accepts_amplitude_vector(wavefunction_4e4o):
+    """A dense amplitude vector produces the same circuit as the equivalent Wavefunction."""
+    state_prep = create("state_prep", "dense_pure_state")
+
+    circuit_from_wavefunction = state_prep.run(wavefunction_4e4o)
+    statevector = np.array(circuit_from_wavefunction._qsharp_factory.parameter["stateVector"])
+
+    circuit_from_vector = state_prep.run(statevector)
+
+    params_wfn = circuit_from_wavefunction._qsharp_factory.parameter
+    params_vec = circuit_from_vector._qsharp_factory.parameter
+    assert params_vec["numQubits"] == params_wfn["numQubits"]
+    assert params_vec["rowMap"] == params_wfn["rowMap"]
+    np.testing.assert_allclose(params_vec["stateVector"], params_wfn["stateVector"], atol=1e-12)
+    assert circuit_from_vector.qasm == circuit_from_wavefunction.qasm
+
+
+def test_dense_pure_state_amplitude_vector_is_normalized():
+    """An unnormalized amplitude vector is normalized before preparation."""
+    circuit = create("state_prep", "dense_pure_state").run([3.0, 4.0])
+    np.testing.assert_allclose(circuit._qsharp_factory.parameter["stateVector"], [0.6, 0.8], atol=1e-12)
+    assert circuit._qsharp_factory.parameter["numQubits"] == 1
+
+
+def test_dense_pure_state_amplitude_vector_accepts_list_and_array():
+    """Sequences and arrays are both accepted and give the same result."""
+    state_prep = create("state_prep", "dense_pure_state")
+    from_list = state_prep.run([0.0, 1.0, 1.0, 0.0])
+    from_array = state_prep.run(np.array([0.0, 1.0, 1.0, 0.0]))
+    assert from_list.qasm == from_array.qasm
+
+
+@pytest.mark.parametrize(
+    ("amplitudes", "message"),
+    [
+        ([1.0, 2.0, 3.0], "power of two"),
+        ([1.0], "power of two"),
+        ([0.0, 0.0], "all-zero"),
+        (np.array([1.0 + 1.0j, 0.0]), "real amplitudes"),
+    ],
+)
+def test_dense_pure_state_amplitude_vector_validation(amplitudes, message):
+    """Invalid amplitude vectors are rejected with an explanatory error."""
+    with pytest.raises(ValueError, match=message):
+        create("state_prep", "dense_pure_state").run(amplitudes)
+
+
+def test_dense_pure_state_amplitude_vector_allows_zero_imaginary_part():
+    """A complex array with zero imaginary part is accepted."""
+    circuit = create("state_prep", "dense_pure_state").run(np.array([1.0 + 0.0j, 1.0 + 0.0j]))
+    np.testing.assert_allclose(
+        circuit._qsharp_factory.parameter["stateVector"], [1 / np.sqrt(2), 1 / np.sqrt(2)], atol=1e-12
+    )
