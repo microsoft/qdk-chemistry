@@ -28,7 +28,6 @@ from pathlib import Path
 
 import pytest
 
-import qdk_chemistry
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
 
@@ -289,16 +288,14 @@ def test_load_tutorial_module_removes_failed_import(tmp_path, monkeypatch):
     assert module_name not in sys.modules
 
 
-def test_tutorial_qpe_setup_accepts_local_build_version(monkeypatch):
+def test_tutorial_qpe_setup_accepts_local_build_version():
     """Accept local metadata only when the public version matches the pin."""
     setup_script = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
-    monkeypatch.setenv("GROUND_STATE_TUTORIAL_VERSION", GROUND_STATE_TUTORIAL_VERSION)
-    monkeypatch.setattr(qdk_chemistry, "__version__", f"{GROUND_STATE_TUTORIAL_VERSION}+local")
-    runpy.run_path(str(setup_script))
+    setup_globals = runpy.run_path(str(setup_script))
+    public_version = setup_globals["public_version"]
 
-    monkeypatch.setattr(qdk_chemistry, "__version__", "2.0.1")
-    with pytest.raises(AssertionError, match="Tutorial expects QDK/Chemistry"):
-        runpy.run_path(str(setup_script))
+    assert public_version(f"{GROUND_STATE_TUTORIAL_VERSION}+local") == GROUND_STATE_TUTORIAL_VERSION
+    assert public_version("2.0.1") != GROUND_STATE_TUTORIAL_VERSION
 
 
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")

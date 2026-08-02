@@ -9,10 +9,16 @@ import os
 
 import qdk_chemistry
 
+
+def public_version(version: str) -> str:
+    """Return a package version without local build metadata."""
+    return version.partition("+")[0]
+
+
 # The documentation test harness sets this tutorial version; downloaded copies do not.
 GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
 if GROUND_STATE_TUTORIAL_VERSION is not None:
-    installed_public_version = qdk_chemistry.__version__.partition("+")[0]
+    installed_public_version = public_version(qdk_chemistry.__version__)
     assert installed_public_version == GROUND_STATE_TUTORIAL_VERSION, (
         f"Tutorial expects QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION}, "
         f"but {qdk_chemistry.__version__} is installed."
