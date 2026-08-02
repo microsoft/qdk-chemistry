@@ -1,11 +1,11 @@
 """Estimate the selected-space N2 ground-state energy with native IQPE."""
 
-# docs-example: slow
-
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+# docs-example: slow
 
 from collections import Counter
 from dataclasses import dataclass
@@ -93,9 +93,7 @@ def choose_reference_guided_evolution_time(
     # QubitOperator.schatten_norm is the sum of absolute Pauli coefficients,
     # denoted lambda in the chapter's evolution-time derivation.
     bound_time = np.pi / qubit_hamiltonian.schatten_norm
-    reference_phase = (
-        bound_time * reference_active_energy_hartree / (2 * np.pi)
-    ) % 1.0
+    reference_phase = (bound_time * reference_active_energy_hartree / (2 * np.pi)) % 1.0
     grid_size = 2**num_phase_bits
     grid_index = round(reference_phase * grid_size) % grid_size
     grid_phase = grid_index / grid_size
@@ -265,7 +263,9 @@ def select_unique_mode(runs: list[IqpeRun]) -> tuple[dict[str, int], IqpeRun]:
         if count == highest_count
     )
     if len(modal_bitstrings) != 1:
-        raise RuntimeError(f"complete IQPE runs have no unique mode: {bitstring_counts}")
+        raise RuntimeError(
+            f"complete IQPE runs have no unique mode: {bitstring_counts}"
+        )
     modal_bitstring = modal_bitstrings[0]
     modal_run = next(run for run in runs if run.bitstring == modal_bitstring)
     return dict(sorted(bitstring_counts.items())), modal_run
@@ -379,9 +379,7 @@ def print_iqpe_results(result: IqpeWorkflowResult) -> None:
         "Hartree"
     )
     print(f"Core energy: {result.problem.mapping.core_energy:.12f} Hartree")
-    print(
-        f"Modal total energy: {result.modal_run.total_energy_hartree:.12f} Hartree"
-    )
+    print(f"Modal total energy: {result.modal_run.total_energy_hartree:.12f} Hartree")
     print(
         "CASCI algorithmic reference: "
         f"{result.problem.mapping.active_space_result.refined_energy:.12f} Hartree"

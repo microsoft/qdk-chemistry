@@ -85,7 +85,9 @@ N    0.000000    0.000000    1.850000
     valence_indices = list(
         valence_wavefunction.get_orbitals().active_indices().indices(alpha_channel)
     )
-    num_valence_alpha, num_valence_beta = valence_wavefunction.get_active_num_electrons()
+    num_valence_alpha, num_valence_beta = (
+        valence_wavefunction.get_active_num_electrons()
+    )
     # end-cell-valence-space
     ################################################################################
 
@@ -100,7 +102,9 @@ N    0.000000    0.000000    1.850000
         calculate_two_rdm=True,
     )
 
-    valence_hamiltonian = hamiltonian_constructor.run(valence_wavefunction.get_orbitals())
+    valence_hamiltonian = hamiltonian_constructor.run(
+        valence_wavefunction.get_orbitals()
+    )
     valence_energy, valence_casci_wavefunction = casci_solver.run(
         valence_hamiltonian,
         num_valence_alpha,
@@ -123,7 +127,9 @@ N    0.000000    0.000000    1.850000
 
     # Rebuild and solve in the rotated basis so the RDMs and orbital entropies
     # describe the same natural-orbital representation.
-    natural_orbital_hamiltonian = hamiltonian_constructor.run(natural_orbital_wavefunction.get_orbitals())
+    natural_orbital_hamiltonian = hamiltonian_constructor.run(
+        natural_orbital_wavefunction.get_orbitals()
+    )
     natural_orbital_energy, natural_orbital_casci_wavefunction = casci_solver.run(
         natural_orbital_hamiltonian,
         num_valence_alpha,
@@ -132,7 +138,8 @@ N    0.000000    0.000000    1.850000
     # Store ordinary Python floats rather than library scalar types so the
     # values can be printed and passed to the visualization notebook directly.
     orbital_entropies = [
-        float(value) for value in natural_orbital_casci_wavefunction.get_single_orbital_entropies()
+        float(value)
+        for value in natural_orbital_casci_wavefunction.get_single_orbital_entropies()
     ]
     # end-cell-natural-orbitals
     ################################################################################
@@ -149,11 +156,15 @@ N    0.000000    0.000000    1.850000
     alpha_channel = SymmetryLabel([axes.alpha()])
     refined_indices = list(refined_orbitals.active_indices().indices(alpha_channel))
     inactive_indices = list(refined_orbitals.inactive_indices().indices(alpha_channel))
-    num_refined_alpha, num_refined_beta = refined_wavefunction.get_active_num_electrons()
+    num_refined_alpha, num_refined_beta = (
+        refined_wavefunction.get_active_num_electrons()
+    )
     num_refined_electrons = num_refined_alpha + num_refined_beta
     num_refined_orbitals = len(refined_indices)
     num_virtual_orbitals = (
-        refined_orbitals.get_num_molecular_orbitals() - len(inactive_indices) - num_refined_orbitals
+        refined_orbitals.get_num_molecular_orbitals()
+        - len(inactive_indices)
+        - num_refined_orbitals
     )
     # end-cell-refine
     ################################################################################
@@ -205,23 +216,31 @@ def print_active_space_results(result: ActiveSpaceResult) -> None:
     print(f"Initial CASCI energy: {result.valence_energy:.12f} Hartree")
     print(f"Initial CASCI determinants: {result.num_valence_determinants}")
     print(f"Natural-orbital CASCI energy: {result.natural_orbital_energy:.12f} Hartree")
-    orbital_transformation_energy_change = result.natural_orbital_energy - result.valence_energy
+    orbital_transformation_energy_change = (
+        result.natural_orbital_energy - result.valence_energy
+    )
     print(
         "Energy change after the natural-orbital transformation: "
         f"{orbital_transformation_energy_change:.12e} Hartree"
     )
     print("Single-orbital entropies:")
-    for orbital_index, entropy in zip(result.valence_indices, result.orbital_entropies, strict=True):
+    for orbital_index, entropy in zip(
+        result.valence_indices, result.orbital_entropies, strict=True
+    ):
         selection_marker = "*" if orbital_index in result.refined_indices else " "
         print(f" {selection_marker} orbital {orbital_index}: {entropy:.9f}")
-    print(f"Refined active space: CAS({result.num_refined_electrons}e, {len(result.refined_indices)}o)")
+    print(
+        f"Refined active space: CAS({result.num_refined_electrons}e, {len(result.refined_indices)}o)"
+    )
     print(f"Inactive orbital indices: {result.inactive_indices}")
     print(f"Active orbital indices: {result.refined_indices}")
     print(f"Virtual orbitals: {result.num_virtual_orbitals}")
     print(f"Final CASCI energy: {result.refined_energy:.12f} Hartree")
     print(f"Final CASCI determinants: {result.num_refined_determinants}")
     energy_increase = result.refined_energy - result.natural_orbital_energy
-    print(f"Energy increase from reducing the active space: {energy_increase:.12f} Hartree")
+    print(
+        f"Energy increase from reducing the active space: {energy_increase:.12f} Hartree"
+    )
 
 
 def generate_active_orbital_cube_data(
@@ -258,13 +277,17 @@ def generate_active_orbital_cube_data(
         position = active_position[orbital_index]
         # Add the alpha and beta occupations to report the total occupation of
         # each spatial orbital in the viewer.
-        occupation = float(occupation_alpha[position]) + float(occupation_beta[position])
+        occupation = float(occupation_alpha[position]) + float(
+            occupation_beta[position]
+        )
         cube_data[f"Orbital {orbital_index}"] = {
             "data": cube_file,
             "info": {
                 "Occupation": f"{occupation:.3f}",
                 "Entropy": f"{result.orbital_entropies[position]:.3f}",
-                "Selected by autoCAS": "yes" if orbital_index in result.refined_indices else "no",
+                "Selected by autoCAS": "yes"
+                if orbital_index in result.refined_indices
+                else "no",
             },
         }
     return cube_data

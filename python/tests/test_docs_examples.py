@@ -167,11 +167,7 @@ class TestExampleScripts(unittest.TestCase):
             example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
             if example_file.name == "tutorial_qpe_setup.py":
                 example_env["GROUND_STATE_TUTORIAL_VERSION"] = GROUND_STATE_TUTORIAL_VERSION
-            example_timeout = (
-                1200
-                if "# docs-example: slow" in example_file.read_text(encoding="utf-8")
-                else 360
-            )
+            example_timeout = 1200 if "# docs-example: slow" in example_file.read_text(encoding="utf-8") else 360
 
             result = subprocess.run(
                 [sys.executable, str(example_file)],
@@ -212,7 +208,7 @@ def _create_test_methods():
             ) = check_example_requirements(example_file)
 
             # Create the test method
-            def make_test(  # noqa: PLR0917
+            def make_test(
                 filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion, slow
             ):
                 """Create a test method for the given example file."""

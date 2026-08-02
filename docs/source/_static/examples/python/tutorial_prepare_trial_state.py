@@ -109,9 +109,7 @@ def iter_leaf_gates(value: object) -> Iterator[str]:
                 # Q# represents CNOT as an X gate with controls; distinguish it
                 # from a bare X while the full gate record is available.
                 yield (
-                    "CNOT"
-                    if gate_name == "X" and value.get("controls")
-                    else gate_name
+                    "CNOT" if gate_name == "X" and value.get("controls") else gate_name
                 )
         # The children branch was already traversed, so skip that key while
         # checking other fields for additional nested circuit structures.
@@ -238,9 +236,7 @@ def print_trial_state_results(result: TrialStateWorkflowResult) -> None:
         print(f"\nDeterminants: {trial_state.num_determinants}")
         print(f"Fidelity: {trial_state.fidelity:.12f}")
         print(f"Compute qubits: {trial_state.num_compute_qubits}")
-        print(
-            f"Preparation logical gate count: {trial_state.num_logical_gates}"
-        )
+        print(f"Preparation logical gate count: {trial_state.num_logical_gates}")
         print(f"Logical gate-family counts: {trial_state.logical_gate_counts}")
 
 

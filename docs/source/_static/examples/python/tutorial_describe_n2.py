@@ -50,7 +50,9 @@ for basis_set in basis_sets:
     wavefunctions[basis_set] = wavefunction
     print(f"{basis_set}: {energy:.12f} Hartree")
 
-num_cc_pvdz_orbitals = wavefunctions["cc-pvdz"].get_orbitals().get_num_molecular_orbitals()
+num_cc_pvdz_orbitals = (
+    wavefunctions["cc-pvdz"].get_orbitals().get_num_molecular_orbitals()
+)
 print(f"cc-pvdz wavefunction: {num_cc_pvdz_orbitals} molecular orbitals")
 # end-cell-hartree-fock
 ################################################################################

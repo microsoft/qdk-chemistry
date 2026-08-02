@@ -241,9 +241,7 @@ def _execute_notebook_skip_visualizations(
 
 
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
-DOCS_PYTHON_EXAMPLES_DIR = (
-    Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
-)
+DOCS_PYTHON_EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
 
 
 def _load_tutorial_module(module_name: str):
@@ -330,12 +328,9 @@ def test_tutorial_choose_active_space_results():
         margin=4.0,
     )
     assert len(cube_data) == 8
-    assert sum(
-        orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()
-    ) == 6
+    assert sum(orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()) == 6
     assert all(
-        set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"}
-        for orbital in cube_data.values()
+        set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"} for orbital in cube_data.values()
     )
 
 
@@ -364,6 +359,7 @@ def test_tutorial_map_n2_to_qubits_results():
     assert all(set(pauli_string).issubset({"I", "Z"}) for pauli_string, _ in preview_terms[1:4])
     assert all("X" in pauli_string or "Y" in pauli_string for pauli_string, _ in preview_terms[4:])
     assert tutorial_module.format_pauli_string("IXYI") == "Y(qubit 1) X(qubit 2)"
+
 
 def test_tutorial_prepare_trial_state_results():
     """Check the trial-state quality and cost results used by Chapter 5."""
@@ -434,14 +430,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
     assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
     assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
     assert problem.evolution_time.grid_phase_fraction == 49 / 64
-    assert (
-        abs(
-            problem.evolution_time.grid_active_energy_hartree
-            - problem.mapping.mapped_active_energy
-            - 1e-3
-        )
-        < 1e-12
-    )
+    assert abs(problem.evolution_time.grid_active_energy_hartree - problem.mapping.mapped_active_energy - 1e-3) < 1e-12
 
     first_run = tutorial_module.IqpeRun(
         seed=1,
@@ -461,9 +450,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
         error_hartree=0.644485056238,
         runtime_seconds=1.0,
     )
-    counts, mode = tutorial_module.select_unique_mode(
-        [first_run, neighboring_run, first_run]
-    )
+    counts, mode = tutorial_module.select_unique_mode([first_run, neighboring_run, first_run])
     assert counts == {"110001": 2, "110010": 1}
     assert mode is first_run
     with pytest.raises(RuntimeError, match="no unique mode"):
@@ -507,8 +494,6 @@ def test_tutorial_run_iqpe_simulation():
     run = tutorial_module.run_complete_iqpe(problem, seed=42)
     assert run.bitstring == "110001"
     assert abs(run.error_hartree - 1e-3) < 1e-10
-
-
 
 
 @_requires_notebook_deps
