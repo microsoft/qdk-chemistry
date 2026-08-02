@@ -145,12 +145,15 @@ extends:
           image: windows-2025-gen2-arm64
           os: windows
           hostArchitecture: Arm64
-        # Cold-cache builds here are long: the ARM64 agents are roughly half the
-        # size of the x86_64 ones, and this job builds OpenBLAS with clang-cl
-        # plus libint2, ecpint and gauxc from source. Measured at ~2x the
-        # equivalent x86_64 job, which does not fit in the 480 minutes sized for
-        # x86_64. Warm-cache runs restore in minutes and never approach this.
-        timeoutInMinutes: 720
+        # Cold-cache builds here are very long. The ARM64 agents are 2 vCPU /
+        # 7 GB (vs 4 vCPU / 16 GB on the GitHub runners), so
+        # CMAKE_BUILD_PARALLEL_LEVEL is 2. A measured cold run spent 108 minutes
+        # on OpenBLAS alone -- vcpkg builds it once for the host triplet and
+        # once for the target -- and was still partway through libint2's 1442
+        # objects when a 480 minute limit killed it, losing the cache save with
+        # it. Sized generously so the one-time cold build can complete and
+        # populate the caches; warm-cache runs restore in minutes.
+        timeoutInMinutes: 1080
         displayName: Build Windows ARM64 C++ dependencies
         steps:
         - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
