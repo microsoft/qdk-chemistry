@@ -71,9 +71,6 @@ Acronym definitions
    GGA
       Generalized Gradient Approximation.
 
-   GF(2)+X
-      Sparse-isometry state-preparation method that combines Gaussian elimination over the binary field GF(2) with Pauli-X operations.
-
    HF
       Hartree-Fock.
 
