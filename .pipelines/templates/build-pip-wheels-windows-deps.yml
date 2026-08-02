@@ -19,16 +19,26 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-# ecpint and gau2grid generate their sources with Python at configure time, so
-# a Python interpreter has to be on PATH for the dependency build. The x86_64
-# image happens to ship one; the ARM64 image does not, so provision it
-# explicitly rather than depending on what the image contains.
-- task: UsePythonVersion@0
-  displayName: Use Python (${{ parameters.arch }})
-  inputs:
-    versionSpec: '3.13'
-    ${{ if eq(parameters.arch, 'arm64') }}:
-      architecture: 'arm64'
+# ecpint and gau2grid generate their sources with Python at CMake configure
+# time, so an interpreter has to be on PATH for the dependency build.
+#
+# The two architectures need different mechanisms. On x64 the image ships Python
+# in the agent tool cache, so UsePythonVersion@0 simply puts it on PATH. On ARM64
+# the tool cache is empty, so that task falls through to downloading Python and
+# then tries to bootstrap pip from pypi.org -- which the CFSClean network
+# isolation policy blocks by design, since it exists to force package traffic
+# through the Centralized Feed Service. The task treats that as fatal and
+# unregisters the interpreter it just extracted. So provision ARM64 without
+# touching any package feed.
+- ${{ if eq(parameters.arch, 'x64') }}:
+  - task: UsePythonVersion@0
+    displayName: Use Python (x64)
+    inputs:
+      versionSpec: '3.13'
+
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1 -Arch arm64
+    displayName: Use Python (arm64)
 
 # Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
