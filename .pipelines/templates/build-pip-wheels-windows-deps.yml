@@ -11,6 +11,18 @@ parameters:
   values:
   - x64
   - arm64
+# Which slice of the dependency set this job builds. 'all' is a single job and
+# is what x86_64 uses. Windows ARM64 splits the work so each slice banks its own
+# cache as soon as it succeeds -- see the Phase notes in
+# install-cpp-deps-windows.ps1 for why.
+- name: phase
+  type: string
+  default: all
+  values:
+  - all
+  - vcpkg
+  - libint2
+  - rest
 
 steps:
 - checkout: self
@@ -50,32 +62,61 @@ steps:
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
-      vcpkg-overlay/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+      vcpkg-overlay/**/*
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
-- task: Cache@2
-  displayName: Restore/save C++ deps install cache
-  inputs:
-    key: >-
-      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
-      cpp/manifest/qdk-chemistry/cgmanifest.json |
-      external/macis/manifest/cgmanifest.json |
-      cpp/cmake/patches/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
-      .pipelines/toolchains/windows.cmake
-    path: $(System.DefaultWorkingDirectory)/deps-install-msvc
-    cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
+# The install-tree cache key is built up phase by phase, so that each phase can
+# restore the previous phase's output through restoreKeys and then save the
+# combined result under its own key. Keeping the phase tokens at the end of the
+# key is what makes that prefix match work.
+#
+# Note that these keys deliberately do NOT hash install-cpp-deps-windows.ps1.
+# They used to, which meant an edit anywhere in that script -- even one that
+# only touched diagnostics -- threw away a dependency tree that takes most of a
+# day to rebuild on the ARM64 agent. The keys now track the things that actually
+# determine the output: pinned versions, patches, toolchain and toolset. Bump
+# the r<N> literal above and below to force a rebuild when the build recipe
+# itself changes in a way those inputs do not capture.
+- ${{ if ne(parameters.phase, 'vcpkg') }}:
+  - task: Cache@2
+    displayName: Restore/save C++ deps install cache (${{ parameters.phase }})
+    inputs:
+      key: >-
+        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+        cpp/manifest/qdk-chemistry/cgmanifest.json |
+        external/macis/manifest/cgmanifest.json |
+        cpp/cmake/patches/**/* |
+        .pipelines/toolchains/windows.cmake |
+        "${{ parameters.phase }}"
+      ${{ if eq(parameters.phase, 'rest') }}:
+        restoreKeys: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+          cpp/manifest/qdk-chemistry/cgmanifest.json |
+          external/macis/manifest/cgmanifest.json |
+          cpp/cmake/patches/**/* |
+          .pipelines/toolchains/windows.cmake |
+          "libint2"
+      path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+      cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
 - pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -BuildType "${{ parameters.buildType }}" `
         -Triplet   "$(VCPKG_TRIPLET)" `
-        -ClPath    "$(CL_PATH)"
-  displayName: Build and install C++ dependencies
-  condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
+        -ClPath    "$(CL_PATH)" `
+        -Phase     "${{ parameters.phase }}"
+  displayName: Build and install C++ dependencies (${{ parameters.phase }})
+  # A restoreKeys match reports 'inexact' rather than 'true', which is exactly
+  # when the tail phase still has work to do, so comparing against 'true' is
+  # what makes the chained caches resume correctly.
+  ${{ if eq(parameters.phase, 'vcpkg') }}:
+    condition: ne(variables['VCPKG_CACHE_RESTORED'], 'true')
+  ${{ if eq(parameters.phase, 'all') }}:
+    condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
+  ${{ if or(eq(parameters.phase, 'libint2'), eq(parameters.phase, 'rest')) }}:
+    condition: ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true')

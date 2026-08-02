@@ -135,31 +135,71 @@ extends:
           parameters:
             march: x86-64-v3
 
-      # Same rationale for Windows ARM64. Runs on the 1ES ARM64 pool per the
-      # image guidance from the QDK platform team. hostArchitecture is required:
-      # the 1ES template otherwise defaults it to amd64, which provisions an
-      # x64-emulated agent on the ARM64 image.
-      - job: Build_windows_aarch64_deps
+      # Same rationale for Windows ARM64, but split into phases. Runs on the 1ES
+      # ARM64 pool per the image guidance from the QDK platform team.
+      # hostArchitecture is required: the 1ES template otherwise defaults it to
+      # amd64, which provisions an x64-emulated agent on the ARM64 image.
+      #
+      # The ARM64 agents are 2 vCPU / 7 GB (vs 4 vCPU / 16 GB on the GitHub
+      # runners), so CMAKE_BUILD_PARALLEL_LEVEL is 2 and a cold build runs for
+      # the better part of a day: 108 minutes for OpenBLAS, which vcpkg builds
+      # once for the host triplet and once for the target, and around seven
+      # hours for libint2's 1442 objects.
+      #
+      # Cache@2 only saves when its job succeeds, so while this was a single job
+      # every failure threw away the entire tree and the next attempt started
+      # from nothing -- a 480 minute timeout and a later ecpint failure each
+      # cost a full day of rebuilding. Splitting it means each phase banks its
+      # own cache the moment it succeeds, so a failure only ever costs its own
+      # phase. The phases chain through Cache@2 restoreKeys, and the build
+      # script additionally stamps each installed dependency so a restored tree
+      # is never rebuilt.
+      - job: Build_windows_aarch64_deps_vcpkg
         pool:
           name: Azure-Pipelines-DevTools-ARM64-EO
           image: windows-2025-gen2-arm64
           os: windows
           hostArchitecture: Arm64
-        # Cold-cache builds here are very long. The ARM64 agents are 2 vCPU /
-        # 7 GB (vs 4 vCPU / 16 GB on the GitHub runners), so
-        # CMAKE_BUILD_PARALLEL_LEVEL is 2. A measured cold run spent 108 minutes
-        # on OpenBLAS alone -- vcpkg builds it once for the host triplet and
-        # once for the target -- and was still partway through libint2's 1442
-        # objects when a 480 minute limit killed it, losing the cache save with
-        # it. Sized generously so the one-time cold build can complete and
-        # populate the caches; warm-cache runs restore in minutes.
-        timeoutInMinutes: 1080
-        displayName: Build Windows ARM64 C++ dependencies
+        timeoutInMinutes: 360
+        displayName: Build Windows ARM64 C++ dependencies (vcpkg)
         steps:
         - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
           parameters:
             march: armv8-a
             arch: arm64
+            phase: vcpkg
+
+      - job: Build_windows_aarch64_deps_libint2
+        dependsOn: Build_windows_aarch64_deps_vcpkg
+        pool:
+          name: Azure-Pipelines-DevTools-ARM64-EO
+          image: windows-2025-gen2-arm64
+          os: windows
+          hostArchitecture: Arm64
+        timeoutInMinutes: 720
+        displayName: Build Windows ARM64 C++ dependencies (libint2)
+        steps:
+        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+          parameters:
+            march: armv8-a
+            arch: arm64
+            phase: libint2
+
+      - job: Build_windows_aarch64_deps
+        dependsOn: Build_windows_aarch64_deps_libint2
+        pool:
+          name: Azure-Pipelines-DevTools-ARM64-EO
+          image: windows-2025-gen2-arm64
+          os: windows
+          hostArchitecture: Arm64
+        timeoutInMinutes: 480
+        displayName: Build Windows ARM64 C++ dependencies (ecpint + gauxc)
+        steps:
+        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+          parameters:
+            march: armv8-a
+            arch: arm64
+            phase: rest
 
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
