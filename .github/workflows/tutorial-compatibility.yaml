@@ -3,15 +3,15 @@ name: Tutorial compatibility
 on:
   pull_request:
     paths:
-    - '.github/workflows/tutorial-compatibility.yaml'
-    - 'docs/source/tutorials/_versions.py'
-    - 'docs/source/tutorials/ground_state_molecular_energies_with_qpe/**'
-    - 'docs/source/_static/examples/data/tutorial_stretched_n2.structure.xyz'
-    - 'docs/source/_static/examples/ground_state_qpe_lab_notebook_*.md'
-    - 'docs/source/_static/examples/python/tutorial_*.py'
-    - 'docs/source/_static/examples/python/tutorial_*.ipynb'
-    - 'python/pyproject.toml'
-    - 'python/tests/test_sample_workflow.py'
+    - .github/workflows/tutorial-compatibility.yaml
+    - docs/source/tutorials/_versions.py
+    - docs/source/tutorials/ground_state_molecular_energies_with_qpe/**
+    - docs/source/_static/examples/data/tutorial_stretched_n2.structure.xyz
+    - docs/source/_static/examples/ground_state_qpe_lab_notebook_*.md
+    - docs/source/_static/examples/python/tutorial_*.py
+    - docs/source/_static/examples/python/tutorial_*.ipynb
+    - python/pyproject.toml
+    - python/tests/test_sample_workflow.py
   workflow_dispatch:
 
 concurrency:
