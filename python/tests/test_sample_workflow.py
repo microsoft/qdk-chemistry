@@ -18,7 +18,9 @@ To run the slow tests (including notebook e2e tests), set the environment variab
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.metadata
 import os
+import runpy
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from math import comb
@@ -26,6 +28,7 @@ from pathlib import Path
 
 import pytest
 
+import qdk_chemistry
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
 
@@ -242,6 +245,17 @@ def _execute_notebook_skip_visualizations(
 
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 DOCS_PYTHON_EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
+TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
+GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
+_INSTALLED_QDK_CHEMISTRY_VERSION = importlib.metadata.version("qdk-chemistry")
+_RUN_GROUND_STATE_TUTORIAL_BASELINES = _INSTALLED_QDK_CHEMISTRY_VERSION == GROUND_STATE_TUTORIAL_VERSION
+_requires_ground_state_tutorial_version = pytest.mark.skipif(
+    not _RUN_GROUND_STATE_TUTORIAL_BASELINES,
+    reason=(
+        f"Ground-state tutorial baselines require qdk-chemistry=={GROUND_STATE_TUTORIAL_VERSION}; "
+        f"installed {_INSTALLED_QDK_CHEMISTRY_VERSION}."
+    ),
+)
 
 
 def _load_tutorial_module(module_name: str):
@@ -275,6 +289,19 @@ def test_load_tutorial_module_removes_failed_import(tmp_path, monkeypatch):
     assert module_name not in sys.modules
 
 
+def test_tutorial_qpe_setup_accepts_local_build_version(monkeypatch):
+    """Accept local metadata only when the public version matches the pin."""
+    setup_script = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
+    monkeypatch.setenv("GROUND_STATE_TUTORIAL_VERSION", GROUND_STATE_TUTORIAL_VERSION)
+    monkeypatch.setattr(qdk_chemistry, "__version__", f"{GROUND_STATE_TUTORIAL_VERSION}+local")
+    runpy.run_path(str(setup_script))
+
+    monkeypatch.setattr(qdk_chemistry, "__version__", "2.0.1")
+    with pytest.raises(AssertionError, match="Tutorial expects QDK/Chemistry"):
+        runpy.run_path(str(setup_script))
+
+
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
 def test_tutorial_module_imports_preserve_global_logging():
     """Reusable tutorial imports must not change process-wide logging."""
     previous_level = Logger.get_global_level()
@@ -291,6 +318,8 @@ def test_tutorial_module_imports_preserve_global_logging():
         Logger.set_global_level(previous_level)
 
 
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
 def test_tutorial_choose_active_space_results():
     """Check the stable numerical and structural results used by Chapter 3."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
@@ -334,6 +363,8 @@ def test_tutorial_choose_active_space_results():
     )
 
 
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
 def test_tutorial_map_n2_to_qubits_results():
     """Check the stable Jordan-Wigner mapping results used by Chapter 4."""
     _load_tutorial_module("tutorial_choose_active_space")
@@ -361,6 +392,8 @@ def test_tutorial_map_n2_to_qubits_results():
     assert tutorial_module.format_pauli_string("IXYI") == "Y(qubit 1) X(qubit 2)"
 
 
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
 def test_tutorial_prepare_trial_state_results():
     """Check the trial-state quality and cost results used by Chapter 5."""
     _load_tutorial_module("tutorial_choose_active_space")
@@ -409,6 +442,8 @@ def test_tutorial_prepare_trial_state_results():
     }
 
 
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
 def test_tutorial_run_iqpe_configuration(capsys):
     """Check the fast IQPE configuration and phase-grid values used by Chapter 6."""
     _load_tutorial_module("tutorial_choose_active_space")
@@ -479,6 +514,8 @@ def test_tutorial_run_iqpe_configuration(capsys):
 
 
 @pytest.mark.slow
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
@@ -497,6 +534,7 @@ def test_tutorial_run_iqpe_simulation():
 
 
 @_requires_notebook_deps
+@pytest.mark.tutorial_baseline
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
@@ -521,6 +559,12 @@ def test_tutorial_choose_active_space_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
+    if not _RUN_GROUND_STATE_TUTORIAL_BASELINES:
+        pytest.skip(
+            f"Notebook execution requires qdk-chemistry=={GROUND_STATE_TUTORIAL_VERSION}; "
+            f"installed {_INSTALLED_QDK_CHEMISTRY_VERSION}."
+        )
+
     _execute_notebook_skip_visualizations(
         notebook_path,
         timeout=360,
@@ -533,6 +577,7 @@ def test_tutorial_choose_active_space_notebook():
 
 
 @_requires_notebook_deps
+@pytest.mark.tutorial_baseline
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
@@ -557,10 +602,17 @@ def test_tutorial_prepare_trial_state_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
+    if not _RUN_GROUND_STATE_TUTORIAL_BASELINES:
+        pytest.skip(
+            f"Notebook execution requires qdk-chemistry=={GROUND_STATE_TUTORIAL_VERSION}; "
+            f"installed {_INSTALLED_QDK_CHEMISTRY_VERSION}."
+        )
+
     _execute_notebook_skip_visualizations(notebook_path, timeout=360)
 
 
 @_requires_notebook_deps
+@pytest.mark.tutorial_baseline
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
@@ -585,6 +637,12 @@ def test_tutorial_visualize_iqpe_circuit_notebook():
         if cell.cell_type == "code":
             assert cell.execution_count is None
             assert not cell.outputs
+
+    if not _RUN_GROUND_STATE_TUTORIAL_BASELINES:
+        pytest.skip(
+            f"Notebook execution requires qdk-chemistry=={GROUND_STATE_TUTORIAL_VERSION}; "
+            f"installed {_INSTALLED_QDK_CHEMISTRY_VERSION}."
+        )
 
     _execute_notebook_skip_visualizations(notebook_path, timeout=360)
 

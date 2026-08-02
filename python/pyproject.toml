@@ -181,6 +181,7 @@ filterwarnings = [
 ]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "tutorial_baseline: validates version-pinned tutorial outputs against the published package",
 ]
 testpaths = ["tests"]
 env = [

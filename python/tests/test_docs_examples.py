@@ -9,31 +9,18 @@ import importlib.metadata
 import importlib.util
 import os
 import re
-import runpy
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import ClassVar
-from unittest.mock import patch
 
-import pytest
-
-import qdk_chemistry
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
-
-_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
-_VERSIONS_SPEC = importlib.util.spec_from_file_location("tutorial_versions", _VERSIONS_FILE)
-if _VERSIONS_SPEC is None or _VERSIONS_SPEC.loader is None:
-    raise ImportError(f"Unable to load tutorial versions from {_VERSIONS_FILE}")
-_VERSIONS_MODULE = importlib.util.module_from_spec(_VERSIONS_SPEC)
-_VERSIONS_SPEC.loader.exec_module(_VERSIONS_MODULE)
-GROUND_STATE_TUTORIAL_VERSION: str = _VERSIONS_MODULE.GROUND_STATE_TUTORIAL_VERSION
 
 # Get the examples directory
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
@@ -49,6 +36,11 @@ _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1",
 _INSTALLED_VERSION: str = importlib.metadata.version("qdk-chemistry")
 _INSTALLED_MAJOR_MINOR = tuple(int(x) for x in _INSTALLED_VERSION.split(".")[:2])
 _RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
+
+
+def _generic_python_examples() -> list[Path]:
+    """Return examples owned by the shared source-build test lane."""
+    return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
 
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
@@ -155,31 +147,13 @@ class TestExampleScripts(unittest.TestCase):
 
     py_example_files: ClassVar[list[Path]] = []
 
-    def test_tutorial_qpe_setup_accepts_local_build_version(self):
-        """Accept local metadata only when the public version matches the pin."""
-        setup_script = PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
-        version_env = {"GROUND_STATE_TUTORIAL_VERSION": GROUND_STATE_TUTORIAL_VERSION}
-
-        with (
-            patch.dict(os.environ, version_env),
-            patch.object(qdk_chemistry, "__version__", f"{GROUND_STATE_TUTORIAL_VERSION}+local"),
-        ):
-            runpy.run_path(str(setup_script))
-
-        with (
-            patch.dict(os.environ, version_env),
-            patch.object(qdk_chemistry, "__version__", "2.0.1"),
-            pytest.raises(AssertionError, match="Tutorial expects QDK/Chemistry"),
-        ):
-            runpy.run_path(str(setup_script))
-
     @classmethod
     def setUpClass(cls):
         """Collect all .py files from the examples directory."""
         if not PYTHON_EXAMPLES_DIR.exists():
             raise FileNotFoundError(f"Python examples directory not found: {PYTHON_EXAMPLES_DIR}")
 
-        cls.py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        cls.py_example_files = _generic_python_examples()
 
         if not cls.py_example_files:
             raise FileNotFoundError(f"No Python example files found in {PYTHON_EXAMPLES_DIR}")
@@ -188,8 +162,6 @@ class TestExampleScripts(unittest.TestCase):
         """Helper method to run a Python example file."""
         with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
             example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-            if example_file.name == "tutorial_qpe_setup.py":
-                example_env["GROUND_STATE_TUTORIAL_VERSION"] = GROUND_STATE_TUTORIAL_VERSION
             example_timeout = 1200 if "# docs-example: slow" in example_file.read_text(encoding="utf-8") else 360
 
             result = subprocess.run(
@@ -213,7 +185,8 @@ def _create_test_methods():
     """Create individual test methods for each example file."""
     if PYTHON_EXAMPLES_DIR.exists():
         # Python examples
-        py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        # Version-pinned tutorial scripts run in tutorial-compatibility.yaml.
+        py_example_files = _generic_python_examples()
 
         for example_file in py_example_files:
             # Create a test method name from the file name
