@@ -145,7 +145,12 @@ extends:
           image: windows-2025-gen2-arm64
           os: windows
           hostArchitecture: Arm64
-        timeoutInMinutes: 480
+        # Cold-cache builds here are long: the ARM64 agents are roughly half the
+        # size of the x86_64 ones, and this job builds OpenBLAS with clang-cl
+        # plus libint2, ecpint and gauxc from source. Measured at ~2x the
+        # equivalent x86_64 job, which does not fit in the 480 minutes sized for
+        # x86_64. Warm-cache runs restore in minutes and never approach this.
+        timeoutInMinutes: 720
         displayName: Build Windows ARM64 C++ dependencies
         steps:
         - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
