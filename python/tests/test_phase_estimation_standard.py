@@ -41,7 +41,6 @@ class PhaseEstimationProblem:
     state_prep: Circuit
     evolution_time: float
     num_bits: int
-    expected_bits: list[int]
     expected_phase: float
     expected_energy: float
     expected_bitstring: str
@@ -50,11 +49,21 @@ class PhaseEstimationProblem:
 
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
-    """Return the two-qubit phase estimation scenario used in documentation."""
+    """Return a canonical two-qubit phase estimation benchmark.
+
+    Uses ``H = 0.25*XX + 0.5*ZZ`` (commuting terms, so the Trotter unitary is
+    exact). The prepared state is the exact eigenstate ``(|00> + |11>)/sqrt(2)``
+    with eigenvalue ``E = +0.75``.
+
+    Theory (``U = e^{-iHt}`` with ``t = pi/2``):
+        phi = (-E t / 2pi) mod 1 = (-0.75 * (pi/2) / 2pi) mod 1 = 13/16 = 0.8125
+        4-bit MSB-first bitstring = "1101"
+        E = -angle(phi)/t = +0.75
+    """
     hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
     state_prep_params = {
         "rowMap": [1, 0],
-        "stateVector": [0.6, 0.0, 0.0, 0.8],
+        "stateVector": [1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)],
         "expansionOps": [],
         "numQubits": 2,
     }
@@ -70,8 +79,7 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
         state_prep=state_prep,
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
-        expected_bits=[1, 1, 0, 0],
-        expected_phase=0.1875,
+        expected_phase=13 / 16,
         expected_energy=0.75,
         expected_bitstring="1101",
         shots=3,
@@ -80,11 +88,21 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
 
 @pytest.fixture
 def four_qubit_phase_problem() -> PhaseEstimationProblem:
-    """Return the four-qubit benchmark used in documentation."""
+    """Return a canonical four-qubit phase estimation benchmark.
+
+    Uses ``H = 0.25*XXXX + 4.5*ZZZZ`` (commuting terms, so the Trotter unitary is
+    exact). The prepared state is the exact eigenstate
+    ``(|1000> - |0111>)/sqrt(2)`` with eigenvalue ``E = -4.75``.
+
+    Theory (``U = e^{-iHt}`` with ``t = pi/8``):
+        phi = (-E t / 2pi) mod 1 = (4.75 * (pi/8) / 2pi) mod 1 = 19/64 = 0.296875
+        6-bit MSB-first bitstring = "010011"
+        E = -angle(phi)/t = -4.75
+    """
     hamiltonian = QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 4.5])
     state_vector = np.zeros(2**4, dtype=float)
-    state_vector[int("1000", 2)] = 0.8
-    state_vector[int("0111", 2)] = -0.6
+    state_vector[int("1000", 2)] = 1.0 / np.sqrt(2.0)
+    state_vector[int("0111", 2)] = -1.0 / np.sqrt(2.0)
     state_prep_params = {
         "rowMap": [3, 2, 1, 0],
         "stateVector": state_vector.tolist(),
@@ -102,8 +120,7 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
         state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
         evolution_time=float(np.pi / 8.0),
         num_bits=6,
-        expected_bits=[1, 0, 1, 1, 0, 1],
-        expected_phase=45 / 64,
+        expected_phase=19 / 64,
         expected_energy=-4.75,
         expected_bitstring="010011",
         shots=3,
@@ -159,35 +176,6 @@ def _run_standard(problem: PhaseEstimationProblem, builder_name: str = "qdk_stan
     )
 
 
-def _resolve_phase_ambiguity(
-    phase_fraction: float,
-    evolution_time: float,
-    expected_energy: float,
-) -> tuple[float, float]:
-    """Resolve phase ambiguity due to periodicity by selecting closest energy.
-
-    Args:
-        phase_fraction: Measured phase fraction from QPE.
-        evolution_time: Evolution time used in QPE.
-        expected_energy: Reference energy to resolve ambiguity.
-
-    Returns:
-        Tuple of (resolved phase fraction, resolved energy).
-
-    """
-    phase_fraction_candidates = [phase_fraction % 1.0, (1.0 - phase_fraction) % 1.0]
-    energies = []
-    for candidate in phase_fraction_candidates:
-        angle = (candidate % 1.0) * (2 * np.pi)
-        if angle > np.pi:
-            angle -= 2 * np.pi
-        energies.append(angle / evolution_time)
-
-    # Select candidate closest to expected energy
-    index = int(np.argmin([abs(energy - expected_energy) for energy in energies]))
-    return phase_fraction_candidates[index], energies[index]
-
-
 # Parametrize over both qdk_standard and qiskit_standard builders
 _builder_params = [
     pytest.param("qdk_standard", id="qdk_standard"),
@@ -206,19 +194,16 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
 ) -> None:
     """Verify standard phase estimation recovers expected phase and energy."""
     result = _run_standard(two_qubit_phase_problem, builder_name)
-    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
-    )
 
     assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
     assert np.isclose(
-        resolved_phase,
+        result.phase_fraction,
         two_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        resolved_energy,
+        result.raw_energy,
         two_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
@@ -232,19 +217,16 @@ def test_standard_phase_estimation_four_qubit(
 ) -> None:
     """Validate standard phase estimation on the four-qubit benchmark."""
     result = _run_standard(four_qubit_phase_problem, builder_name)
-    resolved_phase, resolved_energy = _resolve_phase_ambiguity(
-        result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
-    )
 
     assert result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
     assert np.isclose(
-        resolved_phase,
+        result.phase_fraction,
         four_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
     assert np.isclose(
-        resolved_energy,
+        result.raw_energy,
         four_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,

@@ -4,6 +4,7 @@
 
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
+#include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
