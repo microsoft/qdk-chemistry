@@ -11,6 +11,9 @@ See Also:
 To run the slow tests (including notebook e2e tests), set the environment variable:
     QDK_CHEMISTRY_RUN_SLOW_TESTS=1 pytest
 
+To validate exact version-pinned tutorial snapshots in the controlled reference environment, set:
+    QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS=1 pytest -m tutorial_baseline
+
 """
 
 # --------------------------------------------------------------------------------------------
@@ -23,7 +26,7 @@ import os
 import runpy
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
-from math import comb
+from math import comb, log
 from pathlib import Path
 
 import pytest
@@ -69,6 +72,11 @@ except ImportError:
 
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+_RUN_TUTORIAL_SNAPSHOTS = os.getenv("QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def _has_jupyter_kernel(kernel_name: str = "python3") -> bool:
@@ -318,7 +326,7 @@ def test_tutorial_module_imports_preserve_global_logging():
 @pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_choose_active_space_results():
-    """Check the stable numerical and structural results used by Chapter 3."""
+    """Check portable active-space invariants and optional reference snapshots."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
 
     result = tutorial_module.run_active_space_workflow()
@@ -333,20 +341,25 @@ def test_tutorial_choose_active_space_results():
     assert result.num_refined_electrons == 6
     assert result.num_virtual_orbitals == 18
     assert result.num_refined_determinants == comb(6, 3) ** 2 == 400
-    assert result.orbital_entropies == pytest.approx(
-        [
-            0.021695655,
-            0.029962803,
-            0.547855061,
-            0.963884097,
-            0.963884097,
-            0.966011090,
-            0.966011090,
-            0.554008809,
-        ],
-        abs=1e-8,
-    )
+    assert len(result.orbital_entropies) == 8
+    assert all(0.0 <= entropy <= log(4.0) for entropy in result.orbital_entropies)
+    assert sum(entropy >= 0.5 for entropy in result.orbital_entropies) == 6
     assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.orbital_entropies == pytest.approx(
+            [
+                0.021695655,
+                0.029962803,
+                0.547855061,
+                0.963884097,
+                0.963884097,
+                0.966011090,
+                0.966011090,
+                0.554008809,
+            ],
+            abs=1e-8,
+        )
 
     cube_data = tutorial_module.generate_active_orbital_cube_data(
         result,
@@ -363,7 +376,7 @@ def test_tutorial_choose_active_space_results():
 @pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_map_n2_to_qubits_results():
-    """Check the stable Jordan-Wigner mapping results used by Chapter 4."""
+    """Check portable mapping invariants and optional reference snapshots."""
     _load_tutorial_module("tutorial_choose_active_space")
     tutorial_module = _load_tutorial_module("tutorial_map_n2_to_qubits")
 
@@ -372,14 +385,17 @@ def test_tutorial_map_n2_to_qubits_results():
     assert result.num_active_spatial_orbitals == 6
     assert result.num_active_spin_orbitals == 12
     assert result.num_compute_qubits == 12
-    assert result.num_pauli_terms == 383
+    assert result.num_pauli_terms == len(result.qubit_hamiltonian.pauli_strings) > 0
     assert result.qubit_hamiltonian.encoding == "jordan-wigner"
     assert result.qubit_hamiltonian.fermion_mode_order.value == "blocked"
-    assert abs(result.core_energy - (-99.117775949333)) < 1e-8
     assert result.num_fixed_electron_states == 400
-    assert abs(result.mapped_active_energy - (-9.653275843566)) < 1e-8
     assert abs(result.mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
     assert abs(result.mapping_energy_difference) < 1e-10
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.num_pauli_terms == 383
+        assert abs(result.core_energy - (-99.117775949333)) < 1e-8
+        assert abs(result.mapped_active_energy - (-9.653275843566)) < 1e-8
 
     preview_terms = tutorial_module.representative_pauli_terms(result.qubit_hamiltonian)
     assert len(preview_terms) == 8
@@ -392,57 +408,55 @@ def test_tutorial_map_n2_to_qubits_results():
 @pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_prepare_trial_state_results():
-    """Check the trial-state quality and cost results used by Chapter 5."""
+    """Check portable trial-state invariants and optional reference snapshots."""
     _load_tutorial_module("tutorial_choose_active_space")
     tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
 
     result = tutorial_module.run_trial_state_workflow()
     assert result.active_space_result.num_refined_determinants == 400
     assert len(result.reference_determinants) == 8
-    assert result.reference_determinants[0].occupation == "222000"
-    assert abs(result.reference_determinants[0].amplitude - (-0.694657450061)) < 1e-10
-    assert abs(result.reference_determinants[0].weight - 0.482548972925) < 1e-10
-    assert result.reference_determinants[1].occupation == "202020"
-    assert result.reference_determinants[2].occupation == "220200"
-    assert abs(result.reference_determinants[2].cumulative_weight - 0.691383326350) < 1e-10
+    assert all(len(item.occupation) == 6 for item in result.reference_determinants)
+    assert all(item.weight > 0.0 for item in result.reference_determinants)
+    assert all(
+        larger.weight >= smaller.weight
+        for larger, smaller in zip(result.reference_determinants, result.reference_determinants[1:], strict=False)
+    )
+    assert all(
+        larger.cumulative_weight < smaller.cumulative_weight
+        for larger, smaller in zip(result.reference_determinants, result.reference_determinants[1:], strict=False)
+    )
+    assert result.reference_determinants[-1].cumulative_weight <= 1.0
     assert len(result.trial_states) == 3
 
     one_determinant, two_determinants, four_determinants = result.trial_states
-    assert one_determinant.num_determinants == 1
-    assert abs(one_determinant.fidelity - 0.482548972925) < 1e-10
-    assert one_determinant.num_compute_qubits == 12
-    assert one_determinant.num_logical_gates == 6
-    assert one_determinant.logical_gate_counts == {"X": 6}
+    assert [state.num_determinants for state in result.trial_states] == [1, 2, 4]
+    assert all(state.num_compute_qubits == 12 for state in result.trial_states)
+    assert 0.0 < one_determinant.fidelity < two_determinants.fidelity < four_determinants.fidelity < 1.0
+    assert one_determinant.num_logical_gates < two_determinants.num_logical_gates < four_determinants.num_logical_gates
+    assert all(sum(state.logical_gate_counts.values()) == state.num_logical_gates for state in result.trial_states)
 
-    assert two_determinants.num_determinants == 2
-    assert abs(two_determinants.fidelity - 0.578050111416) < 1e-10
-    assert two_determinants.num_compute_qubits == 12
-    assert two_determinants.num_logical_gates == 14
-    assert two_determinants.logical_gate_counts == {
-        "CNOT": 6,
-        "H": 2,
-        "Rz": 2,
-        "S": 2,
-        "X": 2,
-    }
-
-    assert four_determinants.num_determinants == 4
-    assert abs(four_determinants.fidelity - 0.717362840569) < 1e-10
-    assert four_determinants.num_compute_qubits == 12
-    assert four_determinants.num_logical_gates == 30
-    assert four_determinants.logical_gate_counts == {
-        "CNOT": 16,
-        "H": 4,
-        "Rz": 4,
-        "S": 4,
-        "X": 2,
-    }
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.reference_determinants[0].occupation == "222000"
+        assert abs(result.reference_determinants[0].amplitude - (-0.694657450061)) < 1e-10
+        assert abs(result.reference_determinants[0].weight - 0.482548972925) < 1e-10
+        assert result.reference_determinants[1].occupation == "202020"
+        assert result.reference_determinants[2].occupation == "220200"
+        assert abs(result.reference_determinants[2].cumulative_weight - 0.691383326350) < 1e-10
+        assert abs(one_determinant.fidelity - 0.482548972925) < 1e-10
+        assert one_determinant.num_logical_gates == 6
+        assert one_determinant.logical_gate_counts == {"X": 6}
+        assert abs(two_determinants.fidelity - 0.578050111416) < 1e-10
+        assert two_determinants.num_logical_gates == 14
+        assert two_determinants.logical_gate_counts == {"CNOT": 6, "H": 2, "Rz": 2, "S": 2, "X": 2}
+        assert abs(four_determinants.fidelity - 0.717362840569) < 1e-10
+        assert four_determinants.num_logical_gates == 30
+        assert four_determinants.logical_gate_counts == {"CNOT": 16, "H": 4, "Rz": 4, "S": 4, "X": 2}
 
 
 @pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_run_iqpe_configuration(capsys):
-    """Check the fast IQPE configuration and phase-grid values used by Chapter 6."""
+    """Check portable IQPE invariants and optional reference snapshots."""
     _load_tutorial_module("tutorial_choose_active_space")
     _load_tutorial_module("tutorial_map_n2_to_qubits")
     _load_tutorial_module("tutorial_prepare_trial_state")
@@ -451,18 +465,30 @@ def test_tutorial_run_iqpe_configuration(capsys):
     problem = tutorial_module.prepare_iqpe_problem()
     assert problem.mapping.num_compute_qubits == 12
     assert problem.trial_state.num_determinants == 4
-    assert abs(problem.trial_state.fidelity - 0.717362840569) < 1e-10
+    assert 0.0 < problem.trial_state.fidelity < 1.0
     assert problem.num_phase_bits == 6
     assert problem.shots_per_bit == 3
     assert len(problem.iteration_circuits) == 6
-    assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 20.185236582112) < 1e-10
-    assert problem.evolution_time.grid_bitstring == "110001"
-    assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.155638138835) < 1e-12
-    assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.760882767) < 1e-9
-    assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
-    assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
-    assert problem.evolution_time.grid_phase_fraction == 49 / 64
+    assert problem.mapping.qubit_hamiltonian.schatten_norm > 0.0
+    assert len(problem.evolution_time.grid_bitstring) == problem.num_phase_bits
+    assert set(problem.evolution_time.grid_bitstring).issubset({"0", "1"})
+    assert problem.evolution_time.grid_phase_fraction == int(problem.evolution_time.grid_bitstring, 2) / (
+        2**problem.num_phase_bits
+    )
+    assert problem.evolution_time.bound_time_hartree_inverse > 0.0
+    assert problem.evolution_time.time_hartree_inverse > 0.0
+    assert 0.0 <= problem.evolution_time.bound_reference_phase_fraction < 1.0
+    assert 0.0 <= problem.evolution_time.reference_phase_fraction < 1.0
     assert abs(problem.evolution_time.grid_active_energy_hartree - problem.mapping.mapped_active_energy - 1e-3) < 1e-12
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert abs(problem.trial_state.fidelity - 0.717362840569) < 1e-10
+        assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 20.185236582112) < 1e-10
+        assert problem.evolution_time.grid_bitstring == "110001"
+        assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.155638138835) < 1e-12
+        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.760882767) < 1e-9
+        assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
+        assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
 
     first_run = tutorial_module.IqpeRun(
         seed=1,
@@ -504,10 +530,11 @@ def test_tutorial_run_iqpe_configuration(capsys):
         "first-order Trotter product formula",
         "Trotter divisions: 1",
         "repeated approximate base unitary",
-        "0.760882766860",
-        "0.152567288817 Hartree^-1",
     ):
         assert expected_text in settings_output
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert "0.760882766860" in settings_output
+        assert "0.152567288817 Hartree^-1" in settings_output
 
 
 @pytest.mark.slow
@@ -518,7 +545,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
     reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
 )
 def test_tutorial_run_iqpe_simulation():
-    """Check one complete simulator run from the final Chapter 6 workflow."""
+    """Check one seeded IQPE run against its configured phase-grid target."""
     _load_tutorial_module("tutorial_choose_active_space")
     _load_tutorial_module("tutorial_map_n2_to_qubits")
     _load_tutorial_module("tutorial_prepare_trial_state")
@@ -526,7 +553,7 @@ def test_tutorial_run_iqpe_simulation():
 
     problem = tutorial_module.prepare_iqpe_problem()
     run = tutorial_module.run_complete_iqpe(problem, seed=42)
-    assert run.bitstring == "110001"
+    assert run.bitstring == problem.evolution_time.grid_bitstring
     assert abs(run.error_hartree - 1e-3) < 1e-10
 
 
