@@ -12,7 +12,8 @@ import qdk_chemistry
 # The documentation test harness sets this tutorial version; downloaded copies do not.
 GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
 if GROUND_STATE_TUTORIAL_VERSION is not None:
-    assert qdk_chemistry.__version__ == GROUND_STATE_TUTORIAL_VERSION, (
+    installed_public_version = qdk_chemistry.__version__.partition("+")[0]
+    assert installed_public_version == GROUND_STATE_TUTORIAL_VERSION, (
         f"Tutorial expects QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION}, "
         f"but {qdk_chemistry.__version__} is installed."
     )

@@ -9,13 +9,18 @@ import importlib.metadata
 import importlib.util
 import os
 import re
+import runpy
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import ClassVar
+from unittest.mock import patch
 
+import pytest
+
+import qdk_chemistry
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -149,6 +154,24 @@ class TestExampleScripts(unittest.TestCase):
     """Test case for all example scripts."""
 
     py_example_files: ClassVar[list[Path]] = []
+
+    def test_tutorial_qpe_setup_accepts_local_build_version(self):
+        """Accept local metadata only when the public version matches the pin."""
+        setup_script = PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
+        version_env = {"GROUND_STATE_TUTORIAL_VERSION": GROUND_STATE_TUTORIAL_VERSION}
+
+        with (
+            patch.dict(os.environ, version_env),
+            patch.object(qdk_chemistry, "__version__", f"{GROUND_STATE_TUTORIAL_VERSION}+local"),
+        ):
+            runpy.run_path(str(setup_script))
+
+        with (
+            patch.dict(os.environ, version_env),
+            patch.object(qdk_chemistry, "__version__", "2.0.1"),
+            pytest.raises(AssertionError, match="Tutorial expects QDK/Chemistry"),
+        ):
+            runpy.run_path(str(setup_script))
 
     @classmethod
     def setUpClass(cls):
