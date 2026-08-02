@@ -24,13 +24,20 @@ parameters:
 steps:
 # The venv path tests with the agent's own interpreter, so it has to be
 # provisioned first. Conda test envs bring their own Python and skip this.
+#
+# ARM64 cannot use UsePythonVersion@0 -- see the note in
+# build-pip-wheels-windows.yml for why.
 - ${{ if eq(parameters.pythonEnv, 'venv') }}:
-  - task: UsePythonVersion@0
-    displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
-    inputs:
-      versionSpec: '${{ parameters.pythonVersion }}'
-      ${{ if eq(parameters.arch, 'arm64') }}:
-        architecture: 'arm64'
+  - ${{ if eq(parameters.arch, 'arm64') }}:
+    - pwsh: >-
+        $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
+        -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+      displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+  - ${{ else }}:
+    - task: UsePythonVersion@0
+      displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
+      inputs:
+        versionSpec: '${{ parameters.pythonVersion }}'
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'

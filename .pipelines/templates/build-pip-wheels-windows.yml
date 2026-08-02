@@ -39,13 +39,23 @@ steps:
 
 # The venv path builds on the agent's own interpreter, so it has to be provisioned
 # first. Conda builds bring their own Python and skip this.
+#
+# ARM64 cannot use UsePythonVersion@0: that image's tool cache is empty, so the
+# task downloads Python and then tries to bootstrap pip from pypi.org, which the
+# CFSClean isolation policy blocks by design. It treats that as fatal and
+# unregisters the interpreter it just extracted. ensure-python-windows.ps1
+# installs the same official build without contacting any package feed.
 - ${{ if eq(parameters.pythonEnv, 'venv') }}:
-  - task: UsePythonVersion@0
-    displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
-    inputs:
-      versionSpec: '${{ parameters.pythonVersion }}'
-      ${{ if eq(parameters.arch, 'arm64') }}:
-        architecture: 'arm64'
+  - ${{ if eq(parameters.arch, 'arm64') }}:
+    - pwsh: >-
+        $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
+        -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+      displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+  - ${{ else }}:
+    - task: UsePythonVersion@0
+      displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
+      inputs:
+        versionSpec: '${{ parameters.pythonVersion }}'
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `

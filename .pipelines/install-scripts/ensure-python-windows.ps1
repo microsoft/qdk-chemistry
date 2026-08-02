@@ -40,13 +40,22 @@
 .PARAMETER Force
     Skip the PATH and tool cache probes and go straight to the download. Used to
     exercise the download path when testing this script.
+
+.PARAMETER IncludePip
+    Install pip as well. The dependency build does not need it, but the wheel
+    jobs do, because `python -m venv` provisions pip into the new environment.
+    This stays within the isolation policy: the python.org installer bundles pip
+    and installs it offline via ensurepip. It is only the actions/python-versions
+    setup.ps1 wrapper, which afterwards runs `pip install --upgrade pip` against
+    pypi.org, that needs a package feed -- and that wrapper is never used here.
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('x64', 'arm64')]
     [string]$Arch,
     [string]$Version = '3.13',
-    [switch]$Force
+    [switch]$Force,
+    [switch]$IncludePip
 )
 
 Set-StrictMode -Version Latest
@@ -71,7 +80,17 @@ function Test-PythonExe {
         # perfectly good interpreter gets reported as broken.
         $out  = & $Exe --version 2>&1
         $code = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-        if ($code -eq 0 -and ($out | Out-String) -match 'Python\s+(\d+\.\d+\.\d+)') { return $Matches[1] }
+        if ($code -ne 0 -or ($out | Out-String) -notmatch 'Python\s+(\d+\.\d+\.\d+)') { return $null }
+        $found = $Matches[1]
+        # A pip-less interpreter is no use to a caller that asked for pip, so
+        # treat it as a miss and keep looking rather than failing later inside
+        # venv creation.
+        if ($IncludePip) {
+            & $Exe -m pip --version 2>&1 | Out-Null
+            $pipCode = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+            if ($pipCode -ne 0) { return $null }
+        }
+        return $found
     } catch {
         # An interpreter that cannot run is the same as no interpreter. This
         # legitimately happens in the tool cache when an install was interrupted
@@ -172,15 +191,15 @@ if (-not $installer) { throw "No installer found under '$work' after extracting 
 
 $targetDir = Join-Path $env:SystemDrive "PythonCI\$($asset.Version)\$Arch"
 Write-Host "Running $($installer.Name) -> $targetDir"
-# Include_pip=0 keeps this provisioning step free of any package feed, which is
-# what lets it run under the CFSClean isolation policy. The dependency builds
-# only need the standard library. Anything that genuinely needs packages should
-# get them from the internal feed via PipAuthenticate@1 instead.
+# The dependency build only needs the standard library, so pip is left out by
+# default and this step then touches no package feed at all. When the caller
+# does ask for pip, the installer still provisions it offline from its bundled
+# copy, so the CFSClean policy is satisfied either way.
 $installArgs = @(
     '/quiet'
     "TargetDir=$targetDir"
     'InstallAllUsers=0'
-    'Include_pip=0'
+    "Include_pip=$(if ($IncludePip) { 1 } else { 0 })"
     'Include_test=0'
     'Include_doc=0'
     'Include_tcltk=0'
