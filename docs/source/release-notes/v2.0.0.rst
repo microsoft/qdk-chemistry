@@ -29,6 +29,7 @@ Highlights
 - **Nuclear gradients and Hessians.** A new nuclear-derivative algorithm returns energies, gradients, and optionally a Hessian and the converged wavefunction.
 - **More robust SCF.** A stabilized SCF solver follows internal and external instabilities to a stable reference, and :term:`ROHF` gains geometric direct minimization.
 - **New simulation primitives.** Block-encoding / :term:`LCU` qubitization, the Hadamard test, Zassenhaus product formulas, and real-time dynamics for driven Hamiltonians join the existing Trotter-Suzuki builders.
+- **Amplitude amplification.** A pluggable reflection about a target state or marked subspace, standard and fixed-point amplification loops, a phase-estimation acceptance oracle, and a round-count policy that avoids overshooting when the guiding-state overlap is poorly known.
 - **Fermion-to-qubit mapping as data.** Encodings are carried by :class:`~qdk_chemistry.data.MajoranaMapping`, including a Verstraete-Cirac local encoding.
 - **Explicit term grouping and expectation estimation.** Pauli grouping is now an opt-in ``term_grouper`` step, and the estimator generalizes to any :class:`~qdk_chemistry.data.QubitOperator`.
 - **Resource estimation integration.** Generated circuits hand off directly to the QDK Quantum Resource Estimator via ``Circuit.estimate()`` and ``Circuit.get_qre_application()`` (see :ref:`v2-resource-estimation`).
@@ -153,6 +154,26 @@ evolved state. See
 <https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/time_evolve_and_measure.ipynb>`_
 and `examples/estimation_ising_2d.ipynb
 <https://github.com/microsoft/qdk-chemistry/blob/v2.0.0/examples/estimation_ising_2d.ipynb>`_.
+
+**Amplitude amplification.** A new Q# module,
+``QDKChemistry.Utils.AmplitudeAmplification``, provides a general reflection about a
+target state (``ReflectAboutTargetState``) or about a marked subspace
+(``ReflectAboutMarkedSubspace``), plus standard and fixed-point amplification loops.
+Because the reflection is pluggable, the "target" can be a state-preparation circuit
+or any predicate — including the supplied phase-estimation acceptance oracle
+``ApplyQpeAcceptanceMark``, which marks a QPE energy window while requiring the
+block-encoding signal ancillas to be clean. ``ApplyCoherentStandardQPE`` supplies the
+adjointable, measurement-free QPE circuit needed as the state preparation.
+
+The companion Python module
+:mod:`qdk_chemistry.algorithms.amplitude_amplification.schedule` decides how many
+rounds to run when the guiding-state overlap is poorly known. Overshoot is governed
+by an *upper* bound on the overlap, not a lower one, so ``safe_rounds(a_max)`` can
+never run past the first maximum; ``robust_rounds`` optimizes the worst case over an
+overlap interval, ``exponential_schedule`` reproduces the Brassard-Høyer-Mosca-Tapp
+randomized strategy when nothing is known, and ``fixed_point_phases`` produces the
+Yoder-Low-Chuang phase sequence that removes overshoot entirely. See
+:doc:`Amplitude amplification <../user/comprehensive/algorithms/amplitude_amplification>`.
 
 
 Fermion-to-Qubit Mapping as Data

@@ -163,6 +163,70 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
+    /// # Summary
+    /// Applies `power` repetitions of a controlled block encoding.
+    ///
+    /// Unlike `MakeControlledPrepSelPrepOp` this carries no resource-estimation
+    /// caching, so the adjoint can be generated.  Amplitude amplification needs
+    /// to run the phase-estimation circuit backwards and therefore requires this
+    /// variant.
+    operation ApplyControlledPrepSelPrepPower(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        power : Int,
+        control : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let systems = allQubits[0..numSystemQubits - 1];
+        let ancilla = allQubits[numSystemQubits...];
+        for _ in 0..power - 1 {
+            Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+        }
+    }
+
+    /// # Summary
+    /// Applies `power` repetitions of a controlled PSP-based quantum walk.
+    ///
+    /// Adjointable counterpart of `MakeControlledPSPWalkOp`; see
+    /// `ApplyControlledPrepSelPrepPower`.
+    operation ApplyControlledPSPWalkPower(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        power : Int,
+        control : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let systems = allQubits[0..numSystemQubits - 1];
+        let ancilla = allQubits[numSystemQubits...];
+        for _ in 0..power - 1 {
+            Controlled PSPWalk([control], (prepareOp, selectOp, systems, ancilla));
+        }
+    }
+
+    /// # Summary
+    /// Creates an adjointable controlled block-encoding callable.
+    function MakeAdjointableControlledPrepSelPrepOp(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        power : Int,
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+        ApplyControlledPrepSelPrepPower(prepareOp, selectOp, numSystemQubits, power, _, _)
+    }
+
+    /// # Summary
+    /// Creates an adjointable controlled quantum-walk callable.
+    function MakeAdjointableControlledPSPWalkOp(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        power : Int,
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+        ApplyControlledPSPWalkPower(prepareOp, selectOp, numSystemQubits, power, _, _)
+    }
+
     /// Circuit entry point for prep-sel-prep (allocates qubits).
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
