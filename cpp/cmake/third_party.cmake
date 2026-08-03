@@ -129,36 +129,31 @@ handle_dependency(gauxc
   REQUIRED
 )
 
-# BTAS (header-only dense tensor library) is the numeric backend for the DUCC
-# effective-Hamiltonian dressing (ducc_level > 0). The symbolic
-# Baker-Campbell-Hausdorff transform and Wick contraction are derived OFFLINE by
-# the SeQuant-based generator in ducc/, whose output is checked in as
-# ducc_equations.inc, so qdk-chemistry itself needs no symbolic-algebra library
-# at build or run time.
+# BTAS (header-only dense tensors) evaluates the DUCC effective-Hamiltonian
+# dressing. The symbolic Baker-Campbell-Hausdorff / Wick derivation is done
+# offline by the generator in ducc/ and checked in as ducc_equations.inc, so no
+# symbolic-algebra library is needed at build or run time.
 #
-# BTAS is fetched + installed by qdk here (via handle_dependency) so its
-# install() rules actually run: the installed qdk config does
-# find_dependency(BTAS), which is a hard error for anything consuming the
-# installed qdk (the two-phase build/install then find_package(qdk) path) if the
-# dependency was only ever fetched EXCLUDE_FROM_ALL.
-#
-# Boost is not a first-class qdk-chemistry dependency (it only arrives
-# transitively via libint2). BTAS needs a wider set of Boost components, so
-# discover the modular Boost here first: this defines Boost_CONFIG, so BTAS
-# reuses the same Boost libint2 uses instead of fetching a second modular copy
-# (which collides on the Boost::headers target). No Fortran compiler is
-# required: BTAS is C++/header-only and the blaspp/lapackpp wrappers are reused
-# prebuilt (they need only the libgfortran runtime, not the compiler).
+# BTAS links Boost::headers/random/serialization, so discover the modular Boost
+# libint2 already uses to make those imported targets exist. Do NOT set
+# BLA_VENDOR: it flips BTAS onto the standard-linalg-kit path, which needs an
+# explicit Fortran mangling convention. blaspp/lapackpp/BLAS are reused prebuilt
+# (the ones MACIS already requires), so no Fortran compiler is needed.
 find_package(Boost CONFIG REQUIRED)
-set(Boost_FETCH_IF_MISSING OFF CACHE BOOL "" FORCE)
 
-# Do NOT set BLA_VENDOR (it flips BTAS onto the standard-linalg-kit path that
-# needs an explicit Fortran mangling convention).
+# An installed btas-config.cmake is unusable: it expects a `blaspp_headers`
+# marker target that the ValeevGroup kit installs beside BTAS, but then looks
+# for it under the standalone blaspp_DIR, where it does not exist. That is what
+# the wheel build hits, since it reconfigures against the prefix the preceding
+# C++ install step populated. NO_DEFAULT_PATH skips discovery entirely so BTAS
+# is always taken from source at the pinned tag (it is header-only, so this
+# costs a configure, not a compile).
 handle_dependency(BTAS
   GIT_REPOSITORY https://github.com/BTAS/btas.git
   GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
   BUILD_TARGET BTAS
   INSTALL_TARGET BTAS::BTAS
+  FIND_PACKAGE_ARGS NO_DEFAULT_PATH
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )
