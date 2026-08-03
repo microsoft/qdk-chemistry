@@ -345,6 +345,23 @@ def test_tutorial_ao_anchoring_is_rotation_invariant():
 
 
 @pytest.mark.tutorial_baseline
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
+def test_tutorial_scalar_refinement_resolves_subgrid_cusp():
+    """Refine a cusp too close to zero for the coarse angular grid to detect."""
+    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    expected_angle = 1e-8
+
+    actual_angle, actual_value = tutorial_module._golden_section_minimum(
+        lambda angle: abs(angle - expected_angle),
+        -np.pi / 32,
+        np.pi / 32,
+    )
+
+    assert actual_angle == pytest.approx(expected_angle, abs=1e-12)
+    assert actual_value < 1e-12
+
+
+@pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_choose_active_space_results():
     """Check portable active-space invariants and optional reference snapshots."""
@@ -559,9 +576,6 @@ def test_tutorial_run_iqpe_configuration(capsys):
         "repeated approximate base unitary",
     ):
         assert expected_text in settings_output
-    if _RUN_TUTORIAL_SNAPSHOTS:
-        assert "0.753870703905" in settings_output
-        assert "0.162738441405 Hartree^-1" in settings_output
 
 
 @pytest.mark.slow

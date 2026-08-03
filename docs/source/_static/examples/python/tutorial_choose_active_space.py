@@ -490,10 +490,11 @@ def coordinate_minimize_natural_orbital_coefficient_norm(
                     [norm_at_angle(float(angle)) for angle in angle_grid]
                 )
                 best_index = int(np.argmin(grid_norms))
-                if grid_norms[best_index] >= current_norm - improvement_tolerance:
-                    continue
-
                 best_angle = float(angle_grid[best_index])
+                # Refine even when the best coarse sample is the current
+                # zero-angle point. A symmetry cusp can lie within 1e-8 radians
+                # of that sample, below the grid's resolution but far enough
+                # away to leave platform-dependent Pauli coefficients.
                 refined_angle, refined_norm = _golden_section_minimum(
                     norm_at_angle,
                     best_angle - angle_step,
