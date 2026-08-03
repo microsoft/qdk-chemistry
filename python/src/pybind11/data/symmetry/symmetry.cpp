@@ -20,7 +20,8 @@ using qdk::chemistry::python::utils::to_string_path;
 
 void bind_symmetry(py::module& symmetry) {
   py::enum_<AxisName>(symmetry, "AxisName", "Symmetry axis identifier.")
-      .value("Spin", AxisName::Spin);
+      .value("Spin", AxisName::Spin)
+      .value("ParticleNumber", AxisName::ParticleNumber);
 
   symmetry.def(
       "axis_name_to_string", [](AxisName axis) { return to_string(axis); },
@@ -43,6 +44,13 @@ void bind_symmetry(py::module& symmetry) {
       .def(py::init<int>(), py::arg("two_ms"),
            "Construct from 2*Ms (e.g. +1 for alpha, -1 for beta).")
       .def("value", &SpinValue::value, "The stored 2*Ms value.");
+
+  py::class_<ParticleNumberValue, SymmetryAxisValue,
+             std::shared_ptr<ParticleNumberValue>>(
+      symmetry, "ParticleNumberValue", "Concrete particle-number axis value.")
+      .def(py::init<std::size_t>(), py::arg("number"))
+      .def("value", &ParticleNumberValue::value,
+           "The represented particle number.");
 
   py::class_<SymmetryAxis, DataClass, py::smart_holder>(
       symmetry, "SymmetryAxis",
@@ -189,6 +197,9 @@ void bind_symmetry(py::module& symmetry) {
       [](int two_s, bool equivalent) { return axes::spin(two_s, equivalent); },
       py::arg("two_s"), py::arg("equivalent") = true,
       "Build a spin axis carrying the alpha and beta labels.");
+  axes.def("particle_number", &axes::particle_number, py::arg("maximum_number"),
+           "Build a particle-number axis carrying labels from zero through the "
+           "maximum.");
   axes.def(
       "alpha",
       []() { return std::const_pointer_cast<SpinValue>(axes::alpha()); },
@@ -202,4 +213,11 @@ void bind_symmetry(py::module& symmetry) {
         return std::const_pointer_cast<SpinValue>(axes::spin_value(two_ms));
       },
       py::arg("two_ms"), "Construct a spin value carrying 2*Ms = two_ms.");
+  axes.def(
+      "particle_number_value",
+      [](std::size_t number) {
+        return std::const_pointer_cast<ParticleNumberValue>(
+            axes::particle_number_value(number));
+      },
+      py::arg("number"), "Construct a particle-number value.");
 }

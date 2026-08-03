@@ -13,6 +13,7 @@
 #include <numeric>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/abelian_mps_wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -1418,6 +1419,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
     } else if (container_type == "amplitude" ||
                container_type == "coupled_cluster" || container_type == "mp2") {
       container = AmplitudeContainer::from_json(j["container"]);
+    } else if (container_type == "mps") {
+      container = AbelianMPSContainer::from_json(j["container"]);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }

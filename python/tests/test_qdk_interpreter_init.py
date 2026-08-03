@@ -34,6 +34,6 @@ def test_qdk_interpreter_init_with_target_profile():
 
     init(target_profile=TargetProfile.Base)
 
-    from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # noqa: PLC0415
+    from qdk_chemistry.utils.qsharp import BASE_QSHARP_UTILS  # noqa: PLC0415
 
-    assert getattr(QSHARP_UTILS, "StatePreparation", None) is not None
+    assert getattr(BASE_QSHARP_UTILS, "StatePreparation", None) is not None

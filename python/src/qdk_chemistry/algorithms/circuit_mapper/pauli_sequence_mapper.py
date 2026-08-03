@@ -95,15 +95,17 @@ class PauliSequenceMapper(CircuitMapper):
         }
 
         target_indices = list(range(unitary_container.num_qubits))
+        program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
+        context = getattr(program, "_qdk_context", qsharp)
 
-        qsc = qsharp.circuit(
-            QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+        qsc = context.circuit(
+            program,
             evo_params,
             target_indices,
         )
 
-        qir = qsharp.compile(
-            QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+        qir = context.compile(
+            program,
             evo_params,
             target_indices,
         )
@@ -111,7 +113,7 @@ class PauliSequenceMapper(CircuitMapper):
         evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
-            program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+            program=program,
             parameter={"evo_params": evo_params, "target_indices": target_indices},
         )
 

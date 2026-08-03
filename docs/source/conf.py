@@ -178,6 +178,7 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
     (r"cpp:identifier", r".*::value"),
+    (r"cpp:identifier", r"ScalarVariant"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
     # constants:: symbols imported via `using namespace codata_XXXX` inside
