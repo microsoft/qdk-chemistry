@@ -179,6 +179,13 @@ def format_pauli_string(pauli_string: str) -> str:
     return " ".join(factors) if factors else "I"
 
 
+def _pauli_term_display_key(term: tuple[str, complex]) -> tuple[float, str]:
+    """Rank large Pauli coefficients first with deterministic near-tie order."""
+    # Rounding affects only display ranking, not Hamiltonian coefficients. The
+    # formatted label resolves coefficients equal at twelve decimal places.
+    return (-round(abs(term[1]), 12), format_pauli_string(term[0]))
+
+
 def representative_pauli_terms(
     qubit_operator: QubitOperator,
     *,
@@ -206,13 +213,6 @@ def representative_pauli_terms(
     ]
     identity_string = "I" * qubit_operator.num_qubits
 
-    def by_magnitude(term: tuple[str, complex]) -> tuple[float, str]:
-        """Rank large coefficients first with deterministic near-tie ordering."""
-        # Rounding affects only display ranking, not Hamiltonian coefficients.
-        # Twelve decimal places suppress platform noise near the mapper's
-        # 1e-12 threshold; the formatted label resolves equal rounded values.
-        return (-round(abs(term[1]), 12), format_pauli_string(term[0]))
-
     # Separate the constant shift, occupation-diagonal terms, and determinant
     # couplings before selecting the largest coefficients in each family.
     identity_terms = [term for term in terms if term[0] == identity_string]
@@ -222,11 +222,11 @@ def representative_pauli_terms(
             for term in terms
             if term[0] != identity_string and set(term[0]).issubset({"I", "Z"})
         ),
-        key=by_magnitude,
+        key=_pauli_term_display_key,
     )
     off_diagonal_terms = sorted(
         (term for term in terms if "X" in term[0] or "Y" in term[0]),
-        key=by_magnitude,
+        key=_pauli_term_display_key,
     )
     return (
         identity_terms[:1]

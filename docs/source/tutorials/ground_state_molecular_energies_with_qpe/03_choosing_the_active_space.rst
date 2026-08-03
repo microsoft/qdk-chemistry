@@ -28,8 +28,9 @@ After completing this chapter, you will be able to:
 Example download
 ====================
 
-Download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save both files in your tutorial working directory.
-Open both files in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
+First download :download:`tutorial_orbital_coordinates.py <../../_static/examples/python/tutorial_orbital_coordinates.py>`, which contains the reusable numerical machinery for choosing coordinates inside degenerate orbital subspaces.
+Then download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save all three files in your tutorial working directory.
+Open all three files in Visual Studio Code and review the complete scripts, including imports and setup code omitted from the excerpts below.
 The script resumes the stretched N\ :sub:`2` workflow from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining the correlated model.
 Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive notebook use the same tested chemistry workflow rather than duplicate it.
 

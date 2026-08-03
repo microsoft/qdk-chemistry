@@ -101,6 +101,8 @@ def leading_determinants(
         unchanged complex coefficients.
 
     Raises:
+        ValueError: If ``max_determinants`` is not positive or exceeds the
+            reference support size.
         ValueError: If determinant and coefficient arrays have different lengths.
 
     Notes:
@@ -109,6 +111,14 @@ def leading_determinants(
         occupation string breaks remaining ties. Stored coefficients are never
         rounded or modified.
     """
+    if max_determinants <= 0:
+        raise ValueError("max_determinants must be positive")
+    if max_determinants > wavefunction.size():
+        raise ValueError(
+            f"requested {max_determinants} determinants from a wavefunction "
+            f"with support size {wavefunction.size()}"
+        )
+
     ranked = sorted(
         zip(
             wavefunction.get_active_determinants(),
@@ -260,7 +270,14 @@ def run_trial_state_workflow(
     Returns:
         The selected molecular model, reference determinant summary, and one
         quality/circuit-cost result per requested support size.
+
+    Raises:
+        ValueError: If no support sizes are requested or a requested size is
+            invalid for the selected-space reference.
     """
+    if not determinant_counts:
+        raise ValueError("determinant_counts must not be empty")
+
     active_space_result = run_active_space_workflow()
     reference_wavefunction = active_space_result.refined_casci_wavefunction
     selected_orbitals = active_space_result.refined_orbitals

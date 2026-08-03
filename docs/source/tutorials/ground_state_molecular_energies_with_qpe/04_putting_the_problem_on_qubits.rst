@@ -28,8 +28,8 @@ After completing this chapter, you will be able to:
 Example download
 ====================
 
-Download :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` and save it in the tutorial working directory that contains ``tutorial_choose_active_space.py`` from :doc:`Choosing the active space <03_choosing_the_active_space>`.
-Open both files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
+Download :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` and save it in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py`` from :doc:`Choosing the active space <03_choosing_the_active_space>`.
+Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
 The script imports the tested Chapter 3 workflow so that both chapters use the same selected active space.
 
 The active-space Hamiltonian

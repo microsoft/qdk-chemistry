@@ -30,7 +30,7 @@ After completing this chapter, you will be able to:
 Example download
 ================
 
-Download :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and save it in the tutorial working directory alongside :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>`, :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>`, and :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>`.
+Download :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and save it in the tutorial working directory alongside :download:`tutorial_orbital_coordinates.py <../../_static/examples/python/tutorial_orbital_coordinates.py>`, :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>`, :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>`, and :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>`.
 Also download :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to the same directory.
 Open the files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
 The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.

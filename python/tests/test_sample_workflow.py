@@ -21,6 +21,7 @@ To validate exact version-pinned tutorial snapshots in the controlled reference 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 import importlib.metadata
 import os
 import runpy
@@ -313,6 +314,22 @@ def test_tutorial_qpe_setup_accepts_local_build_version():
 
 
 @pytest.mark.tutorial_baseline
+def test_tutorial_scripts_do_not_define_nested_functions():
+    """Keep downloadable tutorial control flow at module and class scope."""
+    for script_path in DOCS_PYTHON_EXAMPLES_DIR.glob("tutorial_*.py"):
+        syntax_tree = ast.parse(script_path.read_text(encoding="utf-8"))
+        for node in ast.walk(syntax_tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            nested_functions = [
+                child for child in node.body if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+            ]
+            assert not nested_functions, f"{script_path.name}:{node.lineno} defines nested function(s): " + ", ".join(
+                child.name for child in nested_functions
+            )
+
+
+@pytest.mark.tutorial_baseline
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
 def test_tutorial_module_imports_preserve_global_logging():
     """Reusable tutorial imports must not change process-wide logging."""
@@ -320,6 +337,7 @@ def test_tutorial_module_imports_preserve_global_logging():
     Logger.set_global_level(Logger.LogLevel.warn)
     try:
         for module_name in (
+            "tutorial_orbital_coordinates",
             "tutorial_choose_active_space",
             "tutorial_map_n2_to_qubits",
             "tutorial_prepare_trial_state",
@@ -334,7 +352,7 @@ def test_tutorial_module_imports_preserve_global_logging():
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
 def test_tutorial_ao_anchoring_is_rotation_invariant():
     """Canonicalize arbitrary orientations of the same degenerate subspace."""
-    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
     rng = np.random.default_rng(42)
     block, _ = np.linalg.qr(rng.normal(size=(10, 2)))
     overlap = np.eye(block.shape[0])
@@ -351,7 +369,7 @@ def test_tutorial_ao_anchoring_is_rotation_invariant():
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
 def test_tutorial_scalar_refinement_resolves_subgrid_cusp():
     """Refine a cusp too close to zero for the coarse angular grid to detect."""
-    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
     expected_angle = 1e-8
 
     actual_angle, actual_value = tutorial_module._golden_section_minimum(
@@ -386,7 +404,7 @@ def test_tutorial_orbital_coordinates_transfer_across_diatomics(
     use_autocas,
 ):
     """Preserve the selected-space energy for other diatomic workflows."""
-    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
     structure = Structure.from_xyz(f"2\n{label}\n{atoms}\n")
     _, hartree_fock_wavefunction = create("scf_solver", "qdk").run(
         structure,
@@ -435,12 +453,19 @@ def test_tutorial_orbital_coordinates_transfer_across_diatomics(
         num_valence_beta,
     )
 
+    autocas_wavefunction = create(
+        "active_space_selector",
+        "qdk_autocas_eos",
+    ).run(natural_casci_wavefunction)
+    autocas_indices = list(autocas_wavefunction.get_orbitals().active_indices().indices(alpha_channel))
     selected_wavefunction = natural_wavefunction
     if use_autocas:
-        selected_wavefunction = create(
-            "active_space_selector",
-            "qdk_autocas_eos",
-        ).run(natural_casci_wavefunction)
+        assert autocas_indices
+        selected_wavefunction = autocas_wavefunction
+    else:
+        # Weakly correlated H2 and LiH have no autoCAS-selected reduction;
+        # retaining the complete valence space is an explicit test choice.
+        assert not autocas_indices
     selected_orbitals = selected_wavefunction.get_orbitals()
     selected_indices = list(selected_orbitals.active_indices().indices(alpha_channel))
     assert selected_indices
@@ -580,6 +605,16 @@ def test_tutorial_prepare_trial_state_results():
     tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
 
     result = tutorial_module.run_trial_state_workflow()
+    with pytest.raises(ValueError, match="max_determinants must be positive"):
+        tutorial_module.leading_determinants(
+            result.active_space_result.refined_casci_wavefunction,
+            0,
+        )
+    with pytest.raises(ValueError, match="requested 401 determinants"):
+        tutorial_module.leading_determinants(
+            result.active_space_result.refined_casci_wavefunction,
+            401,
+        )
     assert result.active_space_result.num_refined_determinants == 400
     assert len(result.reference_determinants) == 8
     assert all(len(item.occupation) == 6 for item in result.reference_determinants)
@@ -630,6 +665,11 @@ def test_tutorial_run_iqpe_configuration(capsys):
     tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
 
     problem = tutorial_module.prepare_iqpe_problem()
+    with pytest.raises(ValueError, match="zero-angle phase-grid point"):
+        tutorial_module.choose_reference_guided_evolution_time(
+            problem.mapping.qubit_hamiltonian,
+            0.0,
+        )
     assert problem.mapping.num_compute_qubits == 12
     assert problem.trial_state.num_determinants == 4
     assert 0.0 < problem.trial_state.fidelity < 1.0

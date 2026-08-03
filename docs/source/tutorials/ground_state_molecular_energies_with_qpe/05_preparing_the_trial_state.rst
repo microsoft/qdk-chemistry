@@ -28,7 +28,7 @@ After completing this chapter, you will be able to:
 Example download
 ================
 
-Download :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>`, and save both files in the tutorial working directory that contains ``tutorial_choose_active_space.py``.
+Download :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>`, and save both files in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py``.
 Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
 The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and :term:`CASCI` reference.
 The notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.
@@ -152,7 +152,7 @@ The later controlled time evolution in :term:`QPE` therefore requires the comple
 Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.
 
 Before answering the next question, download and open :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` in Visual Studio Code.
-Save it in the tutorial working directory alongside ``tutorial_prepare_trial_state.py`` and ``tutorial_choose_active_space.py``.
+Save it in the tutorial working directory alongside ``tutorial_prepare_trial_state.py``, ``tutorial_choose_active_space.py``, and ``tutorial_orbital_coordinates.py``.
 Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
 Then select **Run All** to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
 Compare the gate types and circuit structure before revealing the answer below.
