@@ -231,21 +231,14 @@ class SOSSAMapper(ControlledCircuitMapper):
 
         power = unitary_container.power
 
-        outer_prepare_op = self.build_outer_prep(unitary_container)
-        inner_prepare_op = self.build_inner_prep(unitary_container)
-        select_op = self.build_select(unitary_container)
-        regs = self._compute_register_sizes(unitary_container)
+        outer_prepare_op, inner_prepare_op, select_op = self._build_walk_oracles(unitary_container)
+        layout = self._build_walk_layout(unitary_container)
 
         walk_params = {
             "outerPrepareOp": outer_prepare_op,
             "innerPrepareOp": inner_prepare_op,
             "selectOp": select_op,
-            "numSystemQubits": regs["num_system_qubits"],
-            "numOuterQubits": regs["num_outer_qubits"],
-            "numOuterIndexQubits": regs["num_outer_index_qubits"],
-            "numInnerQubits": regs["num_inner_qubits"],
-            "numReflectInner": regs["num_reflect_inner"],
-            "numPhaseGradientQubits": regs["num_phase_gradient_qubits"],
+            "layout": layout,
             "power": power,
         }
 
@@ -257,22 +250,78 @@ class SOSSAMapper(ControlledCircuitMapper):
             outer_prepare_op,
             inner_prepare_op,
             select_op,
-            regs["num_system_qubits"],
-            regs["num_outer_qubits"],
-            regs["num_outer_index_qubits"],
-            regs["num_inner_qubits"],
-            regs["num_reflect_inner"],
-            regs["num_phase_gradient_qubits"],
+            layout,
             power,
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    def _build_walk_oracles(self, container: SOSSAWalkContainer) -> tuple[Any, Any, Any]:
+        """Build the outer PREPARE, inner PREPARE and SELECT callables of the block encoding."""
+        return (
+            self.build_outer_prep(container),
+            self.build_inner_prep(container),
+            self.build_select(container),
+        )
+
+    def _build_walk_layout(self, container: SOSSAWalkContainer) -> Any:
+        """Build the Q# ``SOSSAWalkLayout`` describing the register sizes of the walk."""
+        regs = self._compute_register_sizes(container)
+        return QSHARP_UTILS.SOSSAWalk.SOSSAWalkLayout(
+            numSystemQubits=regs["num_system_qubits"],
+            numOuterQubits=regs["num_outer_qubits"],
+            numOuterIndexQubits=regs["num_outer_index_qubits"],
+            numInnerQubits=regs["num_inner_qubits"],
+            numReflectInner=regs["num_reflect_inner"],
+            numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
+        )
 
     def num_ancillary_qubits(self, container: SOSSAWalkContainer) -> int:
         """The number of ancillary qubits used by external algorithms like phase estimation."""
         regs = self._compute_register_sizes(container)
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
         return regs["num_outer_qubits"] + regs["num_inner_qubits"] + num_spin_qubits + regs["num_phase_gradient_qubits"]
+
+    def build_walk_op(
+        self,
+        unitary: UnitaryRepresentation,
+        num_queries: int,
+        use_unary_iteration: bool = True,
+    ) -> Any:
+        """Build a SOSSA walk callable acting on (control register, system + ancilla register).
+
+        Args:
+            unitary: The unitary representation containing the SOSSA decomposition.
+            num_queries: Number of SOSSA involution blocks to apply.
+            use_unary_iteration: If ``True``, the control register is the phase register and
+                unary iteration skips one outer reflection per address, so branch ``t`` applies
+                ``W^(num_queries - 2t)``. If ``False``, the control register holds a single qubit
+                and the controlled walk step is repeated ``num_queries`` times.
+
+        Returns:
+            A Q# callable accepting the control register and the combined system/ancilla register.
+
+        Raises:
+            TypeError: If the unitary does not contain a SOSSA walk.
+            ValueError: If ``num_queries`` is not positive.
+
+        """
+        container = unitary.get_container()
+        if not isinstance(container, SOSSAWalkContainer):
+            raise TypeError("A SOSSA walk callable requires a SOSSAWalkContainer")
+        if num_queries <= 0:
+            raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
+
+        outer_prepare_op, inner_prepare_op, select_op = self._build_walk_oracles(container)
+
+        return QSHARP_UTILS.SOSSAWalk.MakeSOSSAWalkOp(
+            outer_prepare_op,
+            inner_prepare_op,
+            select_op,
+            self._build_walk_layout(container),
+            num_queries,
+            use_unary_iteration,
+        )
 
     def get_ancilla_prep_op(self) -> Any:
         """Return the Q# ancilla preparation op for external algorithms like phase estimation.

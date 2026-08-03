@@ -26,7 +26,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.MappedOverRange;
-    import Std.Arrays.MostAndTail;
     import Std.Arrays.Padded;
     import Std.Arrays.Partitioned;
     import Std.Arrays.Zipped;
@@ -42,6 +41,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Math.MinI;
     import Std.Measurement.MResetEachZ;
     import Std.TableLookup.Select;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
 
     // ═══════════════════════════════════════════════════════════════════════════
     //  1D SELECT-SWAP
@@ -118,76 +118,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
 
         return bestLambda;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  Unary Iteration
-    // ══════════════════════════════════════════════════════════════════════════
-
-    operation UnaryIteration(
-        address : Qubit[],
-        numActions : Int,
-        action : (Int => Unit is Adj + Ctl),
-    ) : Unit is Adj {
-        Fact(numActions > 0, "actions cannot be empty");
-
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
-        Fact(
-            Length(address) >= n,
-            $"address register is too small, requires at least {n} qubits",
-        );
-
-        if numActions == 1 {
-            action(0);
-        } else {
-            let (most, tail) = MostAndTail(address[...n - 1]);
-
-            within {
-                X(tail);
-            } apply {
-                SinglyControlledUnaryIteration(tail, most, 2^(n - 1), 0, action);
-            }
-
-            SinglyControlledUnaryIteration(tail, most, numActions - 2^(n - 1), 2^(n - 1), action);
-        }
-    }
-
-    internal operation SinglyControlledUnaryIteration(
-        ctl : Qubit,
-        address : Qubit[],
-        numActions : Int,
-        actionOffset : Int,
-        action : (Int => Unit is Adj + Ctl),
-    ) : Unit is Adj {
-        Fact(numActions > 0, "actions cannot be empty");
-
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
-        Fact(
-            Length(address) >= n,
-            $"address register is too small, requires at least {n} qubits",
-        );
-
-        if numActions == 1 {
-            Controlled action([ctl], actionOffset);
-        } else {
-            use helper = Qubit();
-
-            let (most, tail) = MostAndTail(address[...n - 1]);
-
-            within {
-                X(tail);
-            } apply {
-                AND(ctl, tail, helper);
-            }
-
-            SinglyControlledUnaryIteration(helper, most, 2^(n - 1), actionOffset, action);
-
-            CNOT(ctl, helper);
-
-            SinglyControlledUnaryIteration(helper, most, numActions - 2^(n - 1), actionOffset + 2^(n - 1), action);
-
-            Adjoint AND(ctl, tail, helper);
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
