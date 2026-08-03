@@ -15,6 +15,7 @@ from qdk_chemistry._core.data import DataClass as DataClassCore
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
+    CircuitExecutorData,
     DataClass,
     Hamiltonian,
     Orbitals,
@@ -164,6 +165,24 @@ class TestDataClass:
         # Test that we can still access Structure-specific methods
         assert hasattr(s, "get_num_atoms")
         assert s.get_num_atoms() == 1
+
+    def test_pure_python_content_hash_zero_returns_full_digest(self):
+        """Test pure-Python data classes return the full digest when truncate_chars is zero."""
+        data = CircuitExecutorData(bitstring_counts={"00": 1}, total_shots=1, executor="test")
+
+        short_digest = data.content_hash()
+        full_digest = data.content_hash(0)
+
+        assert len(short_digest) == 16
+        assert len(full_digest) == 64
+        assert full_digest.startswith(short_digest)
+
+    def test_pure_python_content_hash_rejects_negative_truncation(self):
+        """Test pure-Python data classes reject negative truncation lengths."""
+        data = CircuitExecutorData(bitstring_counts={"00": 1}, total_shots=1, executor="test")
+
+        with pytest.raises(ValueError, match="truncate_chars must be non-negative"):
+            data.content_hash(-1)
 
 
 class TestDataClassCompliance:

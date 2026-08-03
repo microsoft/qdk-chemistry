@@ -4,6 +4,7 @@
 
 // Orbitals usage examples.
 // --------------------------------------------------------------------------------------------
+// docs:xyz ../data/h2.structure.xyz
 // start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
@@ -13,8 +14,12 @@ using namespace qdk::chemistry::algorithms;
 
 int main() {
   // Obtain orbitals from a SCF calculation
-  // Load H2 molecule from XYZ file
-  auto structure = Structure::from_xyz_file("../data/h2.structure.xyz");
+  // Load H2 molecule from inline XYZ file
+  auto structure = Structure::from_xyz(R"(2
+H2 molecule
+H    0.000000    0.000000    0.000000
+H    0.000000    0.000000    0.740848
+)");
 
   // Obtain orbitals from a SCF calculation
   auto scf_solver = ScfSolverFactory::create();
@@ -45,17 +50,23 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-access
-  // Access orbital coefficients (returns std::pair<const Eigen::MatrixXd&,
-  // const Eigen::MatrixXd&>)
-  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  // Access orbital coefficients as a symmetry-blocked tensor, then per spin
+  // block
+  auto coefficients = orbitals->coefficients();
+  const auto& coeffs_alpha =
+      coefficients->block({axes::alpha(), axes::alpha()});
+  const auto& coeffs_beta = coefficients->block({axes::beta(), axes::beta()});
 
-  // Access orbital energies (returns std::pair<const Eigen::VectorXd&, const
-  // Eigen::VectorXd&>)
-  auto [energies_alpha, energies_beta] = orbitals->get_energies();
+  // Access orbital energies as a symmetry-blocked tensor, then per spin block
+  auto orbital_energies = orbitals->energies();
+  const auto& energies_alpha = orbital_energies->block({axes::alpha()});
+  const auto& energies_beta = orbital_energies->block({axes::beta()});
 
-  // Get active space indices
-  auto [active_indices_alpha, active_indices_beta] =
-      orbitals->get_active_space_indices();
+  // Get active space indices per spin channel
+  auto active_indices_alpha =
+      orbitals->active_indices()->indices(SymmetryLabel({axes::alpha()}));
+  auto active_indices_beta =
+      orbitals->active_indices()->indices(SymmetryLabel({axes::beta()}));
 
   // Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&)
   const auto& ao_overlap = orbitals->get_overlap_matrix();

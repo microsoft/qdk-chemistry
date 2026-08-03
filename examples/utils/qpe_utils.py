@@ -7,7 +7,7 @@
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Wavefunction
+from qdk_chemistry.data import Hamiltonian, QubitOperator, Wavefunction
 
 
 def prepare_top_dets_trial_state(
@@ -44,7 +44,7 @@ def prepare_top_dets_trial_state(
 
 
 def compute_evolution_time(
-    qubit_hamiltonian: QubitHamiltonian,
+    qubit_hamiltonian: QubitOperator,
     num_bits: int,
     solve_hamiltonian: bool = True,
     target_energy_precision: float = 1e-3,
@@ -79,7 +79,7 @@ def compute_evolution_time(
     if not solve_hamiltonian:
         return base_time
 
-    # Use the reference energy from the qubit Hamiltonian
+    # Use the reference energy from the Hamiltonian
     solver = create("qubit_hamiltonian_solver", "qdk_sparse_matrix_solver")
     reference_energy, _ = solver.run(qubit_hamiltonian)
 

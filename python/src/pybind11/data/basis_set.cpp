@@ -55,6 +55,8 @@ std::shared_ptr<BasisSet> basis_set_from_json_file_wrapper(
       qdk::chemistry::python::utils::to_string_path(filename));
 }
 
+//TODO: Check why both functions exist here
+
 // Convert a Python iterable of Shell objects to std::vector<Shell>.
 // Used by lambda-based init overloads to bypass pybind11's list_caster, which
 // can create a list_iterator that crashes under py::smart_holder during
@@ -73,6 +75,21 @@ std::vector<Shell> to_shell_vec(const py::iterable& items) {
     result.push_back(
         py::reinterpret_borrow<py::object>(PyList_GET_ITEM(lst.ptr(), i))
             .cast<Shell>());
+  }
+  return result;
+}
+
+// Converts a Python list of Shell objects to std::vector<Shell> via index
+// access. Using PyList_GET_ITEM avoids constructing a list_iterator, which
+// cannot be weak-referenced under py::smart_holder and otherwise crashes
+// during constructor overload probing.
+std::vector<Shell> shells_from_py_list(const py::list& shells) {
+  std::vector<Shell> result;
+  const Py_ssize_t size = PyList_GET_SIZE(shells.ptr());
+  result.reserve(static_cast<std::size_t>(size));
+  for (Py_ssize_t i = 0; i < size; ++i) {
+    PyObject* item = PyList_GET_ITEM(shells.ptr(), i);
+    result.push_back(py::reinterpret_borrow<py::object>(item).cast<Shell>());
   }
   return result;
 }
@@ -230,6 +247,8 @@ Examples:
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
 )");
 
+  // TODO: Check also these here 
+
   // Copy constructor
   basis_set.def(py::init<const BasisSet&>(), py::arg("other"),
                 "Copy constructor. Creates a deep copy of the basis set.");
@@ -241,6 +260,51 @@ Examples:
                 }),
                 py::arg("name"), py::arg("shells"),
                 py::arg("atomic_orbital_type") = AOType::Spherical,
+                R"(
+Create a basis set from a name and shells.
+
+Args:
+    name (str): Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+        shells (Iterable[Shell]): Iterable of Shell objects
+    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+)");
+
+  basis_set.def(
+      py::init([](const std::string& name, const py::list& shells,
+                  std::shared_ptr<Structure> structure,
+                  std::shared_ptr<const SymmetryProduct> ao_symmetries,
+                  std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
+                  AOType atomic_orbital_type) {
+        return std::make_shared<BasisSet>(
+            name, shells_from_py_list(shells), std::move(structure),
+            std::move(ao_symmetries), std::move(ao_extents),
+            atomic_orbital_type);
+      }),
+      R"(
+Constructor with explicit AO symmetries.
+
+Creates a basis set whose atomic orbitals are blocked under a caller-provided
+single-particle SymmetryProduct.
+
+Args:
+    name (str): Name of the basis set
+    shells (list[Shell]): Vector of shell objects defining the atomic orbitals
+    structure (Structure): Molecular structure to associate with this basis set
+    ao_symmetries (SymmetryProduct): SymmetryProduct the AO basis is blocked under
+    ao_extents (dict[SymmetryLabel, int] | None): Per-label AO extents; if empty, each admissible label defaults to the total atomic-orbital count
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals. Default is Spherical
+
+Examples:
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> sym = SymmetryProduct([axes.spin(1, True)])
+    >>> basis = BasisSet("custom", shells, structure, sym)
+)",
+      py::arg("name"), py::arg("shells"), py::arg("structure"),
+      py::arg("ao_symmetries"),
+      py::arg("ao_extents") = std::unordered_map<SymmetryLabel, std::size_t>{},
+      py::arg("atomic_orbital_type") = AOType::Spherical);
+
+  basis_set.def(py::init<const std::string&, const Structure&, AOType>(),
                 R"(
 Create a basis set from a name and shells.
 
@@ -680,6 +744,30 @@ Returns:
 Examples:
     >>> n_aux = basis_set.get_num_auxiliary_orbitals()
     >>> print(f"Total auxiliary orbitals: {n_aux}")
+)");
+
+  basis_set.def("ao_symmetries", &BasisSet::ao_symmetries,
+                R"(
+Get the single-particle SymmetryProduct the AO basis is blocked under.
+
+Returns:
+    SymmetryProduct: The AO :class:`~qdk_chemistry.data.symmetry.SymmetryProduct`. Defaults to a
+        restricted spin axis when not specified at construction.
+
+Examples:
+    >>> sym = basis_set.ao_symmetries()
+)");
+
+  basis_set.def("ao_extents", &BasisSet::ao_extents,
+                R"(
+Get the per-label AO extents.
+
+Returns:
+    dict[SymmetryLabel, int]: Mapping from :class:`~qdk_chemistry.data.symmetry.SymmetryLabel`
+        to the number of atomic orbitals carried by that symmetry block.
+
+Examples:
+    >>> extents = basis_set.ao_extents()
 )");
 
   // Atom mapping

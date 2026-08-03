@@ -16,9 +16,11 @@
 namespace sparsexx::detail {
 
 template <typename IndexType>
-void metis_kway_partitioning(int64_t _nvert, int64_t _npart, IndexType* _xadj,
-                             IndexType* _adjncy,
-                             std::vector<IndexType>& _part) {
+void metis_kway_partitioning([[maybe_unused]] int64_t _nvert,
+                             [[maybe_unused]] int64_t _npart,
+                             [[maybe_unused]] IndexType* _xadj,
+                             [[maybe_unused]] IndexType* _adjncy,
+                             [[maybe_unused]] std::vector<IndexType>& _part) {
 #ifdef SPARSEXX_ENABLE_METIS
   idx_t nvert = _nvert;
   idx_t nweights = 1;

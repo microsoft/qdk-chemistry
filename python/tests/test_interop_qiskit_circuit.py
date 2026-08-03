@@ -5,12 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.util
 from unittest.mock import patch
 
 import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils import Logger
+
+_HAS_PYLATEXENC = importlib.util.find_spec("pylatexenc") is not None
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
@@ -22,6 +25,7 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     )
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+_requires_pylatexenc = pytest.mark.skipif(not _HAS_PYLATEXENC, reason="pylatexenc not installed")
 
 
 @pytest.fixture
@@ -199,6 +203,7 @@ def test_circuit_info_count_gate_methods(simple_circuit):
     assert empty_category_count == 0
 
 
+@_requires_pylatexenc
 def test_plot_circuit_diagram(tmp_path, simple_circuit):
     """Test plotting a simple quantum circuit diagram and save the output."""
     # Plot with default settings
@@ -206,6 +211,7 @@ def test_plot_circuit_diagram(tmp_path, simple_circuit):
     assert (tmp_path / "circuit.png").exists()
 
 
+@_requires_pylatexenc
 def test_plot_circuit_diagram_remove_idle_classical_with_measurements():
     """Test plotting a circuit diagram with idle and classical qubits removed."""
     # Create a circuit with idle and classical qubits
@@ -226,6 +232,7 @@ def test_plot_circuit_diagram_remove_idle_classical_with_measurements():
     assert "3" not in texts  # 2 measurements remain, not 3
 
 
+@_requires_pylatexenc
 def test_plot_circuit_diagram_clbits_index():
     """Test plotting a circuit diagram with classical bits and their indices."""
     # Create a circuit with classical bits
@@ -243,6 +250,7 @@ def test_plot_circuit_diagram_clbits_index():
     assert "0" in texts  # measurement index 0 present
 
 
+@_requires_pylatexenc
 def test_clbit_register_handling():
     """Test plotting a circuit diagram with classical registers."""
     # Create a circuit with classical registers
@@ -259,6 +267,7 @@ def test_clbit_register_handling():
     assert "3" in texts  # 3 clibits registered
 
 
+@_requires_pylatexenc
 def test_plot_circuit_diagram_logging_and_warning(capfd):
     # Circuit with one qubit and one classical bit
     qc = QuantumCircuit(2, 1)

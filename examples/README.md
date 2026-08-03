@@ -23,8 +23,11 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 
 | Example | Install command |
 |---------|----------------|
-| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
+| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
+| `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
+| `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
 | `interoperability/qiskit/` | `pip install 'qdk-chemistry[qiskit-extras]'` |
@@ -40,12 +43,19 @@ python -m pip install pennylane rdkit
 
 ## Standalone examples and data
 
+Some notebooks import helper modules from the `utils/` directory.
+Download or clone the full `examples/` directory structure to run the examples.
+
 - `data`: Data directory for examples
+- `utils`: Shared helper modules used by some notebooks and scripts in this directory
 - `factory_list.ipynb`: Jupyter notebook that lists available factory methods in QDK/Chemistry along with their descriptions and settings
 - `language/cpp`: C++ example programs using the QDK/Chemistry C++ API
 - `language/sample_sci_workflow.py`: Python script demonstrating a sample classical workflow for selected CI quantum chemistry calculations.
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
+- `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
+- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 
 ## Companion datasets and assets
 

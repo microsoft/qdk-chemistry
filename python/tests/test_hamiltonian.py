@@ -20,6 +20,8 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     Orbitals,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
@@ -106,9 +108,9 @@ class TestHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2
@@ -327,9 +329,9 @@ class TestHamiltonian:
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
         assert data["container"]["core_energy"] == 0.0
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 1
         assert h2.get_core_energy() == 0.0
@@ -401,7 +403,16 @@ class TestHamiltonian:
             orig_orbs = h.get_orbitals()
             restored_orbs = h_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_hamiltonian_construction(self):
         """Test restricted Hamiltonian construction and properties."""
@@ -550,7 +561,7 @@ class TestHamiltonian:
     def test_active_space_consistency(self):
         """Test that active space handling works correctly for both restricted and unrestricted."""
         # Test restricted case with active space
-        model_orbitals_restricted = ModelOrbitals(4, True)
+        model_orbitals_restricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
         assert model_orbitals_restricted.is_restricted()
         assert model_orbitals_restricted.has_active_space()
 
@@ -563,7 +574,7 @@ class TestHamiltonian:
         assert h_restricted.is_restricted()
 
         # Test unrestricted case with active space
-        model_orbitals_unrestricted = ModelOrbitals(4, False)
+        model_orbitals_unrestricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))
         assert not model_orbitals_unrestricted.is_restricted()
         assert model_orbitals_unrestricted.is_unrestricted()
         assert model_orbitals_unrestricted.has_active_space()
@@ -590,12 +601,16 @@ class TestHamiltonian:
         assert h_unrestricted.is_unrestricted()
 
         # Verify active space information is accessible
-        alpha_indices, beta_indices = model_orbitals_restricted.get_active_space_indices()
+        active_indices = model_orbitals_restricted.active_indices()
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
         assert len(alpha_indices) == 4  # All orbitals active by default
         assert len(beta_indices) == 4
         assert alpha_indices == beta_indices
 
-        alpha_indices_unres, beta_indices_unres = model_orbitals_unrestricted.get_active_space_indices()
+        active_indices_unres = model_orbitals_unrestricted.active_indices()
+        alpha_indices_unres = spin_channel_indices(active_indices_unres, axes.alpha())
+        beta_indices_unres = spin_channel_indices(active_indices_unres, axes.beta())
         assert len(alpha_indices_unres) == 4  # All orbitals active by default
         assert len(beta_indices_unres) == 4
 
@@ -694,9 +709,9 @@ class TestCholeskyHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "three_center_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2
@@ -928,7 +943,16 @@ class TestCholeskyHamiltonian:
             orig_orbs = h.get_orbitals()
             restored_orbs = h_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_hamiltonian_construction(self):
         """Test restricted Cholesky Hamiltonian construction and properties."""

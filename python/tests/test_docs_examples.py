@@ -5,12 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib.metadata
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import ClassVar
 
 from qdk_chemistry.plugins.qiskit import (
@@ -27,6 +30,13 @@ PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
+# Release-note example scripts are snapshots that only work with the matching
+# library version.  Parse the major.minor from the filename (e.g.
+# "release_notes_v1_1.py" → (1, 1)) and compare against the installed version.
+_INSTALLED_VERSION: str = importlib.metadata.version("qdk-chemistry")
+_INSTALLED_MAJOR_MINOR = tuple(int(x) for x in _INSTALLED_VERSION.split(".")[:2])
+_RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
+
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
     """Check if an example file requires qiskit, pyscf, openfermion or contains slow tests.
@@ -39,7 +49,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
                   requires_openfermion, is_slow)
 
     """
-    content = example_file.read_text()
+    content = example_file.read_text(encoding="utf-8")
 
     requires_pyscf = False
     requires_qiskit = False
@@ -116,8 +126,8 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    # Energy estimator examples run circuit simulations and are slow
-    if 'create("energy_estimator"' in content or "create('energy_estimator'" in content:
+    # Expectation estimator examples run circuit simulations and are slow
+    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
     return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
@@ -141,18 +151,21 @@ class TestExampleScripts(unittest.TestCase):
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
-        result = subprocess.run(
-            [sys.executable, str(example_file)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=360,
-            cwd=example_file.parent,
-        )
+        with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            result = subprocess.run(
+                [sys.executable, str(example_file)],
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=360,
+                cwd=tmpdir,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
 
-        assert result.returncode == 0, (
-            f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
+            assert result.returncode == 0, (
+                f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
 
 
 # Dynamically create test methods for each example file
@@ -185,6 +198,15 @@ def _create_test_methods():
 
                 def test_method(self):
                     """Test the example file runs without errors."""
+                    # Release-note examples are version-pinned snapshots
+                    m = _RELEASE_NOTES_RE.match(filepath.name)
+                    if m:
+                        expected = (int(m.group(1)), int(m.group(2)))
+                        if expected != _INSTALLED_MAJOR_MINOR:
+                            self.skipTest(
+                                f"release_notes example requires v{expected[0]}.{expected[1]}.x "
+                                f"(installed: {_INSTALLED_VERSION})"
+                            )
                     # Skip if required packages are not available
                     if needs_pyscf and not PYSCF_AVAILABLE:
                         self.skipTest("PySCF not available")

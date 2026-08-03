@@ -30,7 +30,13 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
-from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
+from qdk_chemistry.algorithms.orbital_localizer import new_aufbau_determinant_wavefunction
+from qdk_chemistry.data import Orbitals, Settings, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import (
+    axes,
+    spin_index_set,
+)
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -69,9 +75,21 @@ class PyscfLocalizerSettings(Settings):
         """Initialize the localization object with default parameters."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("method", "string", "pipek-mezey")
+        self._set_default(
+            "method",
+            "string",
+            "pipek-mezey",
+            "Localization algorithm",
+            ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"],
+        )
         self._set_default("occupation_threshold", "double", 1e-10)
-        self._set_default("population_method", "string", "mulliken")
+        self._set_default(
+            "population_method",
+            "string",
+            "mulliken",
+            "Population analysis for Pipek-Mezey localization",
+            ["mulliken", "lowdin", "meta_lowdin", "becke"],
+        )
 
 
 class PyscfLocalizer(OrbitalLocalizer):
@@ -141,9 +159,20 @@ class PyscfLocalizer(OrbitalLocalizer):
         if loc_indices_b != sorted(loc_indices_b):
             raise ValueError("loc_indices_b must be sorted")
 
-        # If both index vectors are empty, return original orbitals unchanged
+        # Localization rotates the (active) orbital basis. Correlated-state coefficients
+        # are not re-expressed in the localized basis; the returned wavefunction is an
+        # Aufbau determinant built from the transformed orbitals.
+        if len(wavefunction.get_active_determinants()) > 1:
+            Logger.warn(
+                "PyscfLocalizer received a multi-determinant wavefunction. The returned wavefunction will contain "
+                "an Aufbau determinant built from the transformed orbitals; correlated-state coefficients are not "
+                "preserved."
+            )
+
+        # If both index vectors are empty, return an Aufbau determinant wavefunction
+        # with the original orbital coefficients unchanged.
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
-            return wavefunction
+            return new_aufbau_determinant_wavefunction(wavefunction, wavefunction.get_orbitals())
 
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
@@ -168,13 +197,16 @@ class PyscfLocalizer(OrbitalLocalizer):
             raise ValueError(f"Unknown localization method: {loc_method}")
 
         # Preserve active/inactive space indices from input orbitals if they exist
-        # For restricted: indices = (active, inactive)
-        # For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)
-        if orbitals.has_active_space():
-            active_alpha, active_beta = orbitals.get_active_space_indices()
-            inactive_alpha, inactive_beta = orbitals.get_inactive_space_indices()
+        has_active = orbitals.has_active_space()
+        if has_active:
+            active_idx = orbitals.active_indices()
+            active_alpha = spin_channel_indices(active_idx, axes.alpha())
+            active_beta = spin_channel_indices(active_idx, axes.beta())
+            inactive_idx = orbitals.inactive_indices()
+            inactive_alpha = spin_channel_indices(inactive_idx, axes.alpha())
+            inactive_beta = spin_channel_indices(inactive_idx, axes.beta())
         else:
-            active_alpha = active_beta = inactive_alpha = inactive_beta = None
+            active_alpha = active_beta = inactive_alpha = inactive_beta = []
 
         # Perform localization and populate localized orbitals instance
         if orbitals.is_restricted():
@@ -182,23 +214,28 @@ class PyscfLocalizer(OrbitalLocalizer):
                 raise ValueError("For restricted orbitals, loc_indices_a and loc_indices_b must be identical")
 
             # Start with original coefficients
-            mo_coeffs = orbitals.get_coefficients()[0]  # For restricted, get alpha coefficients
+            mo_coeffs = spin_channel_matrix(orbitals.coefficients(), axes.alpha())  # restricted: alpha coefficients
             mo_loc = mo_coeffs.copy()
 
             localized_mos = _do_loc(mo_coeffs, loc_indices_a)
             for i, idx in enumerate(loc_indices_a):
                 mo_loc[:, idx] = localized_mos[:, i]
 
+            nmo = mo_loc.shape[1]
             loc_orbitals = Orbitals(
                 coefficients=mo_loc,
-                energies=orbitals.get_energies()[0] if orbitals.has_energies() else None,
+                energies=spin_channel_vector(orbitals.energies(), axes.alpha()) if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(list(active_alpha), list(inactive_alpha)) if active_alpha is not None else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha)) if has_active else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha))
+                if has_active
+                else None,
             )
         else:
             # Unrestricted case - handle alpha and beta separately
-            mo_coeffs_alpha, mo_coeffs_beta = orbitals.get_coefficients()
+            mo_coeffs_alpha = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+            mo_coeffs_beta = spin_channel_matrix(orbitals.coefficients(), axes.beta())
             mo_a = mo_coeffs_alpha.copy()
             mo_b = mo_coeffs_beta.copy()
 
@@ -210,7 +247,12 @@ class PyscfLocalizer(OrbitalLocalizer):
             for i, idx in enumerate(loc_indices_b):
                 mo_b[:, idx] = localized_b[:, i]
 
-            energies_alpha, energies_beta = orbitals.get_energies() if orbitals.has_energies() else (None, None)
+            nmo = mo_a.shape[1]
+            if orbitals.has_energies():
+                energies_alpha = spin_channel_vector(orbitals.energies(), axes.alpha())
+                energies_beta = spin_channel_vector(orbitals.energies(), axes.beta())
+            else:
+                energies_alpha = energies_beta = None
             loc_orbitals = Orbitals(
                 coefficients_alpha=mo_a,
                 coefficients_beta=mo_b,
@@ -218,19 +260,15 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies_beta=energies_beta,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(
-                    list(active_alpha),
-                    list(active_beta),
-                    list(inactive_alpha),
-                    list(inactive_beta),
-                )
-                if active_alpha is not None
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_beta), equivalent=False)
+                if has_active
+                else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_beta), equivalent=False)
+                if has_active
                 else None,
             )
-        if len(wavefunction.get_active_determinants()) == 1:
-            # Single determinant case - return new wavefunction with localized orbitals
-            return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], loc_orbitals))
-        return Wavefunction(SciWavefunctionContainer(wavefunction.get_active_determinants(), loc_orbitals))
+        # Return an Aufbau determinant wavefunction in the transformed orbital basis.
+        return new_aufbau_determinant_wavefunction(wavefunction, loc_orbitals)
 
     def name(self) -> str:
         """Return the settings for the localizer."""

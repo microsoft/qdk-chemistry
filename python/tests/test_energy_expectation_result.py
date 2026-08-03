@@ -69,7 +69,7 @@ def test_energy_expectation_result_json_file_io():
         assert Path(filename).exists()
 
         # Verify file contents
-        with open(filename) as f:
+        with open(filename, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["energy_expectation_value"] == -1.0

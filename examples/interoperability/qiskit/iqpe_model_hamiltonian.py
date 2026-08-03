@@ -30,7 +30,7 @@ except ImportError as ex:
     ) from ex
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -59,7 +59,7 @@ hamiltonian_op = SparsePauliOp.from_list(
         ("ZZ", 1.0),
     ]
 )
-hamiltonian_1 = QubitHamiltonian(
+hamiltonian_1 = QubitOperator(
     pauli_strings=hamiltonian_op.paulis.to_labels(),
     coefficients=hamiltonian_op.coeffs,
 )
@@ -72,21 +72,26 @@ state_prep_circuit_1 = Circuit(qasm3.dumps(state_prep_1))
 # 2. Run iterative QPE
 iqpe_1 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_1,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_1,
+)
+iqpe_1.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_1,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_1
+        ),
+    ),
 )
 iqpe_1.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1),
-)
-iqpe_1.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=TIME_STEP_1),
-)
-iqpe_1.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 result_1 = iqpe_1.run(
@@ -136,7 +141,7 @@ hamiltonian_op_2 = SparsePauliOp.from_list(
         ("ZZ", 0.0590),
     ]
 )
-hamiltonian_2 = QubitHamiltonian(
+hamiltonian_2 = QubitOperator(
     pauli_strings=hamiltonian_op_2.paulis.to_labels(),
     coefficients=hamiltonian_op_2.coeffs,
 )
@@ -150,21 +155,26 @@ state_prep_circuit_2 = Circuit(qasm3.dumps(state_prep_2))
 # 2. Run iterative QPE
 iqpe_2 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_2,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_2,
+)
+iqpe_2.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_2,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_2
+        ),
+    ),
 )
 iqpe_2.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2),
-)
-iqpe_2.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=TIME_STEP_2),
-)
-iqpe_2.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 result_2 = iqpe_2.run(

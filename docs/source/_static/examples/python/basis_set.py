@@ -6,15 +6,20 @@
 # --------------------------------------------------------------------------------------------
 
 ################################################################################
+# docs:xyz ../data/water.structure.xyz
 # start-cell-loading
 import numpy as np
 from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
-# Load a water molecule structure from XYZ file
-structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
-)
+# Load a water molecule structure from inline XYZ file
+structure = Structure.from_xyz("""\
+3
+Water molecule
+O    0.000000    0.000000    0.000000
+H    0.758602    0.000000    0.504284
+H   -0.758602    0.000000    0.504284
+""")
 
 # Create basis sets from the library using basis set name
 basis_from_name = BasisSet.from_basis_name("sto-3g", structure)

@@ -89,19 +89,19 @@ Setting ``periodic=True`` adds an edge between the first and last site to form a
    Ring (n=6):   0 --- 1 --- 2 --- 3 --- 4 --- 5
                  |_____________________________|
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
-      :language: cpp
-      :start-after: // start-cell-create-chain
-      :end-before: // end-cell-create-chain
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
       :language: python
       :start-after: # start-cell-create-chain
       :end-before: # end-cell-create-chain
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
+      :language: cpp
+      :start-after: // start-cell-create-chain
+      :end-before: // end-cell-create-chain
 
 Two-dimensional lattices
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,13 +185,6 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
    / \     / \      / \
   0---1---3---4----6---7
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
-      :language: cpp
-      :start-after: // start-cell-create-2d
-      :end-before: // end-cell-create-2d
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
@@ -199,17 +192,17 @@ With periodic boundary conditions, the inter-cell bonds that form the down-trian
       :start-after: # start-cell-create-2d
       :end-before: # end-cell-create-2d
 
-Creating from adjacency data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For geometries not covered by the built-in methods, you can construct a :class:`~qdk_chemistry.data.LatticeGraph` from a dense adjacency matrix, a sparse adjacency matrix, or an edge-weight dictionary.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
       :language: cpp
-      :start-after: // start-cell-from-matrix
-      :end-before: // end-cell-from-matrix
+      :start-after: // start-cell-create-2d
+      :end-before: // end-cell-create-2d
+
+Creating from adjacency data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For geometries not covered by the built-in methods, you can construct a :class:`~qdk_chemistry.data.LatticeGraph` from a dense adjacency matrix, a sparse adjacency matrix, or an edge-weight dictionary.
 
 .. tab:: Python API
 
@@ -217,6 +210,13 @@ For geometries not covered by the built-in methods, you can construct a :class:`
       :language: python
       :start-after: # start-cell-from-matrix
       :end-before: # end-cell-from-matrix
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
+      :language: cpp
+      :start-after: // start-cell-from-matrix
+      :end-before: // end-cell-from-matrix
 
 .. _lattice-periodic-boundary-conditions:
 
@@ -250,13 +250,6 @@ The ``~~~`` edges show the wrap-around connections that turn the open lattice in
      ~     ~     ~     ~
      8     9    10    11
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
-      :language: cpp
-      :start-after: // start-cell-periodic
-      :end-before: // end-cell-periodic
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
@@ -264,17 +257,17 @@ The ``~~~`` edges show the wrap-around connections that turn the open lattice in
       :start-after: # start-cell-periodic
       :end-before: # end-cell-periodic
 
-Accessing lattice data
-----------------------
-
-The :class:`~qdk_chemistry.data.LatticeGraph` class provides methods to query connectivity, edge weights, and structural properties.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
       :language: cpp
-      :start-after: // start-cell-properties
-      :end-before: // end-cell-properties
+      :start-after: // start-cell-periodic
+      :end-before: // end-cell-periodic
+
+Accessing lattice data
+----------------------
+
+The :class:`~qdk_chemistry.data.LatticeGraph` class provides methods to query connectivity, edge weights, and structural properties.
 
 .. tab:: Python API
 
@@ -282,6 +275,13 @@ The :class:`~qdk_chemistry.data.LatticeGraph` class provides methods to query co
       :language: python
       :start-after: # start-cell-properties
       :end-before: # end-cell-properties
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
+      :language: cpp
+      :start-after: // start-cell-properties
+      :end-before: // end-cell-properties
 
 Serialization
 -------------
@@ -292,6 +292,13 @@ For detailed information about serialization in QDK/Chemistry, see the :doc:`Ser
 .. note::
    Lattice graph files use the ``.lattice_graph`` suffix before the file type extension, for example ``chain.lattice_graph.json`` and ``square.lattice_graph.hdf5``.
 
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
+      :language: python
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
+
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
@@ -299,12 +306,15 @@ For detailed information about serialization in QDK/Chemistry, see the :doc:`Ser
       :start-after: // start-cell-serialization
       :end-before: // end-cell-serialization
 
-.. tab:: Python API
+Edge coloring
+-------------
 
-   .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
-      :language: python
-      :start-after: # start-cell-serialization
-      :end-before: # end-cell-serialization
+The ``edge_coloring`` property returns an optional ``dict[tuple[int, int], int]`` that assigns a color index to each undirected edge such that edges sharing a vertex receive distinct colors.
+Factory methods for recognised topologies (chain, square, honeycomb) pre-populate this with a deterministic optimal coloring; triangular and kagome lattices use a greedy heuristic.
+Custom lattices built from raw adjacency matrices have ``edge_coloring`` set to ``None`` — callers can compute and supply their own coloring.
+
+This coloring is the topological ingredient that powers geometry-aware Trotter scheduling: edges of the same color have disjoint qubit supports, so their Pauli exponentials can be applied in parallel inside one Trotter step.
+The :doc:`spin model Hamiltonian builders <../model_hamiltonians>` consume the coloring automatically when ``include_term_groups=True`` and store the result on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
 
 Related classes
 ---------------

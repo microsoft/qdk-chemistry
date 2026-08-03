@@ -229,6 +229,8 @@ class Ansatz : public DataClass, public std::enable_shared_from_this<Ansatz> {
   static std::shared_ptr<Ansatz> from_hdf5(H5::Group& group);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Hamiltonian operator for the system
   std::shared_ptr<Hamiltonian> _hamiltonian;
 
