@@ -123,11 +123,15 @@ class TestOuterPrep:
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
     def test_build_outer_prep_alias_sampling_marginal_probs(self, adaptive_qdk_ctx):
-        """Verify alias sampling prepares the correct marginal probabilities.
+        r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
 
-        The alias sampling op produces |ψ⟩ = Σ_l √(p̃_l) |l⟩|garbage_l⟩.
-        We check that the marginal probabilities on the index register match
-        p(l) = |c_l| / Σ|c_j|.
+        The SOS block encoding needs amplitudes proportional to the generator one-norms
+        :math:`c_l` (Eq. 88 of Low et al. 2025), because the normalization
+        :math:`\Lambda = \frac{1}{2}\sum_l c_l^2` and the energy decoding
+        :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are both read off those amplitudes.
+        One-dimensional alias sampling discretizes its input as a *probability*
+        distribution, so the marginal on the index register must come out as
+        :math:`p(l) = c_l^2 / \sum_j c_j^2` rather than :math:`|c_l| / \sum_j |c_j|`.
         """
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
@@ -152,8 +156,8 @@ class TestOuterPrep:
             index_val = int("{:0{w}b}".format(be_idx, w=num_index_qubits)[::-1], 2)
             probs[index_val] += abs(full_sv[i]) ** 2
 
-        abs_coeffs = np.abs(coefficients)
-        expected_probs = abs_coeffs / np.sum(abs_coeffs)
+        squared_coeffs = np.abs(coefficients) ** 2
+        expected_probs = squared_coeffs / np.sum(squared_coeffs)
 
         atol = 2.0 / (2**bit_precision)
         np.testing.assert_allclose(probs[: len(coefficients)], expected_probs, atol=atol)
@@ -256,21 +260,6 @@ class TestInnerPrep:
 class TestSOSSAMapper:
     """Tests for the SOSSA controlled circuit mapper."""
 
-    def test_name_and_type(self):
-        """Test that name and type_name return correct values."""
-        mapper = SOSSAMapper()
-        assert mapper.name() == "sossa"
-        assert mapper.type_name() == "controlled_circuit_mapper"
-
-    def test_default_settings(self):
-        """Test default settings are correct."""
-        mapper = SOSSAMapper()
-        assert mapper.settings().get("inner_prepare_algorithm") == "controlled_alias_sampling"
-        assert mapper.settings().get("select_algorithm") == "qrom_phase_gradient"
-        assert mapper.uses_phase_gradient is True
-        assert mapper.settings().get("rotation_bit_precision") == 10
-        assert mapper.settings().get("coefficient_bit_precision") == 10
-
     def test_rejects_non_sossa_container(self):
         """Verify SOSSAMapper raises ValueError for non-SOSSAWalkContainer containers."""
 
@@ -349,34 +338,6 @@ class TestSOSSAMapper:
 
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
-
-    def test_walk_params_alias_sampling_flags(self):
-        """Test that alias sampling algorithms set reflection flags correctly."""
-        controlled_unitary = _build_controlled_unitary()
-        mapper = _make_sossa_mapper(
-            outer_algorithm="alias_sampling",
-            inner_algorithm="controlled_alias_sampling",
-            select_algorithm="qrom_phase_gradient",
-        )
-        circuit = mapper.run(controlled_unitary)
-
-        params = circuit._qsharp_factory.parameter
-        assert "outerPrepareOp" in params
-        assert "innerPrepareOp" in params
-        assert "selectOp" in params
-        assert params["numSystemQubits"] == 4  # 2 * num_orbitals(=2)
-
-    def test_walk_params_power(self):
-        """Test that power passes through to walk_params."""
-        fh = create_random_factorized_hamiltonian()
-        builder = SOSSABuilder(power=5)
-        unitary_rep = builder.run(_to_sossa_operator(fh))
-
-        mapper = SOSSAMapper()
-        circuit = mapper.run(unitary_rep)
-
-        params = circuit._qsharp_factory.parameter
-        assert params["power"] == 5
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

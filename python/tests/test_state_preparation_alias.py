@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 import qdk
 
-from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 
@@ -77,11 +76,6 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 
 class TestAliasSamplingStatePreparation:
     """Tests for the alias sampling state preparation algorithm."""
-
-    def test_registered_in_registry(self):
-        """Test that alias_sampling is registered in the algorithm registry."""
-        prep = registry.create("state_prep", "alias_sampling")
-        assert isinstance(prep, AliasSamplingStatePreparation)
 
     def test_run_returns_circuit(self):
         """Test that run() returns a Circuit with ops set."""

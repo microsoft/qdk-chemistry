@@ -146,29 +146,90 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
+    /// Number of address qubits needed to enumerate `numActions` values.
+    function AddressQubits(numActions : Int) : Int {
+        Ceiling(Lg(IntAsDouble(numActions)))
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     //  Test wrappers
+    //
+    //  These leak their qubits with `QIR.Runtime.AllocateQubitArray` so that the
+    //  full statevector survives until the caller dumps it, and they restore the
+    //  address register to |0...0> so the dumped state is exactly the payload.
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Applies the power schedule with reflection A = X and block B = H for testing.
-    operation TestUnaryIterationPowerSchedule(
-        numBlocks : Int,
-        addressValue : Int,
-    ) : Unit {
-        let numAddressQubits = Ceiling(Lg(IntAsDouble(numBlocks + 1)));
+    /// Flips `flags[index]` for the single selected address.
+    ///
+    /// The dumped state must be the basis state whose only excited flag qubit is
+    /// `flags[addressValue]`, which pins down both the selection and the absence of
+    /// residual entanglement with the internal AND ancillas.
+    operation TestUnaryIterationOneHot(numActions : Int, addressValue : Int) : Unit {
+        let numAddressQubits = AddressQubits(numActions);
+        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
+        let address = qs[0..numAddressQubits - 1];
+        let flags = qs[numAddressQubits...];
+        ApplyXorInPlace(addressValue, address);
+        UnaryIteration(address, numActions, (index) => {
+            X(flags[index]);
+        });
+        ApplyXorInPlace(addressValue, address);
+    }
+
+    /// Runs the one-hot iteration on a uniform superposition of every address.
+    ///
+    /// `numActions` must be a power of two so that all addresses are in range; the
+    /// dumped state must be the entangled sum over addresses with no ancilla residue.
+    operation TestUnaryIterationSuperposedAddress(numActions : Int) : Unit {
+        let numAddressQubits = AddressQubits(numActions);
+        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
+        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
+        let address = qs[0..numAddressQubits - 1];
+        let flags = qs[numAddressQubits...];
+        ApplyToEach(H, address);
+        UnaryIteration(address, numActions, (index) => {
+            X(flags[index]);
+        });
+    }
+
+    /// Applies `Z` to the exposed unary control for every index flagged in `data`.
+    ///
+    /// The address register carries a uniform superposition, so the dumped
+    /// amplitudes are the sign pattern of `data`. This checks that the exposed
+    /// control is an exact equality predicate for phase-only actions, which is the
+    /// mode used by the reflection schedule.
+    operation TestUnaryIterationControlPhases(numActions : Int, data : Bool[]) : Unit {
+        let numAddressQubits = AddressQubits(numActions);
+        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
+        let address = QIR.Runtime.AllocateQubitArray(numAddressQubits);
+        ApplyToEach(H, address);
+        UnaryIterationWithControl(address, numActions, (index, control) => {
+            if data[index] {
+                Z(control);
+            }
+        });
+    }
+
+    /// Signed-power schedule with reflection A = Z and block B = X on one target
+    /// prepared in Ry(0.7)|0>.
+    ///
+    /// Branch `addressValue` must apply exactly (Z·X)^(numBlocks - 2*addressValue),
+    /// including the relative phase, which distinguishes every power in the schedule.
+    operation TestUnaryIterationSignedPower(numBlocks : Int, addressValue : Int) : Unit {
+        let numAddressQubits = AddressQubits(numBlocks + 1);
         let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + 1);
         let address = qs[0..numAddressQubits - 1];
         let target = qs[numAddressQubits];
-
         ApplyXorInPlace(addressValue, address);
+        Ry(0.7, target);
         UnaryIterationPowerSchedule(address, numBlocks, (selected) => {
             within {
                 X(selected);
             } apply {
-                Controlled X([selected], target);
+                Controlled Z([selected], target);
             }
         }, () => {
-            H(target);
+            X(target);
         });
         ApplyXorInPlace(addressValue, address);
     }

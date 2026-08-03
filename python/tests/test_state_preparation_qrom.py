@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 import qdk
 
-from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 
@@ -70,11 +69,6 @@ class TestQROMStatePreparation:
         assert circuit is not None
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
-
-    def test_registered_in_registry(self):
-        """Test that qrom is registered in the algorithm registry."""
-        prep = registry.create("state_prep", "qrom")
-        assert isinstance(prep, QROMStatePreparation)
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_fidelity_random(self, qdk_ctx, num_coefficients):

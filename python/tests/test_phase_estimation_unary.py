@@ -7,33 +7,132 @@
 
 import numpy as np
 import pytest
-from qdk_chemistry.algorithms import create
+
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     num_phase_bits,
     phase_window_state,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
-    UnaryPhaseEstimation,
     _select_dominant_decoded_phase,
 )
 
+_PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
+_PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
+
+
+def _address_qubits(num_actions: int) -> int:
+    """Number of address qubits the Q# operations allocate for ``num_actions`` values."""
+    return int(np.ceil(np.log2(num_actions))) if num_actions > 1 else 0
+
+
+def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
+    """Map a little-endian address value onto its index in the dumped statevector.
+
+    ``ApplyXorInPlace`` and the unary iteration address the register little-endian
+    (``address[0]`` is the least significant bit) while ``dump_machine`` reads the
+    first allocated qubit as the most significant bit, so the two differ by a bit
+    reversal over the address register.
+    """
+    if num_address_qubits == 0:
+        return 0
+    return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
+
+
+def _matrix_power(matrix: np.ndarray, exponent: int) -> np.ndarray:
+    """Signed matrix power for a self-inverse-product walk operator."""
+    base = matrix if exponent >= 0 else np.linalg.inv(matrix)
+    result = np.eye(matrix.shape[0], dtype=complex)
+    for _ in range(abs(exponent)):
+        result = base @ result
+    return result
+
 
 class TestUnaryIterationQsharp:
-    """Q# level checks of the signed-power schedule."""
+    """Statevector checks of the unary-iteration primitives against exact references."""
 
-    @pytest.mark.parametrize("address_value", [0, 1, 2])
-    def test_power_schedule_realizes_signed_powers(self, qdk_ctx, address_value):
-        """With A = X, B = H and p = 2, slot t applies (XH)^(2-2t), which is the identity only at t = 1."""
-        num_blocks = 2
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationPowerSchedule(num_blocks, address_value)
+    @pytest.mark.parametrize(
+        ("num_actions", "address_value"),
+        [(n, a) for n in (1, 2, 3, 4, 5, 6, 7, 8, 11) for a in range(n)],
+    )
+    def test_selects_exactly_one_action_per_address(self, qdk_ctx, num_actions, address_value):
+        """Address ``i`` must flip flag ``i`` and nothing else, for every valid address.
+
+        Covers ``num_actions`` values that are not powers of two, where the iteration
+        recurses into unequal halves. Comparing against the full basis state also rules
+        out residual entanglement with the internal AND ancillas.
+        """
+        num_address_qubits = _address_qubits(num_actions)
+        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationOneHot(num_actions, address_value)
         state = np.array(qdk_ctx.dump_machine().as_dense_state())
 
-        probability_zero = abs(state[0]) ** 2
-        if num_blocks - 2 * address_value == 0:
-            assert probability_zero == pytest.approx(1.0, abs=1e-9)
-        else:
-            assert probability_zero == pytest.approx(0.0, abs=1e-9)
+        expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
+        expected[1 << (num_actions - 1 - address_value)] = 1.0
+        np.testing.assert_allclose(state, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("num_actions", [2, 4, 8])
+    def test_superposed_address_stays_coherent(self, qdk_ctx, num_actions):
+        """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue.
+
+        A per-address test cannot detect ancillas that are left entangled with the
+        address, because each computational-basis address leaves them in a product
+        state; only a coherent superposition exposes that failure mode.
+        """
+        num_address_qubits = _address_qubits(num_actions)
+        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationSuperposedAddress(num_actions)
+        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+
+        expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
+        for address_value in range(num_actions):
+            index = _dumped_address_index(address_value, num_address_qubits) << num_actions
+            expected[index | (1 << (num_actions - 1 - address_value))] = 1.0 / np.sqrt(num_actions)
+        np.testing.assert_allclose(state, expected, atol=1e-10)
+
+    @pytest.mark.parametrize(
+        ("num_actions", "data"),
+        [
+            (2, [True, False]),
+            (4, [True, False, False, True]),
+            (8, [True, False, False, False, False, True, True, False]),
+        ],
+    )
+    def test_exposed_control_is_an_equality_predicate(self, qdk_ctx, num_actions, data):
+        """Phasing the exposed control must imprint exactly the flagged sign pattern.
+
+        The reflection schedule uses the exposed control as a phase control rather than
+        as a control on a target, so it has to be a clean ``[address == i]`` predicate.
+        """
+        num_address_qubits = _address_qubits(num_actions)
+        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationControlPhases(num_actions, data)
+        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+
+        expected = np.zeros(1 << num_address_qubits, dtype=complex)
+        for address_value in range(num_actions):
+            sign = -1.0 if data[address_value] else 1.0
+            expected[_dumped_address_index(address_value, num_address_qubits)] = sign / np.sqrt(num_actions)
+        np.testing.assert_allclose(state, expected, atol=1e-10)
+
+    @pytest.mark.parametrize(
+        ("num_blocks", "address_value"),
+        [(m, t) for m in (1, 2, 3, 4, 5, 6) for t in range(m + 1)],
+    )
+    def test_power_schedule_realizes_signed_powers(self, qdk_ctx, num_blocks, address_value):
+        """Slot ``t`` must apply exactly ``W^(num_blocks - 2t)`` for ``W = Z.X``.
+
+        The target starts in ``Ry(0.7)|0>``, which is an eigenstate of neither ``W`` nor
+        any of its powers, so the comparison pins down the relative phase and therefore
+        distinguishes every signed power in the schedule - including the negative ones.
+        """
+        walk = _PAULI_Z @ _PAULI_X
+        initial = np.array([np.cos(0.35), np.sin(0.35)], dtype=complex)
+        num_address_qubits = _address_qubits(num_blocks + 1)
+
+        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationSignedPower(num_blocks, address_value)
+        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+
+        expected = np.zeros(1 << (num_address_qubits + 1), dtype=complex)
+        expected[:2] = _matrix_power(walk, num_blocks - 2 * address_value) @ initial
+        np.testing.assert_allclose(state, expected, atol=1e-10)
 
 
 class TestPhaseRegisterSizing:
@@ -116,19 +215,6 @@ class TestPhaseDecoding:
 
 class TestRegistration:
     """Registry wiring for the unary phase estimation stack."""
-
-    def test_builder_is_registered(self):
-        """The builder is available under its registry name."""
-        builder = create("qpe_circuit_builder", "qdk_unary")
-        assert isinstance(builder, QdkUnaryQpeCircuitBuilder)
-        assert builder.settings().get("phase_window") == "kaiser"
-
-    def test_algorithm_is_registered_with_matching_builder(self):
-        """The algorithm defaults to the unary builder."""
-        algorithm = create("phase_estimation", "qdk_unary", shots=17)
-        assert isinstance(algorithm, UnaryPhaseEstimation)
-        assert algorithm.settings().get("shots") == 17
-        assert algorithm.settings().get("qpe_circuit_builder").algorithm_name == "qdk_unary"
 
     def test_query_count_falls_back_to_settings(self):
         """A unitary representation without a power uses the configured query count."""

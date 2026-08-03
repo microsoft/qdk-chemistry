@@ -53,30 +53,32 @@ def test_qubit_operator_rejects_legacy_constructor() -> None:
         QubitOperator(["X"])  # type: ignore[arg-type]
 
 
-def test_sos_container_stores_block_encoding_data() -> None:
-    """The SOS container stores per-block Givens angles, LCU coefficients, and Pauli terms."""
+def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
+    """Complex LCU coefficients and Givens angles survive a JSON round-trip.
+
+    The SOS generators carry the D1/Q1 ``+/-i`` sign in the imaginary part, so a
+    serializer that silently drops it would still produce a well-formed container
+    while flipping particle generators into hole generators.
+    """
+    one_body_coeffs = np.array([[0.2, 0.2j], [0.3, -0.3j]])
     container = SOSSAContainer(
         num_spatial_orbitals=2,
         energy_shift=-1.5,
         num_ranks=1,
         num_bases=1,
         num_copies=1,
-        one_body=RotatedPaulis(np.array([[0.1], [0.2]]), np.array([[0.2, 0.2j], [0.3, -0.3j]]), ("X", "Y")),
+        one_body=RotatedPaulis(np.array([[0.1], [0.2]]), one_body_coeffs, ("X", "Y")),
         num_positive_one_body_terms=1,
         two_body=RotatedPaulis(np.array([[0.3]]), np.array([[0.3, 0.7]]), ("Z",)),
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
     )
-    operator = QubitOperator(container)
 
-    assert operator.get_container_type() == "sossa"
-    assert container.num_positive_one_body_terms == 1
-    assert container.one_body.paulis == ("X", "Y")
-    assert container.two_body.paulis == ("Z",)
-    np.testing.assert_allclose(container.one_body.coeffs, np.array([[0.2, 0.2j], [0.3, -0.3j]]))
-    restored = QubitOperator.from_json(operator.to_json()).get_container()
-    assert restored.type == "sossa"
+    restored = QubitOperator.from_json(QubitOperator(container).to_json()).get_container()
+
+    np.testing.assert_allclose(restored.one_body.coeffs, one_body_coeffs)
+    np.testing.assert_allclose(restored.one_body.angles, container.one_body.angles)
     np.testing.assert_allclose(restored.two_body.coeffs, container.two_body.coeffs)
     np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
-    np.testing.assert_allclose(restored.one_body.coeffs, container.one_body.coeffs)
     assert restored.num_positive_one_body_terms == 1
+    assert restored.energy_shift == pytest.approx(-1.5)

@@ -1,4 +1,4 @@
-"""Unary-iteration phase estimation with an arbitrary number of walk queries.
+r"""Unary-iteration phase estimation with an arbitrary number of walk queries.
 
 This module implements phase estimation whose query schedule is driven by
 unary iteration over the phase register rather than by controlled powers of the walk
@@ -7,17 +7,17 @@ branch that omits reflection slot :math:`t` realizes :math:`W^{p-2t}`, so the to
 query count need not be a power of two.
 
 Because every branch phase is doubled relative to the walk phase, the measured
-fraction :math:`y` satisfies :math:`y = \\pm 2\\varphi \\bmod 1`. The conjugate bins
+fraction :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins
 are merged before the winner is chosen, and the ``phase_band`` builder setting selects
 which half-band the result is reported in.
 
 References:
-    Berry et al. (2022). arXiv:2209.13581, Appendix D.
-    Lee, Berry, Gidney, Huggins, McClean, Wiebe, Babbush (2021). arXiv:2011.03494 —
-        tensor hypercontraction; prescription for a non-power-of-two number of queries.
-    Babbush, Gidney, Berry, Wiebe, McClean, Paler, Fowler, Neven (2018). arXiv:1805.03662 —
-        Heisenberg-limited phase estimation with a sine-window control state, where each
-        block applies :math:`W` or :math:`W^\\dagger` and hence doubles the phase.
+    :cite:`Berry2024`, Appendix D.
+    :cite:`Lee2021` — tensor hypercontraction; prescription for a non-power-of-two
+        number of queries.
+    :cite:`Babbush2018` — Heisenberg-limited phase estimation with a sine-window
+        control state, where each block applies :math:`W` or :math:`W^\dagger` and
+        hence doubles the phase.
 
 """
 

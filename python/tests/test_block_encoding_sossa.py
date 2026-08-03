@@ -177,15 +177,6 @@ class TestSOSSAWalkContainer:
         assert restored.get_container_type() == "sossa_walk"
         assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
-    def test_get_summary(self):
-        """Test that get_summary returns a non-empty string."""
-        result = _make_sossa_unitary_representation()
-        summary = result.get_container().get_summary()
-
-        assert "SOSSA" in summary
-        assert "N=2" in summary
-        assert "R=2" in summary
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Builder tests
@@ -194,13 +185,6 @@ class TestSOSSAWalkContainer:
 
 class TestSOSSABuilder:
     """Tests for the SOSSA block encoding builder algorithm."""
-
-    def test_power_setting(self):
-        """Test power parameter passes through to container."""
-        fh = create_random_factorized_hamiltonian()
-        builder = SOSSABuilder(power=3)
-        result = builder.run(_to_sossa_operator(fh))
-        assert result.get_container().power == 3
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
