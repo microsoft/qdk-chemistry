@@ -1,4 +1,9 @@
-"""Verify the native QDK/Chemistry implementations used by the QPE tutorial."""
+"""Verify the Python environment and implementations required by the tutorial.
+
+The script checks package compatibility, imports notebook/widget dependencies,
+and instantiates every QDK/Chemistry algorithm implementation used later. It does
+not run a chemistry calculation.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,11 +16,20 @@ import qdk_chemistry
 
 
 def public_version(version: str) -> str:
-    """Return a package version without local build metadata."""
+    """Remove PEP 440 local build metadata from a package version.
+
+    Args:
+        version: Installed version such as ``2.0.0`` or ``2.0.0+local``.
+
+    Returns:
+        The public release component, such as ``2.0.0``.
+    """
     return version.partition("+")[0]
 
 
-# The documentation test harness sets this tutorial version; downloaded copies do not.
+# CI sets this variable to verify the tutorial's declared release compatibility.
+# Downloaded copies leave it unset, so ordinary student execution reports the
+# installed version without embedding test-harness policy in the example.
 GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
 if GROUND_STATE_TUTORIAL_VERSION is not None:
     installed_public_version = public_version(qdk_chemistry.__version__)
@@ -32,8 +46,10 @@ import ipykernel
 from qdk.widgets import MoleculeViewer
 from qdk_chemistry.algorithms import create
 
-# create() instantiates each required implementation without running a
-# calculation; completing this tuple verifies that every plugin is available.
+# create() resolves each factory key and instantiates its implementation without
+# running a calculation. Successful construction proves the required algorithms
+# are registered and their import-time dependencies are available. Retaining the
+# objects in a tuple also lets the final diagnostic report how many were checked.
 required_implementations = (
     create("scf_solver", "qdk"),
     create("active_space_selector", "qdk_autocas_eos"),

@@ -294,7 +294,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :class: quiz-question
    :collapsible: closed
 
-   The mapped Hamiltonian contains 383 Pauli terms on twelve compute qubits.
+   The mapped Hamiltonian contains 247 Pauli terms on twelve compute qubits.
    The separately stored core energy is approximately :math:`-99.117775949333` Hartree.
    These counts use the mapper's default numerical thresholds.
 

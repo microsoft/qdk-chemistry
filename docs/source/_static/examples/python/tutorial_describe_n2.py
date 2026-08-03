@@ -1,4 +1,9 @@
-"""Define stretched N2 and compare Hartree-Fock basis-set energies."""
+"""Define stretched N2 and compare Hartree--Fock basis-set energies.
+
+This linear first example changes only the orbital basis while holding geometry,
+charge, spin, and solver fixed. The resulting energy difference measures basis-
+set sensitivity rather than exact error.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -22,6 +27,8 @@ Stretched N2 molecule for the ground-state QPE tutorial
 N    0.000000    0.000000    0.000000
 N    0.000000    0.000000    1.850000
 """)
+# The 1.85-Angstrom bond is substantially longer than the approximately
+# 1.10-Angstrom equilibrium distance, increasing multiconfigurational character.
 # The target is neutral N2 in its singlet ground state, where all electrons are
 # paired and the spin multiplicity 2S + 1 equals one.
 charge = 0
@@ -31,6 +38,8 @@ spin_multiplicity = 1
 
 ################################################################################
 # start-cell-hartree-fock
+# Correlation-consistent double- and triple-zeta bases form a controlled sequence:
+# cc-pVTZ adds radial/angular flexibility beyond cc-pVDZ at higher cost.
 basis_sets = ("cc-pvdz", "cc-pvtz")
 # Store each result under its basis-set name so the values from the shared loop
 # can be compared afterward without repeating either calculation.
@@ -40,6 +49,9 @@ wavefunctions = {}
 # Change only the basis set so the energy difference measures basis-set sensitivity.
 for basis_set in basis_sets:
     solver = create("scf_solver", "qdk")
+    # basis_or_guess accepts either a basis name or a reusable orbital guess.
+    # Supplying a string asks the solver to build that basis from the structure.
+    # run() returns the converged total energy and its Hartree--Fock wavefunction.
     energy, wavefunction = solver.run(
         structure,
         charge=charge,
@@ -50,6 +62,8 @@ for basis_set in basis_sets:
     wavefunctions[basis_set] = wavefunction
     print(f"{basis_set}: {energy:.12f} Hartree")
 
+# Record the continued workflow's orbital count. The active-space workflow later
+# selects a subset, and each retained spatial orbital contributes two spin modes.
 num_cc_pvdz_orbitals = (
     wavefunctions["cc-pvdz"].get_orbitals().get_num_molecular_orbitals()
 )
@@ -61,7 +75,8 @@ print(f"cc-pvdz wavefunction: {num_cc_pvdz_orbitals} molecular orbitals")
 # start-cell-compare
 signed_difference = energies["cc-pvtz"] - energies["cc-pvdz"]
 
-# Report the same absolute energy difference in chemically familiar units.
+# Report the same absolute sensitivity in milliHartree and kJ/mol, a common
+# chemical-energy unit obtained with the library's Hartree conversion constant.
 absolute_difference_millihartree = abs(signed_difference) * 1000
 absolute_difference_kj_mol = abs(signed_difference) * HARTREE_TO_KJ_PER_MOL
 

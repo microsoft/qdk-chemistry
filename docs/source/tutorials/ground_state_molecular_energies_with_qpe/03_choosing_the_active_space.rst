@@ -213,6 +213,8 @@ It then repartitions the orbitals according to the selected group:
 
 The asterisks in the script output identify the selected orbitals.
 The selected high-entropy group determines the refined active space.
+Equal natural-orbital occupations can leave the corresponding orbital vectors free to rotate within a degenerate subspace.
+The script chooses a reproducible representation within each selected degenerate block by coordinate-minimizing the mapped Hamiltonian coefficient norm :math:`\lambda=\sum_\ell\lvert h_\ell\rvert`, without changing the orbital subspace or its exact :term:`CASCI` energy.
 Among the unselected orbitals, those below the occupied--virtual boundary of the reference determinant become inactive, while those above the boundary become virtual.
 Freezing these low-entropy orbitals is still an approximation because low entropy does not mean that their correlation contribution is exactly zero, so the energy comparison below measures part of its cost.
 Their entropies are small rather than exactly zero, and allowing excitations involving them can still lower the correlated energy.

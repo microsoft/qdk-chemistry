@@ -1,4 +1,9 @@
-"""Map the selected stretched-N2 active-space Hamiltonian to qubits."""
+"""Map the selected stretched-N2 active-space Hamiltonian to qubits.
+
+The workflow constructs the fermionic Hamiltonian from the coordinate-minimized
+selected orbitals, applies Jordan--Wigner mapping in blocked spin ordering, and
+verifies the mapped ground-state energy in the fixed-electron-number sector.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -20,7 +25,24 @@ from tutorial_choose_active_space import (
 
 @dataclass
 class QubitMappingResult:
-    """Selected-space Hamiltonian and its Jordan-Wigner representation."""
+    """Selected-space Hamiltonian and its Jordan--Wigner representation.
+
+    Attributes:
+        active_space_result: Molecular model and coordinate-minimized selected orbitals.
+        active_hamiltonian: Fermionic Hamiltonian for the selected orbital space.
+        qubit_hamiltonian: Weighted Pauli representation of the active Hamiltonian.
+        num_active_spatial_orbitals: Selected spatial-orbital count.
+        num_active_spin_orbitals: Twice the spatial count for alpha/beta spin.
+        num_compute_qubits: Qubits in the mapped occupation register.
+        num_pauli_terms: Terms retained by the mapper at its configured threshold.
+        core_energy: Nuclear and frozen-inactive contribution, in Hartree, omitted
+            from the qubit Hamiltonian and added back classically.
+        num_fixed_electron_states: Basis states in the physical alpha/beta sector.
+        mapped_active_energy: Lowest mapped eigenvalue in that sector, in Hartree.
+        mapped_total_energy: Active eigenvalue plus core energy, in Hartree.
+        mapping_energy_difference: Mapped total minus selected-space CASCI energy;
+            this should be zero to numerical precision.
+    """
 
     active_space_result: ActiveSpaceResult
     active_hamiltonian: Hamiltonian
@@ -37,14 +59,19 @@ class QubitMappingResult:
 
 
 def run_qubit_mapping_workflow() -> QubitMappingResult:
-    """Construct and map the selected stretched-N2 Hamiltonian."""
-    # This chapter reuses the tested active-space workflow from Chapter 3 so
-    # both chapters describe the same selected Hamiltonian without duplicating it.
+    """Construct, map, and validate the selected stretched-N2 Hamiltonian.
+
+    Returns:
+        Fermionic and qubit Hamiltonians, register/term counts, core-energy
+        bookkeeping, and an exact fixed-sector mapping check.
+    """
+    # Reuse the tested active-space workflow so every downstream calculation
+    # describes the same selected Hamiltonian without duplicating its construction.
     active_space_result = run_active_space_workflow()
 
     ################################################################################
     # start-cell-active-hamiltonian
-    selected_orbitals = active_space_result.refined_wavefunction.get_orbitals()
+    selected_orbitals = active_space_result.refined_orbitals
     hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
     active_hamiltonian = hamiltonian_constructor.run(selected_orbitals)
 
@@ -84,9 +111,9 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
         active_space_result.refined_wavefunction.get_active_num_electrons()
     )
 
-    # Blocked ordering stores alpha occupations in the low bits and beta
-    # occupations in the high bits. Shifting 1 left and subtracting 1 creates a
-    # binary mask with one low bit for each alpha occupation.
+    # QDK/Chemistry's blocked fermion ordering stores alpha occupations in the
+    # low bits and beta occupations in the high bits. Shifting 1 left and
+    # subtracting 1 creates a mask with one low bit per alpha spin orbital.
     alpha_mask = (1 << num_active_spatial_orbitals) - 1
     # Enumerate all compute-register bit strings, then keep only states with the
     # required numbers of set alpha and beta occupation bits.
@@ -128,9 +155,17 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
 ################################################################################
 # start-cell-pauli-preview-helpers
 def format_pauli_string(pauli_string: str) -> str:
-    """Format a stored Pauli string with explicit qubit indices."""
-    # Stored strings place qubit 0 at the right, so reverse the characters before
-    # enumerate() attaches the corresponding qubit index.
+    """Format one QDK Pauli label with explicit qubit indices.
+
+    Args:
+        pauli_string: QDK label stored with qubit zero at the right.
+
+    Returns:
+        Human-readable factors such as ``X(qubit 1) Z(qubit 3)``. Identity
+        factors are omitted; an all-identity label returns ``I``.
+    """
+    # QubitOperator labels are little-endian: the rightmost character acts on
+    # qubit zero. Reverse before enumerate() assigns the displayed qubit index.
     factors = [
         f"{operator}(qubit {qubit_index})"
         for qubit_index, operator in enumerate(reversed(pauli_string))
@@ -145,7 +180,17 @@ def representative_pauli_terms(
     num_diagonal_terms: int = 3,
     num_off_diagonal_terms: int = 4,
 ) -> list[tuple[str, complex]]:
-    """Select identity, diagonal, and off-diagonal terms for display."""
+    """Select representative identity, diagonal, and coupling terms.
+
+    Args:
+        qubit_operator: Mapped weighted Pauli sum.
+        num_diagonal_terms: Largest nonidentity I/Z-only terms to retain.
+        num_off_diagonal_terms: Largest terms containing X or Y to retain.
+
+    Returns:
+        Identity followed by deterministically ranked diagonal and off-diagonal
+        ``(Pauli label, coefficient)`` pairs.
+    """
     terms = [
         (pauli_string, complex(coefficient))
         for pauli_string, coefficient in zip(
@@ -157,8 +202,10 @@ def representative_pauli_terms(
     identity_string = "I" * qubit_operator.num_qubits
 
     def by_magnitude(term: tuple[str, complex]) -> tuple[float, str]:
-        # sorted() is ascending, so a negative magnitude places the largest
-        # coefficients first; the formatted string gives deterministic ties.
+        """Rank large coefficients first with deterministic near-tie ordering."""
+        # Rounding affects only display ranking, not Hamiltonian coefficients.
+        # Twelve decimal places suppress platform noise near the mapper's
+        # 1e-12 threshold; the formatted label resolves equal rounded values.
         return (-round(abs(term[1]), 12), format_pauli_string(term[0]))
 
     # Separate the constant shift, occupation-diagonal terms, and determinant
@@ -188,7 +235,11 @@ def representative_pauli_terms(
 
 
 def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
-    """Print a compact preview of the mapped Pauli terms."""
+    """Print a compact chemical interpretation of mapped Pauli families.
+
+    Args:
+        qubit_operator: Mapped Hamiltonian to preview.
+    """
     terms = representative_pauli_terms(qubit_operator)
     print(
         f"Representative Pauli terms ({len(terms)} of {len(qubit_operator.pauli_strings)}):"
@@ -227,7 +278,11 @@ def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
 
 
 def print_qubit_mapping_results(result: QubitMappingResult) -> None:
-    """Print the quantities students record in the tutorial lab notebook."""
+    """Print mapping evidence for the cumulative lab notebook.
+
+    Args:
+        result: Completed mapping workflow.
+    """
     print(f"Active spatial orbitals: {result.num_active_spatial_orbitals}")
     print(f"Active spin orbitals: {result.num_active_spin_orbitals}")
     print(f"Predicted Jordan-Wigner compute qubits: {result.num_active_spin_orbitals}")
@@ -265,7 +320,7 @@ def print_qubit_mapping_results(result: QubitMappingResult) -> None:
 
 
 def main() -> None:
-    """Run and report the command-line version of the mapping workflow."""
+    """Run the mapping workflow and print its lab-notebook evidence."""
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_qubit_mapping_workflow()
     print_qubit_mapping_results(result)

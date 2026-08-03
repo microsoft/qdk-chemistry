@@ -122,13 +122,13 @@ If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h
    \lambda=\sum_\ell\lvert h_\ell\rvert.
 
 The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient sum as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
-For this Hamiltonian, the reported value is :math:`\lambda=20.185236582112\ E_{\mathrm{h}}`.
+For this Hamiltonian, the reported value is :math:`\lambda=19.610172370184\ E_{\mathrm{h}}`.
 Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice
 
 .. math::
 
    t_{\mathrm{bound}}=\frac{\pi}{\lambda}
-   =0.155638138835\ E_{\mathrm{h}}^{-1}
+   =0.160202194773\ E_{\mathrm{h}}^{-1}
 
 keeps the spectrum within the signed, unaliased phase interval.
 The script reports this value as the ``Initial unaliased time bound`` in its pre-simulation settings.
@@ -138,26 +138,26 @@ Using the active-space reference from :doc:`Putting the problem on qubits <04_pu
 
    \varphi_{\mathrm{bound}}
    =\left(\frac{t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
-   \approx0.760882766860.
+   \approx0.753870703905.
 
 The script reports this value as the ``Reference phase at initial time bound``.
-The nearest six-bit fraction is :math:`49/64=0.765625`, represented by ``110001``.
-Its signed angle is :math:`2\pi(49/64-1)=-15\pi/32`.
+The nearest six-bit fraction is :math:`48/64=0.75`, represented by ``110000``.
+Its signed angle is :math:`2\pi(48/64-1)=-\pi/2`.
 Finally, we can choose the evolution time so that this grid point reconstructs an energy :math:`\delta=0.001\ E_{\mathrm{h}}` above the known reference:
 
 .. math::
 
    t
-   =\frac{-15\pi/32}{E_{\mathrm{ref}}+\delta}
-   =0.152567288817\ E_{\mathrm{h}}^{-1}.
+   =\frac{-\pi/2}{E_{\mathrm{ref}}+\delta}
+   =0.162738441405\ E_{\mathrm{h}}^{-1}.
 
 The script reports this adjusted value as the ``Selected evolution time``.
-Using this time, the reference phase fraction is approximately :math:`0.765600718`, only about :math:`2.43\times10^{-5}` below the selected grid point.
+Using this time, the reference phase fraction is approximately :math:`0.749974099`, only about :math:`2.59\times10^{-5}` below the selected grid point.
 The grid point therefore reconstructs an active energy exactly :math:`1` milliHartree above the classical reference to the displayed precision.
 
 **Please note**:  this use of the already known classical energy is circular.
 It is useful for this tutorial, but it is not a generally available strategy when the target energy is unknown.
-For the chosen :math:`t`, adjacent energies represented by the six-bit phase grid differ by approximately :math:`0.6435\ E_{\mathrm{h}}`, not :math:`0.001\ E_{\mathrm{h}}`.
+For the chosen :math:`t`, adjacent energies represented by the six-bit phase grid differ by approximately :math:`0.6033\ E_{\mathrm{h}}`, not :math:`0.001\ E_{\mathrm{h}}`.
 The smaller value, :math:`0.001\ E_{\mathrm{h}}` or one milliHartree, is the accuracy target adopted for this tutorial.
 The question below asks why one grid point can nevertheless reconstruct this particular reference energy within that target.
 
@@ -275,7 +275,7 @@ Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv
 Then select **Run All** to construct the six iteration circuits and render the shortest, power-one circuit.
 The notebook does not execute a quantum simulation.
 
-The rendered circuit is still long because it contains the four-determinant state preparation and controlled first-order Trotter evolution for a 383-term Hamiltonian.
+The rendered circuit is still long because it contains the four-determinant state preparation and controlled first-order Trotter evolution for a 247-term Hamiltonian.
 Before opening the answers below, trace the operations on each wire to infer its role and compare the dimensions reported for all six iteration circuits.
 Record the evidence you used in the notebook's interpretation task.
 
@@ -393,14 +393,14 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
 Do not interrupt the process merely because one run takes roughly half a minute.
-The twenty-run simulation phase took approximately ten minutes in one development run; total duration depends on the computer and may be tens of minutes.
+The twenty-run simulation phase took approximately six minutes in one development run; total duration depends on the computer and may be tens of minutes.
 A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
 
 .. admonition:: What bitstring distribution and energy estimate did the script produce?
    :class: quiz-question
    :collapsible: closed
 
-   The bitstring ``110001`` appeared 19 times and ``110010`` appeared once, so ``110001`` was the most frequent result.
+   The bitstring ``110000`` appeared 19 times and ``110001`` appeared once, so ``110000`` was the most frequent result.
    It produced an active-space energy of :math:`-9.652275843566\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792900\ E_{\mathrm{h}}` after adding the core energy.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?

@@ -54,7 +54,7 @@ This completed example records the reference results for the documented QDK/Chem
 - Active spatial orbitals: 6.
 - Active spin orbitals: 12.
 - Compute-register qubits: 12.
-- Pauli terms: 383 using default mapper thresholds.
+- Pauli terms: 247 using default mapper thresholds.
 - Fixed-electron-number subspace: 3 alpha and 3 beta electrons; 400 basis states.
 - Core energy: -99.117775949333 Hartree.
 - Mapped active-space ground-state energy: -9.653275843566 Hartree.
@@ -68,8 +68,8 @@ This completed example records the reference results for the documented QDK/Chem
 - Source wavefunction: Selected-space CASCI ground state.
 - Leading determinants (occupation, amplitude, weight, cumulative weight):
   - 222000, -0.694657450061, 0.482548972925, 0.482548972925
-  - 202020, +0.323136467630, 0.104417176712, 0.586966149638
-  - 220200, +0.323136467630, 0.104417176712, 0.691383326350
+  - 202200, +0.333212127561, 0.111030321954, 0.593579294879
+  - 220020, +0.333212127561, 0.111030321954, 0.704609616833
   - 200220, -0.200148173020, 0.040059291163, 0.731442617514
   - 2uddu0, +0.176754072510, 0.031242002149, 0.762684619662
   - 2duud0, +0.176754072510, 0.031242002149, 0.793926621811
@@ -77,34 +77,34 @@ This completed example records the reference results for the documented QDK/Chem
   - 2udud0, +0.117548778913, 0.013817715424, 0.829212694794
 - Selection rule: Retain the largest one, two, or four CASCI coefficients, then re-optimize amplitudes with PMC.
 - One-determinant trial: Fidelity 0.482548972925; 12 compute qubits; 6 preparation logical gates; {'X': 6}.
-- Two-determinant trial: Fidelity 0.578050111416; 12 compute qubits; 14 preparation logical gates; {'CNOT': 6, 'H': 2, 'Rz': 2, 'S': 2, 'X': 2}.
-- Four-determinant trial: Fidelity 0.717362840569; 12 compute qubits; 30 preparation logical gates; {'CNOT': 16, 'H': 4, 'Rz': 4, 'S': 4, 'X': 2}.
+- Two-determinant trial: Fidelity 0.586414643728; 12 compute qubits; 14 preparation logical gates; {'CNOT': 6, 'H': 2, 'Rz': 2, 'S': 2, 'X': 2}.
+- Four-determinant trial: Fidelity 0.732385015551; 12 compute qubits; 30 preparation logical gates; {'CNOT': 16, 'H': 4, 'Rz': 4, 'S': 4, 'X': 2}.
 - State-preparation method: QDK/Chemistry sparse-isometry implementation.
 - Interpretation: More determinants improve fidelity but change preparation cost; register size is fixed by the selected spin-orbital space.
 
 ## Phase-estimation calculation
 
-- Evolution time: 0.152567288817 inverse Hartree.
+- Evolution time: 0.162738441405 inverse Hartree.
 - Hamiltonian simulation: First-order Trotter product formula, one division, repeated approximate base unitary for controlled powers.
 - Phase bits: 6.
 - Shots per bit: 3.
 - Complete IQPE runs: 20.
 - Readout ancillas: 1 per iteration circuit.
 - Simulator seeds: 42-61.
-- Complete-run bitstring counts: {'110001': 19, '110010': 1}.
-- Most frequent bitstring: 110001.
+- Complete-run bitstring counts: {'110000': 19, '110001': 1}.
+- Most frequent bitstring: 110000.
 - Measured active-space energy: -9.652275843566 Hartree.
 - Core energy added after phase estimation: -99.117775949333 Hartree.
 - Total molecular energy estimate: -108.770051792900 Hartree.
 - Algorithmic reference: -108.771051792900 Hartree.
 - Signed difference: +0.001000000000 Hartree.
 - Teaching-target result: Meets the 1 milliHartree target at its boundary.
-- Observed repeated-run phase: approximately ten minutes in the measured development run; runtime varies by computer.
+- Observed repeated-run phase: approximately six minutes in the measured development run; runtime varies by computer.
 
 ## Conclusion
 
 - Main result: The configured IQPE workflow reproduces the selected-space CASCI reference within 1 milliHartree.
-- Supporting evidence: Exact mapped/CASCI agreement, 19 of 20 complete runs at bitstring 110001, and the reconstructed total-energy comparison.
+- Supporting evidence: Exact mapped/CASCI agreement, 19 of 20 complete runs at bitstring 110000, and the reconstructed total-energy comparison.
 - Basis-set limitation: cc-pVDZ is finite; the cc-pVDZ/cc-pVTZ difference is sensitivity evidence, not exact error.
 - Active-space limitation: Refinement excludes correlation and raises the CASCI energy by about 7.32 milliHartree relative to the initial valence space.
 - Quantum-algorithm limitations: Reference-guided evolution-time tuning is circular; first-order Trotter evolution, six phase bits, and finite sampling remain approximations.

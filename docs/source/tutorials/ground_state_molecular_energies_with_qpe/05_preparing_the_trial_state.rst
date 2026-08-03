@@ -210,7 +210,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :class: quiz-question
    :collapsible: closed
 
-   The one-, two-, and four-determinant fidelities are approximately :math:`0.4825`, :math:`0.5781`, and :math:`0.7174`, respectively.
+   The one-, two-, and four-determinant fidelities are approximately :math:`0.4825`, :math:`0.5864`, and :math:`0.7324`, respectively.
    Their generated logical circuits have preparation logical gate counts of 6, 14, and 30, respectively, while every logical circuit uses twelve compute qubits.
 
 .. admonition:: What does the single-determinant fidelity reveal about multireference character?

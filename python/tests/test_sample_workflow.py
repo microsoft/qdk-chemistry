@@ -29,6 +29,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from math import comb, log
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -323,6 +324,21 @@ def test_tutorial_module_imports_preserve_global_logging():
         Logger.set_global_level(previous_level)
 
 
+def test_tutorial_ao_anchoring_is_rotation_invariant():
+    """Canonicalize arbitrary orientations of the same degenerate subspace."""
+    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    rng = np.random.default_rng(42)
+    block, _ = np.linalg.qr(rng.normal(size=(10, 2)))
+    overlap = np.eye(block.shape[0])
+    expected = tutorial_module._ao_anchor_block(block, overlap)
+
+    for _ in range(8):
+        rotation, _ = np.linalg.qr(rng.normal(size=(2, 2)))
+        rotated = block @ rotation
+        actual = tutorial_module._ao_anchor_block(rotated, overlap)
+        assert actual == pytest.approx(expected, abs=1e-12)
+
+
 @pytest.mark.tutorial_baseline
 @_requires_ground_state_tutorial_version
 def test_tutorial_choose_active_space_results():
@@ -345,6 +361,10 @@ def test_tutorial_choose_active_space_results():
     assert all(0.0 <= entropy <= log(4.0) for entropy in result.orbital_entropies)
     assert sum(entropy >= 0.5 for entropy in result.orbital_entropies) == 6
     assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
+    coordinate_minimization = result.natural_orbital_coordinate_minimization
+    assert coordinate_minimization.selected_blocks == ((4,), (5, 6), (7, 8), (9,))
+    assert coordinate_minimization.coefficient_norm_after < coordinate_minimization.coefficient_norm_before
+    assert coordinate_minimization.effective_pauli_terms_after < coordinate_minimization.effective_pauli_terms_before
 
     if _RUN_TUTORIAL_SNAPSHOTS:
         assert result.orbital_entropies == pytest.approx(
@@ -393,7 +413,7 @@ def test_tutorial_map_n2_to_qubits_results():
     assert abs(result.mapping_energy_difference) < 1e-10
 
     if _RUN_TUTORIAL_SNAPSHOTS:
-        assert result.num_pauli_terms == 383
+        assert result.num_pauli_terms == 247
         assert abs(result.core_energy - (-99.117775949333)) < 1e-8
         assert abs(result.mapped_active_energy - (-9.653275843566)) < 1e-8
 
@@ -418,7 +438,7 @@ def test_tutorial_prepare_trial_state_results():
     assert all(len(item.occupation) == 6 for item in result.reference_determinants)
     assert all(item.weight > 0.0 for item in result.reference_determinants)
     assert all(
-        larger.weight >= smaller.weight
+        round(larger.weight, 12) >= round(smaller.weight, 12)
         for larger, smaller in zip(result.reference_determinants, result.reference_determinants[1:], strict=False)
     )
     assert all(
@@ -439,16 +459,16 @@ def test_tutorial_prepare_trial_state_results():
         assert result.reference_determinants[0].occupation == "222000"
         assert abs(result.reference_determinants[0].amplitude - (-0.694657450061)) < 1e-10
         assert abs(result.reference_determinants[0].weight - 0.482548972925) < 1e-10
-        assert result.reference_determinants[1].occupation == "202020"
-        assert result.reference_determinants[2].occupation == "220200"
-        assert abs(result.reference_determinants[2].cumulative_weight - 0.691383326350) < 1e-10
+        assert result.reference_determinants[1].occupation == "202200"
+        assert result.reference_determinants[2].occupation == "220020"
+        assert abs(result.reference_determinants[2].cumulative_weight - 0.704609616833) < 1e-10
         assert abs(one_determinant.fidelity - 0.482548972925) < 1e-10
         assert one_determinant.num_logical_gates == 6
         assert one_determinant.logical_gate_counts == {"X": 6}
-        assert abs(two_determinants.fidelity - 0.578050111416) < 1e-10
+        assert abs(two_determinants.fidelity - 0.586414643728) < 1e-10
         assert two_determinants.num_logical_gates == 14
         assert two_determinants.logical_gate_counts == {"CNOT": 6, "H": 2, "Rz": 2, "S": 2, "X": 2}
-        assert abs(four_determinants.fidelity - 0.717362840569) < 1e-10
+        assert abs(four_determinants.fidelity - 0.732385015551) < 1e-10
         assert four_determinants.num_logical_gates == 30
         assert four_determinants.logical_gate_counts == {"CNOT": 16, "H": 4, "Rz": 4, "S": 4, "X": 2}
 
@@ -482,13 +502,13 @@ def test_tutorial_run_iqpe_configuration(capsys):
     assert abs(problem.evolution_time.grid_active_energy_hartree - problem.mapping.mapped_active_energy - 1e-3) < 1e-12
 
     if _RUN_TUTORIAL_SNAPSHOTS:
-        assert abs(problem.trial_state.fidelity - 0.717362840569) < 1e-10
-        assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 20.185236582112) < 1e-10
-        assert problem.evolution_time.grid_bitstring == "110001"
-        assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.155638138835) < 1e-12
-        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.760882767) < 1e-9
-        assert abs(problem.evolution_time.time_hartree_inverse - 0.152567288817) < 1e-12
-        assert abs(problem.evolution_time.reference_phase_fraction - 0.765600718162) < 1e-10
+        assert abs(problem.trial_state.fidelity - 0.732385015551) < 1e-10
+        assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 19.610172370184) < 1e-10
+        assert problem.evolution_time.grid_bitstring == "110000"
+        assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.160202194773) < 1e-12
+        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.753870703905) < 1e-10
+        assert abs(problem.evolution_time.time_hartree_inverse - 0.162738441405) < 1e-12
+        assert abs(problem.evolution_time.reference_phase_fraction - 0.749974099373) < 1e-10
 
     first_run = tutorial_module.IqpeRun(
         seed=1,
@@ -533,8 +553,8 @@ def test_tutorial_run_iqpe_configuration(capsys):
     ):
         assert expected_text in settings_output
     if _RUN_TUTORIAL_SNAPSHOTS:
-        assert "0.760882766860" in settings_output
-        assert "0.152567288817 Hartree^-1" in settings_output
+        assert "0.753870703905" in settings_output
+        assert "0.162738441405 Hartree^-1" in settings_output
 
 
 @pytest.mark.slow
