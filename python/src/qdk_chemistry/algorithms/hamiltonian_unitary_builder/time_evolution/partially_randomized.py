@@ -451,7 +451,7 @@ class PartiallyRandomized(QDrift):
     def _split_accuracy(self) -> tuple[float, float]:
         r"""Split the target accuracy ε into deterministic and random budgets.
 
-        Uses a quadrature split (matching Eq. 46 of :cite:`Guenther2025`):
+        Uses a quadrature split:
 
         .. math::
 
@@ -460,6 +460,12 @@ class PartiallyRandomized(QDrift):
             \epsilon_D^2 + \epsilon_R^2 = \epsilon^2
 
         where ``s`` is ``accuracy_split`` clamped to ``(0, 1)``.
+
+        .. note::
+            This is an implementation policy, not a bound inherited from
+            :cite:`Guenther2025`. The quadrature rule there combines a phase
+            estimation variance with a deterministic Trotter energy bias, not
+            two channel tolerances of a single evolution circuit.
 
         Returns:
             The pair ``(ε_D, ε_R)``. Both are ``0.0`` when ``target_accuracy``

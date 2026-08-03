@@ -248,9 +248,18 @@ The squared error budget is split in quadrature between the two parts,
    \epsilon_D^2 + \epsilon_R^2 = \epsilon^2, \qquad \epsilon_D^2 = s\,\epsilon^2,
 
 with the fraction :math:`s` given by ``accuracy_split``.
+
+.. note::
+
+   This split is an implementation policy of this builder, not a bound taken from :cite:`Guenther2025`.
+   The quadrature rule in that reference combines a phase-estimation variance with a deterministic Trotter energy bias, which are different quantities from the two channel tolerances used here.
+
 The evolution is divided into :math:`r` outer Trotter steps sized from :math:`\epsilon_D` (using ``trotter_error_bound``), and the per-step qDRIFT sample count is sized from :math:`\epsilon_R` (Campbell bound).
 Each of the :math:`r` steps draws a *fresh* independent qDRIFT block, which is required for the randomized error to add up correctly across steps.
 With ``target_accuracy = 0.0`` (the default) a single step is used with ``num_random_samples`` samples, preserving the legacy behavior.
+
+The Campbell bound sizes the tail for a diamond-norm tolerance, so it is conservative when the circuit is only read through a Hadamard test.
+Bounding the draw-averaged signal instead requires :math:`\lambda_R^2 t^2 / (2\epsilon_R)` sampled rotations in total across all :math:`r` steps, a factor of four fewer.
 
 The randomized part contributes :math:`O(\lambda_R^2 / \epsilon^2)` Pauli rotations, where :math:`\lambda_R = \sum_m |h_m|` is the 1-norm of :math:`H_R` :cite:`Guenther2025`.
 Because the deterministic part removes the dominant terms from :math:`\lambda_R`, this is typically much smaller than the cost of applying qDRIFT to the full Hamiltonian.
