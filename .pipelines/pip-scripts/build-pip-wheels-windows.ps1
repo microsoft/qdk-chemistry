@@ -37,8 +37,17 @@ Write-Host "vcpkg triplet: $Triplet"
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
-    Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+    # Budget for the OS, the agent and ninja itself before dividing what is left
+    # among compiler processes. Without that reserve a 7 GB machine looks like it
+    # can run two jobs, and on Windows ARM64 the pair of cl.exe processes then
+    # exhaust the commit limit while instantiating libint2's engine.impl.h:
+    #
+    #   libint2\./engine.impl.h(643): fatal error C1060: compiler is out of heap space
+    #
+    # This leaves larger agents unaffected: a 16 GB machine still gets 4 jobs.
+    $usableGB = $ramGB - 2
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($usableGB / 3.5)))
+    Write-Host "CPUs=$cpu  RAM=${ramGB} GB (usable ${usableGB} GB)  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
 
