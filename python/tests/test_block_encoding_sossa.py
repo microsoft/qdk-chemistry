@@ -277,7 +277,7 @@ class TestSOSSABuilder:
 class TestOuterPrepareQSharp:
     """Test the Q# OuterPrepare sub-operations via dump_machine."""
 
-    def test_pure_state_preparation(self, adaptive_qdk_ctx):
+    def test_pure_state_preparation(self, qdk_ctx):
         """Test MakeOuterPreparePureState produces the correct statevector.
 
         Applies PreparePureStateD to |0⟩ and verifies amplitudes via dump_machine.
@@ -297,9 +297,9 @@ class TestOuterPrepareQSharp:
             expected[be_idx] = c / norm
 
         sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
-        adaptive_qdk_ctx.eval(f"use qs = Qubit[{n_qubits}];")
-        adaptive_qdk_ctx.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
-        state = adaptive_qdk_ctx.dump_machine()
+        qdk_ctx.eval(f"use qs = Qubit[{n_qubits}];")
+        qdk_ctx.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
+        state = qdk_ctx.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
         # Check amplitudes match expected (up to global phase)
@@ -308,13 +308,13 @@ class TestOuterPrepareQSharp:
             np.abs(expected),
             atol=float_comparison_absolute_tolerance,
         )
-        adaptive_qdk_ctx.eval("ResetAll(qs)")
+        qdk_ctx.eval("ResetAll(qs)")
 
 
 class TestInnerPrepareQSharp:
     """Test the Q# InnerPrepare sub-operations via dump_machine."""
 
-    def test_direct_inner_prepare_conditioned_on_xo(self, adaptive_qdk_ctx):
+    def test_direct_inner_prepare_conditioned_on_xo(self, qdk_ctx):
         """Test InnerPrepareDirect: for a fixed x_o, inner register gets correct state.
 
         Prepares outer register in |x_o⟩, applies inner prepare, checks inner register.
@@ -329,12 +329,12 @@ class TestInnerPrepareQSharp:
         ic_str = "[[0.8, 0.6], [0.3, 0.95]]"
 
         # Test x_o=0: inner should be proportional to [0.8, 0.6]
-        adaptive_qdk_ctx.eval(f"use outer = Qubit[{n_outer}];")
-        adaptive_qdk_ctx.eval(f"use inner = Qubit[{n_inner}];")
-        adaptive_qdk_ctx.eval(
+        qdk_ctx.eval(f"use outer = Qubit[{n_outer}];")
+        qdk_ctx.eval(f"use inner = Qubit[{n_inner}];")
+        qdk_ctx.eval(
             f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);"
         )
-        state = adaptive_qdk_ctx.dump_machine()
+        state = qdk_ctx.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
         # With outer=|0⟩, the state is |0⟩_outer ⊗ PreparedState(inner_coefficients[0])
@@ -351,4 +351,4 @@ class TestInnerPrepareQSharp:
             np.abs(expected_inner),
             atol=float_comparison_absolute_tolerance,
         )
-        adaptive_qdk_ctx.eval("ResetAll(outer); ResetAll(inner)")
+        qdk_ctx.eval("ResetAll(outer); ResetAll(inner)")

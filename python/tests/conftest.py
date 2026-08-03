@@ -30,7 +30,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import qdk
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (

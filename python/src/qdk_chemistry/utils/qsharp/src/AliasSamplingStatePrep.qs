@@ -356,13 +356,15 @@ namespace QDKChemistry.Utils.AliasSampling {
     // resulting state can be captured via dump_operation_on_state.
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Test wrapper: run alias sampling on the supplied register.
+    /// Test wrapper: run alias sampling on a freshly allocated register.
+    ///
+    /// The register is intentionally leaked (``AllocateQubitArray`` rather than ``use``)
+    /// so the prepared state survives the call and can be read with ``dump_machine``.
     operation RunAliasSamplingPrep(
         coefficients : Double[],
         bitsPrecision : Int,
         numIndexQubits : Int,
         numQubits : Int,
-        qs : Qubit[],
     ) : Unit {
         let params = new AliasSamplingParams {
             coefficients = coefficients,
@@ -370,6 +372,7 @@ namespace QDKChemistry.Utils.AliasSampling {
             numIndexQubits = numIndexQubits,
             numQubits = numQubits,
         };
+        let qs = QIR.Runtime.AllocateQubitArray(numQubits);
         AliasSamplingPrepare(params, qs);
     }
 

@@ -81,7 +81,7 @@ class TestOuterPrep:
         assert op is not None
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
-    def test_build_outer_prep_fidelity(self, algorithm, adaptive_qdk_ctx):
+    def test_build_outer_prep_fidelity(self, algorithm, qdk_ctx):
         """Verify build_outer_prep's callable prepares the correct statevector.
 
         Simulates the Q# callable in the global Q# session and checks fidelity
@@ -102,8 +102,8 @@ class TestOuterPrep:
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
-        adaptive_qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
-        state = adaptive_qdk_ctx.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
+        state = qdk_ctx.dump_machine()
         actual_sv = np.array(state.as_dense_state())
 
         n_states = 2**num_qubits
@@ -122,7 +122,7 @@ class TestOuterPrep:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
-    def test_build_outer_prep_alias_sampling_marginal_probs(self, adaptive_qdk_ctx):
+    def test_build_outer_prep_alias_sampling_marginal_probs(self, qdk_ctx):
         r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
 
         The SOS block encoding needs amplitudes proportional to the generator one-norms
@@ -143,8 +143,8 @@ class TestOuterPrep:
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
         total_qubits = 2 * num_index_qubits + 2 * bit_precision + 1
 
-        adaptive_qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
-        state = adaptive_qdk_ctx.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
+        state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
         # Compute marginal probabilities on the index register (top bits, LE)
@@ -167,7 +167,7 @@ class TestInnerPrep:
     """Tests for SOSSAMapper.build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_inner_prep_fidelity(self, algorithm, adaptive_qdk_ctx):
+    def test_build_inner_prep_fidelity(self, algorithm, qdk_ctx):
         """Verify inner prep conditional marginals when combined with outer prep.
 
         Applies outer prep (dense_pure, exact) then inner prep on the combined
@@ -207,10 +207,10 @@ class TestInnerPrep:
             num_inner_qubits = n_index_bits + n_fr
 
         # Apply outer + inner prep
-        adaptive_qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
             outer_op, inner_op, num_outer_qubits, num_inner_qubits
         )
-        state = adaptive_qdk_ctx.dump_machine()
+        state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
         # Check conditional marginals for each outer value l
@@ -360,7 +360,7 @@ class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N, adaptive_qdk_ctx):  # noqa: N803
+    def test_select_dq_givens_fidelity(self, N, qdk_ctx):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
         rng = np.random.default_rng(42 + N)
         dq_angles = []
@@ -387,8 +387,8 @@ class TestSelectFullFidelity:
             "numFreeRiderBits": 2,
         }
 
-        adaptive_qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
-        state = adaptive_qdk_ctx.dump_machine()
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
+        state = qdk_ctx.dump_machine()
         sv = np.array(state.as_dense_state())
 
         assert np.sum(np.abs(sv) ** 2) > 0.99, "State normalization check failed"
@@ -507,16 +507,16 @@ class TestSelectSwapCorrectness:
             (8, 4, 2),  # 8 entries, 2 swap bits
         ],
     )
-    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits, adaptive_qdk_ctx):
+    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits, qdk_ctx):
         """For each address |i⟩, SelectSwap should load data[i] into output."""
         data = _make_random_data_1d(n_data, n_bits)
-        result = adaptive_qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
         assert result, f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
 
-    def test_1d_auto_lambda(self, adaptive_qdk_ctx):
+    def test_1d_auto_lambda(self, qdk_ctx):
         """SelectSwap with numSwapBits=-1 (auto-optimal) should produce correct results."""
         data = _make_random_data_1d(8, 4)
-        result = adaptive_qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
+        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
         assert result, "SelectSwap 1D with auto lambda failed"
 
     @pytest.mark.parametrize(
@@ -527,10 +527,10 @@ class TestSelectSwapCorrectness:
             (3, 4, 4, 0),  # non-power-of-2 outer
         ],
     )
-    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, adaptive_qdk_ctx):
+    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, qdk_ctx):
         """For each (i, j), Select2DLoad should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
-        result = adaptive_qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
         assert result, (
             f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )
