@@ -112,6 +112,14 @@ steps:
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
+# Compiling our libint2 translation unit exhausts cl.exe's heap on the 7 GB
+# ARM64 agent even with a single compiler process, because what bounds one
+# cl.exe is the system commit limit rather than the job count. Raise it before
+# building. Best-effort: this only reports and warns if it cannot.
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\expand-pagefile-windows.ps1
+    displayName: Enlarge page file (arm64)
+
 # Full qdk build, C++ tests, conda environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
 - pwsh: |
