@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   published-baseline:
-    name: Published compatibility (${{ matrix.os }})
+    name: Exact published baseline (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -74,7 +74,10 @@ jobs:
           fi
         done
 
-    - name: Run published tutorial compatibility checks
+    - name: Run exact published tutorial baselines
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
-      run: python -m pytest -q python/tests/test_sample_workflow.py -m tutorial_baseline
+        QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
+      run: >-
+        python -m pytest -q --strict-config --strict-markers
+        python/tests/test_sample_workflow.py -m tutorial_baseline

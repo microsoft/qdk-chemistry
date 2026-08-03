@@ -285,6 +285,7 @@ def _load_tutorial_module(module_name: str):
     return tutorial_module
 
 
+@pytest.mark.tutorial_baseline
 def test_load_tutorial_module_removes_failed_import(tmp_path, monkeypatch):
     """Do not cache a partially initialized tutorial module after import failure."""
     module_name = "tutorial_failing_import"
@@ -297,6 +298,7 @@ def test_load_tutorial_module_removes_failed_import(tmp_path, monkeypatch):
     assert module_name not in sys.modules
 
 
+@pytest.mark.tutorial_baseline
 def test_tutorial_qpe_setup_accepts_local_build_version():
     """Accept local metadata only when the public version matches the pin."""
     setup_script = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
@@ -307,6 +309,7 @@ def test_tutorial_qpe_setup_accepts_local_build_version():
     assert public_version("2.0.1") != GROUND_STATE_TUTORIAL_VERSION
 
 
+@pytest.mark.tutorial_baseline
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
 def test_tutorial_module_imports_preserve_global_logging():
     """Reusable tutorial imports must not change process-wide logging."""
@@ -324,6 +327,7 @@ def test_tutorial_module_imports_preserve_global_logging():
         Logger.set_global_level(previous_level)
 
 
+@pytest.mark.tutorial_baseline
 def test_tutorial_ao_anchoring_is_rotation_invariant():
     """Canonicalize arbitrary orientations of the same degenerate subspace."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
@@ -367,6 +371,10 @@ def test_tutorial_choose_active_space_results():
     assert coordinate_minimization.effective_pauli_terms_after < coordinate_minimization.effective_pauli_terms_before
 
     if _RUN_TUTORIAL_SNAPSHOTS:
+        assert abs(coordinate_minimization.coefficient_norm_before - 20.185236582169) < 1e-10
+        assert abs(coordinate_minimization.coefficient_norm_after - 19.610172370244) < 1e-10
+        assert coordinate_minimization.effective_pauli_terms_before == 383
+        assert coordinate_minimization.effective_pauli_terms_after == 247
         assert result.orbital_entropies == pytest.approx(
             [
                 0.021695655,
