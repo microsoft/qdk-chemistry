@@ -120,6 +120,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_operator import PauliLCUContainer, QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers import (
     QubitOperatorContainer,
+    RotatedPaulis,
     SOSSAContainer,
 )
 from qdk_chemistry.data.symmetries import Symmetries
@@ -181,6 +182,7 @@ __all__ = [
     "QubitHamiltonian",
     "QubitOperator",
     "QubitOperatorContainer",
+    "RotatedPaulis",
     "SOSSAContainer",
     "SettingNotFound",
     "SettingNotFoundError",
