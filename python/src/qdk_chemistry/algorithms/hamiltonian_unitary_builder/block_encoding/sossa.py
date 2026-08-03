@@ -113,6 +113,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         container = SOSSAWalkContainer(
             outer_prepare=self._build_outer_prepare(outer_coefficients, num_outer_qubits),
+            outer_prepare_probabilities=self._build_outer_prepare(outer_coefficients**2, num_outer_qubits),
             inner_prepare=SOSSAInnerPrepare(
                 conditional_coefficients=self._inner_conditional_coefficients(sossa, len(one_body_rotation_angles)),
                 num_inner_qubits=num_inner_qubits,
@@ -142,6 +143,15 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         one-norms; each generator contributes two Pauli terms (X and Y) whose
         magnitudes are summed. The spin-free coefficients are the per-``(rank,
         copy)`` two-body row one-norms scaled by :math:`1/\sqrt{2}`.
+
+        The SOS block encoding needs the outer PREPARE to produce amplitudes
+        proportional to these coefficients :math:`c_{x_o}` themselves, not to their
+        square roots, because both the normalization
+        :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` and the energy decoding
+        :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are read off those amplitudes
+        (Eq. 88 of :cite:`Low2025`). Backends that discretize their input as a
+        probability distribution therefore have to be handed
+        :math:`c_{x_o}^2`, which is what ``outer_prepare_probabilities`` holds.
         """
         one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
         spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]

@@ -7,9 +7,7 @@
 
 from typing import Any
 
-import numpy as np
-
-from qdk_chemistry.data import AlgorithmRef, Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer, sossa_register_bits
@@ -106,30 +104,12 @@ class SOSSAMapper(ControlledCircuitMapper):
             # Keep the op's precision in sync with the outer register size (see _compute_register_sizes).
             prepare_algorithm.bits_precision = self._settings.get("coefficient_bit_precision")
             # One-dimensional alias sampling discretizes its input as a probability
-            # distribution, so it has to be handed the squared amplitudes to end up
-            # preparing amplitudes proportional to the outer coefficients. The 2D
-            # conditional table used by the inner PREPARE squares its input itself.
-            outer_prepare = self._squared_wavefunction(
-                outer_prepare, self._compute_register_sizes(container)["num_outer_qubits"]
-            )
+            # distribution, so it has to be handed the squared coefficients the
+            # builder precomputed. The 2D conditional table used by the inner
+            # PREPARE squares its input itself.
+            outer_prepare = container.outer_prepare_probabilities
         circuit = prepare_algorithm.run(outer_prepare)
         return circuit._qsharp_op  # noqa: SLF001
-
-    @staticmethod
-    def _squared_wavefunction(wavefunction: Wavefunction, num_qubits: int) -> Wavefunction:
-        """Return a copy of ``wavefunction`` whose coefficients are squared and renormalized.
-
-        The outer PREPARE coefficients are generator one-norms and therefore
-        non-negative, so squaring loses no sign information.
-        """
-        coefficients = np.abs(np.asarray(wavefunction.get_coefficients())) ** 2
-        norm = float(np.linalg.norm(coefficients))
-        if norm > 0.0:
-            coefficients = coefficients / norm
-        determinants = [
-            Configuration.from_bitstring(format(index, f"0{num_qubits}b")) for index in range(len(coefficients))
-        ]
-        return Wavefunction(StateVectorContainer(coefficients, determinants, ModelOrbitals(num_qubits)))
 
     def build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.

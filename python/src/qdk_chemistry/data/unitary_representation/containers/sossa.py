@@ -185,6 +185,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
     def __init__(
         self,
         outer_prepare: "Wavefunction",
+        outer_prepare_probabilities: "Wavefunction",
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
         num_orbitals: int,
@@ -198,7 +199,12 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         r"""Initialize a SOSSAWalkContainer.
 
         Args:
-            outer_prepare: The outer PREPARE Wavefunction.
+            outer_prepare: The outer PREPARE Wavefunction, whose amplitudes are the
+                normalized generator one-norms :math:`c_{x_o}`.
+            outer_prepare_probabilities: The same distribution expressed as
+                probabilities :math:`c_{x_o}^2`, for state-preparation backends
+                (such as alias sampling) that discretize their input as a
+                probability distribution rather than as amplitudes.
             inner_prepare: The inner (conditional) PREPARE oracle data.
             select: The SELECT oracle data (Givens rotations + Spin swap + Majorana).
             num_orbitals: Number of spatial orbitals N (system register = 2N spin-orbitals).
@@ -213,6 +219,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         """
         self._power = power
         self.outer_prepare = outer_prepare
+        self.outer_prepare_probabilities = outer_prepare_probabilities
         self.inner_prepare = inner_prepare
         self.select = select
         self.num_orbitals = num_orbitals
@@ -263,6 +270,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             "num_bases": self.num_bases,
             "num_copies": self.num_copies,
             "outer_prepare": self.outer_prepare.to_json(),
+            "outer_prepare_probabilities": self.outer_prepare_probabilities.to_json(),
             "inner_prepare": self.inner_prepare.to_json(),
             "select": self.select.to_json(),
         }
@@ -280,6 +288,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         group.attrs["num_bases"] = self.num_bases
         group.attrs["num_copies"] = self.num_copies
         _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
+        _wavefunction_to_hdf5(self.outer_prepare_probabilities, group.create_group("outer_prepare_probabilities"))
         self.inner_prepare.to_hdf5(group.create_group("inner_prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
@@ -291,11 +300,13 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
 
         outer_prepare = Wavefunction.from_json(json_data["outer_prepare"])
+        outer_prepare_probabilities = Wavefunction.from_json(json_data["outer_prepare_probabilities"])
         inner_prepare = SOSSAInnerPrepare.from_json(json_data["inner_prepare"])
         select = SOSSASelect.from_json(json_data["select"])
 
         return cls(
             outer_prepare=outer_prepare,
+            outer_prepare_probabilities=outer_prepare_probabilities,
             inner_prepare=inner_prepare,
             select=select,
             num_orbitals=json_data["num_orbitals"],
@@ -311,10 +322,12 @@ class SOSSAWalkContainer(QuantumWalkContainer):
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAWalkContainer":
         """Load a SOSSAWalkContainer from an HDF5 group."""
         outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
+        outer_prepare_probabilities = _wavefunction_from_hdf5(group["outer_prepare_probabilities"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
         return cls(
             outer_prepare=outer_prepare,
+            outer_prepare_probabilities=outer_prepare_probabilities,
             inner_prepare=inner_prepare,
             select=select,
             num_orbitals=int(group.attrs["num_orbitals"]),

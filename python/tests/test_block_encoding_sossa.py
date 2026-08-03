@@ -84,6 +84,9 @@ def _make_sossa_unitary_representation():
     orbitals = ModelOrbitals(num_outer_qubits)
     sv_container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
     outer_prepare = Wavefunction(sv_container)
+    squared = np.array(coeffs_list) ** 2
+    squared /= np.linalg.norm(squared)
+    outer_prepare_probabilities = Wavefunction(StateVectorContainer(squared, dets, orbitals))
     inner_prepare = SOSSAInnerPrepare(
         conditional_coefficients=inner_coefficients,
         num_inner_qubits=num_inner_qubits,
@@ -101,6 +104,7 @@ def _make_sossa_unitary_representation():
 
     container = SOSSAWalkContainer(
         outer_prepare=outer_prepare,
+        outer_prepare_probabilities=outer_prepare_probabilities,
         inner_prepare=inner_prepare,
         select=select,
         num_orbitals=num_orbitals,
@@ -139,6 +143,11 @@ class TestSOSSAWalkContainer:
             atol=float_comparison_absolute_tolerance,
         )
         assert np.allclose(
+            restored.outer_prepare_probabilities.get_coefficients(),
+            container.outer_prepare_probabilities.get_coefficients(),
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
             restored.inner_prepare.conditional_coefficients,
             container.inner_prepare.conditional_coefficients,
             atol=float_comparison_absolute_tolerance,
@@ -165,6 +174,10 @@ class TestSOSSAWalkContainer:
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
+        assert np.allclose(
+            restored.outer_prepare_probabilities.get_coefficients(),
+            container.outer_prepare_probabilities.get_coefficients(),
+        )
         assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
 
     def test_unitary_representation_json_dispatch(self):
@@ -213,6 +226,47 @@ class TestSOSSABuilder:
         assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
+
+    @pytest.mark.parametrize(
+        ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
+        [(2, 1, 1, 1), (3, 2, 2, 1)],
+        ids=["N2R1B1C1", "N3R2B2C1"],
+    )
+    def test_outer_prepare_probabilities_are_the_squared_amplitudes(
+        self, num_orbitals, num_ranks, num_bases, num_copies
+    ):
+        r"""Verify the builder emits both conventions of the outer PREPARE distribution.
+
+        The SOS block encoding needs the outer PREPARE to produce amplitudes
+        proportional to the generator one-norms :math:`c_{x_o}` (Eq. 88 of Low et
+        al. 2025), so ``outer_prepare`` holds :math:`c/\|c\|`. Backends that
+        discretize their input as a probability distribution have to be handed
+        :math:`c^2` instead, which is what ``outer_prepare_probabilities`` holds.
+        Also check the normalization identity :math:`\sum_{x_o} c_{x_o}^2 = 2\Lambda`.
+        """
+        fh = create_random_factorized_hamiltonian(
+            num_orbitals=num_orbitals,
+            num_ranks=num_ranks,
+            num_bases=num_bases,
+            num_copies=num_copies,
+        )
+        container = SOSSABuilder().run(_to_sossa_operator(fh)).get_container()
+
+        amplitudes = np.asarray(container.outer_prepare.get_coefficients(), dtype=float)
+        probabilities = np.asarray(container.outer_prepare_probabilities.get_coefficients(), dtype=float)
+
+        assert np.isclose(np.linalg.norm(amplitudes), 1.0)
+        assert np.isclose(np.linalg.norm(probabilities), 1.0)
+        assert np.all(amplitudes >= 0.0)
+
+        expected = amplitudes**2
+        expected /= np.linalg.norm(expected)
+        np.testing.assert_allclose(probabilities, expected, atol=float_comparison_absolute_tolerance)
+
+        # sum_xo c_xo^2 = 2 Lambda, so the unnormalized coefficients are recovered
+        # from the stored amplitudes by scaling with sqrt(2 Lambda).
+        unnormalized = amplitudes * np.sqrt(2.0 * container.normalization)
+        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.normalization)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

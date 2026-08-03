@@ -15,7 +15,6 @@ References:
         extra Toffoli cost.
     :cite:`Babbush2018` — Heisenberg-limited phase estimation with a sine-window
         control state.
-    :cite:`Poulin2018` — spectral measurement from a windowed control register.
 
 """
 
