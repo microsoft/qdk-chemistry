@@ -34,11 +34,8 @@ void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
-<<<<<<< HEAD
 void bind_population_analysis(py::module& m);
-=======
 void bind_geometry_optimization(py::module& m);
->>>>>>> origin/main
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
