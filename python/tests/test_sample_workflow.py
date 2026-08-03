@@ -32,8 +32,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import MajoranaMapping, Structure
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 
 # Optional dependencies for notebook execution
 try:
@@ -359,6 +362,126 @@ def test_tutorial_scalar_refinement_resolves_subgrid_cusp():
 
     assert actual_angle == pytest.approx(expected_angle, abs=1e-12)
     assert actual_value < 1e-12
+
+
+@pytest.mark.slow
+@pytest.mark.tutorial_baseline
+@_requires_ground_state_tutorial_version
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Tutorial workflow requires PySCF")
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.parametrize(
+    ("label", "atoms", "use_autocas"),
+    [
+        ("H2 at 0.74 Angstrom", "H 0 0 0\nH 0 0 0.74", False),
+        ("LiH at 1.60 Angstrom", "Li 0 0 0\nH 0 0 1.60", False),
+        ("N2 at 2.20 Angstrom", "N 0 0 0\nN 0 0 2.20", True),
+    ],
+)
+def test_tutorial_orbital_coordinates_transfer_across_diatomics(
+    label,
+    atoms,
+    use_autocas,
+):
+    """Preserve the selected-space energy for other diatomic workflows."""
+    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+    structure = Structure.from_xyz(f"2\n{label}\n{atoms}\n")
+    _, hartree_fock_wavefunction = create("scf_solver", "qdk").run(
+        structure,
+        charge=0,
+        spin_multiplicity=1,
+        basis_or_guess="cc-pvdz",
+    )
+    num_valence_electrons, num_valence_orbitals = compute_valence_space_parameters(
+        hartree_fock_wavefunction,
+        0,
+    )
+    valence_wavefunction = create(
+        "active_space_selector",
+        "qdk_valence",
+        num_active_electrons=num_valence_electrons,
+        num_active_orbitals=num_valence_orbitals,
+    ).run(hartree_fock_wavefunction)
+
+    alpha_channel = SymmetryLabel([axes.alpha()])
+    valence_indices = list(valence_wavefunction.get_orbitals().active_indices().indices(alpha_channel))
+    num_valence_alpha, num_valence_beta = valence_wavefunction.get_active_num_electrons()
+    hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
+    casci_solver = create(
+        "multi_configuration_calculator",
+        "macis_cas",
+        ci_residual_tolerance=1e-10,
+        calculate_one_rdm=True,
+        calculate_two_rdm=True,
+    )
+    _, valence_casci_wavefunction = casci_solver.run(
+        hamiltonian_constructor.run(valence_wavefunction.get_orbitals()),
+        num_valence_alpha,
+        num_valence_beta,
+    )
+    natural_wavefunction = create(
+        "orbital_localizer",
+        "qdk_natural_orbitals",
+    ).run(
+        valence_casci_wavefunction,
+        valence_indices,
+        valence_indices,
+    )
+    _, natural_casci_wavefunction = casci_solver.run(
+        hamiltonian_constructor.run(natural_wavefunction.get_orbitals()),
+        num_valence_alpha,
+        num_valence_beta,
+    )
+
+    selected_wavefunction = natural_wavefunction
+    if use_autocas:
+        selected_wavefunction = create(
+            "active_space_selector",
+            "qdk_autocas_eos",
+        ).run(natural_casci_wavefunction)
+    selected_orbitals = selected_wavefunction.get_orbitals()
+    selected_indices = list(selected_orbitals.active_indices().indices(alpha_channel))
+    assert selected_indices
+
+    coordinate_result = tutorial_module.coordinate_minimize_natural_orbital_coefficient_norm(
+        valence_casci_wavefunction,
+        selected_orbitals,
+        valence_indices,
+    )
+    assert coordinate_result.coefficient_norm_after <= coordinate_result.coefficient_norm_before + 1e-10
+    assert coordinate_result.effective_pauli_terms_after <= coordinate_result.effective_pauli_terms_before
+
+    num_selected_alpha, num_selected_beta = selected_wavefunction.get_active_num_electrons()
+    selected_hamiltonian = hamiltonian_constructor.run(coordinate_result.orbitals)
+    selected_energy, _ = casci_solver.run(
+        selected_hamiltonian,
+        num_selected_alpha,
+        num_selected_beta,
+    )
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * len(selected_indices))
+    qubit_hamiltonian = create(
+        "qubit_mapper",
+        "qdk",
+        threshold=1e-10,
+        integral_threshold=1e-14,
+    ).run(selected_hamiltonian, mapping)
+    assert len(qubit_hamiltonian.pauli_strings) == (coordinate_result.effective_pauli_terms_after)
+
+    alpha_mask = (1 << len(selected_indices)) - 1
+    fixed_electron_basis = [
+        state
+        for state in range(1 << qubit_hamiltonian.num_qubits)
+        if (state & alpha_mask).bit_count() == num_selected_alpha
+        and (state >> len(selected_indices)).bit_count() == num_selected_beta
+    ]
+    fixed_electron_matrix = qubit_hamiltonian.to_matrix(sparse=True)[fixed_electron_basis][
+        :, fixed_electron_basis
+    ].toarray()
+    mapped_active_energy = float(np.linalg.eigvalsh(fixed_electron_matrix)[0])
+    mapped_total_energy = selected_hamiltonian.get_core_energy() + mapped_active_energy
+    assert mapped_total_energy == pytest.approx(selected_energy, abs=1e-9)
 
 
 @pytest.mark.tutorial_baseline
