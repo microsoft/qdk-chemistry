@@ -213,6 +213,59 @@ class TestPhaseDecoding:
         assert measured in {0.25, 0.75}
 
 
+class TestUnaryQpeEndToEnd:
+    """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
+
+    @staticmethod
+    def _measure(qdk_ctx, num_queries: int, k: int, system_state: int) -> int:
+        """Run the synthetic-walk QPE circuit and read the phase register MSB-first."""
+        num_states = num_queries + 1
+        theta = -np.pi * k / num_states
+        results = qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(
+            num_queries, theta, system_state
+        )
+        return int("".join("1" if str(bit) == "One" else "0" for bit in results), 2)
+
+    @pytest.mark.parametrize(
+        ("num_queries", "k", "system_state"),
+        [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
+    )
+    def test_measured_bin_is_twice_the_walk_phase(self, qdk_ctx, num_queries, k, system_state):
+        """The measured register must read exactly ``2*phi*N``, MSB-first.
+
+        The synthetic walk is ``W = Rz(2*theta)`` built from two self-inverse
+        reflections, so ``W|1> = e^{+i theta}|1>`` and ``W|0> = e^{-i theta}|0>``.
+        Choosing ``theta = -pi*k/N`` with ``N = num_queries + 1`` puts the answer
+        exactly on a bin boundary, making the outcome deterministic and the
+        assertion exact rather than statistical.
+
+        This pins the whole register chain at once: the big-endian window state,
+        the little-endian unary addressing reached through ``Reversed``, the
+        endianness of ``Adjoint ApplyQFT`` (which writes the phase little-endian
+        because ``ApplyQFT`` maps a little-endian input to a big-endian output),
+        and the most-significant-bit-first order of the returned results.
+        """
+        num_states = num_queries + 1
+        expected = (-k) % num_states if system_state == 1 else k
+        assert self._measure(qdk_ctx, num_queries, k, system_state) == expected
+
+    @pytest.mark.parametrize("k", [1, 2, 3])
+    def test_decoder_recovers_the_walk_phase(self, qdk_ctx, k):
+        """The measured bin, run through the decoder, returns the walk phase.
+
+        The two eigenvectors carry conjugate phases ``+-phi`` and land in
+        conjugate bins, which the decoder must fold onto the same answer.
+        """
+        num_queries = 7
+        num_states = num_queries + 1
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries, phase_band="lower")
+
+        expected_phase = k / (2 * num_states)
+        for system_state in (0, 1):
+            measured = self._measure(qdk_ctx, num_queries, k, system_state) / num_states
+            assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_phase)
+
+
 class TestRegistration:
     """Registry wiring for the unary phase estimation stack."""
 

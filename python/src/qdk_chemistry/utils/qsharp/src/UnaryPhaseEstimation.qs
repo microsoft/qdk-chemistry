@@ -18,10 +18,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Arrays.Reversed;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import Std.Canon.ApplyToEach;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIterationPowerSchedule;
 
     /// Number of phase qubits required to address `numQueries + 1` reflection slots.
     function PhaseRegisterSize(numQueries : Int) : Int {
@@ -80,9 +82,64 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
         ResetAll(allTargets);
         mutable results = [Zero, size = numBits];
+        // `Std.Canon.ApplyQFT` maps a little-endian input to a big-endian output, so
+        // `Adjoint ApplyQFT` leaves the phase little-endian in `phaseAncillas`. Read the
+        // register back in reverse to return the documented most-significant-bit-first order.
         for idx in 0..numBits - 1 {
-            set results w/= idx <- MResetZ(phaseAncillas[idx]);
+            set results w/= idx <- MResetZ(phaseAncillas[numBits - 1 - idx]);
         }
         return results;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Test wrapper
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    internal operation NoAncillaPrep(qs : Qubit[]) : Unit is Adj {}
+
+    /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
+    ///
+    /// The two self-inverse reflections are `R = X` and
+    /// `B = Rz(theta) X Rz(-theta) = cos(theta) X + sin(theta) Y`, whose product is the
+    /// walk `W = B·R = Rz(2*theta)`, with `W|0> = e^{-i*theta}|0>` and
+    /// `W|1> = e^{+i*theta}|1>`. A uniform window is used, so `numQueries` must be
+    /// `2^b - 1` for the window to exactly fill the phase register and the outcome to
+    /// be deterministic.
+    ///
+    /// With `theta = -pi*k/(numQueries + 1)` the returned bits must read `k` for
+    /// `systemState = 1` and `(-k) mod (numQueries + 1)` for `systemState = 0`, which
+    /// pins the documented relation `y = -+2*phi mod 1` together with every endianness
+    /// convention in the chain: big-endian window state, little-endian unary addressing,
+    /// and the bit order of the measured phase register.
+    operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemState : Int) : Result[] {
+        let numBits = PhaseRegisterSize(numQueries);
+        Fact(2^numBits == numQueries + 1, "numQueries must be one less than a power of two");
+
+        return MakeUnaryQPECircuit(
+            (systems) => {
+                if systemState == 1 {
+                    X(systems[0]);
+                }
+            },
+            (address, targets) => {
+                UnaryIterationPowerSchedule(address, numQueries, (selected) => {
+                    within {
+                        X(selected);
+                    } apply {
+                        CNOT(selected, targets[0]);
+                    }
+                }, () => {
+                    Rz(-theta, targets[0]);
+                    X(targets[0]);
+                    Rz(theta, targets[0]);
+                });
+            },
+            numQueries,
+            Std.Arrays.SequenceI(0, numBits - 1),
+            [numBits],
+            ApplyToEach(H, _),
+            0,
+            NoAncillaPrep
+        );
     }
 }
