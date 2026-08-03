@@ -83,11 +83,13 @@ $cppManifest  = "$SrcDir\cpp\manifest\qdk-chemistry\cgmanifest.json"
 $libintUrl    = Get-ManifestUrl    $cppManifest 'Libint'
 $ecpintCommit = Get-ManifestCommit $cppManifest 'robashaw/libecpint'
 $gauxcCommit  = Get-ManifestCommit $cppManifest 'wavefunction91/gauxc'
+$btasCommit   = Get-ManifestCommit $cppManifest 'BTAS/btas'
 
 Write-Host "=== Dependency versions ==="
 Write-Host "  libint2 : $libintUrl"
 Write-Host "  ecpint  : $ecpintCommit"
 Write-Host "  gauxc   : $gauxcCommit"
+Write-Host "  btas    : $btasCommit"
 
 # ─── Common CMake flags (applied to every dep build) ─────────────────────────
 $commonArgs = @(
@@ -214,6 +216,21 @@ Invoke-CMakeDep 'gauxc' $gauxcSrc @(
     '-DGAUXC_ENABLE_OPENMP=OFF'
 )
 Remove-Item $gauxcSrc -Recurse -Force
+
+# ─── BTAS ────────────────────────────────────────────────────────────────────
+# Header-only. blaspp/lapackpp are not prebuilt on Windows, so BTAS's kit fetches
+# and installs them here beside it -- which is where its installed config then
+# resolves the `blaspp_headers` marker from.
+Write-Host "=== Installing BTAS ==="
+$btasSrc = "$buildDir\btas-src"
+git clone https://github.com/BTAS/btas.git $btasSrc
+git -C $btasSrc checkout $btasCommit
+
+Invoke-CMakeDep 'btas' $btasSrc @(
+    '-DBUILD_TESTING=OFF',
+    '-DBTAS_BUILD_UNITTEST=OFF'
+)
+Remove-Item $btasSrc -Recurse -Force
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
 if (-not $KeepBuildDir) {
