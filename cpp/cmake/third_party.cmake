@@ -129,31 +129,17 @@ handle_dependency(gauxc
   REQUIRED
 )
 
-# BTAS (header-only dense tensors) evaluates the DUCC effective-Hamiltonian
-# dressing. The symbolic Baker-Campbell-Hausdorff / Wick derivation is done
-# offline by the generator in ducc/ and checked in as ducc_equations.inc, so no
-# symbolic-algebra library is needed at build or run time.
-#
-# BTAS links Boost::headers/random/serialization, so discover the modular Boost
-# libint2 already uses to make those imported targets exist. Do NOT set
-# BLA_VENDOR: it flips BTAS onto the standard-linalg-kit path, which needs an
-# explicit Fortran mangling convention. blaspp/lapackpp/BLAS are reused prebuilt
-# (the ones MACIS already requires), so no Fortran compiler is needed.
+# BTAS for dense tensor contraction in the DUCC effective Hamiltonian. Boost is
+# discovered first because BTAS links Boost::headers/random/serialization, and
+# install_cpp_dependencies.sh installs BTAS beside blaspp because an installed
+# btas-config.cmake resolves its `blaspp_headers` marker only from there.
 find_package(Boost CONFIG REQUIRED)
 
-# An installed btas-config.cmake is unusable: it expects a `blaspp_headers`
-# marker target that the ValeevGroup kit installs beside BTAS, but then looks
-# for it under the standalone blaspp_DIR, where it does not exist. That is what
-# the wheel build hits, since it reconfigures against the prefix the preceding
-# C++ install step populated. NO_DEFAULT_PATH skips discovery entirely so BTAS
-# is always taken from source at the pinned tag (it is header-only, so this
-# costs a configure, not a compile).
 handle_dependency(BTAS
   GIT_REPOSITORY https://github.com/BTAS/btas.git
   GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
   BUILD_TARGET BTAS
   INSTALL_TARGET BTAS::BTAS
-  FIND_PACKAGE_ARGS NO_DEFAULT_PATH
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )
