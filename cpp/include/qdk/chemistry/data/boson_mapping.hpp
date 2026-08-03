@@ -1,8 +1,6 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
 #pragma once
 #include <H5Cpp.h>
@@ -35,26 +33,40 @@ using BosonPauliTerms =
 
 /**
  * @brief Boson-to-qubit encodings supported by @ref BosonMapping.
+ *
+ * @ref BosonEncoding::StandardBinary and @ref BosonEncoding::GrayCode are named
+ * conveniences: each fixes one particular codeword table. @ref
+ * BosonEncoding::Custom is what an arbitrary table supplied to
+ * @ref BosonMapping::from_codeword_table reports, and it is *not* a single
+ * encoding — the table, not this tag, identifies such a mapping.
  */
 enum class BosonEncoding : std::uint8_t {
   /// Level @f$n@f$ maps to the binary representation of @f$n@f$.
   StandardBinary = 0,
   /// Level @f$n@f$ maps to @f$n \oplus (n \gg 1)@f$.
   GrayCode = 1,
+  /// An explicit codeword table supplied by the caller; see
+  /// @ref BosonMapping::from_codeword_table.
+  Custom = 2,
 };
 
 /**
  * @brief Canonical lowercase name of a boson encoding.
  * @param encoding The encoding.
- * @return ``"standard-binary"`` or ``"gray-code"``.
+ * @return ``"standard-binary"``, ``"gray-code"`` or ``"custom"``.
  */
 std::string to_string(BosonEncoding encoding);
 
 /**
  * @brief Parse a boson encoding name.
  *
- * Accepts ``"standard-binary"``/``"standard_binary"``/``"sb"``/``"binary"``
- * and ``"gray-code"``/``"gray_code"``/``"gray"``/``"gc"``, case-insensitively.
+ * Accepts ``"standard-binary"``/``"standard_binary"``/``"sb"``/``"binary"``,
+ * ``"gray-code"``/``"gray_code"``/``"gray"``/``"gc"`` and ``"custom"``,
+ * case-insensitively.
+ *
+ * @note ``"custom"`` round-trips the tag only. It names no particular table, so
+ *       it cannot be handed to @ref BosonMapping::for_encoding; build a custom
+ *       mapping with @ref BosonMapping::from_codeword_table instead.
  *
  * @param name Encoding name.
  * @return The corresponding encoding.
@@ -71,12 +83,22 @@ BosonEncoding boson_encoding_from_string(const std::string& name);
  * *codeword* map @f$\mathrm{cw}: \{0,\ldots,d_i-1\} \to \{0,1\}^{n_q(i)}@f$.
  * The associated isometry is @f$V = \sum_n |\mathrm{cw}(n)\rangle\langle n|@f$.
  *
+ * @par The encoding set is open
+ * An encoding *is* a codeword table, and this class stores exactly that. The
+ * named factories (@ref standard_binary, @ref gray_code, @ref for_encoding,
+ * @ref for_basis) are conveniences that fill the table for you;
+ * @ref from_codeword_table accepts any table directly, so callers are not
+ * limited to the encodings this header happens to name. This mirrors
+ * @ref MajoranaMapping, where @c from_table is the general entry point and the
+ * named transforms sit on top of it.
+ *
  * @par Where the cutoff lives
  * The cutoff is owned by the @ref BosonicModes basis and is attributed per
  * mode. This class mirrors that: it stores one dimension per mode and every
- * accessor and internal loop is per-mode. Phase 1 offers only uniform
- * construction through @ref standard_binary, @ref gray_code and
- * @ref for_encoding; @ref for_basis carries whatever the basis states.
+ * accessor and internal loop is per-mode. The named factories construct
+ * uniformly; @ref for_basis carries whatever the basis states, and
+ * @ref from_codeword_table takes one dimension per mode from the table it is
+ * given.
  *
  * @par Power-of-two truncation
  * Only power-of-two @f$d_i@f$ is accepted. The codeword map is then a
@@ -157,6 +179,51 @@ class BosonMapping : public DataClass {
       const BosonicModes& modes,
       BosonEncoding encoding = BosonEncoding::StandardBinary);
 
+  /**
+   * @brief Build a mapping from an explicit codeword table.
+   *
+   * This is the general constructor, the boson analogue of
+   * @c MajoranaMapping::from_table: an encoding *is* the injective map
+   * @f$\mathrm{cw}: \{0,\ldots,d-1\} \to \{0,1\}^{n_q}@f$, and this factory
+   * takes that map directly. @ref standard_binary and @ref gray_code are
+   * conveniences that build particular tables.
+   *
+   * One inner vector per mode; its length is that mode's local dimension
+   * @f$d@f$, and entry @c level is the codeword of @f$|level\rangle@f$. The
+   * qubit count of each mode is derived from the table exactly as the named
+   * factories derive it, @f$n_q = \log_2 d@f$.
+   *
+   * @par What counts as a valid table
+   * Every mode's table must be a permutation of @f$\{0,\ldots,d-1\}@f$: it must
+   * be injective, @f$d@f$ must be a power of two, and every codeword must fit
+   * in @f$n_q@f$ qubits. That is not an implementation restriction but the same
+   * surjectivity condition the named encodings satisfy — it is what makes the
+   * isometry unitary, the unphysical subspace empty and leakage identically
+   * zero. Standard binary is the identity permutation and Gray code is the
+   * reflected-binary permutation.
+   *
+   * @par How such a mapping identifies itself
+   * @ref encoding always reports @ref BosonEncoding::Custom for a mapping built
+   * here, even when the supplied table happens to coincide with a named
+   * encoding: the tag records how the mapping was built, and no table
+   * recognition is attempted. The table is the identity of the mapping — it is
+   * what is hashed, what is written to disk, and what is restored on read.
+   * @ref name carries @p name, or ``"custom"`` when none is given.
+   *
+   * @param per_mode_codewords One codeword list per mode; entry @c level holds
+   *        the codeword of occupation @c level.
+   * @param name Optional label reported by @ref name; defaults to
+   *        ``"custom"``.
+   * @return The mapping.
+   * @throws std::invalid_argument If the table is empty, or if any mode's
+   *         codeword list has fewer than 2 entries, has a length that is not a
+   *         power of two, holds a codeword that does not fit in that mode's
+   *         qubits, or repeats a codeword.
+   */
+  static BosonMapping from_codeword_table(
+      std::vector<std::vector<std::uint64_t>> per_mode_codewords,
+      std::string name = "");
+
   /// Number of bosonic modes.
   std::size_t num_modes() const { return mode_dimensions_.size(); }
 
@@ -202,14 +269,38 @@ class BosonMapping : public DataClass {
   /// Total number of qubits, the sum of qubits_per_mode(i) over all modes.
   std::size_t num_qubits() const { return num_qubits_; }
 
-  /// Which encoding this mapping implements.
+  /**
+   * @brief Which encoding this mapping implements.
+   *
+   * @ref BosonEncoding::Custom for any mapping built by
+   * @ref from_codeword_table, whose identity is its @ref codeword_table rather
+   * than this tag.
+   *
+   * @return The encoding tag.
+   */
   BosonEncoding encoding() const { return encoding_; }
 
-  /// Human-readable encoding name.
+  /**
+   * @brief Human-readable encoding name.
+   *
+   * ``"standard-binary"`` or ``"gray-code"`` for the named encodings; for a
+   * mapping built by @ref from_codeword_table, the label supplied there, or
+   * ``"custom"`` if none was given. This is the string a plugin backend reads
+   * to pick a transform, and the string recorded on a mapped
+   * @ref QubitOperator.
+   *
+   * @note @ref MajoranaMapping deliberately carries two names — @c name and
+   *       @c base_encoding — because tapering renames a mapping while leaving
+   *       it built on an underlying transform, so a backend must be told which
+   *       untapered transform to use. @ref BosonMapping has no such
+   *       transformation, so the two would be the same string; it therefore
+   *       offers this one accessor only. If boson tapering is ever added, a
+   *       @c base_encoding accessor should be added *with* it, so that it is
+   *       introduced already carrying a meaning.
+   *
+   * @return The name.
+   */
   const std::string& name() const { return name_; }
-
-  /// Encoding name used by third-party plugin backends.
-  const std::string& base_encoding() const { return name_; }
 
   /**
    * @brief Codeword (register bit pattern) of an occupation level on a mode.
@@ -231,6 +322,10 @@ class BosonMapping : public DataClass {
 
   /**
    * @brief The full codeword table of a mode, indexed by occupation level.
+   *
+   * The exact inverse of @ref from_codeword_table: feeding one table per mode
+   * back to that factory reproduces this mapping's operators.
+   *
    * @param mode Mode index.
    * @return That mode's codeword table.
    * @throws std::out_of_range If @p mode is not a valid mode index.
@@ -379,13 +474,32 @@ class BosonMapping : public DataClass {
   void to_file(const std::string& filename,
                const std::string& type) const override;
 
-  /// @brief Serialize to JSON.
+  /**
+   * @brief Serialize to JSON.
+   *
+   * Always writes @c version, @c num_modes, @c mode_dimensions and
+   * @c encoding. A mapping built by @ref from_codeword_table additionally
+   * writes @c codewords (one array of codewords per mode) and @c name, because
+   * for such a mapping the table — not the @c encoding tag — is what identifies
+   * it. Both extra fields are omitted for the named encodings, whose payload is
+   * therefore unchanged, and both are optional on read.
+   *
+   * @return The JSON representation.
+   */
   nlohmann::json to_json() const override;
 
   /**
    * @brief Deserialize from JSON.
+   *
+   * When @c codewords is present it is the source of truth and the mapping is
+   * rebuilt from the table; @c encoding is then only a tag. When it is absent
+   * the named encoding in @c encoding regenerates the table, which is how every
+   * document written before custom tables existed is read.
+   *
    * @param data JSON object produced by @ref to_json.
    * @return The reconstructed mapping.
+   * @throws std::invalid_argument If the document is malformed, or claims the
+   *         ``"custom"`` encoding without carrying a @c codewords table.
    */
   static BosonMapping from_json(const nlohmann::json& data);
 
@@ -432,11 +546,28 @@ class BosonMapping : public DataClass {
   BosonMapping(std::vector<std::size_t> mode_dimensions,
                BosonEncoding encoding);
 
+  /// General constructor: the codeword table is the encoding. Everything else
+  /// — the per-mode dimensions, the qubit counts, the register layout and the
+  /// inverse tables — is derived from it.
+  BosonMapping(std::vector<std::vector<std::uint64_t>> per_mode_codewords,
+               BosonEncoding encoding, std::string name);
+
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /// Throw unless d >= 2 and d is a power of two, naming the offending mode.
   static void validate_mode_dimension(std::size_t mode,
                                       std::size_t mode_dimension);
+
+  /// Throw unless every mode's codeword list is a permutation of [0, d),
+  /// naming the offending mode, level(s) and codeword.
+  static void validate_codeword_table(
+      const std::vector<std::vector<std::uint64_t>>& per_mode_codewords);
+
+  /// Codeword table of a named encoding: standard binary is the identity
+  /// permutation of [0, d), Gray code the reflected-binary one. Validates each
+  /// dimension on the way through.
+  static std::vector<std::vector<std::uint64_t>> builtin_codeword_table(
+      const std::vector<std::size_t>& mode_dimensions, BosonEncoding encoding);
 
   /// Throw unless @p mode is a valid mode index.
   void check_mode(std::size_t mode) const;

@@ -205,3 +205,30 @@ TEST(BosonicModes, SummaryMentionsTheCutoff) {
   EXPECT_NE(summary.find("Local dimension d: 4"), std::string::npos);
   EXPECT_EQ(modes.get_data_type_name(), "bosonic_modes");
 }
+
+TEST(BosonicModes, HardCoreGivesTwoLevelModesThatNeedNoPadding) {
+  const auto modes = BosonicModes::hard_core(5);
+  ASSERT_NE(modes, nullptr);
+  EXPECT_EQ(modes->num_modes(), 5u);
+  for (std::size_t i = 0; i < modes->num_modes(); ++i) {
+    EXPECT_EQ(modes->mode_dimension(i), 2u) << "mode " << i;
+    EXPECT_EQ(modes->max_occupation(i), 1u) << "mode " << i;
+  }
+  EXPECT_EQ(modes->mode_dimensions(),
+            (std::vector<std::size_t>{2u, 2u, 2u, 2u, 2u}));
+  ASSERT_TRUE(modes->uniform_dimension().has_value());
+  EXPECT_EQ(*modes->uniform_dimension(), 2u);
+
+  // d = 2 is already a power of two, so a mapping needs no padding at all.
+  EXPECT_TRUE(modes->has_power_of_two_dimensions());
+  EXPECT_EQ(BosonicModes::padded_dimension(2), 2u);
+  EXPECT_EQ(modes->with_padded_dimensions()->mode_dimensions(),
+            modes->mode_dimensions());
+  EXPECT_EQ(modes->fock_space_dimension(), 32u);
+
+  // It is an ordinary uniform basis, so it round-trips and hashes like one.
+  EXPECT_EQ(modes->content_hash(), BosonicModes(5, 2).content_hash());
+  EXPECT_NE(modes->content_hash(), BosonicModes(5, 4).content_hash());
+
+  EXPECT_THROW(BosonicModes::hard_core(0), std::invalid_argument);
+}

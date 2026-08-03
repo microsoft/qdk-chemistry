@@ -698,3 +698,226 @@ def _label(word, num_qubits: int) -> str:
     from qdk_chemistry._core.data import sparse_pauli_word_to_label  # noqa: PLC0415
 
     return sparse_pauli_word_to_label(word, num_qubits)
+
+
+def _all_primitives(mapping: BosonMapping) -> dict[str, dict[str, complex]]:
+    """Every primitive operator a mapping can emit, collected by label.
+
+    Args:
+        mapping: The boson-to-qubit mapping to exercise.
+
+    Returns:
+        dict[str, dict[str, complex]]: Primitive tag to its Pauli-label expansion.
+
+    """
+    nq = mapping.num_qubits()
+
+    def collect(terms) -> dict[str, complex]:
+        """Collect ``(word, coefficient)`` pairs into a label dictionary.
+
+        Args:
+            terms: Sparse ``(word, coefficient)`` pairs from the mapping.
+
+        Returns:
+            dict[str, complex]: One entry per distinct Pauli label.
+
+        """
+        out: dict[str, complex] = {}
+        for word, coefficient in terms:
+            label = _label(word, nq)
+            out[label] = out.get(label, 0.0) + complex(coefficient)
+        return out
+
+    primitives: dict[str, dict[str, complex]] = {}
+    for mode in range(mapping.num_modes()):
+        primitives[f"{mode}:a"] = collect(mapping.annihilation(mode))
+        primitives[f"{mode}:c"] = collect(mapping.creation(mode))
+        primitives[f"{mode}:n"] = collect(mapping.number(mode))
+        primitives[f"{mode}:nn1"] = collect(mapping.number_times_number_minus_one(mode))
+        primitives[f"{mode}:aa"] = collect(mapping.ladder_product([(mode, False), (mode, False)]))
+        primitives[f"{mode}:ccaa"] = collect(
+            mapping.ladder_product([(mode, True), (mode, True), (mode, False), (mode, False)])
+        )
+    # Cross-mode hopping additionally pins the per-mode qubit block layout.
+    for i in range(mapping.num_modes() - 1):
+        primitives[f"{i}->{i + 1}"] = collect(mapping.ladder_product([(i, True), (i + 1, False)]))
+    return primitives
+
+
+class TestCustomCodewordTable:
+    """Tests for the open end of the encoding set, ``BosonMapping.from_codeword_table``."""
+
+    def test_reproduces_the_named_encodings_exactly(self):
+        """A table holding the standard-binary or Gray codewords reproduces that mapping."""
+        for dim in (2, 4, 8):
+            for named, table in (
+                (BosonMapping.standard_binary(2, dim), [list(range(dim))] * 2),
+                (BosonMapping.gray_code(2, dim), [[n ^ (n >> 1) for n in range(dim)]] * 2),
+            ):
+                custom = BosonMapping.from_codeword_table(table)
+                assert custom.num_qubits() == named.num_qubits()
+                assert [custom.codeword_table(i) for i in range(2)] == [named.codeword_table(i) for i in range(2)]
+                assert _all_primitives(custom) == _all_primitives(named)
+
+    def test_reports_custom_even_when_the_table_is_a_named_one(self):
+        """``encoding`` is never inferred from the table; the table is the truth."""
+        custom = BosonMapping.from_codeword_table([[0, 1, 2, 3]])
+        assert custom.encoding == BosonEncoding.Custom
+        assert custom.name == "custom"
+        assert BosonMapping.from_codeword_table([[0, 1, 2, 3]], "my-encoding").name == "my-encoding"
+        assert BosonMapping.standard_binary(1, 4).encoding == BosonEncoding.StandardBinary
+
+    def test_custom_is_a_tag_not_a_rule(self):
+        """``BosonEncoding.Custom`` parses from a string but cannot select an encoding."""
+        from qdk_chemistry._core.data import boson_encoding_from_string  # noqa: PLC0415
+
+        assert boson_encoding_from_string("custom") == BosonEncoding.Custom
+        with pytest.raises(ValueError, match="from_codeword_table"):
+            BosonMapping.for_encoding(2, 4, BosonEncoding.Custom)
+
+    def test_rejects_invalid_tables(self):
+        """Every way of breaking the permutation invariant is a hard, actionable error."""
+        with pytest.raises(ValueError, match="codeword table is empty"):
+            BosonMapping.from_codeword_table([])
+        with pytest.raises(ValueError, match="mode 1"):
+            BosonMapping.from_codeword_table([[0, 1], [0]])
+        with pytest.raises(ValueError, match="power of two"):
+            BosonMapping.from_codeword_table([[0, 1, 2]])
+        with pytest.raises(ValueError, match="does not fit"):
+            BosonMapping.from_codeword_table([[0, 4, 2, 3]])
+        with pytest.raises(ValueError, match="injective"):
+            BosonMapping.from_codeword_table([[0, 1, 1, 3]])
+
+    def test_json_and_pickle_round_trip_the_table(self):
+        """A custom table survives serialization; the table, not the enum, is on the wire."""
+        import pickle  # noqa: PLC0415
+
+        original = BosonMapping.from_codeword_table([[2, 0, 3, 1], [0, 1, 3, 2]], "mixed")
+        document = json.loads(original.to_json())
+        assert document["codewords"] == [[2, 0, 3, 1], [0, 1, 3, 2]]
+        assert document["name"] == "mixed"
+        assert document["encoding"] == "custom"
+
+        for restored in (BosonMapping.from_json(original.to_json()), pickle.loads(pickle.dumps(original))):
+            assert restored.encoding == BosonEncoding.Custom
+            assert restored.name == "mixed"
+            assert [restored.codeword_table(i) for i in range(2)] == [[2, 0, 3, 1], [0, 1, 3, 2]]
+            assert restored.content_hash() == original.content_hash()
+            assert _all_primitives(restored) == _all_primitives(original)
+
+    def test_named_encoding_documents_are_unchanged(self):
+        """The new optional fields are written only for custom tables."""
+        document = json.loads(BosonMapping.standard_binary(2, 4).to_json())
+        assert "codewords" not in document
+        assert "name" not in document
+        assert document["encoding"] == "standard-binary"
+
+    def test_heterogeneous_tables_are_supported(self):
+        """Modes may carry different dimensions, exactly as ``for_basis`` allows."""
+        mapping = BosonMapping.from_codeword_table([[1, 0], [3, 2, 0, 1], [0, 1]])
+        assert mapping.mode_dimensions() == [2, 4, 2]
+        assert [mapping.qubits_per_mode(i) for i in range(3)] == [1, 2, 1]
+        assert mapping.num_qubits() == 4
+        # Mode 0 owns the most significant block, as for every other factory.
+        assert mapping.mode_qubits(0) == [3]
+        assert mapping.mode_qubits(1) == [1, 2]
+        assert mapping.mode_qubits(2) == [0]
+        assert mapping.uniform_dimension() is None
+
+    def test_maps_a_hamiltonian_identically_to_the_named_encoding(self):
+        """End to end: a Gray table produces the Gray operator, and records its own name."""
+        hamiltonian = create_bose_hubbard_hamiltonian(LatticeGraph.chain(2), t=1.0, U=4.0, mu=0.0, mode_dimension=4)
+        gray_table = [[n ^ (n >> 1) for n in range(4)]] * 2
+        custom = create("boson_qubit_mapper").run(hamiltonian, BosonMapping.from_codeword_table(gray_table, "gray-ish"))
+        named = create("boson_qubit_mapper").run(hamiltonian, BosonMapping.gray_code(2, 4))
+        assert _terms(custom) == pytest.approx(_terms(named), abs=TOL)
+        assert custom.encoding == "gray-ish"
+
+    @pytest.mark.parametrize(
+        ("case", "codewords"),
+        [
+            ((2, 4, 0.7, 3.3, 0.9), [2, 0, 3, 1]),
+            ((2, 4, 1.0, 4.0, 0.0), [3, 2, 1, 0]),
+            ((3, 2, 0.7, 3.3, 0.9), [1, 0]),
+            ((2, 8, 0.5, 2.0, -1.0), [5, 2, 7, 0, 3, 6, 1, 4]),
+        ],
+    )
+    def test_custom_permutation_matches_the_kronecker_construction(self, case, codewords):
+        """An arbitrary permutation still permutes the occupation-basis Hamiltonian exactly.
+
+        This is the independent check: the reference matrix is built by NumPy
+        from the Fock-space definition and shares no code with the mapping.
+
+        Args:
+            case: The ``(modes, dim, t, u, mu)`` model parameters.
+            codewords: The custom codeword table shared by every mode.
+
+        """
+        modes, dim, t, u, mu = case
+        hamiltonian = create_bose_hubbard_hamiltonian(LatticeGraph.chain(modes), t=t, U=u, mu=mu, mode_dimension=dim)
+        mapping = BosonMapping.from_codeword_table([list(codewords)] * modes)
+        encoded = _qubit_operator_matrix(create("boson_qubit_mapper").run(hamiltonian, mapping))
+        np.testing.assert_allclose(encoded, encoded.conj().T, atol=TOL)
+
+        permutation = []
+        for occupations in itertools.product(range(dim), repeat=modes):
+            index = 0
+            for n in occupations:
+                index = index * dim + codewords[n]
+            permutation.append(index)
+        expected = np.zeros_like(encoded)
+        expected[np.ix_(np.array(permutation), np.array(permutation))] = _bose_hubbard_matrix(case)
+        np.testing.assert_allclose(encoded, expected, atol=TOL)
+
+
+class TestHardCoreBosons:
+    """Tests for the ``d = 2`` hard-core limit and its inert on-site interaction."""
+
+    def test_hard_core_basis_is_two_level_and_needs_no_padding(self):
+        """``hard_core(L)`` gives every mode ``d = 2``, which is already a power of two."""
+        modes = BosonicModes.hard_core(3)
+        assert modes.num_modes() == 3
+        assert modes.mode_dimensions() == [2, 2, 2]
+        assert all(modes.mode_dimension(i) == 2 for i in range(3))
+        assert modes.with_padded_dimensions().mode_dimensions() == [2, 2, 2]
+        assert BosonMapping.for_basis(modes).num_qubits() == 3
+
+    def test_annihilation_is_exactly_sigma_minus(self):
+        """On two levels ``b`` is the spin lowering operator, with no truncation error."""
+        mapping = BosonMapping.for_basis(BosonicModes.hard_core(1))
+        terms = {_label(word, 1): complex(coefficient) for word, coefficient in mapping.annihilation(0)}
+        assert terms == pytest.approx({"X": 0.5, "Y": 0.5j}, abs=TOL)
+        assert mapping.number_times_number_minus_one(0) == []
+
+    def test_u_is_inert_in_the_hard_core_limit(self):
+        """``n (n - 1)`` vanishes identically at ``d = 2``, so any ``U`` gives the same operator."""
+        baseline = _terms(_mapped((2, 2, 1.0, 0.0, 0.0), BosonEncoding.StandardBinary))
+        for u in (4.0, 400.0, -17.5):
+            assert _terms(_mapped((2, 2, 1.0, u, 0.0), BosonEncoding.StandardBinary)) == baseline
+        # Fixture 1 of the research report.
+        assert baseline == pytest.approx({"XX": -0.5, "YY": -0.5}, abs=TOL)
+
+    def test_inert_u_is_warned_about(self, capfd):
+        """The physics is left alone, but the user is told that ``U`` cannot be felt."""
+        from qdk_chemistry.utils import Logger  # noqa: PLC0415
+
+        previous = Logger.get_global_level()
+        Logger.set_global_level("warn")
+        try:
+            capfd.readouterr()
+            create_bose_hubbard_hamiltonian(LatticeGraph.chain(2), t=1.0, U=4.0, mu=0.0, mode_dimension=2)
+            assert "hard-core limit" in capfd.readouterr().out
+
+            create_bose_hubbard_hamiltonian(LatticeGraph.chain(2), t=1.0, U=0.0, mu=0.0, mode_dimension=2)
+            assert "hard-core limit" not in capfd.readouterr().out
+
+            create_bose_hubbard_hamiltonian(LatticeGraph.chain(2), t=1.0, U=4.0, mu=0.0, mode_dimension=4)
+            assert "hard-core limit" not in capfd.readouterr().out
+        finally:
+            Logger.set_global_level(previous)
+
+    def test_the_warning_does_not_alter_the_integrals(self):
+        """``U`` is still stored verbatim as ``(ii|ii)``; only the Pauli operator is blind to it."""
+        hamiltonian = create_bose_hubbard_hamiltonian(LatticeGraph.chain(2), t=1.0, U=4.0, mu=0.0, mode_dimension=2)
+        assert hamiltonian.get_two_body_element(0, 0, 0, 0) == pytest.approx(4.0, abs=TOL)
+        assert hamiltonian.get_one_body_element(0, 1) == pytest.approx(-1.0, abs=TOL)

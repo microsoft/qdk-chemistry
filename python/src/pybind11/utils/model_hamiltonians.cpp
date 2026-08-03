@@ -194,10 +194,13 @@ To map the result to qubits the cutoff must be a power of two; use
 ``BosonicModes.padded_dimension`` to round up (padding is free in Pauli-term
 count and removes the unphysical subspace entirely).
 
+Warning:
+    At ``mode_dimension = 2`` -- the hard-core limit -- ``U`` has no effect whatsoever, because ``n (n - 1)`` is zero for both ``n = 0`` and ``n = 1``, so the on-site term vanishes identically. Any ``U`` produces the same operator. This is the correct physics of hard-core bosons, not a truncation artefact, and the requested ``U`` is still stored as ``(ii|ii)``; but because it is easy to miss, a warning is logged when a non-zero ``U`` is combined with ``mode_dimension = 2``. Use ``mode_dimension = 4`` or larger for an interacting model, or :meth:`~qdk_chemistry.data.BosonicModes.hard_core` to state the hard-core limit explicitly.
+
 Args:
     lattice (LatticeGraph): Symmetric lattice graph defining connectivity.
     t (float or numpy.ndarray): Hopping integral(s).
-    U (float or numpy.ndarray): On-site interaction strength(s).
+    U (float or numpy.ndarray): On-site interaction strength(s); inert when ``mode_dimension`` is 2.
     mu (float or numpy.ndarray): Chemical potential(s).
     mode_dimension (int): Local Fock-space dimension ``d = n_max + 1`` of every mode.
 

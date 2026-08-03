@@ -1,8 +1,6 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
 #include <limits>
 #include <qdk/chemistry/data/bosonic_modes.hpp>
@@ -112,6 +110,12 @@ std::shared_ptr<BosonicModes> BosonicModes::padded_to_power_of_two(
     std::size_t num_modes, std::size_t requested_dimension) {
   return std::make_shared<BosonicModes>(num_modes,
                                         padded_dimension(requested_dimension));
+}
+
+std::shared_ptr<BosonicModes> BosonicModes::hard_core(std::size_t num_modes) {
+  // d = 2 keeps only n in {0, 1}: one qubit per mode, b == sigma^-, and the
+  // two-body on-site term n(n-1) is identically zero.
+  return std::make_shared<BosonicModes>(num_modes, 2);
 }
 
 std::shared_ptr<BosonicModes> BosonicModes::with_padded_dimensions() const {

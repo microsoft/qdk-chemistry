@@ -1,8 +1,6 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
 #include <algorithm>
 #include <cctype>
@@ -19,7 +17,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -207,16 +204,21 @@ bool is_diagonal(const LocalMatrix& matrix, std::size_t dimension) {
   return true;
 }
 
-/// Cached local decomposition of a ladder-operator sequence.  The result
-/// depends only on (encoding, dimension, sequence), never on the mode.
+/// Cached local decomposition of a ladder-operator sequence.
+///
+/// The result depends only on the mode's codeword table and the sequence — the
+/// table fixes the dimension (its length) and the register width (log2 of that
+/// length) — so the table itself is the cache key. Keying on the encoding tag
+/// instead would be wrong the moment two different custom tables share a
+/// dimension: they would collide and silently return each other's Pauli terms.
 const LocalPauliMap& cached_sequence_terms(
-    BosonEncoding encoding, std::size_t dimension, std::size_t num_qubits,
+    std::size_t dimension, std::size_t num_qubits,
     const std::vector<std::uint64_t>& codewords, const std::string& sequence) {
-  using Key = std::tuple<std::uint8_t, std::size_t, std::string>;
+  using Key = std::pair<std::vector<std::uint64_t>, std::string>;
   static std::mutex mutex;
   static std::map<Key, LocalPauliMap> cache;
 
-  const Key key{static_cast<std::uint8_t>(encoding), dimension, sequence};
+  const Key key{codewords, sequence};
   const std::lock_guard<std::mutex> guard(mutex);
   auto it = cache.find(key);
   if (it != cache.end()) {
@@ -234,7 +236,7 @@ const LocalPauliMap& cached_sequence_terms(
   } else {
     terms = decompose_local(matrix, dimension, num_qubits, codewords);
   }
-  return cache.emplace(key, std::move(terms)).first->second;
+  return cache.emplace(std::move(key), std::move(terms)).first->second;
 }
 
 /// Sorted, pruned local terms as (packed word, coefficient) pairs.
@@ -262,6 +264,8 @@ std::string to_string(BosonEncoding encoding) {
       return "standard-binary";
     case BosonEncoding::GrayCode:
       return "gray-code";
+    case BosonEncoding::Custom:
+      return "custom";
   }
   throw std::invalid_argument("Unknown BosonEncoding value");
 }
@@ -280,8 +284,12 @@ BosonEncoding boson_encoding_from_string(const std::string& name) {
   if (key == "gray-code" || key == "gray" || key == "gc" || key == "graycode") {
     return BosonEncoding::GrayCode;
   }
-  throw std::invalid_argument("Unknown boson encoding '" + name +
-                              "'; expected 'standard-binary' or 'gray-code'");
+  if (key == "custom") {
+    return BosonEncoding::Custom;
+  }
+  throw std::invalid_argument(
+      "Unknown boson encoding '" + name +
+      "'; expected 'standard-binary', 'gray-code' or 'custom'");
 }
 
 void BosonMapping::validate_mode_dimension(std::size_t mode,
@@ -311,6 +319,96 @@ void BosonMapping::validate_mode_dimension(std::size_t mode,
   }
 }
 
+void BosonMapping::validate_codeword_table(
+    const std::vector<std::vector<std::uint64_t>>& per_mode_codewords) {
+  if (per_mode_codewords.empty()) {
+    throw std::invalid_argument(
+        "BosonMapping::from_codeword_table: the codeword table is empty, so "
+        "the mapping would have no modes. Supply one codeword list per mode: "
+        "the outer vector is indexed by mode, the inner one by occupation "
+        "level.");
+  }
+  for (std::size_t mode = 0; mode < per_mode_codewords.size(); ++mode) {
+    const auto& codewords = per_mode_codewords[mode];
+    const std::size_t dimension = codewords.size();
+    if (dimension < 2) {
+      throw std::invalid_argument(
+          "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
+          " was given " + std::to_string(dimension) +
+          " codeword(s), so its local dimension would be d=" +
+          std::to_string(dimension) +
+          ", but a mode dimension must be at least 2 (a mode with fewer than "
+          "two levels carries no bosonic degree of freedom).");
+    }
+    if (!detail::is_power_of_two(dimension)) {
+      throw std::invalid_argument(
+          "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
+          " was given " + std::to_string(dimension) +
+          " codewords, so its local dimension d=" + std::to_string(dimension) +
+          " is not a power of two. Every mode's codeword table must be a "
+          "permutation of {0, ..., d-1}: the qubit register is then exactly "
+          "the code space, so there is no unphysical subspace and leakage is "
+          "identically zero. Give this mode " +
+          std::to_string(BosonicModes::padded_dimension(dimension)) +
+          " codewords instead.");
+    }
+    std::vector<bool> seen(dimension, false);
+    std::vector<std::size_t> first_level(dimension, 0);
+    for (std::size_t level = 0; level < dimension; ++level) {
+      const std::uint64_t code = codewords[level];
+      if (code >= dimension) {
+        throw std::invalid_argument(
+            "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
+            " maps level " + std::to_string(level) + " to codeword " +
+            std::to_string(code) + ", which does not fit in the " +
+            std::to_string(detail::log2_exact(dimension)) +
+            " qubit(s) implied by that mode's " + std::to_string(dimension) +
+            " codewords. Every codeword must be less than d=" +
+            std::to_string(dimension) + ".");
+      }
+      const auto index = static_cast<std::size_t>(code);
+      if (seen[index]) {
+        throw std::invalid_argument(
+            "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
+            " maps levels " + std::to_string(first_level[index]) + " and " +
+            std::to_string(level) + " to the same codeword " +
+            std::to_string(code) +
+            ". A codeword table is an injective map from occupation levels to "
+            "register states, so one mode's codewords must be pairwise "
+            "distinct.");
+      }
+      seen[index] = true;
+      first_level[index] = level;
+    }
+  }
+}
+
+std::vector<std::vector<std::uint64_t>> BosonMapping::builtin_codeword_table(
+    const std::vector<std::size_t>& mode_dimensions, BosonEncoding encoding) {
+  if (mode_dimensions.empty()) {
+    throw std::invalid_argument("BosonMapping: num_modes must be at least 1");
+  }
+  if (encoding == BosonEncoding::Custom) {
+    throw std::invalid_argument(
+        "BosonMapping: BosonEncoding::Custom names no particular codeword "
+        "table, so it cannot select an encoding. Supply the table itself with "
+        "BosonMapping::from_codeword_table(...).");
+  }
+  std::vector<std::vector<std::uint64_t>> table(mode_dimensions.size());
+  for (std::size_t i = 0; i < mode_dimensions.size(); ++i) {
+    validate_mode_dimension(i, mode_dimensions[i]);
+    const std::size_t dimension = mode_dimensions[i];
+    table[i].resize(dimension);
+    for (std::size_t n = 0; n < dimension; ++n) {
+      const auto value = static_cast<std::uint64_t>(n);
+      table[i][n] = (encoding == BosonEncoding::GrayCode)
+                        ? (value ^ (value >> 1))
+                        : value;
+    }
+  }
+  return table;
+}
+
 void BosonMapping::check_mode(std::size_t mode) const {
   if (mode >= mode_dimensions_.size()) {
     throw std::out_of_range("BosonMapping: mode index " + std::to_string(mode) +
@@ -321,25 +419,31 @@ void BosonMapping::check_mode(std::size_t mode) const {
 
 BosonMapping::BosonMapping(std::vector<std::size_t> mode_dimensions,
                            BosonEncoding encoding)
-    : mode_dimensions_(std::move(mode_dimensions)),
-      num_qubits_(0),
+    : BosonMapping(builtin_codeword_table(mode_dimensions, encoding), encoding,
+                   to_string(encoding)) {}
+
+BosonMapping::BosonMapping(
+    std::vector<std::vector<std::uint64_t>> per_mode_codewords,
+    BosonEncoding encoding, std::string name)
+    : num_qubits_(0),
       encoding_(encoding),
-      name_(to_string(encoding)) {
-  if (mode_dimensions_.empty()) {
-    throw std::invalid_argument("BosonMapping: num_modes must be at least 1");
-  }
-  const std::size_t num_modes = mode_dimensions_.size();
+      name_(std::move(name)),
+      codewords_(std::move(per_mode_codewords)) {
+  validate_codeword_table(codewords_);
+  const std::size_t num_modes = codewords_.size();
+
+  // Everything else is derived from the table: its length per mode is that
+  // mode's local dimension, and log2 of that is the mode's register width.
+  mode_dimensions_.resize(num_modes);
+  mode_qubit_counts_.resize(num_modes);
   for (std::size_t i = 0; i < num_modes; ++i) {
-    validate_mode_dimension(i, mode_dimensions_[i]);
+    mode_dimensions_[i] = codewords_[i].size();
+    mode_qubit_counts_[i] = detail::log2_exact(mode_dimensions_[i]);
+    num_qubits_ += mode_qubit_counts_[i];
   }
 
   // Widths first, then offsets: mode 0 owns the most significant block, so the
   // block of mode i starts above every block with a larger index.
-  mode_qubit_counts_.resize(num_modes);
-  for (std::size_t i = 0; i < num_modes; ++i) {
-    mode_qubit_counts_[i] = detail::log2_exact(mode_dimensions_[i]);
-    num_qubits_ += mode_qubit_counts_[i];
-  }
   mode_qubit_offsets_.assign(num_modes, 0);
   std::size_t offset = 0;
   for (std::size_t i = num_modes; i-- > 0;) {
@@ -347,19 +451,12 @@ BosonMapping::BosonMapping(std::vector<std::size_t> mode_dimensions,
     offset += mode_qubit_counts_[i];
   }
 
-  codewords_.resize(num_modes);
   levels_.resize(num_modes);
   for (std::size_t i = 0; i < num_modes; ++i) {
     const std::size_t dimension = mode_dimensions_[i];
-    codewords_[i].resize(dimension);
     levels_[i].assign(dimension, 0);
     for (std::size_t n = 0; n < dimension; ++n) {
-      const auto value = static_cast<std::uint64_t>(n);
-      const std::uint64_t code = (encoding_ == BosonEncoding::GrayCode)
-                                     ? (value ^ (value >> 1))
-                                     : value;
-      codewords_[i][n] = code;
-      levels_[i][static_cast<std::size_t>(code)] = n;
+      levels_[i][static_cast<std::size_t>(codewords_[i][n])] = n;
     }
   }
 }
@@ -394,6 +491,19 @@ BosonMapping BosonMapping::for_basis(const BosonicModes& modes,
     dimensions.push_back(modes.mode_dimension(i));
   }
   return BosonMapping(std::move(dimensions), encoding);
+}
+
+BosonMapping BosonMapping::from_codeword_table(
+    std::vector<std::vector<std::uint64_t>> per_mode_codewords,
+    std::string name) {
+  // The tag records how the mapping was built, not what the table happens to
+  // look like: a table equal to the standard-binary one still reports Custom.
+  // No table recognition is attempted, so encoding() never has to guess.
+  if (name.empty()) {
+    name = to_string(BosonEncoding::Custom);
+  }
+  return BosonMapping(std::move(per_mode_codewords), BosonEncoding::Custom,
+                      std::move(name));
 }
 
 std::size_t BosonMapping::mode_dimension(std::size_t mode) const {
@@ -523,9 +633,9 @@ BosonPauliTerms BosonMapping::ladder_product(
   for (auto it = sequences.rbegin(); it != sequences.rend(); ++it) {
     const std::size_t mode = it->first;
     const std::size_t mode_qubits_count = mode_qubit_counts_[mode];
-    const auto& local = detail::cached_sequence_terms(
-        encoding_, mode_dimensions_[mode], mode_qubits_count, codewords_[mode],
-        it->second);
+    const auto& local =
+        detail::cached_sequence_terms(mode_dimensions_[mode], mode_qubits_count,
+                                      codewords_[mode], it->second);
     const auto local_terms = detail::sorted_local(local, threshold);
 
     BosonPauliTerms next;
@@ -657,21 +767,112 @@ std::string BosonMapping::get_summary() const {
     ss << "]";
   }
   ss << "\n  Qubits: " << num_qubits();
+  if (encoding_ == BosonEncoding::Custom) {
+    // A custom mapping is defined by its table, so show it.
+    for (std::size_t i = 0; i < codewords_.size(); ++i) {
+      ss << "\n  Codewords[" << i << "]: [";
+      for (std::size_t n = 0; n < codewords_[i].size(); ++n) {
+        ss << (n == 0 ? "" : ", ") << codewords_[i][n];
+      }
+      ss << "]";
+    }
+  }
   return ss.str();
 }
 
 nlohmann::json BosonMapping::to_json() const {
   // The cutoff is written per mode so that a heterogeneous mapping round-trips
   // without a schema change; num_modes is redundant but kept for readability.
-  return nlohmann::json{{"version", SERIALIZATION_VERSION},
-                        {"num_modes", mode_dimensions_.size()},
-                        {"mode_dimensions", mode_dimensions_},
-                        {"encoding", to_string(encoding_)}};
+  nlohmann::json data{{"version", SERIALIZATION_VERSION},
+                      {"num_modes", mode_dimensions_.size()},
+                      {"mode_dimensions", mode_dimensions_},
+                      {"encoding", to_string(encoding_)}};
+  if (encoding_ == BosonEncoding::Custom) {
+    // A named encoding regenerates its own table from the tag, but a custom
+    // mapping *is* its table, so the table -- not the tag -- has to be what
+    // goes on the wire. Both extra fields are written only for custom
+    // mappings, so documents for the named encodings are byte for byte what
+    // they were before custom tables existed.
+    data["codewords"] = codewords_;
+    data["name"] = name_;
+  }
+  return data;
 }
 
 BosonMapping BosonMapping::from_json(const nlohmann::json& data) {
   const auto encoding =
       boson_encoding_from_string(data.at("encoding").get<std::string>());
+
+  // A codeword table, when present, is the source of truth: it defines the
+  // encoding outright and every dimension is read off it. The field is
+  // optional, so documents written before custom tables existed still load.
+  if (data.contains("codewords")) {
+    if (!data["codewords"].is_array()) {
+      throw std::invalid_argument(
+          "BosonMapping: JSON field codewords must be an array holding one "
+          "array of codewords per mode");
+    }
+    auto table =
+        data["codewords"].get<std::vector<std::vector<std::uint64_t>>>();
+    validate_codeword_table(table);
+
+    if (data.contains("num_modes")) {
+      const auto num_modes = data.at("num_modes").get<std::size_t>();
+      if (num_modes != table.size()) {
+        throw std::invalid_argument("BosonMapping: num_modes is " +
+                                    std::to_string(num_modes) +
+                                    " but the codewords table holds " +
+                                    std::to_string(table.size()) + " modes");
+      }
+    }
+    if (data.contains("mode_dimensions")) {
+      const auto dimensions =
+          data.at("mode_dimensions").get<std::vector<std::size_t>>();
+      if (dimensions.size() != table.size()) {
+        throw std::invalid_argument("BosonMapping: mode_dimensions holds " +
+                                    std::to_string(dimensions.size()) +
+                                    " entries but the codewords table holds " +
+                                    std::to_string(table.size()) + " modes");
+      }
+      for (std::size_t i = 0; i < dimensions.size(); ++i) {
+        if (dimensions[i] != table[i].size()) {
+          throw std::invalid_argument(
+              "BosonMapping: mode " + std::to_string(i) +
+              " declares dimension " + std::to_string(dimensions[i]) +
+              " but its codewords table holds " +
+              std::to_string(table[i].size()) + " entries");
+        }
+      }
+    }
+    if (encoding != BosonEncoding::Custom) {
+      // A named encoding defines its own table, so a document carrying both
+      // must be self-consistent -- otherwise encoding() would describe a table
+      // the mapping does not have, and there is no way to tell which of the
+      // two the writer meant.
+      std::vector<std::size_t> dimensions;
+      dimensions.reserve(table.size());
+      for (const auto& codewords : table) {
+        dimensions.push_back(codewords.size());
+      }
+      if (builtin_codeword_table(dimensions, encoding) != table) {
+        throw std::invalid_argument(
+            "BosonMapping: the document declares the '" + to_string(encoding) +
+            "' encoding but carries a codewords table that is not the '" +
+            to_string(encoding) +
+            "' table. Declare the 'custom' encoding to ship an explicit "
+            "table.");
+      }
+    }
+    auto name = data.value("name", to_string(encoding));
+    return BosonMapping(std::move(table), encoding, std::move(name));
+  }
+
+  if (encoding == BosonEncoding::Custom) {
+    throw std::invalid_argument(
+        "BosonMapping: the document declares the 'custom' encoding but "
+        "carries no codewords field. A custom mapping is defined by its "
+        "codeword table, so there is nothing to rebuild it from.");
+  }
 
   // The schema is an array of one dimension per mode, always. num_modes is
   // written alongside it for readability and is cross-checked when present.
@@ -766,6 +967,17 @@ void BosonMapping::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
                                       static_cast<std::uint64_t>(dimension));
   }
   qdk::chemistry::utils::hash_value(ctx, to_string(encoding_));
+  if (encoding_ == BosonEncoding::Custom) {
+    // A named encoding is fully identified by its tag plus the dimensions; a
+    // custom one is not, so its table and label join the hash. Folding them in
+    // only here leaves the hash of every named mapping exactly as it was.
+    qdk::chemistry::utils::hash_value(ctx, name_);
+    for (const auto& codewords : codewords_) {
+      for (const std::uint64_t code : codewords) {
+        qdk::chemistry::utils::hash_value(ctx, code);
+      }
+    }
+  }
 }
 
 }  // namespace qdk::chemistry::data

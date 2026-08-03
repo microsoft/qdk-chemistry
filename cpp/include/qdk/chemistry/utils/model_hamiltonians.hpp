@@ -409,6 +409,18 @@ inline qdk::chemistry::data::Hamiltonian create_ppp_hamiltonian(
  *       @ref qdk::chemistry::data::BosonicModes::padded_dimension or
  *       @ref qdk::chemistry::data::BosonicModes::padded_to_power_of_two.
  *
+ * @warning **@p mode_dimension = 2 is the hard-core limit and @p U_in is inert
+ *          there.** With @f$n \in \{0,1\}@f$ the on-site term
+ *          @f$n(n-1)@f$ is identically zero, so every value of @f$U@f$ gives
+ *          bit-identical output: @f$U = 0@f$ and @f$U = 400@f$ produce the same
+ *          operator. This is correct physics — the hard-core Bose-Hubbard model
+ *          — and the integrals are stored exactly as given, but it is silent,
+ *          so a non-zero @f$U@f$ at @f$d = 2@f$ is reported as a warning
+ *          through the library logger. Use @f$d \ge 4@f$ if the on-site
+ *          interaction is meant to be felt, or
+ *          @ref qdk::chemistry::data::BosonicModes::hard_core to say the
+ *          hard-core limit was intended.
+ *
  * @tparam TT   double or Eigen::MatrixXd
  * @tparam UT   double or Eigen::VectorXd
  * @tparam MuT  double or Eigen::VectorXd
@@ -438,6 +450,22 @@ inline qdk::chemistry::data::Hamiltonian create_bose_hubbard_hamiltonian(
 
   auto [h1, h2] = detail::_build_hubbard_integrals(
       lattice, epsilon, std::forward<TT>(t_in), std::forward<UT>(U_in));
+
+  // The hard-core limit silently ignores U: n(n-1) = 0 for n in {0, 1}, so the
+  // two-body term contributes nothing whatever U is. The Hamiltonian is left
+  // exactly as asked -- the physics is right -- but the caller is told, because
+  // otherwise U = 0 and U = 400 give bit-identical output with no indication.
+  // _build_hubbard_integrals stores (ii|ii) = U_i and skips zeros, so a
+  // non-empty two-body map is precisely "some U_i is non-zero".
+  if (mode_dimension == 2 && !h2.empty()) {
+    QDK_LOGGER().warn(
+        "Bose-Hubbard with mode_dimension = 2 is the hard-core limit, where "
+        "the on-site interaction n(n-1) vanishes identically (n is 0 or 1). "
+        "The requested U has no effect on this Hamiltonian: any value would "
+        "give the same operator. Use mode_dimension = 4 or larger (a power of "
+        "two) for an interacting model, or BosonicModes::hard_core to make the "
+        "hard-core limit explicit.");
+  }
 
   auto modes = std::make_shared<qdk::chemistry::data::BosonicModes>(
       static_cast<std::size_t>(lattice.num_sites()), mode_dimension);

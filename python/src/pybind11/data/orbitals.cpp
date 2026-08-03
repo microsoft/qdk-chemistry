@@ -1292,6 +1292,27 @@ Returns:
 )",
       py::arg("num_modes"), py::arg("requested_dimension"));
 
+  bosonic_modes.def_static("hard_core", &BosonicModes::hard_core,
+                           R"(
+Construct a hard-core bosonic basis: every mode is two-level (``d = 2``).
+
+Truncating at two levels is the hard-core limit, in which at most one boson may
+occupy a mode. It is exact rather than approximate for that model: on two
+levels the annihilation operator ``b`` *is* the spin lowering operator
+``sigma^-``, so one mode maps onto exactly one qubit with no padding and no
+unphysical subspace.
+
+Warning:
+    The two-body on-site interaction ``(U/2) n (n - 1)`` vanishes identically here, because ``n(n - 1) = 0`` for both ``n = 0`` and ``n = 1``. A Bose-Hubbard model built on this basis is therefore independent of ``U``: use ``mode_dimension >= 4`` if the interaction is meant to be felt.
+
+Args:
+    num_modes (int): Number of bosonic modes.
+
+Returns:
+    BosonicModes: A basis with ``mode_dimension(i) == 2`` for every mode.
+)",
+                           py::arg("num_modes"));
+
   bosonic_modes.def("with_padded_dimensions",
                     &BosonicModes::with_padded_dimensions,
                     R"(

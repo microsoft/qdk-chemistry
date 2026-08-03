@@ -1,8 +1,6 @@
-// --------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-// --------------------------------------------------------------------------------------------
 
 #pragma once
 
@@ -120,6 +118,30 @@ class BosonicModes : public ModelOrbitals {
    */
   static std::shared_ptr<BosonicModes> padded_to_power_of_two(
       std::size_t num_modes, std::size_t requested_dimension);
+
+  /**
+   * @brief Construct a hard-core bosonic basis, @f$d = 2@f$ on every mode.
+   *
+   * The hard-core limit keeps only the occupations @f$n \in \{0, 1\}@f$, so
+   * each mode is a single qubit and the truncated ladder operator is exactly
+   * the spin lowering operator,
+   * @f$b = |0\rangle\langle 1| = \sigma^- = (X + iY)/2@f$, with
+   * @f$\hat n = (I - Z)/2@f$. @f$d = 2@f$ is already a power of two, so the
+   * basis maps to qubits with no padding.
+   *
+   * @warning The two-body on-site interaction vanishes identically here:
+   *          @f$\hat n(\hat n - 1) = 0@f$ because @f$n(n-1) = 0@f$ for both
+   *          @f$n = 0@f$ and @f$n = 1@f$. A Bose-Hubbard @f$U@f$ therefore has
+   *          **no effect at all** on a Hamiltonian built over this basis —
+   *          that is the physical content of the hard-core limit, not a
+   *          defect. Use @f$d \ge 4@f$ (the next power of two) if the on-site
+   *          interaction is meant to do something.
+   *
+   * @param num_modes Number of bosonic modes.
+   * @return A basis with @f$d = 2@f$ on every mode.
+   * @throws std::invalid_argument If @p num_modes is 0.
+   */
+  static std::shared_ptr<BosonicModes> hard_core(std::size_t num_modes);
 
   /**
    * @brief Copy of this basis with every mode dimension padded to a power of

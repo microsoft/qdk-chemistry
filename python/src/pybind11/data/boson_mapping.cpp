@@ -46,17 +46,25 @@ void bind_boson_mapping(pybind11::module& data) {
                            R"(
 Boson-to-qubit encoding family.
 
-Both members map the truncated local Fock space of one mode onto
-``nq = log2(d)`` qubits and use exactly the same number of Pauli terms; they
-differ only in which computational basis state represents which occupation
-number.
+Every encoding maps the truncated local Fock space of one mode onto
+``nq = log2(d)`` qubits. ``StandardBinary`` and ``GrayCode`` use exactly the
+same number of Pauli terms and differ only in which computational basis state
+represents which occupation number.
+
+``Custom`` is not an encoding rule but a tag: it marks a mapping built by
+:meth:`BosonMapping.from_codeword_table`, whose codeword table is arbitrary and
+is carried explicitly by the object. It is never inferred, so a table that
+happens to equal the standard-binary one still reports ``Custom``, and it cannot
+be passed to :meth:`BosonMapping.for_encoding`.
 
 Attributes:
     StandardBinary: ``codeword(n) = n``. The default.
     GrayCode: ``codeword(n) = n XOR (n >> 1)``; adjacent occupations differ in a single bit.
+    Custom: Tag for a mapping built from an explicit codeword table.
 )")
       .value("StandardBinary", BosonEncoding::StandardBinary)
-      .value("GrayCode", BosonEncoding::GrayCode);
+      .value("GrayCode", BosonEncoding::GrayCode)
+      .value("Custom", BosonEncoding::Custom);
 
   data.def("boson_encoding_from_string", &boson_encoding_from_string,
            py::arg("name"),
@@ -64,10 +72,10 @@ Attributes:
 Parse a boson encoding name.
 
 Args:
-    name (str): Case-insensitive encoding name; ``"standard-binary"`` (aliases ``"standard_binary"``, ``"binary"``, ``"sb"``) or ``"gray-code"`` (aliases ``"gray_code"``, ``"gray"``, ``"gc"``).
+    name (str): Case-insensitive encoding name; ``"standard-binary"`` (aliases ``"standard_binary"``, ``"binary"``, ``"sb"``), ``"gray-code"`` (aliases ``"gray_code"``, ``"gray"``, ``"gc"``) or ``"custom"``.
 
 Returns:
-    BosonEncoding: The parsed encoding.
+    BosonEncoding: The parsed encoding. ``"custom"`` yields ``BosonEncoding.Custom``, which is a tag rather than a rule and cannot be given to :meth:`BosonMapping.for_encoding`.
 
 Raises:
     ValueError: If the name is not a recognised encoding.
@@ -88,6 +96,11 @@ The cutoff is owned by the ``BosonicModes`` basis and is attributed per mode, so
 every accessor here takes a mode index. The uniform factories
 (``standard_binary``, ``gray_code``, ``for_encoding``) simply give every mode the
 same dimension; ``for_basis`` carries whatever the basis states.
+
+The encoding set is open. An encoding *is* its codeword table, so
+``from_codeword_table`` accepts any per-mode permutation of ``range(d)`` and the
+named families are conveniences on top of it. ``codeword_table(i)`` is the exact
+inverse of that factory.
 
 Qubit layout follows the library convention that qubit 0 is the **rightmost**
 character of a Pauli label. Mode ``i`` owns the contiguous qubit block starting
@@ -171,6 +184,45 @@ Returns:
 Raises:
     ValueError: If any mode dimension of the basis is not a power of two.
 )")
+      .def_static("from_codeword_table", &BosonMapping::from_codeword_table,
+                  py::arg("per_mode_codewords"), py::arg("name") = "",
+                  R"(
+Create a mapping from an explicit codeword table.
+
+This is the open end of the encoding set: any injective assignment of
+occupation numbers to computational basis states can be used, not only the
+named families. ``per_mode_codewords[i][n]`` is the codeword representing
+occupation ``n`` of mode ``i``, and ``len(per_mode_codewords[i])`` is that
+mode's local dimension ``d``.
+
+Because every cutoff is a power of two and the code must be surjective on
+``nq = log2(d)`` qubits, a valid table is exactly a permutation of
+``range(d)``. ``standard_binary`` is the identity permutation and ``gray_code``
+is ``n ^ (n >> 1)``; passing either reproduces the corresponding named mapping
+operator for operator.
+
+The resulting mapping always reports ``BosonEncoding.Custom`` -- the table is
+never matched against the named families -- and the table, not the enum, is
+what is written to and read back from serialized documents.
+
+Args:
+    per_mode_codewords (list[list[int]]): One list per mode; entry ``n`` is the codeword for occupation ``n``.
+    name (str, optional): Label reported by ``name``; defaults to ``"custom"``.
+
+Returns:
+    BosonMapping: A mapping using exactly the supplied codewords.
+
+Raises:
+    ValueError: If the table is empty, if any mode has fewer than 2 levels, if any mode's level count is not a power of two, or if a mode's codewords are not a permutation of ``range(d)`` (out of range or repeated).
+
+Examples:
+    >>> from qdk_chemistry.data import BosonMapping, BosonEncoding
+    >>> mapping = BosonMapping.from_codeword_table([[0, 1, 3, 2]] * 2)
+    >>> mapping.encoding == BosonEncoding.Custom
+    True
+    >>> mapping.codeword_table(0) == BosonMapping.gray_code(num_modes=2, mode_dimension=4).codeword_table(0)
+    True
+)")
       .def("num_modes", &BosonMapping::num_modes,
            R"(
 Number of bosonic modes.
@@ -240,11 +292,11 @@ Returns:
 )")
       .def_property_readonly("encoding", &BosonMapping::encoding,
                              R"(
-BosonEncoding: The encoding family used by this mapping.
+BosonEncoding: The encoding family used by this mapping. Mappings built by ``from_codeword_table`` always report ``BosonEncoding.Custom``.
 )")
       .def_property_readonly("name", &BosonMapping::name,
                              R"(
-str: Canonical name of the encoding, e.g. ``"standard-binary"``.
+str: Canonical name of the encoding, e.g. ``"standard-binary"``, or the caller-supplied label of a custom table (``"custom"`` by default).
 )")
       .def("codeword", &BosonMapping::codeword, py::arg("mode"),
            py::arg("level"),
@@ -283,7 +335,7 @@ Args:
     mode (int): Mode index.
 
 Returns:
-    list[int]: ``[codeword(mode, 0), ..., codeword(mode, d - 1)]``.
+    list[int]: ``[codeword(mode, 0), ..., codeword(mode, d - 1)]``. Feeding one such list per mode to :meth:`from_codeword_table` reproduces this mapping exactly.
 
 Raises:
     IndexError: If ``mode`` is not a valid mode index.
