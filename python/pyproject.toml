@@ -88,6 +88,7 @@ openfermion-extras = [
   "openfermion>=1.0.0; python_version < '3.14'"
 ]
 plugins = [
+  "geometric>=1.0",
   "pyscf>=2.9.0,<2.12.1; sys_platform != 'win32'"
 ]
 qiskit-extras = [
