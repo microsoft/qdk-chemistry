@@ -230,7 +230,9 @@ __factories: list[AlgorithmFactory] = []
 # Deprecated algorithm-type keys mapped to their current names. Accessing a
 # deprecated key still works but emits a DeprecationWarning.
 _DEPRECATED_TYPE_ALIASES: dict[str, str] = {
+    "controlled_evolution_circuit_mapper": "controlled_circuit_mapper",
     "energy_estimator": "expectation_estimator",
+    "time_evolution_builder": "hamiltonian_unitary_builder",
 }
 
 
@@ -677,6 +679,7 @@ def _register_cpp_factories():
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
+        GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
@@ -695,6 +698,7 @@ def _register_cpp_factories():
     register_factory(NuclearDerivativeCalculatorFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
+    register_factory(GeometryOptimizerFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 
