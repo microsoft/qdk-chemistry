@@ -81,16 +81,23 @@ try {
         Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false }
     }
 
+    # Re-query only after turning automatic management off: while Windows is
+    # managing the page file itself, Win32_PageFileSetting reports nothing, so an
+    # earlier lookup would wrongly conclude there is no page file to resize.
     $path     = "$($drive.DeviceID)\pagefile.sys"
     $existing = Get-CimInstance Win32_PageFileSetting -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -ieq $path }
+
+    # These properties are UInt32 in WMI. Passing a plain PowerShell integer is
+    # rejected with 'Type mismatch for property "InitialSize"'.
+    $sizes = @{ InitialSize = [uint32]$maxMB; MaximumSize = [uint32]$maxMB }
     if ($existing) {
         Write-Host "Resizing page file $path to $maxMB MB"
-        Set-CimInstance -InputObject $existing -Property @{ InitialSize = $maxMB; MaximumSize = $maxMB }
+        Set-CimInstance -InputObject $existing -Property $sizes
     } else {
         Write-Host "Creating page file $path at $maxMB MB"
         New-CimInstance -ClassName Win32_PageFileSetting `
-                        -Property @{ Name = $path; InitialSize = $maxMB; MaximumSize = $maxMB } | Out-Null
+                        -Property (@{ Name = $path } + $sizes) | Out-Null
     }
 } catch {
     Write-Warning "Could not adjust the page file: $($_.Exception.Message)"
