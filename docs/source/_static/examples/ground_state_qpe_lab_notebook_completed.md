@@ -37,16 +37,16 @@ This completed example records the reference results for the documented QDK/Chem
 - Initial correlated method: Exact CASCI within the initial valence space.
 - Initial determinant count: 3,136.
 - Initial CASCI energy: -108.778369520882 Hartree.
-- Natural-orbital CASCI energy: -108.778369520881 Hartree; change 1.99e-13 Hartree.
-- Single-orbital entropies for orbitals 2-9: 0.021695655, 0.029962803, 0.547855061, 0.963884097, 0.963884097, 0.966011090, 0.966011090, 0.554008809.
+- Natural-orbital CASCI energy: -108.778369520882 Hartree; change indistinguishable from zero at the displayed precision.
+- Single-orbital entropies for orbitals 2-9: 0.021695559, 0.029962840, 0.547855655, 0.963884534, 0.963884534, 0.966011520, 0.966011520, 0.554009346.
 - Entropy-gap evidence: Orbitals 4-9 form the high-entropy group; orbitals 2-3 are near 0.03 or below.
 - Selected active space: CAS(6e,6o), alpha/beta counts (3,3), orbitals 4-9.
 - Selected partition: Four inactive, six active, and 18 virtual spatial orbitals.
 - Selected determinant count: 400.
-- Selected active-space energy: -108.771051792900 Hartree.
-- Energy increase from refinement: 0.007317727982 Hartree.
+- Selected active-space energy: -108.771051792909 Hartree.
+- Energy increase from refinement: 0.007317727973 Hartree.
 - Interpretation: The compact space retains the strongest entropy-based correlation evidence while documenting excluded correlation as model error.
-- Algorithmic reference energy: -108.771051792900 Hartree.
+- Algorithmic reference energy: -108.771051792909 Hartree.
 
 ## Qubit representation
 
@@ -54,12 +54,12 @@ This completed example records the reference results for the documented QDK/Chem
 - Active spatial orbitals: 6.
 - Active spin orbitals: 12.
 - Compute-register qubits: 12.
-- Pauli terms: 247 using default mapper thresholds.
+- Pauli terms: 247 using a 1e-10 Hartree Pauli-coefficient threshold.
 - Fixed-electron-number subspace: 3 alpha and 3 beta electrons; 400 basis states.
-- Core energy: -99.117775949333 Hartree.
-- Mapped active-space ground-state energy: -9.653275843566 Hartree.
-- Mapped selected-space total energy: -108.771051792900 Hartree.
-- Difference from algorithmic reference: approximately -1.42e-14 Hartree.
+- Core energy: -99.117775726922 Hartree.
+- Mapped active-space ground-state energy: -9.653276065987 Hartree.
+- Mapped selected-space total energy: -108.771051792909 Hartree.
+- Difference from algorithmic reference: indistinguishable from zero at the displayed precision.
 - Interpretation: The mapping and fixed-sector construction reproduce the selected-space Hamiltonian within numerical precision.
 - Excluded from compute-qubit count: Readout/workspace ancillas, error-correction overhead, and physical qubits.
 
@@ -67,24 +67,24 @@ This completed example records the reference results for the documented QDK/Chem
 
 - Source wavefunction: Selected-space CASCI ground state.
 - Leading determinants (occupation, amplitude, weight, cumulative weight):
-  - 222000, +0.694657450061, 0.482548972925, 0.482548972925
-  - 202200, +0.333212127561, 0.111030321954, 0.593579294879
-  - 220020, +0.333212127561, 0.111030321954, 0.704609616833
-  - 200220, -0.200148173020, 0.040059291163, 0.731442617514
-  - 2uddu0, +0.176754072510, 0.031242002149, 0.762684619662
-  - 2duud0, +0.176754072510, 0.031242002149, 0.793926621811
-  - 022002, +0.146520843429, 0.021468357559, 0.815394979370
-  - 2udud0, +0.117548778913, 0.013817715424, 0.829212694794
+  - 222000, +0.694657453275, 0.482548977390, 0.482548977390
+  - 202200, -0.333212130081, 0.111030323633, 0.593579301023
+  - 220020, -0.333212130081, 0.111030323633, 0.704609624656
+  - 200220, +0.200148175782, 0.040059292269, 0.744668916925
+  - 2dudu0, +0.186829733892, 0.034905349466, 0.779574266391
+  - 2udud0, +0.186829733892, 0.034905349466, 0.814479615857
+  - 022002, -0.146520835129, 0.021468355127, 0.835947970984
+  - 2duud0, +0.127624440015, 0.016287997689, 0.852235968673
 - Selection rule: Retain the largest one, two, or four CASCI coefficients, then re-optimize amplitudes with PMC.
-- One-determinant trial: Fidelity 0.482548972925; 12 compute qubits; 6 preparation logical gates; {'X': 6}.
-- Two-determinant trial: Fidelity 0.586414643728; 12 compute qubits; 14 preparation logical gates; {'CNOT': 6, 'H': 2, 'Rz': 2, 'S': 2, 'X': 2}.
-- Four-determinant trial: Fidelity 0.732385015551; 12 compute qubits; 30 preparation logical gates; {'CNOT': 16, 'H': 4, 'Rz': 4, 'S': 4, 'X': 2}.
+- One-determinant trial: Fidelity 0.482548977390; 12 compute qubits; 6 preparation logical gates; {'X': 6}.
+- Two-determinant trial: Fidelity 0.586414650360; 12 compute qubits; 14 preparation logical gates; {'CNOT': 6, 'H': 2, 'Rz': 2, 'S': 2, 'X': 2}.
+- Four-determinant trial: Fidelity 0.732385025483; 12 compute qubits; 30 preparation logical gates; {'CNOT': 16, 'H': 4, 'Rz': 4, 'S': 4, 'X': 2}.
 - State-preparation method: QDK/Chemistry sparse-isometry implementation.
 - Interpretation: More determinants improve fidelity but change preparation cost; register size is fixed by the selected spin-orbital space.
 
 ## Phase-estimation calculation
 
-- Evolution time: 0.162738441405 inverse Hartree.
+- Evolution time: 0.162738437655 inverse Hartree.
 - Hamiltonian simulation: First-order Trotter product formula, one division, repeated approximate base unitary for controlled powers.
 - Phase bits: 6.
 - Shots per bit: 3.
@@ -93,10 +93,10 @@ This completed example records the reference results for the documented QDK/Chem
 - Simulator seeds: 42-61.
 - Complete-run bitstring counts: {'110000': 19, '110001': 1}.
 - Most frequent bitstring: 110000.
-- Measured active-space energy: -9.652275843566 Hartree.
-- Core energy added after phase estimation: -99.117775949333 Hartree.
-- Total molecular energy estimate: -108.770051792900 Hartree.
-- Algorithmic reference: -108.771051792900 Hartree.
+- Measured active-space energy: -9.652276065987 Hartree.
+- Core energy added after phase estimation: -99.117775726922 Hartree.
+- Total molecular energy estimate: -108.770051792909 Hartree.
+- Algorithmic reference: -108.771051792909 Hartree.
 - Signed difference: +0.001000000000 Hartree.
 - Teaching-target result: Meets the 1 milliHartree target at its boundary.
 - Observed repeated-run phase: approximately six minutes in the measured development run; runtime varies by computer.

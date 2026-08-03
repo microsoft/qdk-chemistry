@@ -588,6 +588,9 @@ N    0.000000    0.000000    1.850000
     casci_solver = create(
         "multi_configuration_calculator",
         "macis_cas",
+        # Tight convergence keeps the RDM-derived natural subspaces stable
+        # across numerical backends before their orbital gauge is selected.
+        ci_residual_tolerance=1e-10,
         # autoCAS entropies require both one- and two-particle RDMs.
         calculate_one_rdm=True,
         calculate_two_rdm=True,

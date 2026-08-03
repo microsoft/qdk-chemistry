@@ -122,23 +122,23 @@ If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h
    \lambda=\sum_\ell\lvert h_\ell\rvert.
 
 The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient sum as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
-For this Hamiltonian, the reported value is :math:`\lambda=19.610172370184\ E_{\mathrm{h}}`.
+For this Hamiltonian, the reported value is :math:`\lambda=19.610172748837\ E_{\mathrm{h}}`.
 Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice
 
 .. math::
 
    t_{\mathrm{bound}}=\frac{\pi}{\lambda}
-   =0.160202194773\ E_{\mathrm{h}}^{-1}
+   =0.160202191680\ E_{\mathrm{h}}^{-1}
 
 keeps the spectrum within the signed, unaliased phase interval.
 The script reports this value as the ``Initial unaliased time bound`` in its pre-simulation settings.
-Using the active-space reference from :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653275843566\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
+Using the active-space reference from :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653276065987\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
 
 .. math::
 
    \varphi_{\mathrm{bound}}
    =\left(\frac{t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
-   \approx0.753870703905.
+   \approx0.753870702986.
 
 The script reports this value as the ``Reference phase at initial time bound``.
 The nearest six-bit fraction is :math:`48/64=0.75`, represented by ``110000``.
@@ -149,7 +149,7 @@ Finally, we can choose the evolution time so that this grid point reconstructs a
 
    t
    =\frac{-\pi/2}{E_{\mathrm{ref}}+\delta}
-   =0.162738441405\ E_{\mathrm{h}}^{-1}.
+   =0.162738437655\ E_{\mathrm{h}}^{-1}.
 
 The script reports this adjusted value as the ``Selected evolution time``.
 Using this time, the reference phase fraction is approximately :math:`0.749974099`, only about :math:`2.59\times10^{-5}` below the selected grid point.
@@ -401,7 +401,7 @@ A successful run completes all twenty runs and prints the complete-run bitstring
    :collapsible: closed
 
    The bitstring ``110000`` appeared 19 times and ``110001`` appeared once, so ``110000`` was the most frequent result.
-   It produced an active-space energy of :math:`-9.652275843566\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792900\ E_{\mathrm{h}}` after adding the core energy.
+   It produced an active-space energy of :math:`-9.652276065987\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792909\ E_{\mathrm{h}}` after adding the core energy.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?
    :class: quiz-question

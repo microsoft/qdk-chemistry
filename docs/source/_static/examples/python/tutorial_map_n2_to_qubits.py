@@ -95,7 +95,12 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     ################################################################################
     # start-cell-map-hamiltonian
     mapping = MajoranaMapping.jordan_wigner(num_modes=num_active_spin_orbitals)
-    qubit_mapper = create("qubit_mapper", "qdk")
+    qubit_mapper = create(
+        "qubit_mapper",
+        "qdk",
+        threshold=1e-10,
+        integral_threshold=1e-14,
+    )
     qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
     # The mapper returns a weighted Pauli sum whose string length is the

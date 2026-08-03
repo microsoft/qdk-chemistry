@@ -295,8 +295,8 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    :collapsible: closed
 
    The mapped Hamiltonian contains 247 Pauli terms on twelve compute qubits.
-   The separately stored core energy is approximately :math:`-99.117775949333` Hartree.
-   These counts use the mapper's default numerical thresholds.
+   The separately stored core energy is approximately :math:`-99.117775726922` Hartree.
+   The script retains Pauli coefficients of magnitude at least :math:`10^{-10}` Hartree after constructing the mapping with a tighter integral threshold.
 
 .. admonition:: Does the mapped qubit Hamiltonian reproduce the selected-space algorithmic reference?
    :class: quiz-question
