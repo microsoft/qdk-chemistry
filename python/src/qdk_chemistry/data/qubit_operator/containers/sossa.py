@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from math import isfinite
 from typing import TYPE_CHECKING, Any
 
@@ -15,28 +16,53 @@ import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
-from qdk_chemistry.data.qubit_operator.containers.rotated_pauli import RotatedPauliContainer
 
 if TYPE_CHECKING:
     import h5py
-    from numpy.typing import ArrayLike
 
-__all__ = ["SOSSAContainer"]
+__all__ = ["RotatedPaulis", "SOSSAContainer"]
+
+
+def _complex_block_to_json(coeffs: np.ndarray) -> dict[str, Any]:
+    """Serialize a complex coefficient array as split real/imaginary lists."""
+    arr = np.asarray(coeffs, dtype=complex)
+    return {"real": arr.real.tolist(), "imag": arr.imag.tolist()}
+
+
+def _complex_block_from_json(data: dict[str, Any]) -> np.ndarray:
+    """Rebuild a complex coefficient array from split real/imaginary lists."""
+    return np.asarray(data["real"], dtype=float) + 1j * np.asarray(data["imag"], dtype=float)
+
+
+@dataclass(frozen=True, eq=False)
+class RotatedPaulis:
+    """A block of rotated-Pauli generators: Givens ``angles`` [M, N-1], LCU ``coeffs`` [M, T], and ``paulis``."""
+
+    angles: np.ndarray
+    coeffs: np.ndarray
+    paulis: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        """Coerce inputs to arrays and a tuple."""
+        object.__setattr__(self, "angles", np.asarray(self.angles, dtype=float))
+        object.__setattr__(self, "coeffs", np.asarray(self.coeffs, dtype=complex))
+        object.__setattr__(self, "paulis", tuple(self.paulis))
 
 
 class SOSSAContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator.
 
-    The SOSSA generators are split into three rotated-Pauli combinations:
-    :attr:`d1` (particle one-body), :attr:`q1` (hole one-body), and :attr:`sf`
-    (spin-free two-body). Each is a :class:`RotatedPauliContainer` whose
-    ``rotations`` hold the Givens rotation angles derived from the orbital
-    rotation ``U`` (one angle vector per orbital for ``d1``/``q1``, one per
-    rank/basis for ``sf``). The ``inner_coefficients`` give the inner-PREPARE
-    conditional distribution and ``energy_shift`` the constant offset. The
-    circuit builder derives the outer LCU coefficients and the block-encoding
-    normalization from these.
+    The one-body and two-body generators are each a :class:`RotatedPaulis` block
+    (``angles``, ``coeffs``, ``paulis``). ``one_body`` uses ``(X +/- iY) / 2``
+    with the first ``num_positive_one_body_terms`` rows the D1 (particle)
+    generators and the rest Q1 (hole); ``two_body`` uses ``Z`` with one
+    ``[R * C, B + 1]`` coefficient row per ``(rank, copy)`` (columns ``0..B-1``
+    rotated-``Z``, column ``B`` identity). ``energy_shift`` is the constant
+    offset; the builder derives the inner-PREPARE distribution, outer
+    coefficients, and normalization from these blocks.
     """
+
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -45,10 +71,9 @@ class SOSSAContainer(QubitOperatorContainer):
         num_ranks: int,
         num_bases: int,
         num_copies: int,
-        d1: RotatedPauliContainer,
-        q1: RotatedPauliContainer,
-        sf: RotatedPauliContainer,
-        inner_coefficients: ArrayLike,
+        one_body: RotatedPaulis,
+        num_positive_one_body_terms: int,
+        two_body: RotatedPaulis,
         encoding: str | None,
         fermion_mode_order: str | None,
     ) -> None:
@@ -58,14 +83,17 @@ class SOSSAContainer(QubitOperatorContainer):
         self.num_ranks = num_ranks
         self.num_bases = num_bases
         self.num_copies = num_copies
-        self.d1 = d1
-        self.q1 = q1
-        self.sf = sf
-        self.inner_coefficients = inner_coefficients
+        self.one_body = one_body
+        self.num_positive_one_body_terms = num_positive_one_body_terms
+        self.two_body = two_body
         if num_spatial_orbitals <= 0 or not isfinite(self.energy_shift):
             raise ValueError("invalid sum-of-squares container")
-        if not all(isinstance(part, RotatedPauliContainer) for part in (self.d1, self.q1, self.sf)):
-            raise TypeError("d1, q1, and sf must be RotatedPauliContainer instances")
+        if len(self.one_body.angles) != len(self.one_body.coeffs):
+            raise ValueError("one-body angles and coefficients must have matching generator counts")
+        if not 0 <= self.num_positive_one_body_terms <= len(self.one_body.angles):
+            raise ValueError("num_positive_one_body_terms must be between 0 and the one-body generator count")
+        if self.two_body.coeffs.size and self.two_body.coeffs.shape != (num_ranks * num_copies, num_bases + 1):
+            raise ValueError("two_body_coeffs must have shape [num_ranks * num_copies, num_bases + 1]")
         super().__init__(encoding, fermion_mode_order)
 
     @property
@@ -77,11 +105,6 @@ class SOSSAContainer(QubitOperatorContainer):
     def num_qubits(self) -> int:
         """Return the number of qubits (two spin-orbitals per spatial orbital)."""
         return 2 * self.num_spatial_orbitals
-
-    @property
-    def num_positive_one_body_terms(self) -> int:
-        """Return the number of D1 (particle) one-body terms."""
-        return len(self.d1.rotations)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -98,10 +121,13 @@ class SOSSAContainer(QubitOperatorContainer):
                 "num_ranks": self.num_ranks,
                 "num_bases": self.num_bases,
                 "num_copies": self.num_copies,
-                "d1": self.d1.to_json(),
-                "q1": self.q1.to_json(),
-                "sf": self.sf.to_json(),
-                "inner_coefficients": np.asarray(self.inner_coefficients).tolist(),
+                "one_body_angles": self.one_body.angles.tolist(),
+                "one_body_coeffs": _complex_block_to_json(self.one_body.coeffs),
+                "num_positive_one_body_terms": self.num_positive_one_body_terms,
+                "one_body_paulis": list(self.one_body.paulis),
+                "two_body_angles": self.two_body.angles.tolist(),
+                "two_body_coeffs": _complex_block_to_json(self.two_body.coeffs),
+                "two_body_paulis": list(self.two_body.paulis),
                 "encoding": self.encoding,
                 "fermion_mode_order": str(self.fermion_mode_order) if self.fermion_mode_order is not None else None,
             }
@@ -117,16 +143,25 @@ class SOSSAContainer(QubitOperatorContainer):
     def from_json(cls, json_data: dict[str, Any]) -> SOSSAContainer:
         """Create a sum-of-squares container from JSON."""
         cls._validate_json_version(cls._serialization_version, json_data)
+        one_body = RotatedPaulis(
+            np.asarray(json_data["one_body_angles"], dtype=float),
+            _complex_block_from_json(json_data["one_body_coeffs"]),
+            tuple(json_data.get("one_body_paulis", ("X", "Y"))),
+        )
+        two_body = RotatedPaulis(
+            np.asarray(json_data["two_body_angles"], dtype=float),
+            _complex_block_from_json(json_data["two_body_coeffs"]),
+            tuple(json_data.get("two_body_paulis", ("Z",))),
+        )
         return cls(
             json_data["num_spatial_orbitals"],
             json_data["energy_shift"],
             json_data["num_ranks"],
             json_data["num_bases"],
             json_data["num_copies"],
-            RotatedPauliContainer.from_json(json_data["d1"]),
-            RotatedPauliContainer.from_json(json_data["q1"]),
-            RotatedPauliContainer.from_json(json_data["sf"]),
-            np.asarray(json_data["inner_coefficients"], dtype=float),
+            one_body,
+            json_data["num_positive_one_body_terms"],
+            two_body,
             json_data.get("encoding"),
             json_data.get("fermion_mode_order"),
         )
@@ -139,8 +174,11 @@ class SOSSAContainer(QubitOperatorContainer):
 
     def get_summary(self) -> str:
         """Return a summary of the sum-of-squares container."""
+        num_d1 = self.num_positive_one_body_terms
+        num_q1 = len(self.one_body.angles) - num_d1
+        num_sf = len(self.two_body.angles)
         return (
             f"SOS Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
             f"  Number of spatial orbitals: {self.num_spatial_orbitals}\n"
-            f"  D1/Q1/SF terms: {len(self.d1.rotations)}/{len(self.q1.rotations)}/{len(self.sf.rotations)}\n"
+            f"  D1/Q1/SF generators: {num_d1}/{num_q1}/{num_sf}\n"
         )

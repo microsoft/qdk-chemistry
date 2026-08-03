@@ -28,24 +28,16 @@ except ImportError:
     from qsharp._qsharp import get_config
 
 
-def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
-    """Run a state preparation circuit via Q# eval and return the statevector.
+def _run_state_prep_and_dump(circuit: Circuit, context) -> np.ndarray:
+    """Run a state preparation circuit in *context* and return the statevector.
 
-    Reinitializes the Q# interpreter to ensure a clean qubit state,
-    reloads the StatePreparation Q# sources, allocates qubits, applies
-    the state preparation, and captures the statevector via
-    ``qsharp.dump_machine()``.
+    Allocates qubits in the (Base-profile) Q# context, applies the state preparation,
+    and captures the statevector via ``dump_machine()``.
 
     Returns:
         The dense statevector as a complex numpy array (Q# big-endian ordering).
 
     """
-    # Re-initialize to clear any stale qubits from prior calls
-    current_profile = get_config().get_target_profile()
-    qsharp.init(target_profile=TargetProfile.from_str(current_profile))
-    # Trigger lazy reload of Q# sources after interpreter reset
-    _ = QSHARP_UTILS.StatePreparation
-
     params = circuit._qsharp_factory.parameter
     row_map_str = str(params["rowMap"])
     sv_str = "[" + ", ".join(f"{v:.16f}" for v in params["stateVector"]) + "]"
@@ -60,10 +52,10 @@ def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
         f" numQubits = {n_qubits} }}"
     )
 
-    qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-    qsharp.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
+    context.eval(f"use qs = Qubit[{n_qubits}];")
+    context.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
 
-    state = qsharp.dump_machine()
+    state = context.dump_machine()
     return np.array(state.as_dense_state())
 
 
@@ -129,7 +121,7 @@ class TestDensePureStatePreparation:
         # 4 orbitals -> 8 qubits (4 alpha + 4 beta)
         assert num_qubits == 8
 
-    def test_statevector_matches_wavefunction_4e4o(self, wavefunction_4e4o):
+    def test_statevector_matches_wavefunction_4e4o(self, wavefunction_4e4o, qdk_ctx):
         """Verify the prepared state matches the expected statevector for the 4e4o problem.
 
         The wavefunction has two determinants:
@@ -138,7 +130,7 @@ class TestDensePureStatePreparation:
         """
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction_4e4o)
-        actual_sv = _run_state_prep_and_dump(circuit)
+        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
 
         coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
         dets = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2020")]
@@ -148,7 +140,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_statevector_matches_wavefunction_10e6o(self, wavefunction_10e6o):
+    def test_statevector_matches_wavefunction_10e6o(self, wavefunction_10e6o, qdk_ctx):
         """Verify the prepared state matches the expected statevector for the 10e6o F2 problem.
 
         The wavefunction has three determinants:
@@ -158,7 +150,7 @@ class TestDensePureStatePreparation:
         """
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction_10e6o)
-        actual_sv = _run_state_prep_and_dump(circuit)
+        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
 
         coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
         dets = [
@@ -171,7 +163,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_config_from_bitstring(self):
+    def test_config_from_bitstring(self, qdk_ctx):
         """Verify state preparation for configurations created from bitstrings."""
         test_orbitals = create_test_orbitals(2)
         det = Configuration.from_bitstring("11")
@@ -183,7 +175,7 @@ class TestDensePureStatePreparation:
 
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction)
-        actual_sv = _run_state_prep_and_dump(circuit)
+        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
 
         # Build expected statevector for 1-bit-per-mode config using to_bits().
         # dump_machine uses big-endian: MSB interpretation of bits.
@@ -199,7 +191,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_single_determinant(self):
+    def test_single_determinant(self, qdk_ctx):
         """Verify state preparation for a single-determinant wavefunction."""
         test_orbitals = create_test_orbitals(2)
         det = Configuration.from_spin_half_string("du")
@@ -211,7 +203,7 @@ class TestDensePureStatePreparation:
 
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction)
-        actual_sv = _run_state_prep_and_dump(circuit)
+        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
         expected = _build_expected_statevector(np.array([1.0]), [det], num_orbitals=2)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))

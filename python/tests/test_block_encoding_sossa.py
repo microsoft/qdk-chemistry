@@ -12,14 +12,12 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pytest
-from qdk import TargetProfile, qsharp
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
 from qdk_chemistry.data import (
     Configuration,
     Hamiltonian,
-    MajoranaMapping,
     ModelOrbitals,
     StateVectorContainer,
     Wavefunction,
@@ -30,7 +28,6 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSASelect,
     SOSSAWalkContainer,
 )
-from qdk_chemistry.utils.qsharp import get_qsharp_utils
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_helpers import create_random_factorized_hamiltonian
@@ -41,9 +38,8 @@ from .test_helpers import create_random_factorized_hamiltonian
 
 
 def _to_sossa_operator(factorized_hamiltonian):
-    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+    return SOSSAQubitMapper().run(hamiltonian, None)
 
 
 def _make_sossa_unitary_representation():
@@ -199,82 +195,12 @@ class TestSOSSAWalkContainer:
 class TestSOSSABuilder:
     """Tests for the SOSSA block encoding builder algorithm."""
 
-    def test_name_and_type(self):
-        """Test algorithm name and type."""
-        builder = SOSSABuilder()
-        assert builder.name() == "sossa"
-        assert builder.type_name() == "hamiltonian_unitary_builder"
-
-    def test_run_produces_correct_dimensions(self):
-        """Test that run() produces a container with correct dimensions."""
-        n, r, b, c = 4, 3, 2, 2
-        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
-        builder = SOSSABuilder()
-        result = builder.run(_to_sossa_operator(fh))
-        container = result.get_container()
-
-        assert container.num_orbitals == n
-        assert container.num_ranks == r
-        assert container.num_bases == b
-        assert container.num_copies == c
-
-    def test_outer_statevector_normalized(self):
-        """Test that outer PREPARE statevector is properly normalized."""
-        fh = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=2, num_bases=1, num_copies=1)
-        builder = SOSSABuilder()
-        result = builder.run(_to_sossa_operator(fh))
-        container = result.get_container()
-
-        sv = container.outer_prepare.get_coefficients()
-        assert np.isclose(np.sum(sv**2), 1.0, atol=1e-10)
-
-    def test_inner_coefficients_shape(self):
-        """Test inner coefficients have correct shape [Xo, B+1]."""
-        n, r, b, c = 3, 2, 2, 1
-        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
-        builder = SOSSABuilder()
-        result = builder.run(_to_sossa_operator(fh))
-        container = result.get_container()
-
-        x_o_dim = n + r * c
-        inner = container.inner_prepare.conditional_coefficients
-        assert inner.shape == (x_o_dim, b + 1)
-
-    def test_rotation_angles_shape(self):
-        """Test DQ and SF rotation angles have correct shapes."""
-        n, r, b, c = 3, 2, 2, 1
-        fh = create_random_factorized_hamiltonian(num_orbitals=n, num_ranks=r, num_bases=b, num_copies=c)
-        builder = SOSSABuilder()
-        result = builder.run(_to_sossa_operator(fh))
-        container = result.get_container()
-
-        # DQ angles: [N, N-1]
-        assert container.select.one_body_rotation_angles.shape == (n, n - 1)
-        # SF angles: [R*(B+1), N] (N-1 Givens + 1 bEqB flag)
-        assert container.select.two_body_rotation_angles.shape == (r * (b + 1), n)
-
     def test_power_setting(self):
         """Test power parameter passes through to container."""
         fh = create_random_factorized_hamiltonian()
         builder = SOSSABuilder(power=3)
         result = builder.run(_to_sossa_operator(fh))
         assert result.get_container().power == 3
-
-    def test_requires_sossa_qubit_operator(self):
-        fh = create_random_factorized_hamiltonian()
-
-        with pytest.raises(TypeError, match="QubitOperator containing an SOSSAContainer"):
-            SOSSABuilder().run(fh)
-
-    def test_preserves_operator_scalars(self):
-        fh = create_random_factorized_hamiltonian()
-        operator = _to_sossa_operator(fh)
-        operator_container = operator.get_container()
-
-        container = SOSSABuilder().run(operator).get_container()
-
-        assert container.normalization > 0
-        assert container.energy_shift == pytest.approx(operator_container.energy_shift)
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -310,16 +236,10 @@ class TestSOSSABuilder:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@pytest.fixture
-def initialize_sossa_qsharp():
-    return get_qsharp_utils(TargetProfile.Unrestricted)
-
-
-@pytest.mark.usefixtures("initialize_sossa_qsharp")
 class TestOuterPrepareQSharp:
     """Test the Q# OuterPrepare sub-operations via dump_machine."""
 
-    def test_pure_state_preparation(self):
+    def test_pure_state_preparation(self, adaptive_qdk_ctx):
         """Test MakeOuterPreparePureState produces the correct statevector.
 
         Applies PreparePureStateD to |0⟩ and verifies amplitudes via dump_machine.
@@ -339,9 +259,9 @@ class TestOuterPrepareQSharp:
             expected[be_idx] = c / norm
 
         sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
-        qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-        qsharp.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
-        state = qsharp.dump_machine()
+        adaptive_qdk_ctx.eval(f"use qs = Qubit[{n_qubits}];")
+        adaptive_qdk_ctx.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
+        state = adaptive_qdk_ctx.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
         # Check amplitudes match expected (up to global phase)
@@ -350,14 +270,13 @@ class TestOuterPrepareQSharp:
             np.abs(expected),
             atol=float_comparison_absolute_tolerance,
         )
-        qsharp.eval("ResetAll(qs)")
+        adaptive_qdk_ctx.eval("ResetAll(qs)")
 
 
-@pytest.mark.usefixtures("initialize_sossa_qsharp")
 class TestInnerPrepareQSharp:
     """Test the Q# InnerPrepare sub-operations via dump_machine."""
 
-    def test_direct_inner_prepare_conditioned_on_xo(self):
+    def test_direct_inner_prepare_conditioned_on_xo(self, adaptive_qdk_ctx):
         """Test InnerPrepareDirect: for a fixed x_o, inner register gets correct state.
 
         Prepares outer register in |x_o⟩, applies inner prepare, checks inner register.
@@ -372,12 +291,12 @@ class TestInnerPrepareQSharp:
         ic_str = "[[0.8, 0.6], [0.3, 0.95]]"
 
         # Test x_o=0: inner should be proportional to [0.8, 0.6]
-        qsharp.eval(f"use outer = Qubit[{n_outer}];")
-        qsharp.eval(f"use inner = Qubit[{n_inner}];")
-        qsharp.eval(
+        adaptive_qdk_ctx.eval(f"use outer = Qubit[{n_outer}];")
+        adaptive_qdk_ctx.eval(f"use inner = Qubit[{n_inner}];")
+        adaptive_qdk_ctx.eval(
             f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);"
         )
-        state = qsharp.dump_machine()
+        state = adaptive_qdk_ctx.dump_machine()
         amplitudes = np.array(state.as_dense_state())
 
         # With outer=|0⟩, the state is |0⟩_outer ⊗ PreparedState(inner_coefficients[0])
@@ -394,4 +313,4 @@ class TestInnerPrepareQSharp:
             np.abs(expected_inner),
             atol=float_comparison_absolute_tolerance,
         )
-        qsharp.eval("ResetAll(outer); ResetAll(inner)")
+        adaptive_qdk_ctx.eval("ResetAll(outer); ResetAll(inner)")

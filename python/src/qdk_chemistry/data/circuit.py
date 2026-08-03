@@ -160,7 +160,8 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self._qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            compiled_qir = context.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
@@ -195,7 +196,8 @@ class Circuit(DataClass):
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self._qsharp_factory and self.qsharp is None:
-            return qsharp.circuit(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            return context.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
@@ -222,11 +224,12 @@ class Circuit(DataClass):
 
         """
         if self._qsharp_factory is not None:
-            return qsharp.estimate(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            logical_counts = context.logical_counts(
                 self._qsharp_factory.program,
-                params,
                 *self._qsharp_factory.parameter.values(),
             )
+            return logical_counts.estimate(params)
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
 

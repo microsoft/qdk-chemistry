@@ -12,7 +12,7 @@ from qdk_chemistry.data import (
     PauliLCUContainer,
     QubitOperator,
     QubitOperatorContainer,
-    RotatedPauliContainer,
+    RotatedPaulis,
     SOSSAContainer,
 )
 
@@ -53,49 +53,17 @@ def test_qubit_operator_rejects_legacy_constructor() -> None:
         QubitOperator(["X"])  # type: ignore[arg-type]
 
 
-def test_rotated_pauli_container_is_a_qubit_operator_container() -> None:
-    """Rotated-Pauli data is represented by its own container."""
-    container = RotatedPauliContainer(
-        ["IIIX"],
-        np.array([0.5]),
-        [np.array([1.0, 0.0])],
-        4,
-        encoding="jordan-wigner",
-        fermion_mode_order="blocked",
-    )
-    operator = QubitOperator(container)
-
-    assert operator.get_container_type() == "rotated_pauli"
-    assert container.num_qubits == 4
-    np.testing.assert_allclose(container.coefficients, np.array([0.5]))
-    assert QubitOperator.from_json(operator.to_json()).get_container_type() == "rotated_pauli"
-
-    for access in (
-        lambda: operator.pauli_strings,
-        lambda: operator.to_matrix(),
-        lambda: operator.is_hermitian(),
-        lambda: 2 * operator,
-    ):
-        with pytest.raises(TypeError, match="only available for Pauli-LCU operators"):
-            access()
-
-
 def test_sos_container_stores_block_encoding_data() -> None:
-    """The SOS container splits the generators into d1/q1/sf rotated-Pauli combinations."""
-    d1 = RotatedPauliContainer(["IZ"], np.array([0.4]), [np.array([0.1])], 4, "jordan-wigner", "blocked")
-    q1 = RotatedPauliContainer(["ZI"], np.array([0.6]), [np.array([0.2])], 4, "jordan-wigner", "blocked")
-    sf = RotatedPauliContainer(["ZZ"], np.array([0.5]), [np.array([0.3])], 4, "jordan-wigner", "blocked")
+    """The SOS container stores per-block Givens angles, LCU coefficients, and Pauli terms."""
     container = SOSSAContainer(
         num_spatial_orbitals=2,
-        num_qubits=4,
         energy_shift=-1.5,
         num_ranks=1,
         num_bases=1,
         num_copies=1,
-        d1=d1,
-        q1=q1,
-        sf=sf,
-        inner_coefficients=np.array([[1.0, 0.0], [1.0, 0.0], [0.3, 0.7]]),
+        one_body=RotatedPaulis(np.array([[0.1], [0.2]]), np.array([[0.2, 0.2j], [0.3, -0.3j]]), ("X", "Y")),
+        num_positive_one_body_terms=1,
+        two_body=RotatedPaulis(np.array([[0.3]]), np.array([[0.3, 0.7]]), ("Z",)),
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
     )
@@ -103,8 +71,12 @@ def test_sos_container_stores_block_encoding_data() -> None:
 
     assert operator.get_container_type() == "sossa"
     assert container.num_positive_one_body_terms == 1
-    np.testing.assert_allclose(container.d1.coefficients, np.array([0.4]))
+    assert container.one_body.paulis == ("X", "Y")
+    assert container.two_body.paulis == ("Z",)
+    np.testing.assert_allclose(container.one_body.coeffs, np.array([[0.2, 0.2j], [0.3, -0.3j]]))
     restored = QubitOperator.from_json(operator.to_json()).get_container()
     assert restored.type == "sossa"
-    np.testing.assert_allclose(restored.inner_coefficients, container.inner_coefficients)
-    np.testing.assert_allclose(restored.sf.rotations[0], container.sf.rotations[0])
+    np.testing.assert_allclose(restored.two_body.coeffs, container.two_body.coeffs)
+    np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
+    np.testing.assert_allclose(restored.one_body.coeffs, container.one_body.coeffs)
+    assert restored.num_positive_one_body_terms == 1

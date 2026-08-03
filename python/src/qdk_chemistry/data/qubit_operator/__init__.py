@@ -16,7 +16,6 @@ from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.rotated_pauli import RotatedPauliContainer
 from qdk_chemistry.data.qubit_operator.containers.sossa import SOSSAContainer
 
 if TYPE_CHECKING:
@@ -32,7 +31,6 @@ __all__ = [
     "QubitHamiltonian",
     "QubitOperator",
     "QubitOperatorContainer",
-    "RotatedPauliContainer",
     "SOSSAContainer",
 ]
 
@@ -224,8 +222,6 @@ class QubitOperator(DataClass):
         container_type = json_data.get("container_type")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
-        elif container_type == "rotated_pauli":
-            container = RotatedPauliContainer.from_json(json_data)
         elif container_type == "sossa":
             container = SOSSAContainer.from_json(json_data)
         else:
@@ -238,8 +234,6 @@ class QubitOperator(DataClass):
         container_type = group.attrs.get("container_type")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
-        elif container_type == "rotated_pauli":
-            container = RotatedPauliContainer.from_hdf5(group)
         elif container_type == "sossa":
             container = SOSSAContainer.from_hdf5(group)
         else:

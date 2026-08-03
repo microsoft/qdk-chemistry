@@ -30,6 +30,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import qdk
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -41,7 +42,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_PROJECT_ROOT
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -79,8 +80,14 @@ if build_dir.exists():
 
 @pytest.fixture
 def qdk_ctx() -> qdk.Context:
-    """Initialize a fresh Q# context with all Q# sources loaded."""
-    return qdk.Context(project_root=QSHARP_PROJECT_ROOT)
+    """Fresh Base-profile Q# context (loads the Base-compatible source subset)."""
+    return get_qsharp_context(TargetProfile.Base)
+
+
+@pytest.fixture
+def adaptive_qdk_ctx() -> qdk.Context:
+    """Fresh Adaptive-profile Q# context (loads the full Q# project)."""
+    return get_qsharp_context(TargetProfile.Adaptive_RIF)
 
 
 @pytest.fixture

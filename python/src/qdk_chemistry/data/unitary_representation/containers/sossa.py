@@ -24,7 +24,34 @@ from .quantum_walk import QuantumWalkContainer
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
 
-__all__ = ["SOSSAInnerPrepare", "SOSSASelect", "SOSSAWalkContainer"]
+__all__ = ["SOSSAInnerPrepare", "SOSSASelect", "SOSSAWalkContainer", "sossa_register_bits"]
+
+
+def sossa_register_bits(num_orbitals: int, num_ranks: int, num_bases: int, num_copies: int) -> dict[str, int]:
+    r"""Return the structural ancilla register widths shared across the SOSSA workflow.
+
+    These depend only on the block-encoding dimensions ``(N, R, B, C)`` and are the single
+    source of truth for the builder, the walk container, and the circuit mapper.
+
+    Args:
+        num_orbitals: Number of spatial orbitals ``N``.
+        num_ranks: Number of DFTHC ranks ``R``.
+        num_bases: Number of bases ``B`` (``B + 1`` inner entries including the identity term).
+        num_copies: Number of copies ``C``.
+
+    Returns:
+        dict: ``xo_bits`` (outer index), ``b_bits`` (inner index), ``rank_bits``, and
+        ``num_free_rider_bits`` (``2 + rank_bits`` for ``isSF``, ``dvsq``, and the rank).
+
+    """
+    x_o_dim = num_orbitals + num_ranks * num_copies
+    rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
+    return {
+        "xo_bits": ceil(log2(x_o_dim)) if x_o_dim > 1 else 1,
+        "b_bits": ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1,
+        "rank_bits": rank_bits,
+        "num_free_rider_bits": 2 + rank_bits,
+    }
 
 
 @dataclass(frozen=True)
@@ -212,15 +239,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         and free ancillary qubits internally.
         """
         num_system = 2 * self.num_orbitals
-        # Outer register: ceil(log2(x_o_dim))
-        x_o_dim = self.num_orbitals + self.num_ranks * self.num_copies
-        num_outer = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
-        # Inner register: b bits + free-rider bits
-        num_ranks = self.num_ranks
-        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
-        num_free_rider_bits = 2 + rank_bits  # isSF + dvsq + rank
-        num_inner = self.inner_prepare.num_inner_qubits + num_free_rider_bits
-        # Spin register: 2 (spinDQ, spinSF)
+        reg_bits = sossa_register_bits(self.num_orbitals, self.num_ranks, self.num_bases, self.num_copies)
+        num_outer = reg_bits["xo_bits"]
+        # Inner register: logical b bits + free-rider bits; spin register: 2 (spinDQ, spinSF).
+        num_inner = self.inner_prepare.num_inner_qubits + reg_bits["num_free_rider_bits"]
         num_ancilla = num_outer + num_inner + 2
         return num_system + num_ancilla
 

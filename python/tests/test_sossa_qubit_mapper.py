@@ -9,7 +9,7 @@ import pytest
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
-from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator, RotatedPauliContainer, SOSSAContainer
+from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator, SOSSAContainer
 
 from .test_helpers import create_random_factorized_hamiltonian
 
@@ -25,7 +25,8 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
     container = result.get_container()
     assert isinstance(container, SOSSAContainer)
     assert result.get_container_type() == "sossa"
-    assert all(isinstance(part, RotatedPauliContainer) for part in (container.d1, container.q1, container.sf))
+    assert container.one_body.angles.shape[1] == container.num_spatial_orbitals - 1
+    assert container.two_body.coeffs.shape == (container.num_ranks * container.num_copies, container.num_bases + 1)
     # The block-encoding normalization is derived by the builder from the container generators.
     walk = SOSSABuilder().run(result).get_container()
     assert walk.normalization == pytest.approx(expected_normalization)

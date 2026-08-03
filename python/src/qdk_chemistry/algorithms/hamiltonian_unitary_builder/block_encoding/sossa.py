@@ -26,12 +26,21 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
     SOSSAWalkContainer,
+    sossa_register_bits,
 )
 
 __all__: list[str] = ["SOSSABuilder", "SOSSASettings"]
 
 _SQRT_TWO = sqrt(2.0)
 _INV_SQRT_TWO = 1.0 / sqrt(2.0)
+
+
+def _row_l1_norms(coeffs: np.ndarray) -> np.ndarray:
+    """Return the per-row L1 norm of a ``[M, T]`` coefficient block (empty-safe)."""
+    magnitudes = np.abs(np.asarray(coeffs))
+    if magnitudes.ndim < 2:
+        return np.zeros(len(magnitudes))
+    return magnitudes.sum(axis=1)
 
 
 class SOSSASettings(HamiltonianUnitaryBuilderSettings):
@@ -91,34 +100,33 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         if normalization <= self._settings.get("tolerance"):
             raise ValueError("the SOSSA operator normalization is below the configured tolerance")
 
-        one_body_rotation_angles = np.array([*sossa.d1.rotations, *sossa.q1.rotations], dtype=float)
+        one_body_rotation_angles = sossa.one_body.angles
         two_body_rotation_angles = self._two_body_rotation_angles(
-            sossa.sf.rotations, sossa.num_ranks, sossa.num_bases, n_orbitals
+            sossa.two_body.angles, sossa.num_ranks, sossa.num_bases, n_orbitals
         )
 
-        xo_dim = n_orbitals + sossa.num_ranks * sossa.num_copies
-        num_outer_qubits = ceil(log2(xo_dim)) if xo_dim > 1 else 1
-        num_inner_qubits = ceil(log2(sossa.num_bases + 1)) if sossa.num_bases + 1 > 1 else 1
+        reg_bits = sossa_register_bits(n_orbitals, sossa.num_ranks, sossa.num_bases, sossa.num_copies)
+        num_outer_qubits = reg_bits["xo_bits"]
+        num_inner_qubits = reg_bits["b_bits"]
 
         free_rider = self._compute_free_rider_data(num_positive, n_orbitals, sossa.num_ranks, sossa.num_copies)
 
         container = SOSSAWalkContainer(
             outer_prepare=self._build_outer_prepare(outer_coefficients, num_outer_qubits),
             inner_prepare=SOSSAInnerPrepare(
-                conditional_coefficients=sossa.inner_coefficients,
+                conditional_coefficients=self._inner_conditional_coefficients(sossa, len(one_body_rotation_angles)),
                 num_inner_qubits=num_inner_qubits,
-                num_bases=sossa.num_bases,
                 free_rider_data=np.array(free_rider, dtype=bool) if free_rider else None,
             ),
             select=SOSSASelect(
                 one_body_rotation_angles=one_body_rotation_angles,
                 two_body_rotation_angles=two_body_rotation_angles,
-                num_orbitals=n_orbitals,
-                num_ranks=sossa.num_ranks,
-                num_copies=sossa.num_copies,
-                num_bases=sossa.num_bases,
                 num_positive_one_body_terms=num_positive,
             ),
+            num_orbitals=n_orbitals,
+            num_ranks=sossa.num_ranks,
+            num_bases=sossa.num_bases,
+            num_copies=sossa.num_copies,
             normalization=normalization,
             power=self._settings.get("power"),
             energy_shift=sossa.energy_shift,
@@ -130,41 +138,54 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     def _outer_coefficients(sossa: SOSSAContainer) -> np.ndarray:
         r"""Compute the outer PREPARE LCU coefficients from the container generators.
 
-        The one-body coefficients are :math:`\sqrt{2}` times the D1/Q1 term
-        one-norms; the spin-free coefficients are the per-``(rank, copy)`` inner
-        one-norms scaled by :math:`1/\sqrt{2}`.
+        The one-body coefficients are :math:`\sqrt{2}` times the D1/Q1 generator
+        one-norms; each generator contributes two Pauli terms (X and Y) whose
+        magnitudes are summed. The spin-free coefficients are the per-``(rank,
+        copy)`` two-body row one-norms scaled by :math:`1/\sqrt{2}`.
         """
-        one_body = [_SQRT_TWO * abs(coefficient) for coefficient in (*sossa.d1.coefficients, *sossa.q1.coefficients)]
-        num_one_body = len(one_body)
-        spin_free = [
-            _INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1]))))
-            for row in sossa.inner_coefficients[num_one_body:]
-        ]
-        return np.array(one_body + spin_free, dtype=float)
+        one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
+        spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]
+        return np.concatenate([one_body, np.asarray(spin_free, dtype=float)])
+
+    @staticmethod
+    def _inner_conditional_coefficients(sossa: SOSSAContainer, num_one_body: int) -> np.ndarray:
+        r"""Assemble the inner-PREPARE conditional distribution ``[Xo, B+1]``.
+
+        One delta row (``b = 0``) per one-body generator, then one spin-free row
+        per ``(rank, copy)``: the rotated-``Z`` coefficients followed by the
+        absolute identity weight (the ``b == B`` free-rider magnitude).
+        """
+        b_plus_1 = sossa.num_bases + 1
+        delta = np.zeros((num_one_body, b_plus_1))
+        if num_one_body:
+            delta[:, 0] = 1.0
+        sf = np.asarray(sossa.two_body.coeffs)
+        sf_rows = np.zeros((sf.shape[0], b_plus_1))
+        if sf.size:
+            sf_rows[:, :-1] = sf[:, :-1].real
+            sf_rows[:, -1] = np.abs(sf[:, -1])
+        return np.concatenate([delta, sf_rows], axis=0)
 
     @staticmethod
     def _two_body_rotation_angles(
-        sf_rotations: tuple[np.ndarray, ...],
+        sf_angles: np.ndarray,
         num_ranks: int,
         num_bases: int,
         num_orbitals: int,
     ) -> np.ndarray:
-        r"""Assemble the spin-free SELECT angles ``[R (B+1), N]`` from per-``(rank, basis)`` angles.
+        r"""Assemble the spin-free SELECT angles ``[R (B+1), N-1]`` from per-``(rank, basis)`` angles.
 
         Each rank block holds its ``B`` basis Givens angle vectors followed by a
-        zero ``b == B`` row carrying a trailing flag; the blocks are reordered to
-        basis-major, rank-minor addressing for the Q# QROM.
+        zero ``b == B`` (identity) row; the blocks are reordered to basis-major,
+        rank-minor addressing for the Q# QROM, which recomputes the ``b == B`` flag.
         """
         n_bp1 = num_bases + 1
         angles = np.zeros((num_ranks * n_bp1, num_orbitals - 1))
-        flags = np.zeros(num_ranks * n_bp1)
         for rank in range(num_ranks):
             for basis in range(num_bases):
-                angles[rank * n_bp1 + basis] = sf_rotations[rank * num_bases + basis]
-            flags[rank * n_bp1 + num_bases] = 1.0
-        with_flag = np.column_stack([angles, flags])
+                angles[rank * n_bp1 + basis] = sf_angles[rank * num_bases + basis]
         order = [rank * n_bp1 + basis for basis in range(n_bp1) for rank in range(num_ranks)]
-        return with_flag[order]
+        return angles[order]
 
     @staticmethod
     def _build_outer_prepare(statevector: np.ndarray, num_qubits: int) -> Wavefunction:

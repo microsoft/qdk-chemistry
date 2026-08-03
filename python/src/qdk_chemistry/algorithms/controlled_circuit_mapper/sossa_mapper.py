@@ -5,13 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from math import ceil, log2
 from typing import Any
 
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer, sossa_register_bits
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -144,9 +143,9 @@ class SOSSAMapper(ControlledCircuitMapper):
         algorithm = self._settings.get("select_algorithm")
         rot_bits = self._settings.get("rotation_bit_precision")
 
-        num_ranks = container.num_ranks
-        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
-        num_free_rider_bits = 2 + rank_bits
+        num_free_rider_bits = sossa_register_bits(
+            container.num_orbitals, container.num_ranks, container.num_bases, container.num_copies
+        )["num_free_rider_bits"]
 
         select_data = {
             "numOrbitals": container.num_orbitals,
@@ -172,13 +171,10 @@ class SOSSAMapper(ControlledCircuitMapper):
         """Compute register sizes from container structure and settings."""
         num_orbitals = container.num_orbitals
         num_system_qubits = 2 * num_orbitals
-        x_o_dim = num_orbitals + container.num_ranks * container.num_copies
-        xo_bits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
-        num_bases = container.num_bases
-        b_bits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
-        num_ranks = container.num_ranks
-        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
-        num_free_rider_bits = 2 + rank_bits
+        reg_bits = sossa_register_bits(num_orbitals, container.num_ranks, container.num_bases, container.num_copies)
+        xo_bits = reg_bits["xo_bits"]
+        b_bits = reg_bits["b_bits"]
+        num_free_rider_bits = reg_bits["num_free_rider_bits"]
 
         outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
         if outer_ref.algorithm_name == "alias_sampling":
@@ -195,9 +191,7 @@ class SOSSAMapper(ControlledCircuitMapper):
             num_inner_qubits = b_bits + num_free_rider_bits
             num_reflect_inner = b_bits
 
-        num_phase_gradient_qubits = (
-            self._settings.get("rotation_bit_precision") if self.uses_phase_gradient else 0
-        )
+        num_phase_gradient_qubits = self._settings.get("rotation_bit_precision") if self.uses_phase_gradient else 0
 
         return {
             "num_system_qubits": num_system_qubits,
