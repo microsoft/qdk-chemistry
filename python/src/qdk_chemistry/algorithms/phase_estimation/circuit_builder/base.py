@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -98,7 +99,7 @@ class QpeCircuitBuilder(Algorithm):
         self,
         qubit_hamiltonian: QubitOperator,
         power: int,
-    ) -> tuple[Circuit, int]:
+    ) -> tuple[Circuit, int, Any | None]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
@@ -109,9 +110,11 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_ancilla_qubits) where circuit implements
-            controlled-:math:`U^{\\text{power}}` and num_ancilla_qubits is the number
-            of ancilla qubits used by the unitary beyond the system qubits.
+            A tuple of (circuit, num_ancilla_qubits, ancilla_prep_op) where circuit
+            implements controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the
+            number of ancilla qubits used by the unitary beyond the system qubits, and
+            ancilla_prep_op is the mapper's ancilla preparation callable, or ``None``
+            when the mapper does not provide one.
 
         """
         unitary_builder = self._create_nested("unitary_builder")

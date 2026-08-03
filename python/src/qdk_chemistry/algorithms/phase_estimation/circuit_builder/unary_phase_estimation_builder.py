@@ -64,15 +64,15 @@ def num_phase_bits(num_queries: int) -> int:
 
 
 def phase_window_state(num_queries: int, window: str = "kaiser", window_alpha: float = 2.0) -> list[float]:
-    """Return the phase-register amplitudes, zero-padded to a whole number of qubits.
+    r"""Return the phase-register amplitudes, zero-padded to a whole number of qubits.
 
     Args:
         num_queries: Number of walk blocks; the window spans ``num_queries + 1`` slots.
         window: Window family, one of ``"kaiser"``, ``"cosine"`` or ``"uniform"``.
-        window_alpha: Kaiser shape parameter :math:`\\alpha` (ignored by other windows).
+        window_alpha: Kaiser shape parameter :math:`\alpha` (ignored by other windows).
 
     Returns:
-        Real amplitudes of length :math:`2^{\\text{num\\_phase\\_bits}}`, normalized to unit norm.
+        Real amplitudes of length :math:`2^{\text{num\_phase\_bits}}`, normalized to unit norm.
 
     Raises:
         ValueError: If ``window`` is not a supported window family.

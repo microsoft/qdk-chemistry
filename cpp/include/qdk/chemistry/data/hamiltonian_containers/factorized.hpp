@@ -26,7 +26,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Construct a restricted factorized Hamiltonian.
-   *                                                                                                                                                                                                                                                            
+   *
    * @param core_energy Nuclear and inactive-core energy.
    * @param u_matrices U factors, flattened as [R,B,N].
    * @param w_matrices W factors, flattened as [R,B,C].
