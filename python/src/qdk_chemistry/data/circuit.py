@@ -230,6 +230,7 @@ class Circuit(DataClass):
                 *self._qsharp_factory.parameter.values(),
             )
             return logical_counts.estimate(params)
+
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
 

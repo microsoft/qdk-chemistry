@@ -9,30 +9,27 @@ import json
 
 import numpy as np
 import pytest
-from qdk import TargetProfile, qsharp
 
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
 from .test_helpers import create_test_orbitals
 
 try:
-    from qdk._interpreter import get_config
     from qdk._native import Circuit as QdkCircuitType
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
-    from qsharp._qsharp import get_config
 
 
-def _run_state_prep_and_dump(circuit: Circuit, context) -> np.ndarray:
-    """Run a state preparation circuit in *context* and return the statevector.
+def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
+    """Run a state preparation circuit via Q# eval and return the statevector.
 
-    Allocates qubits in the (Base-profile) Q# context, applies the state preparation,
-    and captures the statevector via ``dump_machine()``.
+    Allocates qubits in the chemistry Q# context, applies the state
+    preparation, and captures the statevector.
 
     Returns:
         The dense statevector as a complex numpy array (Q# big-endian ordering).
@@ -52,11 +49,11 @@ def _run_state_prep_and_dump(circuit: Circuit, context) -> np.ndarray:
         f" numQubits = {n_qubits} }}"
     )
 
+    context = create_qsharp_context()
     context.eval(f"use qs = Qubit[{n_qubits}];")
     context.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
 
-    state = context.dump_machine()
-    return np.array(state.as_dense_state())
+    return np.array(context.dump_machine().as_dense_state())
 
 
 def _build_expected_statevector(
@@ -121,7 +118,7 @@ class TestDensePureStatePreparation:
         # 4 orbitals -> 8 qubits (4 alpha + 4 beta)
         assert num_qubits == 8
 
-    def test_statevector_matches_wavefunction_4e4o(self, wavefunction_4e4o, qdk_ctx):
+    def test_statevector_matches_wavefunction_4e4o(self, wavefunction_4e4o):
         """Verify the prepared state matches the expected statevector for the 4e4o problem.
 
         The wavefunction has two determinants:
@@ -130,7 +127,7 @@ class TestDensePureStatePreparation:
         """
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction_4e4o)
-        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
+        actual_sv = _run_state_prep_and_dump(circuit)
 
         coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
         dets = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2020")]
@@ -140,7 +137,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_statevector_matches_wavefunction_10e6o(self, wavefunction_10e6o, qdk_ctx):
+    def test_statevector_matches_wavefunction_10e6o(self, wavefunction_10e6o):
         """Verify the prepared state matches the expected statevector for the 10e6o F2 problem.
 
         The wavefunction has three determinants:
@@ -150,7 +147,7 @@ class TestDensePureStatePreparation:
         """
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction_10e6o)
-        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
+        actual_sv = _run_state_prep_and_dump(circuit)
 
         coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
         dets = [
@@ -163,7 +160,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_config_from_bitstring(self, qdk_ctx):
+    def test_config_from_bitstring(self):
         """Verify state preparation for configurations created from bitstrings."""
         test_orbitals = create_test_orbitals(2)
         det = Configuration.from_bitstring("11")
@@ -175,7 +172,7 @@ class TestDensePureStatePreparation:
 
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction)
-        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
+        actual_sv = _run_state_prep_and_dump(circuit)
 
         # Build expected statevector for 1-bit-per-mode config using to_bits().
         # dump_machine uses big-endian: MSB interpretation of bits.
@@ -191,7 +188,7 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    def test_single_determinant(self, qdk_ctx):
+    def test_single_determinant(self):
         """Verify state preparation for a single-determinant wavefunction."""
         test_orbitals = create_test_orbitals(2)
         det = Configuration.from_spin_half_string("du")
@@ -203,7 +200,7 @@ class TestDensePureStatePreparation:
 
         prep = DensePureStatePreparation()
         circuit = prep.run(wavefunction)
-        actual_sv = _run_state_prep_and_dump(circuit, qdk_ctx)
+        actual_sv = _run_state_prep_and_dump(circuit)
         expected = _build_expected_statevector(np.array([1.0]), [det], num_orbitals=2)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
@@ -216,11 +213,6 @@ class TestDensePureStatePreparation:
         """Verify that dense preparation yields the same energy as sparse isometry."""
         from qiskit.quantum_info import SparsePauliOp  # noqa: PLC0415
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415
-
-        # Re-init with Base profile required for QIR compilation (get_qiskit_circuit)
-        current_profile = get_config().get_target_profile()
-        qsharp.init(target_profile=TargetProfile.from_str(current_profile))
-        _ = QSHARP_UTILS.StatePreparation
 
         dense_prep = create("state_prep", "dense_pure_state")
         sparse_prep = create("state_prep", "sparse_isometry_gf2x")

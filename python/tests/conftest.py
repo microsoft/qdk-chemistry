@@ -42,7 +42,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -80,14 +80,12 @@ if build_dir.exists():
 
 @pytest.fixture
 def qdk_ctx() -> qdk.Context:
-    """Fresh Base-profile Q# context (loads the Base-compatible source subset)."""
-    return get_qsharp_context(TargetProfile.Base)
+    """Fresh Q# context at the default profile, isolated from the shared one.
 
-
-@pytest.fixture
-def adaptive_qdk_ctx() -> qdk.Context:
-    """Fresh Adaptive-profile Q# context (loads the full Q# project)."""
-    return get_qsharp_context(TargetProfile.Adaptive_RIF)
+    Tests that inspect quantum state need their own interpreter, because
+    ``dump_machine`` reports every qubit currently allocated in the context.
+    """
+    return create_qsharp_context()
 
 
 @pytest.fixture

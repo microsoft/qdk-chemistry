@@ -95,8 +95,8 @@ class PauliSequenceMapper(CircuitMapper):
         }
 
         target_indices = list(range(unitary_container.num_qubits))
-
         program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
+
         evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
