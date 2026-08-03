@@ -3,11 +3,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""ExaChem DUCC Hamiltonian downfolding solver.
+"""ExaChem DUCC effective-Hamiltonian builder.
 
-Implements the :class:`~qdk_chemistry.algorithms.base.Algorithm` interface to run
-ExaChem's Double Unitary Coupled Cluster (DUCC) method as an external MPI process,
-parse the resulting FCIDUMP output, and return the downfolded active-space Hamiltonian.
+Implements the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonian` interface
+to run ExaChem's Double Unitary Coupled Cluster (DUCC) method as an external MPI
+process, parse the resulting FCIDUMP output, and return the downfolded
+active-space Hamiltonian.
 
 The DUCC method produces a Hermitian effective Hamiltonian for the active space
 that incorporates dynamical correlation from external orbitals through a unitary
@@ -24,11 +25,13 @@ from __future__ import annotations
 
 import logging
 import shutil
+import tempfile
 from pathlib import Path
 
 import numpy as np
 
-from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms import EffectiveHamiltonian
+from qdk_chemistry.data import Settings
 from qdk_chemistry.plugins.exachem.cli import DuccInputConfig, ExachemResult, run_exachem
 from qdk_chemistry.plugins.exachem.conversion import (
     fcidump_to_hamiltonian,
@@ -41,82 +44,90 @@ from qdk_chemistry.plugins.exachem.scf_export import export_scf_files
 logger = logging.getLogger(__name__)
 
 
-class HamiltonianDownfolderFactory(AlgorithmFactory):
-    """Factory for Hamiltonian downfolding algorithms."""
+def _active_counts(active_orbitals, nocc: int) -> tuple[int, int]:
+    """Count the active occupied and active virtual spatial orbitals.
 
-    def algorithm_type_name(self) -> str:
-        """Return ``"hamiltonian_downfolder"``."""
-        return "hamiltonian_downfolder"
+    Args:
+        active_orbitals: Orbitals carrying an active-space designation.
+        nocc: Number of occupied spatial orbitals in the reference.
 
-    def default_algorithm_name(self) -> str:
-        """Return ``"exachem_ducc"``."""
-        return "exachem_ducc"
+    Returns:
+        Tuple ``(nactive_occupied, nactive_virtual)``.
+
+    Raises:
+        ValueError: If no active space is designated or either channel is empty.
+
+    """
+    if not active_orbitals.has_active_space():
+        raise ValueError("ExaChem DUCC requires active_orbitals with a designated active space.")
+
+    # get_active_space_indices() returns (alpha, beta) lists of SPATIAL indices;
+    # the closed-shell restriction is enforced by the caller, so alpha suffices.
+    alpha_indices, beta_indices = active_orbitals.get_active_space_indices()
+    if sorted(alpha_indices) != sorted(beta_indices):
+        raise ValueError("ExaChem DUCC requires identical alpha and beta active spaces.")
+
+    spatial = sorted(int(p) for p in alpha_indices)
+    nactive_o = sum(1 for p in spatial if p < nocc)
+    nactive_v = len(spatial) - nactive_o
+    if nactive_o == 0 or nactive_v == 0:
+        raise ValueError(
+            f"ExaChem DUCC needs both active occupied and active virtual orbitals; "
+            f"got {nactive_o} occupied and {nactive_v} virtual."
+        )
+    return nactive_o, nactive_v
 
 
-class ExachemDuccSolver(Algorithm):
-    """DUCC Hamiltonian downfolding via ExaChem CLI.
+class ExachemDuccSettings(Settings):
+    """Settings for the ExaChem DUCC effective-Hamiltonian builder.
 
-    Runs ExaChem's DUCC implementation as an external MPI process, skipping
-    ExaChem's internal SCF by providing pre-computed MO coefficients and
-    density matrices. ExaChem performs Cholesky decomposition → CCSD → DUCC
-    on the supplied orbitals, producing a downfolded active-space Hamiltonian
-    in FCIDUMP format.
-
-    Settings:
-        atoms (list[str]): Atom coordinate lines, e.g. ``["H 0.0 0.0 0.0", "O 0.0 0.0 1.0"]``.
-        basis (str): Gaussian basis set name (default: ``"cc-pvdz"``).
-        charge (int): Molecular charge (default: 0).
-        multiplicity (int): Spin multiplicity 2S+1 (default: 1).
-        units (str): Coordinate units, ``"angstrom"`` or ``"bohr"`` (default: ``"angstrom"``).
-        nactive_oa (int): Number of active occupied alpha orbitals (default: 0).
-        nactive_ob (int): Number of active occupied beta orbitals (default: 0).
-        nactive_va (int): Number of active virtual alpha orbitals (default: 0).
-        nactive_vb (int): Number of active virtual beta orbitals (default: 0).
-        ducc_level (int): DUCC truncation level (default: 2).
+    Attributes:
+        ducc_level (int): DUCC/BCH truncation level (default: 2).
         mpi_ranks (int): Number of MPI processes (default: 1).
-        exachem_binary (str): Path to ExaChem binary, or empty for auto-detect (default: ``""``).
+        exachem_binary (str): Path to the ExaChem binary, or empty for auto-detect (default: ``""``).
         work_dir (str): Working directory, or empty for a temp dir (default: ``""``).
         timeout (int): Subprocess timeout in seconds (default: 3600).
-        scf_type (str): SCF type, only ``"restricted"`` is supported (default: ``"restricted"``).
         ccsd_threshold (float): CCSD convergence threshold (default: 1e-6).
-
-    Examples:
-        >>> import numpy as np
-        >>> solver = ExachemDuccSolver()
-        >>> solver.settings().set("atoms", ["H 0.0 0.0 0.0", "H 0.0 0.0 0.74"])
-        >>> solver.settings().set("basis", "cc-pvdz")
-        >>> solver.settings().set("nactive_oa", 1)
-        >>> solver.settings().set("nactive_va", 1)
-        >>> result = solver.run(
-        ...     mo_coeff_alpha=C_alpha, density_alpha=D_alpha,
-        ... )  # returns FcidumpData
+        cd_diagtol (float): Cholesky decomposition diagonal tolerance (default: 1e-5).
 
     """
 
     def __init__(self):
+        """Initialize the settings with default values."""
         super().__init__()
-        s = self._settings
-        s._set_default("atoms", "vector<string>", [])
-        s._set_default("basis", "string", "cc-pvdz")
-        s._set_default("charge", "int", 0)
-        s._set_default("multiplicity", "int", 1)
-        s._set_default("units", "string", "angstrom")
-        s._set_default("nactive_oa", "int", 0)
-        s._set_default("nactive_ob", "int", 0)
-        s._set_default("nactive_va", "int", 0)
-        s._set_default("nactive_vb", "int", 0)
-        s._set_default("ducc_level", "int", 2)
-        s._set_default("mpi_ranks", "int", 1)
-        s._set_default("exachem_binary", "string", "")
-        s._set_default("work_dir", "string", "")
-        s._set_default("timeout", "int", 3600)
-        s._set_default("scf_type", "string", "restricted")
-        s._set_default("ccsd_threshold", "double", 1e-6)
-        s._set_default("cd_diagtol", "double", 1e-5)
+        self._set_default("ducc_level", "int", 2)
+        self._set_default("mpi_ranks", "int", 1)
+        self._set_default("exachem_binary", "string", "")
+        self._set_default("work_dir", "string", "")
+        self._set_default("timeout", "int", 3600)
+        self._set_default("ccsd_threshold", "double", 1e-6)
+        self._set_default("cd_diagtol", "double", 1e-5)
 
-    def type_name(self) -> str:
-        """Return ``"hamiltonian_downfolder"``."""
-        return "hamiltonian_downfolder"
+
+class ExachemDuccSolver(EffectiveHamiltonian):
+    """DUCC effective-Hamiltonian builder via ExaChem CLI.
+
+    Runs ExaChem's DUCC implementation as an external MPI process, skipping
+    ExaChem's internal SCF by exporting the input orbitals' MO coefficients and
+    density matrix in ExaChem's serial-IO restart format. ExaChem performs
+    Cholesky decomposition -> CCSD -> DUCC on the supplied orbitals, producing a
+    downfolded active-space Hamiltonian in FCIDUMP format.
+
+    The geometry, basis set and MO coefficients come from the input Hamiltonian's
+    orbitals, the electron counts from the input wavefunction, and the active
+    space from the active-space indices of ``active_orbitals``.
+
+    Examples:
+        >>> solver = ExachemDuccSolver()
+        >>> solver.settings().set("ducc_level", 2)
+        >>> effective = solver.run(hamiltonian, ccsd_wavefunction, active_orbitals)
+
+    """
+
+    def __init__(self):
+        """Initialize the solver with default settings."""
+        super().__init__()
+        self._settings = ExachemDuccSettings()
 
     def name(self) -> str:
         """Return ``"exachem_ducc"``."""
@@ -126,103 +137,91 @@ class ExachemDuccSolver(Algorithm):
         """Return algorithm aliases."""
         return ["exachem_ducc", "ducc"]
 
-    def _run_impl(self, *args, **kwargs):
-        """Run ExaChem DUCC with pre-computed SCF data and return downfolded Hamiltonian.
+    def _run_impl(self, hamiltonian, wavefunction, active_orbitals):
+        """Run ExaChem DUCC and return the downfolded active-space Hamiltonian.
 
-        Requires pre-computed MO coefficients and density matrices as keyword
-        arguments. ExaChem skips its internal SCF and runs
-        Cholesky decomposition → CCSD → DUCC on the provided orbitals.
-
-        The molecule geometry (``atoms``) and ``basis`` must still be set in
-        Settings so ExaChem can construct the basis set and integrals.
-
-        Keyword Args:
-            mo_coeff_alpha (numpy.ndarray): Alpha MO coefficients, shape ``(nbf, nmo)``. Required.
-            density_alpha (numpy.ndarray): Alpha AO density matrix, shape ``(nbf, nbf)``. Required.
+        Args:
+            hamiltonian: Full-space Hamiltonian whose orbitals supply the geometry, basis and MO coefficients.
+            wavefunction: Full-space wavefunction supplying the alpha/beta electron counts.
+            active_orbitals: Orbitals whose active-space indices designate the active subset.
 
         Returns:
-            :class:`~qdk_chemistry.data.Hamiltonian` containing the downfolded active-space integrals.
+            The effective active-space :class:`~qdk_chemistry.data.Hamiltonian`.
 
         Raises:
-            ExachemNotFoundError: If ExaChem or MPI launcher is not found.
+            ValueError: If the reference is open-shell or the inputs are inconsistent.
+            ExachemNotFoundError: If ExaChem or the MPI launcher is not found.
             ExachemRunError: If ExaChem fails.
-            ValueError: If required arguments are missing.
+            RuntimeError: If ExaChem produces no DUCC output files.
 
         """
         s = self._settings
-        atoms = s.get("atoms")
-        if not atoms:
-            raise ValueError("No atoms configured. Set settings 'atoms' to a list of coordinate strings.")
 
-        mo_coeff_alpha = kwargs.get("mo_coeff_alpha")
-        density_alpha = kwargs.get("density_alpha")
-        if mo_coeff_alpha is None or density_alpha is None:
-            raise ValueError("mo_coeff_alpha and density_alpha are required keyword arguments.")
-
-        if s.get("scf_type") != "restricted":
+        n_alpha, n_beta = wavefunction.get_total_num_electrons()
+        if n_alpha != n_beta:
             raise ValueError(
-                "ExaChem DUCC currently only supports closed-shell (restricted) calculations. "
+                "ExaChem DUCC currently only supports closed-shell (restricted) references. "
                 "Open-shell support is not yet implemented in ExaChem's DUCC module."
             )
 
+        orbitals = hamiltonian.get_orbitals()
+        if not orbitals.has_basis_set():
+            raise ValueError(
+                "ExaChem DUCC requires a Hamiltonian backed by a molecular basis set; "
+                "the provided orbitals have no associated BasisSet."
+            )
+        basis_set = orbitals.get_basis_set()
+        basis_name = basis_set.get_name()
+        structure = basis_set.get_structure()
+
+        # qdk-chemistry stores coordinates in Bohr, so feed ExaChem Bohr directly.
+        element_symbols = [element.name for element in structure.get_elements()]
+        coordinates = np.asarray(structure.get_coordinates()).reshape(-1, 3)
+        atoms = [
+            f"{symbol} {xyz[0]:.12f} {xyz[1]:.12f} {xyz[2]:.12f}"
+            for symbol, xyz in zip(element_symbols, coordinates, strict=True)
+        ]
+
+        nactive_o, nactive_v = _active_counts(active_orbitals, n_alpha)
+
         config = DuccInputConfig(
             atoms=atoms,
-            basis=s.get("basis"),
-            charge=s.get("charge"),
-            multiplicity=s.get("multiplicity"),
-            units=s.get("units"),
-            nactive_oa=s.get("nactive_oa"),
-            nactive_ob=s.get("nactive_ob"),
-            nactive_va=s.get("nactive_va"),
-            nactive_vb=s.get("nactive_vb"),
+            basis=basis_name,
+            charge=0,
+            multiplicity=1,
+            units="bohr",
+            nactive_oa=nactive_o,
+            nactive_ob=nactive_o,
+            nactive_va=nactive_v,
+            nactive_vb=nactive_v,
             ducc_level=s.get("ducc_level"),
             ccsd_threshold=s.get("ccsd_threshold"),
             cd_diagtol=s.get("cd_diagtol"),
-            scf_type=s.get("scf_type"),
+            scf_type="restricted",
             noscf=True,
         )
+
+        mo_coeff_alpha = np.asarray(orbitals.get_coefficients_alpha())
+        # ExaChem expects the TOTAL density (alpha + beta), not alpha-only.
+        # For restricted closed-shell: D_total = 2 * D_alpha
+        density_alpha = np.asarray(orbitals.calculate_ao_density_matrix(n_alpha, n_beta)[0])
+        density_for_export = density_alpha * 2.0
 
         binary = s.get("exachem_binary") or None
         work = s.get("work_dir") or None
         cleanup_work_dir = work is None
-        work_path = Path(work) if work else None
-
-        import tempfile
-
-        if work_path is None:
-            work_path = Path(tempfile.mkdtemp(prefix="exachem_ducc_"))
+        work_path = Path(work) if work else Path(tempfile.mkdtemp(prefix="exachem_ducc_"))
         work_path.mkdir(parents=True, exist_ok=True)
 
         try:
-            scf_prefix_name = f"ducc_input.{s.get('basis')}"
-            scf_type_dir = work_path / f"{scf_prefix_name}_files" / s.get("scf_type")
+            scf_prefix_name = f"ducc_input.{basis_name}"
+            scf_type_dir = work_path / f"{scf_prefix_name}_files" / "restricted"
             scf_dir = scf_type_dir / "scf"
             scf_dir.mkdir(parents=True, exist_ok=True)
             scf_files_prefix = scf_dir / scf_prefix_name
 
             # Run context JSON goes one level up from scf/ (at the scf_type level)
             runcontext_prefix = scf_type_dir / scf_prefix_name
-
-            # Build basis set for AO reordering
-            from qdk_chemistry.data import BasisSet, Element, Structure
-
-            atom_coords = []
-            atom_elements = []
-            element_symbols = []
-            for line in atoms:
-                parts = line.split()
-                atom_elements.append(getattr(Element, parts[0]))
-                element_symbols.append(parts[0])
-                atom_coords.append([float(x) for x in parts[1:4]])
-            coords_np = np.array(atom_coords)
-            if s.get("units").lower() == "angstrom":
-                coords_np = coords_np / 0.529177249
-            structure = Structure(coords_np, atom_elements)
-            basis_set = BasisSet.from_basis_name(s.get("basis"), structure)
-
-            # ExaChem expects the TOTAL density (alpha + beta), not alpha-only.
-            # For restricted closed-shell: D_total = 2 * D_alpha
-            density_for_export = density_alpha * 2.0
 
             # Feed ExaChem qdk-chemistry's own basis (written as a Gaussian-94 file
             # here and read via LIBINT_DATA_PATH) so the two codes use an identical
@@ -237,7 +236,7 @@ class ExachemDuccSolver(Algorithm):
                 ao_tilesize=30,
                 runcontext_prefix=runcontext_prefix,
                 basis_set=basis_set,
-                basis_name=s.get("basis"),
+                basis_name=basis_name,
                 elements=element_symbols,
                 basis_data_dir=basis_data_dir,
             )
@@ -280,16 +279,13 @@ class ExachemDuccSolver(Algorithm):
                 core_energy = fcidump.nuclear_repulsion
                 logger.warning("Could not extract energy shift from ExaChem stdout; using nuc_rep only")
 
-            # Convert to Hamiltonian
-            hamiltonian = fcidump_to_hamiltonian(
+            return fcidump_to_hamiltonian(
                 fcidump,
-                atoms=list(s.get("atoms")),
-                basis=s.get("basis"),
-                units=s.get("units"),
+                atoms=atoms,
+                basis=basis_name,
+                units="bohr",
                 core_energy_override=core_energy,
             )
-
-            return hamiltonian
         finally:
             # Remove every input/output/basis file written during the run, unless
             # the caller supplied an explicit work_dir (then they own the files).

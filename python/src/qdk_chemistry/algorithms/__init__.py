@@ -24,6 +24,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
+from qdk_chemistry.algorithms.effective_hamiltonian import EffectiveHamiltonian
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
@@ -70,6 +71,7 @@ __all__ = [
     "CircuitExecutor",
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
+    "EffectiveHamiltonian",
     "ExpectationEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
     "HadamardTest",

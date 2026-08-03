@@ -10,6 +10,7 @@ target_sources(chemistry PRIVATE
     pmc.cpp
     qdk_nuclear_derivative.cpp
     dynamical_correlation_calculator.cpp
+    effective_hamiltonian.cpp
     scf.cpp
     stability.cpp
 )
