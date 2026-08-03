@@ -92,25 +92,15 @@ def _build_h2_dfthc_data():
     }
 
 
-def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identity_weight):
-    """Build the SOSSA gap Hamiltonian matrix via Jordan-Wigner mapping.
+def _jordan_wigner_excitations(num_orbitals):
+    r"""Build the spin-summed excitation operators ``E_pq`` in the JW encoding.
 
-    Constructs H_gap from the SOS generators (D1² + Q1² + SF²):
-        H_gap = Σ_{k: w_k>0} w_k (n_k - 1)² + Σ_{k: w_k<0} |w_k| n_k²
-              + ½ Σ_{r,c} (W^{(rc)}·I + Σ_b w_b^{(rc)} L_b^{(r)})²
-
-    where n_k = Σ_{p,q} V_{pk} V_{qk} E_{pq} is the occupation of eigenbasis
-    orbital k (eigenvectors V from diagonalizing h1).
-
-    Reference: Eq. 20-21, 29 in arXiv:2502.15882v1.
+    Returns a callable ``E(p, q)`` producing the dense matrix of
+    :math:`E_{pq} = \sum_\sigma a^\dagger_{p\\sigma} a_{q\\sigma}` on
+    ``2 * num_orbitals`` qubits, where ``|1>`` denotes an occupied spin orbital.
     """
-    num_orbitals = h1.shape[0]
-    n_ranks, b_dim, _ = basis_vectors.shape
-    _, n_copies = identity_weight.shape
     num_spin_orbitals = 2 * num_orbitals
     dim = 2**num_spin_orbitals
-
-    # Jordan-Wigner operators
     eye2 = np.eye(2, dtype=complex)
     pauli_z = np.diag([1.0, -1.0]).astype(complex)
     sp = np.array([[0, 0], [1, 0]], dtype=complex)  # a† = |1><0|
@@ -122,44 +112,115 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
             result = np.kron(result, op)
         return result
 
-    # Excitation operator E_{pq} = Sum_sigma a†_{p,sigma} a_{q,sigma}
-    epq_cache = {}
+    cache = {}
 
     def excitation_pq(p, q):
-        if (p, q) not in epq_cache:
+        if (p, q) not in cache:
             mat = np.zeros((dim, dim), dtype=complex)
             for sigma in range(2):
-                c_dag = adag(2 * p + sigma)
-                c = adag(2 * q + sigma).conj().T
-                mat += c_dag @ c
-            epq_cache[(p, q)] = mat
-        return epq_cache[(p, q)]
+                mat += adag(2 * p + sigma) @ adag(2 * q + sigma).conj().T
+            cache[(p, q)] = mat
+        return cache[(p, q)]
 
-    # Eigendecompose h1 for D1/Q1 generators
-    eigvals, eigvecs = np.linalg.eigh(h1)
+    return excitation_pq
 
-    # 1) D1/Q1 terms: linear number operators in h1 eigenbasis
-    # D1 generator is proportional to a†_k (creation), so O†O = (1-n_k sigma) summed
-    # over spins gives w_k(2 - n_k).
-    # Q1 generator is proportional to a_k (annihilation), so O†O = n_k sigma summed
-    # over spins gives |w_k| * n_k.
+
+def _one_body_operator(matrix, excitation_pq, dim):
+    """Return ``sum_pq matrix[p, q] E_pq`` as a dense matrix."""
+    out = np.zeros((dim, dim), dtype=complex)
+    num_orbitals = matrix.shape[0]
+    for p in range(num_orbitals):
+        for q in range(num_orbitals):
+            if abs(matrix[p, q]) > 1e-15:
+                out += matrix[p, q] * excitation_pq(p, q)
+    return out
+
+
+def _dfthc_m_matrices(basis_vectors, two_body_weights):
+    """Return ``M^{rc}_{pq} = sum_b w_b^{rc} u^r_{bp} u^r_{bq}`` keyed by ``(r, c)``."""
+    n_ranks, b_dim, _ = basis_vectors.shape
+    n_copies = two_body_weights.shape[2]
+    return {
+        (r, c): sum(
+            two_body_weights[r, b, c] * np.outer(basis_vectors[r, b], basis_vectors[r, b]) for b in range(b_dim)
+        )
+        for r in range(n_ranks)
+        for c in range(n_copies)
+    }
+
+
+def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
+    """Replicate ``FactorizedHamiltonianContainer::get_h1_majorana`` (Eq. 38).
+
+    The SOS generators are built from the *normal-ordering corrected* one-body
+    matrix, not from the bare ``h1``::
+
+        h1' = h1 + sum_rc [ -1/2 M_rc^2 + tr(M_rc) M_rc - wB^{rc} M_rc ]
+    """
+    m_matrices = _dfthc_m_matrices(basis_vectors, two_body_weights)
+    h1p = np.array(h1, dtype=float, copy=True)
+    for (r, c), m_rc in m_matrices.items():
+        h1p -= 0.5 * (m_rc @ m_rc)
+        h1p += np.trace(m_rc) * m_rc
+        h1p -= identity_weight[r, c] * m_rc
+    return h1p
+
+
+def _sos_energy_shift(h1, basis_vectors, two_body_weights, identity_weight):
+    """Replicate ``SOSSAQubitMapper`` ``energy_shift`` (Eq. 32), with zero core/BLISS.
+
+    ``E_SOS = -2 sum_r w_-^{(r)} - 1/2 sum_rc |W^{(rc)}|^2``.
+    """
+    eigenvalues = np.linalg.eigvalsh(_h1_majorana(h1, basis_vectors, two_body_weights, identity_weight))
+    negative_sum = float(-np.sum(eigenvalues[eigenvalues < 0.0]))
+    w0 = identity_weight - two_body_weights.sum(axis=1)
+    return -2.0 * negative_sum - 0.5 * float(np.sum(w0**2))
+
+
+def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identity_weight):
+    r"""Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner.
+
+    The one-body generators come from diagonalizing the *Majorana-corrected*
+    one-body matrix (Eq. 38), matching ``SOSSAQubitMapper``, which reads
+    ``container.get_h1_majorana()`` rather than the bare ``h1``.
+
+    For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU
+    :math:`\sqrt{|\lambda_k|}\\,(X \pm iY)/2` on the rotated spin orbital.
+    Since :math:`(X + iY)/2 = |0\rangle\langle 1| = a`, the ``+iY`` branch
+    (positive eigenvalues, ``D1``) contributes :math:`G^\dagger G = \lambda_k n_k`
+    and the ``-iY`` branch (negative eigenvalues, ``Q1``) contributes
+    :math:`|\lambda_k| (2 - n_k)`::
+
+        H_gap = sum_{k: lam_k>0} lam_k n_k + sum_{k: lam_k<0} |lam_k| (2 - n_k)
+              + 1/2 sum_rc (W^{rc} I + sum_b w_b^{rc} L_b^r)^2
+
+    where :math:`n_k = \\sum_{pq} V_{pk} V_{qk} E_{pq}` in the eigenbasis of
+    :math:`h_1'` and :math:`W^{rc} = wB^{rc} - \\sum_b w_b^{rc}`.
+
+    With this convention ``H_gap`` is positive semidefinite and
+    ``H_gap + E_SOS`` equals the physical Hamiltonian exactly; see
+    ``test_sos_decomposition_reproduces_physical_hamiltonian``.
+
+    Reference: Eq. 20-21, 29, 32, 38 in :cite:`Low2025`.
+    """
+    num_orbitals = h1.shape[0]
+    n_ranks, b_dim, _ = basis_vectors.shape
+    _, n_copies = identity_weight.shape
+    dim = 2 ** (2 * num_orbitals)
+
+    excitation_pq = _jordan_wigner_excitations(num_orbitals)
+    h1p = _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight)
+    eigvals, eigvecs = np.linalg.eigh(h1p)
+
+    # 1) D1/Q1 generator squares.
     h_1b = np.zeros((dim, dim), dtype=complex)
     for k in range(num_orbitals):
-        # n_k in eigenbasis: n_k = Σ_{p,q} V_{pk} V_{qk} E_{pq}
-        n_k_op = np.zeros((dim, dim), dtype=complex)
-        for p in range(num_orbitals):
-            for q in range(num_orbitals):
-                coeff = eigvecs[p, k] * eigvecs[q, k]
-                if abs(coeff) > 1e-15:
-                    n_k_op += coeff * excitation_pq(p, q)
-
+        n_k_op = _one_body_operator(np.outer(eigvecs[:, k], eigvecs[:, k]), excitation_pq, dim)
         w_k = eigvals[k]
         if w_k > 0:
-            # D1: w_k * (2I - n_k)
-            h_1b += w_k * (2.0 * np.eye(dim) - n_k_op)
+            h_1b += w_k * n_k_op
         else:
-            # Q1: |w_k| * n_k
-            h_1b += abs(w_k) * n_k_op
+            h_1b += abs(w_k) * (2.0 * np.eye(dim) - n_k_op)
 
     # 2) SF squares: ½ Σ_{r,c} (W·I + Σ_b w_b L_b)²
     h_2b = np.zeros((dim, dim), dtype=complex)
@@ -168,14 +229,33 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
             w_rc = identity_weight[r, c_idx] - np.sum(two_body_weights[r, :, c_idx])
             m_op = w_rc * np.eye(dim, dtype=complex)
             for b in range(b_dim):
-                l_b = np.zeros((dim, dim), dtype=complex)
-                for p in range(num_orbitals):
-                    for q in range(num_orbitals):
-                        l_b += basis_vectors[r, b, p] * basis_vectors[r, b, q] * excitation_pq(p, q)
+                l_b = _one_body_operator(np.outer(basis_vectors[r, b], basis_vectors[r, b]), excitation_pq, dim)
                 m_op += two_body_weights[r, b, c_idx] * l_b
             h_2b += 0.5 * (m_op @ m_op)
 
     return (h_1b + h_2b).real
+
+
+def _build_physical_hamiltonian_matrix(h1, basis_vectors, two_body_weights):
+    """Build the physical DF-THC electronic Hamiltonian, independently of the SOS form.
+
+    ``H = sum_pq h1_pq E_pq + 1/2 sum_pqrs h2_pqrs (E_pq E_rs - delta_qr E_ps)``
+    with the tensor-hypercontracted integrals
+    ``h2_pqrs = sum_rc M^{rc}_pq M^{rc}_rs``.
+
+    The ``- delta_qr E_ps`` term is the normal-ordering correction, which
+    contracts to ``-1/2 sum_rc (M_rc @ M_rc)`` on the one-body matrix.
+    """
+    num_orbitals = h1.shape[0]
+    dim = 2 ** (2 * num_orbitals)
+    excitation_pq = _jordan_wigner_excitations(num_orbitals)
+
+    hamiltonian = _one_body_operator(np.asarray(h1, dtype=float), excitation_pq, dim)
+    for m_rc in _dfthc_m_matrices(basis_vectors, two_body_weights).values():
+        m_op = _one_body_operator(m_rc, excitation_pq, dim)
+        hamiltonian += 0.5 * (m_op @ m_op)
+        hamiltonian -= 0.5 * _one_body_operator(m_rc @ m_rc, excitation_pq, dim)
+    return hamiltonian.real
 
 
 def _get_ground_state_and_energy(h_matrix, num_orbitals, nalpha=1, nbeta=1):
@@ -665,6 +745,138 @@ class TestSOSSAQPEIntegration:
         assert np.all(eigenvalues <= 2 * lambda_sos + 1e-10), (
             f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2 * lambda_sos:.6f}"
         )
+
+    def test_sos_decomposition_is_positive_semidefinite(self):
+        """H_gap = Σ_G G†G must be PSD, since it is a sum of operator squares.
+
+        This is the property the spectrum amplification relies on: the walk
+        eigenphase encodes E_gap ∈ [0, 2Λ], so a negative eigenvalue would make
+        the ``arccos`` decoding ill-defined (:cite:`Low2025`, Eq. 11, 20-21).
+        """
+        data = _build_h2_dfthc_data()
+        h_gap = _build_dfthc_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
+        )
+        assert np.linalg.eigvalsh(h_gap).min() >= -1e-12
+
+    def test_sos_decomposition_reproduces_physical_hamiltonian(self):
+        """H_gap + E_SOS must equal the physical Hamiltonian, eigenvalue by eigenvalue.
+
+        This is the correctness statement that makes SOSSA a chemistry
+        algorithm rather than a spectral trick: the sum-of-squares generators
+        are constructed so that
+
+            H_physical = Σ_G G†G + E_SOS · I
+
+        with the energy shift of :cite:`Low2025` Eq. 32,
+        ``E_SOS = -2 Σ_r w_-^{(r)} - ½ Σ_rc |W^{(rc)}|²``, evaluated on the
+        Majorana-corrected one-body matrix of Eq. 38.  Recovering the physical
+        energy from a phase estimate therefore requires adding ``E_SOS`` back.
+
+        The whole spectrum is compared (not just the ground state) so that a
+        wrong particle/hole convention or a missing normal-ordering correction
+        cannot hide behind an accidental agreement at the band edge.
+        """
+        data = _build_h2_dfthc_data()
+        h_gap = _build_dfthc_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
+        )
+        h_physical = _build_physical_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+        )
+        energy_shift = _sos_energy_shift(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
+        )
+
+        np.testing.assert_allclose(
+            np.linalg.eigvalsh(h_gap) + energy_shift,
+            np.linalg.eigvalsh(h_physical),
+            atol=1e-10,
+        )
+
+    def test_energy_shift_matches_qubit_mapper(self):
+        """The mapper's ``energy_shift`` must equal Eq. 32 evaluated on h1_majorana."""
+        data = _build_h2_dfthc_data()
+        n_orb = data["N"]
+        orbitals = create_test_orbitals(n_orb)
+        fh = FactorizedHamiltonianContainer(
+            0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            data["h1"],
+            np.zeros((n_orb, n_orb)),
+            orbitals,
+        )
+        container = _to_sossa_operator(fh).get_container()
+
+        expected = (
+            fh.get_core_energy()
+            + fh.get_bliss_shift()
+            + _sos_energy_shift(
+                data["h1"],
+                data["basis_vectors"],
+                data["two_body_weights"],
+                data["identity_weight"],
+            )
+        )
+        assert container.energy_shift == pytest.approx(expected, abs=1e-12)
+
+    def test_ground_state_energy_recovered_from_walk_eigenphase(self):
+        """Decoding a walk eigenphase must return the exact physical ground energy.
+
+        Exercises the full decoding chain the QPE driver uses: the walk
+        eigenvalue associated with gap energy ``E_gap`` is ``e^{±2πiφ}`` with
+        ``E_gap = Λ(1 + cos 2πφ)`` (:cite:`Low2025`, Eq. 11), and
+        ``SOSSAWalkContainer.eigenvalue_from_phase`` adds ``E_SOS`` back.
+        Feeding it the phase fraction of the exact gap ground state must
+        reproduce the exact ground-state energy of the *physical* Hamiltonian,
+        which is what makes the energy shift meaningful.
+        """
+        data = _build_h2_dfthc_data()
+        n_orb = data["N"]
+        orbitals = create_test_orbitals(n_orb)
+        fh = FactorizedHamiltonianContainer(
+            0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            data["h1"],
+            np.zeros((n_orb, n_orb)),
+            orbitals,
+        )
+        container = SOSSABuilder().run(_to_sossa_operator(fh)).get_container()
+
+        h_gap = _build_dfthc_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
+        )
+        gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
+
+        # Gap energy -> walk phase fraction, then back through the container decoder.
+        phase_fraction = math.acos(np.clip(gap_energy / container.normalization - 1.0, -1.0, 1.0)) / (2 * math.pi)
+        recovered = container.eigenvalue_from_phase(phase_fraction)
+
+        h_physical = _build_physical_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+        )
+        exact_energy, _ = _get_ground_state_and_energy(h_physical, n_orb, nalpha=1, nbeta=1)
+        assert recovered == pytest.approx(exact_energy, abs=1e-10)
 
     @pytest.mark.parametrize("num_bits", [3, 5])
     def test_sossa_qpe(self, num_bits):
