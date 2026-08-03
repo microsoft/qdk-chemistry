@@ -53,7 +53,11 @@ param(
     [string]$DepsInstallDir,
     [switch]$KeepBuildDir,
     [ValidateSet('all', 'vcpkg', 'libint2', 'ecpint', 'gauxc', 'rest')]
-    [string]$Phase = 'all'
+    [string]$Phase = 'all',
+    # Print a hash of the build plan and exit without building anything. The
+    # pipeline uses this for the dependency cache key, so that the key is derived
+    # from the same description of the build that the build itself consumes.
+    [switch]$EmitFingerprint
 )
 $ErrorActionPreference = 'Stop'
 
@@ -179,21 +183,95 @@ Write-Host "  libint2 : $libintUrl"
 Write-Host "  ecpint  : $ecpintCommit"
 Write-Host "  gauxc   : $gauxcCommit"
 
+# ─── Dependency build plan ───────────────────────────────────────────────────
+# The single source of truth for everything that determines what gets built.
+# The build below consumes it, and -EmitFingerprint hashes it, so the cache key
+# and the build can never end up describing different things. Adding a
+# dependency or changing a flag here is picked up by the cache key automatically,
+# with nothing to remember to bump.
+#
+# Only portable, semantically meaningful values belong in here. Machine-specific
+# paths are kept out by construction (see $machineArgs below) so that the same
+# configuration fingerprints identically on every agent.
+$plan = [ordered]@{
+    BuildType = $BuildType
+    Triplet   = $Triplet
+    # The compiler's identity matters -- MSVC and clang-cl produce different
+    # artifacts, and it selects whether the MSVC patches get applied -- but its
+    # install path does not. The toolset version is carried separately in the
+    # cache key by the pipeline.
+    Compiler   = (Split-Path $ClPath -Leaf)
+    CommonArgs = @(
+        '-GNinja',
+        "-DCMAKE_BUILD_TYPE=$BuildType",
+        '-DCMAKE_CXX_STANDARD=20', '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
+        '-DBUILD_SHARED_LIBS=OFF',
+        "-DVCPKG_TARGET_TRIPLET=$Triplet",
+        '-DFETCHCONTENT_QUIET=OFF'
+    )
+    Deps = @(
+        [ordered]@{
+            Name       = 'libint2'
+            Version    = $libintUrl
+            ConfigGlob = 'libint2*'
+            CMakeArgs  = @('-DBUILD_TESTING=OFF')
+        },
+        [ordered]@{
+            Name       = 'ecpint'
+            Version    = $ecpintCommit
+            ConfigGlob = 'ecpint*'
+            CMakeArgs  = @(
+                '-DLIBECPINT_BUILD_TESTS=OFF',
+                '-DLIBECPINT_USE_PUGIXML=OFF'
+            )
+        },
+        [ordered]@{
+            Name       = 'gauxc'
+            Version    = $gauxcCommit
+            ConfigGlob = 'gauxc*'
+            CMakeArgs  = @(
+                '-DBUILD_TESTING=OFF',
+                '-DEXCHCXX_ENABLE_LIBXC=OFF',
+                '-DGAUXC_ENABLE_HDF5=OFF',
+                '-DGAUXC_ENABLE_MAGMA=OFF',
+                '-DGAUXC_ENABLE_CUDA=OFF',
+                '-DGAUXC_ENABLE_CUTLASS=OFF',
+                '-DGAUXC_ENABLE_MPI=OFF',
+                '-DGAUXC_ENABLE_OPENMP=OFF'
+            )
+        }
+    )
+}
+
+function Get-DepPlan([string]$Name) {
+    $dep = $plan.Deps | Where-Object { $_.Name -eq $Name }
+    if (-not $dep) { throw "No plan entry for dependency '$Name'" }
+    return $dep
+}
+
+if ($EmitFingerprint) {
+    # Canonical JSON so that formatting never perturbs the hash. Emit exactly one
+    # line on stdout; everything else the script prints goes to Write-Host.
+    $json  = $plan | ConvertTo-Json -Depth 10 -Compress
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $sha   = [System.Security.Cryptography.SHA256]::Create()
+    Write-Output ([System.BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant())
+    return
+}
+
 # ─── Common CMake flags (applied to every dep build) ─────────────────────────
-$commonArgs = @(
-    '-GNinja',
-    "-DCMAKE_BUILD_TYPE=$BuildType",
-    '-DCMAKE_CXX_STANDARD=20', '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
-    '-DBUILD_SHARED_LIBS=OFF',
+# Paths differ from agent to agent, so they are deliberately not part of the
+# plan: including them would make the fingerprint, and therefore the cache key,
+# vary between machines that are building exactly the same thing.
+$machineArgs = @(
     "-DCMAKE_C_COMPILER=$ClPath",
     "-DCMAKE_CXX_COMPILER=$ClPath",
     "-DCMAKE_INSTALL_PREFIX=$DepsInstallDir",
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
-    "-DVCPKG_TARGET_TRIPLET=$Triplet",
-    "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
-    '-DFETCHCONTENT_QUIET=OFF'
+    "-DVCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed"
 )
+$commonArgs = $plan.CommonArgs + $machineArgs
 
 function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) {
     $depBuild = "$buildDir\$Name-build"
@@ -273,7 +351,7 @@ if ((Test-PhaseSelected 'libint2') -and -not (Test-DepInstalled 'libint2' $libin
         finally { Pop-Location }
     }
 
-    Invoke-CMakeDep 'libint2' $libintSrc @('-DBUILD_TESTING=OFF')
+    Invoke-CMakeDep 'libint2' $libintSrc (Get-DepPlan 'libint2').CMakeArgs
     Remove-Item $libintExtract -Recurse -Force
     Set-DepStamp 'libint2' $libintUrl
 } else { Write-Host "=== libint2 already installed or not in this phase; skipping ===" }
@@ -292,10 +370,7 @@ if ((Test-PhaseSelected 'ecpint') -and -not (Test-DepInstalled 'ecpint' $ecpintC
         finally { Pop-Location }
     }
 
-    Invoke-CMakeDep 'ecpint' $ecpintSrc @(
-        '-DLIBECPINT_BUILD_TESTS=OFF',
-        '-DLIBECPINT_USE_PUGIXML=OFF'
-    )
+    Invoke-CMakeDep 'ecpint' $ecpintSrc (Get-DepPlan 'ecpint').CMakeArgs
     Remove-Item $ecpintSrc -Recurse -Force
     Set-DepStamp 'ecpint' $ecpintCommit
 } else { Write-Host "=== ecpint already installed or not in this phase; skipping ===" }
@@ -309,16 +384,7 @@ if ((Test-PhaseSelected 'gauxc') -and -not (Test-DepInstalled 'gauxc' $gauxcComm
     git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
     git -C $gauxcSrc checkout $gauxcCommit
 
-    Invoke-CMakeDep 'gauxc' $gauxcSrc @(
-        '-DBUILD_TESTING=OFF',
-        '-DEXCHCXX_ENABLE_LIBXC=OFF',
-        '-DGAUXC_ENABLE_HDF5=OFF',
-        '-DGAUXC_ENABLE_MAGMA=OFF',
-        '-DGAUXC_ENABLE_CUDA=OFF',
-        '-DGAUXC_ENABLE_CUTLASS=OFF',
-        '-DGAUXC_ENABLE_MPI=OFF',
-        '-DGAUXC_ENABLE_OPENMP=OFF'
-    )
+    Invoke-CMakeDep 'gauxc' $gauxcSrc (Get-DepPlan 'gauxc').CMakeArgs
     Remove-Item $gauxcSrc -Recurse -Force
     Set-DepStamp 'gauxc' $gauxcCommit
 } else { Write-Host "=== gauxc already installed or not in this phase; skipping ===" }
