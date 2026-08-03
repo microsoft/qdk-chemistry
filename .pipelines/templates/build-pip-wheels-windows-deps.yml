@@ -69,30 +69,50 @@ steps:
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
-# The install-tree cache key is built up phase by phase, so that each phase can
-# restore the previous phase's output through restoreKeys and then save the
-# combined result under its own key. Keeping the phase tokens at the end of the
-# key is what makes that prefix match work.
+# The install-tree cache is built up phase by phase: each phase restores the
+# previous phase's output and saves the combined result under its own key.
 #
-# Note that these keys deliberately do NOT hash install-cpp-deps-windows.ps1.
-# They used to, which meant an edit anywhere in that script -- even one that
-# only touched diagnostics -- threw away a dependency tree that takes most of a
-# day to rebuild on the ARM64 agent. The keys now track the things that actually
-# determine the output: pinned versions, patches, toolchain and toolset. Bump
-# the r<N> literal above and below to force a rebuild when the build recipe
-# itself changes in a way those inputs do not capture.
+# The chaining has a sharp edge. Azure Pipelines appends `**` to every restore
+# key, so a restore key only ever matches caches with MORE segments than itself
+# -- a restore key of `<base>|"libint2"` resolves to `<base>|"libint2"|**` and
+# does NOT match the cache stored under exactly `<base>|"libint2"`. Getting this
+# wrong is silent: the phase simply starts from an empty tree, builds its own
+# dependencies, and banks an incomplete result. That is what happened to the
+# first "rest" cache, and since Cache@2 never overwrites an existing key, that
+# entry stayed poisoned until the key was renamed.
+#
+# So the libint2 phase republishes its tree under a deliberately longer key that
+# the next phase's restore key can actually match. The extra task costs nothing
+# when the tree is already cached: it misses, and saves what the first task
+# restored.
+#
+# These keys deliberately do NOT hash install-cpp-deps-windows.ps1. They used to,
+# which meant an edit anywhere in that script -- even one that only touched
+# diagnostics -- threw away a dependency tree that takes most of a day to rebuild
+# on the ARM64 agent. The keys now track the things that actually determine the
+# output: pinned versions, patches, toolchain and toolset. Bump the r<N> literal
+# to force a rebuild when the build recipe itself changes in a way those inputs
+# do not capture.
 - ${{ if ne(parameters.phase, 'vcpkg') }}:
   - task: Cache@2
     displayName: Restore/save C++ deps install cache (${{ parameters.phase }})
     inputs:
-      key: >-
-        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-        cpp/manifest/qdk-chemistry/cgmanifest.json |
-        external/macis/manifest/cgmanifest.json |
-        cpp/cmake/patches/**/* |
-        .pipelines/toolchains/windows.cmake |
-        "${{ parameters.phase }}"
+      ${{ if eq(parameters.phase, 'libint2') }}:
+        key: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+          cpp/manifest/qdk-chemistry/cgmanifest.json |
+          external/macis/manifest/cgmanifest.json |
+          cpp/cmake/patches/**/* |
+          .pipelines/toolchains/windows.cmake |
+          "libint2"
       ${{ if eq(parameters.phase, 'rest') }}:
+        key: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+          cpp/manifest/qdk-chemistry/cgmanifest.json |
+          external/macis/manifest/cgmanifest.json |
+          cpp/cmake/patches/**/* |
+          .pipelines/toolchains/windows.cmake |
+          "deps"
         restoreKeys: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
           cpp/manifest/qdk-chemistry/cgmanifest.json |
@@ -100,8 +120,31 @@ steps:
           cpp/cmake/patches/**/* |
           .pipelines/toolchains/windows.cmake |
           "libint2"
+      ${{ if eq(parameters.phase, 'all') }}:
+        key: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+          cpp/manifest/qdk-chemistry/cgmanifest.json |
+          external/macis/manifest/cgmanifest.json |
+          cpp/cmake/patches/**/* |
+          .pipelines/toolchains/windows.cmake |
+          "all"
       path: $(System.DefaultWorkingDirectory)/deps-install-msvc
       cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
+
+# Republish the same tree under a longer key so the next phase's restore key can
+# match it. See the note above on the trailing `**` that Azure Pipelines adds.
+- ${{ if eq(parameters.phase, 'libint2') }}:
+  - task: Cache@2
+    displayName: Republish C++ deps install cache for the next phase
+    inputs:
+      key: >-
+        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+        cpp/manifest/qdk-chemistry/cgmanifest.json |
+        external/macis/manifest/cgmanifest.json |
+        cpp/cmake/patches/**/* |
+        .pipelines/toolchains/windows.cmake |
+        "libint2" | "tree"
+      path: $(System.DefaultWorkingDirectory)/deps-install-msvc
 
 - pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `

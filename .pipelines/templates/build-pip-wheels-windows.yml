@@ -89,7 +89,7 @@ steps:
 # what populates the caches. The final phase token differs by architecture
 # because that is where the complete install tree ends up: x86_64 builds the
 # whole set in one job under "all", while ARM64 splits the work and finishes
-# under "rest".
+# under "deps".
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
   inputs:
@@ -100,7 +100,7 @@ steps:
         external/macis/manifest/cgmanifest.json |
         cpp/cmake/patches/**/* |
         .pipelines/toolchains/windows.cmake |
-        "rest"
+        "deps"
     ${{ else }}:
       key: >-
         "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |

@@ -101,10 +101,11 @@ $stampDir = Join-Path $DepsInstallDir '.deps-stamps'
 
 function Test-PhaseSelected([string]$Name) {
     if ($Phase -eq 'all')  { return $true }
-    # 'rest' groups the two short tail dependencies into one job, so they share
-    # a cache entry instead of paying agent startup twice for a few minutes of
-    # work each.
-    if ($Phase -eq 'rest') { return $Name -in @('ecpint', 'gauxc') }
+    # 'rest' covers every cmake-built dependency, not just the tail. It normally
+    # restores libint2 from the previous phase's cache and skips straight over it
+    # via the stamps, but if that restore ever comes back without libint2 this
+    # phase rebuilds it rather than silently banking an incomplete tree.
+    if ($Phase -eq 'rest') { return $Name -in @('libint2', 'ecpint', 'gauxc') }
     return $Phase -eq $Name
 }
 
