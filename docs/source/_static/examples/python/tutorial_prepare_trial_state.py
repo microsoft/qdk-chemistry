@@ -30,7 +30,8 @@ class DeterminantContribution:
 
     Attributes:
         occupation: Spatial-orbital occupation string with storage padding removed.
-        amplitude: Signed CASCI coefficient of the determinant.
+        amplitude: CASCI coefficient after choosing the physically arbitrary
+            global phase so the leading coefficient is positive real.
         weight: Squared coefficient magnitude, ``abs(amplitude)**2``.
         cumulative_weight: Sum of weights through this ranked determinant.
     """
@@ -135,16 +136,19 @@ def leading_determinant_contributions(
         physical active spatial-orbital count because ``Configuration`` storage
         can include trailing zero-valued capacity.
     """
+    ranked_determinants = leading_determinants(wavefunction, max_determinants)
+    leading_coefficient = complex(next(iter(ranked_determinants.values())))
+    global_phase = leading_coefficient.conjugate() / abs(leading_coefficient)
     cumulative_weight = 0.0
     contributions = []
     alpha_channel = SymmetryLabel([axes.alpha()])
     num_active_spatial_orbitals = len(
         wavefunction.get_orbitals().active_indices().indices(alpha_channel)
     )
-    for determinant, coefficient in leading_determinants(
-        wavefunction, max_determinants
-    ).items():
-        amplitude = complex(coefficient)
+    for determinant, coefficient in ranked_determinants.items():
+        # An eigenvector has arbitrary global phase. Make displayed amplitudes
+        # reproducible without changing any weights, fidelities, or circuits.
+        amplitude = complex(coefficient) * global_phase
 
         # Squared amplitudes contribute to the norm; their running sum shows how
         # much of the reference wavefunction the leading determinants capture.

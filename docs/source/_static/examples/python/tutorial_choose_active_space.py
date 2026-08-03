@@ -24,7 +24,6 @@ from qdk_chemistry.data import MajoranaMapping, Orbitals, Structure, Wavefunctio
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
-from scipy.optimize import minimize_scalar
 
 
 @dataclass
@@ -104,11 +103,11 @@ class NaturalOrbitalCoordinateMinimizationResult:
         selected_blocks: Natural-orbital index blocks present in the selected
             active space. Singleton blocks require no rotational search.
         coefficient_norm_before: Mapped coefficient norm ``lambda`` in Hartree
-            before deterministic gauge selection.
+            after AO anchoring and before coordinate rotations.
         coefficient_norm_after: Mapped coefficient norm in Hartree after accepted
             coordinate rotations.
         effective_pauli_terms_before: Pauli terms above the diagnostic threshold
-            before gauge selection.
+            after AO anchoring and before coordinate rotations.
         effective_pauli_terms_after: Corresponding effective term count after
             gauge selection; this is reported but not optimized directly.
     """
@@ -263,6 +262,69 @@ def _givens_rotation(size: int, left: int, right: int, angle: float) -> np.ndarr
     return rotation
 
 
+def _golden_section_minimum(
+    objective,
+    lower_bound: float,
+    upper_bound: float,
+    *,
+    argument_tolerance: float = 1e-13,
+) -> tuple[float, float]:
+    """Refine a bracketed scalar minimum without a machine-epsilon floor.
+
+    The mapped coefficient norm is a sum of absolute values and can therefore
+    have a cusp where symmetry-related Pauli coefficients vanish. SciPy's
+    bounded minimizer stops at an argument tolerance proportional to
+    ``sqrt(machine epsilon)``, which leaves platform-dependent residual terms
+    near such cusps. Golden-section contraction uses the requested absolute
+    angular tolerance directly.
+
+    Args:
+        objective: Scalar function to minimize.
+        lower_bound: Inclusive lower end of the bracketing interval.
+        upper_bound: Inclusive upper end of the bracketing interval.
+        argument_tolerance: Maximum final interval width.
+
+    Returns:
+        The best sampled argument and its objective value.
+
+    Raises:
+        ValueError: If the interval or tolerance is not positive.
+    """
+    if upper_bound <= lower_bound:
+        raise ValueError("upper_bound must be greater than lower_bound")
+    if argument_tolerance <= 0.0:
+        raise ValueError("argument_tolerance must be positive")
+
+    inverse_golden_ratio = (np.sqrt(5.0) - 1.0) / 2.0
+    left = float(lower_bound)
+    right = float(upper_bound)
+    inner_left = right - inverse_golden_ratio * (right - left)
+    inner_right = left + inverse_golden_ratio * (right - left)
+    value_left = float(objective(inner_left))
+    value_right = float(objective(inner_right))
+
+    while right - left > argument_tolerance:
+        if value_left <= value_right:
+            right = inner_right
+            inner_right = inner_left
+            value_right = value_left
+            inner_left = right - inverse_golden_ratio * (right - left)
+            value_left = float(objective(inner_left))
+        else:
+            left = inner_left
+            inner_left = inner_right
+            value_left = value_right
+            inner_right = left + inverse_golden_ratio * (right - left)
+            value_right = float(objective(inner_right))
+
+    candidates = (
+        (inner_left, value_left),
+        (inner_right, value_right),
+        ((left + right) / 2.0, float(objective((left + right) / 2.0))),
+    )
+    return min(candidates, key=lambda candidate: (candidate[1], candidate[0]))
+
+
 def coordinate_minimize_natural_orbital_coefficient_norm(
     reference_wavefunction: Wavefunction,
     selected_orbitals: Orbitals,
@@ -291,8 +353,9 @@ def coordinate_minimize_natural_orbital_coefficient_norm(
     The search is deterministic coordinate descent, not a proof of the global
     minimum for arbitrary high-dimensional blocks. Each sweep visits every
     Givens plane in a fixed order. A coarse angular grid identifies a candidate
-    basin and bounded scalar minimization refines it. Only reductions larger
-    than ``improvement_tolerance`` are accepted. For the two-dimensional pi
+    basin and golden-section contraction refines it without a machine-epsilon
+    stopping floor. Only reductions larger than ``improvement_tolerance`` are
+    accepted. For the two-dimensional pi
     blocks in the diatomic examples, each coordinate is a one-angle search;
     larger blocks can have coupled local minima.
 
@@ -345,8 +408,6 @@ def coordinate_minimize_natural_orbital_coefficient_norm(
         copy=True,
     )
     overlap = selected_orbitals.get_overlap_matrix()
-    original_coefficients = coefficients.copy()
-
     # AO anchoring fixes signs, permutations, and common rotations before the
     # lambda search. If lambda has equivalent minima, keeping a zero rotation
     # below preserves this deterministic AO-based tie-break.
@@ -401,8 +462,8 @@ def coordinate_minimize_natural_orbital_coefficient_norm(
         )
         return mapped_metrics(candidate_coefficients)[0]
 
-    norm_before, terms_before = mapped_metrics(original_coefficients)
-    current_norm, _ = mapped_metrics(coefficients)
+    norm_before, terms_before = mapped_metrics(coefficients)
+    current_norm = norm_before
     angle_grid = np.linspace(0.0, np.pi, angle_samples, endpoint=False)
     angle_step = np.pi / angle_samples
 
@@ -433,17 +494,16 @@ def coordinate_minimize_natural_orbital_coefficient_norm(
                     continue
 
                 best_angle = float(angle_grid[best_index])
-                refinement = minimize_scalar(
+                refined_angle, refined_norm = _golden_section_minimum(
                     norm_at_angle,
-                    bounds=(best_angle - angle_step, best_angle + angle_step),
-                    method="bounded",
-                    options={"xatol": 1e-13},
+                    best_angle - angle_step,
+                    best_angle + angle_step,
                 )
-                if refinement.fun < current_norm - improvement_tolerance:
+                if refined_norm < current_norm - improvement_tolerance:
                     coefficients[:, block] = block_coefficients @ _givens_rotation(
-                        len(block), left, right, float(refinement.x % np.pi)
+                        len(block), left, right, float(refined_angle % np.pi)
                     )
-                    current_norm = float(refinement.fun)
+                    current_norm = refined_norm
 
         if current_norm >= sweep_start_norm - improvement_tolerance:
             break

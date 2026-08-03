@@ -67,7 +67,7 @@ This completed example records the reference results for the documented QDK/Chem
 
 - Source wavefunction: Selected-space CASCI ground state.
 - Leading determinants (occupation, amplitude, weight, cumulative weight):
-  - 222000, -0.694657450061, 0.482548972925, 0.482548972925
+  - 222000, +0.694657450061, 0.482548972925, 0.482548972925
   - 202200, +0.333212127561, 0.111030321954, 0.593579294879
   - 220020, +0.333212127561, 0.111030321954, 0.704609616833
   - 200220, -0.200148173020, 0.040059291163, 0.731442617514
