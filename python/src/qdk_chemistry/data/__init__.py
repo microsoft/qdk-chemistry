@@ -11,6 +11,9 @@ Exposed classes are:
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
+- :class:`BosonEncoding`: Enumeration of boson-to-qubit encoding families (StandardBinary, GrayCode).
+- :class:`BosonMapping`: Boson-to-qubit mapping data class for truncated bosonic Fock spaces.
+- :class:`BosonicModes`: Bosonic single-particle basis carrying the local occupation cutoff.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
@@ -74,6 +77,9 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     BasisSet,
+    BosonEncoding,
+    BosonicModes,
+    BosonMapping,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Configuration,
@@ -142,6 +148,9 @@ __all__ = [
     "AmplitudeType",
     "Ansatz",
     "BasisSet",
+    "BosonEncoding",
+    "BosonMapping",
+    "BosonicModes",
     "CanonicalFourCenterHamiltonianContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",

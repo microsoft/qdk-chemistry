@@ -112,6 +112,47 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
+   * @brief Construct with an explicit single-particle basis.
+   *
+   * Identical to the @ref TwoBodyMap constructor except that the basis is
+   * supplied rather than defaulted to a fresh @ref ModelOrbitals. Use this to
+   * attach a @ref BosonicModes basis, which carries the bosonic occupation
+   * cutoff, to a model Hamiltonian.
+   *
+   * @param one_body_integrals Sparse one-body integral matrix [n x n].
+   * @param two_body_integrals Sparse two-body integral map.
+   * @param orbitals Single-particle basis; must have n modes.
+   * @param core_energy Scalar energy offset.
+   * @param type Hamiltonian type.
+   * @throws std::invalid_argument If @p orbitals is null or its mode count
+   *         does not match the one-body matrix.
+   */
+  SparseHamiltonianContainer(Eigen::SparseMatrix<double> one_body_integrals,
+                             TwoBodyMap two_body_integrals,
+                             std::shared_ptr<Orbitals> orbitals,
+                             double core_energy = 0.0,
+                             HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Construct with an explicit single-particle basis and a
+   *        preconstructed sparse two-body container.
+   *
+   * @param one_body_integrals Sparse one-body integral matrix [n x n].
+   * @param two_body Preconstructed sparse two-body container (may be
+   *        @c nullptr to indicate no two-body integrals).
+   * @param orbitals Single-particle basis; must have n modes.
+   * @param core_energy Scalar energy offset.
+   * @param type Hamiltonian type.
+   * @throws std::invalid_argument If @p orbitals is null or its mode count
+   *         does not match the one-body matrix.
+   */
+  SparseHamiltonianContainer(
+      Eigen::SparseMatrix<double> one_body_integrals,
+      std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
+      std::shared_ptr<Orbitals> orbitals, double core_energy = 0.0,
+      HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
    * @brief Destructor
    */
   ~SparseHamiltonianContainer() = default;
@@ -263,6 +304,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /// Create a ModelOrbitals with all n orbitals active.
   static std::shared_ptr<ModelOrbitals> _make_orbitals(int n);
+
+  /// Validate a caller-supplied basis against the one-body dimension.
+  static std::shared_ptr<Orbitals> _check_orbitals(
+      const std::shared_ptr<Orbitals>& orbitals, Eigen::Index num_orbitals);
 
   /// Convert a dense matrix to compressed sparse form.
   static Eigen::SparseMatrix<double> _to_sparse(const Eigen::MatrixXd& m);

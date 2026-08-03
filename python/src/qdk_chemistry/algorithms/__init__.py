@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
+from qdk_chemistry.algorithms.boson_qubit_mapper import BosonQubitMapper, QdkBosonQubitMapper
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
@@ -68,6 +69,7 @@ from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
+    "BosonQubitMapper",
     "CircuitExecutor",
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
@@ -86,6 +88,7 @@ __all__ = [
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkBosonQubitMapper",
     "QdkExpectationEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",

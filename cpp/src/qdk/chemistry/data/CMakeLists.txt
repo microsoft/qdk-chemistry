@@ -1,6 +1,9 @@
 target_sources(chemistry PRIVATE
     ansatz.cpp
     basis_set.cpp
+    boson_map_engine.cpp
+    boson_mapping.cpp
+    bosonic_modes.cpp
     configuration.cpp
     lattice_graph.cpp
     configuration_set.cpp

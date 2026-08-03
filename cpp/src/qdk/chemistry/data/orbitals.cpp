@@ -8,6 +8,7 @@
 #include <iostream>
 #include <numeric>
 #include <optional>
+#include <qdk/chemistry/data/bosonic_modes.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -1323,6 +1324,10 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     }
 
     // Handle ModelOrbitals case
+    if (type_name == "BosonicModes") {
+      return BosonicModes::from_hdf5(group);
+    }
+
     if (type_name == "ModelOrbitals") {
       return ModelOrbitals::from_hdf5(group);
     }
@@ -1559,6 +1564,10 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
                                    j["version"].get<std::string>());
 
     // Check if this is a ModelOrbitals type (both new and old formats)
+    if (j.contains("type") && j["type"] == "BosonicModes") {
+      return BosonicModes::from_json(j);
+    }
+
     if (j.contains("type") && j["type"] == "ModelOrbitals") {
       return ModelOrbitals::from_json(j);
     }
