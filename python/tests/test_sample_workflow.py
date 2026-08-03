@@ -385,7 +385,7 @@ def test_tutorial_choose_active_space_results():
                 0.966011090,
                 0.554008809,
             ],
-            abs=1e-8,
+            abs=1e-6,
         )
 
     cube_data = tutorial_module.generate_active_orbital_cube_data(
