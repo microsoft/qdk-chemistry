@@ -13,6 +13,8 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/utils/eri_notation.hpp>
@@ -276,14 +278,10 @@ std::shared_ptr<data::Orbitals> as_unrestricted(const data::Orbitals& r) {
   std::optional<Eigen::VectorXd> e;
   if (r.has_energies()) e = r.get_energies_alpha();
   std::optional<Eigen::MatrixXd> s = r.get_overlap_matrix();
-  std::optional<data::Orbitals::UnrestrictedCASIndices> cas;
-  if (r.has_active_space()) {
-    const auto& [aa, ab] = r.get_active_space_indices();
-    const auto& [ia, ib] = r.get_inactive_space_indices();
-    cas = std::make_tuple(aa, ab, ia, ib);
-  }
+  // The index sets carry through unchanged; they are null when unset.
   return std::make_shared<data::Orbitals>(c, c, e, e, s, r.get_basis_set(),
-                                          cas);
+                                          r.active_indices(),
+                                          r.inactive_indices());
 }
 
 std::shared_ptr<data::Hamiltonian> assemble_active_hamiltonian(
@@ -847,9 +845,9 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
 
   std::vector<std::size_t> active_a, active_b;
   if (active_orbitals->has_active_space()) {
-    const auto [aa, ab] = active_orbitals->get_active_space_indices();
-    active_a.assign(aa.begin(), aa.end());
-    active_b.assign(ab.begin(), ab.end());
+    const auto active_ai = active_orbitals->active_indices();
+    active_a = data::spin_channel_indices(active_ai, data::axes::alpha());
+    active_b = data::spin_channel_indices(active_ai, data::axes::beta());
   } else {
     const std::size_t nmo = data.nso / 2;
     active_a.resize(nmo);
