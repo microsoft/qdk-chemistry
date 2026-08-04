@@ -58,15 +58,15 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
     When the input is an :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
-    the block encoding is additionally wrapped with the reflection operator to form a
-    quantum walk:
+    the block encoding is additionally wrapped with the reflection operator to form a quantum walk:
 
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
 
-    That walk is self-inverse up to the reflection, which is what lets this mapper drive
-    unary-iteration phase estimation.
+    That walk is a self-inverse block encoding plus a reflection, which is the shape
+    unary-iteration phase estimation schedules, so this mapper can also drive it via
+    :meth:`build_walk_op`.
 
     """
 
