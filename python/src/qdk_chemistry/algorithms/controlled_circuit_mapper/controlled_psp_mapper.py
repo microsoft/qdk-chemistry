@@ -30,9 +30,10 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
         use_walk: Whether the final reflection about the ancilla zero state is applied,
             turning the block encoding into a quantum walk. Defaults to ``False``, in which
             case the reflection is applied only when the container is an
-            :class:`LCUWalkContainer`. Setting it to ``True`` promotes a plain
-            :class:`LCUContainer` to a walk, which is what unary-iteration phase estimation
-            needs.
+            :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`.
+            Setting it to ``True`` promotes a plain
+            :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer`
+            to a walk, which is what unary-iteration phase estimation needs.
 
     """
 
@@ -79,7 +80,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
     Because that walk is self-inverse-block-plus-reflection, this mapper also satisfies
     :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.UnaryIterationWalkMapper`
-    and can drive unary-iteration phase estimation on a plain :class:`LCUContainer`.
+    and can drive unary-iteration phase estimation on a plain
+    :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer`.
 
     """
 
@@ -241,9 +243,11 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     def get_ancilla_prep_op(self) -> Any:
         """Return the Q# ancilla preparation op used by external algorithms like QPE.
 
+        A PSP walk needs its ancillas in the all-zero state, which is how phase estimation
+        already allocates them, so no preparation is required.
+
         Returns:
-            A no-op: a PSP walk needs its ancillas in the all-zero state, which is how phase
-            estimation allocates them.
+            A Q# callable that leaves the ancilla register untouched.
 
         """
         return QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
