@@ -1,8 +1,3 @@
-# --------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-# --------------------------------------------------------------------------------------------
-
 """Tests for the native DUCC ``effective_hamiltonian`` builder (``ducc_level`` 0-2).
 
 At level 0 there is no BCH dressing, so the effective active-space Hamiltonian
@@ -10,12 +5,14 @@ must reproduce the bare active-space (CASCI) problem exactly: CASCI on the
 original full Hamiltonian equals FCI on the DUCC output Hamiltonian.
 
 Levels 1-2 add the Baker-Campbell-Hausdorff dressing, evaluated by the generated
-BTAS equations. Two invariants are checked: (a) when the active space is the
-whole orbital set there is no external space, so the dressing collapses to the
-bare Hamiltonian and the level-0 identity still holds at every level; (b) the
-dressed output is convention-consistent -- the restricted and unrestricted
-dressings of a closed-shell system agree, and independent CI solvers agree on the
-restricted output.
+BTAS equations. Three properties are checked: (a) the dressed active-space energy
+reproduces ExaChem's independent DUCC implementation for closed-shell active
+spaces with a frozen core, which validates the dressing absolutely; (b) when the
+active space is the whole orbital set there is no external space, so the dressing
+collapses to the bare Hamiltonian and the level-0 identity still holds at every
+level; (c) the dressed output is convention-consistent -- the restricted and
+unrestricted dressings of a closed-shell system agree, and independent CI solvers
+agree on the restricted output.
 
 References are computed on the standard-convention active Hamiltonian from
 ``hamiltonian_constructor`` (full 8-fold chemist integrals): the native MACIS
@@ -35,12 +32,13 @@ tests confirm the restricted and unrestricted outputs map to the same qubit
 ground state.
 """
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import numpy as np
 import pytest
-
-pytest.importorskip("pyscf")
-
-from pyscf.fci import direct_uhf
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -56,7 +54,19 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes, spin_index_set
-from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
+
+from .reference_tolerances import ci_energy_tolerance
+
+try:
+    from pyscf.fci import direct_uhf
+
+    from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
+pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 
 LIH = "2\nLiH\nLi 0 0 0\nH 0 0 1.595\n"
 H2O = "3\nH2O\nO 0 0 0.117790\nH 0 0.756950 -0.471161\nH 0 -0.756950 -0.471161\n"
@@ -153,8 +163,8 @@ def _qubit_ground_state(ham):
     return float(np.linalg.eigvalsh(matrix)[0]) + ham.get_core_energy()
 
 
-def _ducc0_output(xyz, multiplicity, unrestricted, active, inactive):
-    """Build the DUCC level-0 output Hamiltonian and its active electron counts."""
+def _ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
+    """Build the DUCC output Hamiltonian, its active orbitals and active electron counts."""
     wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
     nmo = orbitals.get_num_molecular_orbitals()
@@ -163,11 +173,11 @@ def _ducc0_output(xyz, multiplicity, unrestricted, active, inactive):
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
     active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, unrestricted)
     builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", 0)
+    builder.settings().set("ducc_level", level)
     out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
     n_active_a = sum(1 for p in active if p < nocc_a)
     n_active_b = sum(1 for p in active if p < nocc_b)
-    return out_ham, n_active_a, n_active_b
+    return out_ham, active_orbitals, n_active_a, n_active_b
 
 
 # Each case: label, geometry, spin multiplicity, unrestricted flag, and the
@@ -190,16 +200,9 @@ _CASES = [
 )
 def test_casci_equals_fci_at_level0(label, xyz, multiplicity, unrestricted, active, inactive):
     """CASCI on the full Hamiltonian == FCI on the DUCC level-0 active Hamiltonian."""
-    wfn_hf = _scf(xyz, multiplicity, unrestricted)
-    orbitals = wfn_hf.get_orbitals()
-    nmo = orbitals.get_num_molecular_orbitals()
-    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
-    full_ham = create("hamiltonian_constructor").run(orbitals)
-    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
-
-    active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, unrestricted)
-    n_active_a = sum(1 for p in active if p < nocc_a)
-    n_active_b = sum(1 for p in active if p < nocc_b)
+    out_ham, active_orbitals, n_active_a, n_active_b = _ducc_output(
+        xyz, multiplicity, unrestricted, active, inactive, 0
+    )
 
     # Reference CASCI on the standard-convention active Hamiltonian (full chemist
     # integrals): MACIS for restricted, PySCF direct_uhf for unrestricted.
@@ -207,16 +210,12 @@ def test_casci_equals_fci_at_level0(label, xyz, multiplicity, unrestricted, acti
     ci = _ci_unrestricted if unrestricted else _ci_restricted
     energy_casci = ci(cas_ham, n_active_a, n_active_b)
 
-    builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", 0)
-    out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
-
     # FCI on the DUCC output. Its same-spin block is the half-antisymmetrized
     # representative: MACIS reads it (restricted); direct_uhf does not, so the
     # unrestricted output is diagonalized through the native qubit mapper.
     energy_fci = _qubit_ground_state(out_ham) if unrestricted else _ci_restricted(out_ham, n_active_a, n_active_b)
 
-    assert np.isclose(energy_casci, energy_fci, atol=1e-8), (
+    assert np.isclose(energy_casci, energy_fci, atol=ci_energy_tolerance), (
         f"{label}: CASCI={energy_casci:.10f} != FCI(DUCC0)={energy_fci:.10f}"
     )
 
@@ -244,24 +243,26 @@ def test_active_orbitals_must_be_subset_of_wavefunction():
         builder.run(full_ham, cc_wfn, bad)
 
 
-# Closed-shell LiH active spaces for the qubit-mapper equivalence test. Each is
-# run through both a restricted (RHF) and an unrestricted (UHF) reference; the
-# unrestricted path exercises the spin-blocked (aaaa/bbbb/aabb) assembly.
-_QUBIT_CASES = [
+# Closed-shell LiH active spaces with a real frozen core, shared by the dressed-output
+# tests below. Each is run through both a restricted (RHF) and an unrestricted (UHF)
+# reference; the unrestricted path exercises the spin-blocked (aaaa/bbbb/aabb) assembly.
+_CLOSED_SHELL_CASES = [
     ("lih_cas22", LIH, [1, 2], [0]),
     ("lih_cas23", LIH, [1, 2, 3], [0]),
 ]
 
 
-@pytest.mark.parametrize(("label", "xyz", "active", "inactive"), _QUBIT_CASES, ids=[c[0] for c in _QUBIT_CASES])
+@pytest.mark.parametrize(
+    ("label", "xyz", "active", "inactive"), _CLOSED_SHELL_CASES, ids=[c[0] for c in _CLOSED_SHELL_CASES]
+)
 def test_qubit_mapper_restricted_unrestricted_match_macis(label, xyz, active, inactive):
     """DUCC level-0 through the native qubit mapper.
 
     The restricted and unrestricted outputs give the same qubit ground-state energy,
     both equal to the MACIS total (core energy included).
     """
-    out_r, n_active_a, n_active_b = _ducc0_output(xyz, 1, False, active, inactive)
-    out_u, _, _ = _ducc0_output(xyz, 1, True, active, inactive)
+    out_r, _, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, 0)
+    out_u, *_ = _ducc_output(xyz, 1, True, active, inactive, 0)
 
     # MACIS reference (restricted only): total active-space energy, incl. core.
     energy_macis = _ci_restricted(out_r, n_active_a, n_active_b)
@@ -270,14 +271,14 @@ def test_qubit_mapper_restricted_unrestricted_match_macis(label, xyz, active, in
     energy_qubit_u = _qubit_ground_state(out_u)
 
     # Restricted and unrestricted DUCC outputs give the same qubit ground state.
-    assert np.isclose(energy_qubit_r, energy_qubit_u, atol=1e-8), (
+    assert np.isclose(energy_qubit_r, energy_qubit_u, atol=ci_energy_tolerance), (
         f"{label}: restricted={energy_qubit_r:.10f} != unrestricted={energy_qubit_u:.10f}"
     )
     # Both equal the MACIS total (the qubit ground state adds back the core energy).
-    assert np.isclose(energy_qubit_r, energy_macis, atol=1e-8), (
+    assert np.isclose(energy_qubit_r, energy_macis, atol=ci_energy_tolerance), (
         f"{label}: qubit(RHF)={energy_qubit_r:.10f} != MACIS={energy_macis:.10f}"
     )
-    assert np.isclose(energy_qubit_u, energy_macis, atol=1e-8), (
+    assert np.isclose(energy_qubit_u, energy_macis, atol=ci_energy_tolerance), (
         f"{label}: qubit(UHF)={energy_qubit_u:.10f} != MACIS={energy_macis:.10f}"
     )
 
@@ -301,51 +302,26 @@ _REDUCE_CASES = [
 )
 def test_level_gt0_reduces_to_bare_when_active_is_all(label, xyz, multiplicity, unrestricted, level):
     """With every orbital active, the BCH dressing collapses to the bare Hamiltonian."""
-    wfn_hf = _scf(xyz, multiplicity, unrestricted)
-    orbitals = wfn_hf.get_orbitals()
-    nmo = orbitals.get_num_molecular_orbitals()
-    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
-    full_ham = create("hamiltonian_constructor").run(orbitals)
-    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
-
-    active = list(range(nmo))
-    active_orbitals = _active_orbitals(orbitals, nmo, active, [], unrestricted)
-    n_active_a = sum(1 for p in active if p < nocc_a)
-    n_active_b = sum(1 for p in active if p < nocc_b)
+    active = list(range(_scf(xyz, multiplicity, unrestricted).get_orbitals().get_num_molecular_orbitals()))
+    out_ham, active_orbitals, n_active_a, n_active_b = _ducc_output(xyz, multiplicity, unrestricted, active, [], level)
 
     cas_ham = create("hamiltonian_constructor").run(active_orbitals)
     ci = _ci_unrestricted if unrestricted else _ci_restricted
     energy_casci = ci(cas_ham, n_active_a, n_active_b)
 
-    builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", level)
-    out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
     # The dressed (level > 0) output is spin-blocked regardless of the reference
     # type, so it is diagonalized through the qubit mapper (MACIS is restricted-only).
     energy_fci = _qubit_ground_state(out_ham)
 
-    assert np.isclose(energy_casci, energy_fci, atol=1e-8), (
+    assert np.isclose(energy_casci, energy_fci, atol=ci_energy_tolerance), (
         f"{label}: CASCI={energy_casci:.10f} != FCI(DUCC{level})={energy_fci:.10f}"
     )
 
 
-def _native_ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
-    """Native DUCC level-`level` output Hamiltonian, the full Hamiltonian, and electron counts."""
-    wfn_hf = _scf(xyz, multiplicity, unrestricted)
-    orbitals = wfn_hf.get_orbitals()
-    nmo = orbitals.get_num_molecular_orbitals()
-    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
-    full_ham = create("hamiltonian_constructor").run(orbitals)
-    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
-    active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, unrestricted)
-    builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", level)
-    out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
-    return out_ham, full_ham, nocc_a, nocc_b
-
-
 @pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
-@pytest.mark.parametrize(("label", "xyz", "active", "inactive"), _QUBIT_CASES, ids=[c[0] for c in _QUBIT_CASES])
+@pytest.mark.parametrize(
+    ("label", "xyz", "active", "inactive"), _CLOSED_SHELL_CASES, ids=[c[0] for c in _CLOSED_SHELL_CASES]
+)
 def test_ducc_dressed_restricted_unrestricted_match(label, xyz, active, inactive, level):
     """Restricted and unrestricted DUCC dressings of a closed-shell system agree.
 
@@ -356,30 +332,13 @@ def test_ducc_dressed_restricted_unrestricted_match(label, xyz, active, inactive
     outputs to the native qubit mapper must give the same ground-state energy, confirming
     the unrestricted spin-blocked dressing is consistent with the restricted one.
     """
-    out_r, *_ = _native_ducc_output(xyz, 1, False, active, inactive, level)
-    out_u, *_ = _native_ducc_output(xyz, 1, True, active, inactive, level)
+    out_r, *_ = _ducc_output(xyz, 1, False, active, inactive, level)
+    out_u, *_ = _ducc_output(xyz, 1, True, active, inactive, level)
     energy_r = _qubit_ground_state(out_r)
     energy_u = _qubit_ground_state(out_u)
-    assert np.isclose(energy_r, energy_u, atol=1e-8), (
+    assert np.isclose(energy_r, energy_u, atol=ci_energy_tolerance), (
         f"{label} level {level}: restricted={energy_r:.10f} != unrestricted={energy_u:.10f}"
     )
-
-
-def _restricted_ducc_output(xyz, active, inactive, level):
-    """Restricted DUCC output, its active-space orbitals, and active electron counts."""
-    wfn_hf = _scf(xyz, 1, False)
-    orbitals = wfn_hf.get_orbitals()
-    nmo = orbitals.get_num_molecular_orbitals()
-    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
-    full_ham = create("hamiltonian_constructor").run(orbitals)
-    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
-    active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, False)
-    builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", level)
-    out = builder.run(full_ham, cc_wfn, active_orbitals)
-    n_active_a = sum(1 for p in active if p < nocc_a)
-    n_active_b = sum(1 for p in active if p < nocc_b)
-    return out, active_orbitals, n_active_a, n_active_b
 
 
 def _macis_single_block(out, active_orbitals, n_active_a, n_active_b):
@@ -399,41 +358,68 @@ def _macis_single_block(out, active_orbitals, n_active_a, n_active_b):
     return _ci_restricted(Hamiltonian(container), n_active_a, n_active_b)
 
 
-def _openfermion_ground_state(out, nelec):
-    """Ground-state energy via OpenFermion Jordan-Wigner, reading the DUCC integrals as-is.
-
-    ``hamiltonian_to_interaction_operator`` builds the spin-orbital operator from the output's
-    stored spin blocks without assuming chemist 8-fold symmetry (it handles the DUCC
-    dual-4-fold blocks), so the diagonalization is fully independent of the qdk qubit mapper.
-    """
-    import openfermion as of  # noqa: PLC0415
-
-    from qdk_chemistry.plugins.openfermion.conversion import hamiltonian_to_interaction_operator  # noqa: PLC0415
-
-    sparse = of.linalg.get_sparse_operator(hamiltonian_to_interaction_operator(out))
-    energy, _ = of.linalg.jw_get_ground_state_at_particle_number(sparse, nelec)
-    return float(energy)
-
-
 @pytest.mark.parametrize("level", [0, 1, 2], ids=["level0", "level1", "level2"])
-@pytest.mark.parametrize(("label", "xyz", "active", "inactive"), _QUBIT_CASES, ids=[c[0] for c in _QUBIT_CASES])
+@pytest.mark.parametrize(
+    ("label", "xyz", "active", "inactive"), _CLOSED_SHELL_CASES, ids=[c[0] for c in _CLOSED_SHELL_CASES]
+)
 def test_ducc_restricted_macis_matches_independent_solvers(label, xyz, active, inactive, level):
     """MACIS agrees with two symmetry-agnostic solvers on the restricted DUCC output.
 
     For a closed-shell system at DUCC levels 0-2, the ground-state energy from MACIS (on the
     single-block form it re-antisymmetrizes), PySCF ``direct_uhf`` (reading the spin-blocked
-    integrals as-is), and OpenFermion's Jordan-Wigner (reading the output integrals as-is, no
-    symmetry assumption) must all agree. This confirms MACIS reads the half-antisymmetrized
-    representative correctly rather than merely self-consistently.
+    integrals as-is), and the native qubit mapper (which reads each spin channel independently,
+    assuming no chemist 8-fold symmetry) must all agree. This confirms MACIS reads the
+    half-antisymmetrized representative correctly rather than merely self-consistently.
     """
-    pytest.importorskip("openfermion")
-    out, ao, n_active_a, n_active_b = _restricted_ducc_output(xyz, active, inactive, level)
+    out, ao, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, level)
     e_macis = _macis_single_block(out, ao, n_active_a, n_active_b)
     e_pyscf = _ci_unrestricted(out, n_active_a, n_active_b)
-    e_openfermion = _openfermion_ground_state(out, n_active_a + n_active_b)
-    assert np.isclose(e_macis, e_pyscf, atol=1e-8), (
+    e_qubit = _qubit_ground_state(out)
+    assert np.isclose(e_macis, e_pyscf, atol=ci_energy_tolerance), (
         f"{label} L{level}: MACIS={e_macis:.10f} != pyscf_uhf={e_pyscf:.10f}"
     )
-    assert np.isclose(e_macis, e_openfermion, atol=1e-8), (
-        f"{label} L{level}: MACIS={e_macis:.10f} != openfermion={e_openfermion:.10f}"
+    assert np.isclose(e_macis, e_qubit, atol=ci_energy_tolerance), (
+        f"{label} L{level}: MACIS={e_macis:.10f} != qubit_mapper={e_qubit:.10f}"
+    )
+
+
+# ── Absolute reference: ExaChem's independent DUCC implementation ──
+
+# Closed-shell active spaces with a frozen core, so T_ext != 0 and the BCH dressing
+# is non-trivial. Each is the frontier window ExaChem parameterizes as
+# nactive_oa occupied + nactive_va virtual orbitals about the Fermi level.
+_REFERENCE_CASES = [*_CLOSED_SHELL_CASES, ("h2o_cas65", H2O, [2, 3, 4, 5, 6], [0, 1])]
+
+# Total active-space energies from ExaChem's DUCC, run in `noscf` mode on these same
+# SCF orbitals and diagonalized with MACIS, using ExaChem's default thresholds.
+_EXACHEM_REFERENCE = {
+    ("lih_cas22", 1): -7.8706560183,
+    ("lih_cas22", 2): -7.8828224008,
+    ("lih_cas23", 1): -7.8705694522,
+    ("lih_cas23", 2): -7.8827929828,
+    ("h2o_cas65", 1): -75.0074995411,
+    ("h2o_cas65", 2): -75.0130624402,
+}
+
+# ExaChem's Cholesky decomposition of the two-electron integrals caps cross-code agreement
+# well above the CI convergence tolerance, yet still far below the deviation a missing or
+# mis-leveled dressing would produce.
+_exachem_reference_tolerance = 100 * ci_energy_tolerance
+
+
+@pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
+@pytest.mark.parametrize(("label", "xyz", "active", "inactive"), _REFERENCE_CASES, ids=[c[0] for c in _REFERENCE_CASES])
+def test_dressed_matches_exachem_reference(label, xyz, active, inactive, level):
+    """The BCH-dressed active Hamiltonian reproduces ExaChem's DUCC.
+
+    An absolute check of the generated BCH equations at levels 1-2 over active spaces
+    with a real frozen core: unlike the internal-consistency tests, a systematic error
+    in the dressing cannot cancel here, because the reference comes from an independent
+    implementation rather than another view of the same output.
+    """
+    out, ao, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, level)
+    energy = _macis_single_block(out, ao, n_active_a, n_active_b)
+    reference = _EXACHEM_REFERENCE[(label, level)]
+    assert np.isclose(energy, reference, atol=_exachem_reference_tolerance), (
+        f"{label} L{level}: native={energy:.10f} != ExaChem={reference:.10f}"
     )
