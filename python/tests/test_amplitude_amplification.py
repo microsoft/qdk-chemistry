@@ -8,8 +8,8 @@ Three layers are exercised against each other:
   subspace, so the tests validate the mathematics rather than restating it;
 * the Q# module ``QDKChemistry.Utils.AmplitudeAmplification`` is executed on the
   full-state simulator and compared against those same closed forms;
-* the registry algorithm ``amplitude_amplification/qdk_amplified_qpe`` is run end
-  to end on top of the QPE circuit builder.
+* the registry algorithm ``amplitude_amplification/qdk_amplitude_amplification`` is
+  composed with the QPE circuit builder and an external executor, end to end.
 
 """
 
@@ -28,17 +28,11 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms import registry as algorithm_registry
 from qdk_chemistry.algorithms.amplitude_amplification.base import AmplitudeAmplification
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
-    StandardQpeCircuitBuilder,
-    split_coherent_qpe_bitstring,
-)
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import split_coherent_qpe_bitstring
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
-
-from .reference_tolerances import qpe_energy_tolerance
 
 OVERLAPS = [1e-4, 1e-3, 5e-3, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 0.9]
 
@@ -468,51 +462,113 @@ def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit
     )
 
 
-def _qubitization_builder_ref(num_bits: int = 4) -> AlgorithmRef:
-    """Return an AlgorithmRef for the standard QPE circuit builder with qubitization."""
-    return AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_standard",
+def _qpe_preparation(
+    qubit_hamiltonian: QubitOperator,
+    state_preparation: Circuit,
+    *,
+    num_bits: int = 4,
+    mapper: str = "prepare_select_prepare",
+    unitary: AlgorithmRef | None = None,
+) -> tuple[Circuit, int, list[int]]:
+    """Build a measurement-free QPE circuit plus its register layout.
+
+    This is the composition an external caller performs before amplifying:
+    amplitude amplification itself only sees the resulting circuit.
+
+    Returns:
+        The coherent preparation, the total qubit count, and the indices of the
+        block-encoding signal ancillas within the trailing target register.
+
+    """
+    unitary = unitary or AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
+    builder = create("qpe_circuit_builder", "qdk_standard")
+    builder.settings().update("num_bits", num_bits)
+    builder.settings().update("controlled_circuit_mapper", AlgorithmRef("controlled_circuit_mapper", mapper))
+    builder.settings().update("unitary_builder", unitary)
+    builder.settings().update("measurement", "none")
+    preparation = builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
+
+    unitary_algorithm = create(unitary.algorithm_type, unitary.algorithm_name, **unitary.settings)
+    num_system_qubits = qubit_hamiltonian.num_qubits
+    num_ancilla_qubits = unitary_algorithm.run(qubit_hamiltonian).get_num_qubits() - num_system_qubits
+    num_qubits = num_bits + num_system_qubits + num_ancilla_qubits
+    signal_ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
+    return preparation, num_qubits, signal_ancilla_indices
+
+
+def _amplified_qpe_circuit(
+    qubit_hamiltonian: QubitOperator,
+    state_preparation: Circuit,
+    accepted_indices: list[int],
+    *,
+    num_bits: int = 4,
+    mapper: str = "prepare_select_prepare",
+    unitary: AlgorithmRef | None = None,
+    **settings,
+) -> Circuit:
+    """Compose a coherent QPE preparation with amplitude amplification."""
+    preparation, num_qubits, signal_ancilla_indices = _qpe_preparation(
+        qubit_hamiltonian,
+        state_preparation,
         num_bits=num_bits,
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        mapper=mapper,
+        unitary=unitary,
     )
+    marker = QSHARP_UTILS.AmplitudeAmplification.MakeQpeAcceptanceMarkerOp(
+        num_bits, signal_ancilla_indices, accepted_indices
+    )
+    # The executor reverses the Q# results, so emitting the ancillas reversed and
+    # ahead of the phase indices makes the key read phase register MSB first.
+    ancilla_indices = list(range(num_qubits - len(signal_ancilla_indices), num_qubits))
+    measured_indices = list(reversed(ancilla_indices)) + list(range(num_bits))
 
-
-def _amplified_qpe(shots: int = 400, **settings) -> AmplitudeAmplification:
-    """Return a configured amplified QPE algorithm using the QDK simulator."""
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    algorithm.settings().update("reflect_to_good_space", _qubitization_builder_ref())
-    algorithm.settings().update("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
-    algorithm.settings().update("shots", shots)
+    algorithm = create("amplitude_amplification")
     for key, value in settings.items():
         algorithm.settings().update(key, value)
-    return algorithm
+    return algorithm.run(preparation, marker, num_qubits=num_qubits, measured_indices=measured_indices)
+
+
+def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_indices: list[int], shots: int = 400) -> str:
+    """Execute a circuit and pick the most common bitstring from the good subspace.
+
+    Acceptance lives outside the algorithm: a shot counts when its phase index is
+    in the window *and* every block-encoding signal ancilla measured zero.
+
+    """
+    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+    counts: dict[str, int] = {}
+    for bitstring, count in executor.run(circuit, shots=shots).bitstring_counts.items():
+        phase_bits, ancilla_bits = split_coherent_qpe_bitstring(bitstring, num_bits)
+        if any(bit != "0" for bit in ancilla_bits) or int(phase_bits, 2) not in accepted_indices:
+            continue
+        counts[phase_bits] = counts.get(phase_bits, 0) + count
+    assert counts, f"No shot landed in the accepted window {accepted_indices}."
+    return max(counts, key=counts.get)
 
 
 def test_amplitude_amplification_is_registered():
-    assert available("amplitude_amplification") == ["qdk_amplified_qpe"]
+    assert available("amplitude_amplification") == ["qdk_amplitude_amplification"]
     default = create("amplitude_amplification")
-    assert default.name() == "qdk_amplified_qpe"
+    assert default.name() == "qdk_amplitude_amplification"
     assert default.type_name() == "amplitude_amplification"
     assert isinstance(default, AmplitudeAmplification)
 
 
 def test_resolve_rounds_uses_the_fixed_point_schedule():
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
+    algorithm = create("amplitude_amplification")
     algorithm.settings().update("min_overlap", 0.05)
     assert algorithm.resolve_rounds() == AmplitudeAmplification.fixed_point_rounds(0.05, 0.1)
 
 
 def test_explicit_rounds_override_the_schedule():
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
+    algorithm = create("amplitude_amplification")
     algorithm.settings().update("min_overlap", 0.05)
     algorithm.settings().update("rounds", 1)
     assert algorithm.resolve_rounds() == 1
 
 
 def test_deriving_rounds_requires_a_lower_bound():
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
+    algorithm = create("amplitude_amplification")
     with pytest.raises(ValueError, match="min_overlap"):
         algorithm.resolve_rounds()
 
@@ -616,134 +672,74 @@ def test_measurement_setting_drives_the_standard_qpe_readout():
     assert {key[num_bits:] for key in x_counts} == {"00", "01", "10", "11"}
 
 
-def test_reflect_to_good_space_requires_a_coherent_circuit():
+def test_amplitude_amplification_requires_a_coherent_circuit():
     # Amplitude amplification is decoupled from any particular circuit builder:
-    # it asks the nested algorithm for a measurement-free circuit and only
-    # requires that the answer carries an adjointable Q# operation to reflect about.
-    class MeasuredOnlyBuilder(StandardQpeCircuitBuilder):
-        def name(self) -> str:
-            return "test_measured_only"
+    # it only requires a circuit carrying an adjointable Q# operation.
+    algorithm = create("amplitude_amplification")
+    algorithm.settings().update("rounds", 1)
+    with pytest.raises(TypeError, match="adjointable"):
+        algorithm.run(Circuit(qasm="OPENQASM 3.0;"), marking_oracle=None, num_qubits=4)
 
-        def _run_impl(self, state_preparation, qubit_hamiltonian):  # noqa: ARG002
-            # Ignores the `measurement` setting, as a non-Q# backend would.
-            return [Circuit(qasm="OPENQASM 3.0;")]
 
-    algorithm_registry.register(lambda: MeasuredOnlyBuilder())
-    try:
-        algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-        algorithm.settings().update(
-            "reflect_to_good_space",
-            AlgorithmRef("qpe_circuit_builder", "test_measured_only", num_bits=4),
-        )
-        algorithm.settings().update("accepted_phase_indices", [0])
-        algorithm.settings().update("rounds", 1)
-        with pytest.raises(TypeError, match="did not produce a coherent circuit"):
-            algorithm.run(
-                state_preparation=_guiding_state(1.0, 0),
-                qubit_hamiltonian=_diagonal_hamiltonian(),
-            )
-    finally:
-        algorithm_registry.unregister("qpe_circuit_builder", "test_measured_only")
+def test_register_bounds_are_validated():
+    algorithm = create("amplitude_amplification")
+    algorithm.settings().update("rounds", 0)
+    preparation = _guiding_state(1.0, 0)
+    with pytest.raises(ValueError, match="num_qubits"):
+        algorithm.run(preparation, marking_oracle=None, num_qubits=0)
+    with pytest.raises(ValueError, match="measured_indices"):
+        algorithm.run(preparation, marking_oracle=None, num_qubits=2, measured_indices=[2])
 
 
 @pytest.mark.parametrize("rounds", [0, 1, 2])
 def test_amplification_does_not_change_the_energy(rounds: int):
-    # A guiding state with only 9% overlap on the |00> eigenvector of energy pi/2.
-    algorithm = _amplified_qpe(
+    accepted = [0]
+    circuit = _amplified_qpe_circuit(
+        _diagonal_hamiltonian(),
+        _guiding_state(0.3, 0),
+        accepted,
         rounds=rounds,
-        accepted_phase_indices=[0],
     )
-    result = algorithm.run(
-        state_preparation=_guiding_state(0.3, 0),
-        qubit_hamiltonian=_diagonal_hamiltonian(),
-    )
-
     # Amplification changes how often the window is accepted, never what it accepts.
-    assert result.bitstring_msb_first == "0000"
-    assert result.raw_energy == pytest.approx(math.pi / 2.0, abs=qpe_energy_tolerance)
+    assert _dominant_accepted_phase(circuit, 4, accepted) == "0000"
 
 
 def test_energy_window_selects_the_right_phase_bin():
     # The |11> eigenvector has energy -lambda, which the qubitization walk maps
     # to the phase bin 1/2 -- index 8 of 16, big-endian 0b1000.
-    lambda_norm = math.pi / 2.0
-    algorithm = _amplified_qpe(
+    accepted = [8]
+    circuit = _amplified_qpe_circuit(
+        _diagonal_hamiltonian(),
+        _guiding_state(0.3, 3),
+        accepted,
         rounds=2,
-        min_energy=-lambda_norm - 0.05,
-        max_energy=-lambda_norm + 0.05,
     )
-    result = algorithm.run(
-        state_preparation=_guiding_state(0.3, 3),
-        qubit_hamiltonian=_diagonal_hamiltonian(),
-    )
-
-    assert result.bitstring_msb_first == "1000"
-    assert result.raw_energy == pytest.approx(-lambda_norm, abs=qpe_energy_tolerance)
+    assert _dominant_accepted_phase(circuit, 4, accepted) == "1000"
 
 
 def test_fixed_point_schedule_runs_end_to_end():
-    algorithm = _amplified_qpe(
+    accepted = [0]
+    circuit = _amplified_qpe_circuit(
+        _diagonal_hamiltonian(),
+        _guiding_state(0.3, 0),
+        accepted,
         min_overlap=0.09,
         tolerance=0.3,
-        accepted_phase_indices=[0],
     )
-    result = algorithm.run(
-        state_preparation=_guiding_state(0.3, 0),
-        qubit_hamiltonian=_diagonal_hamiltonian(),
-    )
-    assert result.raw_energy == pytest.approx(math.pi / 2.0, abs=qpe_energy_tolerance)
+    assert _dominant_accepted_phase(circuit, 4, accepted) == "0000"
 
 
 def test_trotter_encoding_is_supported():
     # The pauli-sequence mapper has no block-encoding ancillas, so the accepted
     # window is defined purely on the phase register.
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    algorithm.settings().update(
-        "reflect_to_good_space",
-        AlgorithmRef(
-            "qpe_circuit_builder",
-            "qdk_standard",
-            num_bits=4,
-            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
-        ),
-    )
-    algorithm.settings().update("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
-    algorithm.settings().update("shots", 200)
-    algorithm.settings().update("rounds", 1)
-    algorithm.settings().update("accepted_phase_indices", [4])
-
-    result = algorithm.run(
-        state_preparation=_guiding_state(0.3, 3),
-        qubit_hamiltonian=_diagonal_hamiltonian(),
+    accepted = [4]
+    circuit = _amplified_qpe_circuit(
+        _diagonal_hamiltonian(),
+        _guiding_state(0.3, 3),
+        accepted,
+        mapper="pauli_sequence",
+        unitary=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+        rounds=1,
     )
     # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16.
-    assert result.bitstring_msb_first == "0100"
-    assert result.raw_energy == pytest.approx(-math.pi / 2.0, abs=qpe_energy_tolerance)
-
-
-def test_an_empty_window_is_rejected():
-    algorithm = _amplified_qpe(min_energy=100.0, max_energy=200.0)
-    with pytest.raises(ValueError, match="no phase bin"):
-        algorithm.run(
-            state_preparation=_guiding_state(1.0, 0),
-            qubit_hamiltonian=_diagonal_hamiltonian(),
-        )
-
-
-def test_an_undefined_window_is_rejected():
-    algorithm = _amplified_qpe()
-    with pytest.raises(ValueError, match="accepted_phase_indices"):
-        algorithm.run(
-            state_preparation=_guiding_state(1.0, 0),
-            qubit_hamiltonian=_diagonal_hamiltonian(),
-        )
-
-
-def test_out_of_range_accepted_indices_are_rejected():
-    algorithm = _amplified_qpe(accepted_phase_indices=[16])
-    with pytest.raises(ValueError, match="accepted_phase_indices"):
-        algorithm.run(
-            state_preparation=_guiding_state(1.0, 0),
-            qubit_hamiltonian=_diagonal_hamiltonian(),
-        )
+    assert _dominant_accepted_phase(circuit, 4, accepted, shots=200) == "0100"
