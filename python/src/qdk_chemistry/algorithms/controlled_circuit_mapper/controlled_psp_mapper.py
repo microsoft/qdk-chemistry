@@ -27,13 +27,6 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
-        use_walk: Whether the final reflection about the ancilla zero state is applied,
-            turning the block encoding into a quantum walk. Defaults to ``False``, in which
-            case the reflection is applied only when the container is an
-            :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`.
-            Setting it to ``True`` promotes a plain
-            :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer`
-            to a walk, which is what unary-iteration phase estimation needs.
 
     """
 
@@ -45,12 +38,6 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
             "Algorithm for the PREPARE oracle state preparation. ",
-        )
-        self._set_default(
-            "use_walk",
-            "bool",
-            False,
-            "Apply the final reflection, making the block encoding a quantum walk.",
         )
 
 
@@ -71,17 +58,15 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
     When the input is an :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
-    or when the ``use_walk`` setting is enabled, the block encoding is additionally wrapped
-    with the reflection operator to form a quantum walk:
+    the block encoding is additionally wrapped with the reflection operator to form a
+    quantum walk:
 
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
 
-    Because that walk is self-inverse-block-plus-reflection, this mapper also satisfies
-    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.UnaryIterationWalkMapper`
-    and can drive unary-iteration phase estimation on a plain
-    :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer`.
+    That walk is self-inverse up to the reflection, which is what lets this mapper drive
+    unary-iteration phase estimation.
 
     """
 
@@ -111,14 +96,11 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     def _resolve_lcu(self, container: Any) -> tuple[LCUContainer, int, bool]:
         """Unwrap a container into its LCU data, power, and whether to apply the reflection.
 
-        The reflection is applied when the container already is a walk, or when the
-        ``use_walk`` setting promotes a plain block encoding to one.
-
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The LCU data, the requested power, and whether to form a quantum walk.
+            The LCU data, the requested power, and whether the container is a quantum walk.
 
         Raises:
             ValueError: If the container is neither an LCU nor an LCU walk.
@@ -127,7 +109,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         if isinstance(container, LCUWalkContainer):
             return container.block_encoding, container.power, True
         if isinstance(container, LCUContainer):
-            return container, container.power, bool(self._settings.get("use_walk"))
+            return container, container.power, False
         raise ValueError(
             f"Container type '{type(container).__name__}' is not supported. "
             "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."

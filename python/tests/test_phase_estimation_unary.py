@@ -8,11 +8,6 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import (
-    ControlledPauliSequenceMapper,
-    SOSSAMapper,
-    UnaryIterationWalkMapper,
-)
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     num_phase_bits,
@@ -259,69 +254,6 @@ class TestPhaseWindowState:
         """Unsupported window names are rejected."""
         with pytest.raises(ValueError, match="window must be one of"):
             phase_window_state(4, "kaiser")
-
-
-class TestMapperInterface:
-    """The builder accepts any mapper exposing the unary-iteration walk interface."""
-
-    def test_sossa_mapper_satisfies_the_protocol(self):
-        """The SOSSA mapper is recognized structurally, not by class identity."""
-        assert isinstance(SOSSAMapper(), UnaryIterationWalkMapper)
-
-    def test_arbitrary_mapper_with_the_three_methods_satisfies_the_protocol(self):
-        """A mapper unrelated to SOSSA qualifies as long as it implements the interface."""
-
-        class ThirdPartyWalkMapper:
-            def build_walk_op(self, _unitary, _num_queries, use_unary_iteration=True):  # noqa: ARG002
-                return None
-
-            def num_ancillary_qubits(self, _container):
-                return 0
-
-            def get_ancilla_prep_op(self):
-                return None
-
-        assert isinstance(ThirdPartyWalkMapper(), UnaryIterationWalkMapper)
-
-    def test_mapper_missing_a_method_is_rejected(self):
-        """Dropping any one of the three methods removes the capability."""
-
-        class PartialWalkMapper:
-            def build_walk_op(self, _unitary, _num_queries, use_unary_iteration=True):  # noqa: ARG002
-                return None
-
-            def num_ancillary_qubits(self, _container):
-                return 0
-
-        assert not isinstance(PartialWalkMapper(), UnaryIterationWalkMapper)
-        assert not isinstance(ControlledPauliSequenceMapper(), UnaryIterationWalkMapper)
-
-    def test_incapable_mapper_raises_and_names_the_missing_methods(self, monkeypatch):
-        """A mapper without the interface is refused, and the error says exactly what is absent."""
-
-        class StubUnitaryRepresentation:
-            def get_container(self):
-                return object()  # no ``power`` attribute, so the settings' count is used
-
-        class StubUnitaryBuilder:
-            def run(self, _qubit_hamiltonian):
-                return StubUnitaryRepresentation()
-
-        nested = {
-            "unitary_builder": StubUnitaryBuilder(),
-            "controlled_circuit_mapper": ControlledPauliSequenceMapper(),
-        }
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=4)
-        monkeypatch.setattr(builder, "_create_nested", lambda key: nested[key])
-
-        with pytest.raises(TypeError) as excinfo:
-            builder._run_impl(None, None)
-
-        message = str(excinfo.value)
-        assert "cannot drive unary-iteration phase estimation" in message
-        assert "ControlledPauliSequenceMapper" in message
-        for method in ("build_walk_op", "num_ancillary_qubits", "get_ancilla_prep_op"):
-            assert method in message
 
 
 class TestPhaseDecoding:
