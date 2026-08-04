@@ -110,5 +110,4 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             ancillaPrep = ancillaPrep,
         });
     }
-
 }
