@@ -615,6 +615,14 @@ def test_tutorial_prepare_trial_state_results():
     """Check portable trial-state invariants and optional reference snapshots."""
     _load_tutorial_module("tutorial_choose_active_space")
     tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
+    chapter_text = (
+        DOCS_PYTHON_EXAMPLES_DIR.parent.parent.parent
+        / "tutorials"
+        / "ground_state_molecular_energies_with_qpe"
+        / "05_preparing_the_trial_state.rst"
+    ).read_text(encoding="utf-8")
+    assert r"\sum_{i=1}^{K}\widetilde{c}_i\vert b_i\rangle" in chapter_text
+    assert "each retained determinant becomes one computational-basis state" in chapter_text
 
     result = tutorial_module.run_trial_state_workflow()
     with pytest.raises(ValueError, match="max_determinants must be positive"):

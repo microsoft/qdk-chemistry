@@ -122,7 +122,17 @@ The QDK/Chemistry :term:`PMC` calculator instead constructs the Hamiltonian matr
 The resulting projected wavefunction has zero amplitude on every omitted determinant.
 When using the projected wavefunction as a trial state, its overlap with the complete selected-space :term:`CASCI` wavefunction therefore quantifies how much fidelity is retained after determinant truncation.
 
-The script constructs each projected trial state, forms the reference and trial coefficient vectors on the retained determinant support, and evaluates their squared inner product directly:
+Under the :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>`, each retained determinant becomes one computational-basis state of the compute register.
+The trial wavefunction is therefore
+
+.. math::
+
+   \vert\Psi_{\mathrm{trial}}\rangle
+   =\sum_{i=1}^{K}\widetilde{c}_i\vert b_i\rangle,
+
+where :math:`\vert b_i\rangle` is the occupation bitstring for retained determinant :math:`\Phi_i`, and :math:`\widetilde{c}_i` is its reoptimized amplitude.
+
+The script constructs each projected trial state, forms the reference and trial coefficient vectors for the same retained determinants, and evaluates their squared inner product directly:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
    :language: python
