@@ -63,9 +63,6 @@ if(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm64" AND VCPKG_TARGET_IS_WINDOWS AND NO
             "$ENV{ProgramFiles}/LLVM/bin"
             "$ENV{ProgramW6432}/LLVM/bin"
             "$ENV{VCINSTALLDIR}/Tools/Llvm/ARM64/bin"
-            # Cross-compiling arm64 from an x64 host: the usable clang-cl is the
-            # host-native one, which Visual Studio installs under x64/bin.
-            "$ENV{VCINSTALLDIR}/Tools/Llvm/x64/bin"
             "$ENV{VCINSTALLDIR}/Tools/Llvm/bin"
     )
     # Fail loudly rather than silently falling back to the MSVC/GENERIC build,
