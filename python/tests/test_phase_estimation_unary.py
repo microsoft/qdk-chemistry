@@ -157,7 +157,7 @@ class TestPhaseRegisterSizing:
 class TestPhaseWindowState:
     """Window states prepared on the phase register."""
 
-    @pytest.mark.parametrize("window", ["kaiser", "cosine", "uniform"])
+    @pytest.mark.parametrize("window", ["cosine", "uniform"])
     @pytest.mark.parametrize("num_queries", [3, 5, 25])
     def test_padded_and_normalized(self, window, num_queries):
         """Windows are unit-norm and zero on the unaddressed padding states."""
@@ -167,26 +167,47 @@ class TestPhaseWindowState:
         assert np.all(amplitudes[num_queries + 1 :] == 0.0)
         assert np.all(amplitudes[: num_queries + 1] > 0.0)
 
-    def test_kaiser_matches_bessel_definition(self):
-        """The Kaiser window follows I0(pi*alpha*sqrt(1-x^2)) up to normalization."""
-        num_queries, alpha = 7, 3.0
-        amplitudes = np.array(phase_window_state(num_queries, "kaiser", alpha))[: num_queries + 1]
-        indices = np.arange(num_queries + 1)
-        x = 2.0 * indices / (num_queries + 1) - 1.0
-        expected = np.i0(np.pi * alpha * np.sqrt(np.clip(1.0 - x**2, 0.0, None)))
+    @pytest.mark.parametrize("num_queries", [3, 8, 25])
+    def test_cosine_matches_babbush2018_control_state(self, num_queries):
+        """The cosine window is sin(pi (t + 1) / (p + 2)) over the p + 1 slots."""
+        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
+        expected = np.sin(np.pi * (np.arange(num_queries + 1) + 1) / (num_queries + 2))
         expected /= np.linalg.norm(expected)
-        np.testing.assert_allclose(amplitudes, expected, rtol=1e-8)
+        np.testing.assert_allclose(amplitudes, expected, rtol=1e-12, atol=1e-15)
 
-    def test_larger_alpha_concentrates_the_window(self):
-        """Increasing alpha lowers the side lobes, concentrating amplitude in the center."""
-        peaked = np.array(phase_window_state(15, "kaiser", 6.0))
-        flat = np.array(phase_window_state(15, "kaiser", 1.0))
-        assert peaked.max() > flat.max()
+    @pytest.mark.parametrize("num_queries", [4, 9, 24])
+    def test_cosine_is_symmetric_and_single_lobed(self, num_queries):
+        """The cosine window peaks in the middle and decays monotonically to both edges."""
+        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
+        np.testing.assert_allclose(amplitudes, amplitudes[::-1], rtol=1e-12, atol=1e-15)
+        peak = int(np.argmax(amplitudes))
+        assert np.all(np.diff(amplitudes[: peak + 1]) > 0.0)
+        assert np.all(np.diff(amplitudes[peak:]) < 0.0)
+
+    def test_cosine_suppresses_spectral_leakage_relative_to_uniform(self):
+        r"""The cosine window's phase spectrum has far lighter tails than a uniform one.
+
+        This is the property that makes it the Heisenberg-limited control state:
+        the probability of a phase readout landing far from the true phase decays
+        as :math:`1/\Delta^4` instead of the uniform window's :math:`1/\Delta^2`.
+        """
+        num_queries, oversampling = 31, 32
+
+        def tail_probability(window: str, bins: int) -> float:
+            amplitudes = np.array(phase_window_state(num_queries, window))[: num_queries + 1]
+            spectrum = np.abs(np.fft.fft(amplitudes, amplitudes.size * oversampling)) ** 2
+            spectrum /= spectrum.sum()
+            offsets = np.arange(spectrum.size) - int(np.argmax(spectrum))
+            distance = np.minimum(offsets % spectrum.size, (-offsets) % spectrum.size)
+            return float(spectrum[distance > bins * oversampling].sum())
+
+        assert tail_probability("cosine", 2) < 0.1 * tail_probability("uniform", 2)
+        assert tail_probability("cosine", 4) < 1e-3
 
     def test_unknown_window_rejected(self):
         """Unsupported window names are rejected."""
         with pytest.raises(ValueError, match="window must be one of"):
-            phase_window_state(4, "hann")
+            phase_window_state(4, "kaiser")
 
 
 class TestPhaseDecoding:

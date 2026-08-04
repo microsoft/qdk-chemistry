@@ -6,15 +6,14 @@ chain of ``num_queries`` self-inverse walk blocks and uses unary iteration over 
 phase register to select which interleaved reflection is omitted, so any positive
 query count is supported.
 
-The phase register is prepared in a window state (Kaiser by default) rather than a
-uniform superposition, which suppresses the spectral leakage of the truncated schedule.
+The phase register is prepared in a cosine window state rather than a uniform
+superposition, which suppresses the spectral leakage of the truncated schedule.
 
 References:
-    * :cite:`Berry2024`, Appendix D (Kaiser window states).
+    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
+      cosine-window control state.
     * :cite:`Lee2021` — tensor hypercontraction; non-power-of-two query schedule
       and its extra Toffoli cost.
-    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
-      sine-window control state.
 
 """
 
@@ -24,7 +23,6 @@ References:
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-from scipy.signal.windows import kaiser
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, UnitaryRepresentation
@@ -41,7 +39,7 @@ __all__: list[str] = [
     "phase_window_state",
 ]
 
-PHASE_WINDOWS: tuple[str, ...] = ("kaiser", "cosine", "uniform")
+PHASE_WINDOWS: tuple[str, ...] = ("cosine", "uniform")
 PHASE_BANDS: tuple[str, ...] = ("lower", "upper")
 
 
@@ -63,13 +61,17 @@ def num_phase_bits(num_queries: int) -> int:
     return int(num_queries).bit_length()
 
 
-def phase_window_state(num_queries: int, window: str = "kaiser", window_alpha: float = 2.0) -> list[float]:
+def phase_window_state(num_queries: int, window: str = "cosine") -> list[float]:
     r"""Return the phase-register amplitudes, zero-padded to a whole number of qubits.
+
+    The default ``"cosine"`` window is the Heisenberg-limited control state of
+    Babbush et al. (2018), :math:`\psi_t \propto \sin(\pi (t + 1) / (p + 2))`
+    over the :math:`p + 1` reflection slots. It is the optimal single-lobe
+    window for phase estimation and needs no special functions.
 
     Args:
         num_queries: Number of walk blocks; the window spans ``num_queries + 1`` slots.
-        window: Window family, one of ``"kaiser"``, ``"cosine"`` or ``"uniform"``.
-        window_alpha: Kaiser shape parameter :math:`\alpha` (ignored by other windows).
+        window: Window family, either ``"cosine"`` or ``"uniform"``.
 
     Returns:
         Real amplitudes of length :math:`2^{\text{num\_phase\_bits}}`, normalized to unit norm.
@@ -81,9 +83,7 @@ def phase_window_state(num_queries: int, window: str = "kaiser", window_alpha: f
     dimension = 1 << num_phase_bits(num_queries)
     num_states = num_queries + 1
 
-    if window == "kaiser":
-        amplitudes = kaiser(num_states, window_alpha * np.pi, sym=False)
-    elif window == "cosine":
+    if window == "cosine":
         amplitudes = np.sin(np.pi * (np.arange(num_states) + 1) / (num_states + 1))
     elif window == "uniform":
         amplitudes = np.ones(num_states)
@@ -110,15 +110,9 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
         self._set_default(
             "phase_window",
             "string",
-            "kaiser",
+            "cosine",
             "Window state prepared on the phase register.",
             limit=list(PHASE_WINDOWS),
-        )
-        self._set_default(
-            "window_alpha",
-            "double",
-            2.0,
-            "Kaiser window shape parameter; larger values trade main-lobe width for lower side lobes.",
         )
         self._set_default(
             "phase_band",
@@ -144,8 +138,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     def __init__(
         self,
         num_queries: int = -1,
-        phase_window: str = "kaiser",
-        window_alpha: float = 2.0,
+        phase_window: str = "cosine",
         phase_band: str = "upper",
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
@@ -155,7 +148,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         Args:
             num_queries: Number of walk blocks; used when the unitary representation has no power.
             phase_window: Window state prepared on the phase register.
-            window_alpha: Kaiser window shape parameter.
             phase_band: Half-band used to resolve the doubled measured phase.
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
@@ -166,7 +158,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         self._settings = QdkUnaryQpeCircuitBuilderSettings()
         self._settings.set("num_queries", num_queries)
         self._settings.set("phase_window", phase_window)
-        self._settings.set("window_alpha", window_alpha)
         self._settings.set("phase_band", phase_band)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
@@ -253,11 +244,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         # rowMap is reversed so the window state is big-endian, matching ApplyQFT.
         phase_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=list(range(num_bits - 1, -1, -1)),
-            stateVector=phase_window_state(
-                num_queries,
-                self._settings.get("phase_window"),
-                self._settings.get("window_alpha"),
-            ),
+            stateVector=phase_window_state(num_queries, self._settings.get("phase_window")),
             expansionOps=[],
             numQubits=num_bits,
         )

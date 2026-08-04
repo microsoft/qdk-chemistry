@@ -10,9 +10,9 @@
 /// the phase register select which reflection to omit. Branch t of the phase
 /// register then sees W^(numQueries - 2t), so any positive `numQueries` is allowed.
 ///
-/// The phase register is prepared by `phaseQubitPrep` (a window state such as
-/// Kaiser or cosine) rather than by uniform Hadamards, which suppresses spectral
-/// leakage from the truncated, non-power-of-two schedule.
+/// The phase register is prepared by `phaseQubitPrep` (a cosine window state)
+/// rather than by uniform Hadamards, which suppresses spectral leakage from the
+/// truncated, non-power-of-two schedule.
 namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     import Std.Arrays.Reversed;
