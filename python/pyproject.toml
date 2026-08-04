@@ -20,6 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: C++",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Quantum Computing",
@@ -92,13 +93,13 @@ plugins = [
   "pyscf>=2.9.0,<2.12.1; sys_platform != 'win32'"
 ]
 qiskit-extras = [
-  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
-  "qiskit-aer; python_version < '3.14'",
-  "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
-  "qiskit-nature; python_version < '3.14'",
-  "qiskit-qasm3-import; python_version < '3.14'",
-  "pylatexenc==2.10; python_version < '3.14'",
-  "requests>=2.33.0; python_version < '3.14'"
+  "qiskit[qasm3-import]>=2.2.0",
+  "qiskit-aer",
+  "qiskit-ibm-runtime>=0.46.1",
+  "qiskit-nature",
+  "qiskit-qasm3-import",
+  "pylatexenc==2.10",
+  "requests>=2.33.0"
 ]
 qre = [
   "qdk[qre,jupyter]>=1.30.0"
