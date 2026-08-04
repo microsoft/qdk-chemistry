@@ -150,7 +150,9 @@ if(NOT BTAS_FOUND)
         GIT_REPOSITORY https://github.com/BTAS/btas.git
         GIT_TAG 287b145ead818a0332f2b7ce0b7375a83d328bae
     )
+    set(BUILD_TESTING OFF)
     FetchContent_MakeAvailable(BTAS)
+    unset(BUILD_TESTING)
     # BTAS declares the plain target only; an installed BTAS exports the
     # namespaced one, so alias it for a uniform link name either way.
     if(NOT TARGET BTAS::BTAS)
