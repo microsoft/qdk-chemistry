@@ -21,10 +21,6 @@ class ControlledCircuitMapperSettings(Settings):
         control_indices: The control qubit indices. Defaults to ``[0]``.
         target_indices: The target qubit indices. An empty list means auto-fill
             based on the unitary's qubit count and control indices.
-        adjointable: Whether the generated circuit must support ``Adjoint``.
-            Adjointable circuits skip resource-estimation caching, so they cost
-            more to estimate; they are required by algorithms that reflect about
-            the circuit, such as amplitude amplification. Defaults to ``False``.
 
     """
 
@@ -42,12 +38,6 @@ class ControlledCircuitMapperSettings(Settings):
             "vector<int>",
             [],
             "The target qubit indices. Empty means auto-fill.",
-        )
-        self._set_default(
-            "adjointable",
-            "bool",
-            False,
-            "Emit an adjointable operation, needed for coherent reflection-based algorithms.",
         )
 
 
@@ -83,15 +73,6 @@ class ControlledCircuitMapper(Algorithm):
         if len(control_indices) != len(set(control_indices)):
             raise ValueError("control_indices must not contain duplicates.")
         return control_indices
-
-    def _is_adjointable(self) -> bool:
-        """Whether the caller asked for an adjointable controlled circuit.
-
-        Returns:
-            True when the ``adjointable`` setting is enabled.
-
-        """
-        return bool(self._settings.get("adjointable"))
 
     def _get_target_indices(self, unitary: UnitaryRepresentation) -> list[int]:
         """Get target indices from settings, auto-filling if empty.

@@ -808,8 +808,8 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.amplitude_amplification.amplified_phase_estimation import (  # noqa: PLC0415
-        AmplifiedPhaseEstimation,
+    from qdk_chemistry.algorithms.amplitude_amplification.base import (  # noqa: PLC0415
+        AmplitudeAmplification,
     )
     from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
         QdkFullStateSimulator,
@@ -891,7 +891,7 @@ def _register_python_algorithms():
     register(lambda: HadamardTest())
     register(lambda: QdkHadamardTestCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
-    register(lambda: AmplifiedPhaseEstimation())
+    register(lambda: AmplitudeAmplification())
 
 
 _register_python_algorithms()

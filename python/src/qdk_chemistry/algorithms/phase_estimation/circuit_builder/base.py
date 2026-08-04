@@ -165,10 +165,6 @@ class QpeCircuitBuilder(Algorithm):
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
-        When ``coherent`` is enabled the controlled circuit is requested in
-        adjointable form, because the coherent phase-estimation circuit is meant
-        to be reflected about.
-
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
             power: The power to which the unitary should be raised.
@@ -185,7 +181,6 @@ class QpeCircuitBuilder(Algorithm):
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
-        circuit_mapper.settings().update("adjointable", self.is_coherent())
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
 

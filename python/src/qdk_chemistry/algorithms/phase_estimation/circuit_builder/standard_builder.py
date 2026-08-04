@@ -196,7 +196,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         amplification = QSHARP_UTILS.AmplitudeAmplification
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
-        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakeAdjointablePrepareHadamardAllOp()
+        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
 
         coherent_op = amplification.MakeCoherentStandardQPEOp(
             state_prep_op,

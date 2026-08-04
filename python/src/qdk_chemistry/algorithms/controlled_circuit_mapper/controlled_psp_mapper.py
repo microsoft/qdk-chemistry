@@ -133,11 +133,9 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         if use_quantum_walk:
             make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkCircuit
             make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkOp
-            make_adjointable_op = QSHARP_UTILS.PrepSelPrep.MakeAdjointableControlledPSPWalkOp
         else:
             make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit
             make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp
-            make_adjointable_op = QSHARP_UTILS.PrepSelPrep.MakeAdjointableControlledPrepSelPrepOp
 
         psp_parameters = {
             "prepareOp": prepare_op,
@@ -148,10 +146,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         }
 
         qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
-        if self._is_adjointable():
-            qsharp_op = make_adjointable_op(prepare_op, select_op, num_system, power)
-        else:
-            qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
+        qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
