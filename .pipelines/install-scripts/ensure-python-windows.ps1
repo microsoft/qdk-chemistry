@@ -82,6 +82,18 @@ function Test-PythonExe {
         $code = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
         if ($code -ne 0 -or ($out | Out-String) -notmatch 'Python\s+(\d+\.\d+\.\d+)') { return $null }
         $found = $Matches[1]
+
+        # Reject an interpreter of the wrong architecture. Windows on ARM64 runs
+        # x64 binaries under emulation perfectly happily, so an x64 python on
+        # PATH would otherwise be accepted here and go on to produce win_amd64
+        # wheels on an ARM64 agent -- a silent, and very confusing, wrong answer.
+        $machine = (& $Exe -c "import platform; print(platform.machine())" 2>&1 | Out-String).Trim()
+        $expected = if ($Arch -eq 'arm64') { 'ARM64' } else { 'AMD64' }
+        if ($machine -ne $expected) {
+            Write-Host "  ignoring $Exe : reports $machine, wanted $expected"
+            return $null
+        }
+
         # A pip-less interpreter is no use to a caller that asked for pip, so
         # treat it as a miss and keep looking rather than failing later inside
         # venv creation.
@@ -119,7 +131,7 @@ if (-not $Force) {
             Write-Host "  $($onPath.Source)"
             return
         }
-        Write-Host "python on PATH at '$($onPath.Source)' is not runnable; continuing to search"
+        Write-Host "python on PATH at '$($onPath.Source)' is not usable here; continuing to search"
     }
 }
 

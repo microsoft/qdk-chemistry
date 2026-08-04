@@ -546,7 +546,7 @@ Where possible, the official CMake documentation is linked for further informati
 |[`VCPKG_TARGET_TRIPLET`](https://learn.microsoft.com/vcpkg/users/triplets) | Windows only. vcpkg triplet selecting the dependency link mode | String | N/A | `x64-windows-static-md`, `x64-windows` |
 |[`BUILD_TESTING`](https://cmake.org/cmake/help/latest/variable/BUILD_TESTING.html) | Whether to build unit and integration tests | Bool | `True` | `False` |
 |`QDK_UARCH`| The instruction set architecture (ISA) to compile for. This is not a mandatory setting, but it is strongly encouraged for good performance | String | N/A | [See below](#note-on-qdk_uarch-specification) |
-|`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports. Requires a `Debug` or `RelWithDebInfo` build and a GNU/Clang compiler; ignored under MSVC | Bool | `False` | `True` |
+|`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports. Requires a `Debug` or `RelWithDebInfo` build and a GNU/Clang compiler; under MSVC the build warns and continues without coverage instrumentation | Bool | `False` | `True` |
 |`QDK_CHEMISTRY_ENABLE_LONG_TESTS` | Enable long running tests (useful on HPC architectures) | Bool | `False` | `True` |
 |`QDK_ENABLE_OPENMP` | Enable OpenMP support. Off by default on Windows and on macOS with AppleClang | Bool | `True` (`False` on Windows / AppleClang) | `False` |
 

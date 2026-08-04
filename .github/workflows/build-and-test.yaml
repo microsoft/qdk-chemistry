@@ -619,13 +619,34 @@ jobs:
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
 
+    # The dependency cache key uses a hash of the build plan rather than of the
+    # build script. Hashing the script meant any edit to it -- even one that only
+    # touched a comment or a diagnostic -- discarded the cache and forced a cold
+    # rebuild, which on the ARM64 runner takes over five hours against a six hour
+    # ceiling. The fingerprint is produced by the same script that performs the
+    # build, from the same plan object the build consumes, so it moves when the
+    # build would actually differ and stays put otherwise.
+    - name: Compute dependency build plan fingerprint
+      id: deps-fp
+      shell: pwsh
+      run: |
+        $fp = & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir    "${{ github.workspace }}" `
+            -ClPath    "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType RelWithDebInfo `
+            -Triplet   "${{ env.VCPKG_TRIPLET }}" `
+            -EmitFingerprint | Select-Object -Last 1
+        if (-not $fp) { throw "The build plan fingerprint came back empty." }
+        Write-Host "deps build plan fingerprint: $fp"
+        "fingerprint=$fp" >> $env:GITHUB_OUTPUT
+
     - name: Restore vcpkg cache
       id: cache-vcpkg
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Restore deps-install cache
       id: cache-deps
@@ -634,7 +655,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -652,7 +673,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -660,7 +681,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -765,7 +786,16 @@ jobs:
     # ships the native ARM64 MSVC toolset (VC.Tools.ARM64), clang-cl, vcpkg,
     # CMake and Ninja. 6h is the GitHub-hosted per-job ceiling.
     runs-on: windows-11-arm
-    timeout-minutes: 350
+    # Sized from measurement rather than guessed. A cold run on this runner --
+    # which is what happens when the dependency cache genuinely has to be
+    # rebuilt -- took 317 minutes with MSVC, against the 350 this used to allow;
+    # clang-cl did the same work in 138. That margin was too thin to survive a
+    # slow runner, so use the 360 minute ceiling GitHub allows for a hosted job.
+    #
+    # The cache-save steps deliberately run immediately after the dependency
+    # install rather than at the end of the job, so even a run that later exceeds
+    # this limit still banks the expensive part instead of discarding it.
+    timeout-minutes: 360
     permissions:
       contents: read
       actions: write
@@ -775,7 +805,14 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
-      QDK_UARCH: armv8-a
+      # QDK_UARCH is deliberately not set here. MSVC has no /arch: value for a
+      # generic ARM64 baseline, so forcing one makes qdk-uarch.cmake build
+      # /arch:armv8-a, fail its own flag check and warn on every MSVC run -- and
+      # again from macis-uarch.cmake. clang-cl, meanwhile, does accept
+      # -march=armv8-a. qdk-uarch.cmake already derives exactly the right answer
+      # for each: unset for MSVC, armv8-a for clang-cl on an ARM64 target. Note
+      # it reads the environment as well as the cache variable, so leaving this
+      # unset is what lets both the C++ and the Python builds auto-detect.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       # The ARM64 runner image ships CMake 4.x, which errors out on projects
@@ -816,13 +853,34 @@ jobs:
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
 
+    # The dependency cache key uses a hash of the build plan rather than of the
+    # build script. Hashing the script meant any edit to it -- even one that only
+    # touched a comment or a diagnostic -- discarded the cache and forced a cold
+    # rebuild, which on the ARM64 runner takes over five hours against a six hour
+    # ceiling. The fingerprint is produced by the same script that performs the
+    # build, from the same plan object the build consumes, so it moves when the
+    # build would actually differ and stays put otherwise.
+    - name: Compute dependency build plan fingerprint
+      id: deps-fp
+      shell: pwsh
+      run: |
+        $fp = & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir    "${{ github.workspace }}" `
+            -ClPath    "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType RelWithDebInfo `
+            -Triplet   "${{ env.VCPKG_TRIPLET }}" `
+            -EmitFingerprint | Select-Object -Last 1
+        if (-not $fp) { throw "The build plan fingerprint came back empty." }
+        Write-Host "deps build plan fingerprint: $fp"
+        "fingerprint=$fp" >> $env:GITHUB_OUTPUT
+
     - name: Restore vcpkg cache
       id: cache-vcpkg
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Restore deps-install cache
       id: cache-deps
@@ -831,7 +889,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -852,7 +910,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -860,7 +918,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -871,7 +929,6 @@ jobs:
         $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
-          -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
           -DMACIS_ENABLE_TESTS=OFF `
