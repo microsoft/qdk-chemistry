@@ -47,8 +47,10 @@ void bind_boson_mapping(pybind11::module& data) {
 Boson-to-qubit encoding family.
 
 Every encoding maps the truncated local Fock space of one mode onto
-``nq = log2(d)`` qubits. ``StandardBinary`` and ``GrayCode`` use exactly the
-same number of Pauli terms and differ only in which computational basis state
+``nq = log2(d)`` qubits. ``StandardBinary``, the default, uses
+``codeword(n) = n``; ``GrayCode`` uses ``codeword(n) = n XOR (n >> 1)``, so
+adjacent occupations differ in a single bit. The two use exactly the same
+number of Pauli terms and differ only in which computational basis state
 represents which occupation number.
 
 ``Custom`` is not an encoding rule but a tag: it marks a mapping built by
@@ -56,11 +58,6 @@ represents which occupation number.
 is carried explicitly by the object. It is never inferred, so a table that
 happens to equal the standard-binary one still reports ``Custom``, and it cannot
 be passed to :meth:`BosonMapping.for_encoding`.
-
-Attributes:
-    StandardBinary: ``codeword(n) = n``. The default.
-    GrayCode: ``codeword(n) = n XOR (n >> 1)``; adjacent occupations differ in a single bit.
-    Custom: Tag for a mapping built from an explicit codeword table.
 )")
       .value("StandardBinary", BosonEncoding::StandardBinary)
       .value("GrayCode", BosonEncoding::GrayCode)

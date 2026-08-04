@@ -1,6 +1,6 @@
 """QDK/Chemistry boson-to-qubit mapper abstractions and utilities.
 
-This module provides the base class :class:`BosonQubitMapper` as well as the
+This module provides the base class `BosonQubitMapper` as well as the
 :class:`BosonQubitMapperFactory` for mapping bosonic Hamiltonians to qubit
 operators.
 """

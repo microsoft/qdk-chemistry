@@ -32,7 +32,7 @@ using BosonPauliTerms =
     std::vector<std::pair<std::complex<double>, SparsePauliWord>>;
 
 /**
- * @brief Boson-to-qubit encodings supported by @ref BosonMapping.
+ * @brief Boson-to-qubit encodings supported by @c BosonMapping.
  *
  * @ref BosonEncoding::StandardBinary and @ref BosonEncoding::GrayCode are named
  * conveniences: each fixes one particular codeword table. @ref
@@ -287,7 +287,7 @@ class BosonMapping : public DataClass {
    * mapping built by @ref from_codeword_table, the label supplied there, or
    * ``"custom"`` if none was given. This is the string a plugin backend reads
    * to pick a transform, and the string recorded on a mapped
-   * @ref QubitOperator.
+   * @c QubitOperator.
    *
    * @note @ref MajoranaMapping deliberately carries two names — @c name and
    *       @c base_encoding — because tapering renames a mapping while leaving
@@ -323,7 +323,7 @@ class BosonMapping : public DataClass {
   /**
    * @brief The full codeword table of a mode, indexed by occupation level.
    *
-   * The exact inverse of @ref from_codeword_table: feeding one table per mode
+   * The exact inverse of @ref from_codeword_table — feeding one table per mode
    * back to that factory reproduces this mapping's operators.
    *
    * @param mode Mode index.
