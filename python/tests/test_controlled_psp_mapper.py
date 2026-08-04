@@ -282,9 +282,9 @@ class TestPrepareSelectMapper:
         r"""Unary QPE driven by the PSP mapper must recover the ground-state energy.
 
         This is the end-to-end payoff of making the signed-power schedule
-        block-encoding agnostic: the SOSSA mapper is nowhere in this pipeline, yet the same
-        unary-iteration QPE builder recovers the ground state of :math:`H = aX + bZ`
-        through a PREPARE-SELECT-PREPARE walk. The initial state is the exact eigenvector,
+        block-encoding agnostic: nothing in this pipeline knows what the block encoding is,
+        yet the same unary-iteration QPE builder recovers the ground state of
+        :math:`H = aX + bZ` through a PREPARE-SELECT-PREPARE walk. The initial state is the exact eigenvector,
         so the residual error is pure phase discretization rather than state overlap.
 
         The equal-coefficient case is exact: :math:`E = -1/\sqrt{2}` and
