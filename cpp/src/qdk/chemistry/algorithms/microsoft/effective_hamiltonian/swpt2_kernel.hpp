@@ -167,12 +167,11 @@ struct MeanFieldResult {
 };
 MeanFieldResult mean_field_fold(const SoTensors& h_bd, const SoPartition& part);
 
-/// The effective active-space operator + the discarded-body diagnostic.
+/// The effective active-space operator and intruder diagnostics.
 struct DownfoldResult {
   double e = 0.0;
-  Eigen::MatrixXd f_active;       ///< (n_so, n_so), active block
-  Eigen::VectorXd v_active;       ///< (n_so^4,), active block
-  double higher_body_norm = 0.0;  ///< L2 norm of the discarded >= 3-body part
+  Eigen::MatrixXd f_active;  ///< (n_so, n_so), active block
+  Eigen::VectorXd v_active;  ///< (n_so^4,), active block
   /// Smallest |Delta| over the coupled occupation-changing channels (context).
   double min_denominator = 0.0;
   /// Largest raw amplitude |V / Delta| (perturbation-convergence indicator; the
@@ -256,19 +255,20 @@ struct ActiveDownfoldResult {
   /// effective two-body (the same-spin blocks are its antisymmetrization) --
   /// hence O(n_act^4), not O(n_ac^4) = 16 n_act^4.
   Eigen::VectorXd v_abab;
-  double higher_body_norm = 0.0;  ///< L2 norm of the discarded >= 3-body part
-  double min_denominator = 0.0;   ///< smallest |Delta| over coupled channels
-  double max_amplitude = 0.0;     ///< largest raw |V/Delta| (intruder gauge)
+  double min_denominator = 0.0;  ///< smallest |Delta| over coupled channels
+  double max_amplitude = 0.0;    ///< largest raw |V/Delta| (intruder gauge)
 };
 
 /// Memory-lean equivalent of `reference::downfold`: consumes the spin-blocked
 /// spatial two-body store (`SpinBlocked2B`) and computes every antisymmetric
 /// two-body element on the fly, so the dense n_so^4 tensors (`v`, generator
 /// `s2`, the block-diagonal / off-diagonal split) are never materialized. The
-/// nonempty Wick contractions are evaluated as BLAS matrix products over
-/// flattened active and buffer tuples; operand-internal reference contractions
-/// are reduced while packing those panels. Disconnected highest-rank products
-/// are canceled before evaluation. The result is stored as the
+/// retained Wick contractions are evaluated from packed active/buffer panels;
+/// dense channels use BLAS matrix products and the one-line `S2 * V2` channel
+/// enumerates only active-index coincidences that can survive two-body
+/// truncation. Operand-internal reference contractions are reduced while
+/// packing the panels. Disconnected highest-rank products are canceled before
+/// evaluation. The result is stored as the
 /// spatial opposite-spin block over the active
 /// *spatial* orbitals (`ActiveDownfoldResult::v_abab`, O(n_act^4) --
 /// spin-restriction makes that single block the whole effective two-body).
@@ -279,8 +279,7 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,
                                       const Eigen::VectorXd& eps,
                                       const SoPartition& part,
-                                      const RegOptions& reg, double e_core,
-                                      bool compute_higher_body_norm = true);
+                                      const RegOptions& reg, double e_core);
 
 /// Relabel the compact `ActiveDownfoldResult` active block to compact spatial
 /// chemist integrals for a qdk CanonicalFourCenter Hamiltonian.

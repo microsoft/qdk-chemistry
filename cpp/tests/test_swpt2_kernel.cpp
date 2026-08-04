@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <random>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -215,7 +216,6 @@ TEST(Swpt2Kernel, SecondOrderShiftVirtual) {
   const double shift = -tau * tau / (e1 - e0);         // -tau^2 / Delta
   EXPECT_NEAR(res.f_active(0, 0), e0 + shift, 1e-12);  // alpha
   EXPECT_NEAR(res.f_active(1, 1), e0 + shift, 1e-12);  // beta (spin symmetry)
-  EXPECT_NEAR(res.higher_body_norm, 0.0, 1e-12);       // no >2-body from 1-body
 }
 
 TEST(Swpt2Kernel, SecondOrderShiftInactive) {
@@ -359,7 +359,8 @@ MatrixSwParts build_matrix_sw_parts(const Eigen::MatrixXd& h1,
                                     const Eigen::VectorXd& g,
                                     const Eigen::VectorXd& eps,
                                     const sw::SoPartition& part,
-                                    double core_energy) {
+                                    double core_energy,
+                                    const sw::RegOptions& reg = {}) {
   const int norb = static_cast<int>(h1.rows());
   const int n_so = 2 * norb;
   const int dimension = 1 << n_so;
@@ -380,9 +381,11 @@ MatrixSwParts build_matrix_sw_parts(const Eigen::MatrixXd& h1,
     double denominator = 0.0;
     for (int orbital : create) denominator += eps(orbital);
     for (int orbital : annihilate) denominator -= eps(orbital);
-    if (std::abs(denominator) <= 1e-12)
+    if (std::abs(denominator) <= 1e-12 && reg.denom_flow == 0.0 &&
+        reg.denom_shift == 0.0)
       throw std::runtime_error("matrix reference has a zero denominator");
-    add_term_matrix(result.generator, n_so, coefficient / denominator, create,
+    add_term_matrix(result.generator, n_so,
+                    coefficient * sw::reg_inv(denominator, reg), create,
                     annihilate);
   };
 
@@ -616,58 +619,112 @@ TEST(Swpt2Kernel, ProductionMatchesIndependentFockSpaceMatrix) {
   set_sym_eri(g, 0, 3, 0, 0, norb, 0.05);
   set_sym_eri(g, 1, 2, 1, 1, norb, -0.04);
 
-  const auto part = sw::make_partition(norb, /*active=*/{0, 1},
-                                       /*occupation=*/{2.0, 0.0, 2.0, 0.0});
   Eigen::VectorXd eps(n_so);
   eps << -0.8, -0.8, 0.35, 0.35, -2.7, -2.7, 3.4, 3.4;
   const double core_energy = 0.23;
 
-  const MatrixSwParts reference =
-      build_matrix_sw_parts(h1, g, eps, part, core_energy);
-  const Eigen::MatrixXd reference_effective =
-      reference.block_diagonal +
-      0.5 * (reference.generator * reference.off_diagonal -
-             reference.off_diagonal * reference.generator);
+  sw::RegOptions bare;
+  sw::RegOptions shifted;
+  shifted.denom_shift = 0.4;
+  sw::RegOptions flow;
+  flow.denom_flow = 1.2;
 
-  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
-  const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
-  const auto downfolded = sw::downfold_blocked(one_body, blocked, eps, part,
-                                               sw::RegOptions{}, core_energy);
-  const auto emitted = sw::to_spatial_chemist(downfolded, part);
-  const Eigen::MatrixXd production = spatial_chemist_matrix(emitted);
+  struct PartitionCase {
+    std::vector<int> active;
+    int inactive;
+  };
+  const auto validate = [&](const Eigen::MatrixXd& case_h1,
+                            const Eigen::VectorXd& case_g) {
+    const auto blocked = sw::build_two_body_blocked_restricted(case_g, norb);
+    const auto one_body = sw::spin_orbital_one_body(case_h1, case_h1, norb);
+    for (const auto& partition_case :
+         {PartitionCase{{0, 1}, 2}, PartitionCase{{1, 2}, 0}}) {
+      std::vector<double> occupation(norb, 0.0);
+      occupation[partition_case.inactive] = 2.0;
+      const auto part =
+          sw::make_partition(norb, partition_case.active, occupation);
+      const std::uint64_t external_reference =
+          (std::uint64_t{1} << (2 * partition_case.inactive)) |
+          (std::uint64_t{1} << (2 * partition_case.inactive + 1));
+      const auto expand_active = [&](std::uint64_t compact) {
+        std::uint64_t full = external_reference;
+        for (int active = 0; active < 2; ++active)
+          for (int spin = 0; spin < 2; ++spin)
+            if (compact & (std::uint64_t{1} << (2 * active + spin)))
+              full |= std::uint64_t{1}
+                      << (2 * partition_case.active[active] + spin);
+        return static_cast<int>(full);
+      };
 
-  const std::uint64_t external_reference =
-      (std::uint64_t{1} << 4) | (std::uint64_t{1} << 5);
-  double max_error = 0.0;
-  double max_correction = 0.0;
-  for (std::uint64_t bra = 0; bra < 16; ++bra) {
-    if (__builtin_popcountll(bra) > 2) continue;
-    for (std::uint64_t ket = 0; ket < 16; ++ket) {
-      if (__builtin_popcountll(ket) > 2) continue;
-      const int full_bra = static_cast<int>(external_reference | bra);
-      const int full_ket = static_cast<int>(external_reference | ket);
-      max_error = std::max(
-          max_error,
-          std::abs(reference_effective(full_bra, full_ket) -
-                   production(static_cast<int>(bra), static_cast<int>(ket))));
-      max_correction =
-          std::max(max_correction,
-                   std::abs(reference_effective(full_bra, full_ket) -
-                            reference.block_diagonal(full_bra, full_ket)));
+      for (const auto& reg : {bare, shifted, flow}) {
+        const MatrixSwParts reference =
+            build_matrix_sw_parts(case_h1, case_g, eps, part, core_energy, reg);
+        const Eigen::MatrixXd reference_effective =
+            reference.block_diagonal +
+            0.5 * (reference.generator * reference.off_diagonal -
+                   reference.off_diagonal * reference.generator);
+        const auto downfolded = sw::downfold_blocked(one_body, blocked, eps,
+                                                     part, reg, core_energy);
+        const auto emitted = sw::to_spatial_chemist(downfolded, part);
+        const Eigen::MatrixXd production = spatial_chemist_matrix(emitted);
+
+        double max_error = 0.0;
+        double max_correction = 0.0;
+        for (std::uint64_t bra = 0; bra < 16; ++bra) {
+          if (__builtin_popcountll(bra) > 2) continue;
+          for (std::uint64_t ket = 0; ket < 16; ++ket) {
+            if (__builtin_popcountll(ket) > 2) continue;
+            const int full_bra = expand_active(bra);
+            const int full_ket = expand_active(ket);
+            max_error = std::max(
+                max_error, std::abs(reference_effective(full_bra, full_ket) -
+                                    production(static_cast<int>(bra),
+                                               static_cast<int>(ket))));
+            max_correction = std::max(
+                max_correction,
+                std::abs(reference_effective(full_bra, full_ket) -
+                         reference.block_diagonal(full_bra, full_ket)));
+          }
+        }
+        double max_two_body_dressing = 0.0;
+        for (int p = 0; p < emitted.norb; ++p)
+          for (int q = 0; q < emitted.norb; ++q)
+            for (int r = 0; r < emitted.norb; ++r)
+              for (int s = 0; s < emitted.norb; ++s)
+                max_two_body_dressing = std::max(
+                    max_two_body_dressing,
+                    std::abs(
+                        emitted.two_body(sw::idx4(p, q, r, s, emitted.norb)) -
+                        case_g(sw::idx4(partition_case.active[p],
+                                        partition_case.active[q],
+                                        partition_case.active[r],
+                                        partition_case.active[s], norb))));
+        EXPECT_GT(max_correction, 1e-6);
+        EXPECT_GT(max_two_body_dressing, 1e-6);
+        EXPECT_LT(max_error, 1e-10);
+      }
     }
+  };
+
+  validate(h1, g);
+
+  std::mt19937 generator(0x5A17u);
+  std::uniform_real_distribution<double> coupling(-0.08, 0.08);
+  for (int sample = 0; sample < 2; ++sample) {
+    Eigen::MatrixXd random_h1 = Eigen::MatrixXd::Zero(norb, norb);
+    random_h1.diagonal() << -0.8, 0.35, -2.7, 3.4;
+    for (int p = 0; p < norb; ++p)
+      for (int q = p + 1; q < norb; ++q)
+        random_h1(p, q) = random_h1(q, p) = coupling(generator);
+
+    Eigen::VectorXd random_g = Eigen::VectorXd::Zero(g.size());
+    for (int p = 0; p < norb; ++p)
+      for (int q = p; q < norb; ++q)
+        for (int r = 0; r < norb; ++r)
+          for (int s = r; s < norb; ++s)
+            set_sym_eri(random_g, p, q, r, s, norb, coupling(generator));
+    validate(random_h1, random_g);
   }
-  double max_two_body_dressing = 0.0;
-  for (int p = 0; p < emitted.norb; ++p)
-    for (int q = 0; q < emitted.norb; ++q)
-      for (int r = 0; r < emitted.norb; ++r)
-        for (int s = 0; s < emitted.norb; ++s)
-          max_two_body_dressing = std::max(
-              max_two_body_dressing,
-              std::abs(emitted.two_body(sw::idx4(p, q, r, s, emitted.norb)) -
-                       g(sw::idx4(p, q, r, s, norb))));
-  EXPECT_GT(max_correction, 1e-6);
-  EXPECT_GT(max_two_body_dressing, 1e-6);
-  EXPECT_LT(max_error, 1e-10);
 }
 
 // ---------------------------------------------------------------------------
@@ -912,7 +969,6 @@ TEST(Swpt2Kernel, SemicanonicalDownfoldIsBlockRotationInvariant) {
     sw::ActiveHamiltonian hamiltonian;
     double min_denominator;
     double max_amplitude;
-    double higher_body_norm;
   };
   const auto run = [&](const Eigen::MatrixXd& h_in, const Eigen::VectorXd& g_in,
                        const Eigen::MatrixXd& density_in) {
@@ -946,8 +1002,7 @@ TEST(Swpt2Kernel, SemicanonicalDownfoldIsBlockRotationInvariant) {
         sw::rotate_one_body(effective.one_body, active_rotation.transpose());
     effective.two_body = sw::rotate_two_body(
         effective.two_body, active_rotation.transpose(), effective.norb);
-    return Result{effective, down.min_denominator, down.max_amplitude,
-                  down.higher_body_norm};
+    return Result{effective, down.min_denominator, down.max_amplitude};
   };
 
   const Result reference = run(h, g, density);
@@ -986,7 +1041,6 @@ TEST(Swpt2Kernel, SemicanonicalDownfoldIsBlockRotationInvariant) {
             1e-10);
   EXPECT_NEAR(rotated.min_denominator, reference.min_denominator, 1e-10);
   EXPECT_NEAR(rotated.max_amplitude, reference.max_amplitude, 1e-10);
-  EXPECT_NEAR(rotated.higher_body_norm, reference.higher_body_norm, 1e-10);
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,11 +1094,11 @@ TEST(Swpt2Kernel, RestrictedSpinBlockedStorageReusesSameSpinBlock) {
 // The on-the-fly (spin-blocked) downfold reproduces the dense spin-orbital
 // reference representation: the emitted effective Hamiltonian (core energy,
 // active one-body, active chemist two-body) is identical, as are the intruder
-// diagnostics and discarded higher-body norm. This validates the production
-// BLAS matching kernels against the scalar projected-Wick regression path.
+// diagnostics. This validates the production contraction kernels against the
+// scalar projected-Wick regression path.
 // Arbitrary distinct aa/ab/bb integrals exercise all spin blocks.
 TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
-  const int norb = 4;
+  const int norb = 5;
   const int n4 = norb * norb * norb * norb;
   Eigen::VectorXd gaa(n4), gab(n4), gbb(n4);
   for (int i = 0; i < n4; ++i) {
@@ -1062,49 +1116,41 @@ TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
   }
   const double e_core = 0.7;
   Eigen::VectorXd na(norb), nb(norb);
-  na << 1.0, 0.5, 0.0, 0.0;
+  na << 1.0, 0.5, 0.0, 0.0, 0.0;
   nb = na;
   const auto eps = sw::diagonal_fock_energies(h1, gaa, na, nb, norb);
-  const auto part = sw::make_partition(norb, /*active=*/{1, 2},
-                                       /*occupation=*/{2.0, 1.0, 0.0, 0.0});
-  const sw::RegOptions reg;  // default: plain 1/D with floor
+  const auto part =
+      sw::make_partition(norb, /*active=*/{1, 2, 3},
+                         /*occupation=*/{2.0, 1.0, 0.0, 0.0, 0.0});
 
   const auto so =
       sw::reference::build_tensors(h1, h1, gaa, gab, gbb, e_core, norb);
-  const auto ref = sw::reference::downfold(so, eps, part, reg);
-
   const auto blk = sw::build_two_body_blocked(gaa, gab, gbb, norb);
   const auto f = sw::spin_orbital_one_body(h1, h1, norb);
-  const auto got = sw::downfold_blocked(f, blk, eps, part, reg, e_core);
-  const auto without_higher_body =
-      sw::downfold_blocked(f, blk, eps, part, reg, e_core, false);
 
-  // Compare the emitted effective Hamiltonians (representation-independent:
-  // the reference stores a full spin-orbital tensor, `got` a spatial spin
-  // block) plus the diagnostics carried on the result structs.
-  const auto ref_ham = sw::reference::to_spatial_chemist(ref, part);
-  const auto got_ham = sw::to_spatial_chemist(got, part);
-  ASSERT_EQ(got_ham.norb, ref_ham.norb);
-  EXPECT_NEAR(got_ham.core_energy, ref_ham.core_energy, 1e-10);
-  EXPECT_LT((got_ham.one_body - ref_ham.one_body).cwiseAbs().maxCoeff(), 1e-10);
-  EXPECT_LT((got_ham.two_body - ref_ham.two_body).cwiseAbs().maxCoeff(), 1e-10);
-  EXPECT_NEAR(got.min_denominator, ref.min_denominator, 1e-10);
-  EXPECT_NEAR(got.max_amplitude, ref.max_amplitude, 1e-10);
-  EXPECT_NEAR(got.higher_body_norm, ref.higher_body_norm, 1e-10);
-  const auto without_higher_body_ham =
-      sw::to_spatial_chemist(without_higher_body, part);
-  EXPECT_NEAR(without_higher_body_ham.core_energy, got_ham.core_energy, 1e-10);
-  EXPECT_LT((without_higher_body_ham.one_body - got_ham.one_body)
-                .cwiseAbs()
-                .maxCoeff(),
-            1e-10);
-  EXPECT_LT((without_higher_body_ham.two_body - got_ham.two_body)
-                .cwiseAbs()
-                .maxCoeff(),
-            1e-10);
-  EXPECT_NEAR(without_higher_body.min_denominator, got.min_denominator, 1e-10);
-  EXPECT_NEAR(without_higher_body.max_amplitude, got.max_amplitude, 1e-10);
-  EXPECT_TRUE(std::isnan(without_higher_body.higher_body_norm));
+  sw::RegOptions bare;
+  sw::RegOptions shifted;
+  shifted.denom_shift = 0.4;
+  sw::RegOptions flow;
+  flow.denom_flow = 1.2;
+  for (const auto& reg : {bare, shifted, flow}) {
+    const auto ref = sw::reference::downfold(so, eps, part, reg);
+    const auto got = sw::downfold_blocked(f, blk, eps, part, reg, e_core);
+
+    // Compare the emitted effective Hamiltonians (representation-independent:
+    // the reference stores a full spin-orbital tensor, `got` a spatial spin
+    // block) plus the diagnostics carried on the result structs.
+    const auto ref_ham = sw::reference::to_spatial_chemist(ref, part);
+    const auto got_ham = sw::to_spatial_chemist(got, part);
+    ASSERT_EQ(got_ham.norb, ref_ham.norb);
+    EXPECT_NEAR(got_ham.core_energy, ref_ham.core_energy, 1e-10);
+    EXPECT_LT((got_ham.one_body - ref_ham.one_body).cwiseAbs().maxCoeff(),
+              1e-10);
+    EXPECT_LT((got_ham.two_body - ref_ham.two_body).cwiseAbs().maxCoeff(),
+              1e-10);
+    EXPECT_NEAR(got.min_denominator, ref.min_denominator, 1e-10);
+    EXPECT_NEAR(got.max_amplitude, ref.max_amplitude, 1e-10);
+  }
 }
 
 }  // namespace

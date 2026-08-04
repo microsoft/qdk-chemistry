@@ -32,7 +32,6 @@ class SchriefferWolffPT2Diagnostics final
                                 double denominator_shift, double flow_parameter,
                                 double min_denominator,
                                 double max_raw_amplitude,
-                                double higher_body_norm,
                                 bool semicanonical_rotation_applied)
       : regularizer_(std::move(regularizer)),
         denominator_floor_(denominator_floor),
@@ -40,7 +39,6 @@ class SchriefferWolffPT2Diagnostics final
         flow_parameter_(flow_parameter),
         min_denominator_(min_denominator),
         max_raw_amplitude_(max_raw_amplitude),
-        higher_body_norm_(higher_body_norm),
         semicanonical_rotation_applied_(semicanonical_rotation_applied) {}
 
   std::string method() const override { return "swpt2"; }
@@ -50,7 +48,6 @@ class SchriefferWolffPT2Diagnostics final
   double flow_parameter() const { return flow_parameter_; }
   double min_denominator() const { return min_denominator_; }
   double max_raw_amplitude() const { return max_raw_amplitude_; }
-  double higher_body_norm() const { return higher_body_norm_; }
   bool semicanonical_rotation_applied() const {
     return semicanonical_rotation_applied_;
   }
@@ -62,7 +59,6 @@ class SchriefferWolffPT2Diagnostics final
   double flow_parameter_;
   double min_denominator_;
   double max_raw_amplitude_;
-  double higher_body_norm_;
   bool semicanonical_rotation_applied_;
 };
 
@@ -80,9 +76,8 @@ class SchriefferWolffPT2Diagnostics final
  * ROHF, and spin-adapted CAS references. Every singly occupied ROHF orbital
  * must be active. Noncanonical orbitals are semicanonicalized independently
  * within inactive, active, and virtual blocks. The kernel returns intruder
- * diagnostics with the effective Hamiltonian; the discarded-body norm is
- * optional because storing the active rank-three operator is expensive. A
- * large-amplitude warning is also logged.
+ * diagnostics with the effective Hamiltonian. A large-amplitude warning is
+ * also logged.
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor

@@ -163,7 +163,6 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
   EXPECT_DOUBLE_EQ(settings.get<double>("intruder_warn_amplitude"), 1.0);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
   EXPECT_DOUBLE_EQ(settings.get<double>("semicanonical_tolerance"), 1e-10);
-  EXPECT_FALSE(settings.get<bool>("compute_higher_body_norm"));
   EXPECT_ANY_THROW(settings.set("regularizer", std::string("unknown")));
   EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
 
@@ -234,7 +233,6 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   EXPECT_DOUBLE_EQ(diagnostics->denominator_shift(), 0.0);
   EXPECT_GT(diagnostics->max_raw_amplitude(), 0.0);
   EXPECT_GT(diagnostics->min_denominator(), 0.0);
-  EXPECT_TRUE(std::isnan(diagnostics->higher_body_norm()));
   auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, 2, 2);
 
@@ -279,7 +277,6 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   // which are exact for this canonical closed-shell reference.)
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("swpt2");
   swpt2_bare->settings().set("regularizer", std::string("bare"));
-  swpt2_bare->settings().set("compute_higher_body_norm", true);
   auto bare_result = swpt2_bare->run(reference, H_window);
   auto H_eff_bare = bare_result.hamiltonian();
   auto bare_diagnostics =
@@ -287,7 +284,6 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
           bare_result.diagnostics());
   ASSERT_NE(bare_diagnostics, nullptr);
   EXPECT_EQ(bare_diagnostics->regularizer(), "bare");
-  EXPECT_TRUE(std::isfinite(bare_diagnostics->higher_body_norm()));
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
@@ -388,6 +384,62 @@ TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
 
   auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 0);
+  EXPECT_TRUE(std::isfinite(E_sw));
+}
+
+TEST(SchriefferWolffPT2, AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
+  auto hydroxyl = testing::create_oh_structure();
+  auto scf = ScfSolverFactory::create();
+  scf->settings().set("enable_gdm", false);
+  scf->settings().set("method", std::string("hf"));
+  scf->settings().set("scf_type", std::string("restricted"));
+  auto [E_rohf, wfn_rohf] = scf->run(hydroxyl, 0, 2, "sto-3g");
+  const auto orbitals = wfn_rohf->get_orbitals();
+  ASSERT_TRUE(orbitals->is_restricted());
+
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
+  selector->settings().set("num_active_electrons", 3);
+  selector->settings().set("num_active_orbitals", 2);
+  auto selected = selector->run(wfn_rohf);
+  const auto [na, nb] = selected->get_active_num_electrons();
+  ASSERT_EQ(na + nb, 3);
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto H_P = ham->run(selected->get_orbitals());
+  auto cas_reference = MultiConfigurationCalculatorFactory::create("macis_cas");
+  cas_reference->settings().set("calculate_one_rdm", true);
+  auto [E_cas, reference] = cas_reference->run(H_P, na, nb);
+  ASSERT_TRUE(reference->has_active_one_rdm());
+
+  namespace qcd = qdk::chemistry::data;
+  const auto active = qcd::spin_channel_indices(
+      selected->get_orbitals()->active_indices(), qcd::axes::alpha());
+  const auto inactive = qcd::spin_channel_indices(
+      selected->get_orbitals()->inactive_indices(), qcd::axes::alpha());
+  std::set<size_t> used(active.begin(), active.end());
+  used.insert(inactive.begin(), inactive.end());
+  std::vector<size_t> window(active.begin(), active.end());
+  for (size_t orbital = 0; orbital < orbitals->get_num_molecular_orbitals();
+       ++orbital)
+    if (!used.count(orbital)) {
+      window.push_back(orbital);
+      break;
+    }
+  ASSERT_GT(window.size(), active.size());
+  std::sort(window.begin(), window.end());
+
+  auto H_window = ham->run(testing::with_active_space(
+      orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto result = swpt2->run(reference, H_window);
+  ASSERT_NE(result.hamiltonian(), nullptr);
+  auto diagnostics = std::dynamic_pointer_cast<SchriefferWolffPT2Diagnostics>(
+      result.diagnostics());
+  ASSERT_NE(diagnostics, nullptr);
+  EXPECT_TRUE(std::isfinite(diagnostics->max_raw_amplitude()));
+
+  auto cas_effective = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_sw, wfn_sw] = cas_effective->run(result.hamiltonian(), na, nb);
   EXPECT_TRUE(std::isfinite(E_sw));
 }
 

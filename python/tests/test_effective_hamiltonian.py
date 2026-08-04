@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
-
 import numpy as np
 import pytest
 
@@ -124,4 +122,3 @@ class TestEffectiveHamiltonianConstructor:
         assert diagnostics.flow_parameter == pytest.approx(1.0)
         assert diagnostics.min_denominator > 0.0
         assert diagnostics.max_raw_amplitude > 0.0
-        assert math.isnan(diagnostics.higher_body_norm)

@@ -89,9 +89,6 @@ void bind_effective_hamiltonian_constructor(py::module &m) {
       .def_property_readonly(
           "max_raw_amplitude",
           &microsoft::SchriefferWolffPT2Diagnostics::max_raw_amplitude)
-      .def_property_readonly(
-          "higher_body_norm",
-          &microsoft::SchriefferWolffPT2Diagnostics::higher_body_norm)
       .def_property_readonly("semicanonical_rotation_applied",
                              &microsoft::SchriefferWolffPT2Diagnostics::
                                  semicanonical_rotation_applied);
@@ -233,11 +230,9 @@ orbital energies, preserving spin symmetry while the active solve selects the
 desired spin sector.
 
 The result includes raw intruder-amplitude, minimum-denominator, selected
-regularizer metadata, and whether a semicanonical rotation was applied. The
-discarded higher-body norm is disabled by default; set
-``compute_higher_body_norm=True`` to compute it. Otherwise
-``higher_body_norm`` is NaN. A warning is also logged when the raw amplitude
-exceeds ``intruder_warn_amplitude``.
+regularizer metadata, and whether a semicanonical rotation was applied. A
+warning is also logged when the raw amplitude exceeds
+``intruder_warn_amplitude``.
 
 Typical usage:
 

@@ -391,10 +391,65 @@ namespace {
 using Term = std::vector<std::pair<int, int>>;  // (spin-orbital, 1=cre / 0=ann)
 using FermionOp = std::map<Term, double>;
 
+struct RetainedOperator {
+  using Operator = std::pair<int, int>;
+
+  explicit RetainedOperator(const std::vector<int>& active_so)
+      : so2c(active_so.empty() ? 0 : active_so.back() + 1, -1),
+        one_body(Eigen::MatrixXd::Zero(active_so.size(), active_so.size())),
+        two_body(Eigen::VectorXd::Zero(n4(active_so.size() / 2))) {
+    for (int compact = 0; compact < static_cast<int>(active_so.size());
+         ++compact)
+      so2c[active_so[compact]] = compact;
+  }
+
+  void add(const Term& term, double coeff) {
+    add(term.data(), static_cast<int>(term.size()), coeff);
+  }
+
+  void add(const Operator* term, int size, double coeff) {
+    if (size == 0) {
+      scalar += coeff;
+    } else if (size == 2) {
+      one_body(compact(term[0].first), compact(term[1].first)) += coeff;
+    } else if (size == 4) {
+      const int c0 = compact(term[0].first), c1 = compact(term[1].first);
+      const int a0 = compact(term[2].first), a1 = compact(term[3].first);
+      add_abab(c0, c1, a0, a1, +coeff);
+      add_abab(c1, c0, a0, a1, -coeff);
+      add_abab(c0, c1, a1, a0, -coeff);
+      add_abab(c1, c0, a1, a0, +coeff);
+    }
+  }
+
+  double scalar = 0.0;
+  std::vector<int> so2c;
+  Eigen::MatrixXd one_body;
+  Eigen::VectorXd two_body;
+
+ private:
+  int compact(int orbital) const { return so2c[orbital]; }
+
+  void add_abab(int i, int j, int k, int l, double coeff) {
+    if ((i & 1) == 0 && (j & 1) == 1 && (k & 1) == 0 && (l & 1) == 1) {
+      const int nactive = one_body.rows() / 2;
+      two_body(idx4(i >> 1, j >> 1, k >> 1, l >> 1, nactive)) += coeff;
+    }
+  }
+};
+
+void add_term(FermionOp& out, const Term& term, double coeff) {
+  out[term] += coeff;
+}
+
+void add_term(RetainedOperator& out, const Term& term, double coeff) {
+  out.add(term, coeff);
+}
+
 // Normal-order a raw operator string (anticommutation), accumulating into
 // `out`.
-void normalize(Term ops, double coeff, FermionOp& out,
-               int max_output_length = 8) {
+template <class Output>
+void normalize(Term ops, double coeff, Output& out) {
   const int n = static_cast<int>(ops.size());
   for (int i = 0; i + 1 < n; ++i) {
     const int ai = ops[i].first, aa = ops[i].second;
@@ -403,20 +458,69 @@ void normalize(Term ops, double coeff, FermionOp& out,
     if (wrong) {
       Term swapped = ops;
       std::swap(swapped[i], swapped[i + 1]);
-      normalize(swapped, -coeff, out,
-                max_output_length);  // a b = -b a + {a, b}
-      if (aa != ba && ai == bi) {    // contraction {a, b} = 1
+      normalize(swapped, -coeff, out);  // a b = -b a + {a, b}
+      if (aa != ba && ai == bi) {       // contraction {a, b} = 1
         Term c;
         c.reserve(n - 2);
         for (int k = 0; k < n; ++k)
           if (k != i && k != i + 1) c.push_back(ops[k]);
-        normalize(c, coeff, out, max_output_length);
+        normalize(c, coeff, out);
       }
       return;
     }
     if (aa == ba && ai == bi) return;  // repeated operator -> 0
   }
-  if (n <= max_output_length) out[ops] += coeff;
+  if (n <= 4) add_term(out, ops, coeff);
+}
+
+void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
+                        double coeff, RetainedOperator& out) {
+  for (int i = 0; i + 1 < n; ++i) {
+    const int ai = ops[i].first, aa = ops[i].second;
+    const int bi = ops[i + 1].first, ba = ops[i + 1].second;
+    const bool wrong = (aa == 0 && ba == 1) || (aa == ba && ai > bi);
+    if (wrong) {
+      auto swapped = ops;
+      std::swap(swapped[i], swapped[i + 1]);
+      normalize_retained(swapped, n, -coeff, out);
+      if (aa != ba && ai == bi) {
+        auto contracted = ops;
+        std::move(contracted.begin() + i + 2, contracted.begin() + n,
+                  contracted.begin() + i);
+        normalize_retained(contracted, n - 2, coeff, out);
+      }
+      return;
+    }
+    if (aa == ba && ai == bi) return;
+  }
+  if (n <= 4) out.add(ops.data(), n, coeff);
+}
+
+void normalize(const Term& ops, double coeff, RetainedOperator& out) {
+  std::array<RetainedOperator::Operator, 8> fixed_ops{};
+  std::copy(ops.begin(), ops.end(), fixed_ops.begin());
+  normalize_retained(fixed_ops, static_cast<int>(ops.size()), coeff, out);
+}
+
+template <std::size_t N, class Output>
+void normalize_slots(const std::array<int, N>& values,
+                     const std::array<int, N>& is_cre,
+                     const std::vector<int>& slots, double coeff, Output& out) {
+  Term ops;
+  ops.reserve(slots.size());
+  for (int slot : slots) ops.push_back({values[slot], is_cre[slot]});
+  normalize(std::move(ops), coeff, out);
+}
+
+template <std::size_t N>
+void normalize_slots(const std::array<int, N>& values,
+                     const std::array<int, N>& is_cre,
+                     const std::vector<int>& slots, double coeff,
+                     RetainedOperator& out) {
+  std::array<RetainedOperator::Operator, 8> ops{};
+  int size = 0;
+  for (int slot : slots) ops[size++] = {values[slot], is_cre[slot]};
+  normalize_retained(ops, size, coeff, out);
 }
 
 // All disjoint-pair matchings (i < j) of `slots`, including the empty matching.
@@ -483,11 +587,11 @@ void assign_active_slots(std::array<int, 8>& slots,
 // Every one-cross-line product is a matrix multiplication after flattening
 // the active legs remaining on each operator into rows and the buffer line
 // into the shared column. This covers retained and discarded-body channels.
-template <class A2Get, class B2Get>
+template <class A2Get, class B2Get, class Output>
 void project_one_line_between_blas(const Eigen::MatrixXd& A1, A2Get A2get,
                                    const Eigen::MatrixXd& B1, B2Get B2get,
                                    const SoPartition& part, double scale,
-                                   int max_output_length, FermionOp& out) {
+                                   Output& out) {
   std::vector<int> active_list, inactive_list, virtual_list;
   for (int orbital = 0; orbital < part.n_so; ++orbital) {
     if (part.is_active[orbital]) active_list.push_back(orbital);
@@ -555,21 +659,80 @@ void project_one_line_between_blas(const Eigen::MatrixXd& A1, A2Get A2get,
         }
       }
 
-      Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 nrow_a, nrow_b, nbuffer, 1.0, a.data(), nrow_a, b.data(),
-                 nrow_b, 0.0, product.data(), nrow_a);
-      for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
-        for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b) {
-          const double coeff = prefactor * product(row_a, row_b);
-          if (coeff == 0.0) continue;
-          std::array<int, 8> values{};
-          assign_active_slots(values, ext_a, row_a, active_list);
-          assign_active_slots(values, ext_b, row_b, active_list);
-          Term ops;
-          ops.reserve(ext.size());
-          for (int slot : ext) ops.push_back({values[slot], is_cre[slot]});
-          normalize(ops, coeff, out, max_output_length);
+      if (rA == 2 && rB == 2) {
+        // The raw one-line S2 * V2 product has three active operators from
+        // each operand. Its rank-three part is discarded. A retained term can
+        // arise only when an annihilator from A equals a creator from B, so
+        // enumerate that union instead of all nactive^6 row pairs.
+        std::vector<int> a_annihilators, b_creators;
+        for (int slot : ext_a)
+          if (!is_cre[slot]) a_annihilators.push_back(slot);
+        for (int slot : ext_b)
+          if (is_cre[slot]) b_creators.push_back(slot);
+
+        std::vector<int> active_position(part.n_so, -1);
+        for (int index = 0; index < static_cast<int>(active_list.size());
+             ++index)
+          active_position[active_list[index]] = index;
+        std::vector<char> seen(nrow_b, 0);
+        std::vector<Eigen::Index> candidates;
+        candidates.reserve(a_annihilators.size() * b_creators.size() *
+                           integer_power(nactive, ext_b.size() - 1));
+
+        for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
+          std::array<int, 8> values_a{};
+          assign_active_slots(values_a, ext_a, row_a, active_list);
+          candidates.clear();
+          for (int a_slot : a_annihilators) {
+            for (int b_slot : b_creators) {
+              const Eigen::Index free_count =
+                  integer_power(nactive, ext_b.size() - 1);
+              for (Eigen::Index free = 0; free < free_count; ++free) {
+                std::array<int, 8> values_b{};
+                values_b[b_slot] = values_a[a_slot];
+                Eigen::Index remaining = free;
+                for (auto slot = ext_b.rbegin(); slot != ext_b.rend(); ++slot) {
+                  if (*slot == b_slot) continue;
+                  values_b[*slot] = active_list[remaining % nactive];
+                  remaining /= nactive;
+                }
+                Eigen::Index row_b = 0;
+                for (int slot : ext_b)
+                  row_b = row_b * nactive + active_position[values_b[slot]];
+                if (!seen[row_b]) {
+                  seen[row_b] = 1;
+                  candidates.push_back(row_b);
+                }
+              }
+            }
+          }
+
+          for (Eigen::Index row_b : candidates) {
+            double product = 0.0;
+            for (Eigen::Index q = 0; q < nbuffer; ++q)
+              product += a(row_a, q) * b(row_b, q);
+            const double coeff = prefactor * product;
+            if (coeff == 0.0) continue;
+            std::array<int, 8> values = values_a;
+            assign_active_slots(values, ext_b, row_b, active_list);
+            normalize_slots(values, is_cre, ext, coeff, out);
+          }
+          for (Eigen::Index row_b : candidates) seen[row_b] = 0;
+        }
+      } else {
+        Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   nrow_a, nrow_b, nbuffer, 1.0, a.data(), nrow_a, b.data(),
+                   nrow_b, 0.0, product.data(), nrow_a);
+        for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
+          for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b) {
+            const double coeff = prefactor * product(row_a, row_b);
+            if (coeff == 0.0) continue;
+            std::array<int, 8> values{};
+            assign_active_slots(values, ext_a, row_a, active_list);
+            assign_active_slots(values, ext_b, row_b, active_list);
+            normalize_slots(values, is_cre, ext, coeff, out);
+          }
         }
       }
     }
@@ -579,12 +742,11 @@ void project_one_line_between_blas(const Eigen::MatrixXd& A1, A2Get A2get,
 // Two cross-operator contractions in A2 * B2 leave two active legs on each
 // tensor. Flattening each active pair into a row and the two buffer indices
 // into a column turns every Wick matching into one matrix multiplication.
-template <class A2Get, class B2Get>
+template <class A2Get, class B2Get, class Output>
 void project_two_body_between_blas(A2Get A2get, B2Get B2get,
                                    const SoPartition& part, double scale,
                                    const Eigen::VectorXd& hvec,
-                                   const Eigen::VectorXd& pvec,
-                                   FermionOp& out) {
+                                   const Eigen::VectorXd& pvec, Output& out) {
   std::vector<int> active_list, inactive_list, virtual_list;
   for (int orbital = 0; orbital < part.n_so; ++orbital) {
     if (part.is_active[orbital]) active_list.push_back(orbital);
@@ -697,11 +859,11 @@ void project_two_body_between_blas(A2Get A2get, B2Get B2get,
 // shared column, and contractions internal to one operand are reduced while
 // packing that operand's panel. Matchings owned by the specialized one- and
 // two-line kernels above are excluded.
-template <class A2Get, class B2Get>
+template <class A2Get, class B2Get, class Output>
 void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
                             const Eigen::MatrixXd& B1, B2Get B2get,
                             const SoPartition& part, double scale,
-                            int max_output_length, FermionOp& out) {
+                            Output& out) {
   std::vector<int> active_list, inactive_list, virtual_list;
   for (int orbital = 0; orbital < part.n_so; ++orbital) {
     if (part.is_active[orbital]) active_list.push_back(orbital);
@@ -845,7 +1007,7 @@ void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
           Term ops;
           ops.reserve(ext.size());
           for (int slot : ext) ops.push_back({values[slot], is_cre[slot]});
-          normalize(ops, coeff, out, max_output_length);
+          normalize(ops, coeff, out);
         }
       }
     }
@@ -1022,7 +1184,6 @@ DownfoldResult downfold(const SoTensors& h, const Eigen::VectorXd& eps,
   res.v_active = ps.v_active;
   res.min_denominator = gen.min_denominator;
   res.max_amplitude = gen.max_amplitude;
-  double higher2 = 0.0;
   for (const auto& [term, coeff] : comm) {
     const int len = static_cast<int>(term.size());
     if (len == 0) {
@@ -1036,11 +1197,8 @@ DownfoldResult downfold(const SoTensors& h, const Eigen::VectorXd& eps,
       res.v_active(idx4(c1, c0, a0, a1, M)) -= coeff;
       res.v_active(idx4(c0, c1, a1, a0, M)) -= coeff;
       res.v_active(idx4(c1, c0, a1, a0, M)) += coeff;
-    } else {
-      higher2 += coeff * coeff;  // discarded >= 3-body
     }
   }
-  res.higher_body_norm = std::sqrt(higher2);
   return res;
 }
 
@@ -1194,8 +1352,7 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,
                                       const Eigen::VectorXd& eps,
                                       const SoPartition& part,
-                                      const RegOptions& reg, double e_core,
-                                      bool compute_higher_body_norm) {
+                                      const RegOptions& reg, double e_core) {
   const int M = part.n_so;
 
   // Active spin-orbitals (ascending) + full -> compact index map, so the
@@ -1203,9 +1360,6 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
   std::vector<int> active_so;
   for (int o = 0; o < M; ++o)
     if (part.is_active[o]) active_so.push_back(o);
-  std::vector<int> so2c(M, -1);
-  for (int c = 0; c < static_cast<int>(active_so.size()); ++c)
-    so2c[active_so[c]] = c;
 
   // On-the-fly two-body element accessors (no dense n_so^4 storage).
   const auto v_at = [&](int P, int Q, int R, int S) {
@@ -1301,15 +1455,6 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
           res.v_abab(idx4(p, q, r, s, n_act)) =
               bd_v_at(active_so[2 * p], active_so[2 * q + 1], active_so[2 * r],
                       active_so[2 * s + 1]);
-  // Accumulate a commutator contribution into the opposite-spin block (compact
-  // spin-orbital indices; only abab-patterned images are kept -- the same-spin
-  // images are its antisymmetrization and are never read from the emitted
-  // operator).
-  const auto add_abab = [&](int I, int J, int K, int L, double val) {
-    if ((I & 1) == 0 && (J & 1) == 1 && (K & 1) == 0 && (L & 1) == 1)
-      res.v_abab(idx4(I >> 1, J >> 1, K >> 1, L >> 1, n_act)) += val;
-  };
-
   // reference-occupation propagators: hole line on virtual, particle on
   // inactive
   Eigen::VectorXd hvec = Eigen::VectorXd::Zero(M);
@@ -1320,42 +1465,19 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
   }
 
   // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
-  FermionOp comm;
+  RetainedOperator comm(active_so);
   project_two_body_between_blas(s2_at, od_v_at, part, +0.5, hvec, pvec, comm);
   project_two_body_between_blas(od_v_at, s2_at, part, -0.5, hvec, pvec, comm);
-  const int max_output_length = compute_higher_body_norm ? 8 : 4;
-  project_one_line_between_blas(s1, s2_at, od_f, od_v_at, part, +0.5,
-                                max_output_length, comm);
-  project_one_line_between_blas(od_f, od_v_at, s1, s2_at, part, -0.5,
-                                max_output_length, comm);
-  project_remaining_blas(s1, s2_at, od_f, od_v_at, part, +0.5,
-                         max_output_length, comm);
-  project_remaining_blas(od_f, od_v_at, s1, s2_at, part, -0.5,
-                         max_output_length, comm);
+  project_one_line_between_blas(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
+  project_one_line_between_blas(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
+  project_remaining_blas(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
+  project_remaining_blas(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
 
   res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
   res.max_amplitude = max_amp;
-  double higher2 = 0.0;
-  for (const auto& [term, coeff] : comm) {
-    const int len = static_cast<int>(term.size());
-    if (len == 0) {
-      res.e += coeff;
-    } else if (len == 2) {
-      res.f_active(so2c[term[0].first], so2c[term[1].first]) += coeff;
-    } else if (len == 4) {
-      const int c0 = so2c[term[0].first], c1 = so2c[term[1].first];
-      const int a0 = so2c[term[2].first], a1 = so2c[term[3].first];
-      add_abab(c0, c1, a0, a1, +coeff);
-      add_abab(c1, c0, a0, a1, -coeff);
-      add_abab(c0, c1, a1, a0, -coeff);
-      add_abab(c1, c0, a1, a0, +coeff);
-    } else {
-      higher2 += coeff * coeff;
-    }
-  }
-  res.higher_body_norm = compute_higher_body_norm
-                             ? std::sqrt(higher2)
-                             : std::numeric_limits<double>::quiet_NaN();
+  res.e += comm.scalar;
+  res.f_active += comm.one_body;
+  res.v_abab += comm.two_body;
   return res;
 }
 
