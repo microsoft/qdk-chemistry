@@ -57,7 +57,11 @@ def generate_cubefiles_from_orbitals(
         output_folder = Path(output_folder)
         output_folder.mkdir(parents=True, exist_ok=True)
 
-    mol = basis_to_pyscf_mol(orbitals.get_basis_set())
+    basis_set = orbitals.get_basis_set()
+    try:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=1)
+    except RuntimeError:
+        mol = basis_to_pyscf_mol(basis_set, charge=0, multiplicity=2)
     nmo = orbitals.get_num_molecular_orbitals()
     mo_range = range(nmo)
     nx, ny, nz = grid_size

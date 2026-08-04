@@ -19,6 +19,12 @@ GAUXC::GAUXC(std::shared_ptr<BasisSet> basis_set, const SCFConfig& cfg)
   unrestricted_ = (cfg.scf_orbital_type == SCFOrbitalType::Unrestricted);
   xc_name_ = cfg.exc.xc_name;
 
+  // The functional name and spin treatment are part of the registry key so
+  // that distinct functionals (or spin treatments) do not alias to the same
+  // cached GAUXC instance.
+  gauxc_input_.xc_name = xc_name_;
+  gauxc_input_.unrestricted = unrestricted_;
+
   // Get or create the GAUXC implementation via the registry
   impl::GAUXC* gauxc_impl = util::GAUXCRegistry::get_or_create(
       *basis_set, gauxc_input_, unrestricted_, xc_name_);

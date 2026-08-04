@@ -23,9 +23,10 @@ from qdk_chemistry.algorithms.active_space_selector import (
 )
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
-from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
+from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
+from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -72,6 +73,8 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "ExpectationEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
+    "GeometryOptimizer",
+    "GeometryOptimizerSettings",
     "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
@@ -85,6 +88,7 @@ __all__ = [
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
     "QdkHamiltonianConstructor",
+    "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",
     "QdkMacisCas",

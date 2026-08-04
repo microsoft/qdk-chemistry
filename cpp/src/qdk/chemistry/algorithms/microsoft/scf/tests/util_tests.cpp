@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/util/cache.h>
 #include <qdk/chemistry/scf/util/class_registry.h>
+#include <qdk/chemistry/scf/util/gauxc_util.h>
 #include <qdk/chemistry/scf/util/singleton.h>
 
 #include <Eigen/Dense>
@@ -463,6 +464,34 @@ TEST(ClassRegistryTest, PrimitiveKey) {
   EXPECT_EQ(IntKeyRegistry::find(42), obj1);
   EXPECT_EQ(IntKeyRegistry::find(99), obj2);
   EXPECT_EQ(IntKeyRegistry::find(100), nullptr);  // Non-existent key
+}
+
+//==============================================================================
+// GAUXCInput Hash Tests
+//==============================================================================
+
+// Regression guard: the GAUXC registry is keyed on GAUXCInput, so the
+// functional name and spin treatment must contribute to the hash. Otherwise
+// two calculations that share grid settings but differ only in functional (or
+// spin) alias to the same cached GAUXC instance, silently reusing the wrong
+// functional.
+TEST(GauxcInputHashTest, FunctionalAndSpinArePartOfKey) {
+  std::hash<GAUXCInput> hasher;
+
+  GAUXCInput base;
+  base.xc_name = "pbe";
+  base.unrestricted = true;
+
+  GAUXCInput different_functional = base;
+  different_functional.xc_name = "m06-2x";
+  EXPECT_NE(hasher(base), hasher(different_functional));
+
+  GAUXCInput different_spin = base;
+  different_spin.unrestricted = false;
+  EXPECT_NE(hasher(base), hasher(different_spin));
+
+  GAUXCInput identical = base;
+  EXPECT_EQ(hasher(base), hasher(identical));
 }
 
 //==============================================================================
