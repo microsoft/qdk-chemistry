@@ -55,7 +55,7 @@ Settings
    * - ``rounds``
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
-     
+
 Further Reading
 ---------------
 

@@ -237,6 +237,7 @@ class AmplitudeAmplification(Algorithm):
         angle = cls._rotation_angle(overlap)
         return math.sin((2 * rounds + 1) * angle) ** 2
 
+
 class AmplitudeAmplificationFactory(AlgorithmFactory):
     """Factory class for creating AmplitudeAmplification instances."""
 

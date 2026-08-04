@@ -270,12 +270,8 @@ def test_marking_oracle_conjunction_holds(qsharp_module):
 
 @pytest.mark.parametrize("phase_value", range(8))
 def test_phase_marking_oracles_match_their_criteria(qsharp_module, phase_value: int):
-    index_result = qsharp_module.run(
-        f"{_NAMESPACE}.RunPhaseIndexMarker(3, [1, 6], {phase_value})", shots=1
-    )[0]
-    threshold_result = qsharp_module.run(
-        f"{_NAMESPACE}.RunPhaseThresholdMarker(3, 3, {phase_value})", shots=1
-    )[0]
+    index_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseIndexMarker(3, [1, 6], {phase_value})", shots=1)[0]
+    threshold_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseThresholdMarker(3, 3, {phase_value})", shots=1)[0]
     assert (str(index_result) == "One") == (phase_value in {1, 6})
     assert (str(threshold_result) == "One") == (phase_value <= 3)
 
@@ -450,7 +446,7 @@ def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_indices: 
             continue
         counts[phase_bits] = counts.get(phase_bits, 0) + count
     assert counts, f"No shot landed in the accepted window {accepted_indices}."
-    return max(counts, key=counts.get)
+    return max(counts, key=lambda phase: counts[phase])
 
 
 def test_amplitude_amplification_is_registered():
