@@ -8,12 +8,14 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper, UnaryIterationWalkMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import Circuit, QubitOperator
+from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import create_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, use_qsharp_context
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
@@ -26,6 +28,26 @@ def _build_unitary_rep(pauli_strings, coefficients, *, quantum_walk=False):
     hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
     builder = LCUBuilder(quantum_walk=quantum_walk)
     return builder.run(hamiltonian)
+
+
+def _exact_ground_state_preparation(hamiltonian: QubitOperator) -> tuple[Circuit, float]:
+    """Build a circuit preparing the exact ground state, plus that state's energy."""
+    energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+    num_qubits = hamiltonian.num_qubits
+    params = {
+        "rowMap": list(range(num_qubits - 1, -1, -1)),
+        "stateVector": np.real(vectors[:, 0]).tolist(),
+        "expansionOps": [],
+        "numQubits": num_qubits,
+    }
+    circuit = Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=params,
+        ),
+        qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params),
+    )
+    return circuit, float(energies[0])
 
 
 def _extract_block_encoding_submatrix(full_unitary, num_target, num_ancilla):
@@ -181,6 +203,156 @@ class TestPrepareSelectMapper:
         assert np.allclose(
             phases, expected_phases, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_use_walk_promotes_a_block_encoding_to_the_walk(self):
+        r"""``use_walk`` on a plain LCU container must reproduce the walk container exactly.
+
+        The setting exists so a plain block encoding can be scheduled as a walk without
+        rebuilding the container as an ``LCUWalkContainer``. Comparing the two full
+        unitaries pins that the promoted path really appends the reflection, and appends it
+        in the same place, rather than merely producing something walk-shaped.
+        """
+        coeffs = np.array([0.5, 0.3])
+
+        walk_from_container = ControlledPSPMapper().run(_build_unitary_rep(["X", "Z"], coeffs, quantum_walk=True))
+
+        promoted_mapper = ControlledPSPMapper()
+        promoted_mapper.settings().set("use_walk", True)
+        walk_from_setting = promoted_mapper.run(_build_unitary_rep(["X", "Z"], coeffs))
+
+        assert np.allclose(
+            Operator(walk_from_setting.get_qiskit_circuit()).data,
+            Operator(walk_from_container.get_qiskit_circuit()).data,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_default_leaves_a_block_encoding_unreflected(self):
+        """Without ``use_walk`` a plain LCU container must stay a bare block encoding.
+
+        This is the other half of the setting's contract: the default must not silently
+        change the operator that existing callers get.
+        """
+        coeffs = np.array([0.5, 0.3])
+        plain = ControlledPSPMapper().run(_build_unitary_rep(["X", "Z"], coeffs))
+        walk = ControlledPSPMapper().run(_build_unitary_rep(["X", "Z"], coeffs, quantum_walk=True))
+
+        assert not np.allclose(
+            Operator(plain.get_qiskit_circuit()).data,
+            Operator(walk.get_qiskit_circuit()).data,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_satisfies_the_unary_iteration_walk_interface(self):
+        """The mapper must be usable as a unary-iteration walk mapper.
+
+        The unary QPE builder checks this structurally, so a missing or renamed method
+        would only surface as a runtime failure deep inside circuit construction.
+        """
+        mapper = ControlledPSPMapper()
+        assert isinstance(mapper, UnaryIterationWalkMapper)
+
+        unitary_rep = _build_unitary_rep(["X", "Z"], np.array([0.5, 0.3]), quantum_walk=True)
+        assert mapper.num_ancillary_qubits(unitary_rep.get_container()) == 1
+        assert mapper.build_walk_op(unitary_rep, 3) is not None
+        assert mapper.get_ancilla_prep_op() is not None
+
+    def test_rejects_a_non_positive_query_count(self):
+        """A signed-power schedule with no blocks is meaningless and must be rejected."""
+        unitary_rep = _build_unitary_rep(["X", "Z"], np.array([0.5, 0.3]), quantum_walk=True)
+        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
+            ControlledPSPMapper().build_walk_op(unitary_rep, 0)
+
+    def test_rejects_a_block_encoding_with_no_ancilla(self):
+        """With no ancilla there is nothing to reflect about, so no walk exists.
+
+        A single-term Hamiltonian needs zero PREPARE ancillas, which would make the
+        reflection a global phase and the schedule silently degenerate.
+        """
+        unitary_rep = _build_unitary_rep(["X"], np.array([1.0]))
+        with pytest.raises(ValueError, match="non-empty ancilla register"):
+            ControlledPSPMapper().build_walk_op(unitary_rep, 3)
+
+    @pytest.mark.parametrize(
+        ("coefficients", "num_queries", "tolerance"),
+        [(np.array([0.5, 0.5]), 63, 1e-9), (np.array([0.5, 0.3]), 63, 0.02)],
+    )
+    def test_unary_qpe_recovers_the_walk_phase_of_a_psp_block_encoding(self, coefficients, num_queries, tolerance):
+        r"""Unary QPE driven by the PSP mapper must recover the ground-state energy.
+
+        This is the end-to-end payoff of making the signed-power schedule
+        block-encoding agnostic: the SOSSA mapper is nowhere in this pipeline, yet the same
+        unary-iteration QPE builder recovers the ground state of :math:`H = aX + bZ`
+        through a PREPARE-SELECT-PREPARE walk. The initial state is the exact eigenvector,
+        so the residual error is pure phase discretization rather than state overlap.
+
+        The equal-coefficient case is exact: :math:`E = -1/\sqrt{2}` and
+        :math:`\lambda = 1` give a walk phase of :math:`3/8`, so :math:`2\phi = 3/4` lands
+        exactly on bin :math:`3N/4`. That bin is not invariant under bit reversal, which
+        makes this the assertion that pins the endianness of the measured bitstring: the
+        reversed bin would decode to :math:`+0.98` instead of :math:`-0.71`.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=coefficients)
+        state_prep, ground_energy = _exact_ground_state_preparation(hamiltonian)
+
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=num_queries,
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+            ),
+        )
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
+
+        assert result.raw_energy == pytest.approx(ground_energy, abs=tolerance)
+
+    def test_walk_matrix_has_the_arccos_spectrum(self):
+        r"""The realized PSP walk must have eigenphases :math:`\pm\arccos(E/\lambda)`.
+
+        Qubitization is the claim that ``W = Reflect(ancilla) . PREPARE^dag SELECT PREPARE``
+        maps each Hamiltonian eigenvalue :math:`E` onto the pair of walk eigenphases
+        :math:`\pm\arccos(E/\lambda)`. That is what phase estimation later inverts, so it is
+        worth checking on the operator itself rather than only through a sampled circuit.
+        The walk is reconstructed column by column from ``dump_machine`` and its full
+        spectrum compared against the Hamiltonian, which also pins the register layout: a
+        swapped system/ancilla split would not reproduce these phases.
+        """
+        coefficients = np.array([0.5, 0.3])
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=coefficients)
+        normalization = float(np.sum(np.abs(coefficients)))
+
+        walk = np.zeros((4, 4), dtype=complex)
+        for basis_state in range(4):
+            context = create_qsharp_context()
+            with use_qsharp_context(context):
+                unitary_rep = _build_unitary_rep(["X", "Z"], coefficients, quantum_walk=True)
+                mapper = ControlledPSPMapper()
+                lcu, _, _ = mapper._resolve_lcu(unitary_rep.get_container())
+                context.code.QDKChemistry.Utils.PrepSelPrep.TestPSPWalkOnBasisState(
+                    mapper._build_prepare_op(lcu),
+                    mapper._build_pauli_select_op(lcu.select),
+                    1,
+                    1,
+                    1,
+                    basis_state,
+                )
+                # dump_machine puts the first allocated qubit in the most significant
+                # position, while ApplyXorInPlace writes the basis state little-endian.
+                column = int(format(basis_state, "02b")[::-1], 2)
+                walk[:, column] = np.array(context.dump_machine().as_dense_state())
+
+        assert np.allclose(walk.conj().T @ walk, np.eye(4), atol=float_comparison_absolute_tolerance)
+        energies = np.linalg.eigvalsh(hamiltonian.to_matrix())
+        expected = np.sort(np.concatenate([1, -1] * np.arccos(energies / normalization)[:, None]))
+        measured = np.sort(np.angle(np.linalg.eigvals(walk)))
+        assert measured == pytest.approx(expected, abs=1e-8)
 
     def test_reflect_via_dump_machine(self):
         r"""Verify the Reflect oracle via Q# dump_machine.

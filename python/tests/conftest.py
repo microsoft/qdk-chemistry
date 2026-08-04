@@ -25,10 +25,13 @@ matplotlib.use("Agg")
 
 import platform as plt
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
+import qdk
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -40,6 +43,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -73,6 +77,35 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context at the default profile, isolated from the shared one.
+
+    Tests that inspect quantum state need their own interpreter, because
+    ``dump_machine`` reports every qubit currently allocated in the context.
+    """
+    return create_qsharp_context()
+
+
+@pytest.fixture(scope="session")
+def base_qdk_ctx() -> qdk.Context:
+    """Shared ``TargetProfile.Base`` context, built once per session.
+
+    Base forbids mid-circuit measurement, so measurement-based uncompute
+    (``Adjoint AND``) lowers to a unitary circuit instead of one carrying
+    classical bits. Circuits handed to Qiskit must be compiled this way, since a
+    Qiskit circuit with classical bits cannot be converted to a gate.
+    """
+    return create_qsharp_context(TargetProfile.Base)
+
+
+@pytest.fixture(scope="module")
+def use_base_qdk_ctx(base_qdk_ctx: qdk.Context) -> Iterator[qdk.Context]:
+    """Resolve ``QSHARP_UTILS`` against the Base-profile context for a whole module."""
+    with use_qsharp_context(base_qdk_ctx) as context:
+        yield context
 
 
 @pytest.fixture

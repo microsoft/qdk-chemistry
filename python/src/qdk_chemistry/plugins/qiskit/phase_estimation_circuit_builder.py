@@ -115,7 +115,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # The compiled Qiskit circuit may have additional decomposition ancillas
         # beyond the logical count (e.g., for multi-controlled gate synthesis).
         num_system = qubit_hamiltonian.num_qubits
-        probe_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
+        probe_circuit, _, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
         num_unitary_ancilla = probe_circuit.get_qiskit_circuit().num_qubits - 1 - num_system
 
         phase = QuantumRegister(num_bits, "phase")
@@ -182,7 +182,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             power: The power to which the controlled unitary is raised.
 
         """
-        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        ctrl_unitary_circuit, _, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
         cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
@@ -314,7 +314,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, _, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
             return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)

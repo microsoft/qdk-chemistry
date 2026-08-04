@@ -13,6 +13,7 @@ import qdk
 from qdk import TargetProfile
 
 __all__ = [
+    "DEFAULT_TARGET_PROFILE",
     "QSHARP_UTILS",
     "create_qsharp_context",
     "get_qsharp_context",
@@ -21,6 +22,16 @@ __all__ = [
 ]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
+
+#: Profile the vendored Q# project is compiled for by default.
+#:
+#: Unary iteration toggles the helper qubit of its AND ladder between the compute and
+#: the uncompute, so ``Adjoint AND`` has to read a measurement result to know which
+#: correction to apply. ``TargetProfile.Base`` forbids that and silently lowers the
+#: uncompute to the unitary decomposition, which is only valid when the helper still
+#: holds the original AND. An adaptive profile is therefore required for correctness,
+#: not merely for cost.
+DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 
 
 class _SharedContext:
@@ -36,7 +47,7 @@ _thread_local = threading.local()
 
 
 def create_qsharp_context(
-    target_profile: TargetProfile = TargetProfile.Base,
+    target_profile: TargetProfile = DEFAULT_TARGET_PROFILE,
     target_name: str | None = None,
     language_features: list[str] | None = None,
     qdk_config: dict[str, int | float | str | bool] | None = None,
@@ -50,7 +61,10 @@ def create_qsharp_context(
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
-        ``TargetProfile.Base``.
+        :data:`DEFAULT_TARGET_PROFILE`. Pass ``TargetProfile.Base`` to get measurement-free
+        circuits, which is what the Qiskit interop path needs: a Qiskit circuit carrying
+        classical bits cannot be converted to a gate. Operations that rely on
+        measurement-based uncompute, such as unary iteration, are not valid under Base.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via

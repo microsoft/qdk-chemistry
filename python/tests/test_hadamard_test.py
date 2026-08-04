@@ -24,6 +24,19 @@ _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _base_profile_context(use_base_qdk_ctx):
+    """Compile this module's Q# under the Base profile.
+
+    The reference observables below are exact shot counts for ``seed=42``, so they
+    are only reproducible if the compiled program is fixed. An adaptive profile
+    lowers measurement-based uncompute into real mid-circuit measurements, which
+    consumes extra samples from the simulator's random stream and shifts the
+    counts.
+    """
+    return use_base_qdk_ctx
+
+
 def _make_hadamard_test(test_basis: HadamardTestBasis = HadamardTestBasis.X):
     """Create a Hadamard test configured with the given measurement basis."""
     return create(
