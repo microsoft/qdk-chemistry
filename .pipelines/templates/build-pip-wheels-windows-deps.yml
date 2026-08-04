@@ -116,12 +116,14 @@ steps:
 # The r<N> literal remains only as a manual escape hatch; it is no longer what
 # keeps the keys honest.
 #
-# Each phase also carries a transitional restore key: the pre-fingerprint base,
-# which is a strict prefix of the old keys and so still matches the caches banked
-# under the previous scheme. That lets this change adopt the existing trees --
-# the stamps then skip every dependency -- instead of forcing a rebuild that
-# costs the better part of a day. Remove them once a run has banked under the new
-# keys.
+# Every restore key below includes the fingerprint. A restore key that stopped
+# short of it would match any cache under the same base regardless of the flags
+# it was built with, and the stamps would not catch that, because they compare
+# each dependency's pinned version rather than its flags. Such a key would
+# quietly restore a tree built with different flags and undo the whole point of
+# the fingerprint. Two of them existed briefly, to migrate the pre-fingerprint
+# caches in place rather than spending most of a day rebuilding them, and came
+# out once that migration had banked.
 - ${{ if ne(parameters.phase, 'vcpkg') }}:
   - task: Cache@2
     displayName: Restore/save C++ deps install cache (${{ parameters.phase }})
@@ -135,8 +137,6 @@ steps:
           .pipelines/toolchains/windows.cmake |
           "$(DEPS_FINGERPRINT)" |
           "libint2"
-        restoreKeys: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       ${{ if eq(parameters.phase, 'rest') }}:
         key: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
@@ -146,9 +146,8 @@ steps:
           .pipelines/toolchains/windows.cmake |
           "$(DEPS_FINGERPRINT)" |
           "deps"
-        restoreKeys: |-
+        restoreKeys: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake | "$(DEPS_FINGERPRINT)" | "libint2"
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       ${{ if eq(parameters.phase, 'all') }}:
         key: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
@@ -158,8 +157,6 @@ steps:
           .pipelines/toolchains/windows.cmake |
           "$(DEPS_FINGERPRINT)" |
           "all"
-        restoreKeys: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       path: $(System.DefaultWorkingDirectory)/deps-install-msvc
       cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
