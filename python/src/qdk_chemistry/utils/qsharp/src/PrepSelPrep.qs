@@ -242,4 +242,25 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
+
+    /// Applies the PSP walk to a computational basis state, leaking the qubits.
+    ///
+    /// The qubits are leaked with `QIR.Runtime.AllocateQubitArray` so the full statevector
+    /// survives until the caller dumps it, which lets a test reconstruct the walk operator
+    /// column by column and check its spectrum without a Qiskit round trip. Register layout
+    /// is `[systemReg | ancillaReg]`.
+    operation TestPSPWalkOnBasisState(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+        basisState : Int,
+    ) : Unit {
+        let qs = QIR.Runtime.AllocateQubitArray(numSystemQubits + numAncillaQubits);
+        ApplyXorInPlace(basisState, qs);
+        for _ in 1..power {
+            PSPWalk(prepareOp, selectOp, qs[0..numSystemQubits - 1], qs[numSystemQubits...]);
+        }
+    }
 }

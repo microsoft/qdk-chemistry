@@ -23,6 +23,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSS
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import QdkStandardQpeCircuitBuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -650,6 +651,121 @@ class TestSOSSAQPEIntegration:
         assert abs(measured_e_gap - gs_energy) < discretization_tol, (
             f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, "
             f"expected={gs_energy:.6f}, tol={discretization_tol:.6f}"
+        )
+
+    def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
+        """Recover the H2 ground-state energy end-to-end with unary-iteration QPE.
+
+        This is the unary-iteration counterpart of the iterative-QPE test above and
+        exercises the full production path: SOSSABuilder -> SOSSAMapper ->
+        ``MakeUnaryQPECircuit`` -> sparse simulator -> bitstring decoding.
+
+        Two independent facts are asserted:
+
+        1. The measured phase register lands on the bin predicted by the exact
+           eigenvalue. The unary schedule applies ``W^(p-2a)``, so the measured
+           fraction tracks ``2*phi`` rather than ``phi``; the assertion is stated in
+           that variable and is tight to one bin, which pins the schedule, the
+           inverse QFT and the bitstring decoding together.
+        2. The recovered energy matches exact diagonalization. Because the SOS walk
+           places the ground state near ``phi = 1/2``, where ``dE/dphi = 0``, the
+           energy error is quadratic rather than linear in the phase resolution.
+           That quadratic suppression is the spectral amplification of Low 2025 and
+           the assertion below is the linear bound divided by it, so a regression
+           that reintroduced linear error would fail.
+        """
+        data = _build_h2_dfthc_data()
+        n_orb = data["N"]
+
+        h_matrix = _build_dfthc_hamiltonian_matrix(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
+        )
+        gs_energy, gs_vec = _get_ground_state_and_energy(h_matrix, n_orb, nalpha=1, nbeta=1)
+
+        fh = FactorizedHamiltonianContainer(
+            0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            data["h1"],
+            np.zeros((n_orb, n_orb)),
+            create_test_orbitals(n_orb),
+        )
+        sossa_op = _to_sossa_operator(fh)
+        container = SOSSABuilder().run(sossa_op).get_container()
+        lambda_sos = container.normalization
+
+        num_system_qubits = 2 * n_orb
+        state_prep_params = {
+            "rowMap": list(range(num_system_qubits - 1, -1, -1)),
+            "stateVector": gs_vec.real.tolist(),
+            "expansionOps": [],
+            "numQubits": num_system_qubits,
+        }
+        state_prep = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        )
+
+        num_queries = 31
+        num_bins = num_queries + 1
+        qpe = UnaryPhaseEstimation(shots=100)
+        qpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=num_queries,
+                controlled_circuit_mapper=AlgorithmRef(
+                    "controlled_circuit_mapper",
+                    "sossa",
+                    outer_prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+                    inner_prepare_algorithm="direct",
+                    select_algorithm="direct",
+                    coefficient_bit_precision=10,
+                    rotation_bit_precision=10,
+                ),
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+            ),
+        )
+        qpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=20250815),
+        )
+
+        result = qpe.run(qubit_hamiltonian=sossa_op, state_preparation=state_prep)
+
+        # (1) The register must land on the bin the exact eigenvalue predicts.
+        exact_phase = _energy_to_qpe_phase(gs_energy, lambda_sos)
+        exact_doubled_phase = (2 * exact_phase) % 1.0
+        measured_doubled_phase = result.metadata["measured_phase_fraction"]
+        bin_error = (
+            min(
+                abs(measured_doubled_phase - exact_doubled_phase),
+                1.0 - abs(measured_doubled_phase - exact_doubled_phase),
+            )
+            * num_bins
+        )
+        assert bin_error <= 1.0, (
+            f"Measured 2*phi={measured_doubled_phase:.6f} is {bin_error:.2f} bins away from the "
+            f"exact {exact_doubled_phase:.6f} (num_bins={num_bins})."
+        )
+
+        # (2) The recovered energy must match exact diagonalization, within the
+        # quadratically suppressed (amplified) bound rather than the linear one.
+        measured_e_gap = result.raw_energy - container.energy_shift
+        max_phase_error = 1.0 / num_bins
+        amplified_tol = lambda_sos * (1.0 - math.cos(2 * math.pi * max_phase_error))
+        linear_tol = lambda_sos * 2 * math.pi * max_phase_error
+        assert amplified_tol < linear_tol / 5, "Spectral amplification should beat the linear bound."
+        assert abs(measured_e_gap - gs_energy) < amplified_tol, (
+            f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, expected={gs_energy:.6f}, tol={amplified_tol:.6f}"
         )
 
     def test_sossa_qpe_direct_workflow(self):

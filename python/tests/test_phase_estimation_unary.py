@@ -132,11 +132,57 @@ class TestUnaryIterationQsharp:
         initial = np.array([np.cos(0.35), np.sin(0.35)], dtype=complex)
         num_address_qubits = _address_qubits(num_blocks + 1)
 
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationSignedPower(num_blocks, address_value)
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryIterationSignedPower(num_blocks, address_value)
         state = np.array(qdk_ctx.dump_machine().as_dense_state())
 
         expected = np.zeros(1 << (num_address_qubits + 1), dtype=complex)
         expected[:2] = _matrix_power(walk, num_blocks - 2 * address_value) @ initial
+        np.testing.assert_allclose(state, expected, atol=1e-10)
+
+
+class TestBlockEncodingAgnosticSchedule:
+    """The signed-power schedule must work for block encodings other than SOSSA."""
+
+    @pytest.mark.parametrize(
+        ("num_queries", "address_value"),
+        [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
+    )
+    def test_psp_schedule_matches_the_explicit_walk_power(self, qdk_ctx, num_queries, address_value):
+        """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract.
+
+        The Q# wrapper runs ``MakePSPSignedPowerScheduleOp`` at address ``t`` and then
+        explicitly undoes ``W^(p - 2t)`` walk steps built from the same PREPARE and SELECT.
+        Whatever remains must be the untouched input state, so any mismatch in the power,
+        the sign of the power, the reflection register, or the ancilla bookkeeping shows up
+        as a deviation.
+
+        This is the point of the refactor: nothing about SOSSA is involved here, only the
+        generic schedule driving a completely different block encoding.
+        """
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(num_queries, address_value, 0.7)
+        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+
+        num_address_qubits = _address_qubits(num_queries + 1)
+        expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
+        expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
+        expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
+        np.testing.assert_allclose(state, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qdk_ctx, theta):
+        """The contract must not depend on what the block encoding encodes.
+
+        ``PREPARE = Ry(theta)`` makes the encoded operator ``cos(theta)`` on the system
+        qubit, sweeping the walk from a trivial reflection (``theta = 0``) to the
+        maximally mixing case (``theta = pi/2``). A schedule that only happened to work
+        for one spectrum would fail here.
+        """
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(3, 1, theta)
+        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+
+        expected = np.zeros(1 << 4, dtype=complex)
+        expected[0] = np.cos(0.45)
+        expected[2] = np.sin(0.45)
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
 
@@ -307,20 +353,24 @@ class TestUnaryQpeEndToEnd:
 
     @staticmethod
     def _measure(qdk_ctx, num_queries: int, k: int, system_state: int) -> int:
-        """Run the synthetic-walk QPE circuit and read the phase register MSB-first."""
+        """Run the synthetic-walk QPE circuit and decode the phase register.
+
+        ``MakeUnaryQPECircuit`` returns the register least-significant bit first (the
+        circuit-executor bitstring convention), so a direct Q# caller must reverse it.
+        """
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
         results = qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(
             num_queries, theta, system_state
         )
-        return int("".join("1" if str(bit) == "One" else "0" for bit in results), 2)
+        return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
     def test_measured_bin_is_twice_the_walk_phase(self, qdk_ctx, num_queries, k, system_state):
-        """The measured register must read exactly ``2*phi*N``, MSB-first.
+        """The measured register must read exactly ``2*phi*N``.
 
         The synthetic walk is ``W = Rz(2*theta)`` built from two self-inverse
         reflections, so ``W|1> = e^{+i theta}|1>`` and ``W|0> = e^{-i theta}|0>``.
@@ -332,7 +382,7 @@ class TestUnaryQpeEndToEnd:
         the little-endian unary addressing reached through ``Reversed``, the
         endianness of ``Adjoint ApplyQFT`` (which writes the phase little-endian
         because ``ApplyQFT`` maps a little-endian input to a big-endian output),
-        and the most-significant-bit-first order of the returned results.
+        and the least-significant-bit-first order of the returned results.
         """
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
@@ -382,6 +432,42 @@ class TestUnaryQpeEndToEnd:
         for system_state in (0, 1):
             measured = self._measure(qdk_ctx, num_queries, k, system_state) / num_states
             assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_phase)
+
+    @pytest.mark.parametrize("bin_index", [1, 2, 3])
+    def test_inverse_qft_leaves_the_answer_little_endian(self, qdk_ctx, bin_index):
+        """After ``Adjoint ApplyQFT`` the answer sits little-endian in the phase register.
+
+        This is the contract that decides the order in which ``MakeUnaryQPECircuit`` must
+        return its results: a circuit executor emits the first measured ``Result`` as the
+        right-most character of the bitstring, so the register has to be returned in the same
+        little-endian order it is held in for ``int(bitstring, 2)`` to recover the bin.
+
+        The check is at statevector level rather than through sampling, and the block
+        encoding is deliberately a PREPARE-SELECT-PREPARE walk rather than the synthetic
+        single-qubit one, because ``PREPARE = Ry(theta)`` with ``SELECT = c-Z`` encodes
+        ``cos(theta)`` on ``|1>`` and so puts the answer on bin ``j`` exactly when
+        ``theta = pi*j/N``. Bins 1 and 2 are not invariant under bit reversal, so reading the
+        register with the opposite endianness fails here.
+        """
+        num_queries = 7
+        num_states = num_queries + 1
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSyntheticSchedulePhaseRamp(
+            num_queries, np.pi * bin_index / num_states, True
+        )
+        # dump_machine treats the first allocated qubit as most significant, so the row index
+        # is the phase register read big-endian; reverse it to get the little-endian value.
+        amplitudes = np.array(qdk_ctx.dump_machine().as_dense_state()).reshape(num_states, 4)
+        probabilities = np.zeros(num_states)
+        for row in range(num_states):
+            little_endian = int(format(row, "03b")[::-1], 2)
+            probabilities[little_endian] = np.sum(np.abs(amplitudes[row]) ** 2)
+
+        # |1> is an equal superposition of the two walk eigenvectors, whose conjugate
+        # phases land in bins j and N - j.
+        expected = np.zeros(num_states)
+        expected[bin_index] = 0.5
+        expected[-bin_index] = 0.5
+        assert probabilities == pytest.approx(expected, abs=1e-9)
 
 
 class TestRegistration:

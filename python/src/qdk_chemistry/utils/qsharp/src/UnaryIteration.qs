@@ -8,7 +8,10 @@
 /// Operations:
 ///   UnaryIteration — applies one action per address value.
 ///   UnaryIterationWithControl — same, but exposes the active one-hot control.
-///   UnaryIterationPowerSchedule — signed-power schedule over self-inverse blocks.
+///
+/// The signed-power schedule built on top of these lives in
+/// `QDKChemistry.Utils.UnaryPhaseEstimation`, which owns all phase-estimation-specific
+/// unary-iteration logic.
 ///
 /// All operations support address ranges that are not powers of two.
 ///
@@ -82,25 +85,9 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
-    /// Applies `numBlocks` self-inverse blocks, omitting one of `numBlocks + 1` reflections.
-    ///
-    /// With reflection A, block B, and walk W = A·B, the branch selected by address t
-    /// applies W^(numBlocks - 2t): pairs before the omitted reflection compose as W†
-    /// and pairs after it compose as W.
-    operation UnaryIterationPowerSchedule(
-        address : Qubit[],
-        numBlocks : Int,
-        applyReflectionUnlessSelected : (Qubit => Unit is Adj),
-        applyBlock : (Unit => Unit is Adj),
-    ) : Unit is Adj {
-        Fact(numBlocks > 0, "numBlocks must be positive");
-        UnaryIterationWithControl(address, numBlocks + 1, (slot, selected) => {
-            applyReflectionUnlessSelected(selected);
-            if slot < numBlocks {
-                applyBlock();
-            }
-        });
-    }
+    // The signed-power schedule that used to live here is now
+    // `QDKChemistry.Utils.UnaryPhaseEstimation.UnaryIterationPowerSchedule`, so that all
+    // phase-estimation-specific unary-iteration logic sits in one module.
 
     internal operation SinglyControlledUnaryIterationWithControl(
         ctl : Qubit,
@@ -208,29 +195,5 @@ namespace QDKChemistry.Utils.UnaryIteration {
                 Z(control);
             }
         });
-    }
-
-    /// Signed-power schedule with reflection A = Z and block B = X on one target
-    /// prepared in Ry(0.7)|0>.
-    ///
-    /// Branch `addressValue` must apply exactly (Z·X)^(numBlocks - 2*addressValue),
-    /// including the relative phase, which distinguishes every power in the schedule.
-    operation TestUnaryIterationSignedPower(numBlocks : Int, addressValue : Int) : Unit {
-        let numAddressQubits = AddressQubits(numBlocks + 1);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + 1);
-        let address = qs[0..numAddressQubits - 1];
-        let target = qs[numAddressQubits];
-        ApplyXorInPlace(addressValue, address);
-        Ry(0.7, target);
-        UnaryIterationPowerSchedule(address, numBlocks, (selected) => {
-            within {
-                X(selected);
-            } apply {
-                Controlled Z([selected], target);
-            }
-        }, () => {
-            X(target);
-        });
-        ApplyXorInPlace(addressValue, address);
     }
 }

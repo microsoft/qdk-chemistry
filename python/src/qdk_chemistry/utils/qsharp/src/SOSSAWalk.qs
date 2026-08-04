@@ -40,7 +40,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PhaseGradient.MakePhaseGradientAncillaPrep;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIterationPowerSchedule;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.MakeSignedPowerScheduleOp;
 
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -277,7 +277,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Apply the self-inverse block B = U† · Ref_B · U used by the SOSSA walk.
-    operation SOSSAWalkBlock(
+    operation SOSSABlockEncoding(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -329,7 +329,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         phaseGradientReg : Qubit[],
     ) : Unit is Adj + Ctl {
         body ... {
-            SOSSAWalkBlock(
+            SOSSABlockEncoding(
                 outerPrepareOp,
                 innerPrepareOp,
                 selectOp,
@@ -371,44 +371,62 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         controlled adjoint auto;
     }
 
-    /// Apply p SOSSA blocks while the address register omits one of p+1 outer reflections.
-    /// Address t therefore applies W^(p-2t), where W = Ref_{a,B} · B.
-    operation UnaryIterationSOSSAWalk(
+    /// Sub-register that the SOSSA walk reflection Ref_{a,B} acts on.
+    ///
+    /// These are the block-encoding ancillas whose all-zero state flags success: the outer
+    /// index/coefficient register, the reflected prefix of the inner register, and both spin
+    /// qubits. The phase-gradient register is a persistent resource, not part of the flag,
+    /// so it is excluded.
+    function SOSSAReflectionRegister(layout : SOSSAWalkLayout, allQubits : Qubit[]) : Qubit[] {
+        let regs = SplitSOSSAWalkRegisters(layout, allQubits);
+        regs.outerReg + regs.innerReg[0..layout.numReflectInner - 1] + regs.spinReg
+    }
+
+    /// Apply the SOSSA block encoding to a flat target register.
+    ///
+    /// Adapts `SOSSABlockEncoding` to the `Qubit[] => Unit is Adj` shape that the generic
+    /// signed-power schedule consumes, by slicing the flat register with `layout`.
+    operation SOSSABlockEncodingOnRegister(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numReflectInner : Int,
-        numOuterIndexQubits : Int,
-        numWalkSteps : Int,
-        phaseReg : Qubit[],
-        outerReg : Qubit[],
-        innerReg : Qubit[],
-        spinReg : Qubit[],
-        systemReg : Qubit[],
-        phaseGradientReg : Qubit[],
+        layout : SOSSAWalkLayout,
+        allQubits : Qubit[],
     ) : Unit is Adj {
-        let outerReflectionReg = outerReg + innerReg[0..numReflectInner - 1] + spinReg;
+        let regs = SplitSOSSAWalkRegisters(layout, allQubits);
+        SOSSABlockEncoding(
+            outerPrepareOp,
+            innerPrepareOp,
+            selectOp,
+            layout.numReflectInner,
+            layout.numOuterIndexQubits,
+            regs.outerReg,
+            regs.innerReg,
+            regs.spinReg,
+            regs.systemReg,
+            regs.phaseGradientReg,
+        );
+    }
 
-        UnaryIterationPowerSchedule(phaseReg, numWalkSteps, (skipControl) => {
-            within {
-                X(skipControl);
-            } apply {
-                Controlled Reflect([skipControl], outerReflectionReg);
-            }
-        }, () => {
-            SOSSAWalkBlock(
-                outerPrepareOp,
-                innerPrepareOp,
-                selectOp,
-                numReflectInner,
-                numOuterIndexQubits,
-                outerReg,
-                innerReg,
-                spinReg,
-                systemReg,
-                phaseGradientReg,
-            );
-        });
+    /// Schedule the SOSSA block encoding for unary-iteration phase estimation.
+    ///
+    /// Applies p SOSSA blocks while the address register omits one of p+1 outer reflections,
+    /// so address t applies W^(p-2t) with W = Ref_{a,B} · B. All of the scheduling logic
+    /// lives in `QDKChemistry.Utils.UnaryPhaseEstimation`; this function only supplies the
+    /// two SOSSA-specific pieces the schedule asks for - the block encoding and the register
+    /// its reflection acts on.
+    function MakeSOSSASignedPowerScheduleOp(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        numWalkSteps : Int,
+    ) : (Qubit[], Qubit[]) => Unit {
+        MakeSignedPowerScheduleOp(
+            SOSSABlockEncodingOnRegister(outerPrepareOp, innerPrepareOp, selectOp, layout, _),
+            SOSSAReflectionRegister(layout, _),
+            numWalkSteps
+        )
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -492,23 +510,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         useUnaryIteration : Bool,
     ) : (Qubit[], Qubit[]) => Unit {
         (controlReg, allQubits) => {
-            let regs = SplitSOSSAWalkRegisters(layout, allQubits);
             if useUnaryIteration {
-                UnaryIterationSOSSAWalk(
+                let schedule = MakeSOSSASignedPowerScheduleOp(
                     outerPrepareOp,
                     innerPrepareOp,
                     selectOp,
-                    layout.numReflectInner,
-                    layout.numOuterIndexQubits,
-                    numQueries,
-                    controlReg,
-                    regs.outerReg,
-                    regs.innerReg,
-                    regs.spinReg,
-                    regs.systemReg,
-                    regs.phaseGradientReg,
+                    layout,
+                    numQueries
                 );
+                schedule(controlReg, allQubits);
             } else {
+                let regs = SplitSOSSAWalkRegisters(layout, allQubits);
                 Fact(Length(controlReg) == 1, "the repeated controlled walk expects a single control qubit");
                 for _ in 0..numQueries - 1 {
                     if BeginEstimateCaching("Controlled_SOSSAWalkOp", SingleVariant()) {
