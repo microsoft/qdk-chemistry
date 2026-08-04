@@ -47,17 +47,6 @@ find_dependency(LAPACK REQUIRED)
 find_dependency(gauxc REQUIRED)
 find_dependency(Threads REQUIRED)
 
-# BTAS: the dense-tensor numeric backend for the DUCC effective-Hamiltonian
-# dressing. Its installed config requires a `blaspp_headers` INTERFACE target -- a shim the
-# ValeevGroup linear-algebra kit generates alongside BTAS. The kit installs it under
-# this prefix (lib/cmake/blaspp/blaspp_headers-targets.cmake), but BTAS's config only
-# re-scans the system blaspp directory (e.g. /usr/local) where it is absent, then hard
-# errors if the target is still undefined. Pre-load qdk's own copy so BTAS finds the
-# target already defined and skips that lookup.
-include("${CMAKE_CURRENT_LIST_DIR}/../blaspp/blaspp_headers-targets.cmake" OPTIONAL)
-
-find_dependency(BTAS REQUIRED)
-
 if(QDK_CHEMISTRY_ENABLE_DFTD3)
   find_dependency(s-dftd3 REQUIRED)
 endif()

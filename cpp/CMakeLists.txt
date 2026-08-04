@@ -189,8 +189,10 @@ target_link_libraries(chemistry PUBLIC
 # BTAS evaluates the DUCC effective-Hamiltonian dressing. The symbolic
 # Baker-Campbell-Hausdorff / Wick work is done offline by the SeQuant-based
 # generator in ducc/, whose output is checked in as ducc_equations.inc, so the
-# library itself needs only the dense-tensor backend at build and run time.
-target_link_libraries(chemistry PUBLIC BTAS::BTAS)
+# library itself needs only the dense-tensor backend at build time. BTAS is
+# header-only and reaches no public header, and the blaspp/lapackpp it calls
+# already reach consumers through macis::macis, so keep it out of the export.
+target_link_libraries(chemistry PRIVATE $<BUILD_INTERFACE:BTAS::BTAS>)
 
 # Conditionally link OpenMP
 if(QDK_ENABLE_OPENMP)
