@@ -212,7 +212,7 @@ _TOLERANCE = 0.04
 _HARNESS = """
 namespace QDKChemistryAmplitudeAmplificationTests {
     open QDKChemistry.Utils.AmplitudeAmplification;
-    import QDKChemistry.Utils.StandardPhaseEstimation.MakeStandardQPEOp;
+    open QDKChemistry.Utils.StandardPhaseEstimation;
     import Std.Arithmetic.*;
     import Std.Arrays.*;
     import Std.Convert.*;
@@ -273,7 +273,7 @@ namespace QDKChemistryAmplitudeAmplificationTests {
         // significant bit, which is what ApplyXorInPlace assumes as well.
         ApplyXorInPlace(phaseValue, register[0..numPhaseQubits - 1]);
         ApplyXorInPlace(ancillaValue, register[numPhaseQubits...]);
-        ApplyQpeAcceptanceMark(numPhaseQubits, signalAncillaIndices, accepted, register, flag);
+        ApplyAcceptanceMark(numPhaseQubits, signalAncillaIndices, accepted, register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return outcome;
@@ -308,7 +308,7 @@ namespace QDKChemistryAmplitudeAmplificationTests {
             3,
             1,
         );
-        let marker = MakeQpeAcceptanceMarkerOp(3, signalAncillaIndices, [2]);
+        let marker = MakeAcceptanceMarkerOp(3, signalAncillaIndices, [2]);
         use register = Qubit[4];
         ApplyAmplitudeAmplification(preparation, marker, rounds, register);
         let outcome = [MResetZ(register[0]), MResetZ(register[1]), MResetZ(register[2])];
@@ -397,11 +397,11 @@ def test_qpe_acceptance_requires_the_window_and_clean_signal_ancillas(qsharp_mod
 
 
 def test_accepted_phase_interval_lengths_detect_wrapped_windows():
-    utils = QSHARP_UTILS.AmplitudeAmplification
-    assert tuple(utils.AcceptedPhaseIntervalLengths(3, [0, 1, 6, 7])) == (True, 2, 2)
-    assert tuple(utils.AcceptedPhaseIntervalLengths(3, [0, 1, 2])) == (True, 3, 0)
-    assert tuple(utils.AcceptedPhaseIntervalLengths(3, [5, 6, 7])) == (True, 0, 3)
-    is_wrapped, _, _ = tuple(utils.AcceptedPhaseIntervalLengths(3, [2, 3, 5]))
+    phase_estimation = QSHARP_UTILS.StandardPhaseEstimation
+    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [0, 1, 6, 7])) == (True, 2, 2)
+    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [0, 1, 2])) == (True, 3, 0)
+    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [5, 6, 7])) == (True, 0, 3)
+    is_wrapped, _, _ = tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [2, 3, 5]))
     assert is_wrapped is False
 
 
@@ -514,7 +514,7 @@ def _amplified_qpe_circuit(
         mapper=mapper,
         unitary=unitary,
     )
-    marker = QSHARP_UTILS.AmplitudeAmplification.MakeQpeAcceptanceMarkerOp(
+    marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(
         num_bits, signal_ancilla_indices, accepted_indices
     )
     # The executor reverses the Q# results, so emitting the ancillas reversed and
@@ -531,8 +531,9 @@ def _amplified_qpe_circuit(
 def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_indices: list[int], shots: int = 400) -> str:
     """Execute a circuit and pick the most common bitstring from the good subspace.
 
-    Acceptance lives outside the algorithm: a shot counts when its phase index is
-    in the window *and* every block-encoding signal ancilla measured zero.
+    Acceptance is the QPE-side counterpart of the marking oracle, and is decided
+    here rather than inside amplitude amplification: a shot counts when its phase
+    index is in the window *and* every block-encoding signal ancilla measured zero.
 
     """
     executor = create("circuit_executor", "qdk_sparse_state_simulator")

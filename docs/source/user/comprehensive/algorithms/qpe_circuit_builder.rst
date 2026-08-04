@@ -144,6 +144,25 @@ The circuit body is always the measurement-free, adjointable QPE operation, whic
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
 
+.. _qpe-acceptance:
+
+Accepted energy windows
+-----------------------
+
+A QPE run is *good* when its phase register decodes to an accepted energy bin **and** every block-encoding signal ancilla measured zero. Both conditions matter: a nonzero signal ancilla means the block encoding did not project onto the signal block, so that branch's phase register carries no eigenvalue information. Trotter has no such ancillas; qubitization does.
+
+That predicate has two faces, and both live here rather than with any algorithm that consumes them:
+
+- **Quantum.** ``QDKChemistry.Utils.StandardPhaseEstimation.MakeAcceptanceMarkerOp(num_bits, signal_ancilla_indices, accepted_phase_indices)`` returns an adjointable ``(Qubit[], Qubit) => Unit`` that flips its target on the good subspace. It is what :doc:`amplitude amplification <amplitude_amplification>` amplifies, but it is not specific to it -- any oracle-driven algorithm can take it.
+- **Classical.** :func:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.split_coherent_qpe_bitstring` splits a measured bitstring into its phase bits and signal-ancilla bits, so the same test can be applied to shot counts:
+
+.. code-block:: python
+
+    phase_bits, ancilla_bits = split_coherent_qpe_bitstring(bitstring, num_bits)
+    is_good = all(bit == "0" for bit in ancilla_bits) and int(phase_bits, 2) in accepted
+
+Energy windows produced by qubitization are *wrapped* intervals -- a prefix plus a suffix of the index range -- because the walk phase enters through :math:`\mu = \alpha\cos(2\pi\phi)`, putting the highest energies at both ends. The marker detects that shape and uses two linear-depth comparisons instead of one multiply-controlled flip per accepted index.
+
 Circuit Composition Details
 ----------------------------
 

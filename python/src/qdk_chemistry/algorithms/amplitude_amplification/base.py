@@ -115,7 +115,7 @@ class AmplitudeAmplification(Algorithm):
         >>> preparation = qpe.run(  # doctest: +SKIP
         ...     state_preparation=guiding_state, qubit_hamiltonian=hamiltonian
         ... )[0]
-        >>> marker = QSHARP_UTILS.AmplitudeAmplification.MakeQpeAcceptanceMarkerOp(
+        >>> marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(
         ...     8, [], [17, 18, 19]
         ... )  # doctest: +SKIP
         >>> aa = create("amplitude_amplification")  # doctest: +SKIP

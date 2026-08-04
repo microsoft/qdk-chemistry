@@ -32,12 +32,12 @@ Setting ``rounds`` to a non-negative value overrides the schedule and runs that 
 Worked example
 --------------
 
-Build a measurement-free QPE circuit, mark the accepted energy bins, amplify, then execute:
+Build a measurement-free QPE circuit, ask it for the marking oracle that
+identifies its own good subspace, amplify, then execute:
 
 .. code-block:: python
 
     from qdk_chemistry.algorithms import create
-    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import split_coherent_qpe_bitstring
     from qdk_chemistry.data import AlgorithmRef
     from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -51,23 +51,18 @@ Build a measurement-free QPE circuit, mark the accepted energy bins, amplify, th
     preparation = builder.run(state_preparation=prep, qubit_hamiltonian=ham)[0]
 
     # Trotter has no block-encoding ancillas, so the good subspace is the phase window alone.
-    marker = QSHARP_UTILS.AmplitudeAmplification.MakeQpeAcceptanceMarkerOp(num_bits, [], accepted)
+    marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(num_bits, [], accepted)
 
     algorithm = create("amplitude_amplification")
     algorithm.settings().update("rounds", 1)
     circuit = algorithm.run(preparation, marker, num_qubits=num_bits + ham.num_qubits)
 
     counts = create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=200).bitstring_counts
-    good = [b for b in counts if split_coherent_qpe_bitstring(b, num_bits)[0] == "0100"]
 
-Acceptance is decided classically from the returned bits:
-:func:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.split_coherent_qpe_bitstring`
-separates the phase register from the block-encoding ancillas, and a shot is good when its phase index is
-in the window *and* every signal ancilla measured zero. For a 0.3-overlap guiding state on
-:math:`H = (\pi/4)(ZI + IZ)` the dominant accepted bitstring is ``"0100"``.
-
-Swapping the encoding is a matter of swapping the nested refs on the *builder* (for example a
-``prepare_select_prepare`` mapper with an ``lcu`` walk builder); amplitude amplification itself is unchanged,
+Only the loop is generic here. The oracle, and the matching classical test for which
+shots landed in the good subspace, both belong to whatever defines that subspace --
+for phase estimation, see :ref:`qpe-acceptance`. Swapping the encoding is a matter
+of swapping the nested refs on the *builder*; amplitude amplification is unchanged,
 except that the block-encoding ancilla indices must then be passed to the marker.
 
 Settings
