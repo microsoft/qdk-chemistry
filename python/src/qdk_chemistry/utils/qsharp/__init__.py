@@ -4,50 +4,111 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import qdk
-from qdk import qsharp
+from qdk import TargetProfile
 
-__all__ = ["QSHARP_UTILS"]
-
-_QS_FILES = [
-    Path(__file__).parent / "StatePreparation.qs",
-    Path(__file__).parent / "CircuitComposition.qs",
-    Path(__file__).parent / "IterativePhaseEstimation.qs",
-    Path(__file__).parent / "StandardPhaseEstimation.qs",
-    Path(__file__).parent / "ControlledPauliExp.qs",
-    Path(__file__).parent / "HadamardTest.qs",
-    Path(__file__).parent / "PauliExp.qs",
-    Path(__file__).parent / "MeasurementBasis.qs",
-    Path(__file__).parent / "PrepSelPrep.qs",
-    Path(__file__).parent / "Select.qs",
-    Path(__file__).parent / "AmplitudeAmplification.qs",
+__all__ = [
+    "QSHARP_UTILS",
+    "create_qsharp_context",
+    "get_qsharp_context",
+    "set_qsharp_context",
+    "use_qsharp_context",
 ]
 
+_PROJECT_ROOT = str(Path(__file__).parent)
 
-def get_qsharp_utils():
-    """Returns the Q# namespace for chemistry operations (lazy-loaded)."""
+
+class _SharedContext:
+    """Lock-guarded holder for the process-wide shared Q# context."""
+
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+        self.context: qdk.Context | None = None
+
+
+_shared = _SharedContext()
+_thread_local = threading.local()
+
+
+def create_qsharp_context(
+    target_profile: TargetProfile = TargetProfile.Base,
+    target_name: str | None = None,
+    language_features: list[str] | None = None,
+    qdk_config: dict[str, int | float | str | bool] | None = None,
+) -> qdk.Context:
+    """Create a new, isolated ``qdk.Context`` preloaded with the Q# chemistry utilities.
+
+    Every call returns a *fresh* context with its own Q# interpreter. Most users never
+    need this — the library maintains one shared context (see :func:`get_qsharp_context`).
+    Reach for this only when you need a context configured differently from the default
+    (for example a non-default ``target_profile``); then register it with
+    :func:`set_qsharp_context` if the chemistry builders should use it too.
+
+    :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
+        ``TargetProfile.Base``.
+    :param target_name: Optional target machine name used to infer a compatible profile.
+    :param language_features: Optional list of experimental Q# language feature flags.
+    :param qdk_config: Optional configuration values exposed to Q# code via
+        ``Std.Core.ConfigValue`` (values must be ``int``, ``float``, ``str``, or ``bool``).
+
+    ``project_root`` is intentionally not exposed: it is fixed to the vendored Q# utility
+    project so the chemistry utilities are always available on the returned context.
+    """
+    kwargs: dict = {}
+    if target_name is not None:
+        kwargs["target_name"] = target_name
+    if language_features is not None:
+        kwargs["language_features"] = language_features
+    if qdk_config is not None:
+        kwargs["qdk_config"] = qdk_config
+    return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
+
+
+def get_qsharp_context() -> qdk.Context:
+    """Return the shared ``qdk.Context`` that QDK/Chemistry uses for all Q# composition.
+
+    Call it when you want to define your *own* Q# operation (e.g. a custom state
+    preparation) and compose it with a chemistry builder. The context is created lazily
+    on first use and access is thread-safe.
+    """
+    override = getattr(_thread_local, "context", None)
+    if override is not None:
+        return override
+
+    with _shared.lock:
+        if _shared.context is None:
+            _shared.context = create_qsharp_context()
+        return _shared.context
+
+
+def set_qsharp_context(context: qdk.Context | None) -> None:
+    """Replace the process-wide shared Q# context (pass ``None`` to reset to the default)."""
+    with _shared.lock:
+        _shared.context = context
+
+
+@contextmanager
+def use_qsharp_context(context: qdk.Context) -> Iterator[qdk.Context]:
+    """Temporarily use *context* as the shared Q# context on the current thread."""
+    previous = getattr(_thread_local, "context", None)
+    _thread_local.context = context
     try:
-        return qdk.code.QDKChemistry.Utils
-    except AttributeError:
-        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
-        qsharp.eval(code)
-        return qdk.code.QDKChemistry.Utils
+        yield context
+    finally:
+        _thread_local.context = previous
 
 
 class _QSharpUtilsProxy:
-    """Lightweight proxy that lazily resolves the Q# utilities namespace."""
+    """Resolve the chemistry Q# utilities against the active shared context."""
 
     def __getattr__(self, name: str):
-        """Load Q# code (if necessary) and resolve *name* on the utilities namespace.
-
-        Args:
-            name: The name of the attribute being accessed on the Q# utilities namespace.
-
-        """
-        utils = get_qsharp_utils()
-        return getattr(utils, name)
+        """Resolve *name* on the utilities namespace of the active context."""
+        return getattr(get_qsharp_context().code.QDKChemistry.Utils, name)
 
 
 QSHARP_UTILS = _QSharpUtilsProxy()
