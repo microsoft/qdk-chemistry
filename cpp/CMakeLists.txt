@@ -139,6 +139,25 @@ else()
     endif()
 endif()
 
+# BTAS for dense tensor contraction in the DUCC effective Hamiltonian. It must
+# follow MACIS: its linear-algebra kit reuses the BLAS MACIS resolves and the
+# blaspp/lapackpp targets MACIS brings in (patched for MSVC), instead of running
+# its own discovery, which has no working BLAS to find on Windows.
+find_package(BTAS QUIET)
+if(NOT BTAS_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(BTAS
+        GIT_REPOSITORY https://github.com/BTAS/btas.git
+        GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
+    )
+    FetchContent_MakeAvailable(BTAS)
+    # BTAS declares the plain target only; an installed BTAS exports the
+    # namespaced one, so alias it for a uniform link name either way.
+    if(NOT TARGET BTAS::BTAS)
+        add_library(BTAS::BTAS ALIAS BTAS)
+    endif()
+endif()
+
 # Enable CUDA for GPU bindings in QDK Chemistry
 if(QDK_CHEMISTRY_ENABLE_GPU)
     enable_language(CUDA)

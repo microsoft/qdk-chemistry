@@ -83,13 +83,11 @@ $cppManifest  = "$SrcDir\cpp\manifest\qdk-chemistry\cgmanifest.json"
 $libintUrl    = Get-ManifestUrl    $cppManifest 'Libint'
 $ecpintCommit = Get-ManifestCommit $cppManifest 'robashaw/libecpint'
 $gauxcCommit  = Get-ManifestCommit $cppManifest 'wavefunction91/gauxc'
-$btasCommit   = Get-ManifestCommit $cppManifest 'BTAS/btas'
 
 Write-Host "=== Dependency versions ==="
 Write-Host "  libint2 : $libintUrl"
 Write-Host "  ecpint  : $ecpintCommit"
 Write-Host "  gauxc   : $gauxcCommit"
-Write-Host "  btas    : $btasCommit"
 
 # ─── Common CMake flags (applied to every dep build) ─────────────────────────
 $commonArgs = @(
@@ -128,22 +126,14 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
 
 # ─── vcpkg install ────────────────────────────────────────────────────────────
 # Provides eigen3, openblas, hdf5, boost-headers, spdlog, nlohmann-json, etc.
-# Retried with backoff: ports whose source is missing from the asset mirror fall
-# through to their upstream host, which rate-limits (HTTP 429) on a cold build.
 $env:X_VCPKG_ASSET_SOURCES = 'x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/'
 Write-Host "=== vcpkg install ==="
-foreach ($attempt in 1..3) {
-    & "$VcpkgRoot\vcpkg.exe" install `
-        --triplet x64-windows-static-md `
-        --x-manifest-root="$SrcDir" `
-        --x-install-root="$SrcDir\vcpkg_installed" `
-        --overlay-ports="$SrcDir\vcpkg-overlay\ports"
-    if ($LASTEXITCODE -eq 0) { break }
-    if ($attempt -eq 3) { throw "vcpkg install failed ($LASTEXITCODE)" }
-    $delay = 60 * $attempt
-    Write-Host "vcpkg install failed (attempt $attempt); retrying in ${delay}s"
-    Start-Sleep -Seconds $delay
-}
+& "$VcpkgRoot\vcpkg.exe" install `
+    --triplet x64-windows-static-md `
+    --x-manifest-root="$SrcDir" `
+    --x-install-root="$SrcDir\vcpkg_installed" `
+    --overlay-ports="$SrcDir\vcpkg-overlay\ports"
+if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
 # ─── libint2 ─────────────────────────────────────────────────────────────────
 Write-Host "=== Installing libint2 ==="
@@ -224,21 +214,6 @@ Invoke-CMakeDep 'gauxc' $gauxcSrc @(
     '-DGAUXC_ENABLE_OPENMP=OFF'
 )
 Remove-Item $gauxcSrc -Recurse -Force
-
-# ─── BTAS ────────────────────────────────────────────────────────────────────
-# Header-only. blaspp/lapackpp are not prebuilt on Windows, so BTAS's kit fetches
-# and installs them here beside it -- which is where its installed config then
-# resolves the `blaspp_headers` marker from.
-Write-Host "=== Installing BTAS ==="
-$btasSrc = "$buildDir\btas-src"
-git clone https://github.com/BTAS/btas.git $btasSrc
-git -C $btasSrc checkout $btasCommit
-
-Invoke-CMakeDep 'btas' $btasSrc @(
-    '-DBUILD_TESTING=OFF',
-    '-DBTAS_BUILD_UNITTEST=OFF'
-)
-Remove-Item $btasSrc -Recurse -Force
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
 if (-not $KeepBuildDir) {

@@ -129,20 +129,10 @@ handle_dependency(gauxc
   REQUIRED
 )
 
-# BTAS for dense tensor contraction in the DUCC effective Hamiltonian. Boost is
-# discovered first because BTAS links Boost::headers/random/serialization, and
-# install_cpp_dependencies.sh installs BTAS beside blaspp because an installed
-# btas-config.cmake resolves its `blaspp_headers` marker only from there.
+# BTAS links Boost::headers/random/serialization, so discover the modular Boost
+# libint2 already uses. BTAS itself is configured after MACIS in the top-level
+# CMakeLists, because it reuses the BLAS and blaspp/lapackpp that MACIS resolves.
 find_package(Boost CONFIG REQUIRED)
-
-handle_dependency(BTAS
-  GIT_REPOSITORY https://github.com/BTAS/btas.git
-  GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
-  BUILD_TARGET BTAS
-  INSTALL_TARGET BTAS::BTAS
-  ${DEPENDENCY_BUILD_FLAGS}
-  REQUIRED
-)
 
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
