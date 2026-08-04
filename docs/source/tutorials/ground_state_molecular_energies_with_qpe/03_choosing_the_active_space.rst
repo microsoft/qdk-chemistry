@@ -52,8 +52,17 @@ A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_intera
    \vert \Psi \rangle = \sum_i c_i \vert \Phi_i \rangle,
 
 where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
+Every determinant :math:`\Phi_i`, including :math:`\Phi_{\mathrm{HF}}`, is constructed from one allowed choice of occupied spin orbitals.
+Different choices represent different electron configurations.
 Allowing every possible determinant in all 28 ``cc-pvdz`` spatial orbitals would be unnecessarily expensive for this tutorial.
 An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ restricts which orbital occupations are allowed to vary, reducing the computational costs.
+If that model contains :math:`n_o` active spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, the choices of occupied :math:`\alpha` and :math:`\beta` spin orbitals give
+
+.. _tutorial-determinant-count:
+
+.. math::
+
+   N_{\mathrm{det}} = \binom{n_o}{n_\alpha}\binom{n_o}{n_\beta}.
 
 .. _tutorial-active-space-definition:
 
@@ -109,16 +118,7 @@ The script constructs the molecular Hamiltonian in the initial valence space and
    :start-after: # start-cell-initial-casci
    :end-before: # end-cell-initial-casci
 
-For an active space with :math:`n_o` spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, choosing the occupied :math:`\alpha` and :math:`\beta` spin orbitals gives independent counts that multiply.
-The number of possible determinants in the wavefunction is therefore
-
-.. _tutorial-determinant-count:
-
-.. math::
-
-   N_{\mathrm{det}} = \binom{n_o}{n_\alpha}\binom{n_o}{n_\beta}.
-
-The initial valence space in this example is small enough to include every determinant rather than approximating the wavefunction with a selected subset.
+Using the determinant-count formula above, the initial valence space in this example is small enough to include every determinant rather than approximating the wavefunction with a selected subset.
 Larger active-space studies often use selected :term:`CI` (:term:`SCI`) to obtain approximate active-space diagnostics at lower cost, but that additional approximation is unnecessary here.
 
 The ``calculate_one_rdm`` and ``calculate_two_rdm`` settings request the one- and two-particle reduced density matrices (:term:`RDMs <RDM>`).
