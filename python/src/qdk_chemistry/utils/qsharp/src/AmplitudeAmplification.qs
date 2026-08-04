@@ -9,10 +9,9 @@
 /// * a **reflection about the target**, which defines *what* is amplified, and
 /// * an **amplification loop**, which defines *how hard* it is amplified.
 ///
-/// The target can be supplied either as a state-preparation unitary
-/// (`ReflectAboutTargetState`) or as a marking oracle that flips a flag qubit on
-/// the good subspace (`ReflectAboutMarkedSubspace`).  Quantum phase estimation
-/// plugs into the second form through `MakeQpeAcceptanceMarkerOp`, which marks
+/// The target is supplied as a marking oracle that flips a flag qubit on the
+/// good subspace (`ReflectAboutMarkedSubspace`).  Quantum phase estimation
+/// plugs into it through `MakeQpeAcceptanceMarkerOp`, which marks
 /// the branches whose phase register falls inside an accepted energy window and
 /// whose block-encoding signal ancillas are all zero.
 ///
@@ -24,12 +23,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     import Std.Arithmetic.ApplyIfLessOrEqualL;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyControlledOnInt;
-    import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEachCA;
     import Std.Convert.IntAsBigInt;
     import Std.Core.Length;
     import Std.Intrinsic.R1;
-    import Std.Math.PI;
     import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
@@ -122,25 +119,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         } apply {
             ReflectAboutAllZeros(register);
         }
-    }
-
-    /// # Summary
-    /// The general reflection unitary about a target state.
-    ///
-    /// $$
-    ///     I - 2|t\rangle\langle t|,
-    ///     \qquad |t\rangle = \text{targetPrep}|0\rangle
-    /// $$
-    ///
-    /// Use this when the target is known as a circuit.  When the target is only
-    /// known as a *predicate* — for example "the QPE phase register decodes to an
-    /// energy below the cutoff" — use `ReflectAboutMarkedSubspace` instead; the
-    /// amplification loop accepts either.
-    operation ReflectAboutTargetState(
-        targetPrep : Qubit[] => Unit is Adj,
-        register : Qubit[],
-    ) : Unit is Adj {
-        ApplyPhaseToPreparedState(targetPrep, PI(), register);
     }
 
     /// # Summary
@@ -458,99 +436,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     //
-    // Amplified standard phase estimation
-    //
-
-    /// # Summary
-    /// Coherent, adjointable standard QPE.
-    ///
-    /// Identical to the circuit built by
-    /// `QDKChemistry.Utils.StandardPhaseEstimation.RunStandardQPE` but without the
-    /// terminal measurement and reset, so it can serve as the state preparation
-    /// $U_{\psi}$ of an amplification loop.
-    ///
-    /// `register` is laid out as `phase register ++ system qubits ++ block-encoding
-    /// ancillas`.  After the inverse quantum Fourier transform the phase register
-    /// is little-endian (`register[0]` is the least significant bit), matching
-    /// `QDKChemistry.Utils.StandardPhaseEstimation.RunStandardQPE`.
-    ///
-    /// # Input
-    /// ## controlledUnitary
-    /// One adjointable callable per phase qubit, each already implementing the
-    /// correct power of the walk operator.  Build these with
-    /// `QDKChemistry.Utils.PrepSelPrep.MakeControlledPSPWalkOp`.
-    operation ApplyCoherentStandardQPE(
-        statePrep : Qubit[] => Unit is Adj,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
-        phaseQubitPrep : Qubit[] => Unit is Adj,
-        numPhaseQubits : Int,
-        numSystemQubits : Int,
-        register : Qubit[],
-    ) : Unit is Adj {
-        let phaseRegister = register[0..numPhaseQubits - 1];
-        let allTargets = register[numPhaseQubits...];
-        let systems = allTargets[0..numSystemQubits - 1];
-
-        statePrep(systems);
-        phaseQubitPrep(phaseRegister);
-        for phaseIndex in 0..numPhaseQubits - 1 {
-            controlledUnitary[phaseIndex](phaseRegister[phaseIndex], allTargets);
-        }
-        Adjoint ApplyQFT(phaseRegister);
-    }
-
-    /// # Summary
-    /// Builds the coherent QPE preparation as a single-register callable.
-    function MakeCoherentStandardQPEOp(
-        statePrep : Qubit[] => Unit is Adj,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
-        phaseQubitPrep : Qubit[] => Unit is Adj,
-        numPhaseQubits : Int,
-        numSystemQubits : Int,
-    ) : Qubit[] => Unit is Adj {
-        ApplyCoherentStandardQPE(
-            statePrep,
-            controlledUnitary,
-            phaseQubitPrep,
-            numPhaseQubits,
-            numSystemQubits,
-            _,
-        )
-    }
-
-    /// # Summary
-    /// Applies amplitude-amplified standard QPE in place.
-    ///
-    /// Amplification changes *how often* the energy window is accepted; it does
-    /// not change the accepted state itself, and it cannot repair a badly chosen
-    /// window or insufficient phase resolution.
-    operation ApplyAmplifiedStandardQPE(
-        statePrep : Qubit[] => Unit is Adj,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
-        phaseQubitPrep : Qubit[] => Unit is Adj,
-        numPhaseQubits : Int,
-        numSystemQubits : Int,
-        signalAncillaIndices : Int[],
-        acceptedPhaseIndices : Int[],
-        amplificationRounds : Int,
-        register : Qubit[],
-    ) : Unit is Adj {
-        let preparation = MakeCoherentStandardQPEOp(
-            statePrep,
-            controlledUnitary,
-            phaseQubitPrep,
-            numPhaseQubits,
-            numSystemQubits,
-        );
-        let marker = MakeQpeAcceptanceMarkerOp(
-            numPhaseQubits,
-            signalAncillaIndices,
-            acceptedPhaseIndices,
-        );
-        ApplyAmplitudeAmplification(preparation, marker, amplificationRounds, register);
-    }
-
-    //
     // Circuit entry points
     //
     // These are the operations handed to `Circuit`/`CircuitExecutor`.  They
@@ -558,13 +443,13 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     // they compile under the restricted target profiles used for QIR generation
     // and resource estimation.  Acceptance is decided classically in Python from
     // the returned bits; see
-    // `qdk_chemistry.algorithms.amplitude_amplification.AmplifiedPhaseEstimation`.
+    // `qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification`.
 
     /// # Summary
     /// Builds and measures an amplitude-amplified circuit.
     ///
     /// Fully generic: `preparation` is any adjointable state preparation (for
-    /// example the coherent QPE circuit built by `MakeCoherentStandardQPEOp`) and
+    /// example the coherent QPE circuit built by `MakeStandardQPEOp`) and
     /// `markingOracle` is any adjointable predicate on the good subspace (for
     /// example the energy-window test built by `MakeQpeAcceptanceMarkerOp`).
     ///
@@ -609,35 +494,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
             markingOracle,
             markPhases,
             statePhases,
-            register,
-        );
-        let results = MeasureSelected(register, measuredIndices);
-        ResetAll(register);
-        return results;
-    }
-
-    /// # Summary
-    /// Builds and measures the coherent QPE circuit without any amplification.
-    ///
-    /// Provided so that the amplified and unamplified circuits differ only in the
-    /// amplification loop, which makes the acceptance ratio between them a clean
-    /// measurement of what amplification bought.
-    operation MakeCoherentStandardQPECircuit(
-        statePrep : Qubit[] => Unit is Adj,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
-        phaseQubitPrep : Qubit[] => Unit is Adj,
-        numPhaseQubits : Int,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        measuredIndices : Int[],
-    ) : Result[] {
-        use register = Qubit[numPhaseQubits + numSystemQubits + numAncillaQubits];
-        ApplyCoherentStandardQPE(
-            statePrep,
-            controlledUnitary,
-            phaseQubitPrep,
-            numPhaseQubits,
-            numSystemQubits,
             register,
         );
         let results = MeasureSelected(register, measuredIndices);

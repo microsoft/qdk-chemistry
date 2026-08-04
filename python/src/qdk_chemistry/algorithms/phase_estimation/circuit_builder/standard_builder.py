@@ -11,12 +11,14 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk import qsharp
+
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import QpeCircuitBuilderSettings, StandardQpeCircuitBuilder, coherent_qpe_measured_indices
+from .base import QpeCircuitBuilderSettings, StandardQpeCircuitBuilder
 
 __all__: list[str] = [
     "QdkStandardQpeCircuitBuilder",
@@ -75,11 +77,11 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         Constructs a single circuit with ``num_bits`` ancilla qubits, applying
         controlled-U^(2^k) for each ancilla and finishing with the inverse QFT.
 
-        When the ``coherent`` setting is enabled the returned circuit carries a
-        measurement-free, adjointable Q# operation on the full
-        ``phase ++ system ++ unitary-ancilla`` register, so that reflection-based
-        algorithms such as amplitude amplification can use it as their state
-        preparation.
+        The circuit body is always the measurement-free, adjointable QPE
+        operation, exposed as the returned circuit's Q# operation so that
+        reflection-based algorithms such as amplitude amplification can use it as
+        their state preparation. The ``measurement`` setting only decides what the
+        circuit reads out at the end.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
@@ -90,6 +92,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Raises:
             ValueError: If ``num_bits`` is not a positive integer.
+            RuntimeError: If the inputs do not carry Q# operations.
 
         """
         num_bits = self.settings().get("num_bits")
@@ -109,12 +112,13 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
-            builder = (
-                self._create_coherent_circuit_from_qsharp_op
-                if self.is_coherent()
-                else self._create_circuit_from_qsharp_op
+            circuit = self._create_circuit_from_qsharp_op(
+                state_preparation,
+                ctrl_unitary_circuits,
+                num_bits,
+                num_system_qubits,
+                num_ancilla_qubits,
             )
-            circuit = builder(state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits, num_ancilla_qubits)
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
 
@@ -133,52 +137,9 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
-        Args:
-            state_preparation: Circuit object containing a Q# operation for state preparation.
-            controlled_unitary_circuits: List of Circuit objects (one per ancilla) containing
-                Q# operations for controlled-U^(2^k).
-            num_bits: Number of ancilla qubits (phase bits).
-            num_system_qubits: Number of system qubits.
-            num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).
-
-        Returns:
-            A Circuit object representing the standard QPE circuit.
-
-        """
-        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
-        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
-        ancillas = list(range(num_bits))
-        systems = [i + num_bits for i in range(num_system_qubits)]
-        standard_parameters = {
-            "statePrep": state_prep_op,
-            "controlledUnitary": ctrl_unitary_ops,
-            "numBits": num_bits,
-            "ancillas": ancillas,
-            "systems": systems,
-            "phaseQubitPrep": phase_qubit_prep_op,
-            "numAncillaQubits": num_ancilla_qubits,
-        }
-        return Circuit(
-            qsharp_factory=QsharpFactoryData(
-                program=QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPECircuit,
-                parameter=standard_parameters,
-            )
-        )
-
-    def _create_coherent_circuit_from_qsharp_op(
-        self,
-        state_preparation: Circuit,
-        controlled_unitary_circuits: list[Circuit],
-        num_bits: int,
-        num_system_qubits: int,
-        num_ancilla_qubits: int = 0,
-    ) -> Circuit:
-        """Create a measurement-free, adjointable standard QPE circuit.
-
-        The register is laid out as ``phase ++ system ++ unitary ancillas`` with
-        the phase register most-significant-bit first, matching
-        ``QDKChemistry.Utils.AmplitudeAmplification.ApplyCoherentStandardQPE``.
+        The register is laid out as ``phase ++ system ++ unitary ancillas`` with the
+        phase register least-significant-bit first, matching
+        ``QDKChemistry.Utils.StandardPhaseEstimation.ApplyStandardQPE``.
 
         Args:
             state_preparation: Circuit object containing an adjointable Q# state preparation.
@@ -189,24 +150,24 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).
 
         Returns:
-            A Circuit whose ``_qsharp_op`` applies coherent QPE in place and whose
-            factory measures the phase register plus the unitary ancillas.
+            A Circuit whose Q# operation applies QPE in place and whose factory
+            applies the measurement selected by the ``measurement`` setting.
 
         """
-        amplification = QSHARP_UTILS.AmplitudeAmplification
+        phase_estimation = QSHARP_UTILS.StandardPhaseEstimation
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
 
-        coherent_op = amplification.MakeCoherentStandardQPEOp(
+        qpe_op = phase_estimation.MakeStandardQPEOp(
             state_prep_op,
             ctrl_unitary_ops,
             phase_qubit_prep_op,
             num_bits,
             num_system_qubits,
         )
-        measured_indices = coherent_qpe_measured_indices(num_bits, num_system_qubits, num_ancilla_qubits)
-        coherent_parameters = {
+        measured_indices, bases = self.measurement_plan(num_bits, num_system_qubits)
+        parameters = {
             "statePrep": state_prep_op,
             "controlledUnitary": ctrl_unitary_ops,
             "phaseQubitPrep": phase_qubit_prep_op,
@@ -214,13 +175,14 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "numSystemQubits": num_system_qubits,
             "numAncillaQubits": num_ancilla_qubits,
             "measuredIndices": measured_indices,
+            "bases": [getattr(qsharp.Pauli, letter) for letter in bases],
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
-                program=amplification.MakeCoherentStandardQPECircuit,
-                parameter=coherent_parameters,
+                program=phase_estimation.MakeStandardQPECircuit,
+                parameter=parameters,
             ),
-            qsharp_op=coherent_op,
+            qsharp_op=qpe_op,
         )
 
     def name(self) -> str:

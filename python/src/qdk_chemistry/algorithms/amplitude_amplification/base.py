@@ -209,7 +209,7 @@ class AmplitudeAmplification(Algorithm):
         """
         Logger.trace_entering()
         circuit_builder = self._create_nested("reflect_to_good_space")
-        circuit_builder.settings().update("coherent", True)
+        circuit_builder.settings().update("measurement", "none")
         num_bits = int(circuit_builder.settings().get("num_bits"))
 
         # Resolve the encoding before building, so the accepted window can be
@@ -603,8 +603,8 @@ class AmplitudeAmplification(Algorithm):
     ):
         r"""Build the preparation the amplification loop reflects about.
 
-        The nested algorithm is asked for a coherent circuit and must answer with
-        one that carries an adjointable Q# operation; reflecting about
+        The nested algorithm is asked for a measurement-free circuit and must
+        answer with one that carries an adjointable Q# operation; reflecting about
         :math:`U_\psi` requires applying its adjoint.
 
         Args:
@@ -616,7 +616,7 @@ class AmplitudeAmplification(Algorithm):
             The adjointable Q# operation implementing the preparation.
 
         Raises:
-            TypeError: If the nested algorithm did not honor ``coherent`` mode.
+            TypeError: If the nested algorithm did not honor ``measurement="none"``.
 
         """
         circuit = circuit_builder.run(
@@ -628,7 +628,7 @@ class AmplitudeAmplification(Algorithm):
             raise TypeError(
                 f"The '{circuit_builder.name()}' algorithm in 'reflect_to_good_space' did not produce a "
                 "coherent circuit. Amplitude amplification reflects about the prepared state, so the "
-                "nested algorithm must honor the 'coherent' setting and return a measurement-free, "
+                "nested algorithm must honor measurement='none' and return a measurement-free, "
                 "adjointable Q# circuit. Use the qdk_standard QPE circuit builder."
             )
         return operation

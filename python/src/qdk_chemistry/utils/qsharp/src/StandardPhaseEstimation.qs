@@ -6,98 +6,107 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import QDKChemistry.Utils.MeasurementBasis.MeasureInBasis;
 
-    /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
-    /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
-    /// - `controlledUnitary`: An array of functions to perform controlled-U^(2^k) on (control, systems),
-    ///   one per ancilla qubit. Each operation already encapsulates the correct power.
-    /// - `phaseQubitPrep`: A function to prepare the phase (ancilla) qubits (e.g., Hadamard on each qubit).
-    /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
-    /// - `ancillas`: An array of indices representing the ancilla qubits.
-    /// - `systems`: An array of indices representing the system qubits.
-    /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
-    struct StandardPhaseEstimationParams {
-        statePrep : Qubit[] => Unit,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
-        phaseQubitPrep : Qubit[] => Unit,
-        numBits : Int,
-        ancillas : Int[],
-        systems : Int[],
-        numAncillaQubits : Int,
+    /// # Summary
+    /// Applies standard (QFT-based) quantum phase estimation in place.
+    ///
+    /// This is the measurement-free core of standard QPE: it leaves the phase
+    /// register entangled with the system so the whole circuit can be used as the
+    /// preparation `U` of a reflection-based algorithm such as amplitude
+    /// amplification.  `MakeStandardQPECircuit` adds the measurement layer.
+    ///
+    /// `register` is laid out as `phase register ++ system qubits ++ block-encoding
+    /// ancillas`.  After the inverse quantum Fourier transform the phase register
+    /// is little-endian, so `register[0]` is the least significant phase bit.
+    ///
+    /// # Input
+    /// ## controlledUnitary
+    /// One adjointable callable per phase qubit, each already implementing the
+    /// correct power of the unitary.  `controlledUnitary[k]` is controlled on
+    /// `register[k]` and acts on the system plus block-encoding ancillas.
+    operation ApplyStandardQPE(
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
+        phaseQubitPrep : Qubit[] => Unit is Adj,
+        numPhaseQubits : Int,
+        numSystemQubits : Int,
+        register : Qubit[],
+    ) : Unit is Adj {
+        let phaseRegister = register[0..numPhaseQubits - 1];
+        let allTargets = register[numPhaseQubits...];
+        let systems = allTargets[0..numSystemQubits - 1];
+
+        statePrep(systems);
+        phaseQubitPrep(phaseRegister);
+        for phaseIndex in 0..numPhaseQubits - 1 {
+            controlledUnitary[phaseIndex](phaseRegister[phaseIndex], allTargets);
+        }
+        Adjoint ApplyQFT(phaseRegister);
     }
 
-    /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
-    /// The circuit uses multiple ancilla qubits and the inverse QFT.
-    /// # Parameters
-    /// - `params`: A `StandardPhaseEstimationParams` struct.
-    /// # Returns
-    /// - `Result[]`: The measurement results of the ancilla qubits (MSB first).
-    operation RunStandardQPE(params : StandardPhaseEstimationParams) : Result[] {
-        let totalQubits = params.numBits + Length(params.systems) + params.numAncillaQubits;
-        use qs = Qubit[totalQubits];
-        let ancillas = Subarray(params.ancillas, qs);
-        let systems = Subarray(params.systems, qs);
-        let unitaryAncillas = if params.numAncillaQubits == 0 {
-            []
-        } else {
-            qs[params.numBits + Length(params.systems)..Length(qs) - 1]
-        };
-        let allTargets = systems + unitaryAncillas;
-
-        // Step 1: Prepare the initial state on system qubits
-        params.statePrep(systems);
-
-        // Step 2: Prepare phase (ancilla) qubits
-        params.phaseQubitPrep(ancillas);
-
-        // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
-        // Each controlledUnitary[k] already implements the correct power.
-        // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
-        for ancillaIdx in 0..params.numBits - 1 {
-            params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
-        }
-
-        // Step 4: Apply inverse QFT on ancilla qubits
-        Adjoint ApplyQFT(ancillas);
-
-        // Step 5: Measure ancilla qubits and reset system qubits
-        ResetAll(allTargets);
-        mutable results = [Zero, size = params.numBits];
-        for idx in 0..params.numBits - 1 {
-            set results w/= idx <- MResetZ(ancillas[idx]);
-        }
-        return results;
+    /// # Summary
+    /// Builds standard QPE as a single-register adjointable callable.
+    function MakeStandardQPEOp(
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
+        phaseQubitPrep : Qubit[] => Unit is Adj,
+        numPhaseQubits : Int,
+        numSystemQubits : Int,
+    ) : Qubit[] => Unit is Adj {
+        ApplyStandardQPE(
+            statePrep,
+            controlledUnitary,
+            phaseQubitPrep,
+            numPhaseQubits,
+            numSystemQubits,
+            _,
+        )
     }
 
-    /// Prepare a standard QPE circuit (factory entry point).
-    /// # Parameters
-    /// - `statePrep`: A function to prepare the initial quantum state.
-    /// - `controlledUnitary`: An array of functions to perform controlled-U^(2^k) on (control, systems),
-    ///   one per ancilla qubit. Each operation already encapsulates the correct power.
-    /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
-    /// - `ancillas`: An array of indices for the ancilla qubits.
-    /// - `systems`: An array of indices for the system qubits.
-    /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
-    /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
-    /// # Returns
-    /// The measurement results of the ancilla qubits.
+    /// # Summary
+    /// Builds a standard QPE circuit with a caller-chosen final measurement
+    /// (factory entry point).
+    ///
+    /// The circuit body is always `ApplyStandardQPE`; `measuredIndices` and
+    /// `bases` alone decide what is read out, which is how the Python
+    /// `measurement` setting selects between measuring the phase register,
+    /// measuring the eigenvector in some Pauli basis, and measuring nothing.
+    ///
+    /// # Input
+    /// ## measuredIndices
+    /// Register indices to measure, in the order they should appear in the
+    /// returned array.  Pass an empty array for a measurement-free circuit.
+    /// ## bases
+    /// One Pauli per entry of `measuredIndices`.  `PauliI` resets the qubit
+    /// without recording a result.
+    ///
+    /// # Output
+    /// One `Result` per non-identity entry of `bases`, in `measuredIndices` order.
     operation MakeStandardQPECircuit(
-        statePrep : Qubit[] => Unit,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
-        numBits : Int,
-        ancillas : Int[],
-        systems : Int[],
-        phaseQubitPrep : Qubit[] => Unit,
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
+        phaseQubitPrep : Qubit[] => Unit is Adj,
+        numPhaseQubits : Int,
+        numSystemQubits : Int,
         numAncillaQubits : Int,
+        measuredIndices : Int[],
+        bases : Pauli[],
     ) : Result[] {
-        return RunStandardQPE(new StandardPhaseEstimationParams {
-            statePrep = statePrep,
-            controlledUnitary = controlledUnitary,
-            phaseQubitPrep = phaseQubitPrep,
-            numBits = numBits,
-            ancillas = ancillas,
-            systems = systems,
-            numAncillaQubits = numAncillaQubits,
-        });
+        if Length(bases) != Length(measuredIndices) {
+            fail "Length of bases must match the number of measured indices.";
+        }
+        use register = Qubit[numPhaseQubits + numSystemQubits + numAncillaQubits];
+        ApplyStandardQPE(
+            statePrep,
+            controlledUnitary,
+            phaseQubitPrep,
+            numPhaseQubits,
+            numSystemQubits,
+            register,
+        );
+        let results = MeasureInBasis(bases, Subarray(measuredIndices, register));
+        ResetAll(register);
+        return results;
     }
 }

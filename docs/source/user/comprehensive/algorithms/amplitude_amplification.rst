@@ -79,7 +79,7 @@ Settings
      - Description
    * - ``reflect_to_good_space``
      - ``algorithm_ref``
-     - Nested builder producing the coherent preparation to reflect about. Locked to the ``qpe_circuit_builder`` algorithm type, so any conforming builder is accepted. It is switched into ``coherent`` mode automatically and must return a measurement-free circuit whose inverse the loop can apply; iterative QPE cannot, and says so.
+     - Nested builder producing the coherent preparation to reflect about. Locked to the ``qpe_circuit_builder`` algorithm type, so any conforming builder is accepted. Its ``measurement`` setting is forced to ``"none"`` and it must return a measurement-free circuit whose inverse the loop can apply; iterative QPE cannot, and says so.
    * - ``circuit_executor``
      - ``algorithm_ref``
      - Backend that executes the amplified circuit.

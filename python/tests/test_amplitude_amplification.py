@@ -26,7 +26,6 @@ import math
 
 import numpy as np
 import pytest
-from qdk import qsharp as qdk_qsharp
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms import registry as algorithm_registry
@@ -38,7 +37,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .reference_tolerances import qpe_energy_tolerance
 
@@ -261,6 +260,7 @@ _TOLERANCE = 0.04
 _HARNESS = """
 namespace QDKChemistryAmplitudeAmplificationTests {
     open QDKChemistry.Utils.AmplitudeAmplification;
+    import QDKChemistry.Utils.StandardPhaseEstimation.MakeStandardQPEOp;
     import Std.Arithmetic.*;
     import Std.Arrays.*;
     import Std.Convert.*;
@@ -348,18 +348,17 @@ namespace QDKChemistryAmplitudeAmplificationTests {
             ApplyControlledPower(2, _, _),
             ApplyControlledPower(1, _, _),
         ];
-        use register = Qubit[4];
-        ApplyAmplifiedStandardQPE(
+        let signalAncillaIndices : Int[] = [];
+        let preparation = MakeStandardQPEOp(
             PrepareGuidingState(theta, _),
             unitaries,
             PrepareUniformPhaseRegister,
             3,
             1,
-            [],
-            [2],
-            rounds,
-            register,
         );
+        let marker = MakeQpeAcceptanceMarkerOp(3, signalAncillaIndices, [2]);
+        use register = Qubit[4];
+        ApplyAmplitudeAmplification(preparation, marker, rounds, register);
         let outcome = [MResetZ(register[0]), MResetZ(register[1]), MResetZ(register[2])];
         ResetAll(register);
         return outcome;
@@ -375,10 +374,11 @@ def qsharp_module():
     """Load the chemistry Q# utilities plus the test harness exactly once."""
     if not _HAS_QSHARP:
         pytest.skip("qdk.qsharp is not installed")
-    # Touch the proxy so the chemistry utilities are evaluated first.
-    _ = QSHARP_UTILS.AmplitudeAmplification
-    qdk_qsharp.eval(_HARNESS)
-    return qdk_qsharp
+    # The utilities live on a dedicated context, so the harness has to be
+    # evaluated there rather than on the global interpreter.
+    context = get_qsharp_context()
+    context.eval(_HARNESS)
+    return context
 
 
 def _acceptance_frequency(qsharp_module, expression: str) -> float:
@@ -590,23 +590,110 @@ def test_coherent_qpe_bit_order_round_trips():
         split_coherent_qpe_bitstring("101", 4)
 
 
-def test_iterative_circuit_builder_rejects_coherent_mode():
+def test_iterative_circuit_builder_rejects_non_phase_measurement():
     builder = create("qpe_circuit_builder", "qdk_iterative")
-    builder.settings().update("coherent", True)
-    with pytest.raises(ValueError, match="coherent"):
+    builder.settings().update("measurement", "none")
+    with pytest.raises(ValueError, match="measurement='phase'"):
         builder.run(state_preparation=_guiding_state(1.0, 0), qubit_hamiltonian=_diagonal_hamiltonian())
+
+
+def test_measurement_plan_covers_every_policy():
+    builder = create("qpe_circuit_builder", "qdk_standard")
+    builder.settings().update("num_bits", 3)
+
+    # The default measures only the phase register, in register order, so the
+    # executor's reversal makes the key read most-significant bit first.
+    assert builder.measurement_policy() == "phase"
+    assert builder.measurement_plan(3, 2) == ([0, 1, 2], ["Z", "Z", "Z"])
+
+    # Zero measurement is what amplitude amplification asks for.
+    builder.settings().update("measurement", "none")
+    assert builder.measurement_plan(3, 2) == ([], [])
+
+    # The eigenvector policy trails the phase bits with the system register,
+    # reversed so that the key reads system qubit 0 first.
+    builder.settings().update("measurement", "eigenvector")
+    builder.settings().update("measurement_basis", "X")
+    assert builder.measurement_plan(3, 2) == ([4, 3, 0, 1, 2], ["X", "X", "Z", "Z", "Z"])
+
+    # A per-qubit basis string is accepted, and stays aligned with its indices.
+    builder.settings().update("measurement_basis", "XY")
+    indices, bases = builder.measurement_plan(3, 2)
+    assert indices == [4, 3, 0, 1, 2]
+    assert bases == ["Y", "X", "Z", "Z", "Z"]
+
+    builder.settings().update("measurement_basis", "XYZ")
+    with pytest.raises(ValueError, match="one letter per system"):
+        builder.measurement_plan(3, 2)
+
+    builder.settings().update("measurement_basis", "AB")
+    with pytest.raises(ValueError, match="I, X, Y or Z"):
+        builder.measurement_plan(3, 2)
+
+    builder.settings().update("measurement", "bogus")
+    with pytest.raises(ValueError, match="measurement must be one of"):
+        builder.measurement_policy()
+
+
+@pytest.mark.skipif(not _HAS_QSHARP, reason="qdk.qsharp is not installed")
+def test_measurement_setting_drives_the_standard_qpe_readout():
+    """Every policy shares one circuit body; only the readout changes.
+
+    ``|00>`` is an exact eigenvector of ``(pi/4)(ZI + IZ)`` with eigenvalue
+    ``pi/2``, so QPE leaves the system register untouched and the phase register
+    lands deterministically in a single bin. That makes all three readouts
+    predictable from each other.
+    """
+    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+    hamiltonian = _diagonal_hamiltonian()
+    num_bits, num_system = 3, 2
+
+    def build(**settings) -> Circuit:
+        builder = create("qpe_circuit_builder", "qdk_standard")
+        builder.settings().update("num_bits", num_bits)
+        for key, value in settings.items():
+            builder.settings().update(key, value)
+        return builder.run(state_preparation=_guiding_state(1.0, 0), qubit_hamiltonian=hamiltonian)[0]
+
+    # The body is always the adjointable QPE operation, whatever the readout.
+    phase_circuit = build()
+    eigenvector_circuit = build(measurement="eigenvector", measurement_basis="Z")
+    coherent_circuit = build(measurement="none")
+    for circuit in (phase_circuit, eigenvector_circuit, coherent_circuit):
+        assert circuit._qsharp_op is not None
+
+    phase_counts = executor.run(phase_circuit, shots=64).bitstring_counts
+    assert all(len(key) == num_bits for key in phase_counts)
+    # |00> is an exact eigenvector, so the phase register is deterministic.
+    assert len(phase_counts) == 1
+    phase_key = next(iter(phase_counts))
+
+    eigenvector_counts = executor.run(eigenvector_circuit, shots=64).bitstring_counts
+    assert all(len(key) == num_bits + num_system for key in eigenvector_counts)
+    # The phase bits are unchanged and the system register is still |00>.
+    assert set(eigenvector_counts) == {phase_key + "0" * num_system}
+
+    # Zero measurement is what amplitude amplification consumes: the circuit is
+    # still executable, it simply reports no bits.
+    assert set(executor.run(coherent_circuit, shots=8).bitstring_counts) == {""}
+
+    # The basis really reaches Q#: |00> measured in X is uniform over the system
+    # bits while the phase bits stay put.
+    x_counts = executor.run(build(measurement="eigenvector", measurement_basis="X"), shots=256).bitstring_counts
+    assert {key[:num_bits] for key in x_counts} == {phase_key}
+    assert {key[num_bits:] for key in x_counts} == {"00", "01", "10", "11"}
 
 
 def test_reflect_to_good_space_requires_a_coherent_circuit():
     # Amplitude amplification is decoupled from any particular circuit builder:
-    # it asks the nested algorithm for a coherent circuit and only requires that
-    # the answer carries an adjointable Q# operation to reflect about.
+    # it asks the nested algorithm for a measurement-free circuit and only
+    # requires that the answer carries an adjointable Q# operation to reflect about.
     class MeasuredOnlyBuilder(StandardQpeCircuitBuilder):
         def name(self) -> str:
             return "test_measured_only"
 
         def _run_impl(self, state_preparation, qubit_hamiltonian):  # noqa: ARG002
-            # Ignores the `coherent` setting, as a non-Q# backend would.
+            # Ignores the `measurement` setting, as a non-Q# backend would.
             return [Circuit(qasm="OPENQASM 3.0;")]
 
     algorithm_registry.register(lambda: MeasuredOnlyBuilder())

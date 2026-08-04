@@ -54,6 +54,12 @@ The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeC
    * - ``num_bits``
      - int
      - Number of phase bits to estimate. Must be a positive integer. Default: ``-1`` (invalid; user must set).
+   * - ``measurement``
+     - str
+     - Final measurement applied to the QPE register. ``"phase"`` (default) measures the phase register in the computational basis; ``"eigenvector"`` also measures the system register in ``measurement_basis``; ``"none"`` measures nothing, which is what :doc:`amplitude amplification <amplitude_amplification>` needs. Only ``"phase"`` is supported by the iterative builder.
+   * - ``measurement_basis``
+     - str
+     - Pauli basis for the system register when ``measurement`` is ``"eigenvector"``. A single letter is broadcast to every system qubit; otherwise give one letter per system qubit. ``"I"`` resets a qubit without recording a bit. Default: ``"Z"``.
    * - ``unitary_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Reference to the algorithm that constructs the target unitary :math:`U`. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``.
@@ -115,6 +121,8 @@ Standard QFT-based Phase Estimation Circuit Builder
 .. rubric:: Factory name: ``"qdk_standard"`` (QDK native), ``"qiskit_standard"`` (Qiskit implementation)
 
 Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously using ``num_bits`` ancilla qubits, applying controlled-:math:`U^{2^k}` for each ancilla and finishing with the inverse QFT.
+
+The circuit body is always the measurement-free, adjointable QPE operation, which the returned circuit carries alongside its factory; ``measurement`` only decides what is read out at the end. That is what lets reflection-based algorithms reuse the very same circuit as their state preparation.
 
 **Additional settings (Qiskit implementation):**
 
