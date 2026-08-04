@@ -11,6 +11,7 @@
     "boost-headers",
     "boost-container-hash",
     "boost-dynamic-bitset",
+    "boost-random",
     "boost-sort",
     "catch2",
     "gtest",
