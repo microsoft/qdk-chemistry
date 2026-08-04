@@ -840,13 +840,10 @@ class ReduceToLightCone(TransformationPass):
                 # Re-add measurement gates on the surviving qubits
                 from qiskit.circuit.library import Measure  # noqa: PLC0415
 
-                for idx in measured_qubits:
-                    qubit = dag.qubits[idx]
-                    if qubit in {q for node in dag.op_nodes() for q in node.qargs} or True:
-                        # Find the classical bit that was originally paired with this qubit
-                        if dag.clbits:
-                            clbit = dag.clbits[measured_qubits.index(idx) % len(dag.clbits)]
-                            dag.apply_operation_back(Measure(), [qubit], [clbit])
+                if dag.clbits:
+                    for position, idx in enumerate(measured_qubits):
+                        clbit = dag.clbits[position % len(dag.clbits)]
+                        dag.apply_operation_back(Measure(), [dag.qubits[idx]], [clbit])
                 return dag
             return LightCone().run(dag)
 
