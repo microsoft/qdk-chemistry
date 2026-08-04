@@ -8,18 +8,18 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import (
-    ControlledPauliSequenceMapper,
-    UnaryIterationWalkMapper,
-)
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     num_phase_bits,
     phase_window_state,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
+    UnaryPhaseEstimation,
     _select_dominant_decoded_phase,
 )
+from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 _PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
 _PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
@@ -261,65 +261,6 @@ class TestPhaseWindowState:
             phase_window_state(4, "kaiser")
 
 
-class TestMapperInterface:
-    """The builder accepts any mapper exposing the unary-iteration walk interface."""
-
-    def test_arbitrary_mapper_with_the_three_methods_satisfies_the_protocol(self):
-        """A mapper unrelated to the shipped ones qualifies as long as it implements the interface."""
-
-        class ThirdPartyWalkMapper:
-            def build_walk_op(self, _unitary, _num_queries, use_unary_iteration=True):  # noqa: ARG002
-                return None
-
-            def num_ancillary_qubits(self, _container):
-                return 0
-
-            def get_ancilla_prep_op(self):
-                return None
-
-        assert isinstance(ThirdPartyWalkMapper(), UnaryIterationWalkMapper)
-
-    def test_mapper_missing_a_method_is_rejected(self):
-        """Dropping any one of the three methods removes the capability."""
-
-        class PartialWalkMapper:
-            def build_walk_op(self, _unitary, _num_queries, use_unary_iteration=True):  # noqa: ARG002
-                return None
-
-            def num_ancillary_qubits(self, _container):
-                return 0
-
-        assert not isinstance(PartialWalkMapper(), UnaryIterationWalkMapper)
-        assert not isinstance(ControlledPauliSequenceMapper(), UnaryIterationWalkMapper)
-
-    def test_incapable_mapper_raises_and_names_the_missing_methods(self, monkeypatch):
-        """A mapper without the interface is refused, and the error says exactly what is absent."""
-
-        class StubUnitaryRepresentation:
-            def get_container(self):
-                return object()  # no ``power`` attribute, so the settings' count is used
-
-        class StubUnitaryBuilder:
-            def run(self, _qubit_hamiltonian):
-                return StubUnitaryRepresentation()
-
-        nested = {
-            "unitary_builder": StubUnitaryBuilder(),
-            "controlled_circuit_mapper": ControlledPauliSequenceMapper(),
-        }
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=4)
-        monkeypatch.setattr(builder, "_create_nested", lambda key: nested[key])
-
-        with pytest.raises(TypeError) as excinfo:
-            builder._run_impl(None, None)
-
-        message = str(excinfo.value)
-        assert "cannot drive unary-iteration phase estimation" in message
-        assert "ControlledPauliSequenceMapper" in message
-        for method in ("build_walk_op", "num_ancillary_qubits", "get_ancilla_prep_op"):
-            assert method in message
-
-
 class TestPhaseDecoding:
     """Decoding of the doubled measured phase."""
 
@@ -465,9 +406,75 @@ class TestUnaryQpeEndToEnd:
         expected[-bin_index] = 0.5
         assert probabilities == pytest.approx(expected, abs=1e-9)
 
+    def test_builder_defaults_recover_the_ground_state_energy(self):
+        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end.
 
-class TestRegistration:
-    """Registry wiring for the unary phase estimation stack."""
+        This is the only test that drives the whole Python wiring -- default LCU unitary
+        builder in quantum-walk mode, PSP mapper, circuit executor, phase decode -- rather
+        than calling the Q# operations directly. It therefore covers the parts the direct
+        Q# tests cannot: that the default block encoding really arrives as a walk container,
+        that the ancilla count and preparation reach the Q# entry point, and that the
+        executor's bitstring is decoded with the same endianness the circuit returns.
+
+        The equal-coefficient case is exactly representable: :math:`E = -1/\sqrt{2}` with
+        :math:`\lambda = 1` gives a walk phase of :math:`3/8`, so :math:`2\varphi = 3/4`
+        lands on bin :math:`3N/4`. That bin is asymmetric under bit reversal, so reading the
+        register the other way round decodes to :math:`+0.98` instead of :math:`-0.71`.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+        state_prep_params = {
+            "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
+            "stateVector": np.real(vectors[:, 0]).tolist(),
+            "expansionOps": [],
+            "numQubits": hamiltonian.num_qubits,
+        }
+        state_preparation = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        )
+
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=63))
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+
+
+class TestBaseProfileGuardrail:
+    """Unary iteration must be unreachable from a ``TargetProfile.Base`` context.
+
+    Base is not merely a weaker profile here, it is a wrong one. ``UnaryIterationWithControl``
+    toggles the helper qubit of its AND ladder with a ``CNOT`` between the compute and the
+    uncompute, so ``Adjoint AND`` has to read a measurement result to know which correction
+    to apply. Base forbids mid-circuit measurement, so it lowers the uncompute to the unitary
+    decomposition instead, which is only valid while the helper still holds the original AND.
+
+    Nothing raises when that happens, and the damage is worse than a fixed wrong answer. For
+    ``num_queries = 7`` the phase register comes back well-formed and in range, but equal to
+    the correct bin XOR 2 or XOR 6 with roughly even odds: one phase bit is always flipped,
+    and a second is left randomized by the corrupted uncompute. So the result is never
+    accidentally right, and never reproducibly wrong either -- it is noise shaped like data,
+    which no golden-value assertion downstream could pin.
+
+    The only defence is refusing to load the sources at all. Omitting them from
+    ``_BASE_PROFILE_FILES`` turns a silent wrong answer into an undefined-symbol error at the
+    point of use.
+    """
+
+    @pytest.mark.parametrize("namespace", ["UnaryIteration", "UnaryPhaseEstimation"])
+    def test_base_context_refuses_to_resolve_a_unary_operation(self, base_qdk_ctx, namespace):
+        """Calling into the withheld sources must fail loudly rather than answer wrongly."""
+        with pytest.raises(Exception, match="not found"):
+            base_qdk_ctx.eval(f"QDKChemistry.Utils.{namespace}.AddressQubits(8)")
+
+
+class TestQueryCountResolution:
+    """Precedence between the container's power and the configured query count."""
 
     def test_query_count_falls_back_to_settings(self):
         """A unitary representation without a power uses the configured query count."""

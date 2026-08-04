@@ -24,7 +24,6 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper.base import UnaryIterationWalkMapper
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -133,10 +132,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     is the query count. Omitting slot :math:`t` realizes :math:`W^{p-2t}` while applying
     exactly :math:`p` walk blocks, so :math:`p` need not be a power of two.
 
-    The builder works with any controlled circuit mapper satisfying
-    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.base.UnaryIterationWalkMapper`.
-    The default pairing is the generic LCU builder in quantum-walk mode driven by the
-    PREPARE-SELECT-PREPARE mapper, so no particular block encoding is baked in.
+    The block encoding is the generic LCU built in quantum-walk mode and mapped to a circuit
+    by the PREPARE-SELECT-PREPARE mapper, which supplies the walk operator through
+    :meth:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper.ControlledPSPMapper.build_walk_op`.
 
     """
 
@@ -224,8 +222,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             A single-element list containing the unary-iteration QPE circuit.
 
         Raises:
-            TypeError: If the configured controlled circuit mapper cannot build a
-                unary-iteration walk operator.
             RuntimeError: If the state preparation circuit has no Q# operation.
 
         """
@@ -235,17 +231,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_bits = num_phase_bits(num_queries)
 
         mapper = self._create_nested("controlled_circuit_mapper")
-        if not isinstance(mapper, UnaryIterationWalkMapper):
-            missing = [
-                name
-                for name in ("build_walk_op", "num_ancillary_qubits", "get_ancilla_prep_op")
-                if not callable(getattr(mapper, name, None))
-            ]
-            raise TypeError(
-                f"{type(mapper).__name__} cannot drive unary-iteration phase estimation because it "
-                f"does not implement {missing}. A controlled circuit mapper must satisfy the "
-                "UnaryIterationWalkMapper interface."
-            )
         # The schedule is built already bound to num_queries: it applies all of the walk
         # blocks itself, sharing one unary-iteration ladder with the phase-register decode.
         signed_power_schedule = mapper.build_walk_op(unitary_rep, num_queries, use_unary_iteration=True)

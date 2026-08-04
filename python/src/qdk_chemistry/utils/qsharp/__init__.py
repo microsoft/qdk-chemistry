@@ -22,6 +22,7 @@ __all__ = [
 ]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
+_SOURCE_ROOT = Path(__file__).parent / "src"
 
 #: Profile the vendored Q# project is compiled for by default.
 #:
@@ -32,6 +33,42 @@ _PROJECT_ROOT = str(Path(__file__).parent)
 #: holds the original AND. An adaptive profile is therefore required for correctness,
 #: not merely for cost.
 DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
+
+#: Q# sources that are *correct* under ``TargetProfile.Base``.
+#:
+#: A Base context loads only this subset. The criterion is correctness, not loadability:
+#: the excluded sources do compile under Base, and then compute the wrong answer. Unary
+#: iteration is the motivating case. It toggles the helper qubit of its AND ladder with a
+#: ``CNOT`` between the compute and the uncompute, so ``Adjoint AND`` has to read a
+#: measurement result to know which correction to apply. Base forbids mid-circuit
+#: measurement, so it lowers that uncompute to the unitary decomposition instead -- valid
+#: only when the helper still holds the original AND, which the ``CNOT`` has just made
+#: false.
+#:
+#: The failure is silent and non-deterministic: the phase register comes back well-formed
+#: and in range, but equal to the correct value XOR 2 or XOR 6 with roughly even odds. It is
+#: never accidentally right and never reproducibly wrong, so nothing downstream can catch
+#: it. Withholding those sources from a Base context converts that into an ``undefined
+#: symbol`` error at the point of use.
+#:
+#: Base is still worth reaching for: forbidding mid-circuit measurement is exactly what
+#: makes measurement-based uncompute (``Adjoint AND``) lower to a purely unitary circuit,
+#: which QIR-to-Qiskit conversion requires, since a circuit carrying classical bits cannot
+#: be turned into a Qiskit gate. That path is unaffected by this allowlist: the QIR emitted
+#: for the Base-legal sources is byte-identical whether they are loaded as a subset or as
+#: the whole project.
+_BASE_PROFILE_FILES = (
+    "StatePreparation.qs",
+    "CircuitComposition.qs",
+    "IterativePhaseEstimation.qs",
+    "StandardPhaseEstimation.qs",
+    "ControlledPauliExp.qs",
+    "HadamardTest.qs",
+    "PauliExp.qs",
+    "MeasurementBasis.qs",
+    "PrepSelPrep.qs",
+    "Select.qs",
+)
 
 
 class _SharedContext:
@@ -61,10 +98,12 @@ def create_qsharp_context(
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
-        :data:`DEFAULT_TARGET_PROFILE`. Pass ``TargetProfile.Base`` to get measurement-free
-        circuits, which is what the Qiskit interop path needs: a Qiskit circuit carrying
-        classical bits cannot be converted to a gate. Operations that rely on
-        measurement-based uncompute, such as unary iteration, are not valid under Base.
+        :data:`DEFAULT_TARGET_PROFILE`. A ``TargetProfile.Base`` context loads only the
+        Base-*correct* subset of the vendored project, which is what the Qiskit interop
+        path needs to obtain measurement-free circuits. Sources that rely on
+        measurement-based uncompute, such as unary iteration, are withheld from it: they
+        would compile under Base and return silently wrong results, so they are made to
+        fail as undefined symbols instead.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via
@@ -80,6 +119,10 @@ def create_qsharp_context(
         kwargs["language_features"] = language_features
     if qdk_config is not None:
         kwargs["qdk_config"] = qdk_config
+    if target_profile == TargetProfile.Base:
+        context = qdk.Context(target_profile=target_profile, **kwargs)
+        context.eval("\n".join((_SOURCE_ROOT / name).read_text(encoding="utf-8") for name in _BASE_PROFILE_FILES))
+        return context
     return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
 
 

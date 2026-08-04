@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings, UnaryIterationWalkMapper
+from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
 
@@ -15,5 +15,4 @@ __all__ = [
     "ControlledPSPMapper",
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",
-    "UnaryIterationWalkMapper",
 ]
