@@ -47,6 +47,8 @@ from qdk_chemistry.plugins.exachem.scf_export import export_scf_files
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["ExachemCcsdCalculator", "ExachemCcsdSettings"]
+
 
 class ExachemCcsdSettings(Settings):
     """Settings for the ExaChem CCSD calculator.
@@ -54,6 +56,7 @@ class ExachemCcsdSettings(Settings):
     Attributes:
         exachem_binary (str): Path to the ExaChem binary, or empty to find ``ExaChem`` on ``PATH``.
         mpi_ranks (int): Number of MPI processes (default: 1).
+        mpi_bind_to (str): Binding policy per rank; empty defers to the launcher (default: ``"core"``).
         work_dir (str): Working directory, or empty for a temp dir (default: ``""``).
         timeout (int): Subprocess timeout in seconds (default: 3600).
         ccsd_threshold (float): CCSD convergence threshold (default: 1e-6).
@@ -74,6 +77,9 @@ class ExachemCcsdSettings(Settings):
             "Full path to the ExaChem binary; empty finds 'ExaChem' on PATH",
         )
         self._set_default("mpi_ranks", "int", 1, "Number of MPI processes to launch ExaChem with")
+        self._set_default(
+            "mpi_bind_to", "string", "core", "Binding policy for each MPI rank; empty defers to the launcher default"
+        )
         self._set_default("work_dir", "string", "", "Working directory for ExaChem input/output; empty uses a temp dir")
         self._set_default("timeout", "int", 3600, "Maximum seconds to wait for ExaChem to finish")
         self._set_default("ccsd_threshold", "double", 1e-6, "CCSD convergence threshold")
@@ -119,8 +125,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         """Run ExaChem CCSD on the Ansatz's molecular reference.
 
         Args:
-            ansatz: The :class:`~qdk_chemistry.data.Ansatz` whose orbitals and
-                wavefunction define the molecular reference.
+            ansatz: The :class:`~qdk_chemistry.data.Ansatz` whose orbitals and wavefunction define the reference.
 
         Returns:
             A tuple ``(total_energy, wavefunction, None)`` where ``total_energy``
@@ -242,6 +247,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                 nprocs=s.get("mpi_ranks"),
                 work_dir=work_path,
                 exachem_binary=Path(binary) if binary else None,
+                mpi_bind_to=s.get("mpi_bind_to"),
                 timeout=s.get("timeout"),
                 scf_files_prefix=scf_files_prefix,
                 libint_data_path=basis_data_dir,

@@ -23,6 +23,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "CcsdInputConfig",
+    "ExachemNotFoundError",
+    "ExachemResult",
+    "ExachemRunError",
+    "find_exachem_binary",
+    "find_mpi_launcher",
+    "run_exachem",
+]
+
 
 class ExachemNotFoundError(RuntimeError):
     """Raised when the ExaChem binary cannot be located."""
@@ -98,8 +108,7 @@ class CcsdInputConfig:
         scf_type: SCF type (``"restricted"`` or ``"unrestricted"``).
         noscf: Whether ExaChem should skip its internal SCF and restart.
         write_amplitudes: Enable ``CC.PRINT.tamplitudes`` to write T1/T2 to text.
-        amplitude_threshold: Only amplitudes with absolute value strictly greater
-            than this are written (``0.0`` writes every nonzero amplitude).
+        amplitude_threshold: Only amplitudes with absolute value above this are written (``0.0`` writes all).
         input_prefix: Base name for the ExaChem input file and restart directory.
         extra_cc_options: Additional CC block options merged into the input.
         extra_scf_options: Additional SCF block options merged into the input.
@@ -191,12 +200,39 @@ class ExachemResult:
     returncode: int
 
 
+# srun spells binding differently from mpirun, so map the common policies.
+_SRUN_BIND_POLICIES = {"core": "cores", "hwthread": "threads", "socket": "sockets", "none": "none"}
+
+
+def _binding_args(launcher: str, bind_to: str) -> list[str]:
+    """Translate a binding policy into launcher-specific arguments.
+
+    Args:
+        launcher: The launcher executable name, ``"mpirun"`` or ``"srun"``.
+        bind_to: Binding policy such as ``"core"``; empty deferring to the launcher default.
+
+    Returns:
+        The arguments to append to the launcher invocation, empty when deferring.
+
+    """
+    if not bind_to:
+        return []
+    if launcher.endswith("srun"):
+        policy = _SRUN_BIND_POLICIES.get(bind_to)
+        if policy is None:
+            logger.warning("No srun equivalent for bind-to policy %r; using the srun default.", bind_to)
+            return []
+        return [f"--cpu-bind={policy}"]
+    return ["--bind-to", bind_to]
+
+
 def run_exachem(
     config: CcsdInputConfig,
     *,
     nprocs: int = 1,
     work_dir: Path | None = None,
     exachem_binary: Path | None = None,
+    mpi_bind_to: str = "",
     mpi_extra_args: list[str] | None = None,
     timeout: int | None = None,
     scf_files_prefix: Path | None = None,
@@ -209,13 +245,11 @@ def run_exachem(
         nprocs: Number of MPI processes.
         work_dir: Working directory. If None, creates a temporary directory.
         exachem_binary: Path to ExaChem binary. If None, auto-detects.
+        mpi_bind_to: Binding policy per rank (e.g. ``"core"``); empty defers to the launcher default.
         mpi_extra_args: Extra arguments for the MPI launcher (e.g. ``["--bind-to", "core"]``).
         timeout: Timeout in seconds for the subprocess.
         scf_files_prefix: Prefix of pre-computed SCF restart files to stage for ``noscf`` runs.
-        libint_data_path: If given, set ``LIBINT_DATA_PATH`` for the ExaChem
-            subprocess so Libint2 reads the basis from
-            ``<libint_data_path>/basis/<name>.g94`` (see
-            :func:`~qdk_chemistry.plugins.exachem.scf_export.write_qdk_basis_g94`).
+        libint_data_path: If set, exports ``LIBINT_DATA_PATH`` so Libint2 reads the basis from that directory.
 
     Returns:
         ExachemResult with paths to outputs and captured output.
@@ -228,62 +262,80 @@ def run_exachem(
     if exachem_binary is None:
         exachem_binary = find_exachem_binary()
 
+    # A caller-supplied work_dir belongs to the caller; a directory we create here is
+    # ours to remove if the run fails, and is handed to the caller on success.
+    owns_work_dir = work_dir is None
     if work_dir is None:
         work_dir = Path(tempfile.mkdtemp(prefix="exachem_ccsd_"))
 
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    # If noscf mode, set up SCF restart files in the expected directory structure
-    if config.noscf and scf_files_prefix is not None:
-        _setup_noscf_directory(work_dir, config, scf_files_prefix)
+    try:
+        # If noscf mode, set up SCF restart files in the expected directory structure
+        if config.noscf and scf_files_prefix is not None:
+            _setup_noscf_directory(work_dir, config, scf_files_prefix)
 
-    # Write input JSON
-    input_path = work_dir / f"{config.input_prefix}.json"
-    input_dict = config.to_json()
-    input_path.write_text(json.dumps(input_dict, indent=2))
+        # Write input JSON
+        input_path = work_dir / f"{config.input_prefix}.json"
+        input_dict = config.to_json()
+        input_path.write_text(json.dumps(input_dict, indent=2))
 
-    # Build command
-    launcher = find_mpi_launcher()
-    cmd = [*launcher, "-np", str(nprocs)]
-    if mpi_extra_args:
-        cmd.extend(mpi_extra_args)
-    cmd.extend([str(exachem_binary), str(input_path)])
+        # Build command
+        launcher = find_mpi_launcher()
+        cmd = [*launcher, "-np", str(nprocs)]
+        cmd.extend(_binding_args(launcher[0], mpi_bind_to))
+        if mpi_extra_args:
+            cmd.extend(mpi_extra_args)
+        cmd.extend([str(exachem_binary), str(input_path)])
 
-    logger.info("Running ExaChem: %s", " ".join(cmd))
+        logger.info("Running ExaChem: %s", " ".join(cmd))
 
-    run_env = None
-    if libint_data_path is not None:
-        run_env = {**os.environ, "LIBINT_DATA_PATH": str(libint_data_path)}
-        logger.info("Using LIBINT_DATA_PATH=%s for ExaChem basis", libint_data_path)
+        # A copy of the parent environment: assigning into it never mutates os.environ,
+        # so the calling process keeps its own OMP_NUM_THREADS. One OpenMP thread per
+        # rank avoids oversubscribing the cores the ranks are bound to.
+        run_env = {**os.environ, "OMP_NUM_THREADS": "1"}
+        if libint_data_path is not None:
+            run_env["LIBINT_DATA_PATH"] = str(libint_data_path)
+            logger.info("Using LIBINT_DATA_PATH=%s for ExaChem basis", libint_data_path)
 
-    result = subprocess.run(
-        cmd,
-        cwd=str(work_dir),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        check=False,
-        env=run_env,
-    )
-
-    exachem_result = ExachemResult(
-        input_json=input_path,
-        work_dir=work_dir,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        returncode=result.returncode,
-    )
-
-    if result.returncode != 0:
-        logger.error("ExaChem failed (rc=%d):\nstdout: %s\nstderr: %s", result.returncode, result.stdout, result.stderr)
-        raise ExachemRunError(
-            f"ExaChem exited with code {result.returncode}. "
-            f"Check work_dir={work_dir} for details.\n"
-            f"stderr: {result.stderr[:500]}"
+        result = subprocess.run(
+            cmd,
+            cwd=str(work_dir),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env=run_env,
         )
 
-    return exachem_result
+        exachem_result = ExachemResult(
+            input_json=input_path,
+            work_dir=work_dir,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+        )
+
+        if result.returncode != 0:
+            logger.error(
+                "ExaChem failed (rc=%d):\nstdout: %s\nstderr: %s", result.returncode, result.stdout, result.stderr
+            )
+            location = (
+                "The temporary work directory was removed."
+                if owns_work_dir
+                else f"Check work_dir={work_dir} for details."
+            )
+            raise ExachemRunError(
+                f"ExaChem exited with code {result.returncode}. {location}\nstderr: {result.stderr[:500]}"
+            )
+
+        return exachem_result
+    except BaseException:
+        if owns_work_dir:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            logger.debug("Removed temporary work directory %s after a failed run", work_dir)
+        raise
 
 
 def _setup_noscf_directory(work_dir: Path, config: CcsdInputConfig, scf_files_prefix: Path) -> None:

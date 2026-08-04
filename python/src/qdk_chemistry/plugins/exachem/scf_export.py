@@ -48,6 +48,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["export_scf_files", "write_exachem_matrix", "write_qdk_basis_g94"]
+
 try:
     import h5py
 
@@ -121,15 +123,17 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
     Args:
         basis_set: A :class:`~qdk_chemistry.data.BasisSet` instance.
         elements: Element symbols in molecule (atom) order.
-        basis_data_dir: Directory to write into; the file is placed at
-            ``<basis_data_dir>/basis/<basis_name>.g94``.  Point
-            ``LIBINT_DATA_PATH`` at ``basis_data_dir`` when running ExaChem.
+        basis_data_dir: Directory to write into; the file is placed at ``<basis_data_dir>/basis/<basis_name>.g94``.
         basis_name: Basis set name (used for the file name).
 
     Returns:
         The ``basis_data_dir`` path, to be used as ``LIBINT_DATA_PATH``.
 
     """
+    # basis_name becomes a file name, so reject anything that could escape the basis dir.
+    if not basis_name or "/" in basis_name or "\\" in basis_name or ".." in basis_name:
+        raise ValueError(f"Invalid basis name for a Gaussian-94 file name: {basis_name!r}")
+
     # Group shell indices by atom (shells are already in qdk's native order).
     atom_shells: dict[int, list[int]] = {}
     for s in range(basis_set.get_num_shells()):
@@ -243,9 +247,7 @@ def export_scf_files(
         density_beta: Beta AO density (unrestricted), shape ``(nbf, nbf)``; None writes no beta density.
         basis_name: Basis set name (e.g. ``"cc-pvdz"``); used for the written ``.g94`` file name.
         elements: Element symbols in molecule (atom) order.
-        basis_data_dir: Directory to write qdk-chemistry's basis into as a
-            Gaussian-94 file (at ``<basis_data_dir>/basis/<basis_name>.g94``) for
-            ExaChem to read via ``LIBINT_DATA_PATH``.
+        basis_data_dir: Directory receiving qdk-chemistry's basis as a Gaussian-94 file for ExaChem to read.
 
     Returns:
         List of paths to the created files.

@@ -7,11 +7,14 @@ qdk-chemistry's own SCF orbitals. The only difference between the two runs is th
 coupled-cluster solver itself: ExaChem's Cholesky-decomposed TAMM implementation
 versus PySCF's.
 
-Because both consume the same orbitals there is no per-orbital phase ambiguity, so
-the converged T1/T2 amplitudes are compared elementwise rather than by magnitude.
-Agreement is limited by ExaChem's Cholesky decomposition tolerance and the two
-codes' coupled-cluster convergence thresholds. Both restricted (RHF) and
-unrestricted (UHF) references are exercised.
+Because both consume the same MO coefficients there is no per-orbital phase
+ambiguity, so the converged T1/T2 amplitudes are compared elementwise rather than
+by magnitude. The two runs are not otherwise bit-identical: ExaChem is handed the
+orbitals through its serial-IO restart files and rebuilds the integrals with its
+own Libint2, so agreement is limited by that integral re-computation, by ExaChem's
+Cholesky decomposition tolerance, and by the two codes' coupled-cluster
+convergence thresholds. Both restricted (RHF) and unrestricted (UHF) references
+are exercised.
 
 Each test runs ExaChem via MPI, so they are marked ``slow``. The binary is passed to
 the calculator through its ``exachem_binary`` setting; the tests locate one by looking
@@ -66,12 +69,14 @@ pytestmark = [
     ),
 ]
 
-# Both plugins run on the same orbitals, so the residual difference is the
-# coupled-cluster solver alone. Energies agree to the correlation-energy tolerance
-# used elsewhere for pyscf comparisons, relaxed for ExaChem's Cholesky threshold.
+# The two solvers are not converged to a common threshold: ExaChem's ccsd_threshold
+# defaults to 1e-6 and its Cholesky cd_diagtol to 1e-5, while pyscf's conv_tol is
+# 1e-7. These tolerances are therefore set by the looser code plus the integral
+# re-computation noted in the module docstring, not by either solver alone.
+# NOTE: they are estimates -- they have not been calibrated against a real ExaChem
+# build, so revisit them the first time this suite runs in CI.
 _energy_tolerance = 100 * mp2_energy_tolerance
-# The amplitudes themselves are wavefunction parameters and converge less tightly
-# than the energy they produce.
+# Amplitudes are wavefunction parameters and converge less tightly than the energy.
 _amplitude_tolerance = 10 * rdm_tolerance
 
 # ---------------------------------------------------------------------------

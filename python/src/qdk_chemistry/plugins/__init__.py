@@ -39,6 +39,9 @@ Currently available plugin packages:
 * :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit mapping,
   operator conversion, and quantum circuit interoperability.
 
+* :mod:`qdk_chemistry.plugins.exachem`: ExaChem integration providing coupled cluster
+  (CCSD) calculations with cluster-amplitude read-in, executed as an external MPI process.
+
 Using Plugins
 -------------
 Plugins are used by importing the plugin module (which auto-registers implementations)
@@ -72,6 +75,7 @@ See Also:
     :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration plugin
     :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration plugin
     :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration plugin
+    :mod:`qdk_chemistry.plugins.exachem`: ExaChem integration plugin
 
 """
 # --------------------------------------------------------------------------------------------
