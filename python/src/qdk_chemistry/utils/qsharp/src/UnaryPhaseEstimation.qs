@@ -34,9 +34,17 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
-    /// - `unaryIterationEvolution`: Applies the signed-power schedule on (phase register, targets).
+    /// - `signedPowerSchedule`: Applies the ENTIRE signed-power schedule on
+    ///   (phase register, targets) in a single call. It is not one walk step: the caller
+    ///   builds it already bound to `numQueries`, and it internally sweeps all
+    ///   `numQueries + 1` reflection slots, applying `numQueries` walk blocks and skipping
+    ///   the one reflection selected by the phase register. Fusing that sweep with the
+    ///   address decode is what makes the schedule cost O(numQueries) Toffolis instead of
+    ///   O(numQueries * log numQueries); do not lift the repetition to this call site.
     ///   The phase register is passed little-endian, matching the unary addressing convention.
     /// - `numQueries`: Total number of block applications; need not be a power of two.
+    ///   Used here only to size the phase register - it must equal the query count that
+    ///   `signedPowerSchedule` was built with, or the decoded phase will be wrong.
     /// - `ancillas`: An array of indices for the phase ancilla qubits.
     /// - `systems`: An array of indices for the system qubits (state prep target).
     /// - `phaseQubitPrep`: Prepares the window state on the phase register (big-endian).
@@ -46,7 +54,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// - `Result[]`: The measurement results of the phase ancilla qubits (MSB first).
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
-        unaryIterationEvolution : (Qubit[], Qubit[]) => Unit,
+        signedPowerSchedule : (Qubit[], Qubit[]) => Unit,
         numQueries : Int,
         ancillas : Int[],
         systems : Int[],
@@ -76,7 +84,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         phaseQubitPrep(phaseAncillas);
 
         // ApplyQFT and the window state are big-endian; unary addressing is little-endian.
-        unaryIterationEvolution(Reversed(phaseAncillas), allTargets);
+        // One call applies all `numQueries` blocks: the schedule owns the repetition so the
+        // slot sweep and the phase-register decode share a single unary-iteration ladder.
+        signedPowerSchedule(Reversed(phaseAncillas), allTargets);
 
         Adjoint ApplyQFT(phaseAncillas);
 

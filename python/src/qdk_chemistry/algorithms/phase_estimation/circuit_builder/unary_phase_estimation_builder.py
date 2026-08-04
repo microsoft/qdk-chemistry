@@ -245,7 +245,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 f"does not implement {missing}. A controlled circuit mapper must satisfy the "
                 "UnaryIterationWalkMapper interface."
             )
-        unary_iteration_op = mapper.build_walk_op(unitary_rep, num_queries, use_unary_iteration=True)
+        # The schedule is built already bound to num_queries: it applies all of the walk
+        # blocks itself, sharing one unary-iteration ladder with the phase-register decode.
+        signed_power_schedule = mapper.build_walk_op(unitary_rep, num_queries, use_unary_iteration=True)
         num_ancilla_qubits = mapper.num_ancillary_qubits(unitary_rep.get_container())
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
@@ -261,7 +263,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         )
         parameters = {
             "statePrep": state_prep_op,
-            "unaryIterationEvolution": unary_iteration_op,
+            "signedPowerSchedule": signed_power_schedule,
             "numQueries": num_queries,
             "ancillas": list(range(num_bits)),
             "systems": [index + num_bits for index in range(qubit_hamiltonian.num_qubits)],

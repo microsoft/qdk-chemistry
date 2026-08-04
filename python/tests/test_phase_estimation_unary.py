@@ -338,6 +338,35 @@ class TestUnaryQpeEndToEnd:
         expected = (-k) % num_states if system_state == 1 else k
         assert self._measure(qdk_ctx, num_queries, k, system_state) == expected
 
+    def test_slot_sweep_grows_linearly_with_the_query_count(self, qdk_ctx):
+        """The schedule must sweep ``num_queries + 1`` slots, not apply one controlled block.
+
+        ``MakeUnaryQPECircuit`` hands the whole phase register to a single
+        ``signedPowerSchedule`` call rather than repeating a walk step itself, because unary
+        iteration fuses the slot sweep with the address decode. This pins that the repetition
+        really happens inside that call. The synthetic walk block is Clifford, so the only
+        non-Clifford cost is the unary-iteration AND ladder, one uncompute measurement per
+        slot: the count must therefore grow proportionally to ``num_queries``. A schedule
+        that applied a single block, or that ignored the query count it was built with, would
+        give a flat count instead.
+        """
+        theta = -np.pi / 4
+        counts = {
+            num_queries: qdk_ctx.logical_counts(
+                qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk,
+                num_queries,
+                theta,
+                1,
+            )["measurementCount"]
+            for num_queries in (3, 7, 15, 31)
+        }
+
+        queries = sorted(counts)
+        assert [counts[num_queries] for num_queries in queries] == sorted(counts.values()), counts
+        per_query = [counts[num_queries] / num_queries for num_queries in queries]
+        assert min(per_query) > 0.75, counts
+        assert max(per_query) / min(per_query) < 1.5, counts
+
     @pytest.mark.parametrize("k", [1, 2, 3])
     def test_decoder_recovers_the_walk_phase(self, qdk_ctx, k):
         """The measured bin, run through the decoder, returns the walk phase.
