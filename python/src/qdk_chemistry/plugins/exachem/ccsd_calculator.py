@@ -37,6 +37,8 @@ import numpy as np
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, Settings, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.exachem.cli import CcsdInputConfig, ExachemResult, run_exachem
 from qdk_chemistry.plugins.exachem.conversion import (
     parse_ccsd_amplitudes_restricted,
@@ -167,7 +169,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         scf_type = "unrestricted" if is_unrestricted else "restricted"
 
         alpha_occ, beta_occ = wavefunction.get_total_orbital_occupations()
-        mo_coeff_alpha = np.asarray(orbitals.get_coefficients_alpha())
+        mo_coeff_alpha = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.alpha()))
 
         # Prepare the working directory and SCF restart prefix.
         work = s.get("work_dir") or None
@@ -191,7 +193,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
             if is_unrestricted:
                 density_alpha, density_beta = orbitals.calculate_ao_density_matrix(alpha_occ, beta_occ)
-                mo_coeff_beta = np.asarray(orbitals.get_coefficients_beta())
+                mo_coeff_beta = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.beta()))
                 export_scf_files(
                     files_prefix=scf_files_prefix,
                     mo_coeff_alpha=mo_coeff_alpha,
