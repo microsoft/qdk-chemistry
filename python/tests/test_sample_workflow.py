@@ -663,6 +663,17 @@ def test_tutorial_run_iqpe_configuration(capsys):
     _load_tutorial_module("tutorial_map_n2_to_qubits")
     _load_tutorial_module("tutorial_prepare_trial_state")
     tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
+    chapter_text = (
+        DOCS_PYTHON_EXAMPLES_DIR.parent.parent.parent
+        / "tutorials"
+        / "ground_state_molecular_energies_with_qpe"
+        / "06_iterative_phase_estimation.rst"
+    ).read_text(encoding="utf-8")
+    assert r"\alpha\in(-\pi,\pi]" in chapter_text
+    assert r"(-\pi/t,\pi/t]" in chapter_text
+    assert "The loop executes :math:`k=0` first." in chapter_text
+    assert "reverses the measurements from execution order" in chapter_text
+    assert "This estimates an eigenvalue of the qubit Hamiltonian" in chapter_text
 
     problem = tutorial_module.prepare_iqpe_problem()
     with pytest.raises(ValueError, match="zero-angle phase-grid point"):

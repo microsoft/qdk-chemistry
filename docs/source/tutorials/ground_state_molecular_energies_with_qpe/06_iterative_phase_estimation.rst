@@ -99,9 +99,10 @@ The QDK/Chemistry circuit's readout convention reverses this orientation, so the
    =\left(\frac{E_jt}{2\pi}\right)\bmod 1.
 
 The QDK/Chemistry result object handles the circuit's readout orientation and modulo wrapping automatically.
-It converts the measured phase fraction to a signed angle between :math:`-\pi` and :math:`\pi`, divides by :math:`t`, and returns the signed value.
+It converts the measured phase fraction to a signed angle :math:`\alpha\in(-\pi,\pi]`, divides by :math:`t`, and returns the signed value.
 The tutorial script uses this value directly rather than manually applying a sign conversion.
-To avoid aliasing, the active-space Hamiltonian eigenenergy :math:`E_j` being estimated must lie in the signed interval :math:`[-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
+To avoid aliasing, the active-space Hamiltonian eigenenergy :math:`E_j` being estimated must lie in the signed interval :math:`(-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
+The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to :math:`+\pi/t`.
 
 With :math:`m` measured phase bits, the representable fractions are multiples of :math:`2^{-m}`, so adjacent energy-grid points are separated by
 
@@ -180,8 +181,10 @@ For iterations over :math:`k=0,1,\ldots,m-1`, the circuit builder uses the contr
 
    U^{2^{m-k-1}}.
 
+The loop executes :math:`k=0` first.
 With :math:`m=6`, the six iteration circuits therefore apply powers :math:`32,16,8,4,2,1`.
-In this implementation, the first :math:`U^{32}` iteration determines the least-significant phase bit and the final :math:`U` iteration determines the most-significant bit.
+In this feedback convention, the first :math:`U^{32}` iteration determines the least-significant phase bit and the final :math:`U` iteration determines the most-significant bit.
+QDK/Chemistry reverses the measurements from execution order when it constructs the conventional most-significant-bit-first result.
 For an input eigenstate, the first H gate prepares the readout ancilla in :math:`(\vert0\rangle+\vert1\rangle)/\sqrt{2}`.
 The feedback rotation applies a corrective phase determined by earlier iterations.
 The controlled power then produces *phase kickback*: the :math:`\vert1\rangle` branch acquires the eigenphase of :math:`U^{2^{m-k-1}}`, while the :math:`\vert0\rangle` branch does not.
@@ -355,7 +358,8 @@ Dividing that angle by the evolution time maps the measured phase to the active-
 
    E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{\alpha}{t}.
 
-This is the eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+Finite phase resolution, sampling, and product-formula time evolution all contribute error.
 As :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
 The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
 Because these contributions are not measured by phase estimation, the script adds them classically:
