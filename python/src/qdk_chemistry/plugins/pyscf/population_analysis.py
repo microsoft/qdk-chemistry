@@ -9,7 +9,7 @@ import numpy as np
 from pyscf.scf.hf import mulliken_pop
 
 from qdk_chemistry.algorithms import PopulationAnalyzer, ScfSolver
-from qdk_chemistry.data import AlgorithmRef, Settings, Structure, Wavefunction
+from qdk_chemistry.data import AlgorithmRef, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -24,7 +24,6 @@ class PyscfPopulationAnalysisSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("method", "string", "mulliken", "Population-analysis method", ["mulliken"])
-        self._set_default("basis_set", "string", "def2-svp", "Basis set used for structure inputs")
         self._set_default(
             "scf_solver",
             "algorithm_ref",
@@ -43,32 +42,20 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
 
     def _run_impl(
         self,
-        input_data: Structure | Wavefunction,
+        wavefunction: Wavefunction,
         charge: int,
         spin_multiplicity: int,
         n_inactive_orbitals: int,
     ) -> list[float]:
         """Compute electron populations using PySCF Mulliken analysis."""
         Logger.trace_entering()
-        del n_inactive_orbitals
+        del charge, spin_multiplicity, n_inactive_orbitals
         method = self._settings.get("method").lower()
         if method != "mulliken":
             raise ValueError(f"Unsupported PySCF population-analysis method: {method}")
 
         scf_solver: ScfSolver = self._create_nested("scf_solver")
-        if isinstance(input_data, Structure):
-            _, wavefunction = scf_solver.run(
-                input_data,
-                charge,
-                spin_multiplicity,
-                self._settings.get("basis_set"),
-            )
-            return self._populations_from_wavefunction(wavefunction, scf_solver)
-
-        if isinstance(input_data, Wavefunction):
-            return self._populations_from_wavefunction(input_data, scf_solver)
-
-        raise TypeError("PySCF population analysis requires a Structure or Wavefunction input.")
+        return self._populations_from_wavefunction(wavefunction, scf_solver)
 
     def _populations_from_wavefunction(self, wavefunction: Wavefunction, scf_solver: ScfSolver) -> list[float]:
         orbitals = wavefunction.get_orbitals()

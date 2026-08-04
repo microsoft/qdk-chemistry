@@ -39,11 +39,11 @@ def test_qdk_population_analyzer_has_no_method_aliases():
     assert "mulliken" not in available_analyzers
 
 
-def test_qdk_population_analyzer_structure_input():
-    """The QDK analyzer rejects structures without an electronic state."""
+def test_qdk_population_analyzer_requires_wavefunction_input():
+    """The QDK analyzer only accepts wavefunction inputs."""
     analyzer = algorithms.create("population_analyzer", "qdk")
 
-    with np.testing.assert_raises(ValueError):
+    with np.testing.assert_raises(TypeError):
         analyzer.run(_h2_structure(), charge=1, spin_multiplicity=1)
 
 

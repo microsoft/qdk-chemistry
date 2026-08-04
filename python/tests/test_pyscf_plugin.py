@@ -220,24 +220,26 @@ class TestPyscfPlugin:
     def test_pyscf_h2_population_analysis(self):
         """Test PySCF Mulliken electron populations on neutral H2."""
         h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_set="sto-3g")
         analyzer = algorithms.create("population_analyzer", "pyscf")
-        analyzer.settings().set("basis_set", "sto-3g")
 
-        populations = analyzer.run(h2, charge=0, spin_multiplicity=1)
+        populations = analyzer.run(wavefunction, charge=0, spin_multiplicity=1)
 
         assert len(populations) == 2
         np.testing.assert_allclose(populations, [1.0, 1.0], atol=1e-8)
 
     def test_pyscf_o2_unrestricted_population_analysis(self):
         """Test spin-summed PySCF populations from unrestricted orbitals."""
+        scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
+        _, wavefunction = scf_solver.run(create_o2_structure(), charge=0, spin_multiplicity=3, basis_set="sto-3g")
         analyzer = algorithms.create("population_analyzer", "pyscf")
-        analyzer.settings().set("basis_set", "sto-3g")
         analyzer.settings().set(
             "scf_solver",
             AlgorithmRef("scf_solver", "pyscf", scf_type="unrestricted"),
         )
 
-        populations = analyzer.run(create_o2_structure(), charge=0, spin_multiplicity=3)
+        populations = analyzer.run(wavefunction, charge=0, spin_multiplicity=3)
 
         np.testing.assert_allclose(populations, [8.0, 8.0], atol=1e-8)
 

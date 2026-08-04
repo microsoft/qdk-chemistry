@@ -11,7 +11,6 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <stdexcept>
-#include <type_traits>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
@@ -205,26 +204,14 @@ std::unique_ptr<PopulationAnalyzer> make_qdk_population_analyzer() {
 }  // namespace
 
 std::vector<double> QdkPopulationAnalyzer::_run_impl(
-    PopulationAnalysisInput input, int charge, int spin_multiplicity,
-    unsigned int n_inactive_orbitals) const {
+    std::shared_ptr<data::Wavefunction> wavefunction, int charge,
+    int spin_multiplicity, unsigned int n_inactive_orbitals) const {
   (void)charge;
   (void)spin_multiplicity;
   (void)n_inactive_orbitals;
   const auto method = _settings->get<std::string>("method");
   if (method == "mulliken") {
-    return std::visit(
-        [](const auto& value) -> std::vector<double> {
-          using ValueType = std::decay_t<decltype(value)>;
-          if constexpr (std::is_same_v<ValueType,
-                                       std::shared_ptr<data::Structure>>) {
-            throw std::invalid_argument(
-                "QDK population analysis requires a wavefunction; use a "
-                "backend that can solve structure inputs first.");
-          } else {
-            return mulliken_population(value);
-          }
-        },
-        input);
+    return mulliken_population(wavefunction);
   }
   throw std::invalid_argument("Unsupported QDK population-analysis method: " +
                               method);

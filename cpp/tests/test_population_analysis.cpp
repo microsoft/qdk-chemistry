@@ -124,13 +124,6 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerDoesNotUseMethodAliases) {
                std::runtime_error);
 }
 
-TEST(PopulationAnalyzerTest, QdkAnalyzerRequiresWavefunctionInput) {
-  auto analyzer = PopulationAnalyzerFactory::create("qdk");
-
-  EXPECT_THROW(analyzer->run(create_h2_structure(), 1, 1, 0),
-               std::invalid_argument);
-}
-
 TEST(PopulationAnalyzerTest, QdkAnalyzerReturnsModelSitePopulations) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 

@@ -6,20 +6,11 @@
 
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
-#include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
-#include <variant>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
-
-/**
- * @brief Structure or wavefunction input for population analysis.
- */
-using PopulationAnalysisInput =
-    std::variant<std::shared_ptr<data::Structure>,
-                 std::shared_ptr<data::Wavefunction>>;
 
 /**
  * @class PopulationAnalysisSettings
@@ -40,7 +31,8 @@ class PopulationAnalysisSettings : public data::Settings {
  */
 class PopulationAnalyzer
     : public Algorithm<PopulationAnalyzer, std::vector<double>,
-                       PopulationAnalysisInput, int, int, unsigned int> {
+                       std::shared_ptr<data::Wavefunction>, int, int,
+                       unsigned int> {
  public:
   PopulationAnalyzer() {
     _settings = std::make_unique<PopulationAnalysisSettings>();
@@ -52,7 +44,7 @@ class PopulationAnalyzer
    * @brief Compute per-center particle populations.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param input Structure or wavefunction to analyze
+   * @param wavefunction Wavefunction to analyze
    * @param charge Total molecular charge
    * @param spin_multiplicity Spin multiplicity of the molecular system
    * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
@@ -74,7 +66,7 @@ class PopulationAnalyzer
   /**
    * @brief Implementation hook for derived population analyzers.
    *
-   * @param input Structure or wavefunction to analyze
+   * @param wavefunction Wavefunction to analyze
    * @param charge Total molecular charge
    * @param spin_multiplicity Spin multiplicity of the molecular system
    * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
@@ -82,8 +74,8 @@ class PopulationAnalyzer
    * @return Per-center populations in center order
    */
   virtual std::vector<double> _run_impl(
-      PopulationAnalysisInput input, int charge, int spin_multiplicity,
-      unsigned int n_inactive_orbitals) const = 0;
+      std::shared_ptr<data::Wavefunction> wavefunction, int charge,
+      int spin_multiplicity, unsigned int n_inactive_orbitals) const = 0;
 };
 
 /**
@@ -123,8 +115,8 @@ class QdkPopulationAnalyzer : public PopulationAnalyzer {
    * @brief Compute per-center populations.
    */
   std::vector<double> _run_impl(
-      PopulationAnalysisInput input, int charge, int spin_multiplicity,
-      unsigned int n_inactive_orbitals) const override;
+      std::shared_ptr<data::Wavefunction> wavefunction, int charge,
+      int spin_multiplicity, unsigned int n_inactive_orbitals) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms
