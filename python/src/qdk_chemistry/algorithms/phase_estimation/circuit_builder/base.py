@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -99,7 +98,7 @@ class QpeCircuitBuilder(Algorithm):
         self,
         qubit_hamiltonian: QubitOperator,
         power: int,
-    ) -> tuple[Circuit, int, Any | None]:
+    ) -> tuple[Circuit, int, Circuit | None]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
