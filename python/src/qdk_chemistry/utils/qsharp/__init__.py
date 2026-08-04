@@ -22,6 +22,7 @@ __all__ = [
 ]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
+_SOURCE_ROOT = Path(__file__).parent / "src"
 
 #: Profile the vendored Q# project is compiled for by default.
 #:
@@ -29,6 +30,26 @@ _PROJECT_ROOT = str(Path(__file__).parent)
 #: measurement results, which ``TargetProfile.Base`` rejects at load time, so the
 #: whole project only loads under an adaptive profile.
 DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
+
+#: Q# sources that are legal under ``TargetProfile.Base``.
+#:
+#: A Base context loads only this subset; the remaining sources branch on measurement
+#: results and therefore need an adaptive profile. Base is still worth reaching for:
+#: it forbids mid-circuit measurement, so measurement-based uncompute (``Adjoint AND``)
+#: lowers to a purely unitary circuit. That is what QIR-to-Qiskit conversion requires,
+#: since a circuit carrying classical bits cannot be turned into a Qiskit gate.
+_BASE_PROFILE_FILES = (
+    "StatePreparation.qs",
+    "CircuitComposition.qs",
+    "IterativePhaseEstimation.qs",
+    "StandardPhaseEstimation.qs",
+    "ControlledPauliExp.qs",
+    "HadamardTest.qs",
+    "PauliExp.qs",
+    "MeasurementBasis.qs",
+    "PrepSelPrep.qs",
+    "Select.qs",
+)
 
 
 class _SharedContext:
@@ -59,7 +80,9 @@ def create_qsharp_context(
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
         :data:`DEFAULT_TARGET_PROFILE`. ``TargetProfile.Base`` cannot load the full
-        vendored project, since parts of it branch on measurement results.
+        vendored project, since parts of it branch on measurement results; a Base context
+        therefore loads only the Base-legal subset (:data:`_BASE_PROFILE_FILES`), which is
+        what the Qiskit interop path needs to obtain measurement-free circuits.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via
@@ -75,6 +98,10 @@ def create_qsharp_context(
         kwargs["language_features"] = language_features
     if qdk_config is not None:
         kwargs["qdk_config"] = qdk_config
+    if target_profile == TargetProfile.Base:
+        context = qdk.Context(target_profile=target_profile, **kwargs)
+        context.eval("\n".join((_SOURCE_ROOT / name).read_text(encoding="utf-8") for name in _BASE_PROFILE_FILES))
+        return context
     return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
 
 

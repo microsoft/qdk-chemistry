@@ -819,11 +819,15 @@ class TestSOSSAQPEIntegration:
             np.zeros((n_orb, n_orb)),
             orbitals,
         )
+        # ``_to_sossa_operator`` transfers ownership of the C++ container, so read the
+        # scalar offsets off ``fh`` before it is consumed.
+        core_energy = fh.get_core_energy()
+        bliss_shift = fh.get_bliss_shift()
         container = _to_sossa_operator(fh).get_container()
 
         expected = (
-            fh.get_core_energy()
-            + fh.get_bliss_shift()
+            core_energy
+            + bliss_shift
             + _sos_energy_shift(
                 data["h1"],
                 data["basis_vectors"],
