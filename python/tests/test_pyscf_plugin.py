@@ -221,7 +221,7 @@ class TestPyscfPlugin:
         """Test PySCF Mulliken electron populations on neutral H2."""
         h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        _, wavefunction = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_set="sto-3g")
+        _, wavefunction = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
         analyzer = algorithms.create("population_analyzer", "pyscf")
 
         populations = analyzer.run(wavefunction, charge=0, spin_multiplicity=1)
@@ -232,7 +232,7 @@ class TestPyscfPlugin:
     def test_pyscf_o2_unrestricted_population_analysis(self):
         """Test spin-summed PySCF populations from unrestricted orbitals."""
         scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
-        _, wavefunction = scf_solver.run(create_o2_structure(), charge=0, spin_multiplicity=3, basis_set="sto-3g")
+        _, wavefunction = scf_solver.run(create_o2_structure(), charge=0, spin_multiplicity=3, basis_or_guess="sto-3g")
         analyzer = algorithms.create("population_analyzer", "pyscf")
         analyzer.settings().set(
             "scf_solver",
