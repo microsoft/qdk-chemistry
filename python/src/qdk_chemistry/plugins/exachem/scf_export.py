@@ -34,7 +34,7 @@ qdk-chemistry AO-layout convention: qdk-chemistry represents p orbitals in
 **Cartesian** form (``px, py, pz``) while ExaChem/Libint uses **spherical** p in
 ascending-m order (``m=-1, 0, +1`` = ``py, pz, px``).  Every other angular
 momentum already matches (s is a single function; d/f/g are spherical in both),
-so :func:`_within_shell_m_reorder` applies exactly that p-only swap (permuting
+so ``_within_shell_m_reorder`` applies exactly that p-only swap (permuting
 d/f/g corrupts the imported reference).
 """
 
@@ -113,12 +113,12 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
     """Write qdk-chemistry's basis as a Gaussian-94 file in qdk's shell order.
 
     ExaChem/Libint2 reads a basis from ``<LIBINT_DATA_PATH>/basis/<name>.g94``.
-    :meth:`BasisSet.get_shell` returns each shell's exponents and contraction
+    :meth:`~qdk_chemistry.data.BasisSet.get_shell` returns each shell's exponents and contraction
     coefficients in the raw g94 convention, so writing qdk-chemistry's shells in
     qdk-chemistry's native order makes ExaChem build its AO basis with exactly
     the same inter-shell order *and* numerically identical parameters.  Only the
     within-shell m-component order then differs (handled by
-    :func:`_within_shell_m_reorder`).
+    ``_within_shell_m_reorder``).
 
     Args:
         basis_set: A :class:`~qdk_chemistry.data.BasisSet` instance.
@@ -228,7 +228,7 @@ def export_scf_files(
     giving both codes an identical inter-shell order and identical basis
     parameters.  The AO rows/columns of the MO coefficient and density matrices
     are then corrected for the within-shell p-component ordering only
-    (:func:`_within_shell_m_reorder`).
+    (``_within_shell_m_reorder``).
 
     For a restricted (closed-shell) reference, pass only the alpha quantities;
     ExaChem reads the total density from ``.alpha.density`` (so ``density_alpha``

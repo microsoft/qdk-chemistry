@@ -93,45 +93,58 @@ class CcsdInputConfig:
     (``<prefix>.print_t1amp.txt`` and ``<prefix>.print_t2amp.txt``).  No
     perturbative-triples ``(T)`` step is performed, so the T amplitudes ExaChem
     writes are exactly the converged CCSD amplitudes.
-
-    Attributes:
-        atoms: List of atom lines, e.g. ``["H 0.0 0.0 0.0", "O 0.0 0.0 1.0"]``.
-        basis: Gaussian basis set name, e.g. ``"cc-pvdz"``.
-        charge: Molecular charge.
-        multiplicity: Spin multiplicity (2S+1).
-        units: Coordinate units (``"angstrom"`` or ``"bohr"``).
-        ccsd_threshold: CCSD convergence threshold.
-        ccsd_maxiter: Maximum CCSD iterations.
-        cd_diagtol: Cholesky decomposition diagonal tolerance.
-        freeze_core: Number of frozen core orbitals (0 = none).
-        freeze_virtual: Number of frozen virtual orbitals (0 = none).
-        scf_type: SCF type (``"restricted"`` or ``"unrestricted"``).
-        noscf: Whether ExaChem should skip its internal SCF and restart.
-        write_amplitudes: Enable ``CC.PRINT.tamplitudes`` to write T1/T2 to text.
-        amplitude_threshold: Only amplitudes with absolute value above this are written (``0.0`` writes all).
-        input_prefix: Base name for the ExaChem input file and restart directory.
-        extra_cc_options: Additional CC block options merged into the input.
-        extra_scf_options: Additional SCF block options merged into the input.
-
     """
 
     atoms: list[str] = field(default_factory=list)
+    """List of atom lines, e.g. ``["H 0.0 0.0 0.0", "O 0.0 0.0 1.0"]``."""
+
     basis: str = "cc-pvdz"
+    """Gaussian basis set name, e.g. ``"cc-pvdz"``."""
+
     charge: int = 0
+    """Molecular charge."""
+
     multiplicity: int = 1
+    """Spin multiplicity (2S+1)."""
+
     units: str = "angstrom"
+    """Coordinate units (``"angstrom"`` or ``"bohr"``)."""
+
     ccsd_threshold: float = 1e-6
+    """CCSD convergence threshold."""
+
     ccsd_maxiter: int = 100
+    """Maximum CCSD iterations."""
+
     cd_diagtol: float = 1e-5
+    """Cholesky decomposition diagonal tolerance."""
+
     freeze_core: int = 0
+    """Number of frozen core orbitals (0 = none)."""
+
     freeze_virtual: int = 0
+    """Number of frozen virtual orbitals (0 = none)."""
+
     scf_type: str = "restricted"
+    """SCF type (``"restricted"`` or ``"unrestricted"``)."""
+
     noscf: bool = False
+    """Whether ExaChem should skip its internal SCF and restart."""
+
     write_amplitudes: bool = True
+    """Enable ``CC.PRINT.tamplitudes`` to write T1/T2 to text."""
+
     amplitude_threshold: float = 0.0
+    """Only amplitudes with absolute value above this are written (``0.0`` writes all)."""
+
     input_prefix: str = "ccsd_input"
+    """Base name for the ExaChem input file and restart directory."""
+
     extra_cc_options: dict = field(default_factory=dict)
+    """Additional CC block options merged into the input."""
+
     extra_scf_options: dict = field(default_factory=dict)
+    """Additional SCF block options merged into the input."""
 
     def to_json(self) -> dict:
         """Convert to ExaChem JSON input format."""
@@ -182,22 +195,22 @@ class CcsdInputConfig:
 
 @dataclass
 class ExachemResult:
-    """Result from an ExaChem run.
-
-    Attributes:
-        input_json: Path to the input JSON file.
-        work_dir: Working directory where ExaChem ran.
-        stdout: Captured standard output.
-        stderr: Captured standard error.
-        returncode: Process exit code.
-
-    """
+    """Result from an ExaChem run."""
 
     input_json: Path
+    """Path to the input JSON file."""
+
     work_dir: Path
+    """Working directory where ExaChem ran."""
+
     stdout: str
+    """Captured standard output."""
+
     stderr: str
+    """Captured standard error."""
+
     returncode: int
+    """Process exit code."""
 
 
 # srun spells binding differently from mpirun, so map the common policies.

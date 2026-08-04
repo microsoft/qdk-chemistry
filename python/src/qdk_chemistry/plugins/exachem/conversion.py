@@ -41,23 +41,25 @@ class CcsdtEnergies:
     except the ``*_correction`` and ``*_correlation`` fields. The perturbative
     triples result is ``ccsd_pt_total`` (the canonical "CCSD(T)" energy); the
     ``ccsd_bracket_t_*`` fields hold the related "CCSD[T]" bracket variant.
-
-    Attributes:
-        ccsd_correlation: CCSD correlation energy.
-        ccsd_total: CCSD total energy.
-        ccsd_bracket_t_correction: [T] correction energy (bracket variant).
-        ccsd_bracket_t_total: CCSD[T] total energy.
-        ccsd_pt_correction: (T) perturbative correction energy.
-        ccsd_pt_total: CCSD(T) total energy (the canonical result).
-
     """
 
     ccsd_correlation: float | None = None
+    """CCSD correlation energy."""
+
     ccsd_total: float | None = None
+    """CCSD total energy."""
+
     ccsd_bracket_t_correction: float | None = None
+    """[T] correction energy (bracket variant)."""
+
     ccsd_bracket_t_total: float | None = None
+    """CCSD[T] total energy."""
+
     ccsd_pt_correction: float | None = None
+    """(T) perturbative correction energy."""
+
     ccsd_pt_total: float | None = None
+    """CCSD(T) total energy (the canonical result)."""
 
 
 def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
