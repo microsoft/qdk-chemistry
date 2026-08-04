@@ -8,7 +8,7 @@ r"""QDK/Chemistry amplitude amplification."""
 import math
 import operator
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings
@@ -29,13 +29,16 @@ def phase_marking_oracle(
     *,
     target_indices: Sequence[int] | None = None,
     threshold: int | None = None,
+    comparison: Literal["at_or_below", "at_or_above"] | None = None,
 ) -> Circuit:
     r"""Build a marking-oracle circuit for a little-endian QPE phase register.
 
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
         target_indices: Phase-bin values to mark.
-        threshold: Inclusive upper phase-bin threshold to mark.
+        threshold: Inclusive phase-bin threshold to mark.
+        comparison: Threshold comparison direction. Required with ``threshold``;
+            must be ``"at_or_below"`` or ``"at_or_above"``.
 
     Returns:
         A circuit carrying an adjointable ``(Qubit[], Qubit) => Unit`` Q# operation.
@@ -57,6 +60,8 @@ def phase_marking_oracle(
     max_index = (1 << num_phase_qubits) - 1
     amplification = QSHARP_UTILS.AmplitudeAmplification
     if target_indices is not None:
+        if comparison is not None:
+            raise ValueError("comparison is only valid with threshold.")
         normalized_indices: list[int] = []
         for target_index in target_indices:
             try:
@@ -70,14 +75,14 @@ def phase_marking_oracle(
             raise ValueError("target_indices must not be empty.")
 
         normalized_indices = sorted(set(normalized_indices))
-        parameters = {
-            "numPhaseQubits": num_phase_qubits,
-            "targetIndices": normalized_indices,
-        }
-        make_oracle = amplification.MakePhaseIndexMarkerOp
-        operation = make_oracle(num_phase_qubits, normalized_indices)
+        normalized_threshold = 0
+        comparison_code = 0
     else:
         assert threshold is not None
+        if comparison not in ("at_or_below", "at_or_above"):
+            raise ValueError(
+                'comparison must be "at_or_below" or "at_or_above" when threshold is set.'
+            )
         try:
             normalized_threshold = operator.index(threshold)
         except TypeError as error:
@@ -85,12 +90,17 @@ def phase_marking_oracle(
         if not 0 <= normalized_threshold <= max_index:
             raise ValueError(f"threshold must lie in [0, {max_index}]. Got {normalized_threshold}.")
 
-        parameters = {
-            "numPhaseQubits": num_phase_qubits,
-            "threshold": normalized_threshold,
-        }
-        make_oracle = amplification.MakePhaseThresholdMarkerOp
-        operation = make_oracle(num_phase_qubits, normalized_threshold)
+        normalized_indices = []
+        comparison_code = -1 if comparison == "at_or_below" else 1
+
+    parameters = {
+        "numPhaseQubits": num_phase_qubits,
+        "targetIndices": normalized_indices,
+        "threshold": normalized_threshold,
+        "comparison": comparison_code,
+    }
+    make_oracle = amplification.MakePhaseMarkerOp
+    operation = make_oracle(num_phase_qubits, normalized_indices, normalized_threshold, comparison_code)
 
     return Circuit(
         qsharp_factory=QsharpFactoryData(program=make_oracle, parameter=parameters),

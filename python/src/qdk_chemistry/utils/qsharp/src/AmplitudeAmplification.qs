@@ -19,49 +19,47 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
     /// # Summary
-    /// Flips `target` when the little-endian phase register equals any target index.
-    operation MarkPhaseIndices(
+    /// Flips `target` on the little-endian phase register selected by `comparison`:
+    /// -1 marks values at or below `threshold`, 0 marks `targetIndices`, and 1
+    /// marks values at or above `threshold`.
+    operation MarkPhaseCriterion(
         numPhaseQubits : Int,
         targetIndices : Int[],
+        threshold : Int,
+        comparison : Int,
         register : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
         let phaseRegister = register[0..numPhaseQubits - 1];
-        for targetIndex in targetIndices {
-            ApplyControlledOnInt(targetIndex, X, phaseRegister, target);
+        if comparison == 0 {
+            for targetIndex in targetIndices {
+                ApplyControlledOnInt(targetIndex, X, phaseRegister, target);
+            }
+        } elif comparison == -1 or comparison == 1 {
+            use encodedThreshold = Qubit[numPhaseQubits];
+            within {
+                ApplyXorInPlace(threshold, encodedThreshold);
+            } apply {
+                // `ApplyIfGreaterLE` is strict, so negating the opposite comparison gives the inclusive one.
+                if comparison == -1 {
+                    ApplyIfGreaterLE(X, phaseRegister, encodedThreshold, target);
+                } else {
+                    ApplyIfGreaterLE(X, encodedThreshold, phaseRegister, target);
+                }
+                X(target);
+            }
+        } else {
+            fail "comparison must be -1, 0, or 1.";
         }
     }
 
-    /// # Summary
-    /// Flips `target` when the little-endian phase-register value is at most `threshold`.
-    operation MarkPhaseAtOrBelow(
-        numPhaseQubits : Int,
-        threshold : Int,
-        register : Qubit[],
-        target : Qubit,
-    ) : Unit is Adj {
-        let phaseRegister = register[0..numPhaseQubits - 1];
-        use encodedThreshold = Qubit[numPhaseQubits];
-        within {
-            ApplyXorInPlace(threshold, encodedThreshold);
-        } apply {
-            ApplyIfGreaterLE(X, phaseRegister, encodedThreshold, target);
-            X(target);
-        }
-    }
-
-    function MakePhaseIndexMarkerOp(
+    function MakePhaseMarkerOp(
         numPhaseQubits : Int,
         targetIndices : Int[],
-    ) : (Qubit[], Qubit) => Unit is Adj {
-        MarkPhaseIndices(numPhaseQubits, targetIndices, _, _)
-    }
-
-    function MakePhaseThresholdMarkerOp(
-        numPhaseQubits : Int,
         threshold : Int,
+        comparison : Int,
     ) : (Qubit[], Qubit) => Unit is Adj {
-        MarkPhaseAtOrBelow(numPhaseQubits, threshold, _, _)
+        MarkPhaseCriterion(numPhaseQubits, targetIndices, threshold, comparison, _, _)
     }
 
     //

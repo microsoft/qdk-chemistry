@@ -149,29 +149,17 @@ namespace QDKChemistryAmplitudeAmplificationTests {
         return outcome;
     }
 
-    operation RunPhaseIndexMarker(
+    operation RunPhaseMarker(
         numPhaseQubits : Int,
         targetIndices : Int[],
-        phaseValue : Int,
-    ) : Result {
-        use register = Qubit[numPhaseQubits];
-        use flag = Qubit();
-        ApplyXorInPlace(phaseValue, register);
-        MarkPhaseIndices(numPhaseQubits, targetIndices, register, flag);
-        let outcome = MResetZ(flag);
-        ResetAll(register);
-        return outcome;
-    }
-
-    operation RunPhaseThresholdMarker(
-        numPhaseQubits : Int,
         threshold : Int,
+        comparison : Int,
         phaseValue : Int,
     ) : Result {
         use register = Qubit[numPhaseQubits];
         use flag = Qubit();
         ApplyXorInPlace(phaseValue, register);
-        MarkPhaseAtOrBelow(numPhaseQubits, threshold, register, flag);
+        MakePhaseMarkerOp(numPhaseQubits, targetIndices, threshold, comparison)(register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return outcome;
@@ -270,10 +258,12 @@ def test_marking_oracle_conjunction_holds(qsharp_module):
 
 @pytest.mark.parametrize("phase_value", range(8))
 def test_phase_marking_oracles_match_their_criteria(qsharp_module, phase_value: int):
-    index_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseIndexMarker(3, [1, 6], {phase_value})", shots=1)[0]
-    threshold_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseThresholdMarker(3, 3, {phase_value})", shots=1)[0]
+    index_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseMarker(3, [1, 6], 0, 0, {phase_value})", shots=1)[0]
+    below_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseMarker(3, [], 3, -1, {phase_value})", shots=1)[0]
+    above_result = qsharp_module.run(f"{_NAMESPACE}.RunPhaseMarker(3, [], 3, 1, {phase_value})", shots=1)[0]
     assert (str(index_result) == "One") == (phase_value in {1, 6})
-    assert (str(threshold_result) == "One") == (phase_value <= 3)
+    assert (str(below_result) == "One") == (phase_value <= 3)
+    assert (str(above_result) == "One") == (phase_value >= 3)
 
 
 def test_phase_marking_oracle_validates_criteria():
@@ -281,20 +271,27 @@ def test_phase_marking_oracle_validates_criteria():
         phase_marking_oracle(3)
     with pytest.raises(ValueError, match="exactly one"):
         phase_marking_oracle(3, target_indices=[1], threshold=2)
+    with pytest.raises(ValueError, match="only valid with threshold"):
+        phase_marking_oracle(3, target_indices=[1], comparison="at_or_above")
     with pytest.raises(ValueError, match="target index"):
         phase_marking_oracle(3, target_indices=[8])
+    with pytest.raises(ValueError, match="comparison"):
+        phase_marking_oracle(3, threshold=3)
     with pytest.raises(ValueError, match="threshold"):
-        phase_marking_oracle(3, threshold=-1)
+        phase_marking_oracle(3, threshold=-1, comparison="at_or_below")
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="qdk.qsharp is not installed")
 def test_phase_marking_oracle_returns_circuits():
     index_marker = phase_marking_oracle(3, target_indices=[6, 1, 1])
-    threshold_marker = phase_marking_oracle(3, threshold=3)
+    below_marker = phase_marking_oracle(3, threshold=3, comparison="at_or_below")
+    above_marker = phase_marking_oracle(3, threshold=3, comparison="at_or_above")
     assert isinstance(index_marker, Circuit)
-    assert isinstance(threshold_marker, Circuit)
+    assert isinstance(below_marker, Circuit)
+    assert isinstance(above_marker, Circuit)
     assert index_marker._qsharp_op is not None
-    assert threshold_marker._qsharp_op is not None
+    assert below_marker._qsharp_op is not None
+    assert above_marker._qsharp_op is not None
 
 
 def test_rotation_angle_agrees_with_the_qsharp_convention():

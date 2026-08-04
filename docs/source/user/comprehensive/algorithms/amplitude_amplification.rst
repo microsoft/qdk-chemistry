@@ -29,18 +29,21 @@ QPE phase markers
 
 The :func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle`
 helper builds a marking-oracle :class:`~qdk_chemistry.data.Circuit` from either
-explicit QPE phase-bin indices or an inclusive upper threshold:
+explicit QPE phase-bin indices or an inclusive threshold:
 
 .. code-block:: python
 
    from qdk_chemistry.algorithms import phase_marking_oracle
 
    selected_bins = phase_marking_oracle(8, target_indices=[12, 13, 14])
-   lower_bins = phase_marking_oracle(8, threshold=31)
+   lower_bins = phase_marking_oracle(8, threshold=31, comparison="at_or_below")
+   upper_bins = phase_marking_oracle(8, threshold=224, comparison="at_or_above")
 
 The oracle interprets the first ``num_phase_qubits`` qubits as a little-endian
-integer. Thus ``threshold=31`` marks phase-bin values :math:`j \le 31`. Exactly
-one of ``target_indices`` or ``threshold`` must be supplied.
+integer. The ``at_or_below`` and ``at_or_above`` comparisons mark phase-bin
+values :math:`j \le t` and :math:`j \ge t`, respectively. Exactly one of
+``target_indices`` or ``threshold`` must be supplied, and threshold markers must
+specify ``comparison`` explicitly.
 
 Settings
 --------
