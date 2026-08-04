@@ -171,7 +171,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/BTAS/btas.git",
-          "commitHash": "9c8c8f68fee2b82e64755270a8348e4612cf9941"
+          "commitHash": "287b145ead818a0332f2b7ce0b7375a83d328bae"
         }
       },
       "developmentDependency": false

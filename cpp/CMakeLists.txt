@@ -148,7 +148,7 @@ if(NOT BTAS_FOUND)
     include(FetchContent)
     FetchContent_Declare(BTAS
         GIT_REPOSITORY https://github.com/BTAS/btas.git
-        GIT_TAG 9c8c8f68fee2b82e64755270a8348e4612cf9941
+        GIT_TAG 287b145ead818a0332f2b7ce0b7375a83d328bae
     )
     FetchContent_MakeAvailable(BTAS)
     # BTAS declares the plain target only; an installed BTAS exports the
