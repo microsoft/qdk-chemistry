@@ -383,8 +383,11 @@ class TestUnaryQpeEndToEnd:
         encoding is deliberately a PREPARE-SELECT-PREPARE walk rather than the synthetic
         single-qubit one, because ``PREPARE = Ry(theta)`` with ``SELECT = c-Z`` encodes
         ``cos(theta)`` on ``|1>`` and so puts the answer on bin ``j`` exactly when
-        ``theta = pi*j/N``. Bins 1 and 2 are not invariant under bit reversal, so reading the
-        register with the opposite endianness fails here.
+        ``theta = pi*j/N``. What has to move under bit reversal is the *pair* ``{j, N - j}``
+        the two conjugate eigenvectors occupy, not ``j`` alone: ``j = 2`` is itself a fixed
+        point of a three-bit reversal, but its pair still travels ``{2, 6} -> {2, 3}``. All
+        three cases move (``{1, 7} -> {4, 7}``, ``{2, 6} -> {2, 3}``, ``{3, 5} -> {5, 6}``),
+        so reading the register with the opposite endianness fails for every one of them.
         """
         num_queries = 7
         num_states = num_queries + 1
