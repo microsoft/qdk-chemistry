@@ -671,7 +671,10 @@ def test_tutorial_run_iqpe_configuration(capsys):
     ).read_text(encoding="utf-8")
     assert r"\alpha\in(-\pi,\pi]" in chapter_text
     assert r"(-\pi/t,\pi/t]" in chapter_text
-    assert "The loop executes :math:`k=0` first." in chapter_text
+    assert "Qubit measurement and shots" in chapter_text
+    assert r"\gamma_0\vert0\rangle+\gamma_1\vert1\rangle" in chapter_text
+    assert "One preparation, circuit execution, and measurement is called a *shot*." in chapter_text
+    assert "The loop executes iteration :math:`k=0` first." in chapter_text
     assert "reverses the measurements from execution order" in chapter_text
     assert "This estimates an eigenvalue of the qubit Hamiltonian" in chapter_text
 

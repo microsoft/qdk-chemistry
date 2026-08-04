@@ -169,6 +169,37 @@ The question below asks why one grid point can nevertheless reconstruct this par
    The classically known reference energy was used to tune the evolution time so the target lies almost exactly on one six-bit grid point.
    Six bits do not provide milliHartree resolution for arbitrary energies with this evolution time.
 
+Qubit measurement and shots
+===========================
+
+Immediately before measurement, the readout ancilla has a state
+
+.. math::
+
+   \vert q\rangle
+   =\gamma_0\vert0\rangle+\gamma_1\vert1\rangle,
+   \qquad
+   |\gamma_0|^2+|\gamma_1|^2=1.
+
+The coefficients :math:`\gamma_0` and :math:`\gamma_1` are complex probability amplitudes.
+They play the same mathematical role as the determinant coefficients :math:`c_i` and eigenstate amplitudes :math:`a_j` introduced earlier, but here they describe the two computational-basis states of one qubit.
+
+Measuring this qubit in the computational basis returns one classical bit.
+The probability of measuring zero is :math:`|\gamma_0|^2`, and the probability of measuring one is :math:`|\gamma_1|^2`.
+One preparation, circuit execution, and measurement is called a *shot*.
+
+A single shot samples one outcome; it does not reveal the probabilities themselves.
+Repeating the same circuit from a freshly prepared state produces counts whose relative frequencies estimate the probabilities.
+For example, 70 zero outcomes among 100 shots estimate the probability of zero as :math:`0.70`.
+
+In this :term:`IQPE` implementation, phase kickback, feedback, and the final H gate make the readout-ancilla probabilities depend on the phase bit being measured.
+The circuit uses an odd number of shots and selects the majority outcome as that iteration's bit.
+It then uses this classical bit to set the feedback rotation for the next iteration.
+
+The loop executes iteration :math:`k=0` first.
+This iteration applies the largest controlled power and estimates the least-significant phase bit.
+Later iterations proceed toward the most-significant bit.
+
 One phase bit at a time
 ===============================
 
@@ -181,9 +212,7 @@ For iterations over :math:`k=0,1,\ldots,m-1`, the circuit builder uses the contr
 
    U^{2^{m-k-1}}.
 
-The loop executes :math:`k=0` first.
 With :math:`m=6`, the six iteration circuits therefore apply powers :math:`32,16,8,4,2,1`.
-In this feedback convention, the first :math:`U^{32}` iteration determines the least-significant phase bit and the final :math:`U` iteration determines the most-significant bit.
 QDK/Chemistry reverses the measurements from execution order when it constructs the conventional most-significant-bit-first result.
 For an input eigenstate, the first H gate prepares the readout ancilla in :math:`(\vert0\rangle+\vert1\rangle)/\sqrt{2}`.
 The feedback rotation applies a corrective phase determined by earlier iterations.
@@ -207,8 +236,6 @@ Each circuit performs the following steps:
 4. Apply the controlled time-evolution power between the readout ancilla and compute register.
 5. Apply a second H gate and measure the readout ancilla.
 
-The same iteration circuit is executed several times from a fresh initial state.
-The majority measurement determines one bit, and a classical recurrence incorporates that bit into the phase feedback for the next iteration.
 After all iterations, the feedback accumulator determines the final phase fraction.
 
 Each iteration circuit contains twelve compute qubits and one readout ancilla, for thirteen logical qubits in the simulated circuit.
