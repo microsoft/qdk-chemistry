@@ -295,13 +295,15 @@ class SOSSAMapper(ControlledCircuitMapper):
     ) -> Any:
         """Build a SOSSA walk callable acting on (control register, system + ancilla register).
 
+        When ``use_unary_iteration`` is ``True`` the control register is the phase register.
+        Unary iteration skips one outer reflection per address, so branch ``t`` applies
+        ``W^(num_queries - 2t)``. Otherwise the control register holds a single qubit and the
+        controlled walk step is repeated ``num_queries`` times.
+
         Args:
             unitary: The unitary representation containing the SOSSA decomposition.
             num_queries: Number of SOSSA involution blocks to apply.
-            use_unary_iteration: If ``True``, the control register is the phase register and
-                unary iteration skips one outer reflection per address, so branch ``t`` applies
-                ``W^(num_queries - 2t)``. If ``False``, the control register holds a single qubit
-                and the controlled walk step is repeated ``num_queries`` times.
+            use_unary_iteration: Whether the control register is a phase register iterated over.
 
         Returns:
             A Q# callable accepting the control register and the combined system/ancilla register.
