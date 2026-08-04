@@ -58,6 +58,22 @@ steps:
 - pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1 -Arch ${{ parameters.arch }}
   displayName: Set up MSVC environment (${{ parameters.arch }})
 
+# The dependency cache key includes a hash of the build plan, so that changing a
+# cmake flag, the build type or the compiler invalidates the cache by itself.
+# Computing it here from the very script that performs the build is what stops
+# the key and the build from ever describing different things.
+- pwsh: |
+    $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+        -SrcDir    "$(System.DefaultWorkingDirectory)" `
+        -BuildType "${{ parameters.buildType }}" `
+        -Triplet   "$(VCPKG_TRIPLET)" `
+        -ClPath    "$(CL_PATH)" `
+        -EmitFingerprint | Select-Object -Last 1
+    if (-not $fp) { throw "The build plan fingerprint came back empty." }
+    Write-Host "deps build plan fingerprint: $fp"
+    Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
+  displayName: Compute dependency build plan fingerprint
+
 - task: Cache@2
   displayName: Restore/save vcpkg dependency cache
   inputs:
@@ -86,13 +102,26 @@ steps:
 # when the tree is already cached: it misses, and saves what the first task
 # restored.
 #
-# These keys deliberately do NOT hash install-cpp-deps-windows.ps1. They used to,
-# which meant an edit anywhere in that script -- even one that only touched
-# diagnostics -- threw away a dependency tree that takes most of a day to rebuild
-# on the ARM64 agent. The keys now track the things that actually determine the
-# output: pinned versions, patches, toolchain and toolset. Bump the r<N> literal
-# to force a rebuild when the build recipe itself changes in a way those inputs
-# do not capture.
+# The keys pair two mechanisms. Azure Pipelines' own file hashing covers the
+# file inputs -- pinned versions, patches, toolchain -- which is declarative and
+# easy to audit. $(DEPS_FINGERPRINT) covers what file hashing cannot see: the
+# cmake flags, build type and compiler identity that live in the build script.
+#
+# They used to hash install-cpp-deps-windows.ps1 instead, which meant an edit
+# anywhere in that script -- even one that only touched diagnostics -- threw away
+# a dependency tree that takes most of a day to rebuild on the ARM64 agent. The
+# fingerprint is derived from the build plan rather than the file, so it moves
+# when the build would actually differ and stays put otherwise.
+#
+# The r<N> literal remains only as a manual escape hatch; it is no longer what
+# keeps the keys honest.
+#
+# Each phase also carries a transitional restore key: the pre-fingerprint base,
+# which is a strict prefix of the old keys and so still matches the caches banked
+# under the previous scheme. That lets this change adopt the existing trees --
+# the stamps then skip every dependency -- instead of forcing a rebuild that
+# costs the better part of a day. Remove them once a run has banked under the new
+# keys.
 - ${{ if ne(parameters.phase, 'vcpkg') }}:
   - task: Cache@2
     displayName: Restore/save C++ deps install cache (${{ parameters.phase }})
@@ -104,7 +133,10 @@ steps:
           external/macis/manifest/cgmanifest.json |
           cpp/cmake/patches/**/* |
           .pipelines/toolchains/windows.cmake |
+          "$(DEPS_FINGERPRINT)" |
           "libint2"
+        restoreKeys: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       ${{ if eq(parameters.phase, 'rest') }}:
         key: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
@@ -112,14 +144,11 @@ steps:
           external/macis/manifest/cgmanifest.json |
           cpp/cmake/patches/**/* |
           .pipelines/toolchains/windows.cmake |
+          "$(DEPS_FINGERPRINT)" |
           "deps"
-        restoreKeys: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-          cpp/manifest/qdk-chemistry/cgmanifest.json |
-          external/macis/manifest/cgmanifest.json |
-          cpp/cmake/patches/**/* |
-          .pipelines/toolchains/windows.cmake |
-          "libint2"
+        restoreKeys: |-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake | "$(DEPS_FINGERPRINT)" | "libint2"
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       ${{ if eq(parameters.phase, 'all') }}:
         key: >-
           "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
@@ -127,7 +156,10 @@ steps:
           external/macis/manifest/cgmanifest.json |
           cpp/cmake/patches/**/* |
           .pipelines/toolchains/windows.cmake |
+          "$(DEPS_FINGERPRINT)" |
           "all"
+        restoreKeys: >-
+          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake
       path: $(System.DefaultWorkingDirectory)/deps-install-msvc
       cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
@@ -143,6 +175,7 @@ steps:
         external/macis/manifest/cgmanifest.json |
         cpp/cmake/patches/**/* |
         .pipelines/toolchains/windows.cmake |
+        "$(DEPS_FINGERPRINT)" |
         "libint2" | "tree"
       path: $(System.DefaultWorkingDirectory)/deps-install-msvc
 
