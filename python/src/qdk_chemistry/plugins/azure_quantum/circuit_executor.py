@@ -36,11 +36,11 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
     """Convert emulator histogram results to integer bitstring counts.
 
     Uses the ``microsoft.quantum-results.v2`` histogram format returned by
-    ``job.get_results_histogram()``, which maps a label to
-    ``{'outcome': [...], 'count': n}``. Each ``outcome`` list holds per-qubit
-    values of ``0``, ``1``, or ``'-'`` (a lost qubit). Shots with at least one
-    lost qubit are separated into a loss dictionary, with ``'-'`` rendered as
-    ``'L'`` to match the loss-bitstring convention.
+    ``job.get_results_histogram()``, which maps a label to an outcome and count.
+    An outcome is a scalar for one measurement or a sequence for multiple
+    measurements, with values of ``0``, ``1``, or ``'-'`` (a lost qubit). Shots
+    with at least one lost qubit are separated into a loss dictionary, with
+    ``'-'`` rendered as ``'L'`` to match the loss-bitstring convention.
 
     Args:
         raw_results: Histogram results from ``job.get_results_histogram()``.
@@ -54,11 +54,12 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
     for entry in raw_results.values():
         outcome = entry["outcome"]
         count = entry["count"]
-        if "-" in outcome:
-            key = "".join("L" if bit == "-" else str(bit) for bit in outcome)
+        outcome_bits = outcome if isinstance(outcome, (list, tuple)) else (outcome,)
+        if "-" in outcome_bits:
+            key = "".join("L" if bit == "-" else str(bit) for bit in outcome_bits)
             loss[key] = loss.get(key, 0) + count
         else:
-            key = "".join(str(bit) for bit in outcome)
+            key = "".join(str(bit) for bit in outcome_bits)
             counts[key] = counts.get(key, 0) + count
     return counts, loss
 

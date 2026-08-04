@@ -13,7 +13,7 @@ from qdk_chemistry.data import Circuit, QuantumErrorProfile
 from qdk_chemistry.plugins.azure_quantum import QDK_CHEMISTRY_HAS_AZURE_QUANTUM
 
 if QDK_CHEMISTRY_HAS_AZURE_QUANTUM:
-    from qdk_chemistry.plugins.azure_quantum.circuit_executor import AzureQuantumEmulator
+    from qdk_chemistry.plugins.azure_quantum.circuit_executor import AzureQuantumEmulator, _process_raw_results
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_AZURE_QUANTUM, reason="azure-quantum not available")
@@ -24,6 +24,31 @@ _WORKSPACE_NAME = os.environ.get("AZURE_QUANTUM_WORKSPACE_NAME", "")
 _LOCATION = os.environ.get("AZURE_QUANTUM_LOCATION", "")
 _TARGET_NAME = os.environ.get("AZURE_QUANTUM_TARGET_NAME", "")
 _HAS_WORKSPACE_CONFIG = all([_SUBSCRIPTION_ID, _RESOURCE_GROUP, _WORKSPACE_NAME, _LOCATION, _TARGET_NAME])
+
+
+class TestProcessRawResults:
+    """Test Azure Quantum histogram conversion."""
+
+    def test_scalar_outcomes(self):
+        """Scalar outcomes from single-bit measurements are accepted."""
+        raw_results = {"0": {"outcome": 0, "count": 3}, "1": {"outcome": 1, "count": 2}}
+
+        counts, loss = _process_raw_results(raw_results)
+
+        assert counts == {"0": 3, "1": 2}
+        assert loss == {}
+
+    def test_sequence_outcomes_with_loss(self):
+        """Sequence outcomes retain the existing bit and loss conversion."""
+        raw_results = {
+            "[0, 1]": {"outcome": [0, 1], "count": 3},
+            "[1, -]": {"outcome": [1, "-"], "count": 2},
+        }
+
+        counts, loss = _process_raw_results(raw_results)
+
+        assert counts == {"01": 3}
+        assert loss == {"1L": 2}
 
 
 @pytest.fixture

@@ -29,7 +29,7 @@ from qiskit.circuit.library import (
     YGate,
     ZGate,
 )
-from qiskit.dagcircuit import DAGCircuit
+from qiskit.dagcircuit import DAGCircuit, DAGOpNode
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
 from qiskit.transpiler.passes.optimization.light_cone import LightCone
@@ -833,6 +833,25 @@ class ReduceToLightCone(TransformationPass):
             measure_nodes = [node for node in dag.op_nodes() if node.op.name == "measure"]
             measured_qubits = sorted({dag.find_bit(qarg).index for node in measure_nodes for qarg in node.qargs})
             if measured_qubits:
+                # Preserve the original qubit->clbit pairing across the strip/re-apply cycle.
+                measure_bits = [
+                    (dag.find_bit(node.qargs[0]).index, dag.find_bit(node.cargs[0]).index) for node in measure_nodes
+                ]
+                # Operations downstream of a measurement that feed no other measurement cannot
+                # affect any outcome (e.g. QIR qubit-release resets).  They must be dropped:
+                # measurements are re-applied at the back of the DAG, so leaving them in place
+                # would reorder them ahead of the measurement they originally followed.
+                feeding_measurement: set = set()
+                for node in measure_nodes:
+                    feeding_measurement |= dag.ancestors(node)
+                unobservable = {
+                    descendant
+                    for node in measure_nodes
+                    for descendant in dag.descendants(node)
+                    if isinstance(descendant, DAGOpNode) and descendant not in feeding_measurement
+                }
+                for node in unobservable - set(measure_nodes):
+                    dag.remove_op_node(node)
                 for node in measure_nodes:
                     dag.remove_op_node(node)
                 bit_terms = "Z" * len(measured_qubits)
@@ -840,10 +859,8 @@ class ReduceToLightCone(TransformationPass):
                 # Re-add measurement gates on the surviving qubits
                 from qiskit.circuit.library import Measure  # noqa: PLC0415
 
-                if dag.clbits:
-                    for position, idx in enumerate(measured_qubits):
-                        clbit = dag.clbits[position % len(dag.clbits)]
-                        dag.apply_operation_back(Measure(), [dag.qubits[idx]], [clbit])
+                for qubit_index, clbit_index in measure_bits:
+                    dag.apply_operation_back(Measure(), [dag.qubits[qubit_index]], [dag.clbits[clbit_index]])
                 return dag
             return LightCone().run(dag)
 
