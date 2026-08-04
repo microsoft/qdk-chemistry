@@ -32,6 +32,22 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
     def __init__(self):
         """Initialize the settings for the Standard Phase Estimation Circuit Builder."""
         super().__init__()
+        self._set_default(
+            "measurement",
+            "string",
+            "phase",
+            "Final measurement: 'phase' measures the phase register in the computational "
+            "basis, 'eigenvector' also measures the system register in 'measurement_basis', "
+            "and 'none' measures nothing and returns a coherent, adjointable circuit.",
+        )
+        self._set_default(
+            "measurement_basis",
+            "string",
+            "Z",
+            "Pauli basis for the system register when measurement is 'eigenvector'. A single "
+            "letter is broadcast to every system qubit; otherwise one letter per system qubit. "
+            "'I' resets a qubit without recording a bit.",
+        )
 
 
 class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
@@ -166,7 +182,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             num_bits,
             num_system_qubits,
         )
-        measured_indices, bases = self.measurement_plan(num_bits, num_system_qubits)
+        measured_indices, bases = self._measurement_plan(num_bits, num_system_qubits)
         parameters = {
             "statePrep": state_prep_op,
             "controlledUnitary": ctrl_unitary_ops,
@@ -184,6 +200,49 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             ),
             qsharp_op=qpe_op,
         )
+
+    def _measurement_plan(self, num_bits: int, num_system_qubits: int) -> tuple[list[int], list[str]]:
+        """Resolve the ``measurement`` setting into register indices and Pauli letters.
+
+        The executor reverses the Q# ``Result[]``, so emitting the system indices
+        reversed and ahead of the phase indices makes the key read phase register
+        most-significant-bit first, followed by the system register in order.
+
+        Args:
+            num_bits: Number of phase qubits.
+            num_system_qubits: Number of system qubits.
+
+        Returns:
+            A tuple of (register indices to measure, Pauli letter per index).
+
+        Raises:
+            ValueError: If ``measurement`` or ``measurement_basis`` is invalid.
+
+        """
+        policy = str(self._settings.get("measurement"))
+        phase_indices = list(range(num_bits))
+        if policy == "none":
+            return [], []
+        if policy == "phase":
+            return phase_indices, ["Z"] * num_bits
+        if policy != "eigenvector":
+            raise ValueError(f"measurement must be one of ['phase', 'eigenvector', 'none']. Got '{policy}'.")
+
+        basis = str(self._settings.get("measurement_basis")).upper()
+        if len(basis) == 1:
+            basis *= num_system_qubits
+        if len(basis) != num_system_qubits:
+            raise ValueError(
+                f"measurement_basis must be a single Pauli letter or one letter per system "
+                f"qubit ({num_system_qubits}). Got '{basis}'."
+            )
+        if any(letter not in "IXYZ" for letter in basis):
+            raise ValueError(f"measurement_basis must only contain the letters I, X, Y or Z. Got '{basis}'.")
+
+        system = list(range(num_bits, num_bits + num_system_qubits))
+        indices = list(reversed(system)) + phase_indices
+        bases = [basis[index] for index in reversed(range(num_system_qubits))] + ["Z"] * num_bits
+        return indices, bases
 
     def name(self) -> str:
         """Return the name of the builder algorithm."""

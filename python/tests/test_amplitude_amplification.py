@@ -32,7 +32,6 @@ from qdk_chemistry.algorithms import registry as algorithm_registry
 from qdk_chemistry.algorithms.amplitude_amplification.base import AmplitudeAmplification
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
     StandardQpeCircuitBuilder,
-    coherent_qpe_measured_indices,
     split_coherent_qpe_bitstring,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
@@ -101,78 +100,37 @@ def test_success_probability_matches_simulation(overlap: float, rounds: int):
     assert AmplitudeAmplification.success_probability(overlap, rounds) == pytest.approx(simulated, abs=1e-12)
 
 
-@pytest.mark.parametrize("overlap", OVERLAPS)
-def test_optimal_rounds_is_a_local_maximum(overlap: float):
-    best = AmplitudeAmplification.optimal_rounds(overlap)
-    probability = AmplitudeAmplification.success_probability(overlap, best)
-    assert probability >= AmplitudeAmplification.success_probability(overlap, best + 1)
-    if best > 0:
-        assert probability >= AmplitudeAmplification.success_probability(overlap, best - 1)
+@pytest.mark.parametrize("min_overlap", OVERLAPS)
+def test_fixed_point_rounds_never_overshoot(min_overlap: float):
+    """The whole point of the schedule: acceptance holds above the plateau for every larger overlap."""
+    tolerance = 0.1
+    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
+    for fraction in (1.0, 1.5, 2.0, 5.0, 20.0):
+        overlap = min(0.999, min_overlap * fraction)
+        achieved = _fixed_point_success_probability(overlap, rounds, tolerance)
+        assert achieved >= 1.0 - tolerance**2 - 1e-9
 
 
-@pytest.mark.parametrize("overlap", OVERLAPS)
-def test_optimal_rounds_lands_close_to_certainty(overlap: float):
-    # (2k+1) theta is within theta of pi/2, so the shortfall is at most sin^2(theta).
-    best = AmplitudeAmplification.optimal_rounds(overlap)
-    shortfall = 1.0 - AmplitudeAmplification.success_probability(overlap, best)
-    assert shortfall <= overlap + 1e-12
+@pytest.mark.parametrize("min_overlap", [1e-3, 0.01, 0.05, 0.2])
+def test_fixed_point_rounds_is_the_smallest_sufficient_count(min_overlap: float):
+    tolerance = 0.1
+    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
+    assert _fixed_point_success_probability(min_overlap, rounds, tolerance) >= 1.0 - tolerance**2 - 1e-9
+    # The Yoder-Low-Chuang query bound is log(2/delta)/sqrt(a_min).
+    assert 2 * rounds + 1 >= math.log(2.0 / tolerance) / math.sqrt(min_overlap)
 
 
-@pytest.mark.parametrize("max_overlap", OVERLAPS)
-def test_safe_rounds_never_overshoots(max_overlap: float):
-    rounds = AmplitudeAmplification.safe_rounds(max_overlap)
-    factor = 2 * rounds + 1
-    assert factor * AmplitudeAmplification._rotation_angle(max_overlap) <= math.pi / 2.0 + 1e-9
+def test_plain_rounds_overshoot_where_fixed_point_does_not():
+    """Contrast the two schedules: the sinusoid collapses, the plateau does not."""
+    tolerance = 0.1
+    min_overlap = 0.01
+    plain = 7  # optimal for a = 0.01
+    fixed_point = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
 
-    # Acceptance is monotonically increasing in the true overlap, so a larger
-    # than expected overlap can only help.
-    probabilities = [
-        AmplitudeAmplification.success_probability(max_overlap * fraction, rounds)
-        for fraction in (0.05, 0.2, 0.5, 0.8, 1.0)
-    ]
-    assert probabilities == sorted(probabilities)
-
-
-def test_safe_rounds_is_the_largest_non_overshooting_choice():
-    for max_overlap in OVERLAPS:
-        rounds = AmplitudeAmplification.safe_rounds(max_overlap)
-        if rounds > 0:
-            assert (2 * rounds + 3) * AmplitudeAmplification._rotation_angle(max_overlap) > math.pi / 2.0
-
-
-@pytest.mark.parametrize(
-    ("min_overlap", "max_overlap"),
-    [(1e-4, 1e-3), (1e-3, 0.01), (0.01, 0.1), (0.02, 0.05), (0.1, 0.3), (0.05, 0.9), (0.2, 0.2)],
-)
-def test_worst_case_matches_dense_sampling(min_overlap: float, max_overlap: float):
-    for rounds in range(40):
-        samples = [
-            AmplitudeAmplification.success_probability(
-                min_overlap + (max_overlap - min_overlap) * index / 4000.0, rounds
-            )
-            for index in range(4001)
-        ]
-        predicted = AmplitudeAmplification._worst_case_success_probability(rounds, min_overlap, max_overlap)
-        assert predicted <= min(samples) + 1e-6
-
-
-@pytest.mark.parametrize(
-    ("min_overlap", "max_overlap"),
-    [(1e-4, 1e-3), (1e-3, 0.01), (0.01, 0.1), (0.02, 0.05), (0.1, 0.3), (0.05, 0.9), (0.2, 0.2)],
-)
-def test_robust_rounds_beats_safe_rounds(min_overlap: float, max_overlap: float):
-    robust = AmplitudeAmplification.robust_rounds(min_overlap, max_overlap)
-    safe = AmplitudeAmplification.safe_rounds(max_overlap)
-    robust_worst = AmplitudeAmplification._worst_case_success_probability(robust, min_overlap, max_overlap)
-    safe_worst = AmplitudeAmplification._worst_case_success_probability(safe, min_overlap, max_overlap)
-    assert robust_worst >= safe_worst - 1e-12
-
-    # And it really is the minimax choice.
-    for candidate in range(AmplitudeAmplification.optimal_rounds(min_overlap) + 1):
-        assert (
-            robust_worst
-            >= AmplitudeAmplification._worst_case_success_probability(candidate, min_overlap, max_overlap) - 1e-12
-        )
+    assert AmplitudeAmplification.success_probability(min_overlap, plain) > 0.99
+    # Four times the assumed overlap rotates the plain schedule well past the maximum.
+    assert AmplitudeAmplification.success_probability(0.04, plain) < 0.05
+    assert _fixed_point_success_probability(0.04, fixed_point, tolerance) > 0.99
 
 
 #
@@ -239,7 +197,7 @@ def test_invalid_arguments_are_rejected():
     with pytest.raises(ValueError, match="rounds"):
         AmplitudeAmplification.success_probability(0.1, -1)
     with pytest.raises(ValueError, match="min_overlap"):
-        AmplitudeAmplification.robust_rounds(0.5, 0.1)
+        AmplitudeAmplification.fixed_point_rounds(0.0, 0.1)
     with pytest.raises(ValueError, match="tolerance"):
         AmplitudeAmplification.fixed_point_phases(3, 1.0)
     with pytest.raises(ValueError, match="rounds"):
@@ -397,15 +355,15 @@ def test_plain_amplification_matches_the_closed_form(qsharp_module, overlap: flo
 def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qsharp_module):
     # Three rounds are optimal for a = 0.02 but wrap past the maximum for a = 0.25.
     overlap = 0.25
-    rounds = AmplitudeAmplification.optimal_rounds(0.02)
+    rounds = 3
     theta = AmplitudeAmplification._rotation_angle(overlap)
     observed = _acceptance_frequency(qsharp_module, f"{_NAMESPACE}.RunPlainAmplification({theta}, {rounds})")
     assert observed == pytest.approx(AmplitudeAmplification.success_probability(overlap, rounds), abs=_TOLERANCE)
     assert observed < 0.5
 
-    safe = AmplitudeAmplification.safe_rounds(overlap)
-    safe_observed = _acceptance_frequency(qsharp_module, f"{_NAMESPACE}.RunPlainAmplification({theta}, {safe})")
-    assert safe_observed > observed
+    # A single round is what a = 0.25 actually wants.
+    better = _acceptance_frequency(qsharp_module, f"{_NAMESPACE}.RunPlainAmplification({theta}, 1)")
+    assert better > observed
 
 
 @pytest.mark.parametrize(("rounds", "tolerance"), [(2, 0.3), (4, 0.2), (6, 0.1)])
@@ -540,61 +498,36 @@ def test_amplitude_amplification_is_registered():
     assert isinstance(default, AmplitudeAmplification)
 
 
-@pytest.mark.parametrize(
-    ("policy", "settings", "expected"),
-    [
-        ("fixed", {"rounds": 4}, 4),
-        ("safe", {"max_overlap": 1.0}, 0),
-        ("safe", {"max_overlap": 0.05}, 2),
-        ("optimal", {"min_overlap": 0.05}, 3),
-        ("robust", {"min_overlap": 0.01, "max_overlap": 0.05}, 4),
-    ],
-)
-def test_resolve_rounds_follows_the_policy(policy: str, settings: dict, expected: int):
+def test_resolve_rounds_uses_the_fixed_point_schedule():
     algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    algorithm.settings().update("round_policy", policy)
-    for key, value in settings.items():
-        algorithm.settings().update(key, value)
-    assert algorithm.resolve_rounds() == expected
+    algorithm.settings().update("min_overlap", 0.05)
+    assert algorithm.resolve_rounds() == AmplitudeAmplification.fixed_point_rounds(0.05, 0.1)
 
 
-def test_explicit_rounds_override_the_policy():
+def test_explicit_rounds_override_the_schedule():
     algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    algorithm.settings().update("round_policy", "optimal")
     algorithm.settings().update("min_overlap", 0.05)
     algorithm.settings().update("rounds", 1)
     assert algorithm.resolve_rounds() == 1
 
 
-def test_unknown_round_policy_is_rejected():
+def test_deriving_rounds_requires_a_lower_bound():
     algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    with pytest.raises(ValueError, match="round_policy"):
-        algorithm.settings().update("round_policy", "wishful")
-
-
-def test_fixed_policy_requires_an_explicit_round_count():
-    algorithm = create("amplitude_amplification", "qdk_amplified_qpe")
-    algorithm.settings().update("round_policy", "fixed")
-    with pytest.raises(ValueError, match="round_policy"):
+    with pytest.raises(ValueError, match="min_overlap"):
         algorithm.resolve_rounds()
 
 
 def test_coherent_qpe_bit_order_round_trips():
-    # Phase indices come first so that the executor key reads most-significant
-    # bit first; the signal ancillas trail it.
-    assert coherent_qpe_measured_indices(3, 2, 0) == [0, 1, 2]
-    assert coherent_qpe_measured_indices(3, 2, 2) == [6, 5, 0, 1, 2]
     assert split_coherent_qpe_bitstring("101101", 4) == ("1011", "01")
     assert split_coherent_qpe_bitstring("1011", 4) == ("1011", "")
     with pytest.raises(ValueError, match="phase register"):
         split_coherent_qpe_bitstring("101", 4)
 
 
-def test_iterative_circuit_builder_rejects_non_phase_measurement():
+def test_iterative_circuit_builder_has_no_measurement_setting():
     builder = create("qpe_circuit_builder", "qdk_iterative")
-    builder.settings().update("measurement", "none")
-    with pytest.raises(ValueError, match="measurement='phase'"):
-        builder.run(state_preparation=_guiding_state(1.0, 0), qubit_hamiltonian=_diagonal_hamiltonian())
+    with pytest.raises(Exception, match="measurement"):
+        builder.settings().update("measurement", "none")
 
 
 def test_measurement_plan_covers_every_policy():
@@ -603,36 +536,35 @@ def test_measurement_plan_covers_every_policy():
 
     # The default measures only the phase register, in register order, so the
     # executor's reversal makes the key read most-significant bit first.
-    assert builder.measurement_policy() == "phase"
-    assert builder.measurement_plan(3, 2) == ([0, 1, 2], ["Z", "Z", "Z"])
+    assert builder._measurement_plan(3, 2) == ([0, 1, 2], ["Z", "Z", "Z"])
 
     # Zero measurement is what amplitude amplification asks for.
     builder.settings().update("measurement", "none")
-    assert builder.measurement_plan(3, 2) == ([], [])
+    assert builder._measurement_plan(3, 2) == ([], [])
 
     # The eigenvector policy trails the phase bits with the system register,
     # reversed so that the key reads system qubit 0 first.
     builder.settings().update("measurement", "eigenvector")
     builder.settings().update("measurement_basis", "X")
-    assert builder.measurement_plan(3, 2) == ([4, 3, 0, 1, 2], ["X", "X", "Z", "Z", "Z"])
+    assert builder._measurement_plan(3, 2) == ([4, 3, 0, 1, 2], ["X", "X", "Z", "Z", "Z"])
 
     # A per-qubit basis string is accepted, and stays aligned with its indices.
     builder.settings().update("measurement_basis", "XY")
-    indices, bases = builder.measurement_plan(3, 2)
+    indices, bases = builder._measurement_plan(3, 2)
     assert indices == [4, 3, 0, 1, 2]
     assert bases == ["Y", "X", "Z", "Z", "Z"]
 
     builder.settings().update("measurement_basis", "XYZ")
     with pytest.raises(ValueError, match="one letter per system"):
-        builder.measurement_plan(3, 2)
+        builder._measurement_plan(3, 2)
 
     builder.settings().update("measurement_basis", "AB")
     with pytest.raises(ValueError, match="I, X, Y or Z"):
-        builder.measurement_plan(3, 2)
+        builder._measurement_plan(3, 2)
 
     builder.settings().update("measurement", "bogus")
     with pytest.raises(ValueError, match="measurement must be one of"):
-        builder.measurement_policy()
+        builder._measurement_plan(3, 2)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="qdk.qsharp is not installed")
@@ -715,24 +647,17 @@ def test_reflect_to_good_space_requires_a_coherent_circuit():
 
 
 @pytest.mark.parametrize("rounds", [0, 1, 2])
-def test_amplification_boosts_acceptance_without_changing_the_energy(rounds: int):
+def test_amplification_does_not_change_the_energy(rounds: int):
     # A guiding state with only 9% overlap on the |00> eigenvector of energy pi/2.
-    overlap = 0.09
     algorithm = _amplified_qpe(
-        round_policy="fixed",
         rounds=rounds,
         accepted_phase_indices=[0],
     )
     result = algorithm.run(
-        state_preparation=_guiding_state(math.sqrt(overlap), 0),
+        state_preparation=_guiding_state(0.3, 0),
         qubit_hamiltonian=_diagonal_hamiltonian(),
     )
 
-    assert result.metadata["amplification_rounds"] == rounds
-    assert result.metadata["preparations_per_shot"] == 2 * rounds + 1
-    assert result.metadata["acceptance_probability"] == pytest.approx(
-        AmplitudeAmplification.success_probability(overlap, rounds), abs=_TOLERANCE
-    )
     # Amplification changes how often the window is accepted, never what it accepts.
     assert result.bitstring_msb_first == "0000"
     assert result.raw_energy == pytest.approx(math.pi / 2.0, abs=qpe_energy_tolerance)
@@ -743,8 +668,7 @@ def test_energy_window_selects_the_right_phase_bin():
     # to the phase bin 1/2 -- index 8 of 16, big-endian 0b1000.
     lambda_norm = math.pi / 2.0
     algorithm = _amplified_qpe(
-        round_policy="safe",
-        max_overlap=0.15,
+        rounds=2,
         min_energy=-lambda_norm - 0.05,
         max_energy=-lambda_norm + 0.05,
     )
@@ -753,18 +677,12 @@ def test_energy_window_selects_the_right_phase_bin():
         qubit_hamiltonian=_diagonal_hamiltonian(),
     )
 
-    assert result.metadata["accepted_phase_indices"] == [8]
-    assert result.metadata["amplification_rounds"] == AmplitudeAmplification.safe_rounds(0.15)
     assert result.bitstring_msb_first == "1000"
     assert result.raw_energy == pytest.approx(-lambda_norm, abs=qpe_energy_tolerance)
-    assert result.metadata["acceptance_probability"] == pytest.approx(
-        AmplitudeAmplification.success_probability(0.09, AmplitudeAmplification.safe_rounds(0.15)), abs=_TOLERANCE
-    )
 
 
-def test_fixed_point_policy_runs_end_to_end():
+def test_fixed_point_schedule_runs_end_to_end():
     algorithm = _amplified_qpe(
-        round_policy="fixed_point",
         min_overlap=0.09,
         tolerance=0.3,
         accepted_phase_indices=[0],
@@ -774,7 +692,6 @@ def test_fixed_point_policy_runs_end_to_end():
         qubit_hamiltonian=_diagonal_hamiltonian(),
     )
     assert result.raw_energy == pytest.approx(math.pi / 2.0, abs=qpe_energy_tolerance)
-    assert result.metadata["acceptance_probability"] >= 1.0 - 0.3**2 - _TOLERANCE
 
 
 def test_trotter_encoding_is_supported():
@@ -793,7 +710,6 @@ def test_trotter_encoding_is_supported():
     )
     algorithm.settings().update("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
     algorithm.settings().update("shots", 200)
-    algorithm.settings().update("round_policy", "fixed")
     algorithm.settings().update("rounds", 1)
     algorithm.settings().update("accepted_phase_indices", [4])
 

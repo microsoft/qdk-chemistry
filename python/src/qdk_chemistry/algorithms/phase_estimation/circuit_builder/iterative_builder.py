@@ -96,16 +96,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Raises:
             ValueError: If ``num_iteration`` >= ``num_bits``.
-            ValueError: If ``measurement`` is not ``"phase"``, which iterative QPE cannot support.
 
         """
-        policy = self.measurement_policy()
-        if policy != "phase":
-            raise ValueError(
-                "Iterative phase estimation measures and resets the phase qubit on every "
-                f"iteration, so it only supports measurement='phase'. Got '{policy}'. Use the "
-                "qdk_standard QPE circuit builder instead."
-            )
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")

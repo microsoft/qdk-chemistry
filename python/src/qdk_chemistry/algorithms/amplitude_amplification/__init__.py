@@ -14,10 +14,9 @@ many amplification rounds to run are methods on that class.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import ROUND_POLICIES, AmplitudeAmplification, AmplitudeAmplificationFactory
+from .base import AmplitudeAmplification, AmplitudeAmplificationFactory
 
 __all__: list[str] = [
-    "ROUND_POLICIES",
     "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
 ]

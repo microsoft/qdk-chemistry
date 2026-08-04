@@ -35,26 +35,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     //
 
     /// # Summary
-    /// Reflection about the all-zeros basis state.
-    ///
-    /// $$
-    ///     2|0\rangle\langle 0| - I
-    /// $$
-    ///
-    /// Note the sign convention: this is the *negative* of
-    /// $I - 2|0\rangle\langle 0|$.  The two differ by a global phase, which is
-    /// unobservable in the uncontrolled amplification loop but *is* observable
-    /// when the reflection is applied as the target of a `Controlled` functor.
-    ///
-    /// Delegates to `QDKChemistry.Utils.PrepSelPrep.Reflect`, which already
-    /// special-cases the degenerate sizes (global phase for $n = 0$, a single
-    /// `Z` for $n = 1$) and, when controlled, folds the outer controls into the
-    /// same multi-controlled `Z` rather than nesting `Controlled` on top of it.
-    operation ReflectAboutAllZeros(register : Qubit[]) : Unit is Adj + Ctl {
-        Reflect(register);
-    }
-
-    /// # Summary
     /// Applies the phase $e^{i\,\text{phase}}$ to the all-zeros basis state and
     /// leaves every other basis state unchanged.
     ///
@@ -110,6 +90,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// $$
     ///
     /// This is the reflection that appears inside the Grover iterate.
+    /// `Reflect` special-cases the degenerate sizes (global phase for $n = 0$, a
+    /// single `Z` for $n = 1$) and, when controlled, folds the outer controls
+    /// into the same multi-controlled `Z` rather than nesting `Controlled` on
+    /// top of it.
     operation ReflectAboutPreparedState(
         statePrep : Qubit[] => Unit is Adj,
         register : Qubit[],
@@ -117,7 +101,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         within {
             Adjoint statePrep(register);
         } apply {
-            ReflectAboutAllZeros(register);
+            Reflect(register);
         }
     }
 

@@ -4,10 +4,6 @@ Amplitude amplification
 Amplitude amplification boosts the probability that a computation lands in a designated "good" subspace.
 Its main use in QDK/Chemistry is to rescue a :doc:`phase estimation <phase_estimation>` run whose guiding state has poor overlap :math:`a` with the target eigenstate: instead of repeating the whole QPE circuit :math:`O(1/a)` times, amplification succeeds after :math:`O(1/\sqrt{a})` repetitions of a marked QPE circuit, at a cost of :math:`2k+1` coherent preparations per attempt.
 
-.. note::
-   Amplitude amplification is a registry algorithm type (``amplitude_amplification``) with one implementation, ``qdk_amplified_qpe``, driven by :class:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification`, and is currently available only in the Python API.
-   The quantum primitives live in the Q# namespace ``QDKChemistry.Utils.AmplitudeAmplification``; the round-count closed forms are classmethods on that class.
-
 Choosing the number of rounds
 -----------------------------
 
@@ -19,14 +15,11 @@ Writing the prepared state as :math:`\sin\theta\,|G\rangle + \cos\theta\,|B\rang
 
 Because :math:`p_k` is periodic, more rounds are not always better: past the first maximum the acceptance falls again and vanishes at :math:`(2k+1)\theta = \pi`. This is *overshoot*, the regime a chemistry guiding state lives in — small overlap, known only to within an order of magnitude.
 
-**Overshoot is controlled by an upper bound on the overlap, not a lower one:** underestimating :math:`a` makes :math:`\theta` too small, the round count too large, and the rotation overshoots.
-The ``round_policy`` setting picks :math:`k` accordingly:
+**Overshoot is controlled by an upper bound on the overlap, not a lower one:** underestimating :math:`a` makes :math:`\theta` too small, the round count too large, and the rotation overshoots. Worse, the failure is silent — low acceptance looks exactly like small overlap.
 
-- ``fixed`` — runs the explicit ``rounds`` you supply.
-- ``safe`` (default) — :meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.safe_rounds` from ``max_overlap``; never overshoots, so acceptance rises monotonically with the true overlap (``safe_rounds(0.3) == 0`` for an upper bound of 0.3).
-- ``robust`` — :meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.robust_rounds` over ``[min_overlap, max_overlap]``; best worst-case acceptance, never worse than ``safe``.
-- ``optimal`` — :meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.optimal_rounds` from ``min_overlap`` taken as exact; closest to the first maximum, but overshoots if the true overlap is larger (``optimal_rounds(0.3) == 1`` with ``success_probability(0.3, 1) == 0.972``).
-- ``fixed_point`` — :meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.fixed_point_rounds` from ``min_overlap`` and ``tolerance`` :math:`\delta`; the Yoder-Low-Chuang phase sequence reaches :math:`\ge 1-\delta^2` for every overlap above the threshold, with no overshoot.
+QDK/Chemistry therefore derives :math:`k` from the Yoder-Low-Chuang **fixed-point** schedule (:meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.fixed_point_rounds`), which needs only the ``min_overlap`` *lower* bound you actually have from a classical estimate, plus a ``tolerance`` :math:`\delta`. Its phase sequence replaces the sinusoid with a plateau: acceptance is :math:`\ge 1-\delta^2` for every overlap above the threshold and never falls back, so a conservative bound costs queries but cannot destroy the signal. The guarantee is worth roughly a 2x query overhead against an oracle that knows :math:`a` exactly.
+
+Setting ``rounds`` to a non-negative value overrides the schedule and runs that many plain Grover iterates instead — the textbook loop, overshoot and all.
 
 Worked example
 --------------
@@ -50,22 +43,13 @@ It is configured exactly like :doc:`PhaseEstimation <phase_estimation>` — the 
     )
     algorithm.settings().update("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
     algorithm.settings().update("shots", 200)
-    algorithm.settings().update("round_policy", "fixed")
     algorithm.settings().update("rounds", 1)
     algorithm.settings().update("accepted_phase_indices", [4])
     result = algorithm.run(state_preparation=prep, qubit_hamiltonian=ham)
 
-``run`` returns a single :class:`~qdk_chemistry.data.QpeResult`. For a 0.3-overlap guiding state on :math:`H = (\pi/4)(ZI + IZ)` the observed run gives::
-
-    result.bitstring_msb_first                 # "0100"
-    result.metadata["accepted_shots"]          # 136
-    result.metadata["total_shots"]             # 200
-    result.metadata["acceptance_probability"]  # 0.68
-    result.metadata["preparations_per_shot"]   # 3  (= 2k + 1)
+``run`` returns a single :class:`~qdk_chemistry.data.QpeResult`, built from the dominant bitstring among the *accepted* shots. For a 0.3-overlap guiding state on :math:`H = (\pi/4)(ZI + IZ)` the observed run gives ``result.bitstring_msb_first == "0100"``.
 
 Swapping the encoding is a matter of swapping the nested refs (for example a ``prepare_select_prepare`` mapper with an ``lcu`` walk builder); the good subspace can also be given as an energy window (``min_energy`` / ``max_energy``) instead of explicit ``accepted_phase_indices``.
-
-Acceptance statistics are returned in :attr:`~qdk_chemistry.data.QpeResult.metadata`: ``amplification_rounds``, ``round_policy``, ``accepted_phase_indices``, ``accepted_shots``, ``total_shots``, ``acceptance_probability`` and ``preparations_per_shot`` (:math:`2k+1`), plus ``predicted_acceptance_at_max_overlap`` (and a ``predicted_acceptance_at_min_overlap`` counterpart once ``min_overlap`` is set).
 
 Settings
 --------
@@ -79,7 +63,7 @@ Settings
      - Description
    * - ``reflect_to_good_space``
      - ``algorithm_ref``
-     - Nested builder producing the coherent preparation to reflect about. Locked to the ``qpe_circuit_builder`` algorithm type, so any conforming builder is accepted. Its ``measurement`` setting is forced to ``"none"`` and it must return a measurement-free circuit whose inverse the loop can apply; iterative QPE cannot, and says so.
+     - Nested builder producing the coherent preparation to reflect about. Locked to the ``qpe_circuit_builder`` algorithm type, so any conforming builder is accepted. Its ``measurement`` setting, if it has one, is forced to ``"none"``; either way it must return a measurement-free circuit whose inverse the loop can apply. Iterative QPE cannot, and says so.
    * - ``circuit_executor``
      - ``algorithm_ref``
      - Backend that executes the amplified circuit.
@@ -88,13 +72,10 @@ Settings
      - Number of shots (default 100).
    * - ``rounds``
      - ``int``
-     - Explicit number of amplification rounds. Negative (the default) derives it from ``round_policy``.
-   * - ``round_policy``
-     - ``string``
-     - One of ``fixed``, ``safe`` (default), ``robust``, ``optimal``, ``fixed_point``. See `Choosing the number of rounds`_.
-   * - ``min_overlap`` / ``max_overlap``
+     - Explicit number of plain Grover iterates. Negative (the default) derives a fixed-point schedule from ``min_overlap`` and ``tolerance`` instead.
+   * - ``min_overlap``
      - ``double``
-     - Overlap bounds. ``min_overlap`` feeds ``robust``, ``optimal`` and ``fixed_point``; ``max_overlap`` feeds ``safe`` and ``robust`` and defaults to ``1.0``, for which ``safe`` yields zero rounds — amplification is off until you supply a real bound.
+     - Lower bound on the overlap :math:`a` of the guiding state with the good subspace. Required unless ``rounds`` is set explicitly.
    * - ``tolerance``
      - ``double``
      - Fixed-point tolerance :math:`\delta`; success is guaranteed to exceed :math:`1-\delta^2` (default 0.1).

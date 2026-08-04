@@ -36,10 +36,7 @@ References:
 import math
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
-    coherent_qpe_measured_indices,
-    split_coherent_qpe_bitstring,
-)
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import split_coherent_qpe_bitstring
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -53,26 +50,37 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = [
-    "ROUND_POLICIES",
     "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
     "AmplitudeAmplificationSettings",
 ]
 
-ROUND_POLICIES: list[str] = ["fixed", "safe", "robust", "optimal", "fixed_point"]
-"""Supported strategies for choosing the number of amplification rounds."""
-
 
 class AmplitudeAmplificationSettings(Settings):
     r"""Settings for amplitude amplification.
 
-    The round-count settings are the answer to the central practical question:
-    how many rounds can be run when the overlap of the guiding state is only
-    known approximately?  After :math:`k` rounds the acceptance probability is
-    :math:`\sin^2((2k+1)\theta)` with :math:`\theta = \arcsin\sqrt{a}`, so
-    running too many rounds *rotates past* the maximum and destroys acceptance.
-    Overshoot is therefore controlled by an **upper** bound on the overlap; a
-    lower bound is the dangerous input.
+    The round-count settings answer the central practical question: how many
+    rounds can be run when the overlap of the guiding state is only known
+    approximately?
+
+    Plain amplitude amplification rotates by :math:`(2k+1)\vartheta` with
+    :math:`\vartheta = \arcsin\sqrt{a}`, so its acceptance probability
+    :math:`\sin^2((2k+1)\vartheta)` *falls back to zero* once the rotation runs
+    past :math:`\pi/2`.  Guessing ``k`` from an uncertain overlap therefore
+    risks overshooting, and an overshoot is indistinguishable from a small
+    overlap in the measured counts -- it fails silently.
+
+    The round count is consequently derived from the Yoder-Low-Chuang
+    fixed-point schedule, which replaces that sinusoid by a Chebyshev plateau:
+    acceptance climbs monotonically and then stays above
+    :math:`1 - \text{tolerance}^2` for *every* overlap at or above
+    ``min_overlap``.  Only a **lower** bound is required, which is the bound a
+    classical overlap estimate actually provides, and no overshoot is possible.
+    The guarantee costs roughly twice the queries of a perfectly-tuned plain
+    schedule.
+
+    Set ``rounds`` explicitly to bypass the schedule and run that many plain
+    Grover iterates instead.
 
     """
 
@@ -94,26 +102,13 @@ class AmplitudeAmplificationSettings(Settings):
             "rounds",
             "int",
             -1,
-            "Explicit number of amplification rounds. Negative means derive it from round_policy.",
-        )
-        self._set_default(
-            "round_policy",
-            "string",
-            "safe",
-            "How to derive the round count when rounds is negative.",
-            ROUND_POLICIES,
+            "Explicit number of plain Grover iterates. Negative derives a fixed-point schedule instead.",
         )
         self._set_default(
             "min_overlap",
             "double",
             0.0,
             "Lower bound on the probability that the prepared state lands in the good subspace.",
-        )
-        self._set_default(
-            "max_overlap",
-            "double",
-            1.0,
-            "Upper bound on that probability. This is what prevents overshoot.",
         )
         self._set_default(
             "tolerance",
@@ -144,11 +139,11 @@ class AmplitudeAmplificationSettings(Settings):
 class AmplitudeAmplification(Algorithm):
     r"""Amplitude amplification around a nested coherent circuit.
 
-    The circuit supplied through ``reflect_to_good_space`` is run in ``coherent``
-    mode to obtain the measurement-free, adjointable preparation :math:`U_\psi`
-    that the amplification loop reflects about.  The good subspace is the set of
-    branches whose phase register falls inside the accepted window *and* whose
-    block-encoding signal ancillas are all zero.
+    The circuit supplied through ``reflect_to_good_space`` is built with
+    ``measurement='none'`` to obtain the measurement-free, adjointable
+    preparation :math:`U_\psi` that the amplification loop reflects about.  The
+    good subspace is the set of branches whose phase register falls inside the
+    accepted window *and* whose block-encoding signal ancillas are all zero.
 
     Example:
         >>> from qdk_chemistry.algorithms import create  # doctest: +SKIP
@@ -158,7 +153,7 @@ class AmplitudeAmplification(Algorithm):
         ...     "reflect_to_good_space",
         ...     AlgorithmRef("qpe_circuit_builder", "qdk_standard", num_bits=8),
         ... )  # doctest: +SKIP
-        >>> aa.settings().update("max_overlap", 0.05)  # doctest: +SKIP
+        >>> aa.settings().update("min_overlap", 0.05)  # doctest: +SKIP
         >>> aa.settings().update("min_energy", -1.1)  # doctest: +SKIP
         >>> aa.settings().update("max_energy", -0.9)  # doctest: +SKIP
         >>> result = aa.run(state_preparation, hamiltonian)  # doctest: +SKIP
@@ -200,8 +195,7 @@ class AmplitudeAmplification(Algorithm):
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
-            A QpeResult built from the dominant *accepted* bitstring, with the
-            acceptance statistics in :attr:`~qdk_chemistry.data.QpeResult.metadata`.
+            A QpeResult built from the dominant *accepted* bitstring.
 
         Raises:
             RuntimeError: If no shot was accepted.
@@ -209,7 +203,10 @@ class AmplitudeAmplification(Algorithm):
         """
         Logger.trace_entering()
         circuit_builder = self._create_nested("reflect_to_good_space")
-        circuit_builder.settings().update("measurement", "none")
+        # Builders that do not expose the setting are still accepted; they just
+        # have to return a measurement-free circuit on their own.
+        if circuit_builder.settings().has("measurement"):
+            circuit_builder.settings().update("measurement", "none")
         num_bits = int(circuit_builder.settings().get("num_bits"))
 
         # Resolve the encoding before building, so the accepted window can be
@@ -246,9 +243,8 @@ class AmplitudeAmplification(Algorithm):
             raise RuntimeError(
                 f"No shot landed in the accepted window {sorted(accepted_indices)} after {rounds} "
                 f"amplification round(s) over {shots} shot(s). Widen the window, increase the "
-                "shot count, or revisit the round policy."
+                "shot count, or lower 'min_overlap'."
             )
-        accepted_shots = sum(accepted_counts.values())
 
         dominant_bitstring = max(accepted_counts, key=accepted_counts.get)
         raw_phase = int(dominant_bitstring, 2) / (2**num_bits)
@@ -258,56 +254,35 @@ class AmplitudeAmplification(Algorithm):
             phase_fraction=raw_phase,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
             bitstring_msb_first=dominant_bitstring,
-            metadata=self._acceptance_metadata(
-                rounds=rounds,
-                accepted_indices=accepted_indices,
-                accepted_shots=accepted_shots,
-                shots=shots,
-            ),
         )
 
     def resolve_rounds(self) -> int:
         """Resolve the number of amplification rounds from the settings.
 
-        An explicit non-negative ``rounds`` always wins. Otherwise the count is
-        derived from ``round_policy``:
-
-        * ``safe`` -- the largest count that cannot overshoot for any overlap up
-          to ``max_overlap``. Acceptance is then monotonically increasing in the
-          true overlap.
-        * ``robust`` -- the count maximizing the worst case over
-          ``[min_overlap, max_overlap]``.
-        * ``optimal`` -- the count that maximizes acceptance at ``min_overlap``.
-          This is the textbook choice and the one that overshoots when the true
-          overlap turns out to be larger than assumed.
-        * ``fixed_point`` -- the count needed for the Yoder-Low-Chuang phase
-          sequence to reach ``1 - tolerance^2`` for every overlap at or above
-          ``min_overlap``.
-        * ``fixed`` -- requires an explicit ``rounds``.
+        An explicit non-negative ``rounds`` always wins and selects that many
+        plain Grover iterates. Otherwise the count is derived from the
+        Yoder-Low-Chuang fixed-point schedule, which needs only ``min_overlap``
+        and ``tolerance`` and cannot overshoot.
 
         Returns:
             The number of amplification rounds to run.
 
         Raises:
-            ValueError: If the policy is ``fixed`` but no explicit round count was given.
+            ValueError: If no explicit ``rounds`` was given and ``min_overlap``
+                is not a usable lower bound.
 
         """
         rounds = int(self._settings.get("rounds"))
         if rounds >= 0:
             return rounds
 
-        policy = str(self._settings.get("round_policy"))
-        if policy == "fixed":
-            raise ValueError("round_policy is 'fixed' but no non-negative 'rounds' setting was provided.")
-
         min_overlap = float(self._settings.get("min_overlap"))
-        max_overlap = float(self._settings.get("max_overlap"))
-        if policy == "safe":
-            return self.safe_rounds(max_overlap)
-        if policy == "robust":
-            return self.robust_rounds(min_overlap, max_overlap)
-        if policy == "optimal":
-            return self.optimal_rounds(min_overlap)
+        if min_overlap <= 0.0:
+            raise ValueError(
+                "Deriving a round count needs a positive 'min_overlap' lower bound on the overlap "
+                "of the guiding state with the good subspace. Set 'min_overlap', or set 'rounds' "
+                "explicitly to run a fixed number of plain Grover iterates."
+            )
         return self.fixed_point_rounds(min_overlap, float(self._settings.get("tolerance")))
 
     @staticmethod
@@ -324,23 +299,6 @@ class AmplitudeAmplification(Algorithm):
         """
         if not math.isfinite(overlap) or not 0.0 < overlap <= 1.0:
             raise ValueError(f"{name} must be finite and lie in (0, 1]. Got {overlap}.")
-
-    @classmethod
-    def _validate_interval(cls, min_overlap: float, max_overlap: float) -> None:
-        """Raise if ``[min_overlap, max_overlap]`` is not a usable overlap interval.
-
-        Args:
-            min_overlap: Lower bound on the squared overlap.
-            max_overlap: Upper bound on the squared overlap.
-
-        Raises:
-            ValueError: If either bound is invalid or the interval is empty.
-
-        """
-        cls._validate_overlap(min_overlap, "min_overlap")
-        cls._validate_overlap(max_overlap, "max_overlap")
-        if min_overlap > max_overlap:
-            raise ValueError(f"min_overlap must not exceed max_overlap. Got {min_overlap} > {max_overlap}.")
 
     @staticmethod
     def _validate_schedule_rounds(rounds: int) -> None:
@@ -391,121 +349,6 @@ class AmplitudeAmplification(Algorithm):
         cls._validate_schedule_rounds(rounds)
         angle = cls._rotation_angle(overlap)
         return math.sin((2 * rounds + 1) * angle) ** 2
-
-    @classmethod
-    def optimal_rounds(cls, overlap: float) -> int:
-        r"""Return the round count closest to the first maximum, for a *known* overlap.
-
-        This is :math:`\mathrm{round}\big(\pi/(4\vartheta) - 1/2\big)`, the integer
-        nearest the continuous optimum :math:`k^* = \pi/(4\vartheta) - 1/2` where
-        :math:`(2k+1)\vartheta = \pi/2`.
-
-        Using this with a merely *estimated* overlap is the classic way to
-        overshoot: if the true overlap is larger than assumed the rotation runs
-        past the maximum. Prefer :meth:`safe_rounds` or :meth:`robust_rounds` when
-        the overlap is uncertain.
-
-        Args:
-            overlap: The squared overlap of the prepared state with the good subspace.
-
-        Returns:
-            The nonnegative round count nearest the first acceptance maximum.
-
-        """
-        angle = cls._rotation_angle(overlap)
-        return max(0, round(math.pi / (4.0 * angle) - 0.5))
-
-    @classmethod
-    def safe_rounds(cls, max_overlap: float) -> int:
-        r"""Return the largest round count that cannot overshoot.
-
-        Returns :math:`\lfloor \pi/(4\vartheta_{\max}) - 1/2 \rfloor`, where
-        :math:`\vartheta_{\max} = \arcsin\sqrt{a_{\max}}`. For this ``k`` every
-        overlap ``a <= max_overlap`` satisfies :math:`(2k+1)\vartheta \le \pi/2`,
-        so the acceptance probability is a monotonically increasing function of the
-        true overlap: being luckier than expected can only help.
-
-        Only the *upper* bound matters here. A lower bound tells you how well the
-        schedule will do, not whether it is safe.
-
-        Args:
-            max_overlap: Upper bound on the squared overlap.
-
-        Returns:
-            The largest nonnegative round count with no overshoot risk.
-
-        """
-        cls._validate_overlap(max_overlap, "max_overlap")
-        angle = cls._rotation_angle(max_overlap)
-        # Floor with a small tolerance so that an overlap sitting exactly on a
-        # boundary (a_max = 1/4, where pi/(4*theta) - 1/2 evaluates to
-        # 0.9999999999999998) is not pushed down a round by floating-point error.
-        return max(0, math.floor(math.pi / (4.0 * angle) - 0.5 + 1e-12))
-
-    @classmethod
-    def _worst_case_success_probability(cls, rounds: int, min_overlap: float, max_overlap: float) -> float:
-        r"""Return the guaranteed acceptance probability over an overlap interval.
-
-        The acceptance probability :math:`\sin^2((2k+1)\vartheta)` has interior
-        minima only where :math:`(2k+1)\vartheta` is an integer multiple of
-        :math:`\pi`. The worst case over the interval is therefore exactly zero
-        when the rotation sweeps through such a multiple, and otherwise attained at
-        one of the two endpoints. No search is needed.
-
-        Args:
-            rounds: The number of amplification rounds ``k``.
-            min_overlap: Lower bound on the squared overlap.
-            max_overlap: Upper bound on the squared overlap.
-
-        Returns:
-            The smallest acceptance probability consistent with the interval.
-
-        """
-        cls._validate_schedule_rounds(rounds)
-        cls._validate_interval(min_overlap, max_overlap)
-
-        factor = 2 * rounds + 1
-        low = factor * cls._rotation_angle(min_overlap)
-        high = factor * cls._rotation_angle(max_overlap)
-
-        # A multiple of pi inside the swept arc drives acceptance to zero.
-        if math.floor(high / math.pi) > math.floor(low / math.pi) or low % math.pi == 0.0:
-            return 0.0
-        return min(math.sin(low) ** 2, math.sin(high) ** 2)
-
-    @classmethod
-    def robust_rounds(cls, min_overlap: float, max_overlap: float) -> int:
-        """Return the round count maximizing the guaranteed acceptance probability.
-
-        This is the minimax choice over the overlap interval. It is never worse
-        than :meth:`safe_rounds` and is usually equal to it; it can be larger when
-        the interval is narrow enough that a mild, bounded overshoot at the top of
-        the interval buys more at the bottom than it costs at the top.
-
-        Ties are broken toward the smallest round count, since rounds are queries.
-
-        Args:
-            min_overlap: Lower bound on the squared overlap.
-            max_overlap: Upper bound on the squared overlap.
-
-        Returns:
-            The nonnegative round count with the best worst-case acceptance
-            probability.
-
-        """
-        cls._validate_interval(min_overlap, max_overlap)
-
-        # Beyond the optimum for the smallest admissible overlap, every candidate
-        # has already swept past the first maximum for the whole interval.
-        upper = cls.optimal_rounds(min_overlap)
-        best_rounds = 0
-        best_probability = cls._worst_case_success_probability(0, min_overlap, max_overlap)
-        for candidate in range(1, upper + 1):
-            probability = cls._worst_case_success_probability(candidate, min_overlap, max_overlap)
-            if probability > best_probability:
-                best_rounds = candidate
-                best_probability = probability
-        return best_rounds
 
     @classmethod
     def fixed_point_rounds(cls, min_overlap: float, tolerance: float) -> int:
@@ -710,9 +553,13 @@ class AmplitudeAmplification(Algorithm):
         signal_ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
         marker = amplification.MakeQpeAcceptanceMarkerOp(num_bits, signal_ancilla_indices, accepted_indices)
         num_qubits = num_bits + num_system_qubits + num_ancilla_qubits
-        measured_indices = coherent_qpe_measured_indices(num_bits, num_system_qubits, num_ancilla_qubits)
+        # The executor reverses the Q# results, so emitting the signal ancillas
+        # reversed and ahead of the phase indices makes the key read phase
+        # register most-significant-bit first, then the ancillas in order.
+        ancilla_indices = list(range(num_bits + num_system_qubits, num_qubits))
+        measured_indices = list(reversed(ancilla_indices)) + list(range(num_bits))
 
-        if str(self._settings.get("round_policy")) == "fixed_point" and int(self._settings.get("rounds")) < 0:
+        if int(self._settings.get("rounds")) < 0:
             mark_phases, state_phases = self.fixed_point_phases(rounds, float(self._settings.get("tolerance")))
             parameters = {
                 "preparation": preparation,
@@ -767,44 +614,6 @@ class AmplitudeAmplification(Algorithm):
                 continue
             counts[phase_bits] = counts.get(phase_bits, 0) + count
         return counts
-
-    def _acceptance_metadata(
-        self,
-        *,
-        rounds: int,
-        accepted_indices: list[int],
-        accepted_shots: int,
-        shots: int,
-    ) -> dict[str, object]:
-        """Assemble the acceptance statistics reported alongside the phase.
-
-        Args:
-            rounds: Number of amplification rounds actually run.
-            accepted_indices: Phase-register indices that count as good.
-            accepted_shots: Number of shots that landed in the good subspace.
-            shots: Total number of shots executed.
-
-        Returns:
-            A metadata dictionary for the QpeResult.
-
-        """
-        min_overlap = float(self._settings.get("min_overlap"))
-        max_overlap = float(self._settings.get("max_overlap"))
-        metadata: dict[str, object] = {
-            "amplification_rounds": rounds,
-            "round_policy": str(self._settings.get("round_policy")),
-            "accepted_phase_indices": list(accepted_indices),
-            "accepted_shots": accepted_shots,
-            "total_shots": shots,
-            "acceptance_probability": accepted_shots / shots if shots else 0.0,
-            # One attempt costs 2k+1 coherent preparations of the nested circuit.
-            "preparations_per_shot": 2 * rounds + 1,
-        }
-        if 0.0 < min_overlap <= 1.0:
-            metadata["predicted_acceptance_at_min_overlap"] = self.success_probability(min_overlap, rounds)
-        if 0.0 < max_overlap <= 1.0:
-            metadata["predicted_acceptance_at_max_overlap"] = self.success_probability(max_overlap, rounds)
-        return metadata
 
 
 class AmplitudeAmplificationFactory(AlgorithmFactory):
