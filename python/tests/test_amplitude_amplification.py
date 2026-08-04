@@ -516,9 +516,8 @@ def _amplified_qpe_circuit(
         mapper=mapper,
         unitary=unitary,
     )
-    marker = getattr(qsharp_module.code, _NAMESPACE).MakeAcceptedPhaseMarkerOp(
-        num_bits, signal_ancilla_indices, accepted_indices
-    )
+    make_marker = getattr(qsharp_module.code, _NAMESPACE).MakeAcceptedPhaseMarkerOp
+    marker = make_marker(num_bits, signal_ancilla_indices, accepted_indices)
     # The executor reverses the Q# results, so emitting the ancillas reversed and
     # ahead of the phase indices makes the key read phase register MSB first.
     ancilla_indices = list(range(num_qubits - len(signal_ancilla_indices), num_qubits))
@@ -527,7 +526,18 @@ def _amplified_qpe_circuit(
     algorithm = create("amplitude_amplification")
     for key, value in settings.items():
         algorithm.settings().update(key, value)
-    return algorithm.run(preparation, marker, num_qubits=num_qubits, measured_indices=measured_indices)
+    marking_oracle = Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=make_marker,
+            parameter={
+                "numPhaseQubits": num_bits,
+                "signalAncillaIndices": signal_ancilla_indices,
+                "accepted": accepted_indices,
+            },
+        ),
+        qsharp_op=marker,
+    )
+    return algorithm.run(preparation, marking_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
 
 
 def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_indices: list[int], shots: int = 400) -> str:
@@ -673,7 +683,18 @@ def test_amplitude_amplification_requires_a_coherent_circuit():
     algorithm = create("amplitude_amplification")
     algorithm.settings().update("rounds", 1)
     with pytest.raises(TypeError, match="adjointable"):
-        algorithm.run(Circuit(qasm="OPENQASM 3.0;"), marking_oracle=None, num_qubits=4)
+        algorithm.run(
+            Circuit(qasm="OPENQASM 3.0;"),
+            _guiding_state(1.0, 0),
+            num_qubits=4,
+        )
+
+
+def test_amplitude_amplification_requires_a_marking_oracle_operation():
+    algorithm = create("amplitude_amplification")
+    algorithm.settings().update("rounds", 1)
+    with pytest.raises(TypeError, match="marking oracle"):
+        algorithm.run(_guiding_state(1.0, 0), Circuit(qasm="OPENQASM 3.0;"), num_qubits=1)
 
 
 def test_register_bounds_are_validated():
@@ -681,9 +702,9 @@ def test_register_bounds_are_validated():
     algorithm.settings().update("rounds", 0)
     preparation = _guiding_state(1.0, 0)
     with pytest.raises(ValueError, match="num_qubits"):
-        algorithm.run(preparation, marking_oracle=None, num_qubits=0)
+        algorithm.run(preparation, preparation, num_qubits=0)
     with pytest.raises(ValueError, match="measured_indices"):
-        algorithm.run(preparation, marking_oracle=None, num_qubits=2, measured_indices=[2])
+        algorithm.run(preparation, preparation, num_qubits=2, measured_indices=[2])
 
 
 @pytest.mark.parametrize("rounds", [0, 1, 2])

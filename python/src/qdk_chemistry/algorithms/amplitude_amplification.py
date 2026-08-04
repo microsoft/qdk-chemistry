@@ -1,19 +1,4 @@
-r"""QDK/Chemistry amplitude amplification.
-
-Builds the amplified circuit :math:`Q^k U_\psi` from a measurement-free,
-adjointable preparation and a marking oracle.  Execution and the accept/reject
-decision belong to the caller.
-
-The state reflection is :math:`U_\psi S_0 U_\psi^\dagger`, since
-:math:`|0\cdots0\rangle` is the only state hardware recognises cheaply, so a
-``k``-round circuit contains :math:`2k+1` preparations -- the same :math:`2k+1`
-in :math:`\sin^2((2k+1)\vartheta)`.
-
-References:
-    L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,
-    arXiv:2201.08309, Chapter 2.
-
-"""
+r"""QDK/Chemistry amplitude amplification."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -21,7 +6,7 @@ References:
 # --------------------------------------------------------------------------------------------
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
@@ -38,17 +23,7 @@ __all__: list[str] = [
 
 
 class AmplitudeAmplificationSettings(Settings):
-    r"""Settings for amplitude amplification.
-
-    Plain amplification rotates by :math:`(2k+1)\vartheta`, so acceptance falls
-    back to zero once the rotation passes :math:`\pi/2`, and that overshoot is
-    indistinguishable from a small overlap in the counts.  The round count is
-    therefore derived from the Yoder-Low-Chuang fixed-point schedule, which
-    needs only a **lower** bound on the overlap and cannot overshoot.
-
-    Set ``rounds`` explicitly to run that many plain Grover iterates instead.
-
-    """
+    r"""Settings for amplitude amplification."""
 
     def __init__(self):
         """Initialize the settings for amplitude amplification."""
@@ -57,7 +32,7 @@ class AmplitudeAmplificationSettings(Settings):
             "rounds",
             "int",
             -1,
-            "Explicit number of plain Grover iterates. Negative derives a fixed-point schedule instead.",
+            "Number of amplitude amplification rounds. -1 derives a fixed-point schedule instead.",
         )
         self._set_default(
             "min_overlap",
@@ -74,22 +49,7 @@ class AmplitudeAmplificationSettings(Settings):
 
 
 class AmplitudeAmplification(Algorithm):
-    r"""Build an amplitude-amplified circuit around a coherent preparation.
-
-    Example:
-        >>> from qdk_chemistry.algorithms import create  # doctest: +SKIP
-        >>> qpe = create("qpe_circuit_builder", "qdk_standard")  # doctest: +SKIP
-        >>> qpe.settings().update("num_bits", 8)  # doctest: +SKIP
-        >>> qpe.settings().update("measurement", "none")  # doctest: +SKIP
-        >>> preparation = qpe.run(  # doctest: +SKIP
-        ...     state_preparation=guiding_state, qubit_hamiltonian=hamiltonian
-        ... )[0]
-        >>> marker = my_qsharp_module.MakeMarkerOp(8, [17, 18, 19])  # doctest: +SKIP
-        >>> aa = create("amplitude_amplification")  # doctest: +SKIP
-        >>> aa.settings().update("min_overlap", 0.05)  # doctest: +SKIP
-        >>> circuit = aa.run(preparation, marker, num_qubits=12)  # doctest: +SKIP
-
-    """
+    r"""Build an amplitude-amplified circuit."""
 
     def __init__(self):
         """Initialize amplitude amplification."""
@@ -102,31 +62,29 @@ class AmplitudeAmplification(Algorithm):
         return "amplitude_amplification"
 
     def name(self) -> str:
-        """Return the algorithm name as qdk_amplitude_amplification."""
-        return "qdk_amplitude_amplification"
+        """Return the algorithm name as qdk."""
+        return "qdk"
 
     def _run_impl(
         self,
         preparation: Circuit,
-        marking_oracle: Callable[..., Any],
+        marking_oracle: Circuit,
         num_qubits: int,
-        measured_indices: Sequence[int] | None = None,
     ) -> Circuit:
-        r"""Wrap a coherent preparation in the amplification loop.
+        r"""Build an amplitude-amplified circuit.
 
         Args:
-            preparation: A measurement-free circuit carrying an adjointable Q# operation.
-            marking_oracle: An adjointable ``(Qubit[], Qubit) => Unit is Adj`` that
-                flips its target on the good subspace, leaving the register unchanged.
+            preparation: Prepare the initial state.
+            marking_oracle: Mark the good subspace with a phase flip.
             num_qubits: Size of the register both callables act on.
             measured_indices: Register indices to measure, in output order.
                 Defaults to the whole register.
 
         Returns:
-            The amplified circuit, containing :math:`2k+1` preparations.
+            The amplified circuit.
 
         Raises:
-            TypeError: If ``preparation`` carries no adjointable Q# operation.
+            TypeError: If either circuit carries no adjointable Q# operation.
             ValueError: If ``num_qubits`` or ``measured_indices`` is out of range.
 
         """
@@ -137,6 +95,12 @@ class AmplitudeAmplification(Algorithm):
                 "Amplitude amplification reflects about the prepared state, which requires applying "
                 "the preparation's adjoint. Pass a measurement-free circuit carrying an adjointable "
                 "Q# operation, such as a qdk_standard QPE circuit built with measurement='none'."
+            )
+        marking_operation = marking_oracle._qsharp_op  # noqa: SLF001
+        if marking_operation is None:
+            raise TypeError(
+                "Amplitude amplification requires a marking oracle circuit carrying an adjointable "
+                "Q# operation of type (Qubit[], Qubit) => Unit is Adj."
             )
         if num_qubits < 1:
             raise ValueError(f"num_qubits must be positive. Got {num_qubits}.")
@@ -149,7 +113,7 @@ class AmplitudeAmplification(Algorithm):
         amplification = QSHARP_UTILS.AmplitudeAmplification
         parameters: dict[str, Any] = {
             "preparation": operation,
-            "markingOracle": marking_oracle,
+            "markingOracle": marking_operation,
         }
 
         if int(self._settings.get("rounds")) < 0:
@@ -208,20 +172,6 @@ class AmplitudeAmplification(Algorithm):
         if not math.isfinite(overlap) or not 0.0 < overlap <= 1.0:
             raise ValueError(f"{name} must be finite and lie in (0, 1]. Got {overlap}.")
 
-    @staticmethod
-    def _validate_schedule_rounds(rounds: int) -> None:
-        """Raise if ``rounds`` is not a valid round count.
-
-        Args:
-            rounds: The number of amplification rounds.
-
-        Raises:
-            ValueError: If ``rounds`` is negative.
-
-        """
-        if rounds < 0:
-            raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
-
     @classmethod
     def _rotation_angle(cls, overlap: float) -> float:
         r"""Return the half-rotation angle :math:`\vartheta = \arcsin\sqrt{a}`.
@@ -249,7 +199,8 @@ class AmplitudeAmplification(Algorithm):
             The probability of measuring the good subspace after ``rounds`` rounds.
 
         """
-        cls._validate_schedule_rounds(rounds)
+        if rounds < 0:
+            raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
         angle = cls._rotation_angle(overlap)
         return math.sin((2 * rounds + 1) * angle) ** 2
 
@@ -343,5 +294,5 @@ class AmplitudeAmplificationFactory(AlgorithmFactory):
         return "amplitude_amplification"
 
     def default_algorithm_name(self) -> str:
-        """Return qdk_amplitude_amplification as the default algorithm name."""
-        return "qdk_amplitude_amplification"
+        """Return qdk as the default algorithm name."""
+        return "qdk"
