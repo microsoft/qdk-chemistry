@@ -128,14 +128,22 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
 
 # ─── vcpkg install ────────────────────────────────────────────────────────────
 # Provides eigen3, openblas, hdf5, boost-headers, spdlog, nlohmann-json, etc.
+# Retried with backoff: ports whose source is missing from the asset mirror fall
+# through to their upstream host, which rate-limits (HTTP 429) on a cold build.
 $env:X_VCPKG_ASSET_SOURCES = 'x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/'
 Write-Host "=== vcpkg install ==="
-& "$VcpkgRoot\vcpkg.exe" install `
-    --triplet x64-windows-static-md `
-    --x-manifest-root="$SrcDir" `
-    --x-install-root="$SrcDir\vcpkg_installed" `
-    --overlay-ports="$SrcDir\vcpkg-overlay\ports"
-if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
+foreach ($attempt in 1..3) {
+    & "$VcpkgRoot\vcpkg.exe" install `
+        --triplet x64-windows-static-md `
+        --x-manifest-root="$SrcDir" `
+        --x-install-root="$SrcDir\vcpkg_installed" `
+        --overlay-ports="$SrcDir\vcpkg-overlay\ports"
+    if ($LASTEXITCODE -eq 0) { break }
+    if ($attempt -eq 3) { throw "vcpkg install failed ($LASTEXITCODE)" }
+    $delay = 60 * $attempt
+    Write-Host "vcpkg install failed (attempt $attempt); retrying in ${delay}s"
+    Start-Sleep -Seconds $delay
+}
 
 # ─── libint2 ─────────────────────────────────────────────────────────────────
 Write-Host "=== Installing libint2 ==="
