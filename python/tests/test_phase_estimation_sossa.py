@@ -646,11 +646,17 @@ class TestSOSSAQPEIntegration:
         # Verify: for SOS walk, raw_energy = Λ(1 + cos(2πφ)) + energy_shift
         measured_e_gap = result.raw_energy - container.energy_shift
 
-        # With 5 bits, discretization error ~ Λ * 2π / 2^5 ≈ Λ * 0.2
-        discretization_tol = lambda_sos * 2 * math.pi / (2**num_bits) + 0.05
-        assert abs(measured_e_gap - gs_energy) < discretization_tol, (
-            f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, "
-            f"expected={gs_energy:.6f}, tol={discretization_tol:.6f}"
+        # The ground state sits near φ = 1/2, where dE/dφ = 0, so the energy error
+        # is quadratic rather than linear in the 1/2^num_bits phase resolution. That
+        # quadratic suppression is the spectral amplification of Low 2025, so the
+        # tolerance is stated as the amplified bound; asserting only the much weaker
+        # linear bound previously let a wrong reference Hamiltonian slip through.
+        max_phase_error = 1.0 / 2**num_bits
+        amplified_tol = lambda_sos * (1.0 - math.cos(2 * math.pi * max_phase_error))
+        linear_tol = lambda_sos * 2 * math.pi * max_phase_error
+        assert amplified_tol < linear_tol / 5, "Spectral amplification should beat the linear bound."
+        assert abs(measured_e_gap - gs_energy) < amplified_tol, (
+            f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, expected={gs_energy:.6f}, tol={amplified_tol:.6f}"
         )
 
     def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
