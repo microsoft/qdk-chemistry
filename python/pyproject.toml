@@ -94,7 +94,8 @@ plugins = [
 ]
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0",
-  "qiskit-aer; python_version < '3.14' or platform_machine != 'aarch64'",  # cp314 manylinux aarch64 wheel not available
+  # No cp314 manylinux aarch64 wheel yet; source build needs network-restricted Conan. Restrict to Linux ARM64 only.
+  "qiskit-aer; python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux'",
   "qiskit-ibm-runtime>=0.46.1",
   "qiskit-nature",
   "qiskit-qasm3-import",
