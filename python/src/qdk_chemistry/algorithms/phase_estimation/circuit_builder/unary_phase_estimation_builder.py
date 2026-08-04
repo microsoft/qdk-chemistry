@@ -10,11 +10,11 @@ The phase register is prepared in a window state (Kaiser by default) rather than
 uniform superposition, which suppresses the spectral leakage of the truncated schedule.
 
 References:
-    :cite:`Berry2024`, Appendix D (Kaiser window states).
-    :cite:`Lee2021` — tensor hypercontraction; non-power-of-two query schedule and its
-        extra Toffoli cost.
-    :cite:`Babbush2018` — Heisenberg-limited phase estimation with a sine-window
-        control state.
+    * :cite:`Berry2024`, Appendix D (Kaiser window states).
+    * :cite:`Lee2021` — tensor hypercontraction; non-power-of-two query schedule
+      and its extra Toffoli cost.
+    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
+      sine-window control state.
 
 """
 

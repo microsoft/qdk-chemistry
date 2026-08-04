@@ -52,7 +52,8 @@ class RotatedPaulis:
 class SOSSAContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator.
 
-    The one-body and two-body generators are each a :class:`RotatedPaulis` block
+    The one-body and two-body generators are each a
+    :class:`~qdk_chemistry.data.qubit_operator.containers.sossa.RotatedPaulis` block
     (``angles``, ``coeffs``, ``paulis``). ``one_body`` uses ``(X +/- iY) / 2``
     with the first ``num_positive_one_body_terms`` rows the D1 (particle)
     generators and the rest Q1 (hole); ``two_body`` uses ``Z`` with one

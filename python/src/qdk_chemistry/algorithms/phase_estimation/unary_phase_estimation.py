@@ -12,12 +12,12 @@ are merged before the winner is chosen, and the ``phase_band`` builder setting s
 which half-band the result is reported in.
 
 References:
-    :cite:`Berry2024`, Appendix D.
-    :cite:`Lee2021` — tensor hypercontraction; prescription for a non-power-of-two
-        number of queries.
-    :cite:`Babbush2018` — Heisenberg-limited phase estimation with a sine-window
-        control state, where each block applies :math:`W` or :math:`W^\dagger` and
-        hence doubles the phase.
+    * :cite:`Berry2024`, Appendix D.
+    * :cite:`Lee2021` — tensor hypercontraction; prescription for a
+      non-power-of-two number of queries.
+    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
+      sine-window control state, where each block applies :math:`W` or
+      :math:`W^\dagger` and hence doubles the phase.
 
 """
 

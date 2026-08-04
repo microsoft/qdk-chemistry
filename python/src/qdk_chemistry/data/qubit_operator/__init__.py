@@ -27,11 +27,8 @@ if TYPE_CHECKING:
     from qdk_chemistry.data.term_partition import TermPartition
 
 __all__ = [
-    "PauliLCUContainer",
     "QubitHamiltonian",
     "QubitOperator",
-    "QubitOperatorContainer",
-    "SOSSAContainer",
 ]
 
 

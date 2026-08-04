@@ -81,8 +81,8 @@ def create_qsharp_context(
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
         :data:`DEFAULT_TARGET_PROFILE`. ``TargetProfile.Base`` cannot load the full
         vendored project, since parts of it branch on measurement results; a Base context
-        therefore loads only the Base-legal subset (:data:`_BASE_PROFILE_FILES`), which is
-        what the Qiskit interop path needs to obtain measurement-free circuits.
+        therefore loads only the Base-legal subset, which is what the Qiskit interop path
+        needs to obtain measurement-free circuits.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via

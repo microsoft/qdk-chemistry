@@ -117,12 +117,10 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
-from qdk_chemistry.data.qubit_operator import PauliLCUContainer, QubitHamiltonian, QubitOperator
-from qdk_chemistry.data.qubit_operator.containers import (
-    QubitOperatorContainer,
-    RotatedPaulis,
-    SOSSAContainer,
-)
+from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian

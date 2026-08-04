@@ -169,6 +169,11 @@ suppress_warnings = [
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
     "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
+    # Public classes are deliberately re-exported from ``qdk_chemistry.data`` as well as
+    # defined in their own module, so a short cross-reference such as ``QubitOperator``
+    # legitimately matches more than one documented target. Sphinx still links the first
+    # match, which is the intended one.
+    "ref.python",
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [

@@ -23,19 +23,21 @@ class AliasSamplingStatePreparation(StatePreparation):
 
     The algorithm implements section III.D. of :cite:`Babbush2018`, to
     prepares an arbitrary probability distribution over L terms using:
-      - :math:`\lceil\log_2 L\rceil` index qubits
-      - :math:`\mu` comparison (uniform) qubits
-      - 1 flag qubit
-      - :math:`\mu + \lceil\log_2 L\rceil` QROM output qubits
+
+    - :math:`\lceil\log_2 L\rceil` index qubits
+    - :math:`\mu` comparison (uniform) qubits
+    - 1 flag qubit
+    - :math:`\mu + \lceil\log_2 L\rceil` QROM output qubits
 
     Total ancilla: :math:`2\lceil\log_2 L\rceil + 2\mu + 1` qubits.
 
     The circuit proceeds:
-      1. PrepareUniformSuperposition over L terms
-      2. H⊗μ on comparison register
-      3. QROM load of (keep_l, alt_l) alias table
-      4. Comparison: flag = (sigma >= keep_l)
-      5. Conditional swap: if flag, index <-> alt_l
+
+    1. PrepareUniformSuperposition over L terms
+    2. H⊗μ on comparison register
+    3. QROM load of (keep_l, alt_l) alias table
+    4. Comparison: flag = (sigma >= keep_l)
+    5. Conditional swap: if flag, index <-> alt_l
 
     The Toffoli cost scales as O(L) for the QROM, independent of precision μ.
 

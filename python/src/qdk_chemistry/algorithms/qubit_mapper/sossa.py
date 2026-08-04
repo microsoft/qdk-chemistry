@@ -10,8 +10,10 @@ import numpy as np
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
-from qdk_chemistry.data.qubit_operator.containers import RotatedPaulis, SOSSAContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
 from qdk_chemistry.utils import Logger
+
+__all__ = ["SOSSAQubitMapper"]
 
 
 class SOSSAQubitMapper(QubitMapper):
