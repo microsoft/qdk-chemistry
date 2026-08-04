@@ -59,10 +59,7 @@ After preparing the reference over :math:`P` and the Hamiltonian over
    downfolder = algorithms.create(
        "effective_hamiltonian_constructor", "qdk_swpt2"
    )
-   result = downfolder.run(reference, window_hamiltonian)
-
-   effective_hamiltonian = result.hamiltonian
-   diagnostics = result.diagnostics
+  effective_hamiltonian = downfolder.run(reference, window_hamiltonian)
 
 The returned Hamiltonian uses the reference active-space indexing and can be
 passed to an active-space solver. The original inputs are not modified.
@@ -117,15 +114,16 @@ For example, select shifted denominators before the first run:
 
 Settings lock when ``run`` begins.
 
-Diagnostics
------------
+Diagnostic logging
+------------------
 
-The diagnostics report the selected regularizer and its parameters,
-``min_denominator``, ``max_raw_amplitude``, and whether a semicanonical
-rotation was applied. Small denominators and large raw amplitudes indicate
-sensitivity to intruder states. The default flow parameter is a policy default,
-not a universal accuracy guarantee; inspect these diagnostics and compare
-regularization choices for the system being studied.
+The constructor logs the selected regularizer, minimum denominator, maximum raw
+amplitude, and whether a semicanonical rotation was applied. Small denominators
+and large raw amplitudes indicate sensitivity to intruder states; amplitudes
+above ``intruder_warn_amplitude`` also produce a warning. The default flow
+parameter is a policy default, not a universal accuracy guarantee. Compare
+regularization choices for the system being studied when the logged values
+indicate sensitivity.
 
 Approximations and scaling
 --------------------------

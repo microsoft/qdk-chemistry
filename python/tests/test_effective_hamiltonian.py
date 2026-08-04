@@ -12,10 +12,9 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     EffectiveHamiltonianConstructor,
     QdkSchriefferWolffPT2Constructor,
-    SchriefferWolffPT2Diagnostics,
 )
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Orbitals, Structure
+from qdk_chemistry.data import Hamiltonian, Orbitals, Structure
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 
 _TYPE = "effective_hamiltonian_constructor"
@@ -110,15 +109,5 @@ class TestEffectiveHamiltonianConstructor:
 
         h_window = algorithms.create("hamiltonian_constructor").run(with_active_space(orbitals, window, core))
         downfolder = algorithms.create(_TYPE, "swpt2")
-        result = downfolder.run(reference, h_window)  # must not raise
-        h_eff = result.hamiltonian
-        assert h_eff is not None
-        diagnostics = result.diagnostics
-        assert isinstance(diagnostics, SchriefferWolffPT2Diagnostics)
-        assert diagnostics.method == "swpt2"
-        assert diagnostics.regularizer == "flow"
-        assert diagnostics.denominator_floor == pytest.approx(1e-8)
-        assert diagnostics.denominator_shift == pytest.approx(0.0)
-        assert diagnostics.flow_parameter == pytest.approx(1.0)
-        assert diagnostics.min_denominator > 0.0
-        assert diagnostics.max_raw_amplitude > 0.0
+        h_eff = downfolder.run(reference, h_window)  # must not raise
+        assert isinstance(h_eff, Hamiltonian)

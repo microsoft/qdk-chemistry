@@ -9,37 +9,8 @@
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
-#include <utility>
 
 namespace qdk::chemistry::algorithms {
-
-/** @brief Method-specific diagnostics attached to one effective Hamiltonian. */
-class EffectiveHamiltonianDiagnostics {
- public:
-  virtual ~EffectiveHamiltonianDiagnostics() = default;
-  virtual std::string method() const = 0;
-};
-
-/** @brief Effective Hamiltonian and diagnostics produced by one run. */
-class EffectiveHamiltonianResult {
- public:
-  EffectiveHamiltonianResult(
-      std::shared_ptr<data::Hamiltonian> hamiltonian,
-      std::shared_ptr<EffectiveHamiltonianDiagnostics> diagnostics)
-      : hamiltonian_(std::move(hamiltonian)),
-        diagnostics_(std::move(diagnostics)) {}
-
-  const std::shared_ptr<data::Hamiltonian>& hamiltonian() const {
-    return hamiltonian_;
-  }
-  const std::shared_ptr<EffectiveHamiltonianDiagnostics>& diagnostics() const {
-    return diagnostics_;
-  }
-
- private:
-  std::shared_ptr<data::Hamiltonian> hamiltonian_;
-  std::shared_ptr<EffectiveHamiltonianDiagnostics> diagnostics_;
-};
 
 /**
  * @class EffectiveHamiltonianConstructor
@@ -61,7 +32,7 @@ class EffectiveHamiltonianResult {
  */
 class EffectiveHamiltonianConstructor
     : public Algorithm<EffectiveHamiltonianConstructor,
-                       EffectiveHamiltonianResult,
+                       std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Wavefunction>,
                        std::shared_ptr<data::Hamiltonian>> {
  public:
@@ -89,9 +60,9 @@ class EffectiveHamiltonianConstructor
    * @param reference Reference wavefunction; its active space is the kept
    *        subspace P and its occupations define the reference.
    * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
-   * @return The effective Hamiltonian acting on P and construction diagnostics.
+   * @return The effective Hamiltonian acting on P.
    */
-  virtual EffectiveHamiltonianResult _run_impl(
+  virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
       std::shared_ptr<data::Hamiltonian> hamiltonian) const = 0;
 };

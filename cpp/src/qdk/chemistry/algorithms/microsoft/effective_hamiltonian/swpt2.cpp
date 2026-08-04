@@ -62,7 +62,7 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
 }
 
-EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
+std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     std::shared_ptr<data::Wavefunction> reference,
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   if (!reference || !hamiltonian)
@@ -298,6 +298,11 @@ EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
   if (!std::isfinite(warn_amp))
     throw std::invalid_argument(
         "SchriefferWolffPT2: intruder_warn_amplitude must be finite.");
+  QDK_LOGGER().info(
+      "SW-PT2 downfold complete: regularizer='{}', minimum denominator={:.3g} "
+      "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}",
+      regularizer, down.min_denominator, down.max_amplitude,
+      semicanonical_rotation_applied);
   if (warn_amp > 0.0 && down.max_amplitude > warn_amp) {
     if (regularizer == "bare")
       QDK_LOGGER().warn(
@@ -332,16 +337,10 @@ EffectiveHamiltonianResult SchriefferWolffPT2Constructor::_run_impl(
 
   // --- emit over P, reusing the reference orbitals (active_indices == P) ---
   const Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-  auto effective_hamiltonian = std::make_shared<data::Hamiltonian>(
+  return std::make_shared<data::Hamiltonian>(
       std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
           active.one_body, active.two_body, ref_orbitals, active.core_energy,
           empty_fock));
-  auto diagnostics = std::make_shared<SchriefferWolffPT2Diagnostics>(
-      regularizer, reg.denom_floor,
-      regularizer == "shift" ? reg.denom_shift : 0.0,
-      regularizer == "flow" ? reg.denom_flow : 0.0, down.min_denominator,
-      down.max_amplitude, semicanonical_rotation_applied);
-  return {std::move(effective_hamiltonian), std::move(diagnostics)};
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

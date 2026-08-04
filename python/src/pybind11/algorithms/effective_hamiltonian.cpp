@@ -37,10 +37,10 @@ class EffectiveHamiltonianConstructorBase
   }
 
  protected:
-  EffectiveHamiltonianResult _run_impl(
+  std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction> reference,
       std::shared_ptr<Hamiltonian> hamiltonian) const override {
-    PYBIND11_OVERRIDE_PURE(EffectiveHamiltonianResult,
+    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
                            EffectiveHamiltonianConstructor, _run_impl,
                            reference, hamiltonian);
   }
@@ -49,49 +49,6 @@ class EffectiveHamiltonianConstructorBase
 void bind_effective_hamiltonian_constructor(py::module &m) {
   // Default implementations are registered lazily by the AlgorithmFactory base
   // class on first registry access, so no explicit registration is needed here.
-
-  py::class_<EffectiveHamiltonianDiagnostics,
-             std::shared_ptr<EffectiveHamiltonianDiagnostics>>(
-      m, "EffectiveHamiltonianDiagnostics", R"(
-  Base class for diagnostics attached to an effective-Hamiltonian result.
-  )")
-      .def_property_readonly("method",
-                             &EffectiveHamiltonianDiagnostics::method);
-
-  py::class_<EffectiveHamiltonianResult>(m, "EffectiveHamiltonianResult", R"(
-  Effective Hamiltonian and diagnostics produced by one downfolding run.
-  )")
-      .def_property_readonly("hamiltonian",
-                             &EffectiveHamiltonianResult::hamiltonian)
-      .def_property_readonly("diagnostics",
-                             &EffectiveHamiltonianResult::diagnostics);
-
-  py::class_<microsoft::SchriefferWolffPT2Diagnostics,
-             EffectiveHamiltonianDiagnostics,
-             std::shared_ptr<microsoft::SchriefferWolffPT2Diagnostics>>(
-      m, "SchriefferWolffPT2Diagnostics", R"(
-  Diagnostics and method metadata for one SW-PT2 downfolding run.
-  )")
-      .def_property_readonly(
-          "regularizer", &microsoft::SchriefferWolffPT2Diagnostics::regularizer)
-      .def_property_readonly(
-          "denominator_floor",
-          &microsoft::SchriefferWolffPT2Diagnostics::denominator_floor)
-      .def_property_readonly(
-          "denominator_shift",
-          &microsoft::SchriefferWolffPT2Diagnostics::denominator_shift)
-      .def_property_readonly(
-          "flow_parameter",
-          &microsoft::SchriefferWolffPT2Diagnostics::flow_parameter)
-      .def_property_readonly(
-          "min_denominator",
-          &microsoft::SchriefferWolffPT2Diagnostics::min_denominator)
-      .def_property_readonly(
-          "max_raw_amplitude",
-          &microsoft::SchriefferWolffPT2Diagnostics::max_raw_amplitude)
-      .def_property_readonly("semicanonical_rotation_applied",
-                             &microsoft::SchriefferWolffPT2Diagnostics::
-                                 semicanonical_rotation_applied);
 
   // EffectiveHamiltonianConstructor abstract base class
   py::class_<EffectiveHamiltonianConstructor,
@@ -115,8 +72,7 @@ constructor), otherwise the ``P<->Q`` couplings are already gone.
 Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
-    >>> result = downfolder.run(reference, window_hamiltonian)
-    >>> h_eff = result.hamiltonian
+    >>> h_eff = downfolder.run(reference, window_hamiltonian)
 )");
 
   eff_ham.def(py::init<>(), R"(
@@ -141,8 +97,7 @@ Args:
         the whole window ``W = P union Q``.
 
 Returns:
-  EffectiveHamiltonianResult: The effective Hamiltonian acting on ``P`` and
-    diagnostics from its construction.
+    qdk_chemistry.data.Hamiltonian: The effective Hamiltonian acting on ``P``.
 
 Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
@@ -229,8 +184,8 @@ reference basis. ROHF uses the spin-traced density and common spin-free
 orbital energies, preserving spin symmetry while the active solve selects the
 desired spin sector.
 
-The result includes raw intruder-amplitude, minimum-denominator, selected
-regularizer metadata, and whether a semicanonical rotation was applied. A
+The selected regularizer, minimum denominator, maximum raw intruder amplitude,
+and semicanonicalization status are logged when construction completes. A
 warning is also logged when the raw amplitude exceeds
 ``intruder_warn_amplitude``.
 
@@ -243,9 +198,7 @@ Typical usage:
     downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
     downfolder.settings().set("regularizer", "shift")
     downfolder.settings().set("denom_shift", 0.5)
-    result = downfolder.run(reference, window_hamiltonian)
-    h_eff = result.hamiltonian
-    print(result.diagnostics.max_raw_amplitude)
+    h_eff = downfolder.run(reference, window_hamiltonian)
 
 See Also:
     :class:`EffectiveHamiltonianConstructor`
