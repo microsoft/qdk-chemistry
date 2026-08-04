@@ -1,11 +1,9 @@
 """QDK/Chemistry amplitude amplification module.
 
-Amplitude amplification boosts the probability that a prepared state is found in
-a marked subspace.  The quantum primitives live in the Q# module
-``QDKChemistry.Utils.AmplitudeAmplification``; this package supplies the registry
-algorithm class :class:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification`
-that assembles them into a circuit.  The classical round-scheduling closed forms
-that decide how many amplification rounds to run are methods on that class.
+The quantum primitives live in the Q# module
+``QDKChemistry.Utils.AmplitudeAmplification``; the registry algorithm class
+:class:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification`
+assembles them into a circuit and carries the round-scheduling closed forms.
 
 """
 

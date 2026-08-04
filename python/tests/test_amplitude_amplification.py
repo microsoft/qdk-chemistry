@@ -29,7 +29,6 @@ import pytest
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification.base import AmplitudeAmplification
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import split_coherent_qpe_bitstring
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
@@ -212,7 +211,8 @@ _TOLERANCE = 0.04
 _HARNESS = """
 namespace QDKChemistryAmplitudeAmplificationTests {
     open QDKChemistry.Utils.AmplitudeAmplification;
-    open QDKChemistry.Utils.StandardPhaseEstimation;
+    import QDKChemistry.Utils.StandardPhaseEstimation.MakeStandardQPEOp;
+    import Std.Canon.*;
     import Std.Arithmetic.*;
     import Std.Arrays.*;
     import Std.Convert.*;
@@ -249,14 +249,36 @@ namespace QDKChemistryAmplitudeAmplificationTests {
         return MResetZ(register[0]);
     }
 
-    operation MarkPhaseIndex(numBits : Int, value : Int, accepted : Int[]) : Result {
-        use register = Qubit[numBits];
-        use flag = Qubit();
-        ApplyXorInPlace(value, register);
-        ApplyAcceptedPhaseMark(register, accepted, flag);
-        let outcome = MResetZ(flag);
-        ResetAll(register);
-        return outcome;
+    /// A marking oracle for QPE: the phase register holds an accepted index and
+    /// every signal ancilla is |0>. The library ships no oracle, so callers
+    /// supply their own; this is the one the QPE tests use.
+    operation MarkAcceptedPhase(
+        numPhaseQubits : Int,
+        signalAncillaIndices : Int[],
+        accepted : Int[],
+        register : Qubit[],
+        target : Qubit,
+    ) : Unit is Adj {
+        let phaseRegister = register[0..numPhaseQubits - 1];
+        let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
+        within {
+            ApplyToEachCA(X, signalAncillas);
+        } apply {
+            for index in accepted {
+                Controlled ApplyControlledOnInt(
+                    signalAncillas,
+                    (index, X, phaseRegister, target),
+                );
+            }
+        }
+    }
+
+    function MakeAcceptedPhaseMarkerOp(
+        numPhaseQubits : Int,
+        signalAncillaIndices : Int[],
+        accepted : Int[],
+    ) : (Qubit[], Qubit) => Unit is Adj {
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, accepted, _, _)
     }
 
     operation MarkQpeAcceptance(
@@ -269,11 +291,10 @@ namespace QDKChemistryAmplitudeAmplificationTests {
     ) : Result {
         use register = Qubit[numPhaseQubits + numAncillas];
         use flag = Qubit();
-        // The QPE phase register is little-endian: register[0] is the least
-        // significant bit, which is what ApplyXorInPlace assumes as well.
+        // The QPE phase register is little-endian, as ApplyXorInPlace assumes.
         ApplyXorInPlace(phaseValue, register[0..numPhaseQubits - 1]);
         ApplyXorInPlace(ancillaValue, register[numPhaseQubits...]);
-        ApplyAcceptanceMark(numPhaseQubits, signalAncillaIndices, accepted, register, flag);
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, accepted, register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return outcome;
@@ -308,7 +329,7 @@ namespace QDKChemistryAmplitudeAmplificationTests {
             3,
             1,
         );
-        let marker = MakeAcceptanceMarkerOp(3, signalAncillaIndices, [2]);
+        let marker = MakeAcceptedPhaseMarkerOp(3, signalAncillaIndices, [2]);
         use register = Qubit[4];
         ApplyAmplitudeAmplification(preparation, marker, rounds, register);
         let outcome = [MResetZ(register[0]), MResetZ(register[1]), MResetZ(register[2])];
@@ -375,34 +396,14 @@ def test_fixed_point_amplification_matches_the_chebyshev_closed_form(
     assert observed == pytest.approx(predicted, abs=_TOLERANCE)
 
 
-@pytest.mark.parametrize(
-    "accepted",
-    [[0, 1, 6, 7], [0, 1, 2], [5, 6, 7], [2, 3, 5], [4], list(range(8)), []],
-)
-def test_accepted_phase_mark_is_exact(qsharp_module, accepted: list[int]):
-    num_bits = 3
-    for value in range(1 << num_bits):
-        expression = f"{_NAMESPACE}.MarkPhaseIndex({num_bits}, {value}, {accepted})"
-        outcome = str(qsharp_module.run(expression, shots=1)[0])
-        assert (outcome == "One") == (value in accepted)
-
-
-def test_qpe_acceptance_requires_the_window_and_clean_signal_ancillas(qsharp_module):
+def test_marking_oracle_conjunction_holds(qsharp_module):
+    # The loop is only correct if the oracle flips exactly on the good subspace.
     accepted = [0, 1, 6, 7]
     for phase_value in range(8):
         for ancilla_value in range(4):
             expression = f"{_NAMESPACE}.MarkQpeAcceptance(3, {phase_value}, 2, {ancilla_value}, [0, 1], {accepted})"
             outcome = str(qsharp_module.run(expression, shots=1)[0])
             assert (outcome == "One") == (phase_value in accepted and ancilla_value == 0)
-
-
-def test_accepted_phase_interval_lengths_detect_wrapped_windows():
-    phase_estimation = QSHARP_UTILS.StandardPhaseEstimation
-    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [0, 1, 6, 7])) == (True, 2, 2)
-    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [0, 1, 2])) == (True, 3, 0)
-    assert tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [5, 6, 7])) == (True, 0, 3)
-    is_wrapped, _, _ = tuple(phase_estimation.AcceptedPhaseIntervalLengths(3, [2, 3, 5]))
-    assert is_wrapped is False
 
 
 def test_rotation_angle_agrees_with_the_qsharp_convention():
@@ -497,6 +498,7 @@ def _qpe_preparation(
 
 
 def _amplified_qpe_circuit(
+    qsharp_module,
     qubit_hamiltonian: QubitOperator,
     state_preparation: Circuit,
     accepted_indices: list[int],
@@ -514,7 +516,7 @@ def _amplified_qpe_circuit(
         mapper=mapper,
         unitary=unitary,
     )
-    marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(
+    marker = getattr(qsharp_module.code, _NAMESPACE).MakeAcceptedPhaseMarkerOp(
         num_bits, signal_ancilla_indices, accepted_indices
     )
     # The executor reverses the Q# results, so emitting the ancillas reversed and
@@ -529,17 +531,16 @@ def _amplified_qpe_circuit(
 
 
 def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_indices: list[int], shots: int = 400) -> str:
-    """Execute a circuit and pick the most common bitstring from the good subspace.
+    """Execute a circuit and return the most common bitstring from the good subspace.
 
-    Acceptance is the QPE-side counterpart of the marking oracle, and is decided
-    here rather than inside amplitude amplification: a shot counts when its phase
-    index is in the window *and* every block-encoding signal ancilla measured zero.
+    Acceptance mirrors the marking oracle and is decided by the caller, not by
+    amplitude amplification.
 
     """
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
     counts: dict[str, int] = {}
     for bitstring, count in executor.run(circuit, shots=shots).bitstring_counts.items():
-        phase_bits, ancilla_bits = split_coherent_qpe_bitstring(bitstring, num_bits)
+        phase_bits, ancilla_bits = bitstring[:num_bits], bitstring[num_bits:]
         if any(bit != "0" for bit in ancilla_bits) or int(phase_bits, 2) not in accepted_indices:
             continue
         counts[phase_bits] = counts.get(phase_bits, 0) + count
@@ -572,13 +573,6 @@ def test_deriving_rounds_requires_a_lower_bound():
     algorithm = create("amplitude_amplification")
     with pytest.raises(ValueError, match="min_overlap"):
         algorithm.resolve_rounds()
-
-
-def test_coherent_qpe_bit_order_round_trips():
-    assert split_coherent_qpe_bitstring("101101", 4) == ("1011", "01")
-    assert split_coherent_qpe_bitstring("1011", 4) == ("1011", "")
-    with pytest.raises(ValueError, match="phase register"):
-        split_coherent_qpe_bitstring("101", 4)
 
 
 def test_iterative_circuit_builder_has_no_measurement_setting():
@@ -693,9 +687,10 @@ def test_register_bounds_are_validated():
 
 
 @pytest.mark.parametrize("rounds", [0, 1, 2])
-def test_amplification_does_not_change_the_energy(rounds: int):
+def test_amplification_does_not_change_the_energy(qsharp_module, rounds: int):
     accepted = [0]
     circuit = _amplified_qpe_circuit(
+        qsharp_module,
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 0),
         accepted,
@@ -705,11 +700,12 @@ def test_amplification_does_not_change_the_energy(rounds: int):
     assert _dominant_accepted_phase(circuit, 4, accepted) == "0000"
 
 
-def test_energy_window_selects_the_right_phase_bin():
+def test_energy_window_selects_the_right_phase_bin(qsharp_module):
     # The |11> eigenvector has energy -lambda, which the qubitization walk maps
     # to the phase bin 1/2 -- index 8 of 16, big-endian 0b1000.
     accepted = [8]
     circuit = _amplified_qpe_circuit(
+        qsharp_module,
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 3),
         accepted,
@@ -718,9 +714,10 @@ def test_energy_window_selects_the_right_phase_bin():
     assert _dominant_accepted_phase(circuit, 4, accepted) == "1000"
 
 
-def test_fixed_point_schedule_runs_end_to_end():
+def test_fixed_point_schedule_runs_end_to_end(qsharp_module):
     accepted = [0]
     circuit = _amplified_qpe_circuit(
+        qsharp_module,
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 0),
         accepted,
@@ -730,11 +727,12 @@ def test_fixed_point_schedule_runs_end_to_end():
     assert _dominant_accepted_phase(circuit, 4, accepted) == "0000"
 
 
-def test_trotter_encoding_is_supported():
+def test_trotter_encoding_is_supported(qsharp_module):
     # The pauli-sequence mapper has no block-encoding ancillas, so the accepted
     # window is defined purely on the phase register.
     accepted = [4]
     circuit = _amplified_qpe_circuit(
+        qsharp_module,
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 3),
         accepted,

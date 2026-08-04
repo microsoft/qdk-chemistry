@@ -94,10 +94,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         controlled-U^(2^k) for each ancilla and finishing with the inverse QFT.
 
         The circuit body is always the measurement-free, adjointable QPE
-        operation, exposed as the returned circuit's Q# operation so that
-        reflection-based algorithms such as amplitude amplification can use it as
-        their state preparation. The ``measurement`` setting only decides what the
-        circuit reads out at the end.
+        operation, exposed as the returned circuit's Q# operation; ``measurement``
+        only decides what is read out.
 
         Args:
             state_preparation: The circuit that prepares the initial state.

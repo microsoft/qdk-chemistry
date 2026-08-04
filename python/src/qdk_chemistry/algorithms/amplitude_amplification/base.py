@@ -1,24 +1,13 @@
 r"""QDK/Chemistry amplitude amplification.
 
-Amplitude amplification boosts the probability that a prepared state is found in
-a *good* subspace.  It is built from two independent halves:
+Builds the amplified circuit :math:`Q^k U_\psi` from a measurement-free,
+adjointable preparation and a marking oracle.  Execution and the accept/reject
+decision belong to the caller.
 
-* a **preparation** :math:`U_\psi` -- any measurement-free, adjointable circuit,
-  and
-* a **marking oracle** -- any adjointable predicate flipping a target qubit on
-  the good subspace.
-
-This algorithm knows nothing about either half beyond those two contracts, and
-nothing about execution: it builds the amplified circuit and stops.  Running it
-and deciding which shots landed in the good subspace belong to the caller.
-
-The reflection about the prepared state is realised as
-:math:`U_\psi S_0 U_\psi^\dagger`, since :math:`|0\cdots0\rangle` is the only
-state the hardware recognises in a single gate.  Every round therefore costs one
-:math:`U_\psi` and one :math:`U_\psi^\dagger`, so a ``k``-round circuit contains
-:math:`2k+1` preparations -- the same :math:`2k+1` that appears in the acceptance
-probability :math:`\sin^2((2k+1)\vartheta)`, and what turns an :math:`O(1/a)`
-repeat-until-success loop into :math:`O(1/\sqrt{a})`.
+The state reflection is :math:`U_\psi S_0 U_\psi^\dagger`, since
+:math:`|0\cdots0\rangle` is the only state hardware recognises cheaply, so a
+``k``-round circuit contains :math:`2k+1` preparations -- the same :math:`2k+1`
+in :math:`\sin^2((2k+1)\vartheta)`.
 
 References:
     L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,
@@ -51,28 +40,13 @@ __all__: list[str] = [
 class AmplitudeAmplificationSettings(Settings):
     r"""Settings for amplitude amplification.
 
-    The round-count settings answer the central practical question: how many
-    rounds can be run when the overlap of the guiding state is only known
-    approximately?
+    Plain amplification rotates by :math:`(2k+1)\vartheta`, so acceptance falls
+    back to zero once the rotation passes :math:`\pi/2`, and that overshoot is
+    indistinguishable from a small overlap in the counts.  The round count is
+    therefore derived from the Yoder-Low-Chuang fixed-point schedule, which
+    needs only a **lower** bound on the overlap and cannot overshoot.
 
-    Plain amplitude amplification rotates by :math:`(2k+1)\vartheta` with
-    :math:`\vartheta = \arcsin\sqrt{a}`, so its acceptance probability
-    :math:`\sin^2((2k+1)\vartheta)` *falls back to zero* once the rotation runs
-    past :math:`\pi/2`.  Guessing ``k`` from an uncertain overlap therefore
-    risks overshooting, and an overshoot is indistinguishable from a small
-    overlap in the measured counts -- it fails silently.
-
-    The round count is consequently derived from the Yoder-Low-Chuang
-    fixed-point schedule, which replaces that sinusoid by a Chebyshev plateau:
-    acceptance climbs monotonically and then stays above
-    :math:`1 - \text{tolerance}^2` for *every* overlap at or above
-    ``min_overlap``.  Only a **lower** bound is required, which is the bound a
-    classical overlap estimate actually provides, and no overshoot is possible.
-    The guarantee costs roughly twice the queries of a perfectly-tuned plain
-    schedule.
-
-    Set ``rounds`` explicitly to bypass the schedule and run that many plain
-    Grover iterates instead.
+    Set ``rounds`` explicitly to run that many plain Grover iterates instead.
 
     """
 
@@ -102,22 +76,15 @@ class AmplitudeAmplificationSettings(Settings):
 class AmplitudeAmplification(Algorithm):
     r"""Build an amplitude-amplified circuit around a coherent preparation.
 
-    ``run`` takes the preparation :math:`U_\psi` to reflect about and a marking
-    oracle defining the good subspace, and returns the amplified circuit. It
-    neither executes that circuit nor interprets its shots.
-
     Example:
         >>> from qdk_chemistry.algorithms import create  # doctest: +SKIP
-        >>> from qdk_chemistry.utils.qsharp import QSHARP_UTILS  # doctest: +SKIP
         >>> qpe = create("qpe_circuit_builder", "qdk_standard")  # doctest: +SKIP
         >>> qpe.settings().update("num_bits", 8)  # doctest: +SKIP
         >>> qpe.settings().update("measurement", "none")  # doctest: +SKIP
         >>> preparation = qpe.run(  # doctest: +SKIP
         ...     state_preparation=guiding_state, qubit_hamiltonian=hamiltonian
         ... )[0]
-        >>> marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(
-        ...     8, [], [17, 18, 19]
-        ... )  # doctest: +SKIP
+        >>> marker = my_qsharp_module.MakeMarkerOp(8, [17, 18, 19])  # doctest: +SKIP
         >>> aa = create("amplitude_amplification")  # doctest: +SKIP
         >>> aa.settings().update("min_overlap", 0.05)  # doctest: +SKIP
         >>> circuit = aa.run(preparation, marker, num_qubits=12)  # doctest: +SKIP
@@ -148,14 +115,12 @@ class AmplitudeAmplification(Algorithm):
         r"""Wrap a coherent preparation in the amplification loop.
 
         Args:
-            preparation: A measurement-free circuit carrying an adjointable Q#
-                operation; the loop reflects about the state it prepares.
-            marking_oracle: An adjointable Q# operation of signature
-                ``(Qubit[], Qubit) => Unit is Adj`` that flips its target on the
-                good subspace and leaves the register otherwise unchanged.
+            preparation: A measurement-free circuit carrying an adjointable Q# operation.
+            marking_oracle: An adjointable ``(Qubit[], Qubit) => Unit is Adj`` that
+                flips its target on the good subspace, leaving the register unchanged.
             num_qubits: Size of the register both callables act on.
-            measured_indices: Register indices to measure, in the order they
-                should appear in each shot. Defaults to the whole register.
+            measured_indices: Register indices to measure, in output order.
+                Defaults to the whole register.
 
         Returns:
             The amplified circuit, containing :math:`2k+1` preparations.
@@ -204,10 +169,8 @@ class AmplitudeAmplification(Algorithm):
     def resolve_rounds(self) -> int:
         """Resolve the number of amplification rounds from the settings.
 
-        An explicit non-negative ``rounds`` always wins and selects that many
-        plain Grover iterates. Otherwise the count is derived from the
-        Yoder-Low-Chuang fixed-point schedule, which needs only ``min_overlap``
-        and ``tolerance`` and cannot overshoot.
+        An explicit non-negative ``rounds`` wins; otherwise the count comes from
+        the fixed-point schedule.
 
         Returns:
             The number of amplification rounds to run.
@@ -278,11 +241,6 @@ class AmplitudeAmplification(Algorithm):
     def success_probability(cls, overlap: float, rounds: int) -> float:
         r"""Return the acceptance probability :math:`\sin^2((2k+1)\vartheta)`.
 
-        After ``k`` rounds the prepared state has rotated by :math:`(2k+1)\vartheta`
-        inside the two-dimensional invariant subspace, so the probability of
-        landing in the good subspace is :math:`\sin^2((2k+1)\vartheta)` with
-        :math:`\vartheta = \arcsin\sqrt{a}`.
-
         Args:
             overlap: The squared overlap of the prepared state with the good subspace.
             rounds: The number of amplification rounds ``k``.
@@ -299,11 +257,9 @@ class AmplitudeAmplification(Algorithm):
     def fixed_point_rounds(cls, min_overlap: float, tolerance: float) -> int:
         r"""Return the iterate count for fixed-point amplification.
 
-        The Yoder-Low-Chuang schedule reaches acceptance probability at least
-        :math:`1 - \delta^2` for *every* overlap at or above ``min_overlap`` once
-        the number of queries satisfies
-        :math:`L \ge \log(2/\delta)/\sqrt{a_{\min}}`. This returns the smallest
-        ``l`` with ``L = 2l + 1`` meeting that bound.
+        The schedule reaches acceptance :math:`\ge 1 - \delta^2` for every overlap
+        at or above ``min_overlap`` once :math:`L \ge \log(2/\delta)/\sqrt{a_{\min}}`.
+        Returns the smallest ``l`` with ``L = 2l + 1`` meeting that bound.
 
         Args:
             min_overlap: Lower bound on the squared overlap.
@@ -341,17 +297,9 @@ class AmplitudeAmplification(Algorithm):
             \beta_j = 2\operatorname{arccot}\!\big(\tan(2\pi j/L)\sqrt{1-\gamma^2}\big),
             \qquad j = 1,\dots,l ,
 
-        and the mark phases are the same list reversed,
-        :math:`\alpha_j = \beta_{l+1-j}`. Both reflections are taken in the
-        ``I - (1 - e^{i\varphi}) P`` convention used by the Q# implementation, with
-        the mark applied before the state reflection, which is why no sign flip
-        appears between the two sequences.
-
-        The resulting acceptance probability climbs monotonically up to
-        :math:`a = 1 - T_{1/L}(1/\delta)^{-2}` and from there stays inside
-        :math:`[1-\delta^2, 1]` for every larger overlap -- a plateau, not a global
-        maximum. There is no first maximum to run past, so overshoot is impossible
-        above the design threshold.
+        and the mark phases are the same list reversed. Both reflections use the
+        ``I - (1 - e^{i\varphi}) P`` convention of the Q# implementation, with the
+        mark applied first, so no sign flip appears between the sequences.
 
         Args:
             rounds: The number of iterates ``l``; ``2 * l + 1`` queries are used.

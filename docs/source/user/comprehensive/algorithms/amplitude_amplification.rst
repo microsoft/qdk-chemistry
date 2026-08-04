@@ -1,45 +1,75 @@
 Amplitude amplification
 =======================
 
-Amplitude amplification boosts the probability that a computation lands in a designated "good" subspace.
-Its main use in QDK/Chemistry is to rescue a :doc:`phase estimation <phase_estimation>` run whose guiding state has poor overlap :math:`a` with the target eigenstate: instead of repeating the whole QPE circuit :math:`O(1/a)` times, amplification succeeds after :math:`O(1/\sqrt{a})` repetitions of a marked QPE circuit, at a cost of :math:`2k+1` coherent preparations per attempt.
+Amplitude amplification boosts the probability that a prepared state is found in a marked subspace.
+Given a guiding state with overlap :math:`a` on the target eigenstate, it succeeds after :math:`O(1/\sqrt{a})` repetitions instead of :math:`O(1/a)`.
 
-The algorithm is a **circuit transform**, not a solver. It takes a measurement-free preparation :math:`U` and a marking oracle, and returns the amplified circuit :math:`Q^k U`; executing it and deciding which shots are good are the caller's job. That keeps it independent of phase estimation — any adjointable preparation works.
+``run`` takes a measurement-free preparation :math:`U_\psi` and a marking oracle, and returns the amplified circuit :math:`Q^k U_\psi`:
 
 .. math::
 
-   Q = -\,U S_0 U^\dagger \, S_G
+   Q = -\,U_\psi S_0 U_\psi^\dagger \, S_G
 
-The state reflection is :math:`I - 2|\psi\rangle\langle\psi| = U S_0 U^\dagger`, because :math:`|0\cdots 0\rangle` is the only state hardware can cheaply recognise. That is why :math:`U` is re-run every round and why :math:`Q^k U` contains :math:`2k+1` preparations — nothing cancels, since :math:`S_G` sits between :math:`U^\dagger` and :math:`U`. It also forces the preparation to be exactly invertible: no mid-circuit measurement, no garbage ancillas.
+Executing that circuit and deciding which shots are good are the caller's job.
+
+Because :math:`|0\cdots0\rangle` is the only state hardware recognises cheaply, the state reflection is built as :math:`U_\psi S_0 U_\psi^\dagger`.
+Every round therefore costs one :math:`U_\psi` and one :math:`U_\psi^\dagger`, and :math:`Q^k U_\psi` contains :math:`2k+1` preparations; nothing cancels, since :math:`S_G` sits between them.
+The preparation must be exactly invertible: no mid-circuit measurement, no garbage ancillas.
 
 Choosing the number of rounds
 -----------------------------
 
-Writing the prepared state as :math:`\sin\theta\,|G\rangle + \cos\theta\,|B\rangle` with :math:`\theta = \arcsin\sqrt{a}`, the acceptance probability after :math:`k` rounds is
+With :math:`\theta = \arcsin\sqrt{a}`, the acceptance probability after :math:`k` rounds is
 
 .. math::
 
    p_k = \sin^2\!\big((2k+1)\theta\big).
 
-Because :math:`p_k` is periodic, more rounds are not always better: past the first maximum the acceptance falls again and vanishes at :math:`(2k+1)\theta = \pi`. This is *overshoot*, the regime a chemistry guiding state lives in — small overlap, known only to within an order of magnitude.
+More rounds are not always better: past the first maximum acceptance falls again, vanishing at :math:`(2k+1)\theta = \pi`.
+Overshoot fails silently: low acceptance looks exactly like small overlap.
+Avoiding it needs an *upper* bound on :math:`a`, which a classical overlap estimate does not give.
 
-**Overshoot is controlled by an upper bound on the overlap, not a lower one:** underestimating :math:`a` makes :math:`\theta` too small, the round count too large, and the rotation overshoots. Worse, the failure is silent — low acceptance looks exactly like small overlap.
+The round count is therefore taken from the Yoder-Low-Chuang **fixed-point** schedule (:meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.fixed_point_rounds`), which needs only the ``min_overlap`` *lower* bound plus a ``tolerance`` :math:`\delta`.
+Its phase sequence replaces the sinusoid with a plateau: acceptance stays :math:`\ge 1-\delta^2` for every overlap above the threshold, so a conservative bound costs queries but cannot destroy the signal, at roughly a 2x overhead.
 
-QDK/Chemistry therefore derives :math:`k` from the Yoder-Low-Chuang **fixed-point** schedule (:meth:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification.fixed_point_rounds`), which needs only the ``min_overlap`` *lower* bound you actually have from a classical estimate, plus a ``tolerance`` :math:`\delta`. Its phase sequence replaces the sinusoid with a plateau: acceptance is :math:`\ge 1-\delta^2` for every overlap above the threshold and never falls back, so a conservative bound costs queries but cannot destroy the signal. The guarantee is worth roughly a 2x query overhead against an oracle that knows :math:`a` exactly.
+Setting ``rounds`` to a non-negative value runs that many plain Grover iterates instead.
 
-Setting ``rounds`` to a non-negative value overrides the schedule and runs that many plain Grover iterates instead — the textbook loop, overshoot and all.
+Marking oracle
+--------------
+
+The oracle is any adjointable Q# operation ``(Qubit[], Qubit) => Unit is Adj`` that flips its target on the good subspace and leaves the register otherwise unchanged.
+None ships with the library, since what counts as good is application-specific.
+
+For QPE the predicate is "the phase register holds an accepted index *and* every block-encoding signal ancilla is :math:`|0\rangle`".
+Both halves matter: a nonzero signal ancilla means the block encoding did not project onto the signal block, so that branch's phase register carries no eigenvalue information.
+Conjugating the ancillas by ``X`` turns "all zero" into "all one", so the index test can simply run controlled on them:
+
+.. code-block:: text
+
+    operation MarkAcceptedPhase(
+        numPhaseQubits : Int, signalAncillaIndices : Int[], accepted : Int[],
+        register : Qubit[], target : Qubit,
+    ) : Unit is Adj {
+        let phaseRegister = register[0..numPhaseQubits - 1];
+        let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
+        within { ApplyToEachCA(X, signalAncillas); }
+        apply {
+            for index in accepted {
+                Controlled ApplyControlledOnInt(signalAncillas, (index, X, phaseRegister, target));
+            }
+        }
+    }
+
+The phase register is little-endian after the inverse QFT.
 
 Worked example
 --------------
-
-Build a measurement-free QPE circuit, ask it for the marking oracle that
-identifies its own good subspace, amplify, then execute:
 
 .. code-block:: python
 
     from qdk_chemistry.algorithms import create
     from qdk_chemistry.data import AlgorithmRef
-    from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+    from qdk_chemistry.utils.qsharp import get_qsharp_context
 
     num_bits, accepted = 4, [4]
 
@@ -50,8 +80,8 @@ identifies its own good subspace, amplify, then execute:
     builder.settings().update("measurement", "none")
     preparation = builder.run(state_preparation=prep, qubit_hamiltonian=ham)[0]
 
-    # Trotter has no block-encoding ancillas, so the good subspace is the phase window alone.
-    marker = QSHARP_UTILS.StandardPhaseEstimation.MakeAcceptanceMarkerOp(num_bits, [], accepted)
+    # MarkAcceptedPhase above, partially applied; Trotter has no block-encoding ancillas.
+    marker = get_qsharp_context().code.MyOracles.MakeAcceptedPhaseMarkerOp(num_bits, [], accepted)
 
     algorithm = create("amplitude_amplification")
     algorithm.settings().update("rounds", 1)
@@ -59,11 +89,8 @@ identifies its own good subspace, amplify, then execute:
 
     counts = create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=200).bitstring_counts
 
-Only the loop is generic here. The oracle, and the matching classical test for which
-shots landed in the good subspace, both belong to whatever defines that subspace --
-for phase estimation, see :ref:`qpe-acceptance`. Swapping the encoding is a matter
-of swapping the nested refs on the *builder*; amplitude amplification is unchanged,
-except that the block-encoding ancilla indices must then be passed to the marker.
+Acceptance is applied classically to ``counts``, mirroring the oracle.
+For a 0.3-overlap guiding state on :math:`H = (\pi/4)(ZI + IZ)` the dominant accepted bitstring is ``"0100"``.
 
 Settings
 --------
@@ -77,21 +104,20 @@ Settings
      - Description
    * - ``rounds``
      - ``int``
-     - Explicit number of plain Grover iterates. Negative (the default) derives a fixed-point schedule from ``min_overlap`` and ``tolerance`` instead.
+     - Explicit number of plain Grover iterates. Negative (the default) derives a fixed-point schedule instead.
    * - ``min_overlap``
      - ``double``
-     - Lower bound on the overlap :math:`a` of the prepared state with the good subspace. Required unless ``rounds`` is set explicitly.
+     - Lower bound on the overlap :math:`a`. Required unless ``rounds`` is set.
    * - ``tolerance``
      - ``double``
-     - Fixed-point tolerance :math:`\delta`; success is guaranteed to exceed :math:`1-\delta^2` (default 0.1).
+     - Fixed-point tolerance :math:`\delta`; success exceeds :math:`1-\delta^2` (default 0.1).
 
-``run`` takes the preparation circuit, the marking oracle, ``num_qubits``, and an optional ``measured_indices``
-(defaulting to the whole register, little-endian). The preparation must carry an adjointable Q# operation;
-iterative QPE cannot, and says so.
+``run(preparation, marking_oracle, num_qubits, measured_indices=None)`` defaults ``measured_indices`` to the whole register.
+The preparation must carry an adjointable Q# operation, which iterative QPE does not.
 
 .. warning::
-   Amplitude amplification changes how *often* the phase-estimation window is accepted; it does not change *what* is accepted.
-   It cannot repair a mis-specified energy window or the leakage caused by using too few phase bits — choose the window from the QPE resolution first, then amplify.
+   Amplification changes how *often* the window is accepted, not *what* is accepted.
+   It cannot repair a mis-specified window or too few phase bits: choose the window from the QPE resolution first, then amplify.
 
 References
 ----------

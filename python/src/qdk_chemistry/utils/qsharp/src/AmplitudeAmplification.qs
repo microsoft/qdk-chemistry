@@ -4,15 +4,8 @@
 
 /// Generic amplitude amplification.
 ///
-/// The module is deliberately factored into two swappable halves:
-///
-/// * a **reflection about the target**, which defines *what* is amplified, and
-/// * an **amplification loop**, which defines *how hard* it is amplified.
-///
-/// The target is supplied as a marking oracle that flips a flag qubit on the
-/// good subspace (`ReflectAboutMarkedSubspace`).  Nothing here knows what the
-/// oracle tests; whoever defines the good subspace also owns the classical
-/// decision of which shots landed in it.
+/// The good subspace is supplied as a marking oracle that flips a flag qubit;
+/// nothing here knows what the oracle tests.
 ///
 /// Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific
 /// Computation*, arXiv:2201.08309, Chapter 2.
@@ -29,20 +22,13 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     //
 
     /// # Summary
-    /// Applies the phase $e^{i\,\text{phase}}$ to the all-zeros basis state and
-    /// leaves every other basis state unchanged.
+    /// $I - (1 - e^{i\phi})|0\rangle\langle 0|$: phases the all-zeros state only.
     ///
-    /// $$
-    ///     I - (1 - e^{i\phi})|0\rangle\langle 0|
-    /// $$
-    ///
-    /// With `phase = PI()` this is $I - 2|0\rangle\langle 0|$, the partial-phase
-    /// generalization used by fixed-point amplitude amplification.
+    /// `phase = PI()` gives $I - 2|0\rangle\langle 0|$.
     operation ApplyPhaseToAllZeros(phase : Double, register : Qubit[]) : Unit is Adj + Ctl {
         let numQubits = Length(register);
         if numQubits == 0 {
-            // The all-zeros state spans the whole (trivial) space, so the phase
-            // is global and cannot be represented.
+            // Trivial space: the phase is global and cannot be represented.
         } else {
             within {
                 ApplyToEachCA(X, register);
@@ -57,12 +43,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Applies the phase $e^{i\,\text{phase}}$ to
+    /// $I - (1 - e^{i\phi})|\psi\rangle\langle\psi|$, with
     /// $|\psi\rangle = \text{statePrep}|0\rangle$.
-    ///
-    /// $$
-    ///     I - (1 - e^{i\phi})|\psi\rangle\langle\psi|
-    /// $$
     operation ApplyPhaseToPreparedState(
         statePrep : Qubit[] => Unit is Adj,
         phase : Double,
@@ -76,18 +58,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Reflection about a state given by a preparation unitary.
-    ///
-    /// $$
-    ///     2|\psi\rangle\langle\psi| - I,
-    ///     \qquad |\psi\rangle = \text{statePrep}|0\rangle
-    /// $$
-    ///
-    /// This is the reflection that appears inside the Grover iterate.
-    /// `Reflect` special-cases the degenerate sizes (global phase for $n = 0$, a
-    /// single `Z` for $n = 1$) and, when controlled, folds the outer controls
-    /// into the same multi-controlled `Z` rather than nesting `Controlled` on
-    /// top of it.
+    /// $2|\psi\rangle\langle\psi| - I$, with
+    /// $|\psi\rangle = \text{statePrep}|0\rangle$.
     operation ReflectAboutPreparedState(
         statePrep : Qubit[] => Unit is Adj,
         register : Qubit[],
@@ -100,11 +72,9 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Applies the phase $e^{i\,\text{phase}}$ to the subspace selected by a
-    /// marking oracle.
+    /// $I - (1 - e^{i\phi})\Pi_G$, phasing the marked subspace.
     ///
-    /// `markingOracle` must flip its target qubit exactly on the good subspace
-    /// and must leave the register otherwise unchanged, so that conjugating by it
+    /// `markingOracle` must leave the register unchanged, so conjugating by it
     /// uncomputes the flag.
     operation ApplyPhaseToMarkedSubspace(
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -120,14 +90,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// The general reflection unitary about a marked subspace.
-    ///
-    /// $$
-    ///     I - 2\Pi_G
-    /// $$
-    ///
-    /// where $\Pi_G$ projects onto the states on which `markingOracle` flips its
-    /// target.  This is the pluggable half of the amplification loop.
+    /// $I - 2\Pi_G$, where $\Pi_G$ projects onto the marked subspace.
     operation ReflectAboutMarkedSubspace(
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
         register : Qubit[],
@@ -145,20 +108,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     //
 
     /// # Summary
-    /// One Grover / amplitude-amplification iterate.
-    ///
-    /// $$
-    ///     Q = -\,S_\psi S_G,
-    ///     \qquad
-    ///     S_G = I - 2\Pi_G,
-    ///     \qquad
-    ///     S_\psi = I - 2|\psi\rangle\langle\psi|
-    /// $$
-    ///
-    /// Applied to $|\psi\rangle = \sin\vartheta\,|G\rangle +
-    /// \cos\vartheta\,|B\rangle$ this rotates by $2\vartheta$ inside the
-    /// two-dimensional invariant subspace, so `rounds` iterates give an
-    /// acceptance probability of $\sin^2((2r+1)\vartheta)$.
+    /// One Grover iterate $Q = -S_\psi S_G$, a rotation by $2\vartheta$ in the
+    /// invariant plane.
     operation AmplitudeAmplificationStep(
         statePrep : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -169,17 +120,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// The phase-matched (generalized) iterate used by fixed-point amplitude
-    /// amplification.
-    ///
-    /// $$
-    ///     G(\alpha,\beta)
-    ///     = \left(I - (1 - e^{i\beta})|\psi\rangle\langle\psi|\right)
-    ///       \left(I - (1 - e^{i\alpha})\Pi_G\right)
-    /// $$
-    ///
-    /// Setting $\alpha = \beta = \pi$ recovers `AmplitudeAmplificationStep` up to
-    /// a global phase of $-1$.
+    /// The phase-matched iterate $G(\alpha,\beta)$ used by fixed-point
+    /// amplification. $\alpha = \beta = \pi$ recovers the Grover iterate.
     operation GeneralizedAmplitudeAmplificationStep(
         statePrep : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -193,18 +135,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
 
     /// # Summary
     /// Prepares $|\psi\rangle$ and applies `rounds` Grover iterates in place.
-    ///
-    /// The caller owns `register`; this operation neither measures nor resets.
-    ///
-    /// # Input
-    /// ## statePrep
-    /// Preparation of the initial state on the whole register.
-    /// ## markingOracle
-    /// Flips its target qubit on the good subspace.
-    /// ## rounds
-    /// Number of iterates.  Choosing this from a *lower* bound on the overlap
-    /// overshoots the first maximum; see
-    /// `qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification`.
+    /// Neither measures nor resets.
     operation ApplyAmplitudeAmplification(
         statePrep : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -223,14 +154,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Prepares $|\psi\rangle$ and applies a phase-matched iterate sequence.
     ///
-    /// Supplying the Yoder–Low–Chuang phase sequence replaces the sinusoidal
-    /// acceptance probability by a Chebyshev plateau: it climbs monotonically and
-    /// then stays inside $[1-\delta^2, 1]$ for every larger overlap, so the
-    /// overshoot cliff disappears at the cost of a constant-factor increase in
-    /// queries.  The phases are generated by
-    /// `AmplitudeAmplification.fixed_point_phases`,
-    /// which returns them in exactly the `(markPhases, statePhases)` order and
-    /// reflection convention used here.
+    /// Phases come from `AmplitudeAmplification.fixed_point_phases`, in this
+    /// order and reflection convention.
     operation ApplyFixedPointAmplitudeAmplification(
         statePrep : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -256,25 +181,15 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     //
     // Circuit entry points
     //
-    // These are the operations handed to `Circuit`/`CircuitExecutor`.  They
-    // deliberately contain no measurement-dependent classical control flow, so
-    // they compile under the restricted target profiles used for QIR generation
-    // and resource estimation.  Which shots are good is decided classically by
-    // whoever defined the marking oracle.
+    // Handed to `Circuit`/`CircuitExecutor`. No measurement-dependent classical
+    // control flow, so they compile under the restricted target profiles.
 
     /// # Summary
     /// Builds and measures an amplitude-amplified circuit.
     ///
-    /// Fully generic: `preparation` is any adjointable state preparation and
-    /// `markingOracle` is any adjointable predicate on the good subspace.
-    ///
     /// # Input
     /// ## measuredIndices
-    /// Register indices to measure, in the order they should appear in the
-    /// returned array.
-    ///
-    /// # Output
-    /// One `Result` per entry of `measuredIndices`, in that order.
+    /// Register indices to measure, in output order.
     operation MakeAmplifiedCircuit(
         preparation : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -290,11 +205,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Builds and measures a fixed-point amplitude-amplified circuit.
-    ///
-    /// Identical to `MakeAmplifiedCircuit` except that the round count is
-    /// replaced by the Yoder–Low–Chuang phase sequence, which removes the
-    /// overshoot cliff entirely.
+    /// `MakeAmplifiedCircuit` with the round count replaced by a phase sequence.
     operation MakeFixedPointAmplifiedCircuit(
         preparation : Qubit[] => Unit is Adj,
         markingOracle : (Qubit[], Qubit) => Unit is Adj,
@@ -317,7 +228,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Measures the requested register indices in the requested order.
+    /// Measures the requested register indices, in order.
     operation MeasureSelected(register : Qubit[], measuredIndices : Int[]) : Result[] {
         mutable results = [Zero, size = Length(measuredIndices)];
         for index in 0..Length(measuredIndices) - 1 {
