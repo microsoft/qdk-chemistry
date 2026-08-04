@@ -23,7 +23,7 @@ Most users should start with the PyPI install.
 - Supported platforms:
   - Linux: x86_64, arm64
   - macOS: arm64 (Apple Silicon)
-  - Windows: x86_64 (native and via [WSL](https://learn.microsoft.com/windows/wsl/install)), arm64 ([WSL](https://learn.microsoft.com/windows/wsl/install))
+  - Windows: x86_64 and arm64 via [WSL](https://learn.microsoft.com/windows/wsl/install)
 
 ### Step 1: Create a virtual environment
 
