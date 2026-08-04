@@ -11,51 +11,62 @@
 /// Computation*, arXiv:2201.08309, Chapter 2.
 namespace QDKChemistry.Utils.AmplitudeAmplification {
 
+    import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
+    import Std.Arithmetic.*;
     import Std.Core.Length;
-    import Std.Intrinsic.R1;
     import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
+
+    /// # Summary
+    /// Flips `target` when the little-endian phase register equals any target index.
+    operation MarkPhaseIndices(
+        numPhaseQubits : Int,
+        targetIndices : Int[],
+        register : Qubit[],
+        target : Qubit,
+    ) : Unit is Adj {
+        let phaseRegister = register[0..numPhaseQubits - 1];
+        for targetIndex in targetIndices {
+            ApplyControlledOnInt(targetIndex, X, phaseRegister, target);
+        }
+    }
+
+    /// # Summary
+    /// Flips `target` when the little-endian phase-register value is at most `threshold`.
+    operation MarkPhaseAtOrBelow(
+        numPhaseQubits : Int,
+        threshold : Int,
+        register : Qubit[],
+        target : Qubit,
+    ) : Unit is Adj {
+        let phaseRegister = register[0..numPhaseQubits - 1];
+        use encodedThreshold = Qubit[numPhaseQubits];
+        within {
+            ApplyXorInPlace(threshold, encodedThreshold);
+        } apply {
+            ApplyIfGreaterLE(X, phaseRegister, encodedThreshold, target);
+            X(target);
+        }
+    }
+
+    function MakePhaseIndexMarkerOp(
+        numPhaseQubits : Int,
+        targetIndices : Int[],
+    ) : (Qubit[], Qubit) => Unit is Adj {
+        MarkPhaseIndices(numPhaseQubits, targetIndices, _, _)
+    }
+
+    function MakePhaseThresholdMarkerOp(
+        numPhaseQubits : Int,
+        threshold : Int,
+    ) : (Qubit[], Qubit) => Unit is Adj {
+        MarkPhaseAtOrBelow(numPhaseQubits, threshold, _, _)
+    }
 
     //
     // Elementary reflections
     //
-
-    /// # Summary
-    /// $I - (1 - e^{i\phi})|0\rangle\langle 0|$: phases the all-zeros state only.
-    ///
-    /// `phase = PI()` gives $I - 2|0\rangle\langle 0|$.
-    operation ApplyPhaseToAllZeros(phase : Double, register : Qubit[]) : Unit is Adj + Ctl {
-        let numQubits = Length(register);
-        if numQubits == 0 {
-            // Trivial space: the phase is global and cannot be represented.
-        } else {
-            within {
-                ApplyToEachCA(X, register);
-            } apply {
-                if numQubits == 1 {
-                    R1(phase, register[0]);
-                } else {
-                    Controlled R1(register[1...], (phase, register[0]));
-                }
-            }
-        }
-    }
-
-    /// # Summary
-    /// $I - (1 - e^{i\phi})|\psi\rangle\langle\psi|$, with
-    /// $|\psi\rangle = \text{statePrep}|0\rangle$.
-    operation ApplyPhaseToPreparedState(
-        statePrep : Qubit[] => Unit is Adj,
-        phase : Double,
-        register : Qubit[],
-    ) : Unit is Adj {
-        within {
-            Adjoint statePrep(register);
-        } apply {
-            ApplyPhaseToAllZeros(phase, register);
-        }
-    }
 
     /// # Summary
     /// $2|\psi\rangle\langle\psi| - I$, with
@@ -68,24 +79,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
             Adjoint statePrep(register);
         } apply {
             Reflect(register);
-        }
-    }
-
-    /// # Summary
-    /// $I - (1 - e^{i\phi})\Pi_G$, phasing the marked subspace.
-    ///
-    /// `markingOracle` must leave the register unchanged, so conjugating by it
-    /// uncomputes the flag.
-    operation ApplyPhaseToMarkedSubspace(
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
-        phase : Double,
-        register : Qubit[],
-    ) : Unit is Adj {
-        use flag = Qubit();
-        within {
-            markingOracle(register, flag);
-        } apply {
-            R1(phase, flag);
         }
     }
 
@@ -120,20 +113,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// The phase-matched iterate $G(\alpha,\beta)$ used by fixed-point
-    /// amplification. $\alpha = \beta = \pi$ recovers the Grover iterate.
-    operation GeneralizedAmplitudeAmplificationStep(
-        statePrep : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
-        markPhase : Double,
-        statePhase : Double,
-        register : Qubit[],
-    ) : Unit is Adj {
-        ApplyPhaseToMarkedSubspace(markingOracle, markPhase, register);
-        ApplyPhaseToPreparedState(statePrep, statePhase, register);
-    }
-
-    /// # Summary
     /// Prepares $|\psi\rangle$ and applies `rounds` Grover iterates in place.
     /// Neither measures nor resets.
     operation ApplyAmplitudeAmplification(
@@ -148,33 +127,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         statePrep(register);
         for _ in 1..rounds {
             AmplitudeAmplificationStep(statePrep, markingOracle, register);
-        }
-    }
-
-    /// # Summary
-    /// Prepares $|\psi\rangle$ and applies a phase-matched iterate sequence.
-    ///
-    /// Phases come from `AmplitudeAmplification.fixed_point_phases`, in this
-    /// order and reflection convention.
-    operation ApplyFixedPointAmplitudeAmplification(
-        statePrep : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
-        markPhases : Double[],
-        statePhases : Double[],
-        register : Qubit[],
-    ) : Unit is Adj {
-        if Length(markPhases) != Length(statePhases) {
-            fail "The mark and state phase sequences must have equal length.";
-        }
-        statePrep(register);
-        for index in 0..Length(markPhases) - 1 {
-            GeneralizedAmplitudeAmplificationStep(
-                statePrep,
-                markingOracle,
-                markPhases[index],
-                statePhases[index],
-                register,
-            );
         }
     }
 
@@ -199,29 +151,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     ) : Result[] {
         use register = Qubit[numQubits];
         ApplyAmplitudeAmplification(preparation, markingOracle, rounds, register);
-        let results = MeasureSelected(register, measuredIndices);
-        ResetAll(register);
-        return results;
-    }
-
-    /// # Summary
-    /// `MakeAmplifiedCircuit` with the round count replaced by a phase sequence.
-    operation MakeFixedPointAmplifiedCircuit(
-        preparation : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
-        markPhases : Double[],
-        statePhases : Double[],
-        numQubits : Int,
-        measuredIndices : Int[],
-    ) : Result[] {
-        use register = Qubit[numQubits];
-        ApplyFixedPointAmplitudeAmplification(
-            preparation,
-            markingOracle,
-            markPhases,
-            statePhases,
-            register,
-        );
         let results = MeasureSelected(register, measuredIndices);
         ResetAll(register);
         return results;

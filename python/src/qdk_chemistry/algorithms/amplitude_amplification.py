@@ -6,6 +6,7 @@ r"""QDK/Chemistry amplitude amplification."""
 # --------------------------------------------------------------------------------------------
 
 import math
+import operator
 from collections.abc import Sequence
 from typing import Any
 
@@ -19,7 +20,82 @@ __all__: list[str] = [
     "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
     "AmplitudeAmplificationSettings",
+    "phase_marking_oracle",
 ]
+
+
+def phase_marking_oracle(
+    num_phase_qubits: int,
+    *,
+    target_indices: Sequence[int] | None = None,
+    threshold: int | None = None,
+) -> Circuit:
+    r"""Build a marking-oracle circuit for a little-endian QPE phase register.
+
+    Args:
+        num_phase_qubits: Number of phase qubits at the start of the oracle register.
+        target_indices: Phase-bin values to mark.
+        threshold: Inclusive upper phase-bin threshold to mark.
+
+    Returns:
+        A circuit carrying an adjointable ``(Qubit[], Qubit) => Unit`` Q# operation.
+
+    Raises:
+        ValueError: If the register size or criterion is invalid.
+        TypeError: If a register size, target index, or threshold is not an integer.
+
+    """
+    try:
+        num_phase_qubits = operator.index(num_phase_qubits)
+    except TypeError as error:
+        raise TypeError("num_phase_qubits must be an integer.") from error
+    if num_phase_qubits < 1:
+        raise ValueError(f"num_phase_qubits must be positive. Got {num_phase_qubits}.")
+    if (target_indices is None) == (threshold is None):
+        raise ValueError("Set exactly one of target_indices or threshold.")
+
+    max_index = (1 << num_phase_qubits) - 1
+    amplification = QSHARP_UTILS.AmplitudeAmplification
+    if target_indices is not None:
+        normalized_indices: list[int] = []
+        for target_index in target_indices:
+            try:
+                index = operator.index(target_index)
+            except TypeError as error:
+                raise TypeError("target_indices must contain only integers.") from error
+            if not 0 <= index <= max_index:
+                raise ValueError(f"target index must lie in [0, {max_index}]. Got {index}.")
+            normalized_indices.append(index)
+        if not normalized_indices:
+            raise ValueError("target_indices must not be empty.")
+
+        normalized_indices = sorted(set(normalized_indices))
+        parameters = {
+            "numPhaseQubits": num_phase_qubits,
+            "targetIndices": normalized_indices,
+        }
+        make_oracle = amplification.MakePhaseIndexMarkerOp
+        operation = make_oracle(num_phase_qubits, normalized_indices)
+    else:
+        assert threshold is not None
+        try:
+            normalized_threshold = operator.index(threshold)
+        except TypeError as error:
+            raise TypeError("threshold must be an integer.") from error
+        if not 0 <= normalized_threshold <= max_index:
+            raise ValueError(f"threshold must lie in [0, {max_index}]. Got {normalized_threshold}.")
+
+        parameters = {
+            "numPhaseQubits": num_phase_qubits,
+            "threshold": normalized_threshold,
+        }
+        make_oracle = amplification.MakePhaseThresholdMarkerOp
+        operation = make_oracle(num_phase_qubits, normalized_threshold)
+
+    return Circuit(
+        qsharp_factory=QsharpFactoryData(program=make_oracle, parameter=parameters),
+        qsharp_op=operation,
+    )
 
 
 class AmplitudeAmplificationSettings(Settings):
@@ -31,20 +107,8 @@ class AmplitudeAmplificationSettings(Settings):
         self._set_default(
             "rounds",
             "int",
-            -1,
-            "Number of amplitude amplification rounds. -1 derives a fixed-point schedule instead.",
-        )
-        self._set_default(
-            "min_overlap",
-            "double",
-            0.0,
-            "Lower bound on the probability that the prepared state lands in the good subspace.",
-        )
-        self._set_default(
-            "tolerance",
-            "double",
-            0.1,
-            "Fixed-point amplification tolerance; success is guaranteed to exceed 1 - tolerance^2.",
+            1,
+            "Number of Grover amplitude amplification rounds.",
         )
 
 
@@ -70,6 +134,7 @@ class AmplitudeAmplification(Algorithm):
         preparation: Circuit,
         marking_oracle: Circuit,
         num_qubits: int,
+        measured_indices: list[int] | None = None,
     ) -> Circuit:
         r"""Build an amplitude-amplified circuit.
 
@@ -109,53 +174,21 @@ class AmplitudeAmplification(Algorithm):
         if any(index < 0 or index >= num_qubits for index in indices):
             raise ValueError(f"measured_indices must lie in [0, {num_qubits}). Got {indices}.")
 
-        rounds = self.resolve_rounds()
+        rounds = int(self._settings.get("rounds"))
+        if rounds < 0:
+            raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
         amplification = QSHARP_UTILS.AmplitudeAmplification
         parameters: dict[str, Any] = {
             "preparation": operation,
             "markingOracle": marking_operation,
+            "rounds": rounds,
+            "numQubits": num_qubits,
+            "measuredIndices": indices,
         }
-
-        if int(self._settings.get("rounds")) < 0:
-            mark_phases, state_phases = self.fixed_point_phases(rounds, float(self._settings.get("tolerance")))
-            parameters["markPhases"] = mark_phases
-            parameters["statePhases"] = state_phases
-            program = amplification.MakeFixedPointAmplifiedCircuit
-        else:
-            parameters["rounds"] = rounds
-            program = amplification.MakeAmplifiedCircuit
-
-        parameters["numQubits"] = num_qubits
-        parameters["measuredIndices"] = indices
         Logger.info(f"Amplified circuit uses {2 * rounds + 1} preparations.")
-        return Circuit(qsharp_factory=QsharpFactoryData(program=program, parameter=parameters))
-
-    def resolve_rounds(self) -> int:
-        """Resolve the number of amplification rounds from the settings.
-
-        An explicit non-negative ``rounds`` wins; otherwise the count comes from
-        the fixed-point schedule.
-
-        Returns:
-            The number of amplification rounds to run.
-
-        Raises:
-            ValueError: If no explicit ``rounds`` was given and ``min_overlap``
-                is not a usable lower bound.
-
-        """
-        rounds = int(self._settings.get("rounds"))
-        if rounds >= 0:
-            return rounds
-
-        min_overlap = float(self._settings.get("min_overlap"))
-        if min_overlap <= 0.0:
-            raise ValueError(
-                "Deriving a round count needs a positive 'min_overlap' lower bound on the overlap "
-                "of the guiding state with the good subspace. Set 'min_overlap', or set 'rounds' "
-                "explicitly to run a fixed number of plain Grover iterates."
-            )
-        return self.fixed_point_rounds(min_overlap, float(self._settings.get("tolerance")))
+        return Circuit(
+            qsharp_factory=QsharpFactoryData(program=amplification.MakeAmplifiedCircuit, parameter=parameters)
+        )
 
     @staticmethod
     def _validate_overlap(overlap: float, name: str = "overlap") -> None:
@@ -203,84 +236,6 @@ class AmplitudeAmplification(Algorithm):
             raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
         angle = cls._rotation_angle(overlap)
         return math.sin((2 * rounds + 1) * angle) ** 2
-
-    @classmethod
-    def fixed_point_rounds(cls, min_overlap: float, tolerance: float) -> int:
-        r"""Return the iterate count for fixed-point amplification.
-
-        The schedule reaches acceptance :math:`\ge 1 - \delta^2` for every overlap
-        at or above ``min_overlap`` once :math:`L \ge \log(2/\delta)/\sqrt{a_{\min}}`.
-        Returns the smallest ``l`` with ``L = 2l + 1`` meeting that bound.
-
-        Args:
-            min_overlap: Lower bound on the squared overlap.
-            tolerance: The failure amplitude ``delta`` in ``(0, 1)``; the acceptance
-                probability is at least ``1 - delta ** 2``.
-
-        Returns:
-            The number of iterates ``l``, so that ``2 * l + 1`` queries are used.
-
-        Raises:
-            ValueError: If ``tolerance`` is not in ``(0, 1)``.
-
-        """
-        cls._validate_overlap(min_overlap, "min_overlap")
-        if not math.isfinite(tolerance) or not 0.0 < tolerance < 1.0:
-            raise ValueError(f"tolerance must lie in (0, 1). Got {tolerance}.")
-        queries = math.log(2.0 / tolerance) / math.sqrt(min_overlap)
-        return max(1, math.ceil((math.ceil(queries) - 1) / 2.0))
-
-    @staticmethod
-    def fixed_point_phases(rounds: int, tolerance: float) -> tuple[list[float], list[float]]:
-        r"""Return the Yoder-Low-Chuang phase sequence for fixed-point amplification.
-
-        With ``L = 2 * rounds + 1`` queries and
-
-        .. math::
-
-            \gamma^{-1} = T_{1/L}(1/\delta)
-                        = \cosh\!\big(L^{-1}\operatorname{arccosh}(1/\delta)\big),
-
-        the state-reflection phases are
-
-        .. math::
-
-            \beta_j = 2\operatorname{arccot}\!\big(\tan(2\pi j/L)\sqrt{1-\gamma^2}\big),
-            \qquad j = 1,\dots,l ,
-
-        and the mark phases are the same list reversed. Both reflections use the
-        ``I - (1 - e^{i\varphi}) P`` convention of the Q# implementation, with the
-        mark applied first, so no sign flip appears between the sequences.
-
-        Args:
-            rounds: The number of iterates ``l``; ``2 * l + 1`` queries are used.
-            tolerance: The failure amplitude ``delta`` in ``(0, 1)``.
-
-        Returns:
-            The mark phases ``alpha`` and the state phases ``beta``, both of length
-            ``rounds`` and ordered by iterate.
-
-        Raises:
-            ValueError: If ``rounds`` is not positive or ``tolerance`` is not in
-                ``(0, 1)``.
-
-        """
-        if rounds < 1:
-            raise ValueError(f"rounds must be positive. Got {rounds}.")
-        if not math.isfinite(tolerance) or not 0.0 < tolerance < 1.0:
-            raise ValueError(f"tolerance must lie in (0, 1). Got {tolerance}.")
-
-        queries = 2 * rounds + 1
-        gamma = 1.0 / math.cosh(math.acosh(1.0 / tolerance) / queries)
-        scale = math.sqrt(max(0.0, 1.0 - gamma * gamma))
-
-        # arccot with range (0, pi), so that the phases are continuous in j.
-        state_phases = [
-            2.0 * math.atan2(1.0, math.tan(2.0 * math.pi * j / queries) * scale) for j in range(1, rounds + 1)
-        ]
-        mark_phases = list(reversed(state_phases))
-        return mark_phases, state_phases
-
 
 class AmplitudeAmplificationFactory(AlgorithmFactory):
     """Factory class for creating AmplitudeAmplification instances."""

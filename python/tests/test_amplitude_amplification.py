@@ -2,8 +2,8 @@
 
 Three layers are exercised against each other:
 
-* the round-scheduling closed forms on
-  :class:`~qdk_chemistry.algorithms.amplitude_amplification.base.AmplitudeAmplification`
+* the Grover closed form on
+  :class:`~qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification`
   are checked against an independent simulation of the two-dimensional invariant
   subspace, so the tests validate the mathematics rather than restating it;
 * the Q# module ``QDKChemistry.Utils.AmplitudeAmplification`` is executed on the
@@ -20,7 +20,6 @@ Three layers are exercised against each other:
 
 from __future__ import annotations
 
-import cmath
 import importlib.util
 import math
 
@@ -28,7 +27,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.amplitude_amplification.base import AmplitudeAmplification
+from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
@@ -36,48 +35,10 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 OVERLAPS = [1e-4, 1e-3, 5e-3, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 0.9]
 
 
-def _simulate(overlap: float, mark_phases: list[float], state_phases: list[float]) -> float:
-    """Return the acceptance probability from an explicit 2D subspace simulation.
-
-    The state is represented in the ``(|G>, |B>)`` basis. Each iterate applies a
-    phase to the good component and then the partial reflection about the
-    prepared state, exactly as the Q# ``GeneralizedAmplitudeAmplificationStep``
-    does.
-    """
+def _simulate(overlap: float, rounds: int) -> float:
+    """Return the Grover probability from an explicit 2D rotation."""
     angle = math.asin(math.sqrt(overlap))
-    prepared = (math.sin(angle), math.cos(angle))
-    good, bad = complex(prepared[0]), complex(prepared[1])
-
-    for mark_phase, state_phase in zip(mark_phases, state_phases, strict=True):
-        good *= cmath.exp(1j * mark_phase)
-        projection = prepared[0] * good + prepared[1] * bad
-        factor = (1.0 - cmath.exp(1j * state_phase)) * projection
-        good -= factor * prepared[0]
-        bad -= factor * prepared[1]
-
-    return abs(good) ** 2
-
-
-def _standard_phases(rounds: int) -> tuple[list[float], list[float]]:
-    """Return the phase sequence of plain Grover amplification."""
-    return [math.pi] * rounds, [math.pi] * rounds
-
-
-def _chebyshev(degree: float, argument: float) -> float:
-    """Return the Chebyshev polynomial of the first kind, valid outside [-1, 1]."""
-    if argument >= 1.0:
-        return math.cosh(degree * math.acosh(argument))
-    if argument <= -1.0:
-        magnitude = math.cosh(degree * math.acosh(-argument))
-        return magnitude if int(degree) % 2 == 0 else -magnitude
-    return math.cos(degree * math.acos(argument))
-
-
-def _fixed_point_success_probability(overlap: float, rounds: int, tolerance: float) -> float:
-    """Return 1 - delta^2 T_L(T_{1/L}(1/delta) sqrt(1 - a))^2, an independent stdlib reference."""
-    queries = 2 * rounds + 1
-    scale = math.cosh(math.acosh(1.0 / tolerance) / queries)
-    return 1.0 - tolerance**2 * _chebyshev(queries, scale * math.sqrt(1.0 - overlap)) ** 2
+    return math.sin((2 * rounds + 1) * angle) ** 2
 
 
 #
@@ -88,96 +49,8 @@ def _fixed_point_success_probability(overlap: float, rounds: int, tolerance: flo
 @pytest.mark.parametrize("overlap", OVERLAPS)
 @pytest.mark.parametrize("rounds", [0, 1, 2, 3, 7, 15])
 def test_success_probability_matches_simulation(overlap: float, rounds: int):
-    mark_phases, state_phases = _standard_phases(rounds)
-    simulated = _simulate(overlap, mark_phases, state_phases)
+    simulated = _simulate(overlap, rounds)
     assert AmplitudeAmplification.success_probability(overlap, rounds) == pytest.approx(simulated, abs=1e-12)
-
-
-@pytest.mark.parametrize("min_overlap", OVERLAPS)
-def test_fixed_point_rounds_never_overshoot(min_overlap: float):
-    """The whole point of the schedule: acceptance holds above the plateau for every larger overlap."""
-    tolerance = 0.1
-    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
-    for fraction in (1.0, 1.5, 2.0, 5.0, 20.0):
-        overlap = min(0.999, min_overlap * fraction)
-        achieved = _fixed_point_success_probability(overlap, rounds, tolerance)
-        assert achieved >= 1.0 - tolerance**2 - 1e-9
-
-
-@pytest.mark.parametrize("min_overlap", [1e-3, 0.01, 0.05, 0.2])
-def test_fixed_point_rounds_is_the_smallest_sufficient_count(min_overlap: float):
-    tolerance = 0.1
-    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
-    assert _fixed_point_success_probability(min_overlap, rounds, tolerance) >= 1.0 - tolerance**2 - 1e-9
-    # The Yoder-Low-Chuang query bound is log(2/delta)/sqrt(a_min).
-    assert 2 * rounds + 1 >= math.log(2.0 / tolerance) / math.sqrt(min_overlap)
-
-
-def test_plain_rounds_overshoot_where_fixed_point_does_not():
-    """Contrast the two schedules: the sinusoid collapses, the plateau does not."""
-    tolerance = 0.1
-    min_overlap = 0.01
-    plain = 7  # optimal for a = 0.01
-    fixed_point = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
-
-    assert AmplitudeAmplification.success_probability(min_overlap, plain) > 0.99
-    # Four times the assumed overlap rotates the plain schedule well past the maximum.
-    assert AmplitudeAmplification.success_probability(0.04, plain) < 0.05
-    assert _fixed_point_success_probability(0.04, fixed_point, tolerance) > 0.99
-
-
-#
-# Fixed-point schedule
-#
-
-
-@pytest.mark.parametrize("min_overlap", [0.01, 0.05, 0.1, 0.25])
-@pytest.mark.parametrize("tolerance", [0.5, 0.2, 0.05])
-def test_fixed_point_meets_its_tolerance_everywhere_above_threshold(min_overlap: float, tolerance: float):
-    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
-    mark_phases, state_phases = AmplitudeAmplification.fixed_point_phases(rounds, tolerance)
-    assert len(mark_phases) == rounds
-    assert len(state_phases) == rounds
-
-    for index in range(41):
-        overlap = min_overlap + (1.0 - min_overlap) * index / 40.0
-        probability = _simulate(overlap, mark_phases, state_phases)
-        assert probability >= 1.0 - tolerance**2 - 1e-9
-
-
-@pytest.mark.parametrize("min_overlap", [0.02, 0.1])
-def test_fixed_point_removes_the_overshoot_cliff(min_overlap: float):
-    tolerance = 0.1
-    rounds = AmplitudeAmplification.fixed_point_rounds(min_overlap, tolerance)
-    mark_phases, state_phases = AmplitudeAmplification.fixed_point_phases(rounds, tolerance)
-
-    fixed_point_worst = min(
-        _simulate(min_overlap + (1.0 - min_overlap) * index / 200.0, mark_phases, state_phases) for index in range(201)
-    )
-    plain_worst = min(
-        AmplitudeAmplification.success_probability(min_overlap + (1.0 - min_overlap) * index / 200.0, rounds)
-        for index in range(201)
-    )
-    assert fixed_point_worst >= 1.0 - tolerance**2 - 1e-9
-    assert plain_worst < 1e-2
-
-
-def test_fixed_point_phase_symmetry():
-    rounds = 5
-    mark_phases, state_phases = AmplitudeAmplification.fixed_point_phases(rounds, 0.1)
-    for index in range(rounds):
-        assert mark_phases[index] == pytest.approx(state_phases[rounds - 1 - index])
-
-
-@pytest.mark.parametrize("rounds", [1, 2, 3, 5, 8, 12])
-@pytest.mark.parametrize("tolerance", [0.5, 0.1, 0.01])
-def test_fixed_point_phases_realize_the_chebyshev_closed_form(rounds: int, tolerance: float):
-    mark_phases, state_phases = AmplitudeAmplification.fixed_point_phases(rounds, tolerance)
-    for index in range(101):
-        overlap = 0.001 + 0.998 * index / 100.0
-        simulated = _simulate(overlap, mark_phases, state_phases)
-        predicted = _fixed_point_success_probability(overlap, rounds, tolerance)
-        assert simulated == pytest.approx(predicted, abs=1e-9)
 
 
 @pytest.mark.parametrize("overlap", [0.0, -0.1, 1.5, math.nan, math.inf])
@@ -189,14 +62,6 @@ def test_invalid_overlap_is_rejected(overlap: float):
 def test_invalid_arguments_are_rejected():
     with pytest.raises(ValueError, match="rounds"):
         AmplitudeAmplification.success_probability(0.1, -1)
-    with pytest.raises(ValueError, match="min_overlap"):
-        AmplitudeAmplification.fixed_point_rounds(0.0, 0.1)
-    with pytest.raises(ValueError, match="tolerance"):
-        AmplitudeAmplification.fixed_point_phases(3, 1.0)
-    with pytest.raises(ValueError, match="rounds"):
-        AmplitudeAmplification.fixed_point_phases(0, 0.1)
-    with pytest.raises(ValueError, match="tolerance"):
-        AmplitudeAmplification.fixed_point_rounds(0.1, 0.0)
 
 
 #
@@ -230,22 +95,6 @@ namespace QDKChemistryAmplitudeAmplificationTests {
     operation RunPlainAmplification(theta : Double, rounds : Int) : Result {
         use register = Qubit[1];
         ApplyAmplitudeAmplification(PrepareOverlap(theta, _), MarkFirstQubit, rounds, register);
-        return MResetZ(register[0]);
-    }
-
-    operation RunFixedPointAmplification(
-        theta : Double,
-        markPhases : Double[],
-        statePhases : Double[],
-    ) : Result {
-        use register = Qubit[1];
-        ApplyFixedPointAmplitudeAmplification(
-            PrepareOverlap(theta, _),
-            MarkFirstQubit,
-            markPhases,
-            statePhases,
-            register,
-        );
         return MResetZ(register[0]);
     }
 
@@ -295,6 +144,34 @@ namespace QDKChemistryAmplitudeAmplificationTests {
         ApplyXorInPlace(phaseValue, register[0..numPhaseQubits - 1]);
         ApplyXorInPlace(ancillaValue, register[numPhaseQubits...]);
         MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, accepted, register, flag);
+        let outcome = MResetZ(flag);
+        ResetAll(register);
+        return outcome;
+    }
+
+    operation RunPhaseIndexMarker(
+        numPhaseQubits : Int,
+        targetIndices : Int[],
+        phaseValue : Int,
+    ) : Result {
+        use register = Qubit[numPhaseQubits];
+        use flag = Qubit();
+        ApplyXorInPlace(phaseValue, register);
+        MarkPhaseIndices(numPhaseQubits, targetIndices, register, flag);
+        let outcome = MResetZ(flag);
+        ResetAll(register);
+        return outcome;
+    }
+
+    operation RunPhaseThresholdMarker(
+        numPhaseQubits : Int,
+        threshold : Int,
+        phaseValue : Int,
+    ) : Result {
+        use register = Qubit[numPhaseQubits];
+        use flag = Qubit();
+        ApplyXorInPlace(phaseValue, register);
+        MarkPhaseAtOrBelow(numPhaseQubits, threshold, register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return outcome;
@@ -381,21 +258,6 @@ def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qshar
     assert better > observed
 
 
-@pytest.mark.parametrize(("rounds", "tolerance"), [(2, 0.3), (4, 0.2), (6, 0.1)])
-@pytest.mark.parametrize("overlap", [0.05, 0.5, 0.9])
-def test_fixed_point_amplification_matches_the_chebyshev_closed_form(
-    qsharp_module, rounds: int, tolerance: float, overlap: float
-):
-    theta = AmplitudeAmplification._rotation_angle(overlap)
-    mark_phases, state_phases = AmplitudeAmplification.fixed_point_phases(rounds, tolerance)
-    expression = f"{_NAMESPACE}.RunFixedPointAmplification({theta}, {list(mark_phases)}, {list(state_phases)})".replace(
-        "'", ""
-    )
-    observed = _acceptance_frequency(qsharp_module, expression)
-    predicted = _fixed_point_success_probability(overlap, rounds, tolerance)
-    assert observed == pytest.approx(predicted, abs=_TOLERANCE)
-
-
 def test_marking_oracle_conjunction_holds(qsharp_module):
     # The loop is only correct if the oracle flips exactly on the good subspace.
     accepted = [0, 1, 6, 7]
@@ -404,6 +266,39 @@ def test_marking_oracle_conjunction_holds(qsharp_module):
             expression = f"{_NAMESPACE}.MarkQpeAcceptance(3, {phase_value}, 2, {ancilla_value}, [0, 1], {accepted})"
             outcome = str(qsharp_module.run(expression, shots=1)[0])
             assert (outcome == "One") == (phase_value in accepted and ancilla_value == 0)
+
+
+@pytest.mark.parametrize("phase_value", range(8))
+def test_phase_marking_oracles_match_their_criteria(qsharp_module, phase_value: int):
+    index_result = qsharp_module.run(
+        f"{_NAMESPACE}.RunPhaseIndexMarker(3, [1, 6], {phase_value})", shots=1
+    )[0]
+    threshold_result = qsharp_module.run(
+        f"{_NAMESPACE}.RunPhaseThresholdMarker(3, 3, {phase_value})", shots=1
+    )[0]
+    assert (str(index_result) == "One") == (phase_value in {1, 6})
+    assert (str(threshold_result) == "One") == (phase_value <= 3)
+
+
+def test_phase_marking_oracle_validates_criteria():
+    with pytest.raises(ValueError, match="exactly one"):
+        phase_marking_oracle(3)
+    with pytest.raises(ValueError, match="exactly one"):
+        phase_marking_oracle(3, target_indices=[1], threshold=2)
+    with pytest.raises(ValueError, match="target index"):
+        phase_marking_oracle(3, target_indices=[8])
+    with pytest.raises(ValueError, match="threshold"):
+        phase_marking_oracle(3, threshold=-1)
+
+
+@pytest.mark.skipif(not _HAS_QSHARP, reason="qdk.qsharp is not installed")
+def test_phase_marking_oracle_returns_circuits():
+    index_marker = phase_marking_oracle(3, target_indices=[6, 1, 1])
+    threshold_marker = phase_marking_oracle(3, threshold=3)
+    assert isinstance(index_marker, Circuit)
+    assert isinstance(threshold_marker, Circuit)
+    assert index_marker._qsharp_op is not None
+    assert threshold_marker._qsharp_op is not None
 
 
 def test_rotation_angle_agrees_with_the_qsharp_convention():
@@ -566,23 +461,9 @@ def test_amplitude_amplification_is_registered():
     assert isinstance(default, AmplitudeAmplification)
 
 
-def test_resolve_rounds_uses_the_fixed_point_schedule():
+def test_rounds_setting_defaults_to_one():
     algorithm = create("amplitude_amplification")
-    algorithm.settings().update("min_overlap", 0.05)
-    assert algorithm.resolve_rounds() == AmplitudeAmplification.fixed_point_rounds(0.05, 0.1)
-
-
-def test_explicit_rounds_override_the_schedule():
-    algorithm = create("amplitude_amplification")
-    algorithm.settings().update("min_overlap", 0.05)
-    algorithm.settings().update("rounds", 1)
-    assert algorithm.resolve_rounds() == 1
-
-
-def test_deriving_rounds_requires_a_lower_bound():
-    algorithm = create("amplitude_amplification")
-    with pytest.raises(ValueError, match="min_overlap"):
-        algorithm.resolve_rounds()
+    assert algorithm.settings().get("rounds") == 1
 
 
 def test_iterative_circuit_builder_has_no_measurement_setting():
@@ -733,19 +614,6 @@ def test_energy_window_selects_the_right_phase_bin(qsharp_module):
         rounds=2,
     )
     assert _dominant_accepted_phase(circuit, 4, accepted) == "1000"
-
-
-def test_fixed_point_schedule_runs_end_to_end(qsharp_module):
-    accepted = [0]
-    circuit = _amplified_qpe_circuit(
-        qsharp_module,
-        _diagonal_hamiltonian(),
-        _guiding_state(0.3, 0),
-        accepted,
-        min_overlap=0.09,
-        tolerance=0.3,
-    )
-    assert _dominant_accepted_phase(circuit, 4, accepted) == "0000"
 
 
 def test_trotter_encoding_is_supported(qsharp_module):

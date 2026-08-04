@@ -93,10 +93,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         Constructs a single circuit with ``num_bits`` ancilla qubits, applying
         controlled-U^(2^k) for each ancilla and finishing with the inverse QFT.
 
-        The circuit body is always the measurement-free, adjointable QPE
-        operation, exposed as the returned circuit's Q# operation; ``measurement``
-        only decides what is read out.
-
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
@@ -127,11 +123,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
-                state_preparation,
-                ctrl_unitary_circuits,
-                num_bits,
-                num_system_qubits,
-                num_ancilla_qubits,
+                state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits, num_ancilla_qubits
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
@@ -156,16 +148,15 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         ``QDKChemistry.Utils.StandardPhaseEstimation.ApplyStandardQPE``.
 
         Args:
-            state_preparation: Circuit object containing an adjointable Q# state preparation.
-            controlled_unitary_circuits: List of Circuit objects (one per phase bit) containing
-                adjointable Q# operations for controlled-U^(2^k).
-            num_bits: Number of phase qubits.
+            state_preparation: Circuit object containing a Q# operation for state preparation.
+            controlled_unitary_circuits: List of Circuit objects (one per ancilla) containing
+                Q# operations for controlled-U^(2^k).
+            num_bits: Number of ancilla qubits (phase bits).
             num_system_qubits: Number of system qubits.
             num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).
 
         Returns:
-            A Circuit whose Q# operation applies QPE in place and whose factory
-            applies the measurement selected by the ``measurement`` setting.
+            A Circuit object representing the standard QPE circuit.
 
         """
         phase_estimation = QSHARP_UTILS.StandardPhaseEstimation
@@ -202,10 +193,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _measurement_plan(self, num_bits: int, num_system_qubits: int) -> tuple[list[int], list[str]]:
         """Resolve the ``measurement`` setting into register indices and Pauli letters.
 
-        The executor reverses the Q# ``Result[]``, so emitting the system indices
-        reversed and ahead of the phase indices makes the key read phase register
-        most-significant-bit first, followed by the system register in order.
-
         Args:
             num_bits: Number of phase qubits.
             num_system_qubits: Number of system qubits.
@@ -227,8 +214,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             raise ValueError(f"measurement must be one of ['phase', 'eigenvector', 'none']. Got '{policy}'.")
 
         basis = str(self._settings.get("measurement_basis")).upper()
-        if len(basis) == 1:
-            basis *= num_system_qubits
         if len(basis) != num_system_qubits:
             raise ValueError(
                 f"measurement_basis must be a single Pauli letter or one letter per system "
