@@ -21,7 +21,62 @@ __all__: list[str] = [
     "QpeCircuitBuilderFactory",
     "QpeCircuitBuilderSettings",
     "StandardQpeCircuitBuilder",
+    "coherent_qpe_measured_indices",
+    "split_coherent_qpe_bitstring",
 ]
+
+
+def coherent_qpe_measured_indices(
+    num_bits: int,
+    num_system_qubits: int,
+    num_ancilla_qubits: int,
+) -> list[int]:
+    """Return the register indices a coherent QPE circuit should measure.
+
+    The register is laid out as ``phase ++ system ++ unitary ancillas``. Only the
+    phase register and the unitary (block-encoding signal) ancillas carry
+    information; the system qubits are left to be reset.
+
+    The circuit executor reverses the Q# ``Result[]`` when it forms a bitstring
+    key, so the phase indices are emitted in register order (which the inverse
+    QFT leaves least-significant-bit first) and the ancilla indices are emitted
+    reversed and *before* them. The resulting key reads as the phase register
+    most-significant-bit first, followed by the unitary ancillas in register
+    order -- matching the key produced by ``RunStandardQPE`` and consumed by
+    :func:`split_coherent_qpe_bitstring`.
+
+    Args:
+        num_bits: Number of phase qubits.
+        num_system_qubits: Number of system qubits.
+        num_ancilla_qubits: Number of block-encoding ancilla qubits (0 for Trotter).
+
+    Returns:
+        Register indices in the order the Q# entry point should measure them.
+
+    """
+    phase_indices = list(range(num_bits))
+    ancilla_indices = [num_bits + num_system_qubits + index for index in range(num_ancilla_qubits)]
+    return list(reversed(ancilla_indices)) + phase_indices
+
+
+def split_coherent_qpe_bitstring(bitstring: str, num_bits: int) -> tuple[str, str]:
+    """Split an executor bitstring into its phase bits and signal-ancilla bits.
+
+    Args:
+        bitstring: A key produced by the circuit executor for a circuit built with
+            :func:`coherent_qpe_measured_indices`.
+        num_bits: Number of phase qubits.
+
+    Returns:
+        A tuple of (phase bits most-significant-bit first, signal ancilla bits).
+
+    Raises:
+        ValueError: If the bitstring is shorter than the phase register.
+
+    """
+    if len(bitstring) < num_bits:
+        raise ValueError(f"Bitstring '{bitstring}' is shorter than the {num_bits}-qubit phase register.")
+    return bitstring[:num_bits], bitstring[num_bits:]
 
 
 class QpeCircuitBuilderSettings(Settings):
@@ -36,6 +91,12 @@ class QpeCircuitBuilderSettings(Settings):
         """
         super().__init__()
         self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
+        self._set_default(
+            "coherent",
+            "bool",
+            False,
+            "Build a measurement-free, adjointable circuit instead of a measured one.",
+        )
         self._set_default(
             "unitary_builder",
             "algorithm_ref",
@@ -104,6 +165,10 @@ class QpeCircuitBuilder(Algorithm):
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
+        When ``coherent`` is enabled the controlled circuit is requested in
+        adjointable form, because the coherent phase-estimation circuit is meant
+        to be reflected about.
+
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
             power: The power to which the unitary should be raised.
@@ -120,8 +185,18 @@ class QpeCircuitBuilder(Algorithm):
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
+        circuit_mapper.settings().update("adjointable", self.is_coherent())
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
+
+    def is_coherent(self) -> bool:
+        """Whether the builder was asked for a measurement-free, adjointable circuit.
+
+        Returns:
+            True when the ``coherent`` setting is enabled.
+
+        """
+        return bool(self._settings.get("coherent"))
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):

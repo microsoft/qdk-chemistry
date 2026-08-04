@@ -1,8 +1,11 @@
-"""Amplitude amplification for QDK/Chemistry.
+"""QDK/Chemistry amplitude amplification module.
 
-The quantum primitives live in the Q# module
-``QDKChemistry.Utils.AmplitudeAmplification``; this package supplies the
-classical policy that decides how many amplification rounds to run.
+Amplitude amplification boosts the probability that a prepared state is found in
+a marked subspace.  The quantum primitives live in the Q# module
+``QDKChemistry.Utils.AmplitudeAmplification``; this package supplies the registry
+algorithm class that drives them, plus the classical policy in
+:mod:`~qdk_chemistry.algorithms.amplitude_amplification.schedule` that decides
+how many amplification rounds to run.
 
 """
 
@@ -28,8 +31,11 @@ from qdk_chemistry.algorithms.amplitude_amplification.schedule import (
     worst_case_success_probability,
 )
 
+from .base import AmplitudeAmplificationFactory
+
 __all__: list[str] = [
     "DEFAULT_GROWTH_RATE",
+    "AmplitudeAmplificationFactory",
     "expected_rounds_exponential",
     "exponential_schedule",
     "fixed_point_phases",

@@ -20,7 +20,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         pauliCoefficients : Double[],
         control : Qubit,
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for idx in 0..Length(pauliExponents) - 1 {
             let paulis = pauliExponents[idx];
             let coeff = pauliCoefficients[idx];
@@ -95,5 +95,50 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
     function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit {
         RepControlledPauliExp(params, _, _)
+    }
+
+    /// Performs repeated Controlled Time Evolution without resource-estimation caching.
+    ///
+    /// `RepControlledPauliExp` wraps every repetition in `BeginEstimateCaching`,
+    /// which is not adjointable. Amplitude amplification reflects about the state
+    /// preparation and therefore needs `Adjoint`, so it uses this variant instead
+    /// and pays the full resource-estimation cost.
+    /// # Parameters
+    /// - `pauliExponents`: The Pauli strings of the Trotter step.
+    /// - `pauliCoefficients`: The rotation angle of each Pauli string.
+    /// - `repetitions`: How many times the Trotter step is repeated.
+    /// - `control`: The control qubit for the operation.
+    /// - `systems`: An array of qubits representing the system on which the operation acts.
+    operation AdjointableRepControlledPauliExp(
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        control : Qubit,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        for _ in 1..repetitions {
+            ControlledPauliExp(pauliExponents, pauliCoefficients, control, systems);
+        }
+    }
+
+    /// A helper function to create an adjointable callable for repeated Controlled Time Evolution.
+    ///
+    /// The parameters are passed individually rather than as a
+    /// `RepControlledPauliExpParams` struct so that the callable can be built
+    /// from Python; the struct's `control` and `systems` index fields are not
+    /// needed here because the qubits are supplied directly.
+    /// # Parameters
+    /// - `pauliExponents`: The Pauli strings of the Trotter step.
+    /// - `pauliCoefficients`: The rotation angle of each Pauli string.
+    /// - `repetitions`: How many times the Trotter step is repeated.
+    /// # Returns
+    /// - `(Qubit, Qubit[]) => Unit is Adj + Ctl`: An adjointable callable suitable for
+    ///   amplitude amplification and coherent phase estimation.
+    function MakeAdjointableRepControlledPauliExpOp(
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+        AdjointableRepControlledPauliExp(pauliExponents, pauliCoefficients, repetitions, _, _)
     }
 }

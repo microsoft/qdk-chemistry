@@ -134,7 +134,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     }
 
     /// Applies Hadamard to each qubit in the array.
-    operation PrepareHadamardAll(qubits : Qubit[]) : Unit {
+    operation PrepareHadamardAll(qubits : Qubit[]) : Unit is Adj + Ctl {
         for q in qubits {
             H(q);
         }
@@ -144,6 +144,16 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Returns
     /// - `Qubit[] => Unit`: A callable that prepares the uniform superposition on the given qubits.
     function MakePrepareHadamardAllOp() : Qubit[] => Unit {
+        PrepareHadamardAll(_)
+    }
+
+    /// Returns an adjointable callable that applies Hadamard to each qubit in the array.
+    ///
+    /// Coherent phase estimation and amplitude amplification reflect about the
+    /// preparation and therefore need `Adjoint`.
+    /// # Returns
+    /// - `Qubit[] => Unit is Adj + Ctl`: An adjointable uniform-superposition preparation.
+    function MakeAdjointablePrepareHadamardAllOp() : Qubit[] => Unit is Adj + Ctl {
         PrepareHadamardAll(_)
     }
 }

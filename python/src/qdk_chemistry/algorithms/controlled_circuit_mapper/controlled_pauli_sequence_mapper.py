@@ -100,6 +100,13 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             parameter=vars(controlled_evo_params),
         )
 
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
+        if self._is_adjointable():
+            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeAdjointableRepControlledPauliExpOp(
+                pauli_terms,
+                angles,
+                unitary_container.step_reps,
+            )
+        else:
+            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

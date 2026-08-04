@@ -22,7 +22,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
 
     import Std.Arithmetic.ApplyIfGreaterL;
     import Std.Arithmetic.ApplyIfLessOrEqualL;
-    import Std.Arrays.Reversed;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyQFT;
@@ -31,6 +30,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     import Std.Core.Length;
     import Std.Intrinsic.R1;
     import Std.Math.PI;
+    import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
     //
@@ -403,8 +403,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     ///
     /// # Input
     /// ## numPhaseQubits
-    /// Size of the leading phase register, stored most-significant-bit first to
-    /// match `QDKChemistry.Utils.StandardPhaseEstimation`.
+    /// Size of the leading phase register.  The register is little-endian
+    /// (`register[0]` is the least significant bit), matching the layout
+    /// produced by `QDKChemistry.Utils.StandardPhaseEstimation` after its
+    /// inverse quantum Fourier transform.
     /// ## signalAncillaIndices
     /// Indices into the trailing target register identifying the block-encoding
     /// ancillas.  Empty for encodings without ancillas (for example Trotter).
@@ -415,9 +417,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         register : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
-        // ApplyAcceptedPhaseMark reads little-endian; the QPE register is
-        // most-significant-bit first.
-        let phaseRegister = Reversed(register[0..numPhaseQubits - 1]);
+        let phaseRegister = register[0..numPhaseQubits - 1];
         let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
 
         use accepted = Qubit();
@@ -456,7 +456,9 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// $U_{\psi}$ of an amplification loop.
     ///
     /// `register` is laid out as `phase register ++ system qubits ++ block-encoding
-    /// ancillas`, with the phase register most-significant-bit first.
+    /// ancillas`.  After the inverse quantum Fourier transform the phase register
+    /// is little-endian (`register[0]` is the least significant bit), matching
+    /// `QDKChemistry.Utils.StandardPhaseEstimation.RunStandardQPE`.
     ///
     /// # Input
     /// ## controlledUnitary
@@ -536,75 +538,108 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         ApplyAmplitudeAmplification(preparation, marker, amplificationRounds, register);
     }
 
+    //
+    // Circuit entry points
+    //
+    // These are the operations handed to `Circuit`/`CircuitExecutor`.  They
+    // deliberately contain no measurement-dependent classical control flow, so
+    // they compile under the restricted target profiles used for QIR generation
+    // and resource estimation.  Acceptance is decided classically in Python from
+    // the returned bits; see
+    // `qdk_chemistry.algorithms.amplitude_amplification.AmplifiedPhaseEstimation`.
+
     /// # Summary
-    /// Runs amplitude-amplified standard QPE and measures the outcome.
+    /// Builds and measures an amplitude-amplified circuit.
+    ///
+    /// Fully generic: `preparation` is any adjointable state preparation (for
+    /// example the coherent QPE circuit built by `MakeCoherentStandardQPEOp`) and
+    /// `markingOracle` is any adjointable predicate on the good subspace (for
+    /// example the energy-window test built by `MakeQpeAcceptanceMarkerOp`).
+    ///
+    /// # Input
+    /// ## measuredIndices
+    /// Register indices to measure, in the order they should appear in the
+    /// returned array.
     ///
     /// # Output
-    /// The phase bits most-significant-bit first (matching
-    /// `RunStandardQPE`) and whether the shot was accepted, meaning the decoded
-    /// phase index is in `acceptedPhaseIndices` and every signal ancilla measured
-    /// $|0\rangle$.
-    operation RunAmplifiedStandardQPE(
+    /// One `Result` per entry of `measuredIndices`, in that order.
+    operation MakeAmplifiedCircuit(
+        preparation : Qubit[] => Unit is Adj,
+        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        rounds : Int,
+        numQubits : Int,
+        measuredIndices : Int[],
+    ) : Result[] {
+        use register = Qubit[numQubits];
+        ApplyAmplitudeAmplification(preparation, markingOracle, rounds, register);
+        let results = MeasureSelected(register, measuredIndices);
+        ResetAll(register);
+        return results;
+    }
+
+    /// # Summary
+    /// Builds and measures a fixed-point amplitude-amplified circuit.
+    ///
+    /// Identical to `MakeAmplifiedCircuit` except that the round count is
+    /// replaced by the Yoder–Low–Chuang phase sequence, which removes the
+    /// overshoot cliff entirely.
+    operation MakeFixedPointAmplifiedCircuit(
+        preparation : Qubit[] => Unit is Adj,
+        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        markPhases : Double[],
+        statePhases : Double[],
+        numQubits : Int,
+        measuredIndices : Int[],
+    ) : Result[] {
+        use register = Qubit[numQubits];
+        ApplyFixedPointAmplitudeAmplification(
+            preparation,
+            markingOracle,
+            markPhases,
+            statePhases,
+            register,
+        );
+        let results = MeasureSelected(register, measuredIndices);
+        ResetAll(register);
+        return results;
+    }
+
+    /// # Summary
+    /// Builds and measures the coherent QPE circuit without any amplification.
+    ///
+    /// Provided so that the amplified and unamplified circuits differ only in the
+    /// amplification loop, which makes the acceptance ratio between them a clean
+    /// measurement of what amplification bought.
+    operation MakeCoherentStandardQPECircuit(
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,
         numSystemQubits : Int,
         numAncillaQubits : Int,
-        signalAncillaIndices : Int[],
-        acceptedPhaseIndices : Int[],
-        amplificationRounds : Int,
-    ) : (Result[], Bool) {
-        if numPhaseQubits < 1 {
-            fail "The QPE phase register must contain at least one qubit.";
-        }
-        if amplificationRounds < 0 {
-            fail "The number of amplitude-amplification rounds must be nonnegative.";
-        }
-
+        measuredIndices : Int[],
+    ) : Result[] {
         use register = Qubit[numPhaseQubits + numSystemQubits + numAncillaQubits];
-        ApplyAmplifiedStandardQPE(
+        ApplyCoherentStandardQPE(
             statePrep,
             controlledUnitary,
             phaseQubitPrep,
             numPhaseQubits,
             numSystemQubits,
-            signalAncillaIndices,
-            acceptedPhaseIndices,
-            amplificationRounds,
             register,
         );
+        let results = MeasureSelected(register, measuredIndices);
+        ResetAll(register);
+        return results;
+    }
 
-        let targets = register[numPhaseQubits...];
-        let signalAncillas = Subarray(signalAncillaIndices, targets);
-
-        mutable accepted = true;
-        for ancilla in signalAncillas {
-            if M(ancilla) == One {
-                set accepted = false;
-            }
+    /// # Summary
+    /// Measures the requested register indices in the requested order.
+    operation MeasureSelected(register : Qubit[], measuredIndices : Int[]) : Result[] {
+        mutable results = [Zero, size = Length(measuredIndices)];
+        for index in 0..Length(measuredIndices) - 1 {
+            set results w/= index <- MResetZ(register[measuredIndices[index]]);
         }
-
-        // The phase register is most-significant-bit first.
-        mutable phaseResults = [Zero, size = numPhaseQubits];
-        mutable phaseIndex = 0;
-        for bitIndex in 0..numPhaseQubits - 1 {
-            let result = MResetZ(register[bitIndex]);
-            set phaseResults w/= bitIndex <- result;
-            if result == One {
-                set phaseIndex = phaseIndex ||| (1 <<< (numPhaseQubits - 1 - bitIndex));
-            }
-        }
-
-        mutable phaseAccepted = false;
-        for acceptedIndex in acceptedPhaseIndices {
-            if phaseIndex == acceptedIndex {
-                set phaseAccepted = true;
-            }
-        }
-        set accepted = accepted and phaseAccepted;
-
-        ResetAll(targets);
-        return (phaseResults, accepted);
+        return results;
     }
 }

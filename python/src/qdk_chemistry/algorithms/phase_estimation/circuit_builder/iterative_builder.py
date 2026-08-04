@@ -96,8 +96,15 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Raises:
             ValueError: If ``num_iteration`` >= ``num_bits``.
+            ValueError: If ``coherent`` is enabled, which iterative QPE cannot support.
 
         """
+        if self.is_coherent():
+            raise ValueError(
+                "Iterative phase estimation measures and resets the phase qubit on every "
+                "iteration, so it cannot build a coherent (measurement-free, adjointable) "
+                "circuit. Use the qdk_standard QPE circuit builder instead."
+            )
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")

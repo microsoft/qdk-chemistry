@@ -5,8 +5,8 @@ Amplitude amplification boosts the probability that a quantum computation lands 
 In QDK/Chemistry its main use is to rescue a :doc:`phase estimation <phase_estimation>` run whose guiding state has poor overlap with the eigenstate of interest: instead of repeating the whole QPE circuit :math:`O(1/a)` times, amplitude amplification succeeds after :math:`O(1/\sqrt{a})` repetitions of a marked QPE circuit.
 
 .. note::
-   Amplitude amplification is a Q#-level primitive plus a classical scheduling helper, not a registry algorithm class.
-   The quantum operations live in the Q# namespace ``QDKChemistry.Utils.AmplitudeAmplification``; the round-count policy lives in :mod:`qdk_chemistry.algorithms.amplitude_amplification.schedule`.
+   Amplitude amplification is a registry algorithm type (``amplitude_amplification``) with one implementation, ``qdk_amplified_qpe``.
+   The quantum operations live in the Q# namespace ``QDKChemistry.Utils.AmplitudeAmplification``; the round-count policy lives in :mod:`qdk_chemistry.algorithms.amplitude_amplification.schedule` and is reachable through the algorithm's settings.
 
 Overview
 --------
@@ -156,6 +156,87 @@ Example::
 Amplified phase estimation
 --------------------------
 
+.. note::
+   This algorithm is currently available only in the Python API.
+
+:class:`~qdk_chemistry.algorithms.amplitude_amplification.amplified_phase_estimation.AmplifiedPhaseEstimation` (registered as ``amplitude_amplification/qdk_amplified_qpe``) composes the amplification loop with a :doc:`QpeCircuitBuilder <qpe_circuit_builder>`.
+It is configured exactly like :doc:`PhaseEstimation <phase_estimation>` — same nested ``qpe_circuit_builder`` and ``circuit_executor`` refs, same :class:`~qdk_chemistry.data.QpeResult` output — plus the settings that define the good subspace and the round count:
+
+.. code-block:: python
+
+    from qdk_chemistry.algorithms import create
+    from qdk_chemistry.data import AlgorithmRef
+
+    qpe = create("amplitude_amplification", "qdk_amplified_qpe")
+    qpe.settings().update(
+        "qpe_circuit_builder",
+        AlgorithmRef(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=8,
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        ),
+    )
+    qpe.settings().update("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+    qpe.settings().update("shots", 200)
+
+    # The guiding state overlap is believed to be at most 5%; amplify the energies
+    # near the expected ground state.
+    qpe.settings().update("round_policy", "safe")
+    qpe.settings().update("max_overlap", 0.05)
+    qpe.settings().update("min_energy", -1.20)
+    qpe.settings().update("max_energy", -1.05)
+
+    result = qpe.run(state_preparation=state_prep, qubit_hamiltonian=hamiltonian)
+    result.raw_energy
+    result.metadata["acceptance_probability"]
+    result.metadata["amplification_rounds"]
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``qpe_circuit_builder``
+     - ``algorithm_ref``
+     - The QPE circuit builder used as the state preparation. Must be a standard (QFT-based) builder; the algorithm switches it into ``coherent`` mode automatically.
+   * - ``circuit_executor``
+     - ``algorithm_ref``
+     - Backend that executes the amplified circuit.
+   * - ``shots``
+     - ``int``
+     - Number of shots (default 100).
+   * - ``rounds``
+     - ``int``
+     - Explicit number of amplification rounds. Negative (the default) means derive it from ``round_policy``.
+   * - ``round_policy``
+     - ``string``
+     - One of ``fixed``, ``safe`` (default), ``robust``, ``optimal``, ``fixed_point``. See `Choosing the number of rounds`_.
+   * - ``min_overlap``
+     - ``double``
+     - Lower bound on the overlap, used by ``robust``, ``optimal`` and ``fixed_point``.
+   * - ``max_overlap``
+     - ``double``
+     - Upper bound on the overlap, used by ``safe`` and ``robust``. Defaults to ``1.0``, for which ``safe`` yields zero rounds — amplification is off until you supply a real bound.
+   * - ``tolerance``
+     - ``double``
+     - Fixed-point tolerance :math:`\delta`; success is guaranteed to exceed :math:`1-\delta^2` (default 0.1).
+   * - ``accepted_phase_indices``
+     - ``vector<int>``
+     - Phase-register indices that count as good. Empty (the default) means derive them from the energy window.
+   * - ``min_energy`` / ``max_energy``
+     - ``double``
+     - Accepted energy window, converted to phase indices through the unitary container's own phase-to-eigenvalue map, so the same window works for Trotter and qubitization alike. Used only when ``accepted_phase_indices`` is empty.
+
+Acceptance statistics are returned in :attr:`~qdk_chemistry.data.QpeResult.metadata`: ``amplification_rounds``, ``round_policy``, ``accepted_phase_indices``, ``accepted_shots``, ``total_shots``, ``acceptance_probability`` and ``preparations_per_shot`` (:math:`2k+1`), plus the predicted acceptance at the overlap bounds when those are set.
+
+.. rubric:: How it works
+
 The ``AmplitudeAmplification`` Q# module ships a ready-made marking oracle for phase estimation.
 ``ApplyQpeAcceptanceMark`` flips its target when **both** conditions hold:
 
@@ -167,7 +248,10 @@ Because a qubitization walk encodes energies through :math:`\mu = \alpha\cos(2\p
 ``ApplyAcceptedPhaseMark`` detects that shape and marks it with two comparisons; arbitrary accepted sets fall back to one multiply-controlled flip per index.
 
 ``ApplyCoherentStandardQPE`` provides the adjointable, measurement-free QPE circuit that serves as the state preparation :math:`U_\psi`, and ``ApplyAmplifiedStandardQPE`` wires the two together.
-Because the amplification loop must apply :math:`U_\psi^\dagger`, the controlled walk operators have to be adjointable; build them with ``QDKChemistry.Utils.PrepSelPrep.MakeAdjointableControlledPSPWalkOp`` rather than the resource-estimation-cached factories.
+Because the amplification loop must apply :math:`U_\psi^\dagger`, the controlled walk operators have to be adjointable; setting ``coherent`` on the circuit builder makes it request the adjointable variants (``QDKChemistry.Utils.PrepSelPrep.MakeAdjointableControlledPSPWalkOp`` and ``QDKChemistry.Utils.ControlledPauliExp.MakeAdjointableRepControlledPauliExpOp``) instead of the resource-estimation-cached factories.
+Iterative QPE measures and resets its phase qubit on every iteration, so it cannot be used as the preparation and rejects ``coherent``.
+
+Acceptance is decided classically in Python from the measured bits rather than by mid-circuit branching in Q#, which keeps the circuit entry points compatible with the restricted target profiles used for QIR generation and resource estimation.
 
 .. warning::
    Amplitude amplification changes how *often* the phase-estimation window is accepted; it does not change *what* is accepted.
@@ -177,6 +261,8 @@ Because the amplification loop must apply :math:`U_\psi^\dagger`, the controlled
 References
 ----------
 
+- :doc:`PhaseEstimation <phase_estimation>`: the un-amplified algorithm this one wraps.
+- :doc:`QpeCircuitBuilder <qpe_circuit_builder>`: the nested algorithm that builds the coherent preparation.
 - Lin, L. *Lecture Notes on Quantum Algorithms for Scientific Computation*, `arXiv:2201.08309 <https://arxiv.org/abs/2201.08309>`_, Chapter 2.
 - Brassard, G., Høyer, P., Mosca, M., and Tapp, A. *Quantum Amplitude Amplification and Estimation*, `arXiv:quant-ph/0005055 <https://arxiv.org/abs/quant-ph/0005055>`_.
 - Yoder, T. J., Low, G. H., and Chuang, I. L. *Fixed-point quantum search with an optimal number of queries*, Phys. Rev. Lett. **113**, 210501 (2014), `arXiv:1409.3305 <https://arxiv.org/abs/1409.3305>`_.
