@@ -24,7 +24,7 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper.sossa_mapper import SOSSAMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper.base import UnaryIterationWalkMapper
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -133,6 +133,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     is the query count. Omitting slot :math:`t` realizes :math:`W^{p-2t}` while applying
     exactly :math:`p` walk blocks, so :math:`p` need not be a power of two.
 
+    The builder works with any controlled circuit mapper satisfying
+    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.base.UnaryIterationWalkMapper`;
+    the SOSSA mapper is only the default.
+
     """
 
     def __init__(
@@ -219,7 +223,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             A single-element list containing the unary-iteration QPE circuit.
 
         Raises:
-            TypeError: If the configured controlled circuit mapper is not the SOSSA mapper.
+            TypeError: If the configured controlled circuit mapper cannot build a
+                unary-iteration walk operator.
             RuntimeError: If the state preparation circuit has no Q# operation.
 
         """
@@ -229,10 +234,16 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_bits = num_phase_bits(num_queries)
 
         mapper = self._create_nested("controlled_circuit_mapper")
-        if not isinstance(mapper, SOSSAMapper):
+        if not isinstance(mapper, UnaryIterationWalkMapper):
+            missing = [
+                name
+                for name in ("build_walk_op", "num_ancillary_qubits", "get_ancilla_prep_op")
+                if not callable(getattr(mapper, name, None))
+            ]
             raise TypeError(
-                "QdkUnaryQpeCircuitBuilder requires the SOSSA controlled circuit mapper, "
-                f"but got {type(mapper)} instead."
+                f"{type(mapper).__name__} cannot drive unary-iteration phase estimation because it "
+                f"does not implement {missing}. A controlled circuit mapper must satisfy the "
+                "UnaryIterationWalkMapper interface."
             )
         unary_iteration_op = mapper.build_walk_op(unitary_rep, num_queries, use_unary_iteration=True)
         num_ancilla_qubits = mapper.num_ancillary_qubits(unitary_rep.get_container())

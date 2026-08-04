@@ -6,12 +6,63 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from typing import Any, Protocol, runtime_checkable
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
-__all__: list[str] = ["ControlledCircuitMapper", "ControlledCircuitMapperFactory", "ControlledCircuitMapperSettings"]
+__all__: list[str] = [
+    "ControlledCircuitMapper",
+    "ControlledCircuitMapperFactory",
+    "ControlledCircuitMapperSettings",
+    "UnaryIterationWalkMapper",
+]
+
+
+@runtime_checkable
+class UnaryIterationWalkMapper(Protocol):
+    """Capability a controlled circuit mapper needs to drive unary-iteration phase estimation.
+
+    A mapper satisfies this interface when its block encoding is a self-inverse walk
+    operator whose reflection can be skipped under the control of a phase register, so
+    that branch ``t`` realizes :math:`W^{p - 2t}` while still applying exactly :math:`p`
+    blocks. Membership is structural: any mapper defining these three methods qualifies,
+    without having to subclass anything.
+
+    """
+
+    def build_walk_op(
+        self,
+        unitary: UnitaryRepresentation,
+        num_queries: int,
+        use_unary_iteration: bool = True,
+    ) -> Any:
+        """Build the walk callable acting on (control register, system + ancilla register).
+
+        Args:
+            unitary: The unitary representation holding the block encoding.
+            num_queries: Number of walk blocks to apply.
+            use_unary_iteration: Whether the control register is a phase register iterated over.
+
+        Returns:
+            A Q# callable accepting the control register and the system/ancilla register.
+
+        """
+        ...
+
+    def num_ancillary_qubits(self, container: Any) -> int:
+        """The number of ancilla qubits the walk operator needs beyond the system register."""
+        ...
+
+    def get_ancilla_prep_op(self) -> Any:
+        """Return the Q# callable that initializes those ancillas.
+
+        Returns:
+            A Q# callable preparing the ancilla register, or a no-op when none is needed.
+
+        """
+        ...
 
 
 class ControlledCircuitMapperSettings(Settings):
