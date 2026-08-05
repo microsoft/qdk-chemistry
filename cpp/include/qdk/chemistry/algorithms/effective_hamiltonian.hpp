@@ -7,6 +7,7 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 
@@ -17,14 +18,15 @@ namespace qdk::chemistry::algorithms {
  * @brief Abstract base for constructing an effective Hamiltonian.
  *
  * Given a reference wavefunction and an input Hamiltonian, a concrete
- * implementation constructs an effective Hamiltonian in the active space
- * specified by the reference wavefunction.
+ * implementation constructs an effective Hamiltonian in an explicitly
+ * specified target P-space.
  */
 class EffectiveHamiltonianConstructor
     : public Algorithm<EffectiveHamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Wavefunction>,
-                       std::shared_ptr<data::Hamiltonian>> {
+                       std::shared_ptr<data::Hamiltonian>,
+                       std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
  public:
   EffectiveHamiltonianConstructor() = default;
   virtual ~EffectiveHamiltonianConstructor() = default;
@@ -47,14 +49,16 @@ class EffectiveHamiltonianConstructor
   /**
    * @brief Construct an effective Hamiltonian from a reference wavefunction.
    *
-   * @param reference Reference wavefunction providing the reference state and
-   *        defining the target active space.
+   * @param reference Reference wavefunction providing the reference state.
    * @param hamiltonian Input Hamiltonian to transform.
+   * @param p_space_indices Target P-space orbital indices.
    * @return The effective Hamiltonian.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
-      std::shared_ptr<data::Hamiltonian> hamiltonian) const override = 0;
+      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_space_indices)
+      const override = 0;
 };
 
 /**

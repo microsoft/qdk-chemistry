@@ -33,10 +33,12 @@ class EffectiveHamiltonianConstructorBase
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction> reference,
-      std::shared_ptr<Hamiltonian> hamiltonian) const override {
+      std::shared_ptr<Hamiltonian> hamiltonian,
+      std::shared_ptr<const SymmetryBlockedIndexSet> p_space_indices)
+      const override {
     PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
                            EffectiveHamiltonianConstructor, _run_impl,
-                           reference, hamiltonian);
+                           reference, hamiltonian, p_space_indices);
   }
 };
 
@@ -47,12 +49,13 @@ void bind_effective_hamiltonian_constructor(py::module &m) {
 Abstract base class for effective-Hamiltonian construction.
 
 Concrete implementations construct an effective Hamiltonian from a reference
-wavefunction and an input Hamiltonian.
+wavefunction and an input Hamiltonian in the explicitly specified P-space.
 )");
 
   constructor.def(py::init<>());
   constructor.def("run", &EffectiveHamiltonianConstructor::run,
-                  py::arg("reference"), py::arg("hamiltonian"));
+                  py::arg("reference"), py::arg("hamiltonian"),
+                  py::arg("p_space_indices"));
   constructor.def("settings", &EffectiveHamiltonianConstructor::settings,
                   py::return_value_policy::reference_internal);
   constructor.def_property(
@@ -68,7 +71,8 @@ wavefunction and an input Hamiltonian.
   constructor.def("name", &EffectiveHamiltonianConstructor::name);
   constructor.def("type_name", &EffectiveHamiltonianConstructor::type_name);
   constructor.def("hash", &EffectiveHamiltonianConstructor::hash,
-                  py::arg("reference"), py::arg("hamiltonian"));
+                  py::arg("reference"), py::arg("hamiltonian"),
+                  py::arg("p_space_indices"));
   constructor.def("__repr__", [](const EffectiveHamiltonianConstructor &) {
     return "<qdk_chemistry.algorithms.EffectiveHamiltonianConstructor>";
   });
