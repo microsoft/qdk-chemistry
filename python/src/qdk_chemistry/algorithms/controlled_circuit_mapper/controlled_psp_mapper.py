@@ -93,28 +93,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         """
         return "controlled_circuit_mapper"
 
-    def _resolve_lcu(self, container: Any) -> tuple[LCUContainer, int, bool]:
-        """Unwrap a container into its LCU data, power, and whether to apply the reflection.
-
-        Args:
-            container: The container held by the unitary representation.
-
-        Returns:
-            The LCU data, the requested power, and whether the container is a quantum walk.
-
-        Raises:
-            ValueError: If the container is neither an LCU nor an LCU walk.
-
-        """
-        if isinstance(container, LCUWalkContainer):
-            return container.block_encoding, container.power, True
-        if isinstance(container, LCUContainer):
-            return container, container.power, False
-        raise ValueError(
-            f"Container type '{type(container).__name__}' is not supported. "
-            "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."
-        )
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled block-encoding circuit.
 
@@ -127,7 +105,22 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             Circuit: A quantum circuit implementing the controlled block encoding.
 
         """
-        lcu, power, use_quantum_walk = self._resolve_lcu(unitary.get_container())
+        container = unitary.get_container()
+
+        # Resolve container type → LCU data + dispatch flag
+        if isinstance(container, LCUWalkContainer):
+            lcu = container.block_encoding
+            power = container.power
+            use_quantum_walk = True
+        elif isinstance(container, LCUContainer):
+            lcu = container
+            power = container.power
+            use_quantum_walk = False
+        else:
+            raise ValueError(
+                f"Container type '{unitary.get_container_type()}' is not supported. "
+                "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."
+            )
 
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
@@ -174,7 +167,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             reflection acts on.
 
         """
-        lcu, _, _ = self._resolve_lcu(container)
+        lcu = container.block_encoding if isinstance(container, LCUWalkContainer) else container
         return lcu.num_prepare_ancillas
 
     def build_walk_op(
@@ -207,7 +200,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         if num_queries <= 0:
             raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
 
-        lcu, _, _ = self._resolve_lcu(unitary.get_container())
+        container = unitary.get_container()
+        lcu = container.block_encoding if isinstance(container, LCUWalkContainer) else container
         if lcu.num_prepare_ancillas == 0:
             raise ValueError(
                 "A signed-power schedule needs a non-empty ancilla register to reflect about, "
