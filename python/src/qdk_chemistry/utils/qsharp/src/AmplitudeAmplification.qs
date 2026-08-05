@@ -16,6 +16,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     import Std.Arithmetic.*;
     import Std.Arrays.Subarray;
     import Std.Core.Length;
+    import Std.Measurement.MResetEachZ;
     import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
@@ -102,6 +103,25 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBound, upperBound, _, _)
     }
 
+    /// # Summary
+    /// Applies the marking oracle to an all-zeros register and measures the flag.
+    /// An entry point so the oracle can be run, drawn and costed on its own;
+    /// `MarkTargetStateOp` returns a callable and cannot be executed directly.
+    operation MakeMarkedPhaseCircuit(
+        numPhaseQubits : Int,
+        signalAncillaIndices : Int[],
+        lowerBound : Int,
+        upperBound : Int,
+        numQubits : Int,
+    ) : Result[] {
+        use register = Qubit[numQubits];
+        use flag = Qubit();
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBound, upperBound, register, flag);
+        let outcome = MResetZ(flag);
+        ResetAll(register);
+        return [outcome];
+    }
+
     //
     // Elementary reflections
     //
@@ -175,33 +195,27 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     // control flow, so they compile under the restricted target profiles.
 
     /// # Summary
-    /// Builds and measures an amplitude-amplified circuit.
-    ///
-    /// # Input
-    /// ## measuredIndices
-    /// Register indices to measure, in output order.
+    /// Builds an amplitude-amplified circuit and measures the whole register.
     operation MakeAmplifiedCircuit(
         statePrepOracle : Qubit[] => Unit is Adj,
         goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         rounds : Int,
         numQubits : Int,
-        measuredIndices : Int[],
     ) : Result[] {
         use register = Qubit[numQubits];
         ApplyAmplitudeAmplification(statePrepOracle, goodStateOracle, rounds, register);
-        let results = MeasureSelected(register, measuredIndices);
-        ResetAll(register);
-        return results;
+        return MResetEachZ(register);
     }
 
     /// # Summary
-    /// Measures the requested register indices, in order.
-    operation MeasureSelected(register : Qubit[], measuredIndices : Int[]) : Result[] {
-        mutable results = [Zero, size = Length(measuredIndices)];
-        for index in 0..Length(measuredIndices) - 1 {
-            set results w/= index <- MResetZ(register[measuredIndices[index]]);
-        }
-        return results;
+    /// The amplified state preparation as a callable, without measurement, so a
+    /// caller can append its own measurement or compose it further.
+    function MakeAmplifiedStateOp(
+        statePrepOracle : Qubit[] => Unit is Adj,
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
+        rounds : Int,
+    ) : Qubit[] => Unit is Adj {
+        ApplyAmplitudeAmplification(statePrepOracle, goodStateOracle, rounds, _)
     }
 
     /// # Summary

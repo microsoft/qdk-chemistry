@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
@@ -80,7 +81,7 @@ def _amplified_qpe_circuit(
     mapper: str = "prepare_select_prepare",
     unitary: AlgorithmRef | None = None,
     **settings,
-) -> Circuit:
+) -> tuple[Circuit, int, int]:
     """Compose a coherent QPE preparation with amplitude amplification."""
     state_prep_oracle, num_qubits, signal_ancilla_indices = _qpe_preparation(
         qubit_hamiltonian,
@@ -90,35 +91,38 @@ def _amplified_qpe_circuit(
         unitary=unitary,
     )
     good_state_oracle = phase_marking_oracle(num_bits, accepted_range, signal_ancilla_indices)
-    # The executor reverses the Q# results, so emitting the ancillas reversed and
-    # ahead of the phase indices makes the key read phase register MSB first.
-    ancilla_indices = list(range(num_qubits - len(signal_ancilla_indices), num_qubits))
-    measured_indices = list(reversed(ancilla_indices)) + list(range(num_bits))
 
     algorithm = create("amplitude_amplification")
     for key, value in settings.items():
         algorithm.settings().update(key, value)
-    return algorithm.run(state_prep_oracle, good_state_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
+    circuit = algorithm.run(state_prep_oracle, good_state_oracle, num_qubits=num_qubits)
+    return circuit, num_qubits, len(signal_ancilla_indices)
 
 
 def _accepted_phase_counts(
-    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int
+    circuit: Circuit, num_bits: int, num_ancilla: int, accepted_range: tuple[int, int], shots: int
 ) -> dict[str, int]:
-    """Execute a circuit and count, per phase bitstring, the shots in the good subspace."""
+    """Execute a circuit and count, per phase bitstring, the shots in the good subspace.
+
+    The whole register is measured. The executor reverses the Q# results, so the little-endian
+    phase register lands MSB first at the end of the key and the trailing ancillas land at the front.
+    """
     lower_bound, upper_bound = accepted_range
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
     counts: dict[str, int] = {}
     for bitstring, count in executor.run(circuit, shots=shots).bitstring_counts.items():
-        phase_bits, ancilla_bits = bitstring[:num_bits], bitstring[num_bits:]
+        phase_bits, ancilla_bits = bitstring[-num_bits:], bitstring[:num_ancilla]
         if any(bit != "0" for bit in ancilla_bits) or not lower_bound <= int(phase_bits, 2) < upper_bound:
             continue
         counts[phase_bits] = counts.get(phase_bits, 0) + count
     return counts
 
 
-def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400) -> str:
+def _dominant_accepted_phase(
+    circuit: Circuit, num_bits: int, num_ancilla: int, accepted_range: tuple[int, int], shots: int = 400
+) -> str:
     """Execute a circuit and return the most common bitstring from the good subspace."""
-    counts = _accepted_phase_counts(circuit, num_bits, accepted_range, shots)
+    counts = _accepted_phase_counts(circuit, num_bits, num_ancilla, accepted_range, shots)
     assert counts, f"No shot landed in the accepted window {accepted_range}."
     return max(counts, key=lambda phase: counts[phase])
 
@@ -141,13 +145,13 @@ def test_amplified_qpe_circuit():
     # The |11> eigenvector has energy -lambda, which the qubitization walk maps
     # to the phase bin 1/2 -- index 8 of 16, big-endian 0b1000.
     accepted = (8, 9)
-    circuit = _amplified_qpe_circuit(
+    circuit, _, num_ancilla = _amplified_qpe_circuit(
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 3),
         accepted,
         rounds=2,
     )
-    assert _dominant_accepted_phase(circuit, 4, accepted) == "1000"
+    assert _dominant_accepted_phase(circuit, 4, num_ancilla, accepted) == "1000"
 
 
 def test_amplified_qpe_circuit_with_trotter():
@@ -155,7 +159,7 @@ def test_amplified_qpe_circuit_with_trotter():
     # The pauli-sequence mapper has no block-encoding ancillas, so the accepted
     # window is defined purely on the phase register.
     accepted = (4, 5)
-    circuit = _amplified_qpe_circuit(
+    circuit, _, num_ancilla = _amplified_qpe_circuit(
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 3),
         accepted,
@@ -164,30 +168,55 @@ def test_amplified_qpe_circuit_with_trotter():
         rounds=1,
     )
     # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16.
-    assert _dominant_accepted_phase(circuit, 4, accepted, shots=200) == "0100"
+    assert _dominant_accepted_phase(circuit, 4, num_ancilla, accepted, shots=200) == "0100"
 
 
 def test_amplified_qpe_acceptance_follows_the_round_count():
     """More rounds drive more shots into the accepted window at this overlap."""
     accepted = (8, 9)
     shots = 2000
-    observed = {
-        rounds: sum(
-            _accepted_phase_counts(
-                _amplified_qpe_circuit(
-                    _diagonal_hamiltonian(),
-                    _guiding_state(0.3, 3),
-                    accepted,
-                    rounds=rounds,
-                ),
-                4,
-                accepted,
-                shots,
-            ).values()
+    observed = {}
+    for rounds in (0, 1, 2):
+        circuit, _, num_ancilla = _amplified_qpe_circuit(
+            _diagonal_hamiltonian(),
+            _guiding_state(0.3, 3),
+            accepted,
+            rounds=rounds,
         )
-        / shots
-        for rounds in (0, 1, 2)
-    }
+        counts = _accepted_phase_counts(circuit, 4, num_ancilla, accepted, shots)
+        observed[rounds] = sum(counts.values()) / shots
 
     assert observed[1] > observed[0]
     assert observed[2] > observed[1]
+
+
+def test_marking_oracle_circuit_is_executable():
+    """The oracle circuit runs on its own: it marks the all-zeros register when bin 0 is accepted."""
+    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+    assert executor.run(phase_marking_oracle(3, (0, 1)), shots=20).bitstring_counts == {"1": 20}
+    assert executor.run(phase_marking_oracle(3, (1, 8)), shots=20).bitstring_counts == {"0": 20}
+
+
+def test_amplified_circuit_exposes_a_measurement_free_operation():
+    """The result carries an unmeasured qsharp_op, so a caller can append its own measurement."""
+    circuit, num_qubits, _ = _amplified_qpe_circuit(
+        _diagonal_hamiltonian(),
+        _guiding_state(0.3, 3),
+        (8, 9),
+        rounds=1,
+    )
+    assert circuit._qsharp_op is not None
+
+    measured = Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.MeasurementBasis.MakeMeasurementCircuit,
+            parameter={
+                "baseCircuit": circuit._qsharp_op,
+                "bases": [qsharp.Pauli.Z] * num_qubits,
+                "numQubits": num_qubits,
+            },
+        )
+    )
+    counts = create("circuit_executor", "qdk_sparse_state_simulator").run(measured, shots=50).bitstring_counts
+    assert sum(counts.values()) == 50
+    assert all(len(bitstring) == num_qubits for bitstring in counts)

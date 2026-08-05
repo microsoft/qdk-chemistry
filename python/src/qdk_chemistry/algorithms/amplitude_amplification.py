@@ -29,13 +29,17 @@ def phase_marking_oracle(
 ) -> Circuit:
     r"""Build a good state oracle for a half-open range of QPE phase bins.
 
+    Executing the returned circuit applies the oracle to an all-zeros register and measures
+    the flag, so the oracle can be run, drawn and costed on its own.
+
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
         target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
         signal_ancilla_indices: Indices of ancillas after the phase qubits that must all be :math:`|0\rangle`.
 
     Returns:
-        A circuit carrying an adjointable ``(Qubit[], Qubit) => Unit`` Q# operation.
+        A circuit whose ``qsharp_op`` is the adjointable ``(Qubit[], Qubit) => Unit`` oracle, for use
+        as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
 
     Raises:
         ValueError: If the register size or target range is invalid.
@@ -62,18 +66,21 @@ def phase_marking_oracle(
     if not 0 <= lower_bound < upper_bound <= phase_bin_count:
         raise ValueError(f"target_range must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_range}.")
     ancilla_indices = [] if signal_ancilla_indices is None else [operator.index(i) for i in signal_ancilla_indices]
+    if any(index < 0 for index in ancilla_indices):
+        raise ValueError(f"signal_ancilla_indices must be nonnegative. Got {ancilla_indices}.")
 
     parameters = {
         "numPhaseQubits": num_phase_qubits,
         "signalAncillaIndices": ancilla_indices,
         "lowerBound": lower_bound,
         "upperBound": upper_bound,
+        "numQubits": num_phase_qubits + (max(ancilla_indices) + 1 if ancilla_indices else 0),
     }
-    make_oracle = QSHARP_UTILS.AmplitudeAmplification.MarkTargetStateOp
-    operation = make_oracle(num_phase_qubits, ancilla_indices, lower_bound, upper_bound)
+    amplification = QSHARP_UTILS.AmplitudeAmplification
+    operation = amplification.MarkTargetStateOp(num_phase_qubits, ancilla_indices, lower_bound, upper_bound)
 
     return Circuit(
-        qsharp_factory=QsharpFactoryData(program=make_oracle, parameter=parameters),
+        qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=parameters),
         qsharp_op=operation,
     )
 
@@ -93,7 +100,29 @@ class AmplitudeAmplificationSettings(Settings):
 
 
 class AmplitudeAmplification(Algorithm):
-    r"""Build an amplitude-amplified circuit."""
+    r"""Build an amplitude-amplified circuit.
+
+    Amplitude amplification raises the probability of measuring a state in a chosen
+    "good" subspace. Given a state preparation :math:`U` with
+    :math:`|\psi\rangle = U|0\rangle` and an oracle that flips a flag qubit on the good
+    subspace, one round applies the Grover iterate
+    :math:`Q = -(2|\psi\rangle\langle\psi| - I)(I - 2\Pi_G)`, a rotation by
+    :math:`2\vartheta` in the plane spanned by the good and bad components. If the good
+    subspace initially carries probability :math:`a = \sin^2\vartheta`, then after
+    :math:`k` rounds it carries
+
+    .. math::
+
+        p_k = \sin^2\!\big((2k+1)\arcsin\sqrt{a}\big),
+
+    so :math:`O(1/\sqrt{a})` rounds suffice where direct sampling would need
+    :math:`O(1/a)` shots. More rounds are not always better: past the first maximum near
+    :math:`k \approx \pi/(4\arcsin\sqrt{a})` the success probability falls again, so pick
+    ``rounds`` from an estimate of :math:`a`.
+
+    Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,
+    arXiv:2201.08309, Chapter 2.
+    """
 
     def __init__(self):
         """Initialize amplitude amplification."""
@@ -114,23 +143,27 @@ class AmplitudeAmplification(Algorithm):
         state_prep_oracle: Circuit,
         good_state_oracle: Circuit,
         num_qubits: int,
-        measured_indices: list[int] | None = None,
     ) -> Circuit:
         r"""Build an amplitude-amplified circuit.
 
+        ``num_qubits`` is the width of the register both oracles act on. A Q#
+        ``Qubit[] => Unit`` carries no arity, so it cannot be read back from either oracle
+        and must be given here. It is the register the state preparation was built for: for
+        an amplified QPE circuit that is the phase register, plus the system qubits, plus
+        any block-encoding ancillas.
+
         Args:
-            state_prep_oracle: Prepare the initial state.
-            good_state_oracle: Flip a flag qubit on the good subspace.
-            num_qubits: Size of the register both callables act on.
-            measured_indices: Register indices to measure, in output order.
-                Defaults to the whole register.
+            state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.
+            good_state_oracle: Flips a flag qubit on the good subspace. Must carry an adjointable Q# operation.
+            num_qubits: Size of the register both oracles act on.
 
         Returns:
-            The amplified circuit.
+            The amplified circuit, measuring the whole register. Its ``qsharp_op`` is the same
+            amplification without measurement, for callers that append their own.
 
         Raises:
             TypeError: If either circuit carries no adjointable Q# operation.
-            ValueError: If ``num_qubits`` or ``measured_indices`` is out of range.
+            ValueError: If ``num_qubits`` or the ``rounds`` setting is out of range.
 
         """
         Logger.trace_entering()
@@ -143,10 +176,6 @@ class AmplitudeAmplification(Algorithm):
         if num_qubits < 1:
             raise ValueError(f"num_qubits must be positive. Got {num_qubits}.")
 
-        indices = list(range(num_qubits)) if measured_indices is None else [int(index) for index in measured_indices]
-        if any(index < 0 or index >= num_qubits for index in indices):
-            raise ValueError(f"measured_indices must lie in [0, {num_qubits}). Got {indices}.")
-
         rounds = int(self._settings.get("rounds"))
         if rounds < 0:
             raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
@@ -156,11 +185,11 @@ class AmplitudeAmplification(Algorithm):
             "goodStateOracle": good_state_operation,
             "rounds": rounds,
             "numQubits": num_qubits,
-            "measuredIndices": indices,
         }
         Logger.info(f"Amplified circuit uses {2 * rounds + 1} state preparations.")
         return Circuit(
-            qsharp_factory=QsharpFactoryData(program=amplification.MakeAmplifiedCircuit, parameter=parameters)
+            qsharp_factory=QsharpFactoryData(program=amplification.MakeAmplifiedCircuit, parameter=parameters),
+            qsharp_op=amplification.MakeAmplifiedStateOp(operation, good_state_operation, rounds),
         )
 
 

@@ -21,6 +21,38 @@ This gives the :math:`O(1/\sqrt{a})` query scaling. More rounds are not
 always better: after the first maximum, additional rounds reduce the success
 probability. Choose ``rounds`` from an estimate of state overlap :math:`a`.
 
+Using amplitude amplification
+-----------------------------
+
+.. note::
+   This algorithm is currently available only in the Python API.
+
+.. rubric:: Creating an amplitude amplification algorithm
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
+
+.. rubric:: Configuring settings
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
+
+``run`` also takes ``num_qubits``, the width of the register both oracles act on. A Q#
+``Qubit[] => Unit`` carries no arity, so this cannot be read back from either oracle. It is
+the register the state preparation was built for: for the amplified QPE below, the phase
+register plus the system qubits plus the block-encoding ancillas.
+
+The returned circuit measures the whole register. It also carries the same amplification
+without measurement as a Q# callable, so a caller can append its own measurement instead.
+
 Amplitude amplified QPE
 -----------------------
 
@@ -33,13 +65,12 @@ The :func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracl
 helper builds a :class:`~qdk_chemistry.data.Circuit` that marks a half-open
 range of phase bins:
 
-.. code-block:: python
+.. tab:: Python API
 
-   from qdk_chemistry.algorithms import phase_marking_oracle
-
-   selected_bins = phase_marking_oracle(8, (12, 15))
-   lower_bins = phase_marking_oracle(8, (0, 32))
-   upper_bins = phase_marking_oracle(8, (224, 256))
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-oracle
+      :end-before: # end-cell-oracle
 
 The helper interprets the first ``num_phase_qubits`` qubits as a little-endian
 integer and marks values in ``[start, stop)``. For a phase bin ``j``, use
@@ -50,9 +81,33 @@ A block-encoded walk operator only certifies its phase estimate when its signal
 ancillas return to :math:`|0\rangle`. Pass their indices, counted from the first
 qubit after the phase register, as a third argument to require that too:
 
-.. code-block:: python
+.. tab:: Python API
 
-   trusted_bins = phase_marking_oracle(8, (12, 15), [2, 3])
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-trusted-bins
+      :end-before: # end-cell-trusted-bins
+
+.. rubric:: Running amplified QPE
+
+Build a measurement-free QPE circuit, mark the target phase bin, and amplify:
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
+
+Available implementations
+-------------------------
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/amplitude_amplification.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
 
 Settings
 --------
