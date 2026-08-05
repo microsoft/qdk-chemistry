@@ -8,8 +8,6 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     cosine_window_state,
@@ -152,16 +150,20 @@ class TestBlockEncodingAgnosticSchedule:
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract.
 
         The Q# wrapper runs ``ApplySignedPowerSchedule`` at address ``t`` and then
-        explicitly undoes ``W^(p - 2t)`` walk steps built from the same PREPARE and SELECT.
+        explicitly undoes ``W^(p - 2t)`` walk steps built from the same two callables.
         Whatever remains must be the untouched input state, so any mismatch in the power,
         the sign of the power, the reflection register, or the ancilla bookkeeping shows up
         as a deviation.
 
-        This is the point of the generalization: the schedule never sees a container type,
-        only the two callables describing a block encoding, so a completely different one
-        drives it unchanged.
+        This is the point of the generalization: the schedule never sees a container type or
+        a PREPARE-SELECT-PREPARE symbol, only a block encoding and the reflection it pairs
+        with, both supplied here from the ``PrepSelPrep`` module, so a completely different
+        block encoding drives it unchanged.
         """
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(num_queries, address_value, 0.7)
+        psp = qdk_ctx.code.QDKChemistry.Utils.PrepSelPrep
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSignedPowerScheduleAgainstWalk(
+            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 2, 0.9
+        )
         state = np.array(qdk_ctx.dump_machine().as_dense_state())
 
         num_address_qubits = _address_qubits(num_queries + 1)
@@ -179,7 +181,10 @@ class TestBlockEncodingAgnosticSchedule:
         maximally mixing case (``theta = pi/2``). A schedule that only happened to work
         for one spectrum would fail here.
         """
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(3, 1, theta)
+        psp = qdk_ctx.code.QDKChemistry.Utils.PrepSelPrep
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSignedPowerScheduleAgainstWalk(
+            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 2, 0.9
+        )
         state = np.array(qdk_ctx.dump_machine().as_dense_state())
 
         expected = np.zeros(1 << 4, dtype=complex)
@@ -389,8 +394,14 @@ class TestUnaryQpeEndToEnd:
         """
         num_queries = 7
         num_states = num_queries + 1
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSyntheticSchedulePhaseRamp(
-            num_queries, np.pi * bin_index / num_states, True
+        psp = qdk_ctx.code.QDKChemistry.Utils.PrepSelPrep
+        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSchedulePhaseRamp(
+            psp.MakeTestBlockEncodingOp(np.pi * bin_index / num_states),
+            psp.MakeAncillaReflectionOp(1),
+            num_queries,
+            2,
+            np.pi,
+            True,
         )
         # dump_machine treats the first allocated qubit as most significant, so the row index
         # is the phase register read big-endian; reverse it to get the little-endian value.
@@ -445,21 +456,25 @@ class TestUnaryQpeEndToEnd:
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
 
-    def test_a_non_lcu_unitary_builder_is_rejected(self):
-        """A block encoding the PSP walk cannot schedule must be refused, not stumbled over.
+    def test_a_non_walk_unitary_builder_is_rejected(self):
+        """A unitary representation the schedule cannot drive must be refused, not stumbled over.
 
-        The unary builder never calls ``ControlledPSPMapper.run``, so the container check in
-        ``_run_impl`` never fires on this path: ``build_walk_op`` is the first mapper entry
-        point it touches. Swapping ``unitary_builder`` for any of the product-formula
-        algorithms is a plausible thing to try, and without a guard here the container
-        reaches an attribute access and dies as an ``AttributeError`` naming a private
-        attribute rather than the setting the caller actually got wrong.
+        The signed-power schedule interleaves the reflections itself, so it needs a mapper
+        circuit that applies the block encoding exactly once -- which is what a quantum-walk
+        container guarantees, since its power counts walk steps rather than block encodings.
+        Swapping ``unitary_builder`` for any of the product-formula algorithms is a plausible
+        thing to try, and without a guard here the container reaches an attribute access and
+        dies as an ``AttributeError`` naming a private attribute rather than the setting the
+        caller actually got wrong.
         """
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
-        unitary_rep = algorithms.create("hamiltonian_unitary_builder", "trotter").run(hamiltonian)
+        builder = QdkUnaryQpeCircuitBuilder(
+            num_queries=4,
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+        )
 
-        with pytest.raises(ValueError, match="is not supported"):
-            ControlledPSPMapper().build_walk_op(unitary_rep, 4, use_unary_iteration=True)
+        with pytest.raises(ValueError, match="quantum-walk"):
+            builder._run_impl(Circuit(qasm="OPENQASM 3.0;"), hamiltonian)
 
 
 class TestBaseProfileGuardrail:

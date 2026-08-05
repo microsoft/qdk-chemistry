@@ -13,11 +13,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.Math.AbsI;
-    import Std.Math.PI;
-    import QDKChemistry.Utils.PrepSelPrep.MakePrepSelPrepOp;
-    import QDKChemistry.Utils.PrepSelPrep.MakeTrailingAncillaSelector;
-    import QDKChemistry.Utils.PrepSelPrep.PSPWalk;
-    import QDKChemistry.Utils.PrepSelPrep.Reflect;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Number of phase qubits required to address `numQueries + 1` reflection slots.
@@ -32,7 +28,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     /// Applies `numQueries` self-inverse blocks, omitting the one reflection `phaseReg` selects.
     ///
-    /// With reflection R = Reflect(reflectionRegisterOf(allQubits)), block B, and walk W = R·B,
+    /// With reflection R = `applyReflection`, block B = `applyBlockEncoding` and walk W = R·B,
     /// the branch selected by address t applies a signed power of W: pairs before the omitted
     /// reflection compose as W† and pairs after it compose as W, leaving W^(numQueries - 2t).
     /// Because the slot sweep and the address decode share one unary-iteration ladder, the
@@ -45,25 +41,25 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// # Parameters
     /// - `applyBlockEncoding`: Applies one self-inverse block encoding B to the flat target
     ///   register. It must be its own inverse; the walk is formed here by pairing it with R.
-    /// - `reflectionRegisterOf`: Selects the sub-register the reflection acts on, i.e. the
-    ///   block-encoding ancillas whose all-zero state flags success.
+    /// - `applyReflection`: Applies the reflection R the walk pairs B with, to the same flat
+    ///   register. Taking it as a callable rather than a sub-register selector is what keeps
+    ///   this module independent of how a block encoding lays out its ancillas.
     /// - `numQueries`: Number of blocks applied; need not be a power of two.
     /// - `phaseReg`: The phase register, little-endian, addressing which reflection to omit.
     /// - `allQubits`: The flat target register (system qubits followed by block-encoding ancillas).
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
-        reflectionRegisterOf : (Qubit[] -> Qubit[]),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
         phaseReg : Qubit[],
         allQubits : Qubit[],
     ) : Unit is Adj {
         Fact(numQueries > 0, "numQueries must be positive");
-        let reflectionRegister = reflectionRegisterOf(allQubits);
         UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
             within {
                 X(selected);
             } apply {
-                Controlled Reflect([selected], reflectionRegister);
+                Controlled applyReflection([selected], allQubits);
             }
             if slot < numQueries {
                 applyBlockEncoding(allQubits);
@@ -79,8 +75,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     ///   `numQueries` times; do not lift that repetition to this call site, because fusing the
     ///   slot sweep with the address decode is what makes the schedule cost O(numQueries)
     ///   Toffolis instead of O(numQueries * log numQueries).
-    /// - `reflectionRegisterOf`: Selects the sub-register the walk reflection acts on, i.e. the
-    ///   block-encoding ancillas whose all-zero state flags success.
+    /// - `applyReflection`: Applies the reflection the walk pairs B with, on the same flat
+    ///   register.
     /// - `numQueries`: Total number of block applications; need not be a power of two.
     /// - `ancillas`: An array of indices for the phase ancilla qubits.
     /// - `systems`: An array of indices for the system qubits (state prep target).
@@ -95,7 +91,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
-        reflectionRegisterOf : (Qubit[] -> Qubit[]),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
         ancillas : Int[],
         systems : Int[],
@@ -127,7 +123,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         // ApplyQFT and the window state are big-endian; unary addressing is little-endian.
         ApplySignedPowerSchedule(
             applyBlockEncoding,
-            reflectionRegisterOf,
+            applyReflection,
             numQueries,
             Reversed(phaseAncillas),
             allTargets
@@ -152,32 +148,38 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  Test wrapper
+    //  Test wrappers
+    //
+    //  Each one takes the block encoding and its reflection as callables, so a caller
+    //  supplies whichever block encoding it wants to exercise and nothing here is tied
+    //  to a particular one.
     // ═══════════════════════════════════════════════════════════════════════════
 
     internal operation NoAncillaPrep(qs : Qubit[]) : Unit is Adj {}
 
-    /// Block B = X for the synthetic single-target walk.
-    internal operation TestXBlock(qubits : Qubit[]) : Unit is Adj {
+    /// `X` on the first qubit: a self-inverse factor usable as a block or as a reflection.
+    internal operation TestApplyX(qubits : Qubit[]) : Unit is Adj + Ctl {
         X(qubits[0]);
     }
 
-    /// Signed-power schedule with reflection A = Z and block B = X on one target
+    /// `Z` on the first qubit: a self-inverse factor usable as a block or as a reflection.
+    internal operation TestApplyZ(qubits : Qubit[]) : Unit is Adj + Ctl {
+        Z(qubits[0]);
+    }
+
+    /// Signed-power schedule with reflection R = Z and block B = X on one target
     /// prepared in Ry(0.7)|0>.
-    ///
-    /// `Reflect` on a one-qubit register is `Z`, so passing the whole target register as the
-    /// reflection register gives the A = Z, B = X walk.
     ///
     /// Branch `addressValue` must apply exactly (Z·X)^(numBlocks - 2*addressValue),
     /// including the relative phase, which distinguishes every power in the schedule.
     operation TestUnaryIterationSignedPower(numBlocks : Int, addressValue : Int) : Unit {
-        let numAddressQubits = QDKChemistry.Utils.UnaryIteration.AddressQubits(numBlocks + 1);
+        let numAddressQubits = AddressQubits(numBlocks + 1);
         let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + 1);
         let address = qs[0..numAddressQubits - 1];
         let target = qs[numAddressQubits...];
         ApplyXorInPlace(addressValue, address);
         Ry(0.7, target[0]);
-        ApplySignedPowerSchedule(TestXBlock, MakeTrailingAncillaSelector(0), numBlocks, address, target);
+        ApplySignedPowerSchedule(TestApplyX, TestApplyZ, numBlocks, address, target);
         ApplyXorInPlace(addressValue, address);
     }
 
@@ -188,7 +190,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// exact register handoff `MakeUnaryQPECircuit` performs, including `Reversed`.
     operation TestSchedulePhaseRamp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
-        reflectionRegisterOf : (Qubit[] -> Qubit[]),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
         numTargets : Int,
         systemAngle : Double,
@@ -202,7 +204,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         Ry(systemAngle, targets[0]);
         ApplySignedPowerSchedule(
             applyBlockEncoding,
-            reflectionRegisterOf,
+            applyReflection,
             numQueries,
             Reversed(phaseReg),
             targets
@@ -212,90 +214,66 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         }
     }
 
-    /// PREPARE for the synthetic PSP block encoding: a single-ancilla Ry rotation.
-    internal operation TestRyPrepare(theta : Double, ancilla : Qubit[]) : Unit is Adj + Ctl {
-        Ry(theta, ancilla[0]);
-    }
-
-    /// SELECT for the synthetic PSP block encoding: a sign flip on the system qubit.
-    internal operation TestSignSelect(ancilla : Qubit[], system : Qubit[]) : Unit is Adj + Ctl {
-        Controlled Z(ancilla, system[0]);
-    }
-
-    /// Phase ramp for the synthetic PSP block encoding, with the system in `|1>`.
+    /// Checks the generic schedule against the explicit walk power.
     ///
-    /// `PREPARE = Ry(theta)` and `SELECT = c-Z` block-encode `diag(1, cos theta)`, so the
-    /// walk phase seen by `|1>` is exactly `theta`. Choosing `theta = pi*j/N` therefore puts
-    /// the answer exactly on bin `j`, which makes the post-QFT register contents exact and
-    /// lets a test pin their endianness without sampling.
-    operation TestSyntheticSchedulePhaseRamp(
+    /// The schedule at address `t` is applied, then `W^(numQueries - 2t)` is explicitly undone
+    /// with the same two callables. If the schedule realizes the documented signed power, the
+    /// dumped state must be exactly the prepared input, with no residue on the address or
+    /// ancilla registers.
+    ///
+    /// `applyBlockEncoding` has to be self-inverse; that is what makes `W = R·B` a genuine
+    /// qubitization walk.
+    operation TestSignedPowerScheduleAgainstWalk(
+        applyBlockEncoding : (Qubit[] => Unit is Adj),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
-        theta : Double,
-        applyInverseQft : Bool,
+        addressValue : Int,
+        numTargets : Int,
+        systemAngle : Double,
     ) : Unit {
-        TestSchedulePhaseRamp(
-            MakePrepSelPrepOp(TestRyPrepare(theta, _), TestSignSelect, 1, 1, 1),
-            MakeTrailingAncillaSelector(1),
-            numQueries,
-            2,
-            PI(),
-            applyInverseQft
-        );
-    }
-
-    /// Checks the generic schedule against the explicit walk power, on a PSP block encoding.
-    ///
-    /// `B = PREPARE†·SELECT·PREPARE` with `PREPARE = Ry(theta)` on one ancilla and
-    /// `SELECT = c-Z` is Hermitian and therefore self-inverse, so `W = Reflect(ancilla)·B`
-    /// is a genuine qubitization walk encoding `cos(theta)` on the system qubit.
-    ///
-    /// The schedule at address `t` is applied, then `W^(numQueries - 2t)` is explicitly
-    /// undone. If the schedule realizes the documented signed power, the dumped state must
-    /// be exactly the prepared input, with no residue on the address or ancilla registers.
-    /// Nothing here is tied to a particular block encoding: it exercises the
-    /// block-encoding-agnostic path through the generic schedule.
-    operation TestPSPSignedPowerSchedule(numQueries : Int, addressValue : Int, theta : Double) : Unit {
-        let numAddressQubits = QDKChemistry.Utils.UnaryIteration.AddressQubits(numQueries + 1);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + 2);
+        let numAddressQubits = AddressQubits(numQueries + 1);
+        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numTargets);
         let address = qs[0..numAddressQubits - 1];
         let targets = qs[numAddressQubits...];
-        let system = targets[0..0];
-        let ancilla = targets[1..1];
 
         ApplyXorInPlace(addressValue, address);
-        Ry(0.9, system[0]);
+        Ry(systemAngle, targets[0]);
 
-        ApplySignedPowerSchedule(
-            MakePrepSelPrepOp(TestRyPrepare(theta, _), TestSignSelect, 1, 1, 1),
-            MakeTrailingAncillaSelector(1),
-            numQueries,
-            address,
-            targets
-        );
+        ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
 
+        let walk = (register) => {
+            applyBlockEncoding(register);
+            applyReflection(register);
+        };
         let power = numQueries - 2 * addressValue;
         for _ in 1..AbsI(power) {
             if power > 0 {
-                Adjoint PSPWalk(TestRyPrepare(theta, _), TestSignSelect, system, ancilla);
+                Adjoint walk(targets);
             } else {
-                PSPWalk(TestRyPrepare(theta, _), TestSignSelect, system, ancilla);
+                walk(targets);
             }
         }
 
         ApplyXorInPlace(addressValue, address);
     }
 
-    /// Block B = Rz(2*theta)·Z, which pairs with the one-qubit reflection to give W = Rz(2*theta).
-    internal operation TestRzBlock(theta : Double, qubits : Qubit[]) : Unit is Adj {
-        Z(qubits[0]);
-        Rz(2.0 * theta, qubits[0]);
+    /// Block B = Rz(theta)·X·Rz(-theta), a reflection about an axis in the XY plane.
+    ///
+    /// It is self-inverse, and it does not commute with the reflection `X` it is paired with,
+    /// so the walk W = B·X = Rz(2*theta) has genuinely distinct powers. A pair of commuting
+    /// factors (two diagonal ones, say) would make every schedule branch collapse to the same
+    /// operator and silently pass no matter what the address decode did.
+    internal operation TestRzWalkBlock(theta : Double, qubits : Qubit[]) : Unit is Adj {
+        Rz(-theta, qubits[0]);
+        X(qubits[0]);
+        Rz(theta, qubits[0]);
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
     ///
-    /// `Reflect` on the one-qubit target register is `R = Z`, and the block is
-    /// `B = Rz(2*theta) Z`, which is self-inverse because `Z Rz(a) Z = Rz(-a)`. Their product is
-    /// the walk `W = B·R = Rz(2*theta)`, with `W|0> = e^{-i*theta}|0>` and
+    /// The reflection on the one-qubit target register is `R = X` and the block is the
+    /// self-inverse `B = Rz(theta) X Rz(-theta)`. Their product is the walk
+    /// `W = B·R = Rz(2*theta)`, with `W|0> = e^{-i*theta}|0>` and
     /// `W|1> = e^{+i*theta}|1>`. A uniform window is used, so `numQueries` must be
     /// `2^b - 1` for the window to exactly fill the phase register and the outcome to
     /// be deterministic.
@@ -315,8 +293,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                     X(systems[0]);
                 }
             },
-            TestRzBlock(theta, _),
-            MakeTrailingAncillaSelector(0),
+            TestRzWalkBlock(theta, _),
+            TestApplyX,
             numQueries,
             Std.Arrays.SequenceI(0, numBits - 1),
             [numBits],

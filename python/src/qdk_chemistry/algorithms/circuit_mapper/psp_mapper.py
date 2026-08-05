@@ -59,11 +59,13 @@ class PSPMapper(CircuitMapper):
 
     No reflection is applied, so a
     :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`
-    maps to its underlying block encoding rather than to the walk
-    :math:`W = (2|0\rangle\langle 0| - I) \cdot B[H]`. Whoever schedules the walk owns the
-    reflection: :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper.ControlledPSPMapper`
-    materializes it for standard phase estimation, while unary-iteration phase estimation
-    interleaves its own so it can omit exactly one.
+    maps to a *single* application of its underlying block encoding rather than to the walk
+    :math:`W = (2|0\rangle\langle 0| - I) \cdot B[H]`: its power counts walk steps, which only
+    mean something once the reflections are interleaved. Whoever schedules the walk owns them,
+    and pairs the circuit produced here with :meth:`reflection_op`:
+    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper.ControlledPSPMapper`
+    materializes the walk for standard phase estimation, while unary-iteration phase estimation
+    interleaves its own reflections so it can omit exactly one.
 
     """
 
@@ -125,25 +127,32 @@ class PSPMapper(CircuitMapper):
 
         """
         container = evolution.get_container()
-        lcu, power, _ = self.resolve_lcu(container)
-        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
-        num_ancilla = lcu.num_prepare_ancillas
+        lcu, power, use_quantum_walk = self.resolve_lcu(container)
+        # A walk container's power counts walk steps, not block encodings, and the walk is
+        # whoever schedules the reflections' business, so only a plain LCU repeats the block.
+        block_power = 1 if use_quantum_walk else power
+
+        if lcu.prepare is not None:
+            prepare_op = self._create_nested("prepare").run(lcu.prepare)._qsharp_op  # noqa: SLF001
+        else:
+            # The 0-ancilla case has a 0-mode wavefunction, so PREPARE is a no-op.
+            prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        select_op = self._build_pauli_select_op(lcu.select)
+        num_system = lcu.select.num_target_qubits
 
         psp_parameters = {
             "prepareOp": prepare_op,
             "selectOp": select_op,
             "numSystemQubits": num_system,
-            "numAncillaQubits": num_ancilla,
-            "power": power,
+            "numAncillaQubits": lcu.num_prepare_ancillas,
+            "power": block_power,
         }
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,
             parameter=psp_parameters,
         )
-        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
-            prepare_op, select_op, num_system, num_ancilla, power
-        )
+        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system, block_power)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
@@ -161,36 +170,22 @@ class PSPMapper(CircuitMapper):
         lcu, _, _ = self.resolve_lcu(container)
         return lcu.num_prepare_ancillas
 
-    def build_prepare_select_ops(self, container: Any) -> tuple[Any, Any, int]:
-        """Expose the PREPARE and SELECT oracles so callers can compose their own schedule.
+    def reflection_op(self, container: Any):
+        """Build the reflection a qubitization walk pairs this block encoding with.
+
+        This is the seam that lets a schedule assemble its own walk without knowing that the
+        block encoding is a PREPARE-SELECT-PREPARE one: the returned callable acts on the same
+        flat ``[system | ancilla]`` register as the circuit :meth:`run` produces.
 
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The PREPARE Q# callable, the SELECT Q# callable, and the system register size.
+            A Q# callable reflecting about the all-zero state of the block-encoding ancillas.
 
         """
         lcu, _, _ = self.resolve_lcu(container)
-        return self._build_prepare_op(lcu), self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
-
-    def _build_prepare_op(self, lcu: LCUContainer):
-        """Build the PREPARE Q# operation from an LCU container.
-
-        For the 0-ancilla case the wavefunction has 0 modes, producing a no-op.
-
-        Args:
-            lcu: The LCU container holding the prepare wavefunction.
-
-        Returns:
-            A Q# callable implementing the PREPARE oracle.
-
-        """
-        if lcu.prepare is not None:
-            prepare_algorithm = self._create_nested("prepare")
-            prepare_circuit = prepare_algorithm.run(lcu.prepare)
-            return prepare_circuit._qsharp_op  # noqa: SLF001
-        return QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        return QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(lcu.select.num_target_qubits)
 
     @staticmethod
     def _build_pauli_select_op(select: Select):

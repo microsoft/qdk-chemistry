@@ -36,15 +36,17 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
     A thin wrapper over :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`,
-    which owns the PREPARE and SELECT oracles and the block encoding
+    which owns the block encoding
 
     .. math::
 
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
-    This class adds the control register, and for an
+    and the reflection it pairs with. This class only adds the control register, letting the Q#
+    ``Controlled`` functor do the work — that is what keeps ``PrepSelPrep``'s rule that PREPARE
+    and its inverse stay unconditional in one place. For an
     :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`
-    the reflection that turns the block encoding into a quantum walk:
+    it composes the block encoding with that reflection into the quantum walk:
 
     .. math::
 
@@ -110,25 +112,24 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         block_mapper = self._create_nested("circuit_mapper")
         container = unitary.get_container()
         lcu, power, use_quantum_walk = block_mapper.resolve_lcu(container)
-        prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
-        num_ancilla = lcu.num_prepare_ancillas
+        block_encoding = block_mapper.run(unitary)._qsharp_op  # noqa: SLF001
+        num_qubits = lcu.select.num_target_qubits + lcu.num_prepare_ancillas
 
         if use_quantum_walk:
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkCircuit
-            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkOp
+            reflection = block_mapper.reflection_op(container)
+            parameters = {
+                "blockEncoding": block_encoding,
+                "applyReflection": reflection,
+                "numQubits": num_qubits,
+                "power": power,
+            }
+            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledWalkCircuit
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledWalkOp(block_encoding, reflection, power)
         else:
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit
-            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp
+            parameters = {"blockEncoding": block_encoding, "numQubits": num_qubits}
+            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledBlockEncodingCircuit
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledBlockEncodingOp(block_encoding)
 
-        psp_parameters = {
-            "prepareOp": prepare_op,
-            "selectOp": select_op,
-            "numSystemQubits": num_system,
-            "numAncillaQubits": num_ancilla,
-            "power": power,
-        }
-
-        qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
-        qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
+        qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=parameters)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)

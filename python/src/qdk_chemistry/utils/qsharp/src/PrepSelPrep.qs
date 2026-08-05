@@ -133,79 +133,74 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// # Summary
-    /// PSP-based quantum walk: W = REFLECT · B[H].
+    /// Uncontrolled block encoding on the flat `[systemReg | ancillaReg]` register,
+    /// applied `power` times.
     ///
-    /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
-    /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
-    /// This follows Babbush et al. (arXiv:1805.03662): c-W = c-R · (PREP† · c-SEL · PREP).
-    ///
-    /// $$
-    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
-    /// $$
-    operation PSPWalk(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        targetRegister : Qubit[],
-        ancillaRegister : Qubit[],
-    ) : Unit is Adj + Ctl {
-        body ... {
-            PrepSelPrep(prepareOp, selectOp, targetRegister, ancillaRegister);
-            Reflect(ancillaRegister);
-        }
-        adjoint auto;
-        controlled (ctls, ...) {
-            Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
-            Controlled Reflect(ctls, (ancillaRegister));
-        }
-        controlled adjoint auto;
-    }
-
-    /// PREPARE†·SELECT·PREPARE on a flat `[systemReg | ancillaReg]` register, under `controls`.
-    ///
-    /// No reflection is applied here, so this is the block encoding B rather than the walk W.
-    /// An empty `controls` therefore yields the plain uncontrolled B, which is what the
-    /// unary-iteration signed-power schedule consumes: it applies B unconditionally and
-    /// controls only the reflections.
-    operation ControlledPSPOnRegister(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        controls : Qubit[],
-        allQubits : Qubit[],
-    ) : Unit is Adj {
-        Controlled PrepSelPrep(
-            controls,
-            (prepareOp, selectOp, allQubits[0..numSystemQubits - 1], allQubits[numSystemQubits...])
-        );
-    }
-
-    /// Trailing sub-register of `allQubits`, i.e. the block-encoding ancillas.
-    ///
-    /// These are the qubits whose all-zero state flags a successful block encoding, so they are
-    /// also the register a qubitization walk reflects about.
-    function TrailingAncillaRegister(numSystemQubits : Int, allQubits : Qubit[]) : Qubit[] {
-        allQubits[numSystemQubits...]
-    }
-
-    /// Bind `TrailingAncillaRegister` into a selector over the flat register.
-    function MakeTrailingAncillaSelector(numSystemQubits : Int) : (Qubit[] -> Qubit[]) {
-        TrailingAncillaRegister(numSystemQubits, _)
-    }
-
-    /// # Summary
-    /// Creates an uncontrolled block-encoding callable on the flat `[systemReg | ancillaReg]`
-    /// register.
-    ///
-    /// This is `MakeControlledPrepSelPrepOp` with an empty control register, which is what the
-    /// unary-iteration signed-power schedule applies between its reflections.
+    /// The returned callable is `Adj + Ctl`, so the Q# `Controlled` functor applied to it
+    /// already yields the controlled block encoding with PREPARE left unconditional — that
+    /// rule lives in `PrepSelPrep`'s own controlled specialization and never has to be
+    /// restated. It is also what the unary-iteration signed-power schedule applies between
+    /// its reflections, so both schedules consume the same callable.
     function MakePrepSelPrepOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
-        numAncillaQubits : Int,
         power : Int,
-    ) : (Qubit[] => Unit is Adj) {
-        MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power)([], _)
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => {
+            for _ in 1..power {
+                PrepSelPrep(prepareOp, selectOp, allQubits[0..numSystemQubits - 1], allQubits[numSystemQubits...]);
+            }
+        }
+    }
+
+    /// # Summary
+    /// Reflection about the all-zero state of the trailing block-encoding ancillas of a flat
+    /// `[systemReg | ancillaReg]` register.
+    ///
+    /// Those are the qubits whose all-zero state flags a successful block encoding, so they
+    /// are the register a qubitization walk reflects about. Handing the reflection out as a
+    /// callable on the *whole* register is what lets a schedule apply it without knowing how
+    /// the block encoding lays its ancillas out.
+    function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => Reflect(allQubits[numSystemQubits...])
+    }
+
+    /// # Summary
+    /// Controlled block encoding, from an already-built uncontrolled one.
+    ///
+    /// The caller passes system + ancilla qubits together since the ancilla becomes
+    /// entangled with the control qubits during the controlled operation.
+    function MakeControlledBlockEncodingOp(
+        blockEncoding : Qubit[] => Unit is Adj + Ctl
+    ) : ((Qubit[], Qubit[]) => Unit is Adj) {
+        (controls, allQubits) => Controlled blockEncoding(controls, allQubits)
+    }
+
+    /// # Summary
+    /// Controlled qubitization walk `W = REFLECT · B`, applied `power` times.
+    ///
+    /// Both the block encoding and the reflection are controlled, while PREPARE/PREPARE†
+    /// run unconditionally inside `B` — see Babbush et al. (arXiv:1805.03662),
+    /// c-W = c-R · (PREP† · c-SEL · PREP).
+    ///
+    /// $$
+    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
+    /// $$
+    function MakeControlledWalkOp(
+        blockEncoding : Qubit[] => Unit is Adj + Ctl,
+        applyReflection : Qubit[] => Unit is Adj + Ctl,
+        power : Int,
+    ) : (Qubit[], Qubit[]) => Unit {
+        (controls, allQubits) => {
+            for _ in 1..power {
+                if BeginEstimateCaching("ControlledWalk", SingleVariant()) {
+                    Controlled blockEncoding(controls, allQubits);
+                    Controlled applyReflection(controls, allQubits);
+                    EndEstimateCaching();
+                }
+            }
+        }
     }
 
     /// Circuit entry point for the uncontrolled block encoding (allocates qubits).
@@ -217,96 +212,49 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         power : Int,
     ) : Unit {
         use qs = Qubit[numSystemQubits + numAncillaQubits];
-        MakePrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power)(qs);
+        MakePrepSelPrepOp(prepareOp, selectOp, numSystemQubits, power)(qs);
     }
 
-    /// # Summary
-    /// Creates a controlled block-encoding callable.
-    ///
-    /// The caller passes system + ancilla qubits together since the ancilla
-    /// becomes entangled with the control qubits during the controlled operation.
-    ///
-    /// Passing an empty control register yields the plain uncontrolled block encoding, which is
-    /// what the unary-iteration signed-power schedule applies between its reflections.
-    function MakeControlledPrepSelPrepOp(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-    ) : ((Qubit[], Qubit[]) => Unit is Adj) {
-        (controls, allQubits) => {
-            for _ in 0..power - 1 {
-                ControlledPSPOnRegister(prepareOp, selectOp, numSystemQubits, controls, allQubits);
-            }
-        }
+    /// Circuit entry point for the controlled block encoding (allocates qubits).
+    operation MakeControlledBlockEncodingCircuit(
+        blockEncoding : Qubit[] => Unit is Adj + Ctl,
+        numQubits : Int,
+    ) : Unit {
+        use control = Qubit();
+        use qs = Qubit[numQubits];
+        MakeControlledBlockEncodingOp(blockEncoding)([control], qs);
     }
 
-    /// # Summary
-    /// Creates a controlled PSP-based quantum-walk callable.
-    ///
-    /// System and ancilla qubits are passed together; the caller is responsible
-    /// for allocation since the walk operator leaves ancilla entangled.
-    function MakeControlledPSPWalkOp(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-    ) : (Qubit[], Qubit[]) => Unit {
-        (controls, allQubits) => {
-            let systems = allQubits[0..numSystemQubits - 1];
-            let ancilla = allQubits[numSystemQubits...];
-            for _ in 0..power - 1 {
-                if BeginEstimateCaching("ControlledPSPWalk", SingleVariant()) {
-                    Controlled PSPWalk(controls, (prepareOp, selectOp, systems, ancilla));
-                    EndEstimateCaching();
-                }
-            }
-        }
-    }
-
-    /// Circuit entry point for prep-sel-prep (allocates qubits).
-    operation MakeControlledPrepSelPrepCircuit(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
+    /// Circuit entry point for the controlled quantum walk (allocates qubits).
+    operation MakeControlledWalkCircuit(
+        blockEncoding : Qubit[] => Unit is Adj + Ctl,
+        applyReflection : Qubit[] => Unit is Adj + Ctl,
+        numQubits : Int,
         power : Int,
     ) : Unit {
         use control = Qubit();
-        use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
-        op([control], systems);
+        use qs = Qubit[numQubits];
+        MakeControlledWalkOp(blockEncoding, applyReflection, power)([control], qs);
     }
 
-    /// Circuit entry point for quantum walk (allocates qubits).
-    operation MakeControlledPSPWalkCircuit(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-    ) : Unit {
-        use control = Qubit();
-        use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
-        op([control], systems);
+    /// PREPARE fixture: a single-ancilla Ry rotation.
+    internal operation TestRyPrepare(theta : Double, ancilla : Qubit[]) : Unit is Adj + Ctl {
+        Ry(theta, ancilla[0]);
     }
 
-    /// Applies the PSP walk to a computational basis state, leaking the qubits.
-    operation TestPSPWalkOnBasisState(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-        basisState : Int,
-    ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(numSystemQubits + numAncillaQubits);
-        ApplyXorInPlace(basisState, qs);
-        for _ in 1..power {
-            PSPWalk(prepareOp, selectOp, qs[0..numSystemQubits - 1], qs[numSystemQubits...]);
-        }
+    /// SELECT fixture: a sign flip on the system qubit.
+    internal operation TestSignSelect(ancilla : Qubit[], system : Qubit[]) : Unit is Adj + Ctl {
+        Controlled Z(ancilla, system[0]);
+    }
+
+    /// # Summary
+    /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
+    /// schedules from a test.
+    ///
+    /// `PREPARE = Ry(theta)` and `SELECT = c-Z` block-encode `diag(1, cos theta)`, which is
+    /// Hermitian and therefore self-inverse, so pairing it with `MakeAncillaReflectionOp(1)`
+    /// gives a genuine qubitization walk whose phase seen by `|1>` is exactly `theta`.
+    function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
+        MakePrepSelPrepOp(TestRyPrepare(theta, _), TestSignSelect, 1, 1)
     }
 }

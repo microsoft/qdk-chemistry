@@ -26,6 +26,7 @@ import numpy as np
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -34,8 +35,6 @@ from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings
 __all__: list[str] = [
     "QdkUnaryQpeCircuitBuilder",
     "QdkUnaryQpeCircuitBuilderSettings",
-    "cosine_window_state",
-    "num_phase_bits",
 ]
 
 
@@ -110,8 +109,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
     The block encoding is the generic LCU built in quantum-walk mode, mapped to an
     uncontrolled circuit by :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`.
-    The mapper never materializes the walk: this builder interleaves the reflections itself so
-    it can omit exactly one, which is what makes a non-power-of-two query count possible.
+    The mapper never materializes the walk: it hands over the block encoding and the reflection
+    it pairs with as two separate callables, and this builder interleaves them itself so it can
+    omit exactly one reflection, which is what makes a non-power-of-two query count possible.
 
     """
 
@@ -198,7 +198,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the block encoding has no ancilla register for the walk to reflect about.
+            ValueError: If the unitary representation is not a quantum walk, or if the block
+                encoding has no ancilla register for the walk to reflect about.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -208,6 +209,13 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         mapper = self._create_nested("circuit_mapper")
         container = unitary_rep.get_container()
+        if not isinstance(container, LCUWalkContainer):
+            # The schedule interleaves the reflections itself, so it needs a mapper circuit that
+            # applies the block encoding exactly once; only a walk container guarantees that.
+            raise ValueError(
+                "A signed-power schedule needs a quantum-walk unitary representation, but the "
+                f"unitary builder produced a '{type(container).__name__}'."
+            )
         num_ancilla_qubits = mapper.num_ancillary_qubits(container)
         if num_ancilla_qubits == 0:
             raise ValueError(
@@ -215,13 +223,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 "but this block encoding has none."
             )
 
-        # The mapper returns the block encoding alone; the schedule below owns the reflections,
-        # so the walk is never materialized as a controlled operation. Power is forced to 1
-        # because the schedule applies the block once per slot.
-        unitary_builder.settings().update("power", 1)
-        block_encoding_op = mapper.run(unitary_builder.run(qubit_hamiltonian))._qsharp_op  # noqa: SLF001
-        num_system_qubits = qubit_hamiltonian.num_qubits
-        reflection_register_of = QSHARP_UTILS.PrepSelPrep.MakeTrailingAncillaSelector(num_system_qubits)
+        # The mapper emits the block encoding once and hands out the reflection it pairs with;
+        # the schedule below owns the interleaving, so the walk is never materialized here.
+        block_encoding_op = mapper.run(unitary_rep)._qsharp_op  # noqa: SLF001
+        apply_reflection = mapper.reflection_op(container)
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
@@ -237,7 +242,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         parameters = {
             "statePrep": state_prep_op,
             "applyBlockEncoding": block_encoding_op,
-            "reflectionRegisterOf": reflection_register_of,
+            "applyReflection": apply_reflection,
             "numQueries": num_queries,
             "ancillas": list(range(num_bits)),
             "systems": [index + num_bits for index in range(qubit_hamiltonian.num_qubits)],
