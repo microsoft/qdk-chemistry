@@ -9,7 +9,7 @@ It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 - ``marking_oracle`` flips a flag qubit when the prepared state satisfies the
   success criterion.
 
-The circuit prepares the initial state once. Each round then marks the
+The circuit first prepares the initial state. Each round then marks the
 good subspace and reflects about the prepared state. If the initial probability
 of the marked subspace is :math:`a`, the probability after :math:`k` rounds is
 
