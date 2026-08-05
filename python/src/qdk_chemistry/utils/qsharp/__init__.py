@@ -24,7 +24,12 @@ __all__ = [
 _PROJECT_ROOT = str(Path(__file__).parent)
 _SOURCE_ROOT = Path(__file__).parent / "src"
 #: Profile the vendored Q# project is compiled for by default.
-DEFAULT_TARGET_PROFILE = TargetProfile.Unrestricted
+#:
+#: ``Adaptive_RIF`` rather than ``Unrestricted``: unary iteration uncomputes by
+#: measurement, so the profile has to permit mid-circuit measurement and feed-forward,
+#: but ``Unrestricted`` is the one profile QIR code generation rejects outright. The two
+#: lower measurement-based uncompute identically, so this buys QIR support for free.
+DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 
 #: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
@@ -67,8 +72,8 @@ def create_qsharp_context(
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
         :data:`DEFAULT_TARGET_PROFILE`. A ``TargetProfile.Base`` context loads only the
-        Base-*correct* subset of the vendored project, which is what the Qiskit interop
-        path needs to obtain measurement-free circuits. Sources that rely on
+        Base-*correct* subset of the vendored project, which is what callers that need
+        measurement-free circuits should ask for. Sources that rely on
         measurement-based uncompute, such as unary iteration, are withheld from it: they
         would compile under Base and return silently wrong results, so they are made to
         fail as undefined symbols instead.

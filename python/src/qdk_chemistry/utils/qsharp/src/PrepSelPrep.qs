@@ -150,4 +150,25 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             applyReflection(allQubits);
         }
     }
+
+    /// PREPARE fixture: a single-ancilla Ry rotation.
+    internal operation TestRyPrepare(theta : Double, ancilla : Qubit[]) : Unit is Adj + Ctl {
+        Ry(theta, ancilla[0]);
+    }
+
+    /// SELECT fixture: a sign flip on the system qubit.
+    internal operation TestSignSelect(ancilla : Qubit[], system : Qubit[]) : Unit is Adj + Ctl {
+        Controlled Z(ancilla, system[0]);
+    }
+
+    /// # Summary
+    /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
+    /// schedules from a test.
+    ///
+    /// `PREPARE = Ry(theta)` and `SELECT = c-Z` block-encode `diag(1, cos theta)`, which is
+    /// Hermitian and therefore self-inverse, so pairing it with `MakeAncillaReflectionOp(1)`
+    /// gives a genuine qubitization walk whose phase seen by `|1>` is exactly `theta`.
+    function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
+        MakePrepSelPrepOp(TestRyPrepare(theta, _), TestSignSelect, 1)
+    }
 }

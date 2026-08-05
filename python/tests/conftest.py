@@ -25,6 +25,8 @@ matplotlib.use("Agg")
 
 import platform as plt
 import tempfile
+from collections.abc import Iterator
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +44,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -84,10 +86,23 @@ def qdk_ctx() -> qdk.Context:
     return create_qsharp_context()
 
 
-@pytest.fixture(scope="session")
-def base_qdk_ctx() -> qdk.Context:
-    """Shared ``TargetProfile.Base`` context, built once per session."""
+@cache
+def _base_qsharp_context() -> qdk.Context:
+    """Build the ``TargetProfile.Base`` context once and share it across tests."""
     return create_qsharp_context(TargetProfile.Base)
+
+
+@pytest.fixture
+def use_base_qdk_ctx() -> Iterator[qdk.Context]:
+    """Route the library's shared context to a ``TargetProfile.Base`` build.
+
+    The default profile permits mid-circuit measurement so that unary iteration is
+    available. Tests that need the measurement-free lowering instead -- because they
+    pin exact shot counts, or because they assert that the withheld sources are
+    unreachable -- take this fixture. The context is built once and reused.
+    """
+    with use_qsharp_context(_base_qsharp_context()) as context:
+        yield context
 
 
 @pytest.fixture

@@ -502,10 +502,10 @@ class TestBaseProfileGuardrail:
     """
 
     @pytest.mark.parametrize("namespace", ["UnaryIteration", "UnaryPhaseEstimation"])
-    def test_base_context_refuses_to_resolve_a_unary_operation(self, base_qdk_ctx, namespace):
+    def test_base_context_refuses_to_resolve_a_unary_operation(self, use_base_qdk_ctx, namespace):
         """Calling into the withheld sources must fail loudly rather than answer wrongly."""
         with pytest.raises(Exception, match="not found"):
-            base_qdk_ctx.eval(f"QDKChemistry.Utils.{namespace}.AddressQubits(8)")
+            use_base_qdk_ctx.eval(f"QDKChemistry.Utils.{namespace}.AddressQubits(8)")
 
 
 class TestQueryCountResolution:

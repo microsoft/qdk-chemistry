@@ -16,7 +16,6 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
 from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation
-from qdk_chemistry.utils.qsharp import use_qsharp_context
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -25,8 +24,8 @@ _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _base_profile_context(base_qdk_ctx):
+@pytest.fixture(autouse=True)
+def _base_profile_context(use_base_qdk_ctx):
     """Compile this module's Q# under the Base profile.
 
     The reference observables below are exact shot counts for ``seed=42``, so they
@@ -35,8 +34,7 @@ def _base_profile_context(base_qdk_ctx):
     consumes extra samples from the simulator's random stream and shifts the
     counts.
     """
-    with use_qsharp_context(base_qdk_ctx) as context:
-        yield context
+    return use_base_qdk_ctx
 
 
 def _make_hadamard_test(test_basis: HadamardTestBasis = HadamardTestBasis.X):
