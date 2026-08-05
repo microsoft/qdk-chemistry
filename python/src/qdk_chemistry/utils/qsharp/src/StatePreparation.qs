@@ -46,7 +46,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
     function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit is Adj + Ctl {
         StatePreparation(params, _)
     }
@@ -95,7 +95,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation PrepareSingleReferenceState(
         params : SingleReferenceParams,
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         let bitLen = Length(params.bitStrings);
         if bitLen != Length(qs) {
             fail "Length of bitStrings must match the number of qubits.";
@@ -128,8 +128,8 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
-    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
+    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit is Adj + Ctl {
         PrepareSingleReferenceState(params, _)
     }
 

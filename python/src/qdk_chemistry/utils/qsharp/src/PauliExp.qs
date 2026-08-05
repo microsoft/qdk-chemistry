@@ -17,7 +17,7 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for idx in 0..Length(pauliExponents) - 1 {
             let paulis = pauliExponents[idx];
             let coeff = pauliCoefficients[idx];
@@ -46,7 +46,7 @@ namespace QDKChemistry.Utils.PauliExp {
     operation RepPauliExp(
         params : RepPauliExpParams,
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for i in 1..params.repetitions {
             PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
         }
@@ -85,8 +85,8 @@ namespace QDKChemistry.Utils.PauliExp {
     /// # Parameters
     /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
-    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
+    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit is Adj + Ctl {
         RepPauliExp(params, _)
     }
 }
