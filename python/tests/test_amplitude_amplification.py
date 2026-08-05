@@ -130,14 +130,14 @@ def _amplified_qpe_circuit(
     **settings,
 ) -> Circuit:
     """Compose a coherent QPE preparation with amplitude amplification."""
-    preparation, num_qubits, signal_ancilla_indices = _qpe_preparation(
+    state_prep_oracle, num_qubits, signal_ancilla_indices = _qpe_preparation(
         qubit_hamiltonian,
         state_preparation,
         num_bits=num_bits,
         mapper=mapper,
         unitary=unitary,
     )
-    marking_oracle = phase_marking_oracle(num_bits, accepted_range, signal_ancilla_indices)
+    good_state_oracle = phase_marking_oracle(num_bits, accepted_range, signal_ancilla_indices)
     # The executor reverses the Q# results, so emitting the ancillas reversed and
     # ahead of the phase indices makes the key read phase register MSB first.
     ancilla_indices = list(range(num_qubits - len(signal_ancilla_indices), num_qubits))
@@ -146,7 +146,9 @@ def _amplified_qpe_circuit(
     algorithm = create("amplitude_amplification")
     for key, value in settings.items():
         algorithm.settings().update(key, value)
-    return algorithm.run(preparation, marking_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
+    return algorithm.run(
+        state_prep_oracle, good_state_oracle, num_qubits=num_qubits, measured_indices=measured_indices
+    )
 
 
 def _accepted_phase_counts(

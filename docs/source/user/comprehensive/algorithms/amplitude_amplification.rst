@@ -5,11 +5,11 @@ The :class:`~qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplifica
 algorithm increases the probability of measuring a state in a chosen subspace.
 It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 
-- ``preparation`` prepares the initial state.
-- ``marking_oracle`` flips a flag qubit when the prepared state satisfies the
+- ``state_prep_oracle`` prepares the initial state.
+- ``good_state_oracle`` flips a flag qubit when the prepared state satisfies the
   success criterion.
 
-The circuit first prepares the initial state. Each round then marks the
+The circuit first prepares the initial state. Each round then flags the
 good subspace and reflects about the prepared state. If the initial probability
 of the marked subspace is :math:`a`, the probability after :math:`k` rounds is
 
@@ -25,9 +25,9 @@ Amplitude amplified QPE
 -----------------------
 
 From an initial state with some overlap with the target state, QPE
-coherently writes an estimated phase to the leading phase register; the marking
-oracle then checks the phase register, if it's in the target range, and flips a
-flag qubit.
+coherently writes an estimated phase to the leading phase register; the good
+state oracle then checks the phase register, if it's in the target range, and
+flips a flag qubit.
 
 The :func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle`
 helper builds a :class:`~qdk_chemistry.data.Circuit` that marks a half-open

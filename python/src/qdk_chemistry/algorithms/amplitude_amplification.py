@@ -28,7 +28,7 @@ def phase_marking_oracle(
     target_range: tuple[int, int],
     signal_ancilla_indices: list[int] | None = None,
 ) -> Circuit:
-    r"""Build a marking oracle for a half-open range of QPE phase bins.
+    r"""Build a good state oracle for a half-open range of QPE phase bins.
 
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
@@ -112,16 +112,16 @@ class AmplitudeAmplification(Algorithm):
 
     def _run_impl(
         self,
-        preparation: Circuit,
-        marking_oracle: Circuit,
+        state_prep_oracle: Circuit,
+        good_state_oracle: Circuit,
         num_qubits: int,
         measured_indices: list[int] | None = None,
     ) -> Circuit:
         r"""Build an amplitude-amplified circuit.
 
         Args:
-            preparation: Prepare the initial state.
-            marking_oracle: Mark the good subspace with a phase flip.
+            state_prep_oracle: Prepare the initial state.
+            good_state_oracle: Flip a flag qubit on the good subspace.
             num_qubits: Size of the register both callables act on.
             measured_indices: Register indices to measure, in output order.
                 Defaults to the whole register.
@@ -135,17 +135,17 @@ class AmplitudeAmplification(Algorithm):
 
         """
         Logger.trace_entering()
-        operation = preparation._qsharp_op  # noqa: SLF001
+        operation = state_prep_oracle._qsharp_op  # noqa: SLF001
         if operation is None:
             raise TypeError(
                 "Amplitude amplification reflects about the prepared state, which requires applying "
-                "the preparation's adjoint. Pass a measurement-free circuit carrying an adjointable "
+                "the state preparation's adjoint. Pass a measurement-free circuit carrying an adjointable "
                 "Q# operation, such as a qdk_standard QPE circuit built with measure_phase=False."
             )
-        marking_operation = marking_oracle._qsharp_op  # noqa: SLF001
-        if marking_operation is None:
+        good_state_operation = good_state_oracle._qsharp_op  # noqa: SLF001
+        if good_state_operation is None:
             raise TypeError(
-                "Amplitude amplification requires a marking oracle circuit carrying an adjointable "
+                "Amplitude amplification requires a good state oracle circuit carrying an adjointable "
                 "Q# operation of type (Qubit[], Qubit) => Unit is Adj."
             )
         if num_qubits < 1:
@@ -160,13 +160,13 @@ class AmplitudeAmplification(Algorithm):
             raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
         amplification = QSHARP_UTILS.AmplitudeAmplification
         parameters: dict[str, Any] = {
-            "preparation": operation,
-            "markingOracle": marking_operation,
+            "statePrepOracle": operation,
+            "goodStateOracle": good_state_operation,
             "rounds": rounds,
             "numQubits": num_qubits,
             "measuredIndices": indices,
         }
-        Logger.info(f"Amplified circuit uses {2 * rounds + 1} preparations.")
+        Logger.info(f"Amplified circuit uses {2 * rounds + 1} state preparations.")
         return Circuit(
             qsharp_factory=QsharpFactoryData(program=amplification.MakeAmplifiedCircuit, parameter=parameters)
         )

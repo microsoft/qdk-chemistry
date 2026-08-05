@@ -4,7 +4,7 @@
 
 /// Generic amplitude amplification.
 ///
-/// The good subspace is supplied as a marking oracle that flips a flag qubit;
+/// The good subspace is supplied as a good state oracle that flips a flag qubit;
 /// nothing here knows what the oracle tests.
 ///
 /// Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific
@@ -108,27 +108,27 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
 
     /// # Summary
     /// $2|\psi\rangle\langle\psi| - I$, with
-    /// $|\psi\rangle = \text{statePrep}|0\rangle$.
+    /// $|\psi\rangle = \text{statePrepOracle}|0\rangle$.
     operation ReflectAboutPreparedState(
-        statePrep : Qubit[] => Unit is Adj,
+        statePrepOracle : Qubit[] => Unit is Adj,
         register : Qubit[],
     ) : Unit is Adj {
         within {
-            Adjoint statePrep(register);
+            Adjoint statePrepOracle(register);
         } apply {
             Reflect(register);
         }
     }
 
     /// # Summary
-    /// $I - 2\Pi_G$, where $\Pi_G$ projects onto the marked subspace.
-    operation ReflectAboutMarkedSubspace(
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+    /// $I - 2\Pi_G$, where $\Pi_G$ projects onto the good subspace.
+    operation ReflectAboutGoodSubspace(
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         register : Qubit[],
     ) : Unit is Adj {
         use flag = Qubit();
         within {
-            markingOracle(register, flag);
+            goodStateOracle(register, flag);
         } apply {
             Z(flag);
         }
@@ -142,29 +142,29 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// One Grover iterate $Q = -S_\psi S_G$, a rotation by $2\vartheta$ in the
     /// invariant plane.
     operation AmplitudeAmplificationStep(
-        statePrep : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        statePrepOracle : Qubit[] => Unit is Adj,
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         register : Qubit[],
     ) : Unit is Adj {
-        ReflectAboutMarkedSubspace(markingOracle, register);
-        ReflectAboutPreparedState(statePrep, register);
+        ReflectAboutGoodSubspace(goodStateOracle, register);
+        ReflectAboutPreparedState(statePrepOracle, register);
     }
 
     /// # Summary
     /// Prepares $|\psi\rangle$ and applies `rounds` Grover iterates in place.
     /// Neither measures nor resets.
     operation ApplyAmplitudeAmplification(
-        statePrep : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        statePrepOracle : Qubit[] => Unit is Adj,
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         rounds : Int,
         register : Qubit[],
     ) : Unit is Adj {
         if rounds < 0 {
             fail "The number of amplitude-amplification rounds must be nonnegative.";
         }
-        statePrep(register);
+        statePrepOracle(register);
         for _ in 1..rounds {
-            AmplitudeAmplificationStep(statePrep, markingOracle, register);
+            AmplitudeAmplificationStep(statePrepOracle, goodStateOracle, register);
         }
     }
 
@@ -181,14 +181,14 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// ## measuredIndices
     /// Register indices to measure, in output order.
     operation MakeAmplifiedCircuit(
-        preparation : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        statePrepOracle : Qubit[] => Unit is Adj,
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         rounds : Int,
         numQubits : Int,
         measuredIndices : Int[],
     ) : Result[] {
         use register = Qubit[numQubits];
-        ApplyAmplitudeAmplification(preparation, markingOracle, rounds, register);
+        ApplyAmplitudeAmplification(statePrepOracle, goodStateOracle, rounds, register);
         let results = MeasureSelected(register, measuredIndices);
         ResetAll(register);
         return results;
@@ -205,17 +205,18 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Prepares the state, marks it and measures the flag. The fraction of `One`
-    /// outcomes estimates the overlap $a$ that sets the number of rounds.
+    /// Prepares the state, applies the good state oracle and measures the flag.
+    /// The fraction of `One` outcomes estimates the overlap $a$ that sets the
+    /// number of rounds.
     operation MakeAcceptanceCircuit(
-        preparation : Qubit[] => Unit is Adj,
-        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        statePrepOracle : Qubit[] => Unit is Adj,
+        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
         numQubits : Int,
     ) : Result[] {
         use register = Qubit[numQubits];
         use flag = Qubit();
-        preparation(register);
-        markingOracle(register, flag);
+        statePrepOracle(register);
+        goodStateOracle(register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return [outcome];
