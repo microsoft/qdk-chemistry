@@ -138,15 +138,12 @@ class AmplitudeAmplification(Algorithm):
         operation = state_prep_oracle._qsharp_op  # noqa: SLF001
         if operation is None:
             raise TypeError(
-                "Amplitude amplification reflects about the prepared state, which requires applying "
-                "the state preparation's adjoint. Pass a measurement-free circuit carrying an adjointable "
-                "Q# operation, such as a qdk_standard QPE circuit built with measure_phase=False."
+                "Amplitude amplification requires a state prep oracle qsharp operation."
             )
         good_state_operation = good_state_oracle._qsharp_op  # noqa: SLF001
         if good_state_operation is None:
             raise TypeError(
-                "Amplitude amplification requires a good state oracle circuit carrying an adjointable "
-                "Q# operation of type (Qubit[], Qubit) => Unit is Adj."
+                "Amplitude amplification requires a good state oracle qsharp operation."
             )
         if num_qubits < 1:
             raise ValueError(f"num_qubits must be positive. Got {num_qubits}.")
