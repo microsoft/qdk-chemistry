@@ -217,22 +217,4 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     ) : Qubit[] => Unit is Adj {
         ApplyAmplitudeAmplification(statePrepOracle, goodStateOracle, rounds, _)
     }
-
-    /// # Summary
-    /// Prepares the state, applies the good state oracle and measures the flag.
-    /// The fraction of `One` outcomes estimates the overlap $a$ that sets the
-    /// number of rounds.
-    operation MakeAcceptanceCircuit(
-        statePrepOracle : Qubit[] => Unit is Adj,
-        goodStateOracle : (Qubit[], Qubit) => Unit is Adj,
-        numQubits : Int,
-    ) : Result[] {
-        use register = Qubit[numQubits];
-        use flag = Qubit();
-        statePrepOracle(register);
-        goodStateOracle(register, flag);
-        let outcome = MResetZ(flag);
-        ResetAll(register);
-        return [outcome];
-    }
 }
