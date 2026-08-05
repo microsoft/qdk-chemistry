@@ -137,10 +137,19 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             container.power,
         )
 
-        num_qubits = lcu.select.num_target_qubits + lcu.num_prepare_ancillas
+        prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.CircuitComposition.MakeControlledCircuit,
-            parameter={"op": repeated_op, "numControlQubits": 1, "numQubits": num_qubits},
+            # QIR generation only resolves entry-point callables one level deep, so the oracles
+            # are handed over unstitched and Q# composes them; see ``MakePrepSelPrepCircuit``.
+            program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
+            parameter={
+                "prepareOp": prepare_op,
+                "selectOp": select_op,
+                "numSystemQubits": num_system,
+                "numAncillaQubits": lcu.num_prepare_ancillas,
+                "power": container.power,
+                "useWalk": use_quantum_walk,
+            },
         )
 
         return Circuit(

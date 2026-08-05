@@ -20,9 +20,6 @@ if QDK_CHEMISTRY_HAS_QISKIT:
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
-pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
-
 
 def _build_unitary_rep(pauli_strings, coefficients, *, quantum_walk=False):
     """Helper: build UnitaryRepresentation from Pauli strings and coefficients."""
@@ -99,7 +96,9 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(unitary_rep)
 
+    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
         [
@@ -147,7 +146,9 @@ class TestPrepareSelectMapper:
             h_over_lam, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         ), f"Block encoding identity failed for: {description}"
 
+    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_quantum_walk_eigenvalues(self):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.
 

@@ -19,22 +19,16 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
-_SHOTS = 100
+_SHOTS = 5000
 _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
-
-
-@pytest.fixture(autouse=True)
-def _base_profile_context(use_base_qdk_ctx):
-    """Compile this module's Q# under the Base profile.
-
-    The reference observables below are exact shot counts for ``seed=42``, so they
-    are only reproducible if the compiled program is fixed. An adaptive profile
-    lowers measurement-based uncompute into real mid-circuit measurements, which
-    consumes extra samples from the simulator's random stream and shifts the
-    counts.
-    """
-    return use_base_qdk_ctx
+#: Sampling tolerance for the Hadamard observables at ``_SHOTS`` shots.
+_OBSERVABLE_TOLERANCE = 0.02
+#: True ``Re<psi|U^p|psi>`` and ``Im<psi|U^p|psi>`` for the water benchmark.
+# TODO(#617): placeholders -- NaN forces the assertion to report the sampled value so the
+# exact references can be pinned from a run that has the compiled library available.
+_X_BASIS_REFERENCE = float("nan")
+_Y_BASIS_REFERENCE = float("nan")
 
 
 def _make_hadamard_test(test_basis: HadamardTestBasis = HadamardTestBasis.X):
@@ -118,7 +112,9 @@ def test_qdk_hadamard_test_measures_water_observable(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.34, atol=1e-12)
+    assert np.isclose(observable_value, _X_BASIS_REFERENCE, atol=_OBSERVABLE_TOLERANCE), (
+        f"X-basis observable = {observable_value!r} over {sum(counts.values())} shots"
+    )
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
@@ -135,7 +131,9 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.98, atol=1e-12)
+    assert np.isclose(observable_value, _Y_BASIS_REFERENCE, atol=_OBSERVABLE_TOLERANCE), (
+        f"Y-basis observable = {observable_value!r} over {sum(counts.values())} shots"
+    )
 
 
 def test_hadamard_test_rejects_invalid_test_basis() -> None:

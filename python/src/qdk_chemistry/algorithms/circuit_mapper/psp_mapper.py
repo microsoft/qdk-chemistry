@@ -221,10 +221,19 @@ class PSPMapper(CircuitMapper):
             # wrapped on when it repeats. Callers composing further need those functors.
             qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp("PSPMapper", qsharp_op, container.power)
 
-        num_qubits = lcu.select.num_target_qubits + lcu.num_prepare_ancillas
+        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.CircuitComposition.MakeCircuit,
-            parameter={"op": qsharp_op, "numQubits": num_qubits},
+            # QIR generation only resolves entry-point callables one level deep, so the oracles
+            # are handed over unstitched and Q# composes them; see ``MakePrepSelPrepCircuit``.
+            program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,
+            parameter={
+                "prepareOp": prepare_op,
+                "selectOp": select_op,
+                "numSystemQubits": num_system,
+                "numAncillaQubits": lcu.num_prepare_ancillas,
+                "power": container.power,
+                "useWalk": use_quantum_walk,
+            },
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)

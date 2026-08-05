@@ -29,9 +29,6 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
-pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
-
 
 def _constant_drive(_t: float) -> float:
     """Drive function that always returns 1.0."""
@@ -126,10 +123,12 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
         assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.2)
 
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME,
     reason="Qiskit Aer or IBM Runtime not available",
 )
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_euler_integrator_with_device_backend() -> None:
     """Run EulerIntegrator with a device_backend_name string."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])

@@ -32,8 +32,6 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
-pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
 
 
 @pytest.fixture
@@ -174,7 +172,9 @@ class TestPauliSequenceMapper:
                             atol=float_comparison_absolute_tolerance,
                         )  # Z on qubit 1
 
+    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_controlled_u_circuit_matrix(self, unitary_rep, simple_ppf_container):
         """Test that the constructed controlled-U circuit has the expected matrix."""
         mapper = ControlledPauliSequenceMapper()
