@@ -8,8 +8,9 @@ query count need not be a power of two.
 
 Because every branch phase is doubled relative to the walk phase, the measured
 fraction :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins
-are merged before the winner is chosen, and the ``phase_band`` builder setting selects
-which half-band the result is reported in.
+are merged before the winner is chosen. Doubling also makes the histogram exactly
+invariant under :math:`E \to -E`, so the sign cannot be recovered from the counts;
+the ``phase_band`` setting supplies it.
 
 References:
     * :cite:`Berry2024`, Appendix D.
@@ -44,6 +45,8 @@ __all__: list[str] = [
     "UnaryPhaseEstimation",
     "UnaryPhaseEstimationSettings",
 ]
+
+PHASE_BANDS: tuple[str, ...] = ("lower", "upper")
 
 
 def _select_dominant_decoded_phase(
@@ -89,6 +92,13 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
             100,
             "The number of shots to execute the circuit.",
         )
+        self._set_default(
+            "phase_band",
+            "string",
+            "upper",
+            "Half-band used to resolve the doubled measured phase; picks the eigenvalue sign.",
+            limit=list(PHASE_BANDS),
+        )
         # The inherited key already exists, and set_default is a no-op for those.
         self.set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary"))
 
@@ -96,17 +106,19 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
 class UnaryPhaseEstimation(PhaseEstimation):
     """Phase estimation using unary iteration over an arbitrary-length query schedule."""
 
-    def __init__(self, shots: int = 100) -> None:
+    def __init__(self, shots: int = 100, phase_band: str = "upper") -> None:
         """Initialize the unary-iteration phase estimation routine.
 
         Args:
             shots: The number of shots to execute the circuit.
+            phase_band: ``"lower"`` for a non-negative eigenvalue, ``"upper"`` for a non-positive one.
 
         """
         Logger.trace_entering()
         super().__init__()
         self._settings = UnaryPhaseEstimationSettings()
         self._settings.set("shots", shots)
+        self._settings.set("phase_band", phase_band)
 
     def _run_impl(
         self,
@@ -151,10 +163,11 @@ class UnaryPhaseEstimation(PhaseEstimation):
         execution_data = circuit_executor.run(circuits[0], shots=self._settings.get("shots"), noise=noise)
         counts = execution_data.bitstring_counts
 
+        phase_band = self._settings.get("phase_band")
         phase_fraction, dominant_bitstring, measured_phase = _select_dominant_decoded_phase(
             counts,
             num_bits,
-            circuit_builder.phase_fraction_from_measurement,
+            lambda measured: circuit_builder.phase_fraction_from_measurement(measured, phase_band),
         )
 
         return QpeResult.from_phase_fraction(

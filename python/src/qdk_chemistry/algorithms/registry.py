@@ -810,7 +810,7 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
-    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
@@ -878,6 +878,7 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
+    register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
     register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())

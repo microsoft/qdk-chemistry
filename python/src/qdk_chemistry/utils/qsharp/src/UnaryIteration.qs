@@ -2,21 +2,6 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// Unary iteration building blocks shared by QROM-style data loading and
-/// unary-iteration phase estimation.
-///
-/// Operations:
-///   UnaryIteration — applies one action per address value.
-///   UnaryIterationWithControl — same, but exposes the active one-hot control.
-///
-/// The signed-power schedule built on top of these lives in
-/// `QDKChemistry.Utils.UnaryPhaseEstimation`, which owns all phase-estimation-specific
-/// unary-iteration logic.
-///
-/// All operations support address ranges that are not powers of two.
-///
-/// References:
-///   Babbush et al. (arXiv:1805.03662), Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
 namespace QDKChemistry.Utils.UnaryIteration {
 
     import Std.Arrays.MostAndTail;
@@ -25,6 +10,11 @@ namespace QDKChemistry.Utils.UnaryIteration {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
 
+
+    /// Unary iteration building blocks shared by QROM-style data loading and
+    /// unary-iteration phase estimation
+    /// References:
+    ///   Babbush et al. (arXiv:1805.03662), Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
     /// Applies `action(index)` for each valid address value.
     operation UnaryIteration(
         address : Qubit[],
@@ -86,7 +76,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     // The signed-power schedule that used to live here is now
-    // `QDKChemistry.Utils.UnaryPhaseEstimation.UnaryIterationPowerSchedule`, so that all
+    // `QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule`, so that all
     // phase-estimation-specific unary-iteration logic sits in one module.
 
     internal operation SinglyControlledUnaryIterationWithControl(
@@ -138,19 +128,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
         Ceiling(Lg(IntAsDouble(numActions)))
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Test wrappers
-    //
-    //  These leak their qubits with `QIR.Runtime.AllocateQubitArray` so that the
-    //  full statevector survives until the caller dumps it, and they restore the
-    //  address register to |0...0> so the dumped state is exactly the payload.
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// Flips `flags[index]` for the single selected address.
-    ///
-    /// The dumped state must be the basis state whose only excited flag qubit is
-    /// `flags[addressValue]`, which pins down both the selection and the absence of
-    /// residual entanglement with the internal AND ancillas.
     operation TestUnaryIterationOneHot(numActions : Int, addressValue : Int) : Unit {
         let numAddressQubits = AddressQubits(numActions);
         let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
@@ -164,9 +142,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    ///
-    /// `numActions` must be a power of two so that all addresses are in range; the
-    /// dumped state must be the entangled sum over addresses with no ancilla residue.
     operation TestUnaryIterationSuperposedAddress(numActions : Int) : Unit {
         let numAddressQubits = AddressQubits(numActions);
         Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
@@ -180,11 +155,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    ///
-    /// The address register carries a uniform superposition, so the dumped
-    /// amplitudes are the sign pattern of `data`. This checks that the exposed
-    /// control is an exact equality predicate for phase-only actions, which is the
-    /// mode used by the reflection schedule.
     operation TestUnaryIterationControlPhases(numActions : Int, data : Bool[]) : Unit {
         let numAddressQubits = AddressQubits(numActions);
         Fact(2^numAddressQubits == numActions, "numActions must be a power of two");

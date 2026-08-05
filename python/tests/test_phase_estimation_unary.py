@@ -10,8 +10,8 @@ import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
+    cosine_window_state,
     num_phase_bits,
-    phase_window_state,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     UnaryPhaseEstimation,
@@ -149,7 +149,7 @@ class TestBlockEncodingAgnosticSchedule:
     def test_psp_schedule_matches_the_explicit_walk_power(self, qdk_ctx, num_queries, address_value):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract.
 
-        The Q# wrapper runs ``MakePSPSignedPowerScheduleOp`` at address ``t`` and then
+        The Q# wrapper runs ``ApplySignedPowerSchedule`` at address ``t`` and then
         explicitly undoes ``W^(p - 2t)`` walk steps built from the same PREPARE and SELECT.
         Whatever remains must be the untouched input state, so any mismatch in the power,
         the sign of the power, the reflection register, or the ancilla bookkeeping shows up
@@ -208,11 +208,10 @@ class TestPhaseRegisterSizing:
 class TestPhaseWindowState:
     """Window states prepared on the phase register."""
 
-    @pytest.mark.parametrize("window", ["cosine", "uniform"])
     @pytest.mark.parametrize("num_queries", [3, 5, 25])
-    def test_padded_and_normalized(self, window, num_queries):
-        """Windows are unit-norm and zero on the unaddressed padding states."""
-        amplitudes = np.array(phase_window_state(num_queries, window))
+    def test_padded_and_normalized(self, num_queries):
+        """The window is unit-norm and zero on the unaddressed padding states."""
+        amplitudes = np.array(cosine_window_state(num_queries))
         assert len(amplitudes) == 1 << num_phase_bits(num_queries)
         assert np.linalg.norm(amplitudes) == pytest.approx(1.0)
         assert np.all(amplitudes[num_queries + 1 :] == 0.0)
@@ -221,7 +220,7 @@ class TestPhaseWindowState:
     @pytest.mark.parametrize("num_queries", [3, 8, 25])
     def test_cosine_matches_babbush2018_control_state(self, num_queries):
         """The cosine window is sin(pi (t + 1) / (p + 2)) over the p + 1 slots."""
-        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
+        amplitudes = np.array(cosine_window_state(num_queries))[: num_queries + 1]
         expected = np.sin(np.pi * (np.arange(num_queries + 1) + 1) / (num_queries + 2))
         expected /= np.linalg.norm(expected)
         np.testing.assert_allclose(amplitudes, expected, rtol=1e-12, atol=1e-15)
@@ -229,7 +228,7 @@ class TestPhaseWindowState:
     @pytest.mark.parametrize("num_queries", [4, 9, 24])
     def test_cosine_is_symmetric_and_single_lobed(self, num_queries):
         """The cosine window peaks in the middle and decays monotonically to both edges."""
-        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
+        amplitudes = np.array(cosine_window_state(num_queries))[: num_queries + 1]
         np.testing.assert_allclose(amplitudes, amplitudes[::-1], rtol=1e-12, atol=1e-15)
         peak = int(np.argmax(amplitudes))
         assert np.all(np.diff(amplitudes[: peak + 1]) > 0.0)
@@ -243,9 +242,13 @@ class TestPhaseWindowState:
         as :math:`1/\Delta^4` instead of the uniform window's :math:`1/\Delta^2`.
         """
         num_queries, oversampling = 31, 32
+        windows = {
+            "cosine": np.array(cosine_window_state(num_queries))[: num_queries + 1],
+            "uniform": np.ones(num_queries + 1) / np.sqrt(num_queries + 1),
+        }
 
         def tail_probability(window: str, bins: int) -> float:
-            amplitudes = np.array(phase_window_state(num_queries, window))[: num_queries + 1]
+            amplitudes = windows[window]
             spectrum = np.abs(np.fft.fft(amplitudes, amplitudes.size * oversampling)) ** 2
             spectrum /= spectrum.sum()
             offsets = np.arange(spectrum.size) - int(np.argmax(spectrum))
@@ -255,11 +258,6 @@ class TestPhaseWindowState:
         assert tail_probability("cosine", 2) < 0.1 * tail_probability("uniform", 2)
         assert tail_probability("cosine", 4) < 1e-3
 
-    def test_unknown_window_rejected(self):
-        """Unsupported window names are rejected."""
-        with pytest.raises(ValueError, match="window must be one of"):
-            phase_window_state(4, "kaiser")
-
 
 class TestPhaseDecoding:
     """Decoding of the doubled measured phase."""
@@ -267,18 +265,16 @@ class TestPhaseDecoding:
     @pytest.mark.parametrize(("measured", "expected_lower"), [(0.0, 0.0), (0.25, 0.125), (0.75, 0.125), (0.5, 0.25)])
     def test_conjugate_bins_fold_to_the_same_phase(self, measured, expected_lower):
         """Measured y and 1 - y describe the same walk phase."""
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="lower")
-        assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_lower)
-
-        upper_builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="upper")
-        assert upper_builder.phase_fraction_from_measurement(measured) == pytest.approx(0.5 - expected_lower)
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=7)
+        assert builder.phase_fraction_from_measurement(measured, "lower") == pytest.approx(expected_lower)
+        assert builder.phase_fraction_from_measurement(measured, "upper") == pytest.approx(0.5 - expected_lower)
 
     def test_dominant_phase_merges_conjugate_counts(self):
         """Conjugate bins are summed before the winner is selected."""
         counts = {"010": 3, "110": 3, "001": 5}  # 2/8 and 6/8 are conjugates, 1/8 is a separate bin
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="lower")
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=7)
         phase_fraction, bitstring, measured = _select_dominant_decoded_phase(
-            counts, 3, builder.phase_fraction_from_measurement
+            counts, 3, lambda y: builder.phase_fraction_from_measurement(y, "lower")
         )
         assert phase_fraction == pytest.approx(0.125)
         assert bitstring in {"010", "110"}
@@ -329,7 +325,7 @@ class TestUnaryQpeEndToEnd:
         """The schedule must sweep ``num_queries + 1`` slots, not apply one controlled block.
 
         ``MakeUnaryQPECircuit`` hands the whole phase register to a single
-        ``signedPowerSchedule`` call rather than repeating a walk step itself, because unary
+        ``ApplySignedPowerSchedule`` call rather than repeating a walk step itself, because unary
         iteration fuses the slot sweep with the address decode. This pins that the repetition
         really happens inside that call. The synthetic walk block is Clifford, so the only
         non-Clifford cost is the unary-iteration AND ladder, one uncompute measurement per
@@ -363,12 +359,12 @@ class TestUnaryQpeEndToEnd:
         """
         num_queries = 7
         num_states = num_queries + 1
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries, phase_band="lower")
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
 
         expected_phase = k / (2 * num_states)
         for system_state in (0, 1):
             measured = self._measure(qdk_ctx, num_queries, k, system_state) / num_states
-            assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_phase)
+            assert builder.phase_fraction_from_measurement(measured, "lower") == pytest.approx(expected_phase)
 
     @pytest.mark.parametrize("bin_index", [1, 2, 3])
     def test_inverse_qft_leaves_the_answer_little_endian(self, qdk_ctx, bin_index):
