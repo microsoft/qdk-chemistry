@@ -64,7 +64,7 @@ state_prep_oracle = builder.run(
     state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
 )[0]
 
-# 4. Derive the register layout. 
+# 4. Derive the register layout.
 params = state_prep_oracle._qsharp_factory.parameter
 num_system_qubits = len(params["systems"])
 num_ancilla_qubits = params["numAncillaQubits"]

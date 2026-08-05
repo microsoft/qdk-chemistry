@@ -129,9 +129,9 @@ def _dominant_accepted_phase(
 
 
 def test_amplitude_amplification_is_registered():
-    assert available("amplitude_amplification") == ["qdk"]
+    assert available("amplitude_amplification") == ["base"]
     default = create("amplitude_amplification")
-    assert default.name() == "qdk"
+    assert default.name() == "base"
     assert default.type_name() == "amplitude_amplification"
     assert isinstance(default, AmplitudeAmplification)
 
