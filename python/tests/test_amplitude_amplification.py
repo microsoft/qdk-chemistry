@@ -16,7 +16,13 @@ from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+
+
+@pytest.fixture(scope="module")
+def qsharp_context():
+    """Return the shared Q# context carrying the chemistry utilities."""
+    return get_qsharp_context()
 
 
 def _amplified_expression(theta: float, rounds: int) -> str:
@@ -155,9 +161,9 @@ def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_range: tu
 
 
 def test_amplitude_amplification_is_registered():
-    assert available("amplitude_amplification") == ["qdk_amplitude_amplification"]
+    assert available("amplitude_amplification") == ["qdk"]
     default = create("amplitude_amplification")
-    assert default.name() == "qdk_amplitude_amplification"
+    assert default.name() == "qdk"
     assert default.type_name() == "amplitude_amplification"
     assert isinstance(default, AmplitudeAmplification)
 
