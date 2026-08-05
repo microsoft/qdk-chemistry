@@ -33,9 +33,7 @@ def phase_marking_oracle(
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
         target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
-        signal_ancilla_indices: Indices, relative to the register that follows the
-            phase qubits, of ancillas that must all be :math:`|0\rangle` for the
-            phase estimate to be trusted. Defaults to no ancilla condition.
+        signal_ancilla_indices: Indices of ancillas after the phase qubits that must all be :math:`|0\rangle`.
 
     Returns:
         A circuit carrying an adjointable ``(Qubit[], Qubit) => Unit`` Q# operation.
