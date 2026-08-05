@@ -155,13 +155,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// Circuit entry point: allocates the register and applies the block encoding `power` times.
-    ///
-    /// The composition is done here rather than by partially applying the combinators above
-    /// because QIR generation defunctionalizes the call graph: it resolves callables passed as
-    /// entry-point arguments, but only one level deep. A pre-composed
-    /// `MakeRepeatedOp(MakeWalkOp(MakePrepSelPrepOp(...)))` nests three levels and is rejected as
-    /// a dynamic callable, so the QIR path passes the leaf PREPARE/SELECT oracles instead and
-    /// stitches them together in Q#.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -209,24 +202,16 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// PREPARE fixture: a single-ancilla Ry rotation.
-    internal operation TestRyPrepare(theta : Double, ancilla : Qubit[]) : Unit is Adj + Ctl {
-        Ry(theta, ancilla[0]);
-    }
-
-    /// SELECT fixture: a sign flip on the system qubit.
-    internal operation TestSignSelect(ancilla : Qubit[], system : Qubit[]) : Unit is Adj + Ctl {
-        Controlled Z(ancilla, system[0]);
-    }
-
     /// # Summary
     /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
     /// schedules from a test.
     ///
-    /// `PREPARE = Ry(theta)` and `SELECT = c-Z` block-encode `diag(1, cos theta)`, which is
-    /// Hermitian and therefore self-inverse, so pairing it with `MakeAncillaReflectionOp(1)`
-    /// gives a genuine qubitization walk whose phase seen by `|1>` is exactly `theta`.
+    /// PREPARE is a single-ancilla `Ry` rotation; SELECT is a sign flip on the system qubit.
     function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
-        MakePrepSelPrepOp(TestRyPrepare(theta, _), TestSignSelect, 1)
+        MakePrepSelPrepOp(
+            (ancilla) => Ry(theta, ancilla[0]),
+            (ancilla, system) => Controlled Z(ancilla, system[0]),
+            1
+        )
     }
 }

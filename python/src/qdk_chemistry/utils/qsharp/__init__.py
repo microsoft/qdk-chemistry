@@ -28,19 +28,9 @@ __all__ = [
 _PROJECT_ROOT = str(Path(__file__).parent)
 _SOURCE_ROOT = Path(__file__).parent / "src"
 #: Profile the vendored Q# project is compiled for by default.
-#:
-#: ``Adaptive_RIF`` rather than ``Unrestricted``: unary iteration uncomputes by
-#: measurement, so the profile has to permit mid-circuit measurement and feed-forward,
-#: but ``Unrestricted`` is the one profile QIR code generation rejects outright. The two
-#: lower measurement-based uncompute identically, so this buys QIR support for free.
 DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 
 #: Q# sources that are supported by ``TargetProfile.Base``.
-#:
-#: ``Select`` and ``PrepSelPrep`` qualify: their only measurement-based uncompute is the
-#: AND ladder in ``Reflect``, which the Q# standard library lowers to a measurement-free
-#: decomposition when the target profile demands it. Unary iteration does not qualify --
-#: see :func:`create_qsharp_context`.
 _BASE_PROFILE_FILES = (
     "StatePreparation.qs",
     "CircuitComposition.qs",
@@ -57,16 +47,7 @@ _BASE_PROFILE_FILES = (
 
 @cache
 def _base_project_root() -> str:
-    """Stage the Base-supported sources as a standalone Q# project and return its root.
-
-    A context can take sources either as a ``project_root`` or as a string passed to ``eval``,
-    but only the former compiles them into a package that QIR generation can lower: circuits
-    composed out of ``eval``-ed sources fail with "callable should exist in lowered package".
-    The Base subset is therefore copied into a project of its own rather than concatenated and
-    evaluated, which withholds the unary sources while keeping the rest QIR-capable.
-
-    The directory is built once per process and removed at interpreter exit.
-    """
+    """Stage the Base-supported sources as a standalone Q# project and return its root."""
     root = Path(tempfile.mkdtemp(prefix="qdk-chemistry-qsharp-base-"))
     atexit.register(shutil.rmtree, root, ignore_errors=True)
     shutil.copyfile(Path(_PROJECT_ROOT) / "qsharp.json", root / "qsharp.json")

@@ -43,29 +43,9 @@ namespace QDKChemistry.Utils.CircuitComposition {
         ApplyRepeated(cacheName, op, power, _)
     }
 
-    /// Circuit entry point: allocates `numQubits` qubits and applies `op` to them.
-    ///
-    /// Operations over a richer register shape reach this by partial application, e.g. a
-    /// `(Qubit[], Qubit[]) => Unit` becomes `Qubit[] => Unit` once its control register is bound.
-    operation MakeCircuit(op : Qubit[] => Unit, numQubits : Int) : Unit {
-        use qs = Qubit[numQubits];
-        op(qs);
-    }
-
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
     function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit) : ((Qubit, 'T) => Unit) {
         (control, target) => op([control], target)
-    }
-
-    /// Circuit entry point for an operation that takes a control register beside its target.
-    operation MakeControlledCircuit(
-        op : (Qubit[], Qubit[]) => Unit,
-        numControlQubits : Int,
-        numQubits : Int
-    ) : Unit {
-        use controls = Qubit[numControlQubits];
-        use qs = Qubit[numQubits];
-        op(controls, qs);
     }
 
     /// Applies two operations sequentially on the same system register.

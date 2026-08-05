@@ -93,80 +93,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         return results;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Test wrappers
-    //
-    //  Each one takes the block encoding and its reflection as callables, so a caller
-    //  supplies whichever block encoding it wants to exercise and nothing here is tied
-    //  to a particular one.
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// `X` on the first qubit: a self-inverse factor usable as a block or as a reflection.
-    internal operation TestApplyX(qubits : Qubit[]) : Unit is Adj + Ctl {
-        X(qubits[0]);
-    }
-
-    /// `Z` on the first qubit: a self-inverse factor usable as a block or as a reflection.
-    internal operation TestApplyZ(qubits : Qubit[]) : Unit is Adj + Ctl {
-        Z(qubits[0]);
-    }
-
-    /// Signed-power schedule with reflection R = Z and block B = X on one target
-    /// prepared in Ry(0.7)|0>.
-    ///
-    /// Branch `addressValue` must apply exactly (Z·X)^(numBlocks - 2*addressValue),
-    /// including the relative phase, which distinguishes every power in the schedule.
-    operation TestUnaryIterationSignedPower(numBlocks : Int, addressValue : Int) : Unit {
-        let numAddressQubits = AddressQubits(numBlocks + 1);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + 1);
-        let address = qs[0..numAddressQubits - 1];
-        let target = qs[numAddressQubits...];
-        ApplyXorInPlace(addressValue, address);
-        Ry(0.7, target[0]);
-        ApplySignedPowerSchedule(TestApplyX, TestApplyZ, numBlocks, address, target);
-        ApplyXorInPlace(addressValue, address);
-    }
-
-    /// Dump harness: applies a signed-power schedule with the phase register in superposition.
-    ///
-    /// The qubits are leaked so the caller can read the joint state and check, for every
-    /// address branch, which walk power the schedule actually applied. This reproduces the
-    /// exact register handoff `MakeUnaryQPECircuit` performs, including `Reversed`.
-    operation TestSchedulePhaseRamp(
-        applyBlockEncoding : (Qubit[] => Unit is Adj),
-        applyReflection : (Qubit[] => Unit is Adj + Ctl),
-        numQueries : Int,
-        numTargets : Int,
-        systemAngle : Double,
-        applyInverseQft : Bool,
-    ) : Unit {
-        let numBits = PhaseRegisterSize(numQueries);
-        let qs = QIR.Runtime.AllocateQubitArray(numBits + numTargets);
-        let phaseReg = qs[0..numBits - 1];
-        let targets = qs[numBits...];
-        ApplyToEachA(H, phaseReg);
-        Ry(systemAngle, targets[0]);
-        ApplySignedPowerSchedule(
-            applyBlockEncoding,
-            applyReflection,
-            numQueries,
-            Reversed(phaseReg),
-            targets
-        );
-        if applyInverseQft {
-            Adjoint ApplyQFT(phaseReg);
-        }
-    }
-
     /// Checks the generic schedule against the explicit walk power.
-    ///
-    /// The schedule at address `t` is applied, then `W^(numQueries - 2t)` is explicitly undone
-    /// with the same two callables. If the schedule realizes the documented signed power, the
-    /// dumped state must be exactly the prepared input, with no residue on the address or
-    /// ancilla registers.
-    ///
-    /// `applyBlockEncoding` has to be self-inverse; that is what makes `W = R·B` a genuine
-    /// qubitization walk.
     operation TestSignedPowerScheduleAgainstWalk(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -201,32 +128,14 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         ApplyXorInPlace(addressValue, address);
     }
 
-    /// Block B = Rz(theta)·X·Rz(-theta), a reflection about an axis in the XY plane.
-    ///
-    /// It is self-inverse, and it does not commute with the reflection `X` it is paired with,
-    /// so the walk W = B·X = Rz(2*theta) has genuinely distinct powers. A pair of commuting
-    /// factors (two diagonal ones, say) would make every schedule branch collapse to the same
-    /// operator and silently pass no matter what the address decode did.
-    internal operation TestRzWalkBlock(theta : Double, qubits : Qubit[]) : Unit is Adj {
-        Rz(-theta, qubits[0]);
-        X(qubits[0]);
-        Rz(theta, qubits[0]);
-    }
-
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
     ///
-    /// The reflection on the one-qubit target register is `R = X` and the block is the
-    /// self-inverse `B = Rz(theta) X Rz(-theta)`. Their product is the walk
-    /// `W = B·R = Rz(2*theta)`, with `W|0> = e^{-i*theta}|0>` and
-    /// `W|1> = e^{+i*theta}|1>`. A uniform window is used, so `numQueries` must be
-    /// `2^b - 1` for the window to exactly fill the phase register and the outcome to
-    /// be deterministic.
-    ///
-    /// With `theta = -pi*k/(numQueries + 1)` the returned bits must read `k` for
-    /// `systemState = 1` and `(-k) mod (numQueries + 1)` for `systemState = 0`, which
-    /// pins the documented relation `y = -+2*phi mod 1` together with every endianness
-    /// convention in the chain: big-endian window state, little-endian unary addressing,
-    /// and the bit order of the measured phase register.
+    /// The reflection is `R = X` on the single target qubit and the block is
+    /// B = Rz(theta)·X·Rz(-theta), a reflection about an axis in the XY plane.
+    /// The block is self-inverse, and it does not commute with the reflection it is paired
+    /// with, so the walk W = B·X = Rz(2*theta) has genuinely distinct powers. A pair of
+    /// commuting factors (two diagonal ones, say) would make every schedule branch collapse
+    /// to the same operator and silently pass no matter what the address decode did.
     operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemState : Int) : Result[] {
         let numBits = PhaseRegisterSize(numQueries);
         Fact(2^numBits == numQueries + 1, "numQueries must be one less than a power of two");
@@ -237,8 +146,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                     X(systems[0]);
                 }
             },
-            TestRzWalkBlock(theta, _),
-            TestApplyX,
+            (qubits) => {
+                Rz(-theta, qubits[0]);
+                X(qubits[0]);
+                Rz(theta, qubits[0]);
+            },
+            (qubits) => X(qubits[0]),
             ApplyToEach(H, _),
             numQueries,
             Std.Arrays.SequenceI(0, numBits - 1),

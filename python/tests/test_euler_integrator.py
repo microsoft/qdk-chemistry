@@ -123,7 +123,6 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
         assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.2)
 
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME,
     reason="Qiskit Aer or IBM Runtime not available",

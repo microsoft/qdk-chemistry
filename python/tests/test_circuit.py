@@ -153,7 +153,6 @@ class TestGetQsharpCircuit:
         assert len(qsc_pruned_info["qubits"]) == 2
 
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 @pytest.mark.usefixtures("use_base_qdk_ctx")
 class TestGetQiskitConversion:

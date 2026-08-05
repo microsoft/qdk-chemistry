@@ -5,12 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from fnmatch import filterfalse
-
 import numpy as np
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -84,6 +83,7 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Mapper producing the uncontrolled block encoding the schedule applies.",
         )
 
+
 class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     r"""Phase estimation circuit builder driven by unary iteration over a signed-power schedule.
 
@@ -129,6 +129,30 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if circuit_mapper is not None:
             self._settings.set("circuit_mapper", circuit_mapper)
 
+    def resolve_num_queries(self, unitary_rep: UnitaryRepresentation) -> int:
+        """Return the configured query count, ignoring any power carried by the container.
+
+        Args:
+            unitary_rep: The unitary representation the schedule will be built from.
+
+        Returns:
+            The number of walk blocks the schedule applies.
+
+        Raises:
+            ValueError: If the configured ``num_queries`` is not a positive integer.
+
+        """
+        container_power = getattr(unitary_rep.get_container(), "power", 1)
+        if container_power != 1:
+            Logger.warn(
+                f"The unitary representation carries power {container_power}, which is ignored."
+            )
+
+        num_queries = self._settings.get("num_queries")
+        if num_queries <= 0:
+            raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
+        return int(num_queries)
+
     def _run_impl(
         self,
         state_preparation: Circuit,
@@ -156,17 +180,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(
                 f"Requires a block encoding unitary representation, got '{type(container).__name__}'."
             )
-        container_power = getattr(container, "power", 1)
-        if container_power != 1:
-            Logger.warn(
-                f"The unitary representation carries power {container_power}, which is ignored."
-            )
 
-        num_queries = self._settings.get("num_queries")
-        if num_queries <= 0:
-            raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-        
-        num_queries = int(num_queries)
+        num_queries = self.resolve_num_queries(unitary_rep)
         num_bits = num_phase_bits(num_queries)
 
         mapper = self._create_nested("circuit_mapper")

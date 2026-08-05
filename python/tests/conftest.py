@@ -94,13 +94,7 @@ def _base_qsharp_context() -> qdk.Context:
 
 @pytest.fixture
 def use_base_qdk_ctx() -> Iterator[qdk.Context]:
-    """Route the library's shared context to a ``TargetProfile.Base`` build.
-
-    The default profile permits mid-circuit measurement so that unary iteration is
-    available. Tests that need the measurement-free lowering instead -- because they
-    pin exact shot counts, or because they assert that the withheld sources are
-    unreachable -- take this fixture. The context is built once and reused.
-    """
+    """Route the library's shared context to a ``TargetProfile.Base`` build."""
     with use_qsharp_context(_base_qsharp_context()) as context:
         yield context
 

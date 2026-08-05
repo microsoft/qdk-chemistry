@@ -172,7 +172,6 @@ class TestPauliSequenceMapper:
                             atol=float_comparison_absolute_tolerance,
                         )  # Z on qubit 1
 
-    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_controlled_u_circuit_matrix(self, unitary_rep, simple_ppf_container):

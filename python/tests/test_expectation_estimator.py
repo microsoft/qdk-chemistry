@@ -69,7 +69,6 @@ def test_determine_measurement_basis_not_qubit_wise_commuting():
         _determine_measurement_basis(pauli_strings)
 
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 @pytest.mark.usefixtures("use_base_qdk_ctx")
 @pytest.mark.parametrize(
@@ -286,7 +285,6 @@ def test_estimator_fewer_shots(wavefunction_4e4o):
                 pytest.mark.skipif(
                     not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
                 ),
-                # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
                 pytest.mark.usefixtures("use_base_qdk_ctx"),
             ],
         ),
@@ -386,7 +384,6 @@ def test_estimator_pure_identity_hamiltonian(capfd):
     assert "All Hamiltonian terms are identity; skipping circuit execution." in captured.out
 
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 @pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_estimator_mixed_identity_and_pauli_terms():

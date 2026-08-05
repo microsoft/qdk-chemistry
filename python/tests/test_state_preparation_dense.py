@@ -206,7 +206,6 @@ class TestDensePureStatePreparation:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
 
-    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )

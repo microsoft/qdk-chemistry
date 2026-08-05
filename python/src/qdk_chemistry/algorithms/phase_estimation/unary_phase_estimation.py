@@ -36,29 +36,6 @@ def _post_process_phase_estimation(
     energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
     QPE does, which for a walk operator is :math:`E = \lambda \cos(2\pi\varphi)`.
 
-    Folding maps every bin into
-
-    .. math::
-
-        f = \tfrac{1}{2}\min(y,\, 1 - y) \in [0, \tfrac{1}{4}],
-
-    so :math:`2\pi f \in [0, \pi/2]` and :math:`\cos(2\pi f) \ge 0`. The fold therefore
-    always lands in the non-negative half of the spectrum and destroys the sign, which
-    ``use_positive_sign`` restores by choosing between the two branches:
-
-    .. math::
-
-        E_+ &= \lambda\cos(2\pi f) \ge 0, \\
-        E_- &= \lambda\cos\!\big(2\pi(\tfrac{1}{2} - f)\big)
-             = \lambda\cos(\pi - 2\pi f) = -\lambda\cos(2\pi f) \le 0,
-
-    using :math:`\cos(\pi - \theta) = -\cos\theta`. Hence :math:`\varphi = f` for a
-    non-negative eigenvalue and :math:`\varphi = \tfrac{1}{2} - f` for a non-positive
-    one; the branches meet at :math:`f = \tfrac{1}{4}`, where :math:`E = 0`.
-
-    Because the doubling makes the histogram exactly invariant under :math:`E \to -E`,
-    the sign cannot be recovered from the counts and must be supplied by the caller.
-
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.

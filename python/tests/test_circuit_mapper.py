@@ -71,7 +71,6 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
-    # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_unitary_circuit_matrix(self, simple_unitary):
