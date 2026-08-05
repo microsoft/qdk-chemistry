@@ -34,8 +34,7 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
 }
 
 // ===========================================================================
-// Shared foundations (used by BOTH the dense reference and the production
-// path).
+// Shared kernel foundations.
 // ===========================================================================
 
 /// SW energy-denominator options. Callers select one scheme by setting either
@@ -110,95 +109,6 @@ struct ActiveHamiltonian {
 };
 
 // ===========================================================================
-// Dense spin-orbital reference representation (validation only; not called by
-// the constructor). It checks the blocked storage and element-access paths in
-// `BlockedDownfoldMatchesSpinOrbital`, but shares the generalized-Wick
-// projection machinery with production and is therefore a regression
-// reference, not an independent mathematical oracle. Independent validation is
-// provided by the determinant-space matrix test described in the design.
-// ===========================================================================
-
-namespace reference {
-
-/// Antisymmetric spin-orbital operator tensors.
-struct SoTensors {
-  int n_so = 0;       ///< number of spin-orbitals (2 * norb)
-  double e0 = 0.0;    ///< scalar
-  Eigen::MatrixXd f;  ///< (n_so, n_so) one-body
-  Eigen::VectorXd v;  ///< (n_so^4,) antisymmetric two-body, C-order
-};
-
-/// Build antisymmetric spin-orbital tensors from qdk spin integrals.
-/// h1a,h1b: (norb, norb). g_*: flat (norb^4,) chemist (pq|rs), C-order.
-/// (aaaa/aabb/bbbb = the qdk get_two_body_integrals channels.)
-SoTensors build_tensors(const Eigen::MatrixXd& h1a, const Eigen::MatrixXd& h1b,
-                        const Eigen::VectorXd& g_aaaa,
-                        const Eigen::VectorXd& g_aabb,
-                        const Eigen::VectorXd& g_bbbb, double e_core, int norb);
-
-/// Generator S = (occupation-changing part of H) scaled elementwise by 1/Delta.
-struct Generator {
-  Eigen::MatrixXd s1;  ///< (n_so, n_so)
-  Eigen::VectorXd s2;  ///< (n_so^4,)
-  /// Smallest |Delta| over the coupled (nonzero-V) occupation-changing channels
-  /// (0 if there are none). Secondary context for `max_amplitude`.
-  double min_denominator = 0.0;
-  /// Largest RAW amplitude |V / Delta| over those channels (unregularized, so
-  /// it flags intruders even when the generator itself is regularized). This is
-  /// the perturbation-convergence indicator: values >~ 1 mean second-order PT
-  /// is unreliable for that channel. Zero couplings never contribute (V/Delta =
-  /// 0).
-  double max_amplitude = 0.0;
-};
-Generator make_generator(const SoTensors& h, const Eigen::VectorXd& eps,
-                         const SoPartition& part, const RegOptions& reg);
-
-/// Split (f, v) by external occupation change: block-diagonal (preserving) vs
-/// off-diagonal (occupation-changing). e0 stays in the block-diagonal part.
-std::pair<SoTensors, SoTensors> split_bd_od(const SoTensors& h,
-                                            const SoPartition& part);
-
-/// Reference-occupation mean-field fold of a block-diagonal operator onto the
-/// active space (the inactive-Fock + core folding of the external orbitals).
-struct MeanFieldResult {
-  double e = 0.0;
-  Eigen::MatrixXd f_active;  ///< (n_so, n_so)
-  Eigen::VectorXd v_active;  ///< (n_so^4,)
-};
-MeanFieldResult mean_field_fold(const SoTensors& h_bd, const SoPartition& part);
-
-/// The effective active-space operator and intruder diagnostics.
-struct DownfoldResult {
-  double e = 0.0;
-  Eigen::MatrixXd f_active;  ///< (n_so, n_so), active block
-  Eigen::VectorXd v_active;  ///< (n_so^4,), active block
-  /// Smallest |Delta| over the coupled occupation-changing channels (context).
-  double min_denominator = 0.0;
-  /// Largest raw amplitude |V / Delta| (perturbation-convergence indicator; the
-  /// quantity to gate an intruder warning on -- prefer this over
-  /// `min_denominator`, which flags harmless small gaps that carry no
-  /// coupling).
-  double max_amplitude = 0.0;
-};
-
-/// Full second-order SW downfold: the block-diagonal reference-occupation fold
-/// plus 1/2 [S, V] projected onto the active space, truncated to <= 2-body.
-/// ½[S, V] is evaluated by generalized Wick contraction over the external legs
-/// (buffer summed), emitting operators over the (small) active space only.
-/// Result lives on the active spin-orbitals (full n_so indexing; non-active
-/// entries are zero).
-DownfoldResult downfold(const SoTensors& h, const Eigen::VectorXd& eps,
-                        const SoPartition& part, const RegOptions& reg);
-
-/// Restrict + relabel the spin-restricted active block of a DownfoldResult to
-/// compact spatial chemist integrals (the inverse of build_tensors). Requires
-/// each active spatial orbital to have both spin-orbitals active.
-ActiveHamiltonian to_spatial_chemist(const DownfoldResult& down,
-                                     const SoPartition& part);
-
-}  // namespace reference
-
-// ===========================================================================
 // Spin-blocked on-the-fly downfold (PRODUCTION): the path wired into the
 // constructor. Stores the two-body as spatial spin blocks and forms every
 // element on demand, so no dense n_so^4 tensor is ever materialized.
@@ -219,8 +129,7 @@ struct SpinBlocked2B {
   Eigen::VectorXd v_abab;  ///< (norb^4,) opposite-spin block v[pa,qb,ra,sb]
 };
 
-/// Build the independent spin blocks from qdk chemist integrals (same
-/// convention as `reference::build_tensors`).
+/// Build the independent spin blocks from qdk chemist integrals.
 SpinBlocked2B build_two_body_blocked(const Eigen::VectorXd& g_aaaa,
                                      const Eigen::VectorXd& g_aabb,
                                      const Eigen::VectorXd& g_bbbb, int norb);
@@ -236,8 +145,7 @@ SpinBlocked2B build_two_body_blocked_restricted(const Eigen::VectorXd& g,
 double so_v_from_blocked(const SpinBlocked2B& b, int P, int Q, int R, int S);
 
 /// Spin-orbital one-body matrix (n_so, n_so) from spatial alpha/beta blocks --
-/// the cheap (O(norb^2)) one-body half of `reference::build_tensors`, for the
-/// spin-blocked (on-the-fly two-body) downfold path.
+/// the cheap O(norb^2) one-body input for the spin-blocked downfold path.
 Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
                                       const Eigen::MatrixXd& h1b, int norb);
 
@@ -259,8 +167,8 @@ struct ActiveDownfoldResult {
   double max_amplitude = 0.0;    ///< largest raw |V/Delta| (intruder gauge)
 };
 
-/// Memory-lean equivalent of `reference::downfold`: consumes the spin-blocked
-/// spatial two-body store (`SpinBlocked2B`) and computes every antisymmetric
+/// Consume the spin-blocked spatial two-body store (`SpinBlocked2B`) and
+/// compute every antisymmetric
 /// two-body element on the fly, so the dense n_so^4 tensors (`v`, generator
 /// `s2`, the block-diagonal / off-diagonal split) are never materialized. The
 /// retained Wick contractions are evaluated from packed active/buffer panels;
@@ -272,9 +180,8 @@ struct ActiveDownfoldResult {
 /// spatial opposite-spin block over the active
 /// *spatial* orbitals (`ActiveDownfoldResult::v_abab`, O(n_act^4) --
 /// spin-restriction makes that single block the whole effective two-body).
-/// Numerically identical to `reference::downfold` on the active block in the
-/// regression tests; `f` is the spin-orbital one-body from
-/// `spin_orbital_one_body`, `e_core` the scalar core energy.
+/// `f` is the spin-orbital one-body from `spin_orbital_one_body`; `e_core` is
+/// the scalar core energy.
 ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlocked2B& blk,
                                       const Eigen::VectorXd& eps,

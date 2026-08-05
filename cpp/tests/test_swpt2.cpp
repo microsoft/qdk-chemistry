@@ -24,6 +24,7 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
+#include "swpt2_test_utils.hpp"
 #include "ut_common.hpp"
 
 namespace {
@@ -245,12 +246,12 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   {
     const auto [T_a, T_b] = H_eff->get_one_body_integrals();
     const int m = static_cast<int>(T_a.rows());
-    const auto H_so = sw::reference::build_tensors(T_a, T_a, ge, ge, ge,
-                                                   H_eff->get_core_energy(), m);
+    const auto H_so = swpt2_test::build_spin_orbital_tensors(
+        T_a, T_a, ge, ge, ge, H_eff->get_core_energy(), m);
     std::vector<int> orbs(2 * m);
     for (int i = 0; i < 2 * m; ++i) orbs[i] = i;
-    const double E_kernel_fci =
-        fci_ground_energy(H_so.e0, H_so.f, H_so.v, 2 * m, orbs, 2, 2);
+    const double E_kernel_fci = fci_ground_energy(
+        H_so.core_energy, H_so.one_body, H_so.two_body, 2 * m, orbs, 2, 2);
     EXPECT_NEAR(E_sw, E_kernel_fci, 1e-9);
   }
 

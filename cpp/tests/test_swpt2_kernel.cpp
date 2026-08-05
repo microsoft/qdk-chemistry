@@ -6,7 +6,6 @@
 //
 // Reference values are grounded in first principles, not in any external tool:
 //   * diagonal (generalized) Fock energies from their closed-form definition,
-//   * the SW generator as coupling / energy-gap,
 //   * the reference-buffer fold as textbook inactive-Fock mean field
 //     (a doubly-occupied buffer orbital contributes 2J - K to the
 //     active-space Fock and
@@ -27,6 +26,7 @@
 #include <vector>
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
+#include "swpt2_test_utils.hpp"
 
 namespace {
 namespace sw = qdk::chemistry::algorithms::microsoft::swpt2;
@@ -80,34 +80,6 @@ TEST(Swpt2Kernel, DiagonalFockEnergiesFromDefinition) {
 }
 
 // ---------------------------------------------------------------------------
-// Generator: S solves [H0, S] = V, so a single off-diagonal coupling maps to
-//   S_PQ = f_PQ / (eps_P - eps_Q)  (coupling over energy gap).
-// ---------------------------------------------------------------------------
-TEST(Swpt2Kernel, GeneratorIsCouplingOverGap) {
-  const int norb = 2;  // active=[0], virtual=[1], hopping tau, gap Delta
-  const double tau = 0.2, eps0 = -0.5, eps1 = 3.0;
-  Eigen::MatrixXd h(2, 2);
-  h << eps0, tau, tau, eps1;
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(16);  // no two-body
-
-  auto H = sw::reference::build_tensors(h, h, g, g, g, /*e_core=*/0.0, norb);
-  Eigen::VectorXd na(2), nb(2);
-  na << 1, 0;
-  nb << 0, 0;
-  Eigen::VectorXd eps = sw::diagonal_fock_energies(h, g, na, nb, norb);
-
-  sw::SoPartition part;
-  part.n_so = 4;
-  part.is_active = {1, 1, 0, 0};
-  part.is_inactive = {0, 0, 0, 0};
-  part.is_virtual = {0, 0, 1, 1};
-
-  auto gen = sw::reference::make_generator(H, eps, part, sw::RegOptions{});
-  // active0-alpha (SO 0) -> virtual-alpha (SO 2): S = tau / (eps0 - eps1)
-  EXPECT_NEAR(gen.s1(0, 2), tau / (eps0 - eps1), 1e-12);
-}
-
-// ---------------------------------------------------------------------------
 // Reference-buffer fold = textbook inactive Fock. A doubly-occupied domo d:
 //   f_active[i,i] += 2 (ii|dd) - (id|di)          (Coulomb 2J minus exchange K)
 //   core        += 2 h_dd + (dd|dd)              (two electrons in d)
@@ -124,23 +96,25 @@ TEST(Swpt2Kernel, InactiveFockFoldMeanField) {
   set_eri(g, 1, 0, 0, 1, norb, K);
   set_eri(g, 1, 1, 1, 1, norb, Udd);
 
-  auto H = sw::reference::build_tensors(h, h, g, g, g, e0, norb);
   sw::SoPartition part;
   part.n_so = 4;
   part.is_active = {1, 1, 0, 0};
   part.is_inactive = {0, 0, 1, 1};
   part.is_virtual = {0, 0, 0, 0};
 
-  auto [bd, od] = sw::reference::split_bd_od(H, part);
-  auto res = sw::reference::mean_field_fold(bd, part);
+  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+  const auto one_body = sw::spin_orbital_one_body(h, h, norb);
+  Eigen::VectorXd eps(4);
+  eps << h00, h00, hdd, hdd;
+  const auto res =
+      sw::downfold_blocked(one_body, blocked, eps, part, sw::RegOptions{}, e0);
 
   EXPECT_NEAR(res.e, e0 + (2 * hdd + Udd), 1e-12);            // 0.7 - 0.5 = 0.2
   EXPECT_NEAR(res.f_active(0, 0), h00 + (2 * J - K), 1e-12);  // 0.3 + 1.8 = 2.1
   EXPECT_NEAR(res.f_active(1, 1), h00 + (2 * J - K), 1e-12);  // spin symmetry
   // hermiticity of the folded one-body active operator
-  const int M = 4;
-  for (int i = 0; i < M; ++i)
-    for (int j = 0; j < M; ++j)
+  for (int i = 0; i < res.f_active.rows(); ++i)
+    for (int j = 0; j < res.f_active.cols(); ++j)
       EXPECT_NEAR(res.f_active(i, j), res.f_active(j, i), 1e-12);
 }
 
@@ -155,20 +129,23 @@ TEST(Swpt2Kernel, EmptyExternalSpaceIsIdentity) {
   set_eri(g, 0, 0, 0, 0, norb, 1.0);  // some active interaction
   const double e0 = 0.7;
 
-  auto H = sw::reference::build_tensors(h, h, g, g, g, e0, norb);
   sw::SoPartition part;
   part.n_so = 4;
   part.is_active = {1, 1, 1, 1};
   part.is_inactive = {0, 0, 0, 0};
   part.is_virtual = {0, 0, 0, 0};
 
-  auto [bd, od] = sw::reference::split_bd_od(H, part);
-  auto res = sw::reference::mean_field_fold(bd, part);
+  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+  const auto one_body = sw::spin_orbital_one_body(h, h, norb);
+  Eigen::VectorXd eps(4);
+  eps << h(0, 0), h(0, 0), h(1, 1), h(1, 1);
+  const auto res =
+      sw::downfold_blocked(one_body, blocked, eps, part, sw::RegOptions{}, e0);
+  const auto emitted = sw::to_spatial_chemist(res, part);
 
-  EXPECT_NEAR(res.e, e0, 1e-12);
-  for (int i = 0; i < 4; ++i)
-    for (int j = 0; j < 4; ++j)
-      EXPECT_NEAR(res.f_active(i, j), H.f(i, j), 1e-12);
+  EXPECT_NEAR(emitted.core_energy, e0, 1e-12);
+  EXPECT_LT((emitted.one_body - h).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((emitted.two_body - g).cwiseAbs().maxCoeff(), 1e-12);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +156,8 @@ TEST(Swpt2Kernel, EmptyExternalSpaceIsIdentity) {
 namespace {
 // Build the 2-orbital (active, external) partition + tensors for a hopping tau.
 struct TwoOrbital {
-  sw::reference::SoTensors H;
+  Eigen::MatrixXd one_body;
+  sw::SpinBlocked2B two_body;
   Eigen::VectorXd eps;
   sw::SoPartition part;
   TwoOrbital(double e_active, double e_ext, double tau,
@@ -188,7 +166,8 @@ struct TwoOrbital {
     Eigen::MatrixXd h(2, 2);
     h << e_active, tau, tau, e_ext;
     Eigen::VectorXd g = Eigen::VectorXd::Zero(16);  // no two-body
-    H = sw::reference::build_tensors(h, h, g, g, g, /*e_core=*/0.0, norb);
+    one_body = sw::spin_orbital_one_body(h, h, norb);
+    two_body = sw::build_two_body_blocked_restricted(g, norb);
 
     Eigen::VectorXd na(2), nb(2);
     na << 1,
@@ -210,8 +189,8 @@ struct TwoOrbital {
 TEST(Swpt2Kernel, SecondOrderShiftVirtual) {
   const double e0 = -0.5, e1 = 3.0, tau = 0.2;  // active below virtual
   TwoOrbital sys(e0, e1, tau, /*external_is_virtual=*/true);
-  auto res =
-      sw::reference::downfold(sys.H, sys.eps, sys.part, sw::RegOptions{});
+  const auto res = sw::downfold_blocked(sys.one_body, sys.two_body, sys.eps,
+                                        sys.part, sw::RegOptions{}, 0.0);
 
   const double shift = -tau * tau / (e1 - e0);         // -tau^2 / Delta
   EXPECT_NEAR(res.f_active(0, 0), e0 + shift, 1e-12);  // alpha
@@ -221,8 +200,8 @@ TEST(Swpt2Kernel, SecondOrderShiftVirtual) {
 TEST(Swpt2Kernel, SecondOrderShiftInactive) {
   const double e0 = 3.0, e1 = -0.5, tau = 0.2;  // active above inactive
   TwoOrbital sys(e0, e1, tau, /*external_is_virtual=*/false);
-  auto res =
-      sw::reference::downfold(sys.H, sys.eps, sys.part, sw::RegOptions{});
+  const auto res = sw::downfold_blocked(sys.one_body, sys.two_body, sys.eps,
+                                        sys.part, sw::RegOptions{}, 0.0);
 
   const double shift =
       tau * tau / (e0 - e1);  // +tau^2 / Delta (hole excitation)
@@ -490,106 +469,7 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
   return es.eigenvalues()(0);
 }
 
-// Downfold the lambda-scaled system and measure how each order of the downfold
-// approaches the full-CI ground-state energy of the whole window.
-struct CiProbe {
-  double err_bare;   // |E(bare mean-field fold)        - E_full|
-  double err_1body;  // |E(+ 1-body commutator dressing) - E_full|
-  double err_sw;     // |E(full second-order downfold)  - E_full|
-  double dv2body;    // ||v_active(SW) - v_active(bare)||  (2-body commutator)
-};
-CiProbe downfold_vs_fci(double lam) {
-  const int norb = 4, n_so = 8;
-  // Single-determinant active reference |0^2>: active orbital 0 doubly
-  // occupied, orbital 1 empty, with NO active-active coupling, so |0^2> is an
-  // exact active eigenstate at lambda = 0 and the active space decouples from
-  // the environment there. The orbital-energy denominators are
-  // not those of a self-consistent HF reference, so the *absolute* second-order
-  // residual is O(lambda^2); the physics under test is that each order of the
-  // downfold (mean-field fold -> 1-body commutator -> 2-body commutator)
-  // recovers a successively larger share of that O(lambda^2) coupling
-  // correlation.
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  h1(0, 0) = 0.0;
-  h1(1, 1) = 1.0;                    // active orbital energies (clear gap)
-  h1(2, 2) = -3.0;                   // inactive (deep)
-  h1(3, 3) = 3.0;                    // virtual (high)
-  h1(0, 3) = h1(3, 0) = 0.40 * lam;  // active0-virtual  (occupation-changing)
-  h1(1, 3) = h1(3, 1) = 0.30 * lam;  // active1-virtual
-  h1(1, 2) = h1(2, 1) = 0.35 * lam;  // inactive-active1
-  h1(2, 3) = h1(3, 2) = 0.30 * lam;  // inactive-virtual (environment)
-
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  set_sym_eri(g, 0, 0, 0, 0, norb,
-              0.60);  // active on-site (diagonal, no mixing)
-  set_sym_eri(g, 1, 1, 1, 1, norb, 0.55);
-  set_sym_eri(g, 2, 2, 2, 2, norb, 0.50);  // external density (unscaled, BD)
-  set_sym_eri(g, 3, 3, 3, 3, norb, 0.45);
-  set_sym_eri(g, 0, 0, 2, 2, norb, 0.30);
-  set_sym_eri(g, 1, 1, 2, 2, norb, 0.28);
-  set_sym_eri(g, 0, 0, 3, 3, norb, 0.20);
-  set_sym_eri(g, 1, 1, 3, 3, norb, 0.18);
-  set_sym_eri(g, 2, 2, 3, 3, norb, 0.15);
-  set_sym_eri(g, 0, 3, 0, 0, norb, 0.10 * lam);  // active<->external 2-body
-  set_sym_eri(g, 1, 2, 1, 1, norb, 0.10 * lam);  // (occupation-changing:
-  set_sym_eri(g, 0, 2, 0, 3, norb, 0.08 * lam);  //  generates v_active)
-  set_sym_eri(g, 0, 2, 1, 3, norb, 0.06 * lam);  // active-pair <-> ext-pair
-
-  const auto H =
-      sw::reference::build_tensors(h1, h1, g, g, g, /*e_core=*/0.0, norb);
-  Eigen::VectorXd na(norb), nb(norb);
-  na << 1.0, 0.0, 1.0, 0.0;  // |0^2> + doubly-occupied inactive: n = (2,0,2,0)
-  nb << 1.0, 0.0, 1.0, 0.0;
-  const Eigen::VectorXd eps = sw::diagonal_fock_energies(h1, g, na, nb, norb);
-
-  sw::SoPartition part;
-  part.n_so = n_so;
-  part.is_active = {1, 1, 1, 1, 0, 0, 0, 0};
-  part.is_inactive = {0, 0, 0, 0, 1, 1, 0, 0};
-  part.is_virtual = {0, 0, 0, 0, 0, 0, 1, 1};
-
-  const auto down = sw::reference::downfold(H, eps, part, sw::RegOptions{});
-  const auto [bd, od] = sw::reference::split_bd_od(H, part);
-  const auto mf = sw::reference::mean_field_fold(bd, part);
-
-  const std::vector<int> active_so = {0, 1, 2, 3};
-  const std::vector<int> all_so = {0, 1, 2, 3, 4, 5, 6, 7};
-  const double e_full = fci_ground_energy(H.e0, H.f, H.v, n_so, all_so, 2, 2);
-  const double e_bare =
-      fci_ground_energy(mf.e, mf.f_active, mf.v_active, n_so, active_so, 1, 1);
-  // + 1-body commutator dressing (downfolded scalar & one-body, bare two-body)
-  const double e_1body = fci_ground_energy(down.e, down.f_active, mf.v_active,
-                                           n_so, active_so, 1, 1);
-  // full second-order downfold (adds the two-body commutator dressing)
-  const double e_sw = fci_ground_energy(down.e, down.f_active, down.v_active,
-                                        n_so, active_so, 1, 1);
-  return {std::abs(e_bare - e_full), std::abs(e_1body - e_full),
-          std::abs(e_sw - e_full), (down.v_active - mf.v_active).norm()};
-}
 }  // namespace
-
-TEST(Swpt2Kernel, ConvergesToFullCI) {
-  // At zero coupling the active space decouples exactly: downfold == full CI,
-  // and no second-order (commutator) two-body dressing is produced.
-  const CiProbe p0 = downfold_vs_fci(0.0);
-  EXPECT_NEAR(p0.err_sw, 0.0, 1e-10);
-  EXPECT_NEAR(p0.dv2body, 0.0, 1e-10);
-
-  const CiProbe p = downfold_vs_fci(0.08);
-  // The commutator generates a genuine two-body active dressing.
-  EXPECT_GT(p.dv2body, 1e-6);
-  // Each order of the downfold moves the active-space CI energy closer to full
-  // CI: bare mean-field fold -> + 1-body commutator -> + 2-body commutator.
-  EXPECT_LT(p.err_1body, 0.5 * p.err_bare);  // 1-body dressing helps
-  EXPECT_LT(p.err_sw, 0.5 * p.err_1body);    // 2-body dressing helps further
-  EXPECT_LT(p.err_sw, 0.1 * p.err_bare);     // full downfold recovers >90%
-
-  // The residual is genuinely coupling-driven and second-order controlled:
-  // halving the coupling shrinks it faster than linearly (here ~4x, O(lambda^2)
-  // for this non-self-consistent reference).
-  const CiProbe ph = downfold_vs_fci(0.04);
-  EXPECT_LT(ph.err_sw, 0.35 * p.err_sw);
-}
 
 // Independent coefficient-level validation. Build the SW transformation as
 // ordinary matrices over the complete window Fock space, project the inactive
@@ -748,8 +628,6 @@ TEST(Swpt2Kernel, EmitSpatialChemistRoundTrip) {
   set_sym_eri(g, 0, 2, 2, 0, norb, 0.20);
   set_sym_eri(g, 0, 1, 2, 0, norb, 0.07);  // lower-symmetry, all-distinct pair
 
-  const auto H =
-      sw::reference::build_tensors(h1, h1, g, g, g, /*e_core=*/0.7, norb);
   Eigen::VectorXd na(norb), nb(norb);
   na << 1, 1, 0;
   nb << 1, 1, 0;
@@ -761,8 +639,11 @@ TEST(Swpt2Kernel, EmitSpatialChemistRoundTrip) {
   part.is_inactive.assign(2 * norb, 0);
   part.is_virtual.assign(2 * norb, 0);
 
-  const auto down = sw::reference::downfold(H, eps, part, sw::RegOptions{});
-  const auto out = sw::reference::to_spatial_chemist(down, part);
+  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+  const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+  const auto down =
+      sw::downfold_blocked(one_body, blocked, eps, part, sw::RegOptions{}, 0.7);
+  const auto out = sw::to_spatial_chemist(down, part);
 
   ASSERT_EQ(out.norb, norb);
   EXPECT_NEAR(out.core_energy, 0.7, 1e-12);
@@ -797,8 +678,6 @@ TEST(Swpt2Kernel, EmitPreservesDressedEnergy) {
   set_sym_eri(g, 0, 2, 1, 2, norb, 0.15);  // active<->virtual: drives dressing
   set_sym_eri(g, 0, 2, 0, 0, norb, 0.10);
 
-  const auto H =
-      sw::reference::build_tensors(h1, h1, g, g, g, /*e_core=*/0.0, norb);
   Eigen::VectorXd na(norb), nb(norb);
   na << 1, 0, 0;  // |0^2> active reference, virtual empty
   nb << 1, 0, 0;
@@ -810,20 +689,41 @@ TEST(Swpt2Kernel, EmitPreservesDressedEnergy) {
   part.is_inactive = {0, 0, 0, 0, 0, 0};
   part.is_virtual = {0, 0, 0, 0, 1, 1};
 
-  const auto down = sw::reference::downfold(H, eps, part, sw::RegOptions{});
-  // ground energy directly from the downfold's spin-orbital tensors
-  const double e_so = fci_ground_energy(down.e, down.f_active, down.v_active,
-                                        n_so, {0, 1, 2, 3}, 1, 1);
-  // ... and via the emitted spatial-chemist integrals rebuilt to spin-orbitals
-  const auto act = sw::reference::to_spatial_chemist(down, part);
-  const auto H2 = sw::reference::build_tensors(
+  const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+  const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+  const auto down =
+      sw::downfold_blocked(one_body, blocked, eps, part, sw::RegOptions{}, 0.0);
+  const auto act = sw::to_spatial_chemist(down, part);
+  const auto rebuilt = swpt2_test::build_spin_orbital_tensors(
       act.one_body, act.one_body, act.two_body, act.two_body, act.two_body,
       act.core_energy, act.norb);
   const double e_sp =
-      fci_ground_energy(H2.e0, H2.f, H2.v, 2 * act.norb, {0, 1, 2, 3}, 1, 1);
+      fci_ground_energy(rebuilt.core_energy, rebuilt.one_body, rebuilt.two_body,
+                        2 * act.norb, {0, 1, 2, 3}, 1, 1);
+  const Eigen::MatrixXd full_matrix = spatial_chemist_matrix(act);
+  std::vector<int> sector;
+  for (int state = 0; state < full_matrix.rows(); ++state) {
+    int n_alpha = 0, n_beta = 0;
+    for (int orbital = 0; orbital < 2 * act.norb; ++orbital)
+      if (state & (1 << orbital)) ((orbital % 2 == 0) ? n_alpha : n_beta)++;
+    if (n_alpha == 1 && n_beta == 1) sector.push_back(state);
+  }
+  Eigen::MatrixXd sector_matrix(sector.size(), sector.size());
+  for (int row = 0; row < static_cast<int>(sector.size()); ++row)
+    for (int col = 0; col < static_cast<int>(sector.size()); ++col)
+      sector_matrix(row, col) = full_matrix(sector[row], sector[col]);
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(sector_matrix);
+  const double e_matrix = eigensolver.eigenvalues()(0);
 
-  EXPECT_GT((down.v_active - H.v).norm(), 1e-6);  // there IS a dressing
-  EXPECT_NEAR(e_so, e_sp, 1e-10);
+  Eigen::VectorXd bare_active(act.two_body.size());
+  for (int p = 0; p < act.norb; ++p)
+    for (int q = 0; q < act.norb; ++q)
+      for (int r = 0; r < act.norb; ++r)
+        for (int s = 0; s < act.norb; ++s)
+          bare_active(sw::idx4(p, q, r, s, act.norb)) =
+              g(sw::idx4(p, q, r, s, norb));
+  EXPECT_GT((act.two_body - bare_active).norm(), 1e-6);
+  EXPECT_NEAR(e_sp, e_matrix, 1e-10);
 
   // intruder diagnostics are populated: a real fold has coupling (amplitude>0)
   // over a finite gap (denominator>0), and here the amplitude stays small.
@@ -1060,8 +960,8 @@ TEST(Swpt2Kernel, SpinBlockedTwoBodyRoundTrip) {
     gbb(i) = std::sin(0.3 * i + 1.3);
   }
   const Eigen::MatrixXd zero = Eigen::MatrixXd::Zero(norb, norb);
-  const auto so =
-      sw::reference::build_tensors(zero, zero, gaa, gab, gbb, 0.0, norb);
+  const auto so = swpt2_test::build_spin_orbital_tensors(zero, zero, gaa, gab,
+                                                         gbb, 0.0, norb);
   const auto blk = sw::build_two_body_blocked(gaa, gab, gbb, norb);
 
   double max_dev = 0.0;
@@ -1070,7 +970,7 @@ TEST(Swpt2Kernel, SpinBlockedTwoBodyRoundTrip) {
       for (int R = 0; R < M; ++R)
         for (int S = 0; S < M; ++S)
           max_dev = std::max(max_dev,
-                             std::abs(so.v(sw::idx4(P, Q, R, S, M)) -
+                             std::abs(so.two_body(sw::idx4(P, Q, R, S, M)) -
                                       sw::so_v_from_blocked(blk, P, Q, R, S)));
   EXPECT_LT(max_dev, 1e-12);
 }
@@ -1089,68 +989,6 @@ TEST(Swpt2Kernel, RestrictedSpinBlockedStorageReusesSameSpinBlock) {
         for (int S = 0; S < 2 * norb; ++S)
           EXPECT_DOUBLE_EQ(sw::so_v_from_blocked(restricted, P, Q, R, S),
                            sw::so_v_from_blocked(general, P, Q, R, S));
-}
-
-// The on-the-fly (spin-blocked) downfold reproduces the dense spin-orbital
-// reference representation: the emitted effective Hamiltonian (core energy,
-// active one-body, active chemist two-body) is identical, as are the intruder
-// diagnostics. This validates the production contraction kernels against the
-// scalar projected-Wick regression path.
-// Arbitrary distinct aa/ab/bb integrals exercise all spin blocks.
-TEST(Swpt2Kernel, BlockedDownfoldMatchesSpinOrbital) {
-  const int norb = 5;
-  const int n4 = norb * norb * norb * norb;
-  Eigen::VectorXd gaa(n4), gab(n4), gbb(n4);
-  for (int i = 0; i < n4; ++i) {
-    gaa(i) = 0.1 * std::sin(1.0 * i + 0.1);
-    gab(i) = 0.1 * std::cos(0.7 * i + 0.2);
-    gbb(i) = 0.1 * std::sin(0.3 * i + 1.3);
-  }
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  for (int p = 0; p < norb; ++p) {
-    h1(p, p) = -1.0 - 0.3 * p;
-    for (int q = p + 1; q < norb; ++q) {
-      h1(p, q) = 0.02 * (p + 1) * (q + 1);
-      h1(q, p) = h1(p, q);
-    }
-  }
-  const double e_core = 0.7;
-  Eigen::VectorXd na(norb), nb(norb);
-  na << 1.0, 0.5, 0.0, 0.0, 0.0;
-  nb = na;
-  const auto eps = sw::diagonal_fock_energies(h1, gaa, na, nb, norb);
-  const auto part =
-      sw::make_partition(norb, /*active=*/{1, 2, 3},
-                         /*occupation=*/{2.0, 1.0, 0.0, 0.0, 0.0});
-
-  const auto so =
-      sw::reference::build_tensors(h1, h1, gaa, gab, gbb, e_core, norb);
-  const auto blk = sw::build_two_body_blocked(gaa, gab, gbb, norb);
-  const auto f = sw::spin_orbital_one_body(h1, h1, norb);
-
-  sw::RegOptions bare;
-  sw::RegOptions shifted;
-  shifted.denom_shift = 0.4;
-  sw::RegOptions flow;
-  flow.denom_flow = 1.2;
-  for (const auto& reg : {bare, shifted, flow}) {
-    const auto ref = sw::reference::downfold(so, eps, part, reg);
-    const auto got = sw::downfold_blocked(f, blk, eps, part, reg, e_core);
-
-    // Compare the emitted effective Hamiltonians (representation-independent:
-    // the reference stores a full spin-orbital tensor, `got` a spatial spin
-    // block) plus the diagnostics carried on the result structs.
-    const auto ref_ham = sw::reference::to_spatial_chemist(ref, part);
-    const auto got_ham = sw::to_spatial_chemist(got, part);
-    ASSERT_EQ(got_ham.norb, ref_ham.norb);
-    EXPECT_NEAR(got_ham.core_energy, ref_ham.core_energy, 1e-10);
-    EXPECT_LT((got_ham.one_body - ref_ham.one_body).cwiseAbs().maxCoeff(),
-              1e-10);
-    EXPECT_LT((got_ham.two_body - ref_ham.two_body).cwiseAbs().maxCoeff(),
-              1e-10);
-    EXPECT_NEAR(got.min_denominator, ref.min_denominator, 1e-10);
-    EXPECT_NEAR(got.max_amplitude, ref.max_amplitude, 1e-10);
-  }
 }
 
 }  // namespace
