@@ -516,14 +516,12 @@ class TestQueryCountResolution:
         """A minimal stand-in for a unitary representation carrying ``power``."""
 
         class _Container:
-            pass
-
-        container = _Container()
-        container.power = power
+            def __init__(self) -> None:
+                self.power = power
 
         class _UnitaryRep:
-            def get_container(self):
-                return container
+            def get_container(self) -> _Container:
+                return _Container()
 
         return _UnitaryRep()
 
