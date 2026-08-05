@@ -11,8 +11,6 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -33,20 +31,12 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
         """Initialize the settings for the Standard Phase Estimation Circuit Builder."""
         super().__init__()
         self._set_default(
-            "measurement",
-            "string",
-            "phase",
-            "Final measurement: 'phase' measures the phase register in the computational "
-            "basis, 'eigenvector' also measures the system register in 'measurement_basis', "
-            "and 'none' measures nothing and returns a coherent, adjointable circuit.",
-        )
-        self._set_default(
-            "measurement_basis",
-            "string",
-            "Z",
-            "Pauli basis for the system register when measurement is 'eigenvector'. A single "
-            "letter is broadcast to every system qubit; otherwise one letter per system qubit. "
-            "'I' resets a qubit without recording a bit.",
+            "measure_phase",
+            "bool",
+            True,
+            "Measure the phase register in the computational basis. Set to false for a "
+            "measurement-free, adjointable circuit, such as the preparation amplitude "
+            "amplification reflects about.",
         )
 
 
@@ -143,10 +133,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
-        The register is laid out as ``phase ++ system ++ unitary ancillas`` with the
-        phase register least-significant-bit first, matching
-        ``QDKChemistry.Utils.StandardPhaseEstimation.ApplyStandardQPE``.
-
         Args:
             state_preparation: Circuit object containing a Q# operation for state preparation.
             controlled_unitary_circuits: List of Circuit objects (one per ancilla) containing
@@ -159,73 +145,37 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             A Circuit object representing the standard QPE circuit.
 
         """
-        phase_estimation = QSHARP_UTILS.StandardPhaseEstimation
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
-
-        qpe_op = phase_estimation.MakeStandardQPEOp(
+        ancillas = list(range(num_bits))
+        systems = [i + num_bits for i in range(num_system_qubits)]
+        qpe_op = QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPEOp(
             state_prep_op,
             ctrl_unitary_ops,
-            phase_qubit_prep_op,
             num_bits,
-            num_system_qubits,
+            ancillas,
+            systems,
+            phase_qubit_prep_op,
+            num_ancilla_qubits,
         )
-        measured_indices, bases = self._measurement_plan(num_bits, num_system_qubits)
-        parameters = {
+        standard_parameters = {
             "statePrep": state_prep_op,
             "controlledUnitary": ctrl_unitary_ops,
+            "numBits": num_bits,
+            "ancillas": ancillas,
+            "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
-            "numPhaseQubits": num_bits,
-            "numSystemQubits": num_system_qubits,
             "numAncillaQubits": num_ancilla_qubits,
-            "measuredIndices": measured_indices,
-            "bases": [getattr(qsharp.Pauli, letter) for letter in bases],
+            "measurePhase": bool(self._settings.get("measure_phase")),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
-                program=phase_estimation.MakeStandardQPECircuit,
-                parameter=parameters,
+                program=QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPECircuit,
+                parameter=standard_parameters,
             ),
             qsharp_op=qpe_op,
         )
-
-    def _measurement_plan(self, num_bits: int, num_system_qubits: int) -> tuple[list[int], list[str]]:
-        """Resolve the ``measurement`` setting into register indices and Pauli letters.
-
-        Args:
-            num_bits: Number of phase qubits.
-            num_system_qubits: Number of system qubits.
-
-        Returns:
-            A tuple of (register indices to measure, Pauli letter per index).
-
-        Raises:
-            ValueError: If ``measurement`` or ``measurement_basis`` is invalid.
-
-        """
-        policy = str(self._settings.get("measurement"))
-        phase_indices = list(range(num_bits))
-        if policy == "none":
-            return [], []
-        if policy == "phase":
-            return phase_indices, ["Z"] * num_bits
-        if policy != "eigenvector":
-            raise ValueError(f"measurement must be one of ['phase', 'eigenvector', 'none']. Got '{policy}'.")
-
-        basis = str(self._settings.get("measurement_basis")).upper()
-        if len(basis) != num_system_qubits:
-            raise ValueError(
-                f"measurement_basis must be a single Pauli letter or one letter per system "
-                f"qubit ({num_system_qubits}). Got '{basis}'."
-            )
-        if any(letter not in "IXYZ" for letter in basis):
-            raise ValueError(f"measurement_basis must only contain the letters I, X, Y or Z. Got '{basis}'.")
-
-        system = list(range(num_bits, num_bits + num_system_qubits))
-        indices = list(reversed(system)) + phase_indices
-        bases = [basis[index] for index in reversed(range(num_system_qubits))] + ["Z"] * num_bits
-        return indices, bases
 
     def name(self) -> str:
         """Return the name of the builder algorithm."""

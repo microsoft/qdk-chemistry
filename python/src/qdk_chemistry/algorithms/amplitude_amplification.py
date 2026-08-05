@@ -7,8 +7,7 @@ r"""QDK/Chemistry amplitude amplification."""
 
 import math
 import operator
-from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings
@@ -26,26 +25,24 @@ __all__: list[str] = [
 
 def phase_marking_oracle(
     num_phase_qubits: int,
-    *,
-    target_indices: Sequence[int] | None = None,
-    threshold: int | None = None,
-    comparison: Literal["at_or_below", "at_or_above"] | None = None,
+    target_range: tuple[int, int],
+    signal_ancilla_indices: list[int] | None = None,
 ) -> Circuit:
-    r"""Build a marking-oracle circuit for a little-endian QPE phase register.
+    r"""Build a marking oracle for a half-open range of QPE phase bins.
 
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
-        target_indices: Phase-bin values to mark.
-        threshold: Inclusive phase-bin threshold to mark.
-        comparison: Threshold comparison direction. Required with ``threshold``;
-            must be ``"at_or_below"`` or ``"at_or_above"``.
+        target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
+        signal_ancilla_indices: Indices, relative to the register that follows the
+            phase qubits, of ancillas that must all be :math:`|0\rangle` for the
+            phase estimate to be trusted. Defaults to no ancilla condition.
 
     Returns:
         A circuit carrying an adjointable ``(Qubit[], Qubit) => Unit`` Q# operation.
 
     Raises:
-        ValueError: If the register size or criterion is invalid.
-        TypeError: If a register size, target index, or threshold is not an integer.
+        ValueError: If the register size or target range is invalid.
+        TypeError: If the register size or range endpoints are not integers.
 
     """
     try:
@@ -54,53 +51,31 @@ def phase_marking_oracle(
         raise TypeError("num_phase_qubits must be an integer.") from error
     if num_phase_qubits < 1:
         raise ValueError(f"num_phase_qubits must be positive. Got {num_phase_qubits}.")
-    if (target_indices is None) == (threshold is None):
-        raise ValueError("Set exactly one of target_indices or threshold.")
+    try:
+        start, stop = target_range
+    except (TypeError, ValueError) as error:
+        raise TypeError("target_range must be a (start, stop) tuple.") from error
+    try:
+        lower_bound = operator.index(start)
+        upper_bound = operator.index(stop)
+    except TypeError as error:
+        raise TypeError("target_range endpoints must be integers.") from error
 
-    max_index = (1 << num_phase_qubits) - 1
-    amplification = QSHARP_UTILS.AmplitudeAmplification
-    if target_indices is not None:
-        if comparison is not None:
-            raise ValueError("comparison is only valid with threshold.")
-        normalized_indices: list[int] = []
-        for target_index in target_indices:
-            try:
-                index = operator.index(target_index)
-            except TypeError as error:
-                raise TypeError("target_indices must contain only integers.") from error
-            if not 0 <= index <= max_index:
-                raise ValueError(f"target index must lie in [0, {max_index}]. Got {index}.")
-            normalized_indices.append(index)
-        if not normalized_indices:
-            raise ValueError("target_indices must not be empty.")
-
-        normalized_indices = sorted(set(normalized_indices))
-        normalized_threshold = 0
-        comparison_code = 0
-    else:
-        assert threshold is not None
-        if comparison not in ("at_or_below", "at_or_above"):
-            raise ValueError(
-                'comparison must be "at_or_below" or "at_or_above" when threshold is set.'
-            )
-        try:
-            normalized_threshold = operator.index(threshold)
-        except TypeError as error:
-            raise TypeError("threshold must be an integer.") from error
-        if not 0 <= normalized_threshold <= max_index:
-            raise ValueError(f"threshold must lie in [0, {max_index}]. Got {normalized_threshold}.")
-
-        normalized_indices = []
-        comparison_code = -1 if comparison == "at_or_below" else 1
+    phase_bin_count = 1 << num_phase_qubits
+    if not 0 <= lower_bound < upper_bound <= phase_bin_count:
+        raise ValueError(
+            f"target_range must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_range}."
+        )
+    ancilla_indices = [] if signal_ancilla_indices is None else [operator.index(i) for i in signal_ancilla_indices]
 
     parameters = {
         "numPhaseQubits": num_phase_qubits,
-        "targetIndices": normalized_indices,
-        "threshold": normalized_threshold,
-        "comparison": comparison_code,
+        "signalAncillaIndices": ancilla_indices,
+        "lowerBound": lower_bound,
+        "upperBound": upper_bound,
     }
-    make_oracle = amplification.MakePhaseMarkerOp
-    operation = make_oracle(num_phase_qubits, normalized_indices, normalized_threshold, comparison_code)
+    make_oracle = QSHARP_UTILS.AmplitudeAmplification.MarkTargetStateOp
+    operation = make_oracle(num_phase_qubits, ancilla_indices, lower_bound, upper_bound)
 
     return Circuit(
         qsharp_factory=QsharpFactoryData(program=make_oracle, parameter=parameters),
@@ -169,7 +144,7 @@ class AmplitudeAmplification(Algorithm):
             raise TypeError(
                 "Amplitude amplification reflects about the prepared state, which requires applying "
                 "the preparation's adjoint. Pass a measurement-free circuit carrying an adjointable "
-                "Q# operation, such as a qdk_standard QPE circuit built with measurement='none'."
+                "Q# operation, such as a qdk_standard QPE circuit built with measure_phase=False."
             )
         marking_operation = marking_oracle._qsharp_op  # noqa: SLF001
         if marking_operation is None:

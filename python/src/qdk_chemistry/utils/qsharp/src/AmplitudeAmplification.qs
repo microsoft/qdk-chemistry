@@ -14,52 +14,92 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
     import Std.Arithmetic.*;
+    import Std.Arrays.Subarray;
     import Std.Core.Length;
     import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
     /// # Summary
-    /// Flips `target` on the little-endian phase register selected by `comparison`:
-    /// -1 marks values at or below `threshold`, 0 marks `targetIndices`, and 1
-    /// marks values at or above `threshold`.
-    operation MarkPhaseCriterion(
+    /// Flips `target` when the little-endian phase-register value lies in the
+    /// half-open interval [`lowerBound`, `upperBound`).
+    operation MarkPhaseRange(
         numPhaseQubits : Int,
-        targetIndices : Int[],
-        threshold : Int,
-        comparison : Int,
+        lowerBound : Int,
+        upperBound : Int,
         register : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
         let phaseRegister = register[0..numPhaseQubits - 1];
-        if comparison == 0 {
-            for targetIndex in targetIndices {
-                ApplyControlledOnInt(targetIndex, X, phaseRegister, target);
-            }
-        } elif comparison == -1 or comparison == 1 {
-            use encodedThreshold = Qubit[numPhaseQubits];
+        let phaseBinCount = 1 <<< numPhaseQubits;
+        if lowerBound == 0 and upperBound == phaseBinCount {
+            X(target);
+        } elif upperBound == lowerBound + 1 {
+            ApplyControlledOnInt(lowerBound, X, phaseRegister, target);
+        } elif lowerBound == 0 {
+            use encodedUpper = Qubit[numPhaseQubits];
             within {
-                ApplyXorInPlace(threshold, encodedThreshold);
+                ApplyXorInPlace(upperBound, encodedUpper);
             } apply {
-                // `ApplyIfGreaterLE` is strict, so negating the opposite comparison gives the inclusive one.
-                if comparison == -1 {
-                    ApplyIfGreaterLE(X, phaseRegister, encodedThreshold, target);
-                } else {
-                    ApplyIfGreaterLE(X, encodedThreshold, phaseRegister, target);
-                }
+                ApplyIfGreaterLE(X, encodedUpper, phaseRegister, target);
+            }
+        } elif upperBound == phaseBinCount {
+            use encodedLower = Qubit[numPhaseQubits];
+            within {
+                ApplyXorInPlace(lowerBound, encodedLower);
+            } apply {
+                ApplyIfGreaterLE(X, encodedLower, phaseRegister, target);
                 X(target);
             }
         } else {
-            fail "comparison must be -1, 0, or 1.";
+            use encodedLower = Qubit[numPhaseQubits];
+            use encodedUpper = Qubit[numPhaseQubits];
+            use lowerFlag = Qubit();
+            use upperFlag = Qubit();
+            within {
+                ApplyXorInPlace(lowerBound, encodedLower);
+                ApplyXorInPlace(upperBound, encodedUpper);
+                ApplyIfGreaterLE(X, encodedLower, phaseRegister, lowerFlag);
+                X(lowerFlag);
+                ApplyIfGreaterLE(X, encodedUpper, phaseRegister, upperFlag);
+            } apply {
+                Controlled X([lowerFlag, upperFlag], target);
+            }
         }
     }
 
-    function MakePhaseMarkerOp(
+    /// # Summary
+    /// Flips `target` when the phase register lies in [`lowerBound`,
+    /// `upperBound`) and every signal ancilla is $|0\rangle$. Signal-ancilla
+    /// indices are relative to the register that follows the phase qubits.
+    operation MarkAcceptedPhase(
         numPhaseQubits : Int,
-        targetIndices : Int[],
-        threshold : Int,
-        comparison : Int,
+        signalAncillaIndices : Int[],
+        lowerBound : Int,
+        upperBound : Int,
+        register : Qubit[],
+        target : Qubit,
+    ) : Unit is Adj {
+        let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
+        if Length(signalAncillas) == 0 {
+            MarkPhaseRange(numPhaseQubits, lowerBound, upperBound, register, target);
+        } else {
+            use inRange = Qubit();
+            within {
+                MarkPhaseRange(numPhaseQubits, lowerBound, upperBound, register, inRange);
+                ApplyToEachCA(X, signalAncillas);
+            } apply {
+                Controlled X(signalAncillas + [inRange], target);
+            }
+        }
+    }
+
+    function MarkTargetStateOp(
+        numPhaseQubits : Int,
+        signalAncillaIndices : Int[],
+        lowerBound : Int,
+        upperBound : Int,
     ) : (Qubit[], Qubit) => Unit is Adj {
-        MarkPhaseCriterion(numPhaseQubits, targetIndices, threshold, comparison, _, _)
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBound, upperBound, _, _)
     }
 
     //
@@ -162,5 +202,22 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
             set results w/= index <- MResetZ(register[measuredIndices[index]]);
         }
         return results;
+    }
+
+    /// # Summary
+    /// Prepares the state, marks it and measures the flag. The fraction of `One`
+    /// outcomes estimates the overlap $a$ that sets the number of rounds.
+    operation MakeAcceptanceCircuit(
+        preparation : Qubit[] => Unit is Adj,
+        markingOracle : (Qubit[], Qubit) => Unit is Adj,
+        numQubits : Int,
+    ) : Result[] {
+        use register = Qubit[numQubits];
+        use flag = Qubit();
+        preparation(register);
+        markingOracle(register, flag);
+        let outcome = MResetZ(flag);
+        ResetAll(register);
+        return [outcome];
     }
 }

@@ -1,49 +1,58 @@
 Amplitude amplification
 =======================
 
-The :class:`~qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification` is an algorithm that boosts the probability that a prepared state is found in a marked subspace.
-Given a guiding state with overlap :math:`a` on the target eigenstate, it succeeds after :math:`O(1/\sqrt{a})` repetitions:
+The :class:`~qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification`
+algorithm increases the probability of measuring a state in a chosen subspace.
+It takes two :class:`~qdk_chemistry.data.Circuit` objects:
+
+- ``preparation`` prepares the initial state.
+- ``marking_oracle`` flips a flag qubit when the prepared state satisfies the
+  success criterion.
+
+The circuit prepares the initial state once. Each round then marks the
+good subspace and reflects about the prepared state. If the initial probability
+of the marked subspace is :math:`a`, the probability after :math:`k` rounds is
 
 .. math::
 
-   Q = -\,U_\psi S_0 U_\psi^\dagger \, S_G
+   p_k = \sin^2\!\big((2k+1)\arcsin\sqrt{a}\big).
 
-Here :math:`U_\psi` prepares the guiding state;
-:math:`S_0=I-2\lvert0\rangle\!\langle0\rvert` changes the phase of the all-zero state; and
-:math:`S_G=I-2\Pi_G` changes the phase of every state in the marked subspace, whose projector is :math:`\Pi_G`.
-Thus :math:`-U_\psi S_0 U_\psi^\dagger` is a reflection about :math:`\lvert\psi\rangle`.
-Together, the two reflections rotate amplitude from the unmarked component toward the marked component by :math:`2\theta` per application of :math:`Q`.
+This gives the :math:`O(1/\sqrt{a})` query scaling. More rounds are not
+always better: after the first maximum, additional rounds reduce the success
+probability. Choose ``rounds`` from an estimate of state overlap :math:`a`.
 
-With :math:`\theta = \arcsin\sqrt{a}`, the acceptance probability after :math:`k` rounds is
+Amplitude amplified QPE
+-----------------------
 
-.. math::
-
-   p_k = \sin^2\!\big((2k+1)\theta\big).
-
-More rounds are not always better: after the first maximum, additional Grover
-iterations reduce the acceptance probability. The caller must choose ``rounds``
-from an estimate of :math:`a`.
-
-QPE phase markers
------------------
+From an initial state with some overlap with the target state, QPE
+coherently writes an estimated phase to the leading phase register; the marking
+oracle then checks the phase register, if it's in the target range, and flips a
+flag qubit.
 
 The :func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle`
-helper builds a marking-oracle :class:`~qdk_chemistry.data.Circuit` from either
-explicit QPE phase-bin indices or an inclusive threshold:
+helper builds a :class:`~qdk_chemistry.data.Circuit` that marks a half-open
+range of phase bins:
 
 .. code-block:: python
 
    from qdk_chemistry.algorithms import phase_marking_oracle
 
-   selected_bins = phase_marking_oracle(8, target_indices=[12, 13, 14])
-   lower_bins = phase_marking_oracle(8, threshold=31, comparison="at_or_below")
-   upper_bins = phase_marking_oracle(8, threshold=224, comparison="at_or_above")
+  selected_bins = phase_marking_oracle(8, (12, 15))
+  lower_bins = phase_marking_oracle(8, (0, 32))
+  upper_bins = phase_marking_oracle(8, (224, 256))
 
-The oracle interprets the first ``num_phase_qubits`` qubits as a little-endian
-integer. The ``at_or_below`` and ``at_or_above`` comparisons mark phase-bin
-values :math:`j \le t` and :math:`j \ge t`, respectively. Exactly one of
-``target_indices`` or ``threshold`` must be supplied, and threshold markers must
-specify ``comparison`` explicitly.
+The helper interprets the first ``num_phase_qubits`` qubits as a little-endian
+integer and marks values in ``[start, stop)``. For a phase bin ``j``, use
+``(j, j + 1)`` to mark only that bin, ``(0, j + 1)`` to mark values at or below
+it, or ``(j, 2**num_phase_qubits)`` to mark values at or above it.
+
+A block-encoded walk operator only certifies its phase estimate when its signal
+ancillas return to :math:`|0\rangle`. Pass their indices, counted from the first
+qubit after the phase register, as a third argument to require that too:
+
+.. code-block:: python
+
+   trusted_bins = phase_marking_oracle(8, (12, 15), [2, 3])
 
 Settings
 --------
