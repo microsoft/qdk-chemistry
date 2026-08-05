@@ -15,7 +15,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estim
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     UnaryPhaseEstimation,
-    _select_dominant_decoded_phase,
+    _post_process_samples,
 )
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
@@ -269,20 +269,21 @@ class TestPhaseWindowState:
 class TestPhaseDecoding:
     """Decoding of the doubled measured phase."""
 
-    @pytest.mark.parametrize(("measured", "expected_lower"), [(0.0, 0.0), (0.25, 0.125), (0.75, 0.125), (0.5, 0.25)])
-    def test_conjugate_bins_fold_to_the_same_phase(self, measured, expected_lower):
+    @pytest.mark.parametrize(
+        ("bitstring", "expected_lower"), [("000", 0.0), ("010", 0.125), ("110", 0.125), ("100", 0.25)]
+    )
+    def test_conjugate_bins_fold_to_the_same_phase(self, bitstring, expected_lower):
         """Measured y and 1 - y describe the same walk phase."""
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7)
-        assert builder.phase_fraction_from_measurement(measured, "lower") == pytest.approx(expected_lower)
-        assert builder.phase_fraction_from_measurement(measured, "upper") == pytest.approx(0.5 - expected_lower)
+        counts = {bitstring: 1}
+        lower, _, _ = _post_process_samples(counts, 3, "lower")
+        upper, _, _ = _post_process_samples(counts, 3, "upper")
+        assert lower == pytest.approx(expected_lower)
+        assert upper == pytest.approx(0.5 - expected_lower)
 
     def test_dominant_phase_merges_conjugate_counts(self):
         """Conjugate bins are summed before the winner is selected."""
         counts = {"010": 3, "110": 3, "001": 5}  # 2/8 and 6/8 are conjugates, 1/8 is a separate bin
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7)
-        phase_fraction, bitstring, measured = _select_dominant_decoded_phase(
-            counts, 3, lambda y: builder.phase_fraction_from_measurement(y, "lower")
-        )
+        phase_fraction, bitstring, measured = _post_process_samples(counts, 3, "lower")
         assert phase_fraction == pytest.approx(0.125)
         assert bitstring in {"010", "110"}
         assert measured in {0.25, 0.75}
@@ -366,12 +367,14 @@ class TestUnaryQpeEndToEnd:
         """
         num_queries = 7
         num_states = num_queries + 1
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
+        num_bits = num_phase_bits(num_queries)
 
         expected_phase = k / (2 * num_states)
         for system_state in (0, 1):
-            measured = self._measure(qdk_ctx, num_queries, k, system_state) / num_states
-            assert builder.phase_fraction_from_measurement(measured, "lower") == pytest.approx(expected_phase)
+            measured_bin = self._measure(qdk_ctx, num_queries, k, system_state)
+            counts = {format(measured_bin, f"0{num_bits}b"): 1}
+            phase_fraction, _, _ = _post_process_samples(counts, num_bits, "lower")
+            assert phase_fraction == pytest.approx(expected_phase)
 
     @pytest.mark.parametrize("bin_index", [1, 2, 3])
     def test_inverse_qft_leaves_the_answer_little_endian(self, qdk_ctx, bin_index):
@@ -506,30 +509,41 @@ class TestBaseProfileGuardrail:
 
 
 class TestQueryCountResolution:
-    """Precedence between the container's power and the configured query count."""
+    """The query count comes from the settings; a container power is ignored."""
 
-    def test_query_count_falls_back_to_settings(self):
-        """A unitary representation without a power uses the configured query count."""
+    @staticmethod
+    def _unitary_rep(power: int):
+        """A minimal stand-in for a unitary representation carrying ``power``."""
 
         class _Container:
-            power = 1
+            pass
+
+        container = _Container()
+        container.power = power
 
         class _UnitaryRep:
             def get_container(self):
-                return _Container()
+                return container
 
+        return _UnitaryRep()
+
+    def test_query_count_comes_from_settings(self):
+        """The configured query count drives the schedule."""
         builder = QdkUnaryQpeCircuitBuilder(num_queries=25)
-        assert builder.resolve_num_queries(_UnitaryRep()) == 25
+        assert builder.resolve_num_queries(self._unitary_rep(1)) == 25
 
-    def test_query_count_prefers_unitary_representation(self):
-        """The power carried by the unitary representation wins over the setting."""
+    def test_container_power_is_ignored(self):
+        """A power carried by the unitary representation is warned about and then ignored.
 
-        class _Container:
-            power = 11
-
-        class _UnitaryRep:
-            def get_container(self):
-                return _Container()
-
+        The schedule fixes its length at build time, so there is no controlled power for
+        the container's value to feed. Honouring it would silently resize the query chain
+        out from under the ``num_queries`` the caller asked for.
+        """
         builder = QdkUnaryQpeCircuitBuilder(num_queries=25)
-        assert builder.resolve_num_queries(_UnitaryRep()) == 11
+        assert builder.resolve_num_queries(self._unitary_rep(11)) == 25
+
+    def test_non_positive_query_count_is_rejected(self):
+        """Without a usable setting there is nothing to fall back on."""
+        builder = QdkUnaryQpeCircuitBuilder()
+        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
+            builder.resolve_num_queries(self._unitary_rep(11))

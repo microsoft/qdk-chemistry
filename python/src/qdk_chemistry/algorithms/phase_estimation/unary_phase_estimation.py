@@ -27,8 +27,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Callable
-
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -49,17 +47,24 @@ __all__: list[str] = [
 PHASE_BANDS: tuple[str, ...] = ("lower", "upper")
 
 
-def _select_dominant_decoded_phase(
+def _post_process_samples(
     counts: dict[str, int],
     num_bits: int,
-    decoder: Callable[[float], float],
+    phase_band: str,
 ) -> tuple[float, str, float]:
-    """Aggregate raw bitstrings by decoded phase before selecting the winner.
+    r"""Reduce measured shot counts to a walk phase fraction.
+
+    Every branch phase is doubled relative to the walk phase, so a measured bin
+    :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins :math:`y`
+    and :math:`1 - y` therefore describe the same eigenvalue and are summed before the
+    winner is chosen. Folding them together also discards the sign, which ``phase_band``
+    supplies. What comes out is an ordinary QPE phase fraction, converted to an energy by
+    the unitary representation's ``eigenvalue_from_phase`` exactly as standard QPE does.
 
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
-        decoder: Maps a measured fraction to the walk phase fraction.
+        phase_band: ``"lower"`` for a non-negative eigenvalue, ``"upper"`` for a non-positive one.
 
     Returns:
         A tuple of (decoded phase fraction, representative bitstring, its raw measured fraction).
@@ -69,7 +74,9 @@ def _select_dominant_decoded_phase(
     representatives: dict[float, tuple[str, float, int]] = {}
     for bitstring, count in counts.items():
         measured_phase = int(bitstring, 2) / (2**num_bits)
-        decoded_phase = decoder(measured_phase)
+        doubled_phase = measured_phase % 1.0
+        folded_phase = min(doubled_phase, (-doubled_phase) % 1.0) / 2.0
+        decoded_phase = folded_phase if phase_band == "lower" else 0.5 - folded_phase
         decoded_counts[decoded_phase] = decoded_counts.get(decoded_phase, 0) + count
         representative = representatives.get(decoded_phase)
         if representative is None or count > representative[2]:
@@ -163,11 +170,10 @@ class UnaryPhaseEstimation(PhaseEstimation):
         execution_data = circuit_executor.run(circuits[0], shots=self._settings.get("shots"), noise=noise)
         counts = execution_data.bitstring_counts
 
-        phase_band = self._settings.get("phase_band")
-        phase_fraction, dominant_bitstring, measured_phase = _select_dominant_decoded_phase(
+        phase_fraction, dominant_bitstring, measured_phase = _post_process_samples(
             counts,
             num_bits,
-            lambda measured: circuit_builder.phase_fraction_from_measurement(measured, phase_band),
+            self._settings.get("phase_band"),
         )
 
         return QpeResult.from_phase_fraction(

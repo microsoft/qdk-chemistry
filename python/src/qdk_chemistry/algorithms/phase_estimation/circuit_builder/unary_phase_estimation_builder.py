@@ -89,7 +89,7 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "num_queries",
             "int",
             -1,
-            "Number of walk blocks to apply; ignored when the unitary representation carries a power.",
+            "Number of walk blocks the signed-power schedule applies.",
         )
         self._set_default(
             "circuit_mapper",
@@ -124,7 +124,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         """Initialize the unary-iteration QPE circuit builder.
 
         Args:
-            num_queries: Number of walk blocks; used when the unitary representation has no power.
+            num_queries: Number of walk blocks the schedule applies.
             unitary_builder: Optional algorithm reference for the unitary builder.
             circuit_mapper: Optional algorithm reference for the block-encoding circuit mapper.
 
@@ -139,7 +139,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             self._settings.set("circuit_mapper", circuit_mapper)
 
     def resolve_num_queries(self, unitary_rep: UnitaryRepresentation) -> int:
-        """Return the query count, preferring the power carried by the unitary representation.
+        """Return the query count configured on the builder.
+
+        The schedule fixes its length at build time and applies exactly ``num_queries``
+        blocks, so a power carried by the unitary representation has nothing to act on
+        and is reported and ignored rather than silently folded in.
 
         Args:
             unitary_rep: The unitary representation produced by the nested unitary builder.
@@ -148,39 +152,19 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             The number of walk blocks to apply.
 
         Raises:
-            ValueError: If neither the unitary representation nor the settings supply a positive count.
+            ValueError: If the settings do not supply a positive count.
 
         """
         container_power = getattr(unitary_rep.get_container(), "power", 1)
-        if container_power > 1:
-            return int(container_power)
+        if container_power != 1:
+            Logger.warn(
+                f"The unitary representation carries power {container_power}, which the signed-power "
+                "schedule ignores. The query count is taken from the 'num_queries' setting."
+            )
         num_queries = self._settings.get("num_queries")
         if num_queries <= 0:
-            raise ValueError(
-                "num_queries must be a positive integer, either from the unitary representation's "
-                f"power or from the builder settings. Got {num_queries}."
-            )
+            raise ValueError(f"num_queries must be a positive integer set on the builder. Got {num_queries}.")
         return int(num_queries)
-
-    def phase_fraction_from_measurement(self, measured_phase_fraction: float, phase_band: str) -> float:
-        """Resolve the doubled measured phase within the requested half-band.
-
-        The schedule only realizes even offsets from the query count, so the measurement is
-        invariant under a sign flip of the eigenvalue and the band has to be supplied.
-
-        Args:
-            measured_phase_fraction: The raw fraction read from the phase register.
-            phase_band: ``"lower"`` for a non-negative eigenvalue, ``"upper"`` for a non-positive one.
-
-        Returns:
-            The walk phase fraction in the requested half-band.
-
-        """
-        doubled_phase = measured_phase_fraction % 1.0
-        folded_phase = min(doubled_phase, (-doubled_phase) % 1.0) / 2.0
-        if phase_band == "lower":
-            return folded_phase
-        return 0.5 - folded_phase
 
     def _run_impl(
         self,

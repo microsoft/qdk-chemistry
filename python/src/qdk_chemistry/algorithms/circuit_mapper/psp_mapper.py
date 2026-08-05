@@ -7,12 +7,11 @@
 
 from typing import Any
 
-from qdk import qsharp
-
+from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper import _build_pauli_select_op
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -62,10 +61,9 @@ class PSPMapper(CircuitMapper):
     maps to a *single* application of its underlying block encoding rather than to the walk
     :math:`W = (2|0\rangle\langle 0| - I) \cdot B[H]`: its power counts walk steps, which only
     mean something once the reflections are interleaved. Whoever schedules the walk owns them,
-    and pairs the circuit produced here with :meth:`reflection_op`:
-    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper.ControlledPSPMapper`
-    materializes the walk for standard phase estimation, while unary-iteration phase estimation
-    interleaves its own reflections so it can omit exactly one.
+    and pairs the circuit produced here with :meth:`reflection_op` — unary-iteration phase
+    estimation interleaves its own reflections so it can omit exactly one, which is what makes
+    a non-power-of-two query count possible.
 
     """
 
@@ -92,7 +90,7 @@ class PSPMapper(CircuitMapper):
         """
         return "circuit_mapper"
 
-    def resolve_lcu(self, container: Any) -> tuple[LCUContainer, int, bool]:
+    def _resolve_lcu(self, container: Any) -> tuple[LCUContainer, int, bool]:
         """Unwrap a container into its LCU data, power, and whether it is a quantum walk.
 
         Args:
@@ -127,7 +125,7 @@ class PSPMapper(CircuitMapper):
 
         """
         container = evolution.get_container()
-        lcu, power, use_quantum_walk = self.resolve_lcu(container)
+        lcu, power, use_quantum_walk = self._resolve_lcu(container)
         # A walk container's power counts walk steps, not block encodings, and the walk is
         # whoever schedules the reflections' business, so only a plain LCU repeats the block.
         block_power = 1 if use_quantum_walk else power
@@ -137,7 +135,7 @@ class PSPMapper(CircuitMapper):
         else:
             # The 0-ancilla case has a 0-mode wavefunction, so PREPARE is a no-op.
             prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-        select_op = self._build_pauli_select_op(lcu.select)
+        select_op = _build_pauli_select_op(lcu.select)
         num_system = lcu.select.num_target_qubits
 
         psp_parameters = {
@@ -167,7 +165,7 @@ class PSPMapper(CircuitMapper):
             reflection acts on.
 
         """
-        lcu, _, _ = self.resolve_lcu(container)
+        lcu, _, _ = self._resolve_lcu(container)
         return lcu.num_prepare_ancillas
 
     def reflection_op(self, container: Any):
@@ -184,35 +182,5 @@ class PSPMapper(CircuitMapper):
             A Q# callable reflecting about the all-zero state of the block-encoding ancillas.
 
         """
-        lcu, _, _ = self.resolve_lcu(container)
+        lcu, _, _ = self._resolve_lcu(container)
         return QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(lcu.select.num_target_qubits)
-
-    @staticmethod
-    def _build_pauli_select_op(select: Select):
-        """Build the Pauli SELECT Q# operation from a Select data object.
-
-        Converts each controlled operation's Pauli string into Q# ``Pauli`` enums
-        and packages them with sign phases into a ``PauliSelectParams`` struct.
-
-        Args:
-            select: The SELECT oracle data object containing controlled operations,
-                phases, and qubit layout.
-
-        Returns:
-            A Q# callable implementing the Pauli SELECT oracle.
-
-        """
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        control_states: list[int] = []
-        for op in select.controlled_operations:
-            base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
-            for i, pauli_char in enumerate(reversed(op.operation)):
-                if pauli_char != "I":
-                    base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
-            pauli_terms.append(base_paulis)
-            control_states.append(op.ctrl_state)
-        phases = [int(s) for s in select.phases]
-        select_params = QSHARP_UTILS.Select.PauliSelectParams(
-            pauliTerms=pauli_terms, signs=phases, controlStates=control_states
-        )
-        return QSHARP_UTILS.Select.MakeSelectOp(select_params)
