@@ -129,9 +129,7 @@ handle_dependency(gauxc
   REQUIRED
 )
 
-# BTAS links Boost::headers/random/serialization, so discover the modular Boost
-# libint2 already uses. BTAS itself is configured after MACIS in the top-level
-# CMakeLists, because it reuses the BLAS and blaspp/lapackpp that MACIS resolves.
+# Boost for BTAS
 find_package(Boost CONFIG REQUIRED)
 
 # Restore previous settings

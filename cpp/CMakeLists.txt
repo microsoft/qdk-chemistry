@@ -139,10 +139,7 @@ else()
     endif()
 endif()
 
-# BTAS for dense tensor contraction in the DUCC effective Hamiltonian. It must
-# follow MACIS: its linear-algebra kit reuses the BLAS MACIS resolves and the
-# blaspp/lapackpp targets MACIS brings in (patched for MSVC), instead of running
-# its own discovery, which has no working BLAS to find on Windows.
+# BTAS for dense tensor contraction in DUCC; must follow MACIS to reuse its BLAS and blaspp/lapackpp.
 find_package(BTAS QUIET)
 if(NOT BTAS_FOUND)
     include(FetchContent)
@@ -150,14 +147,12 @@ if(NOT BTAS_FOUND)
         GIT_REPOSITORY https://github.com/BTAS/btas.git
         GIT_TAG 287b145ead818a0332f2b7ce0b7375a83d328bae
     )
-    set(BUILD_TESTING OFF)
+    # BTAS's linalg kit force-writes the BUILD_TESTING it sees back into the cache.
+    set(_qdk_build_testing "${BUILD_TESTING}")
+    set(BUILD_TESTING OFF CACHE BOOL "Build the testing tree." FORCE)
     FetchContent_MakeAvailable(BTAS)
-    unset(BUILD_TESTING)
-    # BTAS declares the plain target only; an installed BTAS exports the
-    # namespaced one, so alias it for a uniform link name either way.
-    if(NOT TARGET BTAS::BTAS)
-        add_library(BTAS::BTAS ALIAS BTAS)
-    endif()
+    set(BUILD_TESTING "${_qdk_build_testing}" CACHE BOOL "Build the testing tree." FORCE)
+    add_library(BTAS::BTAS ALIAS BTAS)
 endif()
 
 # Enable CUDA for GPU bindings in QDK Chemistry
@@ -188,12 +183,7 @@ target_link_libraries(chemistry PUBLIC
     macis::macis
 )
 
-# BTAS evaluates the DUCC effective-Hamiltonian dressing. The symbolic
-# Baker-Campbell-Hausdorff / Wick work is done offline by the SeQuant-based
-# generator in ducc/, whose output is checked in as ducc_equations.inc, so the
-# library itself needs only the dense-tensor backend at build time. BTAS is
-# header-only and reaches no public header, and the blaspp/lapackpp it calls
-# already reach consumers through macis::macis, so keep it out of the export.
+# Header-only and absent from public headers, so keep BTAS out of the export.
 target_link_libraries(chemistry PRIVATE $<BUILD_INTERFACE:BTAS::BTAS>)
 
 # Conditionally link OpenMP
