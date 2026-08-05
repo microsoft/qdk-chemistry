@@ -22,31 +22,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         return Ceiling(Lg(IntAsDouble(numQueries + 1)));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Signed-power schedule (block-encoding agnostic)
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// Applies `numQueries` self-inverse blocks, omitting the one reflection `phaseReg` selects.
-    ///
-    /// With reflection R = `applyReflection`, block B = `applyBlockEncoding` and walk W = R·B,
-    /// the branch selected by address t applies a signed power of W: pairs before the omitted
-    /// reflection compose as W† and pairs after it compose as W, leaving W^(numQueries - 2t).
-    /// Because the slot sweep and the address decode share one unary-iteration ladder, the
-    /// whole schedule costs O(numQueries) Toffolis rather than the O(numQueries · log numQueries)
-    /// of `numQueries` separately controlled walk steps.
-    ///
-    /// The block encoding is never controlled: only the reflections are, which is what keeps the
-    /// cost linear and lets any self-inverse B drive the schedule.
-    ///
-    /// # Parameters
-    /// - `applyBlockEncoding`: Applies one self-inverse block encoding B to the flat target
-    ///   register. It must be its own inverse; the walk is formed here by pairing it with R.
-    /// - `applyReflection`: Applies the reflection R the walk pairs B with, to the same flat
-    ///   register. Taking it as a callable rather than a sub-register selector is what keeps
-    ///   this module independent of how a block encoding lays out its ancillas.
-    /// - `numQueries`: Number of blocks applied; need not be a power of two.
-    /// - `phaseReg`: The phase register, little-endian, addressing which reflection to omit.
-    /// - `allQubits`: The flat target register (system qubits followed by block-encoding ancillas).
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -68,36 +44,15 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
-    /// # Parameters
-    /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
-    /// - `applyBlockEncoding`: Applies ONE self-inverse block encoding B to the flat target
-    ///   register, uncontrolled. The schedule below owns the repetition and applies it
-    ///   `numQueries` times; do not lift that repetition to this call site, because fusing the
-    ///   slot sweep with the address decode is what makes the schedule cost O(numQueries)
-    ///   Toffolis instead of O(numQueries * log numQueries).
-    /// - `applyReflection`: Applies the reflection the walk pairs B with, on the same flat
-    ///   register.
-    /// - `numQueries`: Total number of block applications; need not be a power of two.
-    /// - `ancillas`: An array of indices for the phase ancilla qubits.
-    /// - `systems`: An array of indices for the system qubits (state prep target).
-    /// - `phaseQubitPrep`: Prepares the window state on the phase register (big-endian).
-    /// - `numAncillas`: Number of extra ancillas required by the block encoding.
-    /// - `ancillaPrep`: A function to prepare persistent ancillas (e.g., phase gradient state).
-    /// # Returns
-    /// - `Result[]`: The phase register, LEAST-significant bit first. Circuit executors emit
-    ///   the first measured `Result` as the right-most character of the bitstring (the Qiskit
-    ///   convention), so this ordering is what makes `int(bitstring, 2)` recover the measured
-    ///   value `y`, which satisfies `y / 2^numBits = 2 * phi` for a walk eigenphase `phi`.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
+        phaseQubitPrep : Qubit[] => Unit,
         numQueries : Int,
         ancillas : Int[],
         systems : Int[],
-        phaseQubitPrep : Qubit[] => Unit,
         numAncillas : Int,
-        ancillaPrep : Qubit[] => Unit is Adj,
     ) : Result[] {
         let numBits = PhaseRegisterSize(numQueries);
         Fact(
@@ -117,10 +72,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         let allTargets = systemQubits + beAncillas;
 
         statePrep(systemQubits);
-        ancillaPrep(beAncillas);
         phaseQubitPrep(phaseAncillas);
 
-        // ApplyQFT and the window state are big-endian; unary addressing is little-endian.
         ApplySignedPowerSchedule(
             applyBlockEncoding,
             applyReflection,
@@ -133,14 +86,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
         ResetAll(allTargets);
         mutable results = [Zero, size = numBits];
-        // `Std.Canon.ApplyQFT` maps a little-endian input to a big-endian output, so
-        // `Adjoint ApplyQFT` leaves the phase little-endian in `phaseAncillas`.
-        //
-        // The register is returned LEAST-significant bit first because that is what the
-        // circuit-executor bitstring convention requires: an executor emits the first
-        // measured `Result` as the RIGHT-most character of the bitstring (matching Qiskit),
-        // so returning `phaseAncillas` in its natural little-endian order is exactly what
-        // makes `int(bitstring, 2)` recover the measured value on the Python side.
+
         for idx in 0..numBits - 1 {
             set results w/= idx <- MResetZ(phaseAncillas[idx]);
         }
@@ -154,8 +100,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     //  supplies whichever block encoding it wants to exercise and nothing here is tied
     //  to a particular one.
     // ═══════════════════════════════════════════════════════════════════════════
-
-    internal operation NoAncillaPrep(qs : Qubit[]) : Unit is Adj {}
 
     /// `X` on the first qubit: a self-inverse factor usable as a block or as a reflection.
     internal operation TestApplyX(qubits : Qubit[]) : Unit is Adj + Ctl {
@@ -295,12 +239,11 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             },
             TestRzWalkBlock(theta, _),
             TestApplyX,
+            ApplyToEach(H, _),
             numQueries,
             Std.Arrays.SequenceI(0, numBits - 1),
             [numBits],
-            ApplyToEach(H, _),
-            0,
-            NoAncillaPrep
+            0
         );
     }
 }

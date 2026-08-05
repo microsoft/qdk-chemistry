@@ -5,6 +5,68 @@
 namespace QDKChemistry.Utils.CircuitComposition {
 
     import Std.Arrays.Subarray;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
+
+    /// Returns the controlled version of `op`, taking the control register as its first argument.
+    ///
+    /// The control register is a `Qubit[]`, so the same callable covers the uncontrolled case:
+    /// passing `[]` applies `op` unconditionally.
+    function MakeControlledOp<'T>(op : 'T => Unit is Adj + Ctl) : ((Qubit[], 'T) => Unit is Adj + Ctl) {
+        Controlled op
+    }
+
+    /// Applies `op` to `target` `power` times.
+    operation ApplyRepeated<'T>(
+        cacheName : String,
+        op : 'T => Unit is Adj + Ctl,
+        power : Int,
+        target : 'T
+    ) : Unit {
+        for _ in 1..power {
+            if BeginEstimateCaching(cacheName, SingleVariant()) {
+                op(target);
+                EndEstimateCaching();
+            }
+        }
+    }
+
+    /// Returns an operation applying `op` `power` times.
+    /// Parameters:
+    /// - `cacheName`: A string used for caching the resource estimation
+    function MakeRepeatedOp<'T>(
+        cacheName : String,
+        op : 'T => Unit is Adj + Ctl,
+        power : Int
+    ) : ('T => Unit) {
+        ApplyRepeated(cacheName, op, power, _)
+    }
+
+    /// Circuit entry point: allocates `numQubits` qubits and applies `op` to them.
+    ///
+    /// Operations over a richer register shape reach this by partial application, e.g. a
+    /// `(Qubit[], Qubit[]) => Unit` becomes `Qubit[] => Unit` once its control register is bound.
+    operation MakeCircuit(op : Qubit[] => Unit, numQubits : Int) : Unit {
+        use qs = Qubit[numQubits];
+        op(qs);
+    }
+
+    /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
+    function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit) : ((Qubit, 'T) => Unit) {
+        (control, target) => op([control], target)
+    }
+
+    /// Circuit entry point for an operation that takes a control register beside its target.
+    operation MakeControlledCircuit(
+        op : (Qubit[], Qubit[]) => Unit,
+        numControlQubits : Int,
+        numQubits : Int
+    ) : Unit {
+        use controls = Qubit[numControlQubits];
+        use qs = Qubit[numQubits];
+        op(controls, qs);
+    }
 
     /// Applies two operations sequentially on the same system register.
     operation ApplySequential(

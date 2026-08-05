@@ -146,9 +146,4 @@ namespace QDKChemistry.Utils.StatePreparation {
     function MakePrepareHadamardAllOp() : Qubit[] => Unit {
         PrepareHadamardAll(_)
     }
-
-    /// No-op ancilla preparation (used when no persistent ancilla init is needed).
-    function MakeNoOpAncillaPrep() : Qubit[] => Unit is Adj {
-        (beAncillas) => {}
-    }
 }

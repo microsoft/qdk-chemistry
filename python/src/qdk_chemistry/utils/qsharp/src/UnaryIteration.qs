@@ -11,11 +11,9 @@ namespace QDKChemistry.Utils.UnaryIteration {
     import Std.Math.Lg;
 
 
-    /// Unary iteration building blocks shared by QROM-style data loading and
-    /// unary-iteration phase estimation
+    /// Unary iteration
     /// References:
     ///   Babbush et al. (arXiv:1805.03662), Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
-    /// Applies `action(index)` for each valid address value.
     operation UnaryIteration(
         address : Qubit[],
         numActions : Int,
@@ -32,10 +30,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Applies one action per address value and exposes its active unary control.
-    ///
-    /// The control qubit passed to `action` is in state |1⟩ exactly on the branch
-    /// where the address register holds that index, so callers may use it as a
-    /// positive or negative control.
     operation UnaryIterationWithControl(
         address : Qubit[],
         numActions : Int,
@@ -74,10 +68,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
             );
         }
     }
-
-    // The signed-power schedule that used to live here is now
-    // `QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule`, so that all
-    // phase-estimation-specific unary-iteration logic sits in one module.
 
     internal operation SinglyControlledUnaryIterationWithControl(
         ctl : Qubit,

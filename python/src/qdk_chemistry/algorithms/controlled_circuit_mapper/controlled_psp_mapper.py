@@ -5,13 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
+from typing import Any
 
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -42,25 +41,23 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
 class ControlledPSPMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
-    Composes a controlled block encoding from:
-
-    1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
-       the ``prepare`` setting.  Defaults to ``DensePureStatePreparation``.
-    2. **SELECT** — Pauli SELECT oracle applied on the system register,
-       constructed directly from the block-encoding container's SELECT data.
-
-    The two callables are stitched together by the Q# ``PrepSelPrep`` operation:
+    A wrapper over :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`, which
+    owns the PREPARE and SELECT oracles and the block encoding
 
     .. math::
 
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
-    When the input is an :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
-    the block encoding is additionally wrapped with the reflection operator to form a quantum walk:
+    The circuit is assembled from the generic combinators in
+    ``QDKChemistry.Utils.CircuitComposition``: the block encoding is paired with its reflection
+    into a walk when the container is an
+    :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
 
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
+
+    then controlled, then repeated to the container's power.
 
     """
 
@@ -87,6 +84,29 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         """
         return "controlled_circuit_mapper"
 
+    def _block_mapper(self) -> PSPMapper:
+        """Build the uncontrolled PSP mapper this one delegates the block encoding to.
+
+        Returns:
+            A :class:`PSPMapper` carrying this mapper's ``prepare`` setting.
+
+        """
+        mapper = PSPMapper()
+        mapper.settings().set("prepare", self._settings.get("prepare"))
+        return mapper
+
+    def num_ancillary_qubits(self, container: Any) -> int:
+        """The number of ancilla qubits the block encoding needs beyond the system register.
+
+        Args:
+            container: The container held by the unitary representation.
+
+        Returns:
+            The size of the PREPARE ancilla register.
+
+        """
+        return self._block_mapper().num_ancillary_qubits(container)
+
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled block-encoding circuit.
 
@@ -98,107 +118,37 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         Returns:
             Circuit: A quantum circuit implementing the controlled block encoding.
 
+        Raises:
+            ValueError: If more than one control qubit is requested.
+
         """
-        container = unitary.get_container()
-
-        # Resolve container type → LCU data + dispatch flag
-        if isinstance(container, LCUWalkContainer):
-            lcu = container.block_encoding
-            power = container.power
-            use_quantum_walk = True
-        elif isinstance(container, LCUContainer):
-            lcu = container
-            power = container.power
-            use_quantum_walk = False
-        else:
-            raise ValueError(
-                f"Container type '{unitary.get_container_type()}' is not supported. "
-                "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."
-            )
-
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
             raise ValueError("ControlledPSPMapper currently only supports a single control qubit.")
 
-        # 1. PREPARE — build state-preparation oracle
-        prepare_op = self._build_prepare_op(lcu)
+        block_mapper = self._block_mapper()
+        container = unitary.get_container()
+        lcu, use_quantum_walk = block_mapper.resolve_lcu(container)
 
-        # 2. SELECT — build Pauli SELECT oracle
-        select_op = _build_pauli_select_op(lcu.select)
-
-        # 3. Compose controlled circuit
-        num_system = lcu.select.num_target_qubits
-        num_ancilla = lcu.num_prepare_ancillas
-        num_qubits = num_system + num_ancilla
-
-        # A walk container's power counts walk steps, each of which applies the block encoding
-        # once before reflecting, so only a plain LCU folds the power into the block encoding.
-        block_power = 1 if use_quantum_walk else power
-        block_encoding = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system, block_power)
-
+        step_op = block_mapper.block_encoding_op(container)
         if use_quantum_walk:
-            reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
-            psp_parameters = {
-                "blockEncoding": block_encoding,
-                "applyReflection": reflection,
-                "numQubits": num_qubits,
-                "power": power,
-            }
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledWalkCircuit
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledWalkOp(block_encoding, reflection, power)
-        else:
-            psp_parameters = {"blockEncoding": block_encoding, "numQubits": num_qubits}
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledBlockEncodingCircuit
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledBlockEncodingOp(block_encoding)
+            step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, block_mapper.reflection_op(container))
 
-        qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
+        controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
+        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(
+            "ControlledPSPWalk" if use_quantum_walk else "ControlledPrepSelPrep",
+            controlled_op,
+            container.power,
+        )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+        num_qubits = lcu.select.num_target_qubits + lcu.num_prepare_ancillas
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.CircuitComposition.MakeControlledCircuit,
+            parameter={"op": repeated_op, "numControlQubits": 1, "numQubits": num_qubits},
+        )
 
-    def _build_prepare_op(self, lcu: LCUContainer):
-        """Build the PREPARE Q# operation from an LCU container.
-
-        For the 0-ancilla case the wavefunction has 0 modes, producing a no-op.
-
-        Args:
-            lcu: The LCU container holding the prepare wavefunction.
-
-        Returns:
-            A Q# callable implementing the PREPARE oracle.
-
-        """
-        if lcu.prepare is not None:
-            prepare_algorithm = self._create_nested("prepare")
-            prepare_circuit = prepare_algorithm.run(lcu.prepare)
-            return prepare_circuit._qsharp_op  # noqa: SLF001
-        return QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-
-
-def _build_pauli_select_op(select: Select):
-    """Build the Pauli SELECT Q# operation from a Select data object.
-
-    Converts each controlled operation's Pauli string into Q# ``Pauli`` enums
-    and packages them with sign phases into a ``PauliSelectParams`` struct.
-
-    Args:
-        select: The SELECT oracle data object containing controlled operations,
-            phases, and qubit layout.
-
-    Returns:
-        A Q# callable implementing the Pauli SELECT oracle.
-
-    """
-    pauli_terms: list[list[qsharp.Pauli]] = []
-    control_states: list[int] = []
-    for op in select.controlled_operations:
-        base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
-        for i, pauli_char in enumerate(reversed(op.operation)):
-            if pauli_char != "I":
-                base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
-        pauli_terms.append(base_paulis)
-        control_states.append(op.ctrl_state)
-    phases = [int(s) for s in select.phases]
-    select_params = QSHARP_UTILS.Select.PauliSelectParams(
-        pauliTerms=pauli_terms, signs=phases, controlStates=control_states
-    )
-    return QSHARP_UTILS.Select.MakeSelectOp(select_params)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            # Phase estimation takes a single control qubit rather than a control register.
+            qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(repeated_op),
+        )

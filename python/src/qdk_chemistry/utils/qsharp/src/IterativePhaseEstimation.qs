@@ -5,7 +5,6 @@
 namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
     import Std.Arrays.Subarray;
-    import Std.Core.Length;
 
     /// A struct to hold parameters for iterative Quantum Phase Estimation (IQPE).
     /// - `statePrep`: A function to prepare the initial quantum state.
@@ -14,7 +13,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
-    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas (e.g., phase gradient state).
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
@@ -22,7 +20,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
-        ancillaPrep : Qubit[] => Unit is Adj,
     }
 
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
@@ -42,7 +39,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         let allTargets = systems + ancillas;
 
         params.statePrep(systems);
-        params.ancillaPrep(ancillas);
 
         within {
             H(phaseQubit);
@@ -50,7 +46,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             Rz(params.accumulatePhase, phaseQubit);
             params.repControlledUnitary(phaseQubit, allTargets);
         }
-        Adjoint params.ancillaPrep(ancillas);
         ResetAll(allTargets);
         return [MResetZ(phaseQubit)];
     }
@@ -63,7 +58,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
-    /// - `ancillaPrep`: A function to prepare persistent block-encoding ancillas.
     /// # Returns
     /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
@@ -73,7 +67,6 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
-        ancillaPrep : Qubit[] => Unit is Adj,
     ) : Result[] {
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
@@ -81,8 +74,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             accumulatePhase = accumulatePhase,
             phaseQubit = phaseQubit,
             systems = systems,
-            numAncillaQubits = numAncillaQubits,
-            ancillaPrep = ancillaPrep
+            numAncillaQubits = numAncillaQubits
         });
     }
 }

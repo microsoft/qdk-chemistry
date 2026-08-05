@@ -207,9 +207,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 "but this block encoding has none."
             )
 
-        # The mapper emits the block encoding once and hands out the reflection it pairs with;
+        # The mapper hands over the block encoding and the reflection it pairs with separately;
         # the schedule below owns the interleaving, so the walk is never materialized here.
-        block_encoding_op = mapper.run(unitary_rep)._qsharp_op  # noqa: SLF001
+        block_encoding_op = mapper.block_encoding_op(container)
         apply_reflection = mapper.reflection_op(container)
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
@@ -227,12 +227,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "statePrep": state_prep_op,
             "applyBlockEncoding": block_encoding_op,
             "applyReflection": apply_reflection,
+            "phaseQubitPrep": QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(phase_prep_params),
             "numQueries": num_queries,
             "ancillas": list(range(num_bits)),
             "systems": [index + num_bits for index in range(qubit_hamiltonian.num_qubits)],
-            "phaseQubitPrep": QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(phase_prep_params),
             "numAncillas": num_ancilla_qubits,
-            "ancillaPrep": QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep(),
         }
         circuit = Circuit(
             qsharp_factory=QsharpFactoryData(

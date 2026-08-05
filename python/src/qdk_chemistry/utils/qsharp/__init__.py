@@ -23,40 +23,10 @@ __all__ = [
 
 _PROJECT_ROOT = str(Path(__file__).parent)
 _SOURCE_ROOT = Path(__file__).parent / "src"
-
 #: Profile the vendored Q# project is compiled for by default.
-#:
-#: Unary iteration toggles the helper qubit of its AND ladder between the compute and
-#: the uncompute, so ``Adjoint AND`` has to read a measurement result to know which
-#: correction to apply. ``TargetProfile.Base`` forbids that and silently lowers the
-#: uncompute to the unitary decomposition, which is only valid when the helper still
-#: holds the original AND. An adaptive profile is therefore required for correctness,
-#: not merely for cost.
-DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
+DEFAULT_TARGET_PROFILE = TargetProfile.Unrestricted
 
-#: Q# sources that are *correct* under ``TargetProfile.Base``.
-#:
-#: A Base context loads only this subset. The criterion is correctness, not loadability:
-#: the excluded sources do compile under Base, and then compute the wrong answer. Unary
-#: iteration is the motivating case. It toggles the helper qubit of its AND ladder with a
-#: ``CNOT`` between the compute and the uncompute, so ``Adjoint AND`` has to read a
-#: measurement result to know which correction to apply. Base forbids mid-circuit
-#: measurement, so it lowers that uncompute to the unitary decomposition instead -- valid
-#: only when the helper still holds the original AND, which the ``CNOT`` has just made
-#: false.
-#:
-#: The failure is silent and non-deterministic: the phase register comes back well-formed
-#: and in range, but equal to the correct value XOR 2 or XOR 6 with roughly even odds. It is
-#: never accidentally right and never reproducibly wrong, so nothing downstream can catch
-#: it. Withholding those sources from a Base context converts that into an ``undefined
-#: symbol`` error at the point of use.
-#:
-#: Base is still worth reaching for: forbidding mid-circuit measurement is exactly what
-#: makes measurement-based uncompute (``Adjoint AND``) lower to a purely unitary circuit,
-#: which QIR-to-Qiskit conversion requires, since a circuit carrying classical bits cannot
-#: be turned into a Qiskit gate. That path is unaffected by this allowlist: the QIR emitted
-#: for the Base-legal sources is byte-identical whether they are loaded as a subset or as
-#: the whole project.
+#: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
     "StatePreparation.qs",
     "CircuitComposition.qs",
@@ -66,8 +36,6 @@ _BASE_PROFILE_FILES = (
     "HadamardTest.qs",
     "PauliExp.qs",
     "MeasurementBasis.qs",
-    "PrepSelPrep.qs",
-    "Select.qs",
 )
 
 

@@ -99,19 +99,12 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_ancilla_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, num_ancilla_qubits, ancilla_prep_op = self._create_controlled_circuit(
-                qubit_hamiltonian, power=power
-            )
+            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power=power)
             ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
-                state_preparation,
-                ctrl_unitary_circuits,
-                num_bits,
-                num_system_qubits,
-                num_ancilla_qubits,
-                ancilla_prep_op,
+                state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits, num_ancilla_qubits
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
@@ -128,7 +121,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits: int,
         num_system_qubits: int,
         num_ancilla_qubits: int = 0,
-        ancilla_prep_op: Circuit | None = None,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation using MakeStandardQPECircuit.
 
@@ -139,7 +131,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             num_bits: Number of ancilla qubits (phase bits).
             num_system_qubits: Number of system qubits.
             num_ancilla_qubits: Number of extra ancilla qubits within the unitary (0 for Trotter).
-            ancilla_prep_op: Q# callable to initialize block-encoding ancillas (None for no-op).
 
         Returns:
             A Circuit object representing the standard QPE circuit.
@@ -148,8 +139,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
-        if ancilla_prep_op is None:
-            ancilla_prep_op = QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
@@ -159,8 +148,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "ancillas": ancillas,
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
-            "numAncillas": num_ancilla_qubits,
-            "ancillaPrep": ancilla_prep_op,
+            "numAncillaQubits": num_ancilla_qubits,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
