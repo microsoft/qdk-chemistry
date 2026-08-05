@@ -560,7 +560,7 @@ class TestTrotter:
         """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
         t = 2.0
         energy = 0.5
-        phi = (energy * t / (2 * np.pi)) % 1.0
+        phi = (-energy * t / (2 * np.pi)) % 1.0
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = Trotter(time=t)
         container = builder.run(hamiltonian).get_container()

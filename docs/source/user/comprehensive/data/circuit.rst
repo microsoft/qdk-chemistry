@@ -91,6 +91,66 @@ The standard pattern for building a factory is:
 This pattern is what enables end-to-end Q# composition: because the factory stores Q# callables rather than serialized gate sequences, multi-stage circuits compose natively in the Q# runtime without intermediate format conversions.
 
 
+.. _shared-qsharp-context:
+
+Shared Q# context
+-----------------
+
+QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
+Composing a callable from one context into a program owned by another raises ``QSharpError``.
+
+Three scenarios cover how users interact with this:
+
+**Using QDK/Chemistry algorithms only.**
+You never touch the Q# context. Every circuit the library builds is created against one internal
+shared context, so everything composes automatically.
+
+**Bringing your own Q# operation.**
+When you define your own Q# program (for example, a custom ``BellState`` state preparation) and want
+to compose it with a chemistry builder such as QPE, it must be built against that same shared
+context. Obtain the context with :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`, define your
+operation on it, and pass the resulting callable to the builder.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-byo-operation
+      :end-before: # end-cell-byo-operation
+
+**Bringing your own Q# context.**
+If you want to change the target profile — or any other ``qdk.Context`` option — build a context with
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context` (it keeps the chemistry utilities loaded on
+the project root), then make the library use it: :func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+installs it process-wide (pass ``None`` to restore the default), while
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context` switches to it temporarily on the current
+thread and restores it automatically on exit.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-byo-context
+      :end-before: # end-cell-byo-context
+
+The four helpers in :mod:`qdk_chemistry.utils.qsharp` that manage this are:
+
+:func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
+   Returns the shared context that owns ``QSHARP_UTILS``. Build your own operations against it so they
+   compose with the chemistry builders.
+
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context`
+   Creates a fresh context preloaded with the chemistry utilities. Forwards ``target_profile`` and any
+   other ``qdk.Context`` keyword arguments; use it when you need a non-default configuration.
+
+:func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+   Installs a caller-supplied context process-wide. Pass ``None`` to reset to the default context.
+
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
+   A context manager that overrides the active context for the current thread only and restores it
+   on exit.
+
+
 Conversion methods
 ------------------
 
