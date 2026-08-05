@@ -29,6 +29,9 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
+
 
 def strip_ws(s: str) -> str:
     """Normalize whitespace to make string matching more robust."""

@@ -23,6 +23,8 @@ try:
     from qdk._native import Circuit as QdkCircuitType
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
 
 
 def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:

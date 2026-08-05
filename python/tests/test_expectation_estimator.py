@@ -32,6 +32,9 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
+
 
 @pytest.fixture
 def debug_logger():

@@ -32,6 +32,11 @@ _SOURCE_ROOT = Path(__file__).parent / "src"
 DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 
 #: Q# sources that are supported by ``TargetProfile.Base``.
+#:
+#: ``Select`` and ``PrepSelPrep`` qualify: their only measurement-based uncompute is the
+#: AND ladder in ``Reflect``, which the Q# standard library lowers to a measurement-free
+#: decomposition when the target profile demands it. Unary iteration does not qualify --
+#: see :func:`create_qsharp_context`.
 _BASE_PROFILE_FILES = (
     "StatePreparation.qs",
     "CircuitComposition.qs",
@@ -41,6 +46,8 @@ _BASE_PROFILE_FILES = (
     "HadamardTest.qs",
     "PauliExp.qs",
     "MeasurementBasis.qs",
+    "Select.qs",
+    "PrepSelPrep.qs",
 )
 
 

@@ -29,6 +29,9 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
+
 
 def _constant_drive(_t: float) -> float:
     """Drive function that always returns 1.0."""
