@@ -174,7 +174,7 @@ def _ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
     active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, unrestricted)
     builder = create("effective_hamiltonian", "ducc")
     builder.settings().set("ducc_level", level)
-    out_ham = builder.run(full_ham, cc_wfn, active_orbitals)
+    out_ham = builder.run(full_ham, cc_wfn, active_orbitals.active_indices())
     n_active_a = sum(1 for p in active if p < nocc_a)
     n_active_b = sum(1 for p in active if p < nocc_b)
     return out_ham, active_orbitals, n_active_a, n_active_b
@@ -186,6 +186,7 @@ _CASES = [
     ("lih_full", LIH, 1, False, list(range(6)), []),
     ("lih_cas22", LIH, 1, False, [1, 2], [0]),
     ("lih_cas23", LIH, 1, False, [1, 2, 3], [0]),
+    ("lih_sparse", LIH, 1, False, [0, 3, 5], [1]),
     ("h2o_cas65", H2O, 1, False, [2, 3, 4, 5, 6], [0, 1]),
     ("oh_full", OH, 2, True, list(range(6)), []),
     ("oh_cas_fc2", OH, 2, True, [2, 3, 4, 5], [0, 1]),
@@ -210,37 +211,15 @@ def test_casci_equals_fci_at_level0(label, xyz, multiplicity, unrestricted, acti
     ci = _ci_unrestricted if unrestricted else _ci_restricted
     energy_casci = ci(cas_ham, n_active_a, n_active_b)
 
-    # FCI on the DUCC output. Its same-spin block is the half-antisymmetrized
-    # representative: MACIS reads it (restricted); direct_uhf does not, so the
-    # unrestricted output is diagonalized through the native qubit mapper.
-    energy_fci = _qubit_ground_state(out_ham) if unrestricted else _ci_restricted(out_ham, n_active_a, n_active_b)
+    # FCI on the DUCC output. Every level emits the spin-blocked container whose
+    # same-spin block is the half-antisymmetrized representative, which a
+    # conventional solver misreads, so it is diagonalized through the native
+    # qubit mapper.
+    energy_fci = _qubit_ground_state(out_ham)
 
     assert np.isclose(energy_casci, energy_fci, atol=ci_energy_tolerance), (
         f"{label}: CASCI={energy_casci:.10f} != FCI(DUCC0)={energy_fci:.10f}"
     )
-
-
-def test_active_orbitals_must_be_subset_of_wavefunction():
-    """The active orbitals must share the wavefunction's MO basis (subset assertion)."""
-    wfn_hf = _scf(LIH, 1, False)
-    orbitals = wfn_hf.get_orbitals()
-    nmo = orbitals.get_num_molecular_orbitals()
-    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
-    full_ham = create("hamiltonian_constructor").run(orbitals)
-    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
-
-    # Active orbitals with perturbed coefficients do not match the wavefunction's.
-    bad = Orbitals(
-        coefficients=spin_channel_matrix(orbitals.coefficients(), axes.alpha()) * 1.5,
-        energies=spin_channel_vector(orbitals.energies(), axes.alpha()),
-        ao_overlap=np.array(orbitals.get_overlap_matrix()),
-        basis_set=orbitals.get_basis_set(),
-        active_indices=spin_index_set(nmo, [1, 2], [1, 2], equivalent=True),
-    )
-    builder = create("effective_hamiltonian", "ducc")
-    builder.settings().set("ducc_level", 0)
-    with pytest.raises(RuntimeError, match="subset"):
-        builder.run(full_ham, cc_wfn, bad)
 
 
 # Closed-shell LiH active spaces with a real frozen core, shared by the dressed-output
@@ -261,11 +240,13 @@ def test_qubit_mapper_restricted_unrestricted_match_macis(label, xyz, active, in
     The restricted and unrestricted outputs give the same qubit ground-state energy,
     both equal to the MACIS total (core energy included).
     """
-    out_r, _, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, 0)
+    out_r, active_orbitals, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, 0)
     out_u, *_ = _ducc_output(xyz, 1, True, active, inactive, 0)
 
-    # MACIS reference (restricted only): total active-space energy, incl. core.
-    energy_macis = _ci_restricted(out_r, n_active_a, n_active_b)
+    # MACIS reference on the standard-convention active Hamiltonian (full 8-fold
+    # chemist integrals): total active-space energy, incl. core.
+    cas_ham = create("hamiltonian_constructor").run(active_orbitals)
+    energy_macis = _ci_restricted(cas_ham, n_active_a, n_active_b)
 
     energy_qubit_r = _qubit_ground_state(out_r)
     energy_qubit_u = _qubit_ground_state(out_u)

@@ -9,6 +9,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 
@@ -46,10 +47,10 @@ class EffectiveHamiltonianSettings : public data::Settings {
  *
  * The run signature takes the full-space Hamiltonian, a full-space
  * @ref data::Wavefunction supplying the reference coupled-cluster amplitudes
- * (through an amplitude container), and an active-space @ref data::Orbitals
- * that designates the active orbitals as a subset of the wavefunction's
- * orbitals (through its active-space indices). The alpha/beta occupancy is
- * derived from the wavefunction. Only the BCH truncation level is a setting.
+ * (through an amplitude container), and a @ref data::SymmetryBlockedIndexSet
+ * designating the active (P-space) orbitals per spin channel. The alpha/beta
+ * occupancy is derived from the wavefunction. Only the BCH truncation level is
+ * a setting.
  *
  * Example usage:
  * @code
@@ -57,7 +58,7 @@ class EffectiveHamiltonianSettings : public data::Settings {
  *     qdk::chemistry::algorithms::create<EffectiveHamiltonian>("ducc");
  * builder->settings().set("ducc_level", static_cast<int64_t>(2));
  * auto effective =
- *     builder->run(full_hamiltonian, ccsd_wavefunction, active_orbitals);
+ *     builder->run(full_hamiltonian, ccsd_wavefunction, p_space_indices);
  * @endcode
  *
  * @see data::Hamiltonian
@@ -67,7 +68,7 @@ class EffectiveHamiltonian
     : public Algorithm<EffectiveHamiltonian, std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Wavefunction>,
-                       std::shared_ptr<data::Orbitals>> {
+                       std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
  public:
   /**
    * @brief Default constructor installing the shared effective-Hamiltonian
@@ -103,14 +104,15 @@ class EffectiveHamiltonian
    * @param hamiltonian The full-space Hamiltonian to transform.
    * @param wavefunction A full-space wavefunction whose amplitude container
    *        supplies the reference coupled-cluster amplitudes.
-   * @param active_orbitals Active-space orbitals whose active-space indices
-   *        designate the active subset of @p wavefunction's orbitals.
+   * @param p_space_indices Active-space (P-space) orbital indices per spin
+   *        channel.
    * @return The effective active-space Hamiltonian.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
       std::shared_ptr<data::Wavefunction> wavefunction,
-      std::shared_ptr<data::Orbitals> active_orbitals) const override = 0;
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_space_indices)
+      const override = 0;
 };
 
 /**

@@ -38,10 +38,11 @@ class EffectiveHamiltonianBase : public EffectiveHamiltonian,
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Hamiltonian> hamiltonian,
       std::shared_ptr<Wavefunction> wavefunction,
-      std::shared_ptr<Orbitals> active_orbitals) const override {
+      std::shared_ptr<const qdk::chemistry::data::SymmetryBlockedIndexSet>
+          p_space_indices) const override {
     PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>, EffectiveHamiltonian,
                            _run_impl, hamiltonian, wavefunction,
-                           active_orbitals);
+                           p_space_indices);
   }
 };
 
@@ -61,15 +62,15 @@ Baker-Campbell-Hausdorff (BCH) expansion.
 
 The run signature takes the full-space Hamiltonian, a full-space Wavefunction
 supplying the reference coupled-cluster amplitudes (through its amplitude
-container), and an active-space Orbitals that designates the active orbitals as
-a subset of the wavefunction's orbitals (through its active-space indices). The
-only setting is the BCH truncation level (``ducc_level``).
+container), and a SymmetryBlockedIndexSet designating the active (P-space)
+orbitals per spin channel. The only setting is the BCH truncation level
+(``ducc_level``).
 
 Examples:
   >>> import qdk_chemistry
   >>> builder = qdk_chemistry.algorithms.create("effective_hamiltonian", "ducc")
   >>> builder.settings().set("ducc_level", 2)
-  >>> effective = builder.run(hamiltonian, ccsd_wavefunction, active_orbitals)
+  >>> effective = builder.run(hamiltonian, ccsd_wavefunction, p_space_indices)
     )");
 
   eff.def(py::init<>(),
@@ -87,14 +88,14 @@ Examples:
   qdk::chemistry::python::bind_create_nested(eff);
 
   eff.def("run", &EffectiveHamiltonian::run, py::arg("hamiltonian"),
-          py::arg("wavefunction"), py::arg("active_orbitals"),
+          py::arg("wavefunction"), py::arg("p_space_indices"),
           R"(
   Build the effective active-space Hamiltonian.
 
   Args:
     hamiltonian (Hamiltonian): The full-space Hamiltonian to transform.
     wavefunction (Wavefunction): A full-space wavefunction whose amplitude container supplies the reference coupled-cluster amplitudes.
-    active_orbitals (Orbitals): Active-space orbitals whose active-space indices designate the active subset of the wavefunction's orbitals.
+    p_space_indices (SymmetryBlockedIndexSet): Active-space (P-space) orbital indices per spin channel.
 
   Returns:
     Hamiltonian: The effective active-space Hamiltonian.
@@ -111,7 +112,7 @@ Returns:
         )");
 
   eff.def("hash", &EffectiveHamiltonian::hash, py::arg("hamiltonian"),
-          py::arg("wavefunction"), py::arg("active_orbitals"));
+          py::arg("wavefunction"), py::arg("p_space_indices"));
 
   eff.def("settings", &EffectiveHamiltonian::settings,
           R"(
