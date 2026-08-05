@@ -146,9 +146,7 @@ def _amplified_qpe_circuit(
     algorithm = create("amplitude_amplification")
     for key, value in settings.items():
         algorithm.settings().update(key, value)
-    return algorithm.run(
-        state_prep_oracle, good_state_oracle, num_qubits=num_qubits, measured_indices=measured_indices
-    )
+    return algorithm.run(state_prep_oracle, good_state_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
 
 
 def _accepted_phase_counts(
