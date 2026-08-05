@@ -37,9 +37,9 @@ range of phase bins:
 
    from qdk_chemistry.algorithms import phase_marking_oracle
 
-  selected_bins = phase_marking_oracle(8, (12, 15))
-  lower_bins = phase_marking_oracle(8, (0, 32))
-  upper_bins = phase_marking_oracle(8, (224, 256))
+   selected_bins = phase_marking_oracle(8, (12, 15))
+   lower_bins = phase_marking_oracle(8, (0, 32))
+   upper_bins = phase_marking_oracle(8, (224, 256))
 
 The helper interprets the first ``num_phase_qubits`` qubits as a little-endian
 integer and marks values in ``[start, stop)``. For a phase bin ``j``, use
