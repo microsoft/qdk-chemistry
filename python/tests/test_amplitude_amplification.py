@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import math
 
 import numpy as np
@@ -17,7 +16,7 @@ from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 
 def _amplified_expression(theta: float, rounds: int) -> str:
@@ -29,17 +28,20 @@ def _amplified_expression(theta: float, rounds: int) -> str:
         f"{amplification}.MarkTargetStateOp(1, [], 1, 2), {rounds}, 1, [0])"
     )
 
+
 def _acceptance_frequency(qsharp_context, expression: str) -> float:
     """Return the fraction of shots that land in the good subspace."""
     shots = 4000
     outcomes = qsharp_context.run(expression, shots=shots)
     return sum(1 for outcome in outcomes if str(outcome[0]) == "One") / shots
 
+
 @pytest.mark.parametrize(("overlap", "rounds"), [(0.05, 0), (0.05, 2), (0.05, 3), (0.1, 1), (0.1, 2), (0.25, 1)])
 def test_plain_amplification_matches_the_closed_form(qsharp_context, overlap: float, rounds: int):
     theta = AmplitudeAmplification._rotation_angle(overlap)
     observed = _acceptance_frequency(qsharp_context, _amplified_expression(theta, rounds))
     assert observed == pytest.approx(AmplitudeAmplification.success_probability(overlap, rounds), abs=0.04)
+
 
 def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qsharp_context):
     """Three rounds are optimal for a = 0.02 but wrap past the maximum for a = 0.25."""
@@ -54,10 +56,12 @@ def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qshar
     better = _acceptance_frequency(qsharp_context, _amplified_expression(theta, 1))
     assert better > observed
 
+
 def _diagonal_hamiltonian() -> QubitOperator:
     """Return H = (pi/4) ZI + (pi/4) IZ, whose spectrum is {pi/2, 0, 0, -pi/2}."""
     coefficient = math.pi / 4.0
     return QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=np.array([coefficient, coefficient]))
+
 
 def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit:
     """Prepare a state with the given amplitude on one computational basis state."""
@@ -79,6 +83,7 @@ def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit
         ),
         qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(parameters),
     )
+
 
 def _qpe_preparation(
     qubit_hamiltonian: QubitOperator,
@@ -135,9 +140,7 @@ def _amplified_qpe_circuit(
     return algorithm.run(preparation, marking_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
 
 
-def _dominant_accepted_phase(
-    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400
-) -> str:
+def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400) -> str:
     """Execute a circuit and return the most common bitstring from the good subspace."""
     lower_bound, upper_bound = accepted_range
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
@@ -162,6 +165,7 @@ def test_amplitude_amplification_is_registered():
 def test_rounds_setting_defaults_to_one():
     algorithm = create("amplitude_amplification")
     assert algorithm.settings().get("rounds") == 1
+
 
 def test_amplified_qpe_circuit():
     """Check that amplitude amplification can be applied to a QPE circuit."""

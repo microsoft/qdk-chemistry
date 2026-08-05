@@ -63,9 +63,7 @@ def phase_marking_oracle(
 
     phase_bin_count = 1 << num_phase_qubits
     if not 0 <= lower_bound < upper_bound <= phase_bin_count:
-        raise ValueError(
-            f"target_range must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_range}."
-        )
+        raise ValueError(f"target_range must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_range}.")
     ancilla_indices = [] if signal_ancilla_indices is None else [operator.index(i) for i in signal_ancilla_indices]
 
     parameters = {
