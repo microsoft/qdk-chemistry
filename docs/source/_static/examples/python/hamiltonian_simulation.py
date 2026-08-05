@@ -7,9 +7,9 @@
 
 ################################################################################
 # start-cell-create
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import create
 
-sim = registry.create("hamiltonian_simulation", "euler_integrator")
+sim = create("hamiltonian_simulation", "euler_integrator")
 # end-cell-create
 ################################################################################
 
@@ -37,7 +37,7 @@ sim.settings().set(
 ################################################################################
 # start-cell-run
 import numpy as np
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import AlgorithmRef, DrivenQubitHamiltonian, LatticeGraph
 from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
@@ -49,7 +49,7 @@ h1 = create_ising_hamiltonian(lattice, j=0.0, h=0.5)
 td_hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=lambda t: np.sin(2 * np.pi * t))
 
 # 2. Configure simulation
-sim = registry.create("hamiltonian_simulation", "euler_integrator")
+sim = create("hamiltonian_simulation", "euler_integrator")
 sim.settings().set(
     "evolution_circuit_builder",
     AlgorithmRef(
@@ -74,8 +74,8 @@ for energy_result, measurement_data in results:
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import available
 
-registry.available("hamiltonian_simulation")
+available("hamiltonian_simulation")
 # end-cell-list-implementations
 ################################################################################
