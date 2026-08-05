@@ -113,7 +113,9 @@ Alternatively, you can install them directly:
 
 .. note::
 
-   The ``qiskit-extras`` extra is not currently supported on Python 3.14.
+   On Python 3.14, ``qiskit-aer`` is omitted from ``qiskit-extras`` on Linux ARM64
+   (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that
+   platform. All other platforms install the full set.
 
 **Checking what is loaded:**
 
