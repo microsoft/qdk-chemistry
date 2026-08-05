@@ -64,10 +64,11 @@ def _qpe_preparation(
     builder.settings().update("measure_phase", False)
     preparation = builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
 
-    unitary_algorithm = create(unitary.algorithm_type, unitary.algorithm_name, **unitary.settings)
-    num_system_qubits = qubit_hamiltonian.num_qubits
-    num_ancilla_qubits = unitary_algorithm.run(qubit_hamiltonian).get_num_qubits() - num_system_qubits
-    num_qubits = num_bits + num_system_qubits + num_ancilla_qubits
+    # MakeStandardQPECircuit allocates numBits + Length(systems) + numAncillaQubits qubits.
+    parameters = preparation._qsharp_factory.parameter
+    num_system_qubits = len(parameters["systems"])
+    num_ancilla_qubits = parameters["numAncillaQubits"]
+    num_qubits = parameters["numBits"] + num_system_qubits + num_ancilla_qubits
     signal_ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
     return preparation, num_qubits, signal_ancilla_indices
 

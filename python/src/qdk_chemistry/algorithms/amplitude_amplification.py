@@ -29,9 +29,6 @@ def phase_marking_oracle(
 ) -> Circuit:
     r"""Build a good state oracle for a half-open range of QPE phase bins.
 
-    Executing the returned circuit applies the oracle to an all-zeros register and measures
-    the flag, so the oracle can be run, drawn and costed on its own.
-
     Args:
         num_phase_qubits: Number of phase qubits at the start of the oracle register.
         target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
@@ -145,12 +142,6 @@ class AmplitudeAmplification(Algorithm):
         num_qubits: int,
     ) -> Circuit:
         r"""Build an amplitude-amplified circuit.
-
-        ``num_qubits`` is the width of the register both oracles act on. A Q#
-        ``Qubit[] => Unit`` carries no arity, so it cannot be read back from either oracle
-        and must be given here. It is the register the state preparation was built for: for
-        an amplified QPE circuit that is the phase register, plus the system qubits, plus
-        any block-encoding ancillas.
 
         Args:
             state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.
