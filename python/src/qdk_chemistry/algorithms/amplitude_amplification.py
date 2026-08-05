@@ -5,7 +5,6 @@ r"""QDK/Chemistry amplitude amplification."""
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
 import operator
 from typing import Any
 
@@ -163,53 +162,6 @@ class AmplitudeAmplification(Algorithm):
         return Circuit(
             qsharp_factory=QsharpFactoryData(program=amplification.MakeAmplifiedCircuit, parameter=parameters)
         )
-
-    @staticmethod
-    def _validate_overlap(overlap: float, name: str = "overlap") -> None:
-        """Raise if ``overlap`` is not a usable squared overlap.
-
-        Args:
-            overlap: The value to check.
-            name: Name used in the error message.
-
-        Raises:
-            ValueError: If ``overlap`` is not finite or does not lie in ``(0, 1]``.
-
-        """
-        if not math.isfinite(overlap) or not 0.0 < overlap <= 1.0:
-            raise ValueError(f"{name} must be finite and lie in (0, 1]. Got {overlap}.")
-
-    @classmethod
-    def _rotation_angle(cls, overlap: float) -> float:
-        r"""Return the half-rotation angle :math:`\vartheta = \arcsin\sqrt{a}`.
-
-        Args:
-            overlap: The squared overlap ``a`` of the prepared state with the good
-                subspace, in ``(0, 1]``.
-
-        Returns:
-            The angle in radians, in ``(0, pi/2]``.
-
-        """
-        cls._validate_overlap(overlap)
-        return math.asin(math.sqrt(overlap))
-
-    @classmethod
-    def success_probability(cls, overlap: float, rounds: int) -> float:
-        r"""Return the acceptance probability :math:`\sin^2((2k+1)\vartheta)`.
-
-        Args:
-            overlap: The squared overlap of the prepared state with the good subspace.
-            rounds: The number of amplification rounds ``k``.
-
-        Returns:
-            The probability of measuring the good subspace after ``rounds`` rounds.
-
-        """
-        if rounds < 0:
-            raise ValueError(f"rounds must be nonnegative. Got {rounds}.")
-        angle = cls._rotation_angle(overlap)
-        return math.sin((2 * rounds + 1) * angle) ** 2
 
 
 class AmplitudeAmplificationFactory(AlgorithmFactory):
