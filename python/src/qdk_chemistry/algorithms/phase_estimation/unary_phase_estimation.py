@@ -22,6 +22,7 @@ __all__: list[str] = [
     "UnaryPhaseEstimationSettings",
 ]
 
+
 def _post_process_phase_estimation(
     counts: dict[str, int],
     num_bits: int,
@@ -79,8 +80,7 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
             "use_positive_sign",
             "bool",
             False,
-            "Whether the doubled measured phase resolves to a non-negative eigenvalue "
-            "rather than a non-positive one.",
+            "Whether the doubled measured phase resolves to a non-negative eigenvalue rather than a non-positive one.",
         )
         self.set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary"))
 

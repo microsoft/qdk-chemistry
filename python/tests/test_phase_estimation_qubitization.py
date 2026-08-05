@@ -13,6 +13,7 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -26,7 +27,10 @@ _builder_params = [
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        marks=[
+            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            pytest.mark.usefixtures("use_base_qdk_ctx"),
+        ],
     ),
 ]
 

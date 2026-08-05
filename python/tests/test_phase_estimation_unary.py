@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
-    QdkUnaryQpeCircuitBuilder,
     cosine_window_state,
     num_phase_bits,
 )
@@ -35,6 +34,7 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     if num_address_qubits == 0:
         return 0
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
+
 
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
@@ -226,7 +226,6 @@ class TestUnaryQpeEndToEnd:
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=True)
             assert phase_fraction == pytest.approx(expected_phase)
-
 
     def test_builder_defaults_recover_the_ground_state_energy(self):
         r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""

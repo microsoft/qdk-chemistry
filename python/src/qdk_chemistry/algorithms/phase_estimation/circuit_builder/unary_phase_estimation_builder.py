@@ -144,9 +144,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         """
         container_power = getattr(unitary_rep.get_container(), "power", 1)
         if container_power != 1:
-            Logger.warn(
-                f"The unitary representation carries power {container_power}, which is ignored."
-            )
+            Logger.warn(f"The unitary representation carries power {container_power}, which is ignored.")
 
         num_queries = self._settings.get("num_queries")
         if num_queries <= 0:
@@ -177,9 +175,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
         if not isinstance(container, LCUWalkContainer):
-            raise ValueError(
-                f"Requires a block encoding unitary representation, got '{type(container).__name__}'."
-            )
+            raise ValueError(f"Requires a block encoding unitary representation, got '{type(container).__name__}'.")
 
         num_queries = self.resolve_num_queries(unitary_rep)
         num_bits = num_phase_bits(num_queries)
@@ -187,9 +183,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         mapper = self._create_nested("circuit_mapper")
         num_ancilla_qubits = mapper.num_ancillary_qubits(container)
         if num_ancilla_qubits == 0:
-            raise ValueError(
-                "Requires a non-empty ancilla register to reflect about."
-            )
+            raise ValueError("Requires a non-empty ancilla register to reflect about.")
 
         block_encoding_op = mapper.block_encoding_op(container)
         apply_reflection = mapper.reflection_op(container)
