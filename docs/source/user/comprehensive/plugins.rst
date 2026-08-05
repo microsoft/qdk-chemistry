@@ -80,6 +80,7 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 - `PySCF <https://pyscf.org/>`_ — Python-based quantum chemistry
 - `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum algorithm primitives
 - `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
+- `geomeTRIC <https://github.com/leeping/geomeTRIC>`_ — Molecular geometry optimization
 
 These plugins are enabled automatically when the corresponding package is installed.
 
