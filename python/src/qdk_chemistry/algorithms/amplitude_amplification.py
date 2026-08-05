@@ -30,13 +30,12 @@ def phase_marking_oracle(
     r"""Build a good state oracle for a half-open range of QPE phase bins.
 
     Args:
-        num_phase_qubits: Number of phase qubits at the start of the oracle register.
+        num_phase_qubits: Number of phase qubits.
         target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
-        signal_ancilla_indices: Indices of ancillas after the phase qubits that must all be :math:`|0\rangle`.
+        signal_ancilla_indices: Indices of ancillas that must all be :math:`|0\rangle`.
 
     Returns:
-        A circuit whose ``qsharp_op`` is the adjointable ``(Qubit[], Qubit) => Unit`` oracle, for use
-        as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
+        A circuit for use as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
 
     Raises:
         ValueError: If the register size or target range is invalid.
@@ -132,8 +131,8 @@ class AmplitudeAmplification(Algorithm):
         return "amplitude_amplification"
 
     def name(self) -> str:
-        """Return the algorithm name as qdk."""
-        return "qdk"
+        """Return the algorithm name as base."""
+        return "base"
 
     def _run_impl(
         self,
@@ -196,5 +195,5 @@ class AmplitudeAmplificationFactory(AlgorithmFactory):
         return "amplitude_amplification"
 
     def default_algorithm_name(self) -> str:
-        """Return qdk as the default algorithm name."""
-        return "qdk"
+        """Return base as the default algorithm name."""
+        return "base"

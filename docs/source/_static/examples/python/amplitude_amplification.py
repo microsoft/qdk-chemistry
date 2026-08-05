@@ -9,17 +9,11 @@
 # start-cell-create
 from qdk_chemistry.algorithms import create
 
-amplitude_amplification = create("amplitude_amplification", "qdk")
-# end-cell-create
-################################################################################
-
-################################################################################
-# start-cell-configure
 # Number of Grover iterates. Choose it from an estimate of the overlap a,
 # the success probability after k rounds is sin^2((2k+1) arcsin(sqrt(a))).
-amplitude_amplification = create("amplitude_amplification", "qdk", rounds=2)
+amplitude_amplification = create("amplitude_amplification", "base", rounds=2)
 
-# end-cell-configure
+# end-cell-create
 ################################################################################
 
 ################################################################################
@@ -70,10 +64,8 @@ state_prep_oracle = builder.run(
     state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
 )[0]
 
-# 4. Derive the register layout. MakeStandardQPECircuit allocates
-#    numBits + Length(systems) + numAncillaQubits qubits, so read those back off the
-#    circuit instead of rebuilding the walk operator to measure it.
-params = state_prep_oracle._qsharp_factory.parameter  # noqa: SLF001
+# 4. Derive the register layout. 
+params = state_prep_oracle._qsharp_factory.parameter
 num_system_qubits = len(params["systems"])
 num_ancilla_qubits = params["numAncillaQubits"]
 num_qubits = params["numBits"] + num_system_qubits + num_ancilla_qubits
@@ -87,7 +79,7 @@ good_state_oracle = phase_marking_oracle(
 )
 
 # 6. Amplify, then execute
-amplitude_amplification = create("amplitude_amplification", "qdk", rounds=2)
+amplitude_amplification = create("amplitude_amplification", "base", rounds=2)
 circuit = amplitude_amplification.run(
     state_prep_oracle, good_state_oracle, num_qubits=num_qubits
 )
@@ -96,19 +88,5 @@ executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400
 counts = executor.run(circuit, shots=shots).bitstring_counts
 
-# 7. Accept a shot when the ancillas are |0> and the phase lands in the window.
-#    The whole register is measured and the executor reverses the Q# results, so
-#    the phase register reads MSB first at the end of the key.
-accepted_counts: dict[str, int] = {}
-for bitstring, count in counts.items():
-    phase_bits, ancilla_bits = bitstring[-num_bits:], bitstring[:num_ancilla_qubits]
-    if any(bit != "0" for bit in ancilla_bits):
-        continue
-    if not accepted[0] <= int(phase_bits, 2) < accepted[1]:
-        continue
-    accepted_counts[phase_bits] = accepted_counts.get(phase_bits, 0) + count
-
-print("accepted phase counts:", accepted_counts)
-print("acceptance probability:", sum(accepted_counts.values()) / shots)
 # end-cell-run
 ################################################################################
