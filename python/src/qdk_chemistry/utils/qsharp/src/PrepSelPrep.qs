@@ -14,6 +14,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.Core.Length;
     import Std.Math.PI;
     import Std.Intrinsic.R;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -148,6 +151,61 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         (allQubits) => {
             blockEncoding(allQubits);
             applyReflection(allQubits);
+        }
+    }
+
+    /// Circuit entry point: allocates the register and applies the block encoding `power` times.
+    ///
+    /// The composition is done here rather than by partially applying the combinators above
+    /// because QIR generation defunctionalizes the call graph: it resolves callables passed as
+    /// entry-point arguments, but only one level deep. A pre-composed
+    /// `MakeRepeatedOp(MakeWalkOp(MakePrepSelPrepOp(...)))` nests three levels and is rejected as
+    /// a dynamic callable, so the QIR path passes the leaf PREPARE/SELECT oracles instead and
+    /// stitches them together in Q#.
+    operation MakePrepSelPrepCircuit(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+        useWalk : Bool,
+    ) : Unit {
+        use register = Qubit[numSystemQubits + numAncillaQubits];
+        let systems = register[0..numSystemQubits - 1];
+        let ancilla = register[numSystemQubits...];
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
+                PrepSelPrep(prepareOp, selectOp, systems, ancilla);
+                if useWalk {
+                    Reflect(ancilla);
+                }
+                EndEstimateCaching();
+            }
+        }
+    }
+
+    /// Circuit entry point for the singly-controlled block encoding; see
+    /// `MakePrepSelPrepCircuit` for why the oracles are passed in rather than pre-composed.
+    operation MakeControlledPrepSelPrepCircuit(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+        useWalk : Bool,
+    ) : Unit {
+        use control = Qubit();
+        use register = Qubit[numSystemQubits + numAncillaQubits];
+        let systems = register[0..numSystemQubits - 1];
+        let ancilla = register[numSystemQubits...];
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "Controlled PSPWalk" | "Controlled PrepSelPrep", SingleVariant()) {
+                Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                if useWalk {
+                    Controlled Reflect([control], ancilla);
+                }
+                EndEstimateCaching();
+            }
         }
     }
 

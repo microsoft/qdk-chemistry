@@ -4,9 +4,13 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import atexit
+import shutil
+import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
 
 import qdk
@@ -49,6 +53,28 @@ _BASE_PROFILE_FILES = (
     "Select.qs",
     "PrepSelPrep.qs",
 )
+
+
+@cache
+def _base_project_root() -> str:
+    """Stage the Base-supported sources as a standalone Q# project and return its root.
+
+    A context can take sources either as a ``project_root`` or as a string passed to ``eval``,
+    but only the former compiles them into a package that QIR generation can lower: circuits
+    composed out of ``eval``-ed sources fail with "callable should exist in lowered package".
+    The Base subset is therefore copied into a project of its own rather than concatenated and
+    evaluated, which withholds the unary sources while keeping the rest QIR-capable.
+
+    The directory is built once per process and removed at interpreter exit.
+    """
+    root = Path(tempfile.mkdtemp(prefix="qdk-chemistry-qsharp-base-"))
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    shutil.copyfile(Path(_PROJECT_ROOT) / "qsharp.json", root / "qsharp.json")
+    source_dir = root / _SOURCE_ROOT.name
+    source_dir.mkdir()
+    for name in _BASE_PROFILE_FILES:
+        shutil.copyfile(_SOURCE_ROOT / name, source_dir / name)
+    return str(root)
 
 
 class _SharedContext:
@@ -100,9 +126,7 @@ def create_qsharp_context(
     if qdk_config is not None:
         kwargs["qdk_config"] = qdk_config
     if target_profile == TargetProfile.Base:
-        context = qdk.Context(target_profile=target_profile, **kwargs)
-        context.eval("\n".join((_SOURCE_ROOT / name).read_text(encoding="utf-8") for name in _BASE_PROFILE_FILES))
-        return context
+        return qdk.Context(project_root=_base_project_root(), target_profile=target_profile, **kwargs)
     return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
 
 

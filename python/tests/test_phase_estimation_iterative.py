@@ -32,8 +32,6 @@ from .reference_tolerances import (
 )
 
 _SEED = 42
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
-pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
 
 
 @dataclass(frozen=True)
@@ -243,7 +241,11 @@ _builder_params = [
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        marks=[
+            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+            pytest.mark.usefixtures("use_base_qdk_ctx"),
+        ],
     ),
 ]
 

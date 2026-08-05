@@ -32,9 +32,6 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
-# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
-pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
-
 
 @pytest.fixture
 def debug_logger():
@@ -72,7 +69,9 @@ def test_determine_measurement_basis_not_qubit_wise_commuting():
         _determine_measurement_basis(pauli_strings)
 
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 @pytest.mark.parametrize(
     ("basis", "n_qubits", "expect_measure", "expect_h", "expect_sdg", "measure_count"),
     [
@@ -283,9 +282,13 @@ def test_estimator_fewer_shots(wavefunction_4e4o):
         "qdk_sparse_state_simulator",
         pytest.param(
             "qiskit_aer_simulator",
-            marks=pytest.mark.skipif(
-                not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
-            ),
+            marks=[
+                pytest.mark.skipif(
+                    not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
+                ),
+                # QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
+                pytest.mark.usefixtures("use_base_qdk_ctx"),
+            ],
         ),
     ],
     ids=["qdk-full-state", "qdk-sparse-state", "qiskit-aer"],
@@ -383,7 +386,9 @@ def test_estimator_pure_identity_hamiltonian(capfd):
     assert "All Hamiltonian terms are identity; skipping circuit execution." in captured.out
 
 
+# QIR->Qiskit conversion rejects read_result, which the default adaptive profile emits.
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_estimator_mixed_identity_and_pauli_terms():
     """Test expectation estimator with a Hamiltonian containing both identity and non-identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n'
