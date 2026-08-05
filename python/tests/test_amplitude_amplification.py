@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import math
 
 import numpy as np
@@ -21,7 +22,9 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 @pytest.fixture(scope="module")
 def qsharp_context():
-    """Return the shared Q# context carrying the chemistry utilities."""
+    """Load the chemistry Q# utilities exactly once."""
+    if importlib.util.find_spec("qdk.qsharp") is None:
+        pytest.skip("qdk.qsharp is not installed")
     return get_qsharp_context()
 
 
@@ -34,20 +37,17 @@ def _amplified_expression(theta: float, rounds: int) -> str:
         f"{amplification}.MarkTargetStateOp(1, [], 1, 2), {rounds}, 1, [0])"
     )
 
-
 def _acceptance_frequency(qsharp_context, expression: str) -> float:
     """Return the fraction of shots that land in the good subspace."""
     shots = 4000
     outcomes = qsharp_context.run(expression, shots=shots)
     return sum(1 for outcome in outcomes if str(outcome[0]) == "One") / shots
 
-
 @pytest.mark.parametrize(("overlap", "rounds"), [(0.05, 0), (0.05, 2), (0.05, 3), (0.1, 1), (0.1, 2), (0.25, 1)])
 def test_plain_amplification_matches_the_closed_form(qsharp_context, overlap: float, rounds: int):
     theta = AmplitudeAmplification._rotation_angle(overlap)
     observed = _acceptance_frequency(qsharp_context, _amplified_expression(theta, rounds))
     assert observed == pytest.approx(AmplitudeAmplification.success_probability(overlap, rounds), abs=0.04)
-
 
 def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qsharp_context):
     """Three rounds are optimal for a = 0.02 but wrap past the maximum for a = 0.25."""
@@ -62,12 +62,10 @@ def test_plain_amplification_overshoots_when_the_overlap_is_underestimated(qshar
     better = _acceptance_frequency(qsharp_context, _amplified_expression(theta, 1))
     assert better > observed
 
-
 def _diagonal_hamiltonian() -> QubitOperator:
     """Return H = (pi/4) ZI + (pi/4) IZ, whose spectrum is {pi/2, 0, 0, -pi/2}."""
     coefficient = math.pi / 4.0
     return QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=np.array([coefficient, coefficient]))
-
 
 def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit:
     """Prepare a state with the given amplitude on one computational basis state."""
@@ -89,7 +87,6 @@ def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit
         ),
         qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(parameters),
     )
-
 
 def _qpe_preparation(
     qubit_hamiltonian: QubitOperator,
@@ -146,8 +143,10 @@ def _amplified_qpe_circuit(
     return algorithm.run(preparation, marking_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
 
 
-def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400) -> str:
-    """Execute a circuit and return the most common bitstring from the good subspace."""
+def _accepted_phase_counts(
+    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int
+) -> dict[str, int]:
+    """Execute a circuit and count, per phase bitstring, the shots in the good subspace."""
     lower_bound, upper_bound = accepted_range
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
     counts: dict[str, int] = {}
@@ -156,14 +155,22 @@ def _dominant_accepted_phase(circuit: Circuit, num_bits: int, accepted_range: tu
         if any(bit != "0" for bit in ancilla_bits) or not lower_bound <= int(phase_bits, 2) < upper_bound:
             continue
         counts[phase_bits] = counts.get(phase_bits, 0) + count
+    return counts
+
+
+def _dominant_accepted_phase(
+    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400
+) -> str:
+    """Execute a circuit and return the most common bitstring from the good subspace."""
+    counts = _accepted_phase_counts(circuit, num_bits, accepted_range, shots)
     assert counts, f"No shot landed in the accepted window {accepted_range}."
     return max(counts, key=lambda phase: counts[phase])
 
 
 def test_amplitude_amplification_is_registered():
-    assert available("amplitude_amplification") == ["qdk"]
+    assert available("amplitude_amplification") == ["qdk_amplitude_amplification"]
     default = create("amplitude_amplification")
-    assert default.name() == "qdk"
+    assert default.name() == "qdk_amplitude_amplification"
     assert default.type_name() == "amplitude_amplification"
     assert isinstance(default, AmplitudeAmplification)
 
@@ -171,7 +178,6 @@ def test_amplitude_amplification_is_registered():
 def test_rounds_setting_defaults_to_one():
     algorithm = create("amplitude_amplification")
     assert algorithm.settings().get("rounds") == 1
-
 
 def test_amplified_qpe_circuit():
     """Check that amplitude amplification can be applied to a QPE circuit."""
@@ -202,3 +208,32 @@ def test_amplified_qpe_circuit_with_trotter():
     )
     # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16.
     assert _dominant_accepted_phase(circuit, 4, accepted, shots=200) == "0100"
+
+
+def test_amplified_qpe_acceptance_follows_the_round_count():
+    """Each round rotates the QPE state by the same angle toward the accepted window."""
+    accepted = (8, 9)
+    shots = 2000
+    observed = {
+        rounds: sum(
+            _accepted_phase_counts(
+                _amplified_qpe_circuit(
+                    _diagonal_hamiltonian(),
+                    _guiding_state(0.3, 3),
+                    accepted,
+                    rounds=rounds,
+                ),
+                4,
+                accepted,
+                shots,
+            ).values()
+        )
+        / shots
+        for rounds in (0, 1, 2)
+    }
+
+    overlap = observed[0]
+    assert observed[1] > overlap
+    for rounds in (1, 2):
+        expected = AmplitudeAmplification.success_probability(overlap, rounds)
+        assert observed[rounds] == pytest.approx(expected, abs=0.1)
