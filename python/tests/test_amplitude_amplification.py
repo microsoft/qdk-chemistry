@@ -20,6 +20,14 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
+@pytest.fixture(scope="module")
+def qsharp_context():
+    """Load the chemistry Q# utilities exactly once."""
+    if importlib.util.find_spec("qdk.qsharp") is None:
+        pytest.skip("qdk.qsharp is not installed")
+    return get_qsharp_context()
+
+
 def _amplified_expression(theta: float, rounds: int) -> str:
     """Amplify one qubit prepared as cos(theta)|0> + sin(theta)|1>, marking |1>."""
     amplification = "QDKChemistry.Utils.AmplitudeAmplification"
@@ -135,10 +143,10 @@ def _amplified_qpe_circuit(
     return algorithm.run(preparation, marking_oracle, num_qubits=num_qubits, measured_indices=measured_indices)
 
 
-def _dominant_accepted_phase(
-    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400
-) -> str:
-    """Execute a circuit and return the most common bitstring from the good subspace."""
+def _accepted_phase_counts(
+    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int
+) -> dict[str, int]:
+    """Execute a circuit and count, per phase bitstring, the shots in the good subspace."""
     lower_bound, upper_bound = accepted_range
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
     counts: dict[str, int] = {}
@@ -147,6 +155,14 @@ def _dominant_accepted_phase(
         if any(bit != "0" for bit in ancilla_bits) or not lower_bound <= int(phase_bits, 2) < upper_bound:
             continue
         counts[phase_bits] = counts.get(phase_bits, 0) + count
+    return counts
+
+
+def _dominant_accepted_phase(
+    circuit: Circuit, num_bits: int, accepted_range: tuple[int, int], shots: int = 400
+) -> str:
+    """Execute a circuit and return the most common bitstring from the good subspace."""
+    counts = _accepted_phase_counts(circuit, num_bits, accepted_range, shots)
     assert counts, f"No shot landed in the accepted window {accepted_range}."
     return max(counts, key=lambda phase: counts[phase])
 
@@ -192,3 +208,32 @@ def test_amplified_qpe_circuit_with_trotter():
     )
     # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16.
     assert _dominant_accepted_phase(circuit, 4, accepted, shots=200) == "0100"
+
+
+def test_amplified_qpe_acceptance_follows_the_round_count():
+    """Each round rotates the QPE state by the same angle toward the accepted window."""
+    accepted = (8, 9)
+    shots = 2000
+    observed = {
+        rounds: sum(
+            _accepted_phase_counts(
+                _amplified_qpe_circuit(
+                    _diagonal_hamiltonian(),
+                    _guiding_state(0.3, 3),
+                    accepted,
+                    rounds=rounds,
+                ),
+                4,
+                accepted,
+                shots,
+            ).values()
+        )
+        / shots
+        for rounds in (0, 1, 2)
+    }
+
+    overlap = observed[0]
+    assert observed[1] > overlap
+    for rounds in (1, 2):
+        expected = AmplitudeAmplification.success_probability(overlap, rounds)
+        assert observed[rounds] == pytest.approx(expected, abs=0.1)
