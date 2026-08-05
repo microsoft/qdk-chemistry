@@ -20,7 +20,6 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Orbitals, Structure, Wavefunction
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
-from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 from tutorial_orbital_coordinates import (
     NaturalOrbitalCoordinateMinimizationResult,
     coordinate_minimize_natural_orbital_coefficient_norm,
@@ -366,6 +365,8 @@ def generate_active_orbital_cube_data(
         containing total spatial-orbital occupation, entropy, and autoCAS
         selection status. Total occupation is alpha plus beta occupation.
     """
+    from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
+
     wavefunction = result.natural_orbital_casci_wavefunction
     orbitals = wavefunction.get_orbitals()
     occupation_alpha, occupation_beta = wavefunction.get_active_orbital_occupations()

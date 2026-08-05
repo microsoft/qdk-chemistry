@@ -11,7 +11,7 @@ on:
     - docs/source/_static/examples/python/tutorial_*.py
     - docs/source/_static/examples/python/tutorial_*.ipynb
     - python/pyproject.toml
-    - python/tests/test_sample_workflow.py
+    - python/tests/test_sample_tutorial_gs_qpe.py
   workflow_dispatch:
 
 concurrency:
@@ -80,4 +80,4 @@ jobs:
         QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
       run: >-
         python -m pytest -q --strict-config --strict-markers
-        python/tests/test_sample_workflow.py -m tutorial_baseline
+        python/tests/test_sample_tutorial_gs_qpe.py -m tutorial_baseline

@@ -182,7 +182,7 @@ filterwarnings = [
 ]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-  "tutorial_baseline: validates portable tutorial invariants against the published package",
+  "tutorial_baseline: validates portable tutorial invariants and optional version-pinned snapshots",
 ]
 testpaths = ["tests"]
 env = [
