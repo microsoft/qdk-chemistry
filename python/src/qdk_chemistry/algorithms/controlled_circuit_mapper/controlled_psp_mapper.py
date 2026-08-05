@@ -193,8 +193,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             A Q# callable accepting the control register and the combined system/ancilla register.
 
         Raises:
-            ValueError: If ``num_queries`` is not positive, or the walk has no ancilla to
-                reflect about.
+            ValueError: If ``num_queries`` is not positive, if the container is not an LCU
+                block encoding, or if the walk has no ancilla to reflect about.
 
         """
         if num_queries <= 0:
@@ -202,6 +202,11 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         container = unitary.get_container()
         lcu = container.block_encoding if isinstance(container, LCUWalkContainer) else container
+        if not isinstance(lcu, LCUContainer):
+            raise ValueError(
+                f"Container type '{unitary.get_container_type()}' is not supported. "
+                "ControlledPSPMapper requires LCUContainer or LCUWalkContainer."
+            )
         if lcu.num_prepare_ancillas == 0:
             raise ValueError(
                 "A signed-power schedule needs a non-empty ancilla register to reflect about, "

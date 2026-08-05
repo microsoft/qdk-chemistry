@@ -8,6 +8,8 @@
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
+from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     num_phase_bits,
@@ -446,6 +448,22 @@ class TestUnaryQpeEndToEnd:
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+
+    def test_a_non_lcu_unitary_builder_is_rejected(self):
+        """A block encoding the PSP walk cannot schedule must be refused, not stumbled over.
+
+        The unary builder never calls ``ControlledPSPMapper.run``, so the container check in
+        ``_run_impl`` never fires on this path: ``build_walk_op`` is the first mapper entry
+        point it touches. Swapping ``unitary_builder`` for any of the product-formula
+        algorithms is a plausible thing to try, and without a guard here the container
+        reaches an attribute access and dies as an ``AttributeError`` naming a private
+        attribute rather than the setting the caller actually got wrong.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        unitary_rep = algorithms.create("hamiltonian_unitary_builder", "trotter").run(hamiltonian)
+
+        with pytest.raises(ValueError, match="is not supported"):
+            ControlledPSPMapper().build_walk_op(unitary_rep, 4, use_unary_iteration=True)
 
 
 class TestBaseProfileGuardrail:
