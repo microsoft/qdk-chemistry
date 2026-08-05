@@ -15,7 +15,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estim
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     UnaryPhaseEstimation,
-    _post_process_samples,
+    _post_process_phase_estimation,
 )
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
@@ -275,15 +275,15 @@ class TestPhaseDecoding:
     def test_conjugate_bins_fold_to_the_same_phase(self, bitstring, expected_lower):
         """Measured y and 1 - y describe the same walk phase."""
         counts = {bitstring: 1}
-        lower, _, _ = _post_process_samples(counts, 3, "lower")
-        upper, _, _ = _post_process_samples(counts, 3, "upper")
-        assert lower == pytest.approx(expected_lower)
-        assert upper == pytest.approx(0.5 - expected_lower)
+        positive, _, _ = _post_process_phase_estimation(counts, 3, use_positive_sign=True)
+        negative, _, _ = _post_process_phase_estimation(counts, 3, use_positive_sign=False)
+        assert positive == pytest.approx(expected_lower)
+        assert negative == pytest.approx(0.5 - expected_lower)
 
     def test_dominant_phase_merges_conjugate_counts(self):
         """Conjugate bins are summed before the winner is selected."""
         counts = {"010": 3, "110": 3, "001": 5}  # 2/8 and 6/8 are conjugates, 1/8 is a separate bin
-        phase_fraction, bitstring, measured = _post_process_samples(counts, 3, "lower")
+        phase_fraction, bitstring, measured = _post_process_phase_estimation(counts, 3)
         assert phase_fraction == pytest.approx(0.125)
         assert bitstring in {"010", "110"}
         assert measured in {0.25, 0.75}
@@ -373,7 +373,7 @@ class TestUnaryQpeEndToEnd:
         for system_state in (0, 1):
             measured_bin = self._measure(qdk_ctx, num_queries, k, system_state)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
-            phase_fraction, _, _ = _post_process_samples(counts, num_bits, "lower")
+            phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits)
             assert phase_fraction == pytest.approx(expected_phase)
 
     @pytest.mark.parametrize("bin_index", [1, 2, 3])

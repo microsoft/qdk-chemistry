@@ -42,22 +42,18 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
     A wrapper over :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`, which
-    owns the PREPARE and SELECT oracles and the block encoding
+    owns the PREPARE and SELECT oracles:
 
     .. math::
 
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
-    The circuit is assembled from the generic combinators in
-    ``QDKChemistry.Utils.CircuitComposition``: the block encoding is paired with its reflection
-    into a walk when the container is an
-    :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
+    When the input is an :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`,
+    the block encoding is additionally wrapped with the reflection operator to form a quantum walk:
 
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
-
-    then controlled, then repeated to the container's power.
 
     """
 
@@ -85,7 +81,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         return "controlled_circuit_mapper"
 
     def _block_mapper(self) -> PSPMapper:
-        """Build the uncontrolled PSP mapper this one delegates the block encoding to.
+        """Build the uncontrolled PSP mapper to delegate the block encoding to.
 
         Returns:
             A :class:`PSPMapper` carrying this mapper's ``prepare`` setting.
@@ -149,6 +145,5 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         return Circuit(
             qsharp_factory=qsharp_factory,
-            # Phase estimation takes a single control qubit rather than a control register.
             qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(repeated_op),
         )

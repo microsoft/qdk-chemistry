@@ -1,26 +1,4 @@
-r"""Unary-iteration phase estimation with an arbitrary number of walk queries.
-
-This module implements phase estimation whose query schedule is driven by
-unary iteration over the phase register rather than by controlled powers of the walk
-operator. A single chain of ``num_queries`` self-inverse blocks is applied, and the
-branch that omits reflection slot :math:`t` realizes :math:`W^{p-2t}`, so the total
-query count need not be a power of two.
-
-Because every branch phase is doubled relative to the walk phase, the measured
-fraction :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins
-are merged before the winner is chosen. Doubling also makes the histogram exactly
-invariant under :math:`E \to -E`, so the sign cannot be recovered from the counts;
-the ``phase_band`` setting supplies it.
-
-References:
-    * :cite:`Berry2024`, Appendix D.
-    * :cite:`Lee2021` — tensor hypercontraction; prescription for a
-      non-power-of-two number of queries.
-    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
-      sine-window control state, where each block applies :math:`W` or
-      :math:`W^\dagger` and hence doubles the phase.
-
-"""
+r"""Unary-iteration phase estimation with a number of walk queries."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -44,27 +22,48 @@ __all__: list[str] = [
     "UnaryPhaseEstimationSettings",
 ]
 
-PHASE_BANDS: tuple[str, ...] = ("lower", "upper")
-
-
-def _post_process_samples(
+def _post_process_phase_estimation(
     counts: dict[str, int],
     num_bits: int,
-    phase_band: str,
+    use_positive_sign: bool = False,
 ) -> tuple[float, str, float]:
     r"""Reduce measured shot counts to a walk phase fraction.
 
     Every branch phase is doubled relative to the walk phase, so a measured bin
     :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins :math:`y`
     and :math:`1 - y` therefore describe the same eigenvalue and are summed before the
-    winner is chosen. Folding them together also discards the sign, which ``phase_band``
-    supplies. What comes out is an ordinary QPE phase fraction, converted to an energy by
-    the unitary representation's ``eigenvalue_from_phase`` exactly as standard QPE does.
+    winner is chosen. What comes out is an ordinary QPE phase fraction, converted to an
+    energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
+    QPE does, which for a walk operator is :math:`E = \lambda \cos(2\pi\varphi)`.
+
+    Folding maps every bin into
+
+    .. math::
+
+        f = \tfrac{1}{2}\min(y,\, 1 - y) \in [0, \tfrac{1}{4}],
+
+    so :math:`2\pi f \in [0, \pi/2]` and :math:`\cos(2\pi f) \ge 0`. The fold therefore
+    always lands in the non-negative half of the spectrum and destroys the sign, which
+    ``use_positive_sign`` restores by choosing between the two branches:
+
+    .. math::
+
+        E_+ &= \lambda\cos(2\pi f) \ge 0, \\
+        E_- &= \lambda\cos\!\big(2\pi(\tfrac{1}{2} - f)\big)
+             = \lambda\cos(\pi - 2\pi f) = -\lambda\cos(2\pi f) \le 0,
+
+    using :math:`\cos(\pi - \theta) = -\cos\theta`. Hence :math:`\varphi = f` for a
+    non-negative eigenvalue and :math:`\varphi = \tfrac{1}{2} - f` for a non-positive
+    one; the branches meet at :math:`f = \tfrac{1}{4}`, where :math:`E = 0`.
+
+    Because the doubling makes the histogram exactly invariant under :math:`E \to -E`,
+    the sign cannot be recovered from the counts and must be supplied by the caller.
 
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
-        phase_band: ``"lower"`` for a non-negative eigenvalue, ``"upper"`` for a non-positive one.
+        use_positive_sign: ``True`` selects the non-negative eigenvalue branch,
+            ``False`` (the default) the non-positive one, as wanted for a ground state.
 
     Returns:
         A tuple of (decoded phase fraction, representative bitstring, its raw measured fraction).
@@ -76,7 +75,7 @@ def _post_process_samples(
         measured_phase = int(bitstring, 2) / (2**num_bits)
         doubled_phase = measured_phase % 1.0
         folded_phase = min(doubled_phase, (-doubled_phase) % 1.0) / 2.0
-        decoded_phase = folded_phase if phase_band == "lower" else 0.5 - folded_phase
+        decoded_phase = folded_phase if use_positive_sign else 0.5 - folded_phase
         decoded_counts[decoded_phase] = decoded_counts.get(decoded_phase, 0) + count
         representative = representatives.get(decoded_phase)
         if representative is None or count > representative[2]:
@@ -100,32 +99,32 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
             "The number of shots to execute the circuit.",
         )
         self._set_default(
-            "phase_band",
-            "string",
-            "upper",
-            "Half-band used to resolve the doubled measured phase; picks the eigenvalue sign.",
-            limit=list(PHASE_BANDS),
+            "use_positive_sign",
+            "bool",
+            False,
+            "Whether the doubled measured phase resolves to a non-negative eigenvalue "
+            "rather than a non-positive one.",
         )
-        # The inherited key already exists, and set_default is a no-op for those.
         self.set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary"))
 
 
 class UnaryPhaseEstimation(PhaseEstimation):
     """Phase estimation using unary iteration over an arbitrary-length query schedule."""
 
-    def __init__(self, shots: int = 100, phase_band: str = "upper") -> None:
+    def __init__(self, shots: int = 100, use_positive_sign: bool = False) -> None:
         """Initialize the unary-iteration phase estimation routine.
 
         Args:
             shots: The number of shots to execute the circuit.
-            phase_band: ``"lower"`` for a non-negative eigenvalue, ``"upper"`` for a non-positive one.
+            use_positive_sign: ``True`` selects the non-negative eigenvalue branch,
+                ``False`` (the default) the non-positive one, as wanted for a ground state.
 
         """
         Logger.trace_entering()
         super().__init__()
         self._settings = UnaryPhaseEstimationSettings()
         self._settings.set("shots", shots)
-        self._settings.set("phase_band", phase_band)
+        self._settings.set("use_positive_sign", use_positive_sign)
 
     def _run_impl(
         self,
@@ -170,10 +169,10 @@ class UnaryPhaseEstimation(PhaseEstimation):
         execution_data = circuit_executor.run(circuits[0], shots=self._settings.get("shots"), noise=noise)
         counts = execution_data.bitstring_counts
 
-        phase_fraction, dominant_bitstring, measured_phase = _post_process_samples(
+        phase_fraction, dominant_bitstring, measured_phase = _post_process_phase_estimation(
             counts,
             num_bits,
-            self._settings.get("phase_band"),
+            self._settings.get("use_positive_sign"),
         )
 
         return QpeResult.from_phase_fraction(
