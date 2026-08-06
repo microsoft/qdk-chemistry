@@ -120,9 +120,8 @@ Electronic-structure calculations expand each molecular orbital :math:`\phi_p` i
 
 The index :math:`p` labels a molecular orbital, and :math:`\mu` labels a basis function.
 The coefficients :math:`c_{\mu p}` determine molecular orbital :math:`p`, and the self-consistent field calculation optimizes these coefficients.
-The basis functions are centered on atoms and provide different radial and angular shapes for describing the electrons.
 The collection of basis functions is called a `basis set <https://en.wikipedia.org/wiki/Basis_set_(chemistry)>`_.
-These objects form a hierarchy: atomic basis functions :math:`\chi_\mu` are combined into spatial molecular orbitals :math:`\phi_p`; each spatial orbital combines with an :math:`\alpha` or :math:`\beta` spin function to form a spin orbital :math:`\psi_p`; the occupied spin orbitals form the many-electron determinant :math:`\Phi_{\mathrm{HF}}`.
+These objects form a hierarchy: nucleus-centered basis functions :math:`\chi_\mu` provide localized radial and angular shapes; molecular orbitals :math:`\phi_p` combine these functions and can extend across multiple nuclei; each spatial molecular orbital combines with an :math:`\alpha` or :math:`\beta` spin function to form a spin orbital :math:`\psi_p`; and the occupied spin orbitals form the many-electron determinant :math:`\Phi_{\mathrm{HF}}`.
 
 A finite basis restricts the shapes available to the molecular orbitals and therefore introduces another approximation in the electronic description of the system.
 Adding suitable basis functions gives the orbitals more flexibility, but it also increases computational cost.
