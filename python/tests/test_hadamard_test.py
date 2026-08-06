@@ -12,12 +12,10 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
 from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation
-from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
