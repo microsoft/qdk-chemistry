@@ -44,7 +44,9 @@ See below for an example of amplifying a measurement-free QPE circuit.
 Amplitude amplified QPE
 -----------------------
 
-Build a measurement-free QPE circuit, mark the target phase bin, and amplify:
+Build a measurement-free QPE circuit, mark the target phase bin, and amplify.
+:func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle` reads the
+register layout from the QPE circuit, so only the target bins have to be given:
 
 .. tab:: Python API
 

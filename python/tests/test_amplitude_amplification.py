@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
@@ -54,23 +55,24 @@ def _qpe_preparation(
     num_bits: int = 4,
     mapper: str = "prepare_select_prepare",
     unitary: AlgorithmRef | None = None,
-) -> tuple[Circuit, int, list[int]]:
+) -> tuple[Circuit, int, int]:
     """Build a measurement-free QPE circuit plus its register layout."""
     unitary = unitary or AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
-    builder = create("qpe_circuit_builder", "qdk_standard")
-    builder.settings().update("num_bits", num_bits)
-    builder.settings().update("controlled_circuit_mapper", AlgorithmRef("controlled_circuit_mapper", mapper))
-    builder.settings().update("unitary_builder", unitary)
-    builder.settings().update("measure_phase", False)
+    builder = create(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper),
+        unitary_builder=unitary,
+        measure_phase=False,
+    )
     preparation = builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
 
     # MakeStandardQPECircuit allocates numBits + Length(systems) + numAncillaQubits qubits.
     parameters = preparation._qsharp_factory.parameter
-    num_system_qubits = len(parameters["systems"])
     num_ancilla_qubits = parameters["numAncillaQubits"]
-    num_qubits = parameters["numBits"] + num_system_qubits + num_ancilla_qubits
-    signal_ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
-    return preparation, num_qubits, signal_ancilla_indices
+    num_qubits = parameters["numBits"] + len(parameters["systems"]) + num_ancilla_qubits
+    return preparation, num_qubits, num_ancilla_qubits
 
 
 def _amplified_qpe_circuit(
@@ -84,20 +86,18 @@ def _amplified_qpe_circuit(
     **settings,
 ) -> tuple[Circuit, int, int]:
     """Compose a coherent QPE preparation with amplitude amplification."""
-    state_prep_oracle, num_qubits, signal_ancilla_indices = _qpe_preparation(
+    state_prep_oracle, num_qubits, num_ancilla_qubits = _qpe_preparation(
         qubit_hamiltonian,
         state_preparation,
         num_bits=num_bits,
         mapper=mapper,
         unitary=unitary,
     )
-    good_state_oracle = phase_marking_oracle(num_bits, accepted_range, signal_ancilla_indices)
+    good_state_oracle = phase_marking_oracle(state_prep_oracle, accepted_range)
 
-    algorithm = create("amplitude_amplification")
-    for key, value in settings.items():
-        algorithm.settings().update(key, value)
+    algorithm = create("amplitude_amplification", **settings)
     circuit = algorithm.run(state_prep_oracle, good_state_oracle, num_qubits=num_qubits)
-    return circuit, num_qubits, len(signal_ancilla_indices)
+    return circuit, num_qubits, num_ancilla_qubits
 
 
 def _accepted_phase_counts(
@@ -194,8 +194,9 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
 def test_marking_oracle_circuit_is_executable():
     """The oracle circuit runs on its own: it marks the all-zeros register when bin 0 is accepted."""
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
-    assert executor.run(phase_marking_oracle(3, (0, 1)), shots=20).bitstring_counts == {"1": 20}
-    assert executor.run(phase_marking_oracle(3, (1, 8)), shots=20).bitstring_counts == {"0": 20}
+    qpe_circuit, _, _ = _qpe_preparation(_diagonal_hamiltonian(), _guiding_state(0.3, 3), num_bits=3)
+    assert executor.run(phase_marking_oracle(qpe_circuit, (0, 1)), shots=20).bitstring_counts == {"1": 20}
+    assert executor.run(phase_marking_oracle(qpe_circuit, (1, 8)), shots=20).bitstring_counts == {"0": 20}
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():

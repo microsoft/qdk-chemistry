@@ -23,54 +23,60 @@ __all__: list[str] = [
 
 
 def phase_marking_oracle(
-    num_phase_qubits: int,
-    target_range: tuple[int, int],
-    signal_ancilla_indices: list[int] | None = None,
+    qpe_circuit: Circuit,
+    target_phase_bins: tuple[int, int],
 ) -> Circuit:
-    r"""Build a good state oracle for a half-open range of QPE phase bins.
+    r"""Build a good state oracle marking a range of phase bins of a QPE circuit.
+
+    A QPE circuit with :math:`n` phase qubits writes the phase :math:`\varphi` of the
+    eigenvalue :math:`e^{2\pi i\varphi}` into the bin :math:`\lfloor 2^n\varphi\rceil`, so a
+    target eigenvalue is selected by the bin its phase falls in. Bins are marked over the
+    half-open interval ``(start, stop)``. 
 
     Args:
-        num_phase_qubits: Number of phase qubits.
-        target_range: Half-open phase-bin interval ``(start, stop)`` to mark.
-        signal_ancilla_indices: Indices of ancillas that must all be :math:`|0\rangle`.
+        qpe_circuit: The measurement-free QPE circuit whose phase register is marked.
+        target_phase_bins: Half-open phase-bin interval ``(start, stop)`` to mark.
 
     Returns:
         A circuit for use as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
 
     Raises:
-        ValueError: If the register size or target range is invalid.
-        TypeError: If the register size or range endpoints are not integers.
+        ValueError: If the target range is invalid or the circuit is not a standard QPE circuit.
+        TypeError: If the range endpoints are not integers.
 
     """
+    factory = qpe_circuit._qsharp_factory  # noqa: SLF001
+    parameters = factory.parameter if factory is not None else None
+    if not isinstance(parameters, dict) or not {"numBits", "systems", "numAncillaQubits"} <= parameters.keys():
+        raise ValueError("qpe_circuit must be a standard QPE circuit built by the qdk_standard builder.")
+
+    num_phase_qubits = parameters["numBits"]
+    num_system_qubits = len(parameters["systems"])
+    num_ancilla_qubits = parameters["numAncillaQubits"]
+
     try:
-        num_phase_qubits = operator.index(num_phase_qubits)
-    except TypeError as error:
-        raise TypeError("num_phase_qubits must be an integer.") from error
-    if num_phase_qubits < 1:
-        raise ValueError(f"num_phase_qubits must be positive. Got {num_phase_qubits}.")
-    try:
-        start, stop = target_range
+        start, stop = target_phase_bins
     except (TypeError, ValueError) as error:
-        raise TypeError("target_range must be a (start, stop) tuple.") from error
+        raise TypeError("target_phase_bins must be a (start, stop) tuple.") from error
     try:
         lower_bound = operator.index(start)
         upper_bound = operator.index(stop)
     except TypeError as error:
-        raise TypeError("target_range endpoints must be integers.") from error
+        raise TypeError("target_phase_bins endpoints must be integers.") from error
 
     phase_bin_count = 1 << num_phase_qubits
     if not 0 <= lower_bound < upper_bound <= phase_bin_count:
-        raise ValueError(f"target_range must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_range}.")
-    ancilla_indices = [] if signal_ancilla_indices is None else [operator.index(i) for i in signal_ancilla_indices]
-    if any(index < 0 for index in ancilla_indices):
-        raise ValueError(f"signal_ancilla_indices must be nonnegative. Got {ancilla_indices}.")
+        raise ValueError(
+            f"target_phase_bins must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_phase_bins}."
+        )
 
+    ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
     parameters = {
         "numPhaseQubits": num_phase_qubits,
         "signalAncillaIndices": ancilla_indices,
         "lowerBound": lower_bound,
         "upperBound": upper_bound,
-        "numQubits": num_phase_qubits + (max(ancilla_indices) + 1 if ancilla_indices else 0),
+        "numQubits": num_phase_qubits + num_system_qubits + num_ancilla_qubits,
     }
     amplification = QSHARP_UTILS.AmplitudeAmplification
     operation = amplification.MarkTargetStateOp(num_phase_qubits, ancilla_indices, lower_bound, upper_bound)
