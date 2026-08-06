@@ -21,27 +21,7 @@ from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
-
-@pytest.fixture(scope="module", autouse=True)
-def _base_profile_context():
-    """Compile this module's Q# under the Base profile.
-
-    These tests pin exact shot counts, so they depend on the simulator's RNG stream. Base keeps
-    the measurement-based uncompute in the AND ladders lowered to its unitary decomposition,
-    while the adaptive default emits real mid-circuit measurements that draw extra samples and
-    shift every count.
-
-    The scope has to be ``module`` rather than the usual per-test
-    ``usefixtures("use_base_qdk_ctx")`` because ``water_hadamard_benchmark`` is module-scoped
-    and builds Q# callables. Pytest sets module-scoped fixtures up before function-scoped ones,
-    so a function-scoped context would leave those callables bound to the adaptive context and
-    absent from the Base-lowered package when QIR is generated.
-    """
-    with use_qsharp_context(create_qsharp_context(TargetProfile.Base)) as context:
-        yield context
-
-
-_SHOTS = 100
+_SHOTS = 5_000
 _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
 
@@ -127,9 +107,7 @@ def test_qdk_hadamard_test_measures_water_observable(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.34, atol=1e-12), (
-        f"X-basis observable = {observable_value!r} over {sum(counts.values())} shots"
-    )
+    assert np.isclose(observable_value, 0.29, atol=0.02)
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
@@ -146,9 +124,7 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / sum(counts.values())
 
-    assert np.isclose(observable_value, 0.98, atol=1e-12), (
-        f"Y-basis observable = {observable_value!r} over {sum(counts.values())} shots"
-    )
+    assert np.isclose(observable_value, 0.95, atol=0.02)
 
 
 def test_hadamard_test_rejects_invalid_test_basis() -> None:

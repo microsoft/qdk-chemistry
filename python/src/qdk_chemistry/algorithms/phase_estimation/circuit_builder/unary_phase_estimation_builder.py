@@ -1,4 +1,4 @@
-"""Unary-iteration phase estimation circuit builder for arbitrary query counts."""
+"""Unary-iteration phase estimation circuit builder."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -23,7 +23,7 @@ __all__: list[str] = [
 
 
 def num_phase_bits(num_queries: int) -> int:
-    """Return the phase-register size addressing ``num_queries + 1`` reflection slots.
+    """Return the phase-register size addressing ``num_queries + 1``.
 
     Args:
         num_queries: Number of walk blocks applied by the schedule.
