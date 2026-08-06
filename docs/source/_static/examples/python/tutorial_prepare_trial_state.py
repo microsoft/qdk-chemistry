@@ -56,7 +56,7 @@ class TrialStateResult:
         circuit: Generated sparse-isometry state-preparation circuit.
         num_compute_qubits: Qubits in the occupation register.
         num_logical_gates: Decomposed leaf operations in the Q# circuit tree.
-        logical_gate_counts: Leaf-operation counts grouped by displayed gate name.
+        logical_gate_counts: Childless-operation counts grouped by displayed gate name.
     """
 
     num_determinants: int
@@ -183,14 +183,14 @@ def leading_determinant_contributions(
 
 ################################################################################
 # start-cell-circuit-statistics
-def iter_leaf_gates(value: object) -> Iterator[str]:
-    """Yield normalized leaf-operation names from decomposed QDK circuit JSON.
+def iter_decomposed_gate_names(value: object) -> Iterator[str]:
+    """Yield normalized names for childless operations in decomposed circuit JSON.
 
     Args:
         value: A dictionary, list, or scalar from the nested Q# circuit JSON tree.
 
     Yields:
-        Gate names for operations without child operations. A controlled X is
+        Gate names for records without nested child operations. A controlled X is
         displayed as ``CNOT`` for this tutorial's generated circuits.
 
     Notes:
@@ -199,15 +199,15 @@ def iter_leaf_gates(value: object) -> Iterator[str]:
         arbitrary multi-controlled X operations.
     """
     # The circuit is a nested tree of dictionaries and lists. yield from flattens
-    # recursive results into one stream of leaf-gate names.
+    # recursive results into one stream of decomposed gate names.
     if isinstance(value, dict):
         children = value.get("children")
 
-        # Composite operations contain children; only childless operations are
-        # counted as logical gates.
+        # Composite operations contain children; only gate records without
+        # nested child operations are counted.
         if isinstance(children, list) and children:
             for child in children:
-                yield from iter_leaf_gates(child)
+                yield from iter_decomposed_gate_names(child)
         else:
             gate_name = value.get("gate")
             if isinstance(gate_name, str):
@@ -220,10 +220,10 @@ def iter_leaf_gates(value: object) -> Iterator[str]:
         # checking other fields for additional nested circuit structures.
         for key, child in value.items():
             if key != "children":
-                yield from iter_leaf_gates(child)
+                yield from iter_decomposed_gate_names(child)
     elif isinstance(value, list):
         for child in value:
-            yield from iter_leaf_gates(child)
+            yield from iter_decomposed_gate_names(child)
 
 
 def circuit_statistics(circuit: Circuit) -> tuple[int, int, dict[str, int]]:
@@ -234,13 +234,13 @@ def circuit_statistics(circuit: Circuit) -> tuple[int, int, dict[str, int]]:
             traversed recursively.
 
     Returns:
-        A tuple containing the qubit count, total leaf-operation count, and a
+        A tuple containing the qubit count, total decomposed-gate count, and a
         deterministic gate-family count mapping.
     """
     # Convert the Q# circuit JSON to ordinary Python containers, then flatten
-    # composite operations to the leaf gates that contribute to the count.
+    # composite operations to the childless gate records that contribute to the count.
     circuit_data = json.loads(circuit.get_qsharp_circuit().json())
-    logical_gate_names = list(iter_leaf_gates(circuit_data))
+    logical_gate_names = list(iter_decomposed_gate_names(circuit_data))
     logical_gate_counts = Counter(logical_gate_names)
     return (
         len(circuit_data["qubits"]),

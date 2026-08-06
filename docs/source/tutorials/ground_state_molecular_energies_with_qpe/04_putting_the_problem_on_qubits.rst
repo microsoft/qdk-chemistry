@@ -30,15 +30,15 @@ Example download
 
 Download :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` and save it in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py`` from :doc:`Choosing the active space <03_choosing_the_active_space>`.
 Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
-The script imports the tested Chapter 3 workflow so that both chapters use the same selected active space.
+The script imports the tested :doc:`Choosing the active space <03_choosing_the_active_space>` workflow so that both lessons use the same selected active space.
 
 The active-space Hamiltonian
 ======================================
 
-:ref:`Choosing the active space <tutorial-active-space-definition>` chapter partitioned the `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_ into inactive, active, and virtual spaces.
+:ref:`Choosing the active space <tutorial-active-space-definition>` partitioned the `molecular orbitals <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_ into inactive, active, and virtual spaces.
 As introduced in :ref:`Orbitals and determinants <tutorial-orbitals-and-determinants>`, each `spin orbital <https://en.wikipedia.org/wiki/Spin_orbital>`_ combines a spatial orbital with an :math:`\alpha` or :math:`\beta` spin function.
 Occupations may vary among the active spin orbitals in the correlated `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_, while inactive spatial orbitals remain doubly occupied and virtual spatial orbitals remain empty.
-The active-space Hamiltonian acts only on the active spin orbitals; interactions with frozen inactive orbitals contribute to its effective one-electron terms and to the separately calculated core energy.
+The active-space Hamiltonian acts only on the active spin orbitals; interactions with frozen inactive orbitals contribute to its effective one-electron terms and to the separately calculated *core energy*, a scalar containing the nuclear repulsion and constant frozen-orbital contributions.
 Written in `second quantization <https://en.wikipedia.org/wiki/Second_quantization>`_, this Hamiltonian uses operators that change orbital occupations.
 The `creation operator <https://en.wikipedia.org/wiki/Creation_and_annihilation_operators>`_ :math:`\hat{a}_p^\dagger` adds an electron to spin orbital :math:`p`, while the `annihilation operator <https://en.wikipedia.org/wiki/Creation_and_annihilation_operators>`_ :math:`\hat{a}_p` removes one.
 The Hamiltonian contains one-electron and two-electron terms:
@@ -57,7 +57,7 @@ The coefficients :math:`g_{pqrs}` describe repulsion between pairs of active ele
 The creation and annihilation operators automatically produce zero when creation acts on an already occupied spin orbital or annihilation acts on an unoccupied one.
 Together, these operators connect the `Slater determinants <https://en.wikipedia.org/wiki/Slater_determinant>`_ introduced in :ref:`Orbitals and determinants <tutorial-orbitals-and-determinants>` that can contribute to the active-space wavefunction.
 
-The mapping script reconstructs this selected active-space Hamiltonian from the orbitals produced by Chapter 3:
+The mapping script reconstructs this selected active-space Hamiltonian from the orbitals produced by :doc:`Choosing the active space <03_choosing_the_active_space>`:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_map_n2_to_qubits.py
    :language: python
@@ -74,7 +74,7 @@ The two-electron terms describe corresponding changes involving two electrons.
 The orbital occupations determine whether such a change is allowed.
 When it is allowed, restoring the resulting determinant to the chosen standard orbital order can introduce a minus sign.
 
-Both this ordering sign and the :ref:`exchange effect discussed in Chapter 2 <tutorial-hartree-fock-wavefunction>` follow from the antisymmetry of fermionic wavefunctions.
+Both this ordering sign and the :ref:`exchange effect discussed in Describing the molecule <tutorial-hartree-fock-wavefunction>` follow from the antisymmetry of fermionic wavefunctions.
 Applying the Hamiltonian's operators in a different order can therefore change the sign of the resulting contribution.
 These signs are already part of the electronic-structure problem; mapping the Hamiltonian to qubits must preserve them.
 
@@ -157,7 +157,7 @@ For :math:`n_o` active spatial orbitals, Jordan--Wigner therefore requires
    \qquad
    n_{\mathrm{compute}}=n_{\mathrm{spin}}.
 
-Calculate the compute-register count from the active space selected in Chapter 3 before running the script:
+Calculate the compute-register count from the active space selected in :doc:`Choosing the active space <03_choosing_the_active_space>` before running the script:
 
 Because this restricted calculation has matching :math:`\alpha` and :math:`\beta` active spaces, the code reads the :math:`\alpha`-channel entries directly, one for each active spatial orbital.
 
@@ -187,6 +187,8 @@ You will verify the count when you run the mapping script.
    Each added spatial orbital contributes one :math:`\alpha` and one :math:`\beta` spin orbital.
    Jordan--Wigner therefore requires two additional compute qubits.
    This change does not include algorithm ancillas or error-correction overhead.
+
+.. _tutorial-qubit-hamiltonian:
 
 Qubit Hamiltonian in Pauli form
 ======================================
@@ -233,7 +235,7 @@ The preview writes, for example, ``X(qubit 1) X(qubit 2) X(qubit 5) X(qubit 6)``
 Core-energy bookkeeping
 =======================
 
-The :ref:`selected-space energy from Chapter 3 <tutorial-selected-space-reference>` contains a constant contribution in addition to the active Hamiltonian:
+The :ref:`selected-space energy from Choosing the active space <tutorial-selected-space-reference>` contains a constant contribution in addition to the active Hamiltonian:
 
 .. math::
 

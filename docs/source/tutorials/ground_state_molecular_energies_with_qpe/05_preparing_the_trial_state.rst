@@ -31,7 +31,7 @@ Example download
 Download :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>`, and save both files in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py``.
 Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
 The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and :term:`CASCI` reference.
-The notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.
+The Jupyter notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.
 
 Connection to the selected-space workflow
 =========================================
@@ -39,6 +39,8 @@ Connection to the selected-space workflow
 The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the fixed-electron-number determinant basis identified in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
 The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
+
+.. _tutorial-trial-state-definition:
 
 Why phase estimation needs a trial state
 ========================================
@@ -49,7 +51,7 @@ The phase-to-energy relationship and the :term:`QPE` logical circuit are develop
 For now, the important point is that the compute register must contain a chosen quantum state before phase estimation can begin.
 
 A state-preparation logical circuit initializes the compute register in this chosen normalized quantum state.
-This input is the *trial state*.
+This input is the trial state.
 It is an approximation intended to contain a substantial contribution from the target ground state; :term:`QPE` cannot begin from an unspecified state or create the ground state by searching through all possible wavefunctions.
 
 The trial state can be written as a linear combination of the eigenstates :math:`\{\vert\Psi_j\rangle\}` of the active-space Hamiltonian:
@@ -89,7 +91,7 @@ Both states are normalized, so :math:`0\leq F\leq 1`.
 The fidelity :math:`F` is the weight of the target ground state in the trial-state eigenstate expansion.
 For the textbook coherent measurement described above, it is also the probability of sampling the ground-state eigenphase.
 
-The QDK/Chemistry :term:`IQPE` implementation used later performs a different sampling procedure.
+The QDK/Chemistry iterative quantum phase estimation (:term:`IQPE`) implementation used later performs a different sampling procedure.
 It builds a separate circuit for each phase bit, and every circuit execution freshly prepares the trial state.
 Each phase bit is selected by a majority vote over a specified number of circuit executions, then used as feedback for the next bit.
 The final bit string therefore combines bitwise decisions from many state preparations rather than recording one eigenstate sample.
@@ -108,6 +110,8 @@ A sparse trial wavefunction
 
 The selected-space :term:`CASCI` wavefunction is classically tractable in this teaching example, so it provides a controlled reference for comparing trial states.
 The script ranks its determinants by coefficient magnitude and retains the largest one, two, or four.
+These determinant counts are examples rather than restrictions of the projected calculation or state-preparation method.
+To compare other choices, change ``determinant_counts`` in the Jupyter notebook and rerun its cells.
 In a larger problem where exact :term:`CASCI` is unavailable, an approximate classical method must supply the candidate determinants and amplitudes for the trial state.
 
 The script first prints the leading terms in the selected-space wavefunction.
@@ -177,9 +181,9 @@ Compare the gate types and circuit structure before revealing the answer below.
    Because X gates can only map one basis state to another, rotations are needed to create amplitudes, phase operations establish relative signs or phases, and entangling gates correlate occupation changes across qubits.
    The exact gate sequence depends on the synthesis method, but the distinction between preparing one basis state and preparing a coherent superposition is general.
 
-To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, retains leaf gates, identifies controlled X gates as CNOT gates, and counts each logical gate type.
+To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, counts displayed gate records that have no nested child operations, and identifies controlled X gates as CNOT gates.
 The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
-The factory key ``sparse_isometry_gf2x`` is the implementation's current API identifier using a helper function to count gates:
+The factory key :ref:`sparse_isometry_gf2x <sparse-isometry-gf2x>` is the implementation's current API identifier using a helper function to count gates:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
    :language: python
@@ -187,7 +191,7 @@ The factory key ``sparse_isometry_gf2x`` is the implementation's current API ide
    :start-after: # start-cell-preparation-circuit
    :end-before: # end-cell-preparation-circuit
 
-The reported *preparation logical gate count* is the number of leaf gates in the generated Q# logical-circuit representation after the state-preparation operation has been decomposed.
+The reported *preparation logical gate count* is the number of these childless gate records in the generated Q# logical-circuit representation after the state-preparation operation has been decomposed.
 Here, *logical* means gates in the generated algorithmic circuit before error-correction code synthesis and hardware mapping; this software-level logical gate count is not logical-circuit depth, a fault-tolerant resource estimate, or a physical-resource estimate.
 It can change if the state-preparation or circuit-decomposition implementation changes; error correction affects downstream fault-tolerant and physical costs instead.
 

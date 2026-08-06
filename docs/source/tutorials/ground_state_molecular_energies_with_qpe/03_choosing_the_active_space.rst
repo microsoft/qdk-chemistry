@@ -32,7 +32,7 @@ First download :download:`tutorial_orbital_coordinates.py <../../_static/example
 Then download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save all three files in your tutorial working directory.
 Open all three files in Visual Studio Code and review the complete scripts, including imports and setup code omitted from the excerpts below.
 The script resumes the stretched N\ :sub:`2` workflow from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining the correlated model.
-Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive notebook use the same tested chemistry workflow rather than duplicate it.
+Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive Jupyter notebook use the same tested chemistry workflow rather than duplicate it.
 
 The limits of one determinant
 =======================================
@@ -93,7 +93,9 @@ Unlike complete active space self-consistent field (:term:`CASSCF`), :term:`CASC
 
 A useful first choice is a generous valence space containing orbitals on both sides of the occupied--virtual boundary.
 The :func:`~qdk_chemistry.utils.compute_valence_space_parameters` function determines the numbers of valence electrons and valence spatial orbitals from the Hartree--Fock wavefunction and molecular charge.
-The ``qdk_valence`` selector uses those numbers to construct an initial active space from orbitals near the :term:`HOMO`--:term:`LUMO` gap:
+The :ref:`qdk_valence selector <qdk-valence-active-space>` uses those numbers to construct an initial active space from orbitals near the :term:`HOMO`--:term:`LUMO` gap.
+The highest occupied molecular orbital (:term:`HOMO`) and lowest unoccupied molecular orbital (:term:`LUMO`) define the boundary between occupied and virtual orbitals in the Hartree--Fock reference.
+Orbitals near this boundary are the most accessible when low-energy configurations redistribute electrons, so a valence window around the gap is a useful generous starting space for the correlated calculation:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
@@ -110,7 +112,7 @@ A correlated active-space wavefunction
 
 The active-space selector labels orbitals but does not determine how strongly each orbital participates in correlation.
 That evidence must come from a correlated wavefunction.
-The script constructs the molecular Hamiltonian in the initial valence space and solves it with the :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023` :term:`CASCI` implementation:
+The script constructs the molecular Hamiltonian in the initial valence space and solves it with the :ref:`MACIS CASCI implementation <macis-cas>` :cite:`Williams-Young2023`:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python
@@ -144,7 +146,7 @@ In this basis, the off-diagonal elements vanish, so each occupation number is as
 Occupations near two identify nearly doubly occupied orbitals, occupations near zero identify nearly empty orbitals, and fractional occupations can reveal orbitals that require multiple electron configurations.
 Natural orbitals provide a useful convention in which the one-particle occupations are directly associated with individual orbitals before applying the orbital-resolved entropy criterion.
 
-The supported ``qdk_natural_orbitals`` transformation uses the one-particle :term:`RDM` from the initial :term:`CASCI` wavefunction.
+The supported :ref:`qdk_natural_orbitals transformation <localizer-qdk-natural-orbitals>` uses the one-particle :term:`RDM` from the initial :term:`CASCI` wavefunction.
 It rotates the active orbitals into the natural-orbital representation described above.
 The script then rebuilds and resolves the initial valence-space Hamiltonian so that both :term:`RDMs <RDM>` and the orbital diagnostics are expressed consistently in the natural-orbital representation:
 
@@ -200,7 +202,7 @@ The resulting data flow is therefore: the correlated wavefunction determines the
    The selector uses single-orbital entropies derived from local occupation probabilities.
    Those probabilities require one- and two-particle :term:`RDMs <RDM>` from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
 
-The entropy-difference autoCAS selector, ``qdk_autocas_eos``, sorts the normalized orbital entropies and tests the consecutive gaps against its entropy and difference thresholds :cite:`Stein2016,Stein2019`.
+The entropy-difference :ref:`qdk_autocas_eos selector <qdk-autocas-eos>` sorts the normalized orbital entropies and tests the consecutive gaps against its entropy and difference thresholds :cite:`Stein2016,Stein2019`.
 It selects the largest high-entropy group separated by a qualifying gap.
 A large gap provides evidence of a natural boundary between orbitals with similarly strong occupation coupling and orbitals whose occupations are much less coupled to the rest of the active space.
 These thresholds are configurable; see :doc:`Active-space selection <../../user/comprehensive/algorithms/active_space>` for their defaults and use with less clearly separated entropy values.
@@ -247,14 +249,14 @@ It leaves the energy unchanged only if the removed determinants contribute nothi
 The script reports the observed energy increase when reducing the active space.
 
 The observed increase quantifies correlation excluded when reducing the initial valence space.
-This active-space model error is separate from the 1 milliHartree teaching target, which applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference.
+This active-space model error is separate from the :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target, which applies only to the later quantum algorithm's agreement with the compact-model :term:`CASCI` reference.
 
-.. admonition:: Why should the energy increase caused by active-space refinement not be judged against the 1 milliHartree teaching target?
+.. admonition:: Why should the energy increase caused by active-space refinement not be judged against the :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target?
    :class: quiz-question
    :collapsible: closed
 
    The energy increase measures correlation excluded when orbital occupations are frozen during active-space refinement.
-   The 1 milliHartree target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
+   The :math:`1\ \mathrm{m}E_{\mathrm{h}}` target applies later when comparing the phase-estimation energy with the exact :term:`CASCI` energy of the same selected-space Hamiltonian.
    These comparisons measure different approximations.
 
 For this tutorial, the refined active space is accepted as a compact model because it retains the orbitals with the strongest entropy-based correlation evidence while producing a tractable Hamiltonian for validating the quantum workflow.
@@ -304,9 +306,10 @@ Candidate-orbital visualization
 
 Download and open :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` in Visual Studio Code.
 Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
+If ``.venv`` does not appear, open the Command Palette, run **Developer: Reload Window**, and reopen the kernel selector.
 Then select **Run All** to execute the shared active-space calculation and generate an interactive molecular-orbital viewer.
 
-The notebook displays every candidate natural orbital from the initial valence space, including orbitals that autoCAS did not retain.
+The Jupyter notebook displays every candidate natural orbital from the initial valence space, including orbitals that autoCAS did not retain.
 Use the viewer to inspect the following information:
 
 Orbital menu
