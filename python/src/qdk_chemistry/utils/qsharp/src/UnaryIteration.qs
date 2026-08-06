@@ -85,8 +85,8 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
-    // The signed-power schedule that used to live here is now
-    // `QDKChemistry.Utils.UnaryPhaseEstimation.UnaryIterationPowerSchedule`, so that all
+    // The signed-power schedule that used to live here now lives in
+    // `QDKChemistry.Utils.UnaryPhaseEstimation`, so that all
     // phase-estimation-specific unary-iteration logic sits in one module.
 
     internal operation SinglyControlledUnaryIterationWithControl(
