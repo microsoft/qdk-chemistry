@@ -5,4 +5,4 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-GROUND_STATE_TUTORIAL_VERSION = "2.0.0"
+GROUND_STATE_TUTORIAL_VERSION = "2.1.0"

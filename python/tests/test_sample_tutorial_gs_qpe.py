@@ -32,6 +32,9 @@ with suppress(ImportError):
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import MajoranaMapping, Structure
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 
 from .test_sample_workflow_utils import (
@@ -493,36 +496,49 @@ def test_tutorial_run_iqpe_configuration(capsys):
     assert 0.0 <= problem.evolution_time.bound_reference_phase_fraction < 1.0
     assert 0.0 <= problem.evolution_time.reference_phase_fraction < 1.0
     assert abs(problem.evolution_time.grid_active_energy_hartree - problem.mapping.mapped_active_energy - 1e-3) < 1e-12
+    phase_converter = PauliProductFormulaContainer(
+        step_terms=[],
+        step_reps=1,
+        num_qubits=problem.mapping.num_compute_qubits,
+        scale=problem.evolution_time.time_hartree_inverse,
+    )
+    assert (
+        abs(
+            phase_converter.eigenvalue_from_phase(problem.evolution_time.grid_phase_fraction)
+            - problem.evolution_time.grid_active_energy_hartree
+        )
+        < 1e-12
+    )
 
     if _RUN_TUTORIAL_SNAPSHOTS:
         assert abs(problem.trial_state.fidelity - 0.732385025483) < 1e-8
         assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 19.610172748837) < 1e-7
-        assert problem.evolution_time.grid_bitstring == "110000"
+        assert problem.evolution_time.grid_bitstring == "010000"
         assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.160202191680) < 1e-9
-        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.753870702986) < 1e-8
+        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.246129297014) < 1e-8
         assert abs(problem.evolution_time.time_hartree_inverse - 0.162738437655) < 1e-8
-        assert abs(problem.evolution_time.reference_phase_fraction - 0.749974099373) < 1e-8
+        assert abs(problem.evolution_time.reference_phase_fraction - 0.250025900627) < 1e-8
 
     first_run = tutorial_module.IqpeRun(
         seed=1,
-        bitstring="110001",
-        phase_fraction=49 / 64,
-        active_energy_hartree=-9.652275843566,
-        total_energy_hartree=-108.770051792900,
+        bitstring="010000",
+        phase_fraction=16 / 64,
+        active_energy_hartree=-9.652276065987,
+        total_energy_hartree=-108.770051792909,
         error_hartree=1e-3,
         runtime_seconds=1.0,
     )
     neighboring_run = tutorial_module.IqpeRun(
         seed=2,
-        bitstring="110010",
-        phase_fraction=50 / 64,
-        active_energy_hartree=-9.008790787328,
-        total_energy_hartree=-108.126566736662,
-        error_hartree=0.644485056238,
+        bitstring="001111",
+        phase_fraction=15 / 64,
+        active_energy_hartree=-9.049008811871,
+        total_energy_hartree=-108.166784538793,
+        error_hartree=0.604267254116,
         runtime_seconds=1.0,
     )
     counts, mode = tutorial_module.select_unique_mode([first_run, neighboring_run, first_run])
-    assert counts == {"110001": 2, "110010": 1}
+    assert counts == {"001111": 1, "010000": 2}
     assert mode is first_run
     with pytest.raises(RuntimeError, match="no unique mode"):
         tutorial_module.select_unique_mode([first_run, neighboring_run])

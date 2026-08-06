@@ -144,7 +144,8 @@ def choose_reference_guided_evolution_time(
 
     1. Set :math:`t_{\mathrm{bound}}=\pi/\lambda`, where
        :math:`\lambda=\sum_\ell |h_\ell|` bounds the qubit-Hamiltonian spectrum.
-    2. Map the known active-space reference energy to a phase fraction at that time.
+     2. Map the known active-space reference energy to the phase fraction
+         :math:`(-Et/2\pi)\bmod 1` at that time.
     3. Round to the nearest point on the :math:`2^m`-point phase grid.
     4. Adjust the evolution time so the chosen grid point reconstructs an energy
        ``target_energy_error_hartree`` above the reference.
@@ -183,7 +184,9 @@ def choose_reference_guided_evolution_time(
         raise ValueError("target energy error must be finite")
 
     bound_time = np.pi / coefficient_norm
-    reference_phase = (bound_time * reference_active_energy_hartree / (2 * np.pi)) % 1.0
+    reference_phase = (
+        -bound_time * reference_active_energy_hartree / (2 * np.pi)
+    ) % 1.0
     # Quantize the continuous reference phase to the nearest finite-bit grid
     # point. Modulo handles the wrap from the final grid point back to zero.
     grid_size = 2**num_phase_bits
@@ -202,19 +205,20 @@ def choose_reference_guided_evolution_time(
     if grid_angle > np.pi:
         grid_angle -= 2 * np.pi
 
-    # Solve grid_angle = t * (E_reference + target_error) for t. The measured
-    # grid energy therefore differs from the reference by the requested offset.
+    # Solve grid_angle = -t * (E_reference + target_error) for t, matching the
+    # container convention E = -angle / t. The measured grid energy therefore
+    # differs from the reference by the requested offset.
     target_active_energy = reference_active_energy_hartree + target_energy_error_hartree
     if target_active_energy == 0.0:
         raise ValueError("reference energy plus target error must be nonzero")
-    evolution_time = grid_angle / target_active_energy
+    evolution_time = -grid_angle / target_active_energy
     if not np.isfinite(evolution_time) or evolution_time <= 0.0:
         raise ValueError(
             "reference-guided time selection did not produce a positive finite time"
         )
-    grid_energy = grid_angle / evolution_time
+    grid_energy = -grid_angle / evolution_time
     aligned_reference_phase = (
-        evolution_time * reference_active_energy_hartree / (2 * np.pi)
+        -evolution_time * reference_active_energy_hartree / (2 * np.pi)
     ) % 1.0
     return EvolutionTimeChoice(
         bound_time_hartree_inverse=float(bound_time),

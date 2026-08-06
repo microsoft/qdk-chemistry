@@ -91,8 +91,8 @@ This completed example records the reference results for the documented QDK/Chem
 - Complete IQPE runs: 20.
 - Readout ancillas: 1 per iteration circuit.
 - Simulator seeds: 42-61.
-- Complete-run bitstring counts: {'110000': 19, '110001': 1}.
-- Most frequent bitstring: 110000.
+- Complete-run bitstring counts: {'010000': 19, '001111': 1}.
+- Most frequent bitstring: 010000.
 - Measured active-space energy: -9.652276065987 Hartree.
 - Core energy added after phase estimation: -99.117775726922 Hartree.
 - Total molecular energy estimate: -108.770051792909 Hartree.
@@ -104,7 +104,7 @@ This completed example records the reference results for the documented QDK/Chem
 ## Conclusion
 
 - Main result: The configured IQPE workflow reproduces the selected-space CASCI reference within 1 milliHartree.
-- Supporting evidence: Exact mapped/CASCI agreement, 19 of 20 complete runs at bitstring 110000, and the reconstructed total-energy comparison.
+- Supporting evidence: Exact mapped/CASCI agreement, 19 of 20 complete runs at bitstring 010000, and the reconstructed total-energy comparison.
 - Basis-set limitation: cc-pVDZ is finite; the cc-pVDZ/cc-pVTZ difference is sensitivity evidence, not exact error.
 - Active-space limitation: Refinement excludes correlation and raises the CASCI energy by about 7.32 milliHartree relative to the initial valence space.
 - Quantum-algorithm limitations: Reference-guided evolution-time tuning is circular; first-order Trotter evolution, six phase bits, and finite sampling remain approximations.

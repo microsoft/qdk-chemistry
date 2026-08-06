@@ -85,23 +85,15 @@ Because every power of the Hamiltonian acting on :math:`\vert\Psi_j\rangle` cont
    =e^{-iE_jt}\vert\Psi_j\rangle.
 
 The physical eigenphase in the exponential is therefore :math:`-E_jt` modulo :math:`2\pi`.
-Define the corresponding physical phase fraction as
+The phase fraction reported by :term:`QPE` is
 
 .. math::
 
-   \varphi_j^{\mathrm{physical}}
+   \varphi_j
    =\left(\frac{-E_jt}{2\pi}\right)\bmod 1.
 
-The QDK/Chemistry circuit's readout convention reverses this orientation, so the reported fraction is
-
-.. math::
-
-   \varphi_j^{\mathrm{QDK}}
-   =\left(-\varphi_j^{\mathrm{physical}}\right)\bmod 1
-   =\left(\frac{E_jt}{2\pi}\right)\bmod 1.
-
-The QDK/Chemistry result object handles the circuit's readout orientation and modulo wrapping automatically.
-It converts the measured phase fraction to a signed angle :math:`\alpha\in(-\pi,\pi]`, divides by :math:`t`, and returns the signed value.
+The QDK/Chemistry result object handles the modulo wrapping automatically.
+It converts the measured phase fraction to a signed angle :math:`\alpha\in(-\pi,\pi]` and returns :math:`-\alpha/t`.
 The tutorial script uses this value directly rather than manually applying a sign conversion.
 To avoid aliasing, the active-space Hamiltonian energy eigenvalue :math:`E_j` being estimated must lie in the signed interval :math:`(-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
 The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to :math:`+\pi/t`.
@@ -139,12 +131,12 @@ Using the active-space reference from :doc:`Putting the problem on qubits <04_pu
 .. math::
 
    \varphi_{\mathrm{bound}}
-   =\left(\frac{t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
-   \approx0.753870702986.
+   =\left(\frac{-t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
+   \approx0.246129297014.
 
 The script reports this value as the ``Reference phase at initial time bound``.
-The nearest six-bit fraction is :math:`48/64=0.75`, represented by ``110000``.
-Its signed angle is :math:`2\pi(48/64-1)=-\pi/2`.
+The nearest six-bit fraction is :math:`16/64=0.25`, represented by ``010000``.
+Its signed angle is :math:`2\pi(16/64)=+\pi/2`.
 Finally, we can choose the evolution time so that this grid point reconstructs an energy :math:`\delta=0.001\ E_{\mathrm{h}}` above the known reference:
 
 .. math::
@@ -154,7 +146,7 @@ Finally, we can choose the evolution time so that this grid point reconstructs a
    =0.162738437655\ E_{\mathrm{h}}^{-1}.
 
 The script reports this adjusted value as the ``Selected evolution time``.
-Using this time, the reference phase fraction is approximately :math:`0.749974099`, only about :math:`2.59\times10^{-5}` below the selected grid point.
+Using this time, the reference phase fraction is approximately :math:`0.250025901`, only about :math:`2.59\times10^{-5}` above the selected grid point.
 The grid point therefore reconstructs an active energy exactly :math:`1\ \mathrm{m}E_{\mathrm{h}}` above the classical reference to the displayed precision.
 
 **Please note**:  this use of the already known classical energy is circular.
@@ -388,11 +380,11 @@ If the calculation measures :math:`m` phase bits, convert :math:`b` to the phase
    \varphi=\frac{b}{2^m}.
 
 QDK/Chemistry converts :math:`2\pi\varphi` to its equivalent signed angle :math:`\alpha` between :math:`-\pi` and :math:`\pi`.
-Dividing that angle by the evolution time maps the measured phase to the active-space energy:
+Negating that angle and dividing by the evolution time maps the measured phase to the active-space energy:
 
 .. math::
 
-   E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{\alpha}{t}.
+   E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{-\alpha}{t}.
 
 This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
 Finite phase resolution, sampling, and product-formula time evolution all contribute error.
@@ -438,7 +430,7 @@ A successful run completes all twenty runs and prints the complete-run bitstring
    :class: quiz-question
    :collapsible: closed
 
-   The bitstring ``110000`` appeared 19 times and ``110001`` appeared once, so ``110000`` was the most frequent result.
+   The bitstring ``010000`` appeared 19 times and ``001111`` appeared once, so ``010000`` was the most frequent result.
    It produced an active-space energy of :math:`-9.652276065987\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792909\ E_{\mathrm{h}}` after adding the core energy.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?
