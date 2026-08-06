@@ -17,6 +17,8 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTestBasis
 from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure, UnitaryRepresentation
 
+pytestmark = pytest.mark.usefixtures("use_base_qdk_ctx")
+
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
 _SHOTS = 100

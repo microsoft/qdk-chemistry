@@ -154,6 +154,7 @@ class TestGetQsharpCircuit:
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 class TestGetQiskitConversion:
     """Test cases for get_qiskit_circuit method."""
 
