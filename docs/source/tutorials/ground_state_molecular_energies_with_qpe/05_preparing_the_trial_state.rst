@@ -36,7 +36,7 @@ The Jupyter notebook runs that workflow, renders the one-, two-, and four-determ
 Connection to the selected-space workflow
 =========================================
 
-The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the fixed-electron-number determinant basis identified in :doc:`Choosing the active space <03_choosing_the_active_space>`.
+The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the :math:`(n_\alpha,n_\beta)=(3,3)` determinant sector introduced in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
 Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
 The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
 
@@ -162,7 +162,7 @@ The important input is the normalized sparse wavefunction and the output is a lo
 Some compute-register wires may have no gates in the state-preparation circuit.
 The register begins in the all-zero occupation state, so a wire needs no preparation operation when the selected sparse wavefunction does not require that occupation bit to change or become entangled.
 This does not make the qubit unnecessary: every compute qubit represents an active spin orbital on which the mapped active-space Hamiltonian acts.
-The later controlled time evolution in :term:`QPE` therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the fixed-electron-number sector.
+The later controlled time evolution in :term:`QPE` therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the same sector.
 Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.
 
 Before answering the next question, download and open :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` in Visual Studio Code.
@@ -229,7 +229,8 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    The one-, two-, and four-determinant fidelities are approximately :math:`0.4825`, :math:`0.5864`, and :math:`0.7324`, respectively.
    Their generated logical circuits have preparation logical gate counts of 6, 14, and 30, respectively, while every logical circuit uses twelve compute qubits.
    From one to two determinants, fidelity increases by approximately :math:`0.104` while the gate count increases by eight.
-   From two to four determinants, fidelity increases by approximately :math:`0.146` while the gate count increases by sixteen, so the fidelity gained per additional gate decreases.
+   From two to four determinants, fidelity increases by approximately :math:`0.146` while the gate count increases by sixteen.
+   For these three generated circuits, the second expansion provides less fidelity gain per additional preparation gate than the first.
 
 .. admonition:: What does the single-determinant fidelity reveal about multireference character?
    :class: quiz-question
@@ -237,7 +238,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
    Its fidelity is approximately :math:`0.4825`, equal to the weight of the leading ``222000`` determinant.
    No single determinant therefore carries a majority of the selected-space ground-state weight at this geometry.
-   The substantial weight distributed among additional determinants provides direct evidence of multireference character.
+   The substantial weight distributed among additional determinants provides direct evidence of multireference character in the selected active-space orbital representation.
 
 Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the :ref:`trial-state section of the lab notebook <lab-notebook-trial-state>`.
 Explain what the leading determinant weight reveals about multireference character, and distinguish the fidelity improvement from the increased logical-circuit cost.

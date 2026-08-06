@@ -40,9 +40,6 @@ For the final simulator workflow, 16 GiB of memory and a recent multicore proces
 A GPU is not required.
 
 The installed tutorial environment occupies approximately 1.5 GiB.
-The short chapter Python scripts generally finish within a minute, while the Jupyter notebooks can take longer.
-The final circuit simulation is the only intentionally long required example.
-Its runtime depends on processor performance and other system activity; the final chapter explains how to monitor its progress.
 
 Required software
 =================
@@ -137,7 +134,6 @@ Select the heading again to hide the answer.
    You can check your answer.
 
 Use links to the reference documentation when you need complete application programming interface (:term:`API`) details.
-The final circuit simulation is the only intentionally long required example; the :doc:`tutorial introduction <index>` gives its expected duration, and :doc:`Iterative quantum phase estimation <06_iterative_phase_estimation>` explains how to monitor its progress.
 
 Further reading
 ===============

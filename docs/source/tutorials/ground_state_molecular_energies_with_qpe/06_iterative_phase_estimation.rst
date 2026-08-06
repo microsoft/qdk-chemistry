@@ -112,10 +112,9 @@ With :math:`m` measured phase bits, the representable fractions are multiples of
 
    \Delta E_{\mathrm{grid}}=\frac{2\pi}{t2^m}.
 
-The number of phase bits is a runtime choice in this classically simulated tutorial.
-Six bits require six iteration circuits and a largest controlled power of :math:`U^{32}`; which keeps the runtime manageable.
-Ten bits would require a largest power of :math:`U^{512}` and a lengthy runtime for classical simulation.
-The choice :math:`m=6` therefore keeps the required twenty-run calculation within tens of minutes; it does not by itself provide :math:`\mathrm{m}E_{\mathrm{h}}` resolution.
+With :math:`m` measured phase bits, the largest controlled power is :math:`U^{2^{m-1}}`.
+Increasing :math:`m` from six to ten therefore raises the largest power from :math:`U^{32}` to :math:`U^{512}`, increasing the size and runtime cost of the largest iteration circuit by a factor of sixteen for this repeated-power strategy.
+This tutorial uses six bits to keep the simulation tractable; that choice does not by itself provide :math:`\mathrm{m}E_{\mathrm{h}}` resolution.
 
 The evolution time is computed from quantities already produced by the classically tractable example chosen for this tutorial.
 If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h_\ell P_\ell` and define
@@ -433,8 +432,6 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_run_iqpe.py
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
-Do not interrupt the process merely because one run takes roughly half a minute.
-The twenty-run simulation may take tens of minutes, depending on the computer.
 A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
 
 .. admonition:: What bitstring distribution and energy estimate did the script produce?

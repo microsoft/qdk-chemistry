@@ -118,8 +118,6 @@ The teaching target
 ===================
 
 This tutorial uses :math:`1\ \mathrm{m}E_{\mathrm{h}}` as a teaching target for the absolute difference between the final :term:`QPE` total energy and a classical reference energy for the same Hamiltonian.
-The threshold is often associated with the term "chemical accuracy" because it is close to the thermal energy :math:`RT` at room temperature.
-Definitions of chemical accuracy vary, so the tutorial always states the numerical :math:`1\ \mathrm{m}E_{\mathrm{h}}` target and the two energies being compared.
 Meeting this target shows that the quantum algorithm reproduced its classical reference to the requested tolerance.
 It does not show that the molecular model agrees with experiment, nor does it remove errors from the geometry, basis set, electronic-structure model, or omitted free-energy contributions.
 
@@ -131,7 +129,7 @@ For example:
 
 - The fixed molecular geometry and Born--Oppenheimer approximation define the physical model considered by the tutorial.
 - A finite basis set restricts the one-electron functions used to describe the molecule.
-- Hartree--Fock restricts the wavefunction to one determinant, while an active-space model allows occupations to vary only within selected orbitals and fixes occupations outside them. These restrictions introduce model error relative to full configuration interaction (:term:`FCI`) in the same finite orbital basis. FCI includes every allowed determinant, but their number grows exponentially at a fixed electron-to-orbital ratio, making FCI impractical for large systems.
+- Hartree--Fock limits the wavefunction to one determinant, while the selected active-space model fixes occupations outside the active orbitals. These restrictions introduce model error relative to full configuration interaction (:term:`FCI`) in the same finite orbital basis.
 - Hamiltonian time evolution is approximated when the quantum circuit is constructed.
 - Finite phase resolution and measurement sampling limit the reported :term:`QPE` estimate.
 

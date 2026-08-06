@@ -40,7 +40,7 @@ An electronic-structure calculation requires the identities and positions of the
 This chapter specifies those inputs for the stretched N\ :sub:`2` molecule introduced on the :doc:`tutorial landing page <index>`.
 
 The molecular geometry contains two nitrogen atoms separated by :math:`1.85\ \text{Å}`, compared with the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}`.
-The molecule is neutral, so its charge is zero and it has 14 electrons.
+The molecule is neutral, so its net charge is zero and it has 14 electrons.
 `Spin multiplicity <https://en.wikipedia.org/wiki/Multiplicity_(chemistry)>`_ is defined as :math:`2S+1`, where :math:`S` is the total electron spin produced by combining the spins of all electrons.
 Paired electrons contribute no net spin, whereas unpaired electrons can produce :math:`S>0`.
 A multiplicity of one, two, or three is called a singlet, doublet, or triplet, respectively.
@@ -137,8 +137,9 @@ It measures how much the Hartree--Fock energy changes with basis size while the 
    :class: quiz-question
    :collapsible: closed
 
-   The ``cc-pvtz`` basis should give the lower energy because its additional radial flexibility lets the variational Hartree--Fock calculation optimize over a larger space.
-   The atomic elements and coordinates, molecular charge, spin multiplicity, and Hartree--Fock method remain fixed, so only the basis-set choice contributes to this difference.
+   The ``cc-pvtz`` calculation gives the lower energy.
+   This result is consistent with its additional radial flexibility, which provides a more flexible representation of the molecular orbitals.
+   The atomic elements and coordinates, molecular net charge, spin multiplicity, and Hartree--Fock method remain fixed, so the observed difference measures basis-set sensitivity.
 
 Self-consistent wavefunction optimization
 ===========================================
@@ -153,7 +154,7 @@ The `self-consistent field <https://en.wikipedia.org/wiki/Self-consistent_field>
 3. Solve for an updated set of orbitals.
 4. Repeat until the energy and orbitals satisfy the convergence criteria.
 
-The :term:`QDK`/Chemistry :class:`~qdk_chemistry.algorithms.ScfSolver` returns the converged fixed-geometry total energy and a wavefunction containing the optimized molecular orbitals.
+The :term:`QDK`/Chemistry :class:`~qdk_chemistry.algorithms.ScfSolver` returns the converged fixed-geometry total energy and a wavefunction containing the self-consistent molecular orbitals.
 These orbitals provide the starting point for the multi-configurational calculations introduced in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 
 .. admonition:: Why does a Hartree--Fock calculation require an iterative :term:`SCF` procedure?
@@ -173,7 +174,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_describe_n2.py
 
 The following code runs the built-in :term:`QDK`/Chemistry Hartree--Fock solver once for each basis set.
-The primary result is the ``cc-pvdz`` wavefunction, whose optimized molecular orbitals serve as the starting point for the multi-configurational calculation in :doc:`Choosing the active space <03_choosing_the_active_space>`.
+The primary result is the ``cc-pvdz`` wavefunction, whose self-consistent molecular orbitals serve as the starting point for the multi-configurational calculation in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 The two energies support the basis-set sensitivity exercise that follows.
 
 .. literalinclude:: ../../_static/examples/python/tutorial_describe_n2.py

@@ -116,7 +116,7 @@ The tutorial deliberately selects a compact active-space model that can be solve
 The circuits are executed on a classical simulator, so this tutorial validates the workflow rather than demonstrating quantum advantage.
 Complete active space configuration interaction (:term:`CASCI`) performs full configuration interaction within the selected active space rather than across all orbitals in the molecular model.
 The final quantum calculation is compared with the :term:`CASCI` energy of the same selected active-space Hamiltonian.
-The tutorial uses one `millihartree <https://en.wikipedia.org/wiki/Hartree>`_ (:math:`1\ \mathrm{m}E_{\mathrm{h}}`), often referred to as "chemical accuracy," as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.
+The tutorial uses one `millihartree <https://en.wikipedia.org/wiki/Hartree>`_ (:math:`1\ \mathrm{m}E_{\mathrm{h}}`) as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.
 
 Each required chapter:
 
@@ -124,7 +124,7 @@ Each required chapter:
 - provides a testable Python example where appropriate; and
 - ends with questions and a lab notebook assignment.
 
-Most examples are short, while the final circuit simulation may take tens of minutes depending on the computer.
+The final circuit simulation is the only intentionally long required example and reports progress after each complete run.
 
 Cumulative assignment
 =====================

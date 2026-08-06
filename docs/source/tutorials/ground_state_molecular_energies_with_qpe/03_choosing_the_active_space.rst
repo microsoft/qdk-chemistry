@@ -54,7 +54,18 @@ A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_intera
 where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
 Every determinant :math:`\Phi_i`, including :math:`\Phi_{\mathrm{HF}}`, is constructed from one allowed choice of occupied spin orbitals.
 Different choices represent different electron configurations.
-Full configuration interaction (:term:`FCI`) is exact for a chosen finite orbital basis because it includes every allowed determinant, but its cost grows combinatorially with basis size.
+Full configuration interaction (:term:`FCI`) includes every determinant consistent with a chosen finite orbital basis and fixed :math:`(n_\alpha,n_\beta)` sector.
+It therefore gives the exact eigenvalues of the finite-basis Hamiltonian in that sector, up to numerical solver tolerance.
+For this 14-electron calculation in 28 ``cc-pvdz`` spatial orbitals, the :math:`(n_\alpha,n_\beta)=(7,7)` sector contains
+
+.. math::
+
+   \binom{28}{7}\binom{28}{7}
+   = 1{,}401{,}950{,}721{,}600
+   \approx 1.4\times 10^{12}
+
+determinants.
+At a fixed electron-to-orbital ratio, this count grows exponentially with the number of orbitals, making full-basis :term:`FCI` impractical for large systems.
 An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ controls that cost by allowing occupations to vary only among selected orbitals, trading some model accuracy for a smaller determinant space.
 If that model contains :math:`n_o` active spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, the choices of occupied :math:`\alpha` and :math:`\beta` spin orbitals give
 
