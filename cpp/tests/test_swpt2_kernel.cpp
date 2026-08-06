@@ -210,28 +210,10 @@ TEST(Swpt2Kernel, SecondOrderShiftInactive) {
 }
 
 // ---------------------------------------------------------------------------
-// Convergence to full configuration interaction.
-//
-// Scaling the active<->external coupling by lambda, each order of the downfold
-// (bare mean-field fold -> + 1-body commutator -> + 2-body commutator) recovers
-// a successively larger share of the coupling correlation: the full downfold
-// removes >90% of it, and the 2-body commutator (which the +/- tau^2/Delta
-// level-shift tests never exercise) is a nonzero, energy-lowering piece. This
-// checks the full 2-body channel generation (v_active) and the buffer
-// projection together.
-//
-// The reference is a self-contained bitmask full-CI over the *same*
-// spin-orbital tensors the kernel uses (no external tool, no convention
-// translation). The *absolute* residual is O(lambda^2), NOT O(lambda^3): the
-// kernel uses orbital-energy (Moller-Plesset-like) denominators, which are
-// exact excitation energies only for a self-consistent canonical-HF reference.
-// This synthetic (non-HF) reference carries an O(1) denominator error, so the
-// coupling correlation is captured only to O(lambda^2). This is the expected
-// MP-denominator limitation (why CASPT2/NEVPT2 use Dyall denominators), not a
-// kernel defect -- the single-orbital tests above are exact.
-//
-// Window: spatial {0,1} active, {2} inactive (doubly occupied), {3} virtual;
-// 2 active electrons (1 alpha, 1 beta) on top of the doubly-occupied inactive.
+// Self-contained Fock-space oracle helpers. They assemble the SW parts and
+// evaluate full-CI energies directly from the *same* spin-orbital tensors the
+// kernel uses (no external tool, no convention translation). Shared by the
+// physical-convergence, independent-coefficient, and emission tests below.
 // ---------------------------------------------------------------------------
 namespace {
 
@@ -470,6 +452,82 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Physical convergence (the defining PT property, ported from eff-ham
+// tests/downfold_op/test_toy.py::test_virtual_buffer_convergence_with_coupling):
+// the second-order downfold error must shrink as the active<->external coupling
+// is reduced. A closed-shell reference (spatial orbital 0 doubly occupied) with
+// a dimer partner {1} and a well-separated virtual {2}; both the one-body and
+// two-body active<->virtual couplings are scaled by lambda. Exact = full-CI
+// over the whole {0,1,2} window; effective = full-CI over the emitted active
+// {0,1} operator. The residual falls monotonically and faster than linearly as
+// lambda -> 0. (The absolute residual is O(lambda^2), not O(lambda^3): the
+// synthetic reference is not self-consistent HF, so the orbital-energy
+// denominators carry an O(1) error -- the expected MP-denominator limitation,
+// not a kernel defect. The single-orbital shift tests above are exact.)
+// ---------------------------------------------------------------------------
+TEST(Swpt2Kernel, VirtualBufferConvergesAsCouplingShrinks) {
+  const int norb = 3;  // active {0,1}, virtual {2}
+  const auto residual = [&](double lambda) {
+    Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+    h1(1, 1) = 0.5;
+    h1(2, 2) = 3.0;                       // virtual, well separated
+    h1(0, 2) = h1(2, 0) = -0.2 * lambda;  // one-body active<->virtual coupling
+    Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+    set_sym_eri(g, 0, 0, 0, 0, norb, 0.60);
+    set_sym_eri(g, 1, 1, 1, 1, norb, 0.50);
+    set_sym_eri(g, 0, 0, 1, 1, norb, 0.30);
+    set_sym_eri(g, 2, 2, 2, 2, norb, 0.40);
+    set_sym_eri(g, 0, 0, 2, 2, norb, 0.20);
+    set_sym_eri(g, 1, 1, 2, 2, norb, 0.20);
+    set_sym_eri(g, 0, 2, 0, 0, norb,
+                0.10 * lambda);  // two-body active<->virtual
+    set_sym_eri(g, 0, 2, 1, 1, norb, 0.10 * lambda);
+
+    Eigen::VectorXd na(norb), nb(norb);
+    na << 1, 0,
+        0;  // |0^2> closed-shell reference, dimer partner + virtual empty
+    nb << 1, 0, 0;
+    const Eigen::VectorXd eps = sw::diagonal_fock_energies(h1, g, na, nb, norb);
+
+    sw::SoPartition part;
+    part.n_so = 2 * norb;
+    part.is_active = {1, 1, 1, 1, 0, 0};
+    part.is_inactive = {0, 0, 0, 0, 0, 0};
+    part.is_virtual = {0, 0, 0, 0, 1, 1};
+
+    // exact: full-CI over the whole {0,1,2} window (2 electrons, 1 alpha 1
+    // beta)
+    const auto full =
+        swpt2_test::build_spin_orbital_tensors(h1, h1, g, g, g, 0.0, norb);
+    const double e_exact =
+        fci_ground_energy(full.core_energy, full.one_body, full.two_body,
+                          2 * norb, {0, 1, 2, 3, 4, 5}, 1, 1);
+
+    // effective: downfold onto active {0,1}, then full-CI over that operator
+    const auto blocked = sw::build_two_body_blocked_restricted(g, norb);
+    const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+    const auto down = sw::downfold_blocked(one_body, blocked, eps, part,
+                                           sw::RegOptions{}, 0.0);
+    const auto act = sw::to_spatial_chemist(down, part);
+    const auto rebuilt = swpt2_test::build_spin_orbital_tensors(
+        act.one_body, act.one_body, act.two_body, act.two_body, act.two_body,
+        act.core_energy, act.norb);
+    const double e_eff =
+        fci_ground_energy(rebuilt.core_energy, rebuilt.one_body,
+                          rebuilt.two_body, 2 * act.norb, {0, 1, 2, 3}, 1, 1);
+    return std::abs(e_exact - e_eff);
+  };
+
+  const double e_04 = residual(0.4);
+  const double e_02 = residual(0.2);
+  const double e_01 = residual(0.1);
+  EXPECT_GT(e_04, e_02);  // error shrinks with the coupling
+  EXPECT_GT(e_02, e_01);
+  EXPECT_LT(e_02, 0.6 * e_04);  // and faster than linearly (>= second order)
+  EXPECT_LT(e_01, 0.6 * e_02);
+}
 
 // Independent coefficient-level validation. Build the SW transformation as
 // ordinary matrices over the complete window Fock space, project the inactive

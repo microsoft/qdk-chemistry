@@ -39,10 +39,11 @@ class EffectiveHamiltonianConstructorBase
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction> reference,
-      std::shared_ptr<Hamiltonian> hamiltonian) const override {
+      std::shared_ptr<Hamiltonian> hamiltonian,
+      std::shared_ptr<const SymmetryBlockedIndexSet> p_indices) const override {
     PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
                            EffectiveHamiltonianConstructor, _run_impl,
-                           reference, hamiltonian);
+                           reference, hamiltonian, p_indices);
   }
 };
 
@@ -56,12 +57,14 @@ void bind_effective_hamiltonian_constructor(py::module &m) {
       eff_ham(m, "EffectiveHamiltonianConstructor", R"(
 Abstract base class for effective-Hamiltonian downfolding.
 
-Given a reference :class:`~qdk_chemistry.data.Wavefunction` (whose active space
-defines the kept space ``P`` and whose occupations/RDMs define the reference)
-and an input :class:`~qdk_chemistry.data.Hamiltonian` built over the whole
-downfolding window ``W = P union Q``, a concrete constructor folds the external
-space ``Q`` into an effective Hamiltonian acting on ``P``. This is a distinct
-algorithm type from :class:`~qdk_chemistry.algorithms.HamiltonianConstructor`,
+Given a reference :class:`~qdk_chemistry.data.Wavefunction` (whose
+occupations/RDMs define the reference density), an input
+:class:`~qdk_chemistry.data.Hamiltonian` built over the whole downfolding window
+``W = P union Q``, and an explicit kept space ``P`` (a
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window orbital
+indices), a concrete constructor folds the external space ``Q`` into an
+effective Hamiltonian acting on ``P``. This is a distinct algorithm type from
+:class:`~qdk_chemistry.algorithms.HamiltonianConstructor`,
 which builds the bare integral Hamiltonian from
 :class:`~qdk_chemistry.data.Orbitals`.
 
@@ -72,7 +75,8 @@ constructor), otherwise the ``P<->Q`` couplings are already gone.
 Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
-    >>> h_eff = downfolder.run(reference, window_hamiltonian)
+    >>> p_space = reference.get_orbitals().active_indices()
+    >>> h_eff = downfolder.run(reference, window_hamiltonian, p_space)
 )");
 
   eff_ham.def(py::init<>(), R"(
@@ -83,18 +87,21 @@ class constructors.
 )");
 
   eff_ham.def("run", &EffectiveHamiltonianConstructor::run,
-              py::arg("reference"), py::arg("hamiltonian"), R"(
-Fold the window Hamiltonian onto the reference active space.
+              py::arg("reference"), py::arg("hamiltonian"),
+              py::arg("p_indices"), R"(
+Fold the window Hamiltonian onto the kept space P.
 
 This method automatically locks settings before execution to prevent
 modifications during construction.
 
 Args:
     reference (qdk_chemistry.data.Wavefunction): Reference wavefunction; its
-        active space is the kept space ``P`` and its occupations define the
-        reference.
+        occupations/RDMs define the reference density over the window.
     hamiltonian (qdk_chemistry.data.Hamiltonian): Input Hamiltonian built over
         the whole window ``W = P union Q``.
+    p_indices (qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet): The
+        kept space ``P`` as global (spatial) orbital indices into the window
+        Hamiltonian's active space ``W``.
 
 Returns:
     qdk_chemistry.data.Hamiltonian: The effective Hamiltonian acting on ``P``.
@@ -143,7 +150,8 @@ Returns:
 )");
 
   eff_ham.def("hash", &EffectiveHamiltonianConstructor::hash,
-              py::arg("reference"), py::arg("hamiltonian"));
+              py::arg("reference"), py::arg("hamiltonian"),
+              py::arg("p_indices"));
 
   eff_ham.def("__repr__", [](const EffectiveHamiltonianConstructor &) {
     return "<qdk_chemistry.algorithms.EffectiveHamiltonianConstructor>";
@@ -189,6 +197,13 @@ and semicanonicalization status are logged when construction completes. A
 warning is also logged when the raw amplitude exceeds
 ``intruder_warn_amplitude``.
 
+The kept space ``P`` is a required ``run()`` argument (``p_indices``): a
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window
+(spatial) orbital indices. The reference wavefunction supplies
+the density over ``W``; ``P`` selects which orbitals are kept and need not
+coincide with the reference active space. Every folded external orbital must be
+closed-shell in the reference (doubly occupied or empty).
+
 Typical usage:
 
 .. code-block:: python
@@ -198,7 +213,7 @@ Typical usage:
     downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
     downfolder.settings().set("regularizer", "shift")
     downfolder.settings().set("denom_shift", 0.5)
-    h_eff = downfolder.run(reference, window_hamiltonian)
+    h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
 
 See Also:
     :class:`EffectiveHamiltonianConstructor`

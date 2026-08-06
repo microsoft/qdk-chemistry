@@ -167,7 +167,10 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
   EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
 
   auto invalid = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  EXPECT_THROW(invalid->run(nullptr, nullptr), std::invalid_argument);
+  EXPECT_THROW(invalid->run(nullptr, nullptr,
+                            testing::restricted_index_set(
+                                1, std::vector<std::size_t>{0})),
+               std::invalid_argument);
 }
 
 // End-to-end smoke test: SCF -> window Hamiltonian over W -> CAS reference over
@@ -195,10 +198,10 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   const std::vector<size_t> core = {0, 1, 2};
   const std::vector<size_t> active = {3, 4, 5};
   const std::vector<size_t> window = {3, 4, 5, 6};
+  const auto P_set = testing::restricted_index_set(
+      orbitals->get_num_molecular_orbitals(), active);
 
   auto ham = HamiltonianConstructorFactory::create();
-
-  // reference: CAS over P (produces the active 1-RDM the downfold needs)
   auto p_orbitals = testing::with_active_space(orbitals, active, core);
   auto H_P = ham->run(p_orbitals);
   auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
@@ -215,12 +218,12 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
       testing::with_active_space(orbitals, {3, 4, 6}, core);
   auto H_incomplete = ham->run(incomplete_w_orbitals);
   auto swpt2_invalid = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  EXPECT_THROW(swpt2_invalid->run(reference, H_incomplete),
+  EXPECT_THROW(swpt2_invalid->run(reference, H_incomplete, P_set),
                std::invalid_argument);
 
   // downfold the window onto P, then CAS on the effective Hamiltonian
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  auto H_eff = swpt2->run(reference, H_window);
+  auto H_eff = swpt2->run(reference, H_window, P_set);
   ASSERT_NE(H_eff, nullptr);
   auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, 2, 2);
@@ -266,7 +269,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   // which are exact for this canonical closed-shell reference.)
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("swpt2");
   swpt2_bare->settings().set("regularizer", std::string("bare"));
-  auto H_eff_bare = swpt2_bare->run(reference, H_window);
+  auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
@@ -313,13 +316,95 @@ TEST(SchriefferWolffPT2, AcceptsMeanFieldHfReference) {
   auto H_window =
       ham->run(testing::with_active_space(orbitals, window, core_vec));
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  auto H_eff = swpt2->run(reference, H_window);
+  auto H_eff =
+      swpt2->run(reference, H_window, testing::restricted_index_set(norb, P));
   ASSERT_NE(H_eff, nullptr);
 
   auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, static_cast<unsigned int>(na),
                                     static_cast<unsigned int>(nb));
   EXPECT_TRUE(std::isfinite(E_sw));
+}
+
+// The kept space P can be given explicitly via the `active_indices` setting,
+// independently of the reference wavefunction's active space, as long as every
+// folded orbital is closed-shell in the reference.
+TEST(SchriefferWolffPT2, CustomActiveSpaceOverridesReference) {
+  auto water = testing::create_water_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+
+  const std::vector<size_t> core = {0, 1, 2};
+  const std::vector<size_t> active = {3, 4};  // reference active space
+  const std::vector<size_t> window = {3, 4, 5, 6};
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
+  cas_ref->settings().set("calculate_one_rdm", true);
+  auto [E_bare, reference] = cas_ref->run(
+      ham->run(testing::with_active_space(orbitals, active, core)), 1, 1);
+  auto H_window = ham->run(testing::with_active_space(orbitals, window, core));
+
+  namespace qcd = qdk::chemistry::data;
+
+  // (1) Custom P that differs from the reference active space {3,4}: also keep
+  // the empty external orbital 5, so the folded rest {6} stays closed-shell.
+  // The result must emit over exactly P and be consumable by MACIS.
+  const std::vector<std::size_t> P_custom = {3, 4, 5};
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto H_eff =
+      swpt2->run(reference, H_window,
+                 testing::restricted_index_set(
+                     orbitals->get_num_molecular_orbitals(), P_custom));
+  ASSERT_NE(H_eff, nullptr);
+
+  const auto [T_a, T_b] = H_eff->get_one_body_integrals();
+  EXPECT_EQ(T_a.rows(), static_cast<Eigen::Index>(P_custom.size()));
+  const auto emitted_active = qcd::spin_channel_indices(
+      H_eff->get_orbitals()->active_indices(), qcd::axes::alpha());
+  EXPECT_EQ(
+      std::vector<std::size_t>(emitted_active.begin(), emitted_active.end()),
+      P_custom);
+
+  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 1);
+  EXPECT_TRUE(std::isfinite(E_sw));
+
+  // (2) Custom P = the whole window => empty external => the downfold is the
+  // identity, so the emitted operator must reproduce the bare window
+  // Hamiltonian (validates the custom-P emission path end to end).
+  const std::vector<std::size_t> P_full = {3, 4, 5, 6};
+  auto swpt2_full = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto H_identity =
+      swpt2_full->run(reference, H_window,
+                      testing::restricted_index_set(
+                          orbitals->get_num_molecular_orbitals(), P_full));
+  const auto [ge, ge_ab, ge_bb] = H_identity->get_two_body_integrals();
+  const auto [gw, gw_ab, gw_bb] = H_window->get_two_body_integrals();
+  EXPECT_LT((ge - gw).norm(), 1e-9);
+  EXPECT_NEAR(H_identity->get_core_energy(), H_window->get_core_energy(), 1e-9);
+
+  // (3) Window that spans the reference core: the core orbitals {0,1,2} appear
+  // both as folded window orbitals and in the reference inactive set, so the
+  // emitted inactive index set must be deduplicated (strictly increasing).
+  auto H_all =
+      ham->run(testing::with_active_space(orbitals, {0, 1, 2, 3, 4, 5, 6}, {}));
+  auto swpt2_core = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto H_eff_core = swpt2_core->run(
+      reference, H_all,
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    std::vector<std::size_t>{3, 4}));
+  ASSERT_NE(H_eff_core, nullptr);
+  const auto core_active = qcd::spin_channel_indices(
+      H_eff_core->get_orbitals()->active_indices(), qcd::axes::alpha());
+  EXPECT_EQ(std::vector<std::size_t>(core_active.begin(), core_active.end()),
+            (std::vector<std::size_t>{3, 4}));
+  const auto core_inactive = qcd::spin_channel_indices(
+      H_eff_core->get_orbitals()->inactive_indices(), qcd::axes::alpha());
+  EXPECT_EQ(
+      std::vector<std::size_t>(core_inactive.begin(), core_inactive.end()),
+      (std::vector<std::size_t>{0, 1, 2}));
 }
 
 TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
@@ -362,7 +447,9 @@ TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
   auto H_window = ham->run(testing::with_active_space(
       orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  auto H_eff = swpt2->run(reference, H_window);
+  auto H_eff = swpt2->run(reference, H_window,
+                          testing::restricted_index_set(
+                              orbitals->get_num_molecular_orbitals(), active));
   ASSERT_NE(H_eff, nullptr);
 
   auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
@@ -414,12 +501,31 @@ TEST(SchriefferWolffPT2, AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
   auto H_window = ham->run(testing::with_active_space(
       orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  auto H_eff = swpt2->run(reference, H_window);
+  auto H_eff = swpt2->run(reference, H_window,
+                          testing::restricted_index_set(
+                              orbitals->get_num_molecular_orbitals(), active));
   ASSERT_NE(H_eff, nullptr);
 
   auto cas_effective = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas_effective->run(H_eff, na, nb);
   EXPECT_TRUE(std::isfinite(E_sw));
+
+  // The non-semicanonical path must also handle a correlated (off-diagonal
+  // 1-RDM) reference: its denominators now come from the full-density
+  // generalized Fock rather than a diagonal-occupation Fock that would silently
+  // drop the off-diagonal 1-RDM.
+  auto swpt2_no_semicanon =
+      EffectiveHamiltonianConstructorFactory::create("swpt2");
+  swpt2_no_semicanon->settings().set("semicanonicalize", false);
+  auto H_eff_no_semicanon = swpt2_no_semicanon->run(
+      reference, H_window,
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    active));
+  ASSERT_NE(H_eff_no_semicanon, nullptr);
+  auto [E_sw_no_semicanon, wfn_sw_no_semicanon] =
+      MultiConfigurationCalculatorFactory::create("macis_cas")
+          ->run(H_eff_no_semicanon, na, nb);
+  EXPECT_TRUE(std::isfinite(E_sw_no_semicanon));
 }
 
 TEST(SchriefferWolffPT2, RejectsUnrestrictedHfReference) {
@@ -436,7 +542,11 @@ TEST(SchriefferWolffPT2, RejectsUnrestrictedHfReference) {
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
 
   try {
-    swpt2->run(reference, window_hamiltonian);
+    swpt2->run(
+        reference, window_hamiltonian,
+        testing::restricted_index_set(
+            restricted_reference->get_orbitals()->get_num_molecular_orbitals(),
+            std::vector<std::size_t>{0}));
     FAIL() << "Expected an unrestricted-reference error";
   } catch (const std::invalid_argument& error) {
     EXPECT_NE(std::string(error.what())

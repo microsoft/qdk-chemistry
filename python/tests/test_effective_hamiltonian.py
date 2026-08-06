@@ -15,7 +15,7 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Hamiltonian, Orbitals, Structure
-from qdk_chemistry.data.symmetry import SymmetryLabel, axes
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes, spin_index_set
 
 _TYPE = "effective_hamiltonian_constructor"
 
@@ -109,5 +109,47 @@ class TestEffectiveHamiltonianConstructor:
 
         h_window = algorithms.create("hamiltonian_constructor").run(with_active_space(orbitals, window, core))
         downfolder = algorithms.create(_TYPE, "swpt2")
-        h_eff = downfolder.run(reference, h_window)  # must not raise
+        p_space = spin_index_set(norb, active, active)  # kept space P as an index set
+        h_eff = downfolder.run(reference, h_window, p_space)  # must not raise
         assert isinstance(h_eff, Hamiltonian)
+
+    def test_full_window_spanning_reference_core(self):
+        """Downfold a full-orbital window (the natural ``ham.run(orbitals)`` path).
+
+        The window spans the reference core, so each core orbital appears both as
+        a folded window orbital and in the reference inactive set; the emitted
+        inactive index set must be deduplicated (regression for a
+        strictly-increasing-index crash).
+        """
+        alpha = SymmetryLabel([axes.alpha()])
+        water = Structure(
+            ["O", "H", "H"],
+            np.array(
+                [
+                    [0.0, -0.0757918436, 0.0],
+                    [0.866811829, 0.6014357793, 0.0],
+                    [-0.866811829, 0.6014357793, 0.0],
+                ]
+            )
+            * ANGSTROM_TO_BOHR,
+        )
+        _, wfn_hf = algorithms.create("scf_solver").run(water, 0, 1, "sto-3g")
+
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 2)
+        selector.settings().set("num_active_orbitals", 2)
+        reference = selector.run(wfn_hf)
+
+        ref_orbs = reference.get_orbitals()
+        active = [int(i) for i in ref_orbs.active_indices().indices(alpha)]
+        core = [int(i) for i in ref_orbs.inactive_indices().indices(alpha)]
+
+        # window over the full orbital set (spans the reference core)
+        h_full = algorithms.create("hamiltonian_constructor").run(wfn_hf.get_orbitals())
+        # P == reference active space: pass its index set straight through
+        h_eff = algorithms.create(_TYPE, "swpt2").run(reference, h_full, ref_orbs.active_indices())  # must not raise
+
+        assert isinstance(h_eff, Hamiltonian)
+        emitted = h_eff.get_orbitals()
+        assert list(emitted.active_indices().indices(alpha)) == active
+        assert list(emitted.inactive_indices().indices(alpha)) == core

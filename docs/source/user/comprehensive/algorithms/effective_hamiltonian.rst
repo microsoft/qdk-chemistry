@@ -26,7 +26,7 @@ references are supported. Unrestricted orbitals are not supported.
 Preparing the inputs
 --------------------
 
-The two inputs describe different orbital spaces:
+The three inputs describe different orbital spaces:
 
 ``reference``
    A :class:`~qdk_chemistry.data.Wavefunction` whose active orbitals define the
@@ -40,6 +40,14 @@ The two inputs describe different orbital spaces:
    orbitals must match the reference core. Building this Hamiltonian only over
    :math:`P` removes the :math:`P\leftrightarrow Q` couplings before
    downfolding and is therefore invalid.
+
+``p_indices``
+   A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` naming the
+   kept space :math:`P` as window orbital indices. It need not equal the
+   reference active space, but every folded (external) orbital must be
+   closed-shell in the reference. Reusing
+   ``reference.get_orbitals().active_indices()`` keeps :math:`P` equal to the
+   reference active space.
 
 The reference and window Hamiltonian must use the same restricted molecular
 orbital basis, and every reference-active orbital must occur in the window.
@@ -59,7 +67,10 @@ After preparing the reference over :math:`P` and the Hamiltonian over
    downfolder = algorithms.create(
        "effective_hamiltonian_constructor", "qdk_swpt2"
    )
-  effective_hamiltonian = downfolder.run(reference, window_hamiltonian)
+   p_indices = reference.get_orbitals().active_indices()
+   effective_hamiltonian = downfolder.run(
+       reference, window_hamiltonian, p_indices
+   )
 
 The returned Hamiltonian uses the reference active-space indexing and can be
 passed to an active-space solver. The original inputs are not modified.

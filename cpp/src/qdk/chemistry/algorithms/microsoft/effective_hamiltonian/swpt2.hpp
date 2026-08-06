@@ -16,7 +16,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * `regularizer` selects flow (default), shift, or bare inverse denominators;
  * the corresponding numeric setting controls the selected scheme. The current
- * denominator operator is a semicanonical, spin-free generalized Fock.
+ * denominator operator is a semicanonical, spin-free generalized Fock. The
+ * kept space P is a required `run()` argument, not a setting.
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
@@ -39,6 +40,13 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * must be active. Noncanonical orbitals are semicanonicalized independently
  * within inactive, active, and virtual blocks. Intruder diagnostics are logged,
  * with an additional warning for large raw amplitudes.
+ *
+ * The kept space P is a required `run()` argument (`p_indices`): a
+ * `SymmetryBlockedIndexSet` of window (spatial) orbital indices. The reference
+ * wavefunction supplies the density over W; P selects which orbitals are kept
+ * and need not coincide with the reference active space. Every folded
+ * (external) orbital must be closed-shell in the reference (doubly occupied or
+ * empty).
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor
@@ -57,7 +65,9 @@ class SchriefferWolffPT2Constructor
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
-      std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
+      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices)
+      const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

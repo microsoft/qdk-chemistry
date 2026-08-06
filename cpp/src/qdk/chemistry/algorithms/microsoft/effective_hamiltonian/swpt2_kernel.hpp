@@ -71,6 +71,9 @@ struct SoPartition {
 /// n^sigma = (na+nb)/2) so eps_alpha == eps_beta and H0 preserves S^2.
 /// High-spin states are realized by the active-space solve, not by polarizing
 /// this reference (a spin-polarized H0 would break S^2 of the downfold).
+/// This is the diagonal-occupation special case of `generalized_fock_matrix`;
+/// the production path builds denominators from that full-density Fock so a
+/// correlated reference's off-diagonal 1-RDM is retained.
 Eigen::VectorXd diagonal_fock_energies(const Eigen::MatrixXd& h1a,
                                        const Eigen::VectorXd& g_aaaa,
                                        const Eigen::VectorXd& na,
@@ -170,7 +173,9 @@ struct ActiveDownfoldResult {
 /// Consume the spin-blocked spatial two-body store (`SpinBlocked2B`) and
 /// compute every antisymmetric
 /// two-body element on the fly, so the dense n_so^4 tensors (`v`, generator
-/// `s2`, the block-diagonal / off-diagonal split) are never materialized. The
+/// `s2`, the block-diagonal / off-diagonal split) are never materialized
+/// (intruder diagnostics still scan the couplings in O(norb^4) time, but store
+/// nothing). The
 /// retained Wick contractions are evaluated from packed active/buffer panels;
 /// dense channels use BLAS matrix products and the one-line `S2 * V2` channel
 /// enumerates only active-index coincidences that can survive two-body

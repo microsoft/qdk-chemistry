@@ -937,15 +937,26 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
         s1(P, Q) = f(P, Q) * reg_inv(d, reg);
         track(f(P, Q), d);
       }
-  for (int P = 0; P < M; ++P)
-    for (int Q = 0; Q < M; ++Q)
-      for (int R = 0; R < M; ++R)
-        for (int S = 0; S < M; ++S) {
-          if (!is_od2(part, P, Q, R, S)) continue;
-          const double vv = v_at(P, Q, R, S);
-          if (vv == 0.0) continue;
-          track(vv, eps(P) + eps(Q) - eps(R) - eps(S));
-        }
+  // Intruder diagnostics over the occupation-changing two-body couplings: a
+  // diagnostics-only scan (nothing is materialized) restricted to the nonzero
+  // spin patterns -- same-spin, or one alpha and one beta per creation and
+  // annihilation pair -- instead of the full (2*norb)^4 spin-orbital grid.
+  static constexpr int spin_patterns[6][4] = {{0, 0, 0, 0}, {1, 1, 1, 1},
+                                              {0, 1, 0, 1}, {0, 1, 1, 0},
+                                              {1, 0, 0, 1}, {1, 0, 1, 0}};
+  const int n_spatial = M / 2;
+  for (int p = 0; p < n_spatial; ++p)
+    for (int q = 0; q < n_spatial; ++q)
+      for (int r = 0; r < n_spatial; ++r)
+        for (int s = 0; s < n_spatial; ++s)
+          for (const auto& sp : spin_patterns) {
+            const int P = 2 * p + sp[0], Q = 2 * q + sp[1];
+            const int R = 2 * r + sp[2], S = 2 * s + sp[3];
+            if (!is_od2(part, P, Q, R, S)) continue;
+            const double vv = v_at(P, Q, R, S);
+            if (vv == 0.0) continue;
+            track(vv, eps(P) + eps(Q) - eps(R) - eps(S));
+          }
 
   // Block-diagonal / off-diagonal one-body split (dense, cheap).
   Eigen::MatrixXd od_f = Eigen::MatrixXd::Zero(M, M);
