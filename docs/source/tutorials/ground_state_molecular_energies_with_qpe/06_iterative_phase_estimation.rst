@@ -434,7 +434,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
 Do not interrupt the process merely because one run takes roughly half a minute.
-The twenty-run simulation phase took approximately six minutes in one development run; total duration depends on the computer and may be tens of minutes.
+The twenty-run simulation may take tens of minutes, depending on the computer.
 A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
 
 .. admonition:: What bitstring distribution and energy estimate did the script produce?

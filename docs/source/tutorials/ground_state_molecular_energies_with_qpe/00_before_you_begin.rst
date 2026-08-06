@@ -41,8 +41,8 @@ A GPU is not required.
 
 The installed tutorial environment occupies approximately 1.5 GiB.
 The short chapter Python scripts generally finish within a minute, while the Jupyter notebooks can take longer.
-The final twenty-run :term:`IQPE` simulation took approximately six minutes in a measured development run.
-Allow tens of minutes depending on processor performance and other system activity.
+The final circuit simulation is the only intentionally long required example.
+Its runtime depends on processor performance and other system activity; the final chapter explains how to monitor its progress.
 
 Required software
 =================
