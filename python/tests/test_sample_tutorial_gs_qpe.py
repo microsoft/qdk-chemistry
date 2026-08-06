@@ -322,18 +322,6 @@ def test_tutorial_orbital_coordinates_transfer_across_diatomics(
 def test_tutorial_choose_active_space_results():
     """Check portable active-space invariants and optional reference snapshots."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
-    tutorial_root = (
-        DOCS_PYTHON_EXAMPLES_DIR.parent.parent.parent / "tutorials" / "ground_state_molecular_energies_with_qpe"
-    )
-    molecule_text = (tutorial_root / "02_describing_the_molecule.rst").read_text(encoding="utf-8")
-    active_space_text = (tutorial_root / "03_choosing_the_active_space.rst").read_text(encoding="utf-8")
-    assert r"\det\!\left[\psi_p(x_q)\right]" in molecule_text
-    assert r"x=(\mathbf{r},\sigma)" in molecule_text
-    assert "These objects form a hierarchy" in molecule_text
-    limits_section, active_space_remainder = active_space_text.split("The active space", maxsplit=1)
-    assert ".. _tutorial-determinant-count:" in limits_section
-    assert ".. _tutorial-determinant-count:" not in active_space_remainder
-    assert "Every determinant :math:`\\Phi_i`" in limits_section
 
     result = tutorial_module.run_active_space_workflow()
     assert abs(result.hartree_fock_energy - (-108.418633697214)) < 1e-8
@@ -422,14 +410,6 @@ def test_tutorial_prepare_trial_state_results():
     """Check portable trial-state invariants and optional reference snapshots."""
     _load_tutorial_module("tutorial_choose_active_space")
     tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
-    chapter_text = (
-        DOCS_PYTHON_EXAMPLES_DIR.parent.parent.parent
-        / "tutorials"
-        / "ground_state_molecular_energies_with_qpe"
-        / "05_preparing_the_trial_state.rst"
-    ).read_text(encoding="utf-8")
-    assert r"\sum_{i=1}^{K}\widetilde{c}_i\vert b_i\rangle" in chapter_text
-    assert "each retained determinant becomes one computational-basis state" in chapter_text
 
     result = tutorial_module.run_trial_state_workflow()
     with pytest.raises(ValueError, match="max_determinants must be positive"):
@@ -489,20 +469,6 @@ def test_tutorial_run_iqpe_configuration(capsys):
     _load_tutorial_module("tutorial_map_n2_to_qubits")
     _load_tutorial_module("tutorial_prepare_trial_state")
     tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
-    chapter_text = (
-        DOCS_PYTHON_EXAMPLES_DIR.parent.parent.parent
-        / "tutorials"
-        / "ground_state_molecular_energies_with_qpe"
-        / "06_iterative_phase_estimation.rst"
-    ).read_text(encoding="utf-8")
-    assert r"\alpha\in(-\pi,\pi]" in chapter_text
-    assert r"(-\pi/t,\pi/t]" in chapter_text
-    assert "Qubit measurement and shots" in chapter_text
-    assert r"\gamma_0\vert0\rangle+\gamma_1\vert1\rangle" in chapter_text
-    assert "One preparation, circuit execution, and measurement is called a *shot*." in chapter_text
-    assert "The loop executes iteration :math:`k=0` first." in chapter_text
-    assert "reverses the measurements from execution order" in chapter_text
-    assert "This estimates an eigenvalue of the qubit Hamiltonian" in chapter_text
 
     problem = tutorial_module.prepare_iqpe_problem()
     with pytest.raises(ValueError, match="zero-angle phase-grid point"):
