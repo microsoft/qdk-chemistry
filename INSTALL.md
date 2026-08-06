@@ -51,7 +51,7 @@ If you prefer a minimal install (core library only, no optional backends):
 python3 -m pip install qdk-chemistry
 ```
 
-> **NOTE:** The `all` and `qiskit-extras` extras are not supported on Python 3.14 because Qiskit does not yet publish Python 3.14 wheels. See the [Optional Extras](#optional-extras) table below for details and alternative install targets.
+> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. All other platforms (Linux x86_64, macOS, Windows) install the full set. See the [Optional Extras](#optional-extras) table below for details.
 
 ### Step 3: Verify the installation
 

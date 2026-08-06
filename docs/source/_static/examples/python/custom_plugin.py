@@ -124,137 +124,127 @@ print(available("scf_solver"))  # [..., 'custom']
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-settings
+# start-cell-descriptor-settings
 from qdk_chemistry.data import Settings
 
 
-class GeometryOptimizerSettings(Settings):
-    """Settings for geometry optimization algorithms."""
+class MolecularDescriptorSettings(Settings):
+    """Settings for molecular descriptor algorithms."""
 
     def __init__(self):
         super().__init__()
-        self._set_default(
-            "max_steps", "int", 100, "Maximum optimization steps", (1, 10000)
-        )
-        self._set_default(
-            "convergence_threshold", "double", 1e-5, "Gradient convergence threshold"
-        )
-        self._set_default("step_size", "double", 0.1, "Initial optimization step size")
+        self._set_default("normalize", "bool", False, "Normalize the descriptor")
 
 
-# end-cell-geometry-settings
+# end-cell-descriptor-settings
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-base-class
+# start-cell-descriptor-base-class
 from qdk_chemistry.algorithms.base import Algorithm
 
 
-class GeometryOptimizer(Algorithm):
-    """Abstract base class for geometry optimization algorithms."""
+class MolecularDescriptorCalculator(Algorithm):
+    """Abstract base class for molecular descriptor algorithms."""
 
     def type_name(self) -> str:
-        return "geometry_optimizer"
+        return "molecular_descriptor_calculator"
 
 
-# end-cell-geometry-base-class
+# end-cell-descriptor-base-class
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-factory
+# start-cell-descriptor-factory
 from qdk_chemistry.algorithms.base import AlgorithmFactory
 
 
-class GeometryOptimizerFactory(AlgorithmFactory):
-    """Factory for creating geometry optimizer instances."""
+class MolecularDescriptorCalculatorFactory(AlgorithmFactory):
+    """Factory for creating molecular descriptor calculators."""
 
     def algorithm_type_name(self) -> str:
-        return "geometry_optimizer"
+        return "molecular_descriptor_calculator"
 
     def default_algorithm_name(self) -> str:
-        return "bfgs"
+        return "nuclear_charge"
 
 
-# end-cell-geometry-factory
+# end-cell-descriptor-factory
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-implementations
+# start-cell-descriptor-implementations
 from qdk_chemistry.data import Structure
 
 
-class BfgsOptimizer(GeometryOptimizer):
-    """BFGS quasi-Newton geometry optimizer."""
+class NuclearChargeDescriptor(MolecularDescriptorCalculator):
+    """Calculator for a nuclear-charge molecular descriptor."""
 
     def __init__(self):
         super().__init__()
-        self._settings = GeometryOptimizerSettings()
+        self._settings = MolecularDescriptorSettings()
 
     def name(self) -> str:
-        return "bfgs"
+        return "nuclear_charge"
 
-    def _run_impl(self, structure: Structure) -> Structure:
-        # max_steps = self.settings().get("max_steps")
-        # threshold = self.settings().get("convergence_threshold")
-
-        # BFGS optimization implementation
-        # Placeholder for optimized structure
-        optimized_structure = Structure()
-        return optimized_structure
+    def _run_impl(self, structure: Structure) -> float:
+        descriptor = float(sum(structure.get_nuclear_charges()))
+        if self.settings().get("normalize") and structure.get_num_atoms() > 0:
+            descriptor /= structure.get_num_atoms()
+        return descriptor
 
 
-# end-cell-geometry-implementations
+# end-cell-descriptor-implementations
 ################################################################################
 
 
 ################################################################################
-# start-cell-steepest-descent
-class SteepestDescentOptimizer(GeometryOptimizer):
-    """Steepest descent geometry optimizer."""
+# start-cell-mass-descriptor
+class MassDescriptor(MolecularDescriptorCalculator):
+    """Calculator for a molecular-mass descriptor."""
 
     def __init__(self):
         super().__init__()
-        self._settings = GeometryOptimizerSettings()
+        self._settings = MolecularDescriptorSettings()
 
     def name(self) -> str:
-        return "steepest_descent"
+        return "mass"
 
-    def _run_impl(self, structure: Structure) -> Structure:
-        # Steepest descent implementation
-        # Placeholder for optimized structure
-        optimized_structure = Structure()
-        return optimized_structure
+    def _run_impl(self, structure: Structure) -> float:
+        descriptor = float(sum(structure.get_masses()))
+        if self.settings().get("normalize") and structure.get_num_atoms() > 0:
+            descriptor /= structure.get_num_atoms()
+        return descriptor
 
 
-# end-cell-steepest-descent
+# end-cell-mass-descriptor
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-registration
+# start-cell-descriptor-registration
 import qdk_chemistry.algorithms as algorithms
 
 # Register the factory
-algorithms.registry.register_factory(GeometryOptimizerFactory())
+algorithms.registry.register_factory(MolecularDescriptorCalculatorFactory())
 
 # Register implementations
-algorithms.register(lambda: BfgsOptimizer())
-algorithms.register(lambda: SteepestDescentOptimizer())
-# end-cell-geometry-registration
+algorithms.register(lambda: NuclearChargeDescriptor())
+algorithms.register(lambda: MassDescriptor())
+# end-cell-descriptor-registration
 ################################################################################
 
 ################################################################################
-# start-cell-geometry-usage
+# start-cell-descriptor-usage
 from qdk_chemistry.algorithms import available, create
 
 # List available implementations
-print(available("geometry_optimizer"))  # ['bfgs', 'steepest_descent']
+print(available("molecular_descriptor_calculator"))  # ['mass', 'nuclear_charge']
 
 # Instantiate and configure
-optimizer = create("geometry_optimizer", "bfgs")
-optimizer.settings().set("max_steps", 200)
-optimizer.settings().set("convergence_threshold", 1e-6)
+calculator = create("molecular_descriptor_calculator", "nuclear_charge")
+calculator.settings().set("normalize", True)
 
 # Execute
-# optimized_structure = optimizer.run(initial_structure)
-# end-cell-geometry-usage
+# descriptor = calculator.run(molecule)
+# end-cell-descriptor-usage
 ################################################################################
