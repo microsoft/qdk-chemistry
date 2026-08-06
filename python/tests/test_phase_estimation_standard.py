@@ -176,6 +176,8 @@ def _run_standard(problem: PhaseEstimationProblem, builder_name: str = "qdk_stan
     )
 
 
+pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
+
 # Parametrize over both qdk_standard and qiskit_standard builders
 _builder_params = [
     pytest.param("qdk_standard", id="qdk_standard"),
@@ -184,7 +186,6 @@ _builder_params = [
         id="qiskit_standard",
         marks=[
             pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            pytest.mark.usefixtures("use_base_qdk_ctx"),
         ],
     ),
 ]
@@ -245,7 +246,6 @@ def test_standard_phase_estimation_four_qubit(
             id="qiskit_standard",
             marks=[
                 pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-                pytest.mark.usefixtures("use_base_qdk_ctx"),
             ],
         ),
     ],

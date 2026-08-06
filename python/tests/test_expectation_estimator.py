@@ -32,6 +32,8 @@ from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
 
+pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
+
 
 @pytest.fixture
 def debug_logger():
@@ -285,7 +287,6 @@ def test_estimator_fewer_shots(wavefunction_4e4o):
                 pytest.mark.skipif(
                     not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
                 ),
-                pytest.mark.usefixtures("use_base_qdk_ctx"),
             ],
         ),
     ],

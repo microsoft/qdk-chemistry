@@ -235,6 +235,8 @@ def _run_iterative_with_parameters(
     )
 
 
+pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
+
 # Parametrize over both qdk_iterative and qiskit_iterative builders
 _builder_params = [
     pytest.param("qdk_iterative", id="qdk_iterative"),
@@ -243,7 +245,6 @@ _builder_params = [
         id="qiskit_iterative",
         marks=[
             pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            pytest.mark.usefixtures("use_base_qdk_ctx"),
         ],
     ),
 ]
