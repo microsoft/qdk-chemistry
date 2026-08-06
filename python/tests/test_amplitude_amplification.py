@@ -16,7 +16,7 @@ from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
 def _diagonal_hamiltonian() -> QubitOperator:
@@ -44,6 +44,20 @@ def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit
             parameter=parameters,
         ),
         qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(parameters),
+    )
+
+
+def _all_ones_marking_oracle() -> Circuit:
+    """Return an oracle that flips the flag on the all-ones state."""
+    context = get_qsharp_context()
+    context.eval(
+        "operation AmplitudeAmplificationTestMarkAllOnes(register : Qubit[], flag : Qubit) : "
+        "Unit is Adj + Ctl { Controlled X(register, flag); }"
+    )
+    operation = context.eval("AmplitudeAmplificationTestMarkAllOnes")
+    return Circuit(
+        qsharp_op=operation,
+        qsharp_factory=QsharpFactoryData(program=operation, parameter={}),
     )
 
 
@@ -172,7 +186,13 @@ def test_amplified_qpe_circuit_with_trotter():
 
 
 def test_amplified_qpe_acceptance_follows_the_round_count():
-    """More rounds drive more shots into the accepted window at this overlap."""
+    """Acceptance on the QPE window obeys the same closed form as a plain preparation.
+
+    The amplified quantity is the weight of the marked phase window, so the law holds with
+    the window weight in place of an eigenvector overlap. The window weight is read off the
+    unamplified circuit rather than assumed, because QPE spreads each eigenvector over
+    several bins and only part of that weight lands inside the window.
+    """
     accepted = (8, 9)
     shots = 2000
     observed = {}
@@ -188,6 +208,41 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
 
     assert observed[1] > observed[0]
     assert observed[2] > observed[1]
+
+    angle = math.asin(math.sqrt(observed[0]))
+    for rounds in (1, 2):
+        expected = math.sin((2 * rounds + 1) * angle) ** 2
+        assert abs(observed[rounds] - expected) < 0.1, f"rounds={rounds}: {observed[rounds]} != {expected}"
+
+
+def test_amplification_matches_the_closed_form_and_overshoots():
+    r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` for k = 0..5, decline included.
+
+    Amplifying a plain state preparation isolates the Grover iterate from QPE, so the
+    overlap is known exactly and the closed form can be asserted rather than just its
+    monotonicity. Rounds 3 to 5 walk back down the sine, which is the overshoot that
+    makes ``rounds`` a real choice instead of "as many as affordable".
+    """
+    amplitude = 0.3
+    angle = math.asin(amplitude)
+    shots = 4000
+    state_prep_oracle = _guiding_state(amplitude, 3)
+    good_state_oracle = _all_ones_marking_oracle()
+    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+
+    observed = []
+    for rounds in range(6):
+        circuit = create("amplitude_amplification", rounds=rounds).run(state_prep_oracle, good_state_oracle)
+        counts = executor.run(circuit, shots=shots).bitstring_counts
+        probability = counts.get("11", 0) / shots
+        expected = math.sin((2 * rounds + 1) * angle) ** 2
+        assert abs(probability - expected) < 0.05, f"rounds={rounds}: {probability} != {expected}"
+        observed.append(probability)
+
+    # The peak sits at k = 2 for a = 0.09, so more rounds must do worse, not better.
+    assert observed[2] == max(observed)
+    assert observed[3] < observed[2]
+    assert observed[4] < observed[3]
 
 
 def test_marking_oracle_circuit_is_executable():

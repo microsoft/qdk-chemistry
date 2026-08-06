@@ -122,6 +122,12 @@ class AmplitudeAmplification(Algorithm):
     :math:`k \approx \pi/(4\arcsin\sqrt{a})` the success probability falls again, so pick
     ``rounds`` from an estimate of :math:`a`.
 
+    The rotation stays inside the plane spanned by the good and bad components, so
+    amplification raises the acceptance probability without changing the accepted state.
+    Marking a QPE phase window therefore amplifies the weight of that window, not the
+    fidelity of the system register with one eigenvector, and any leakage into the window
+    is amplified along with it.
+
     Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,
     arXiv:2201.08309, Chapter 2.
     """

@@ -49,7 +49,9 @@ state_preparation = Circuit(
     qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(prep_parameters),
 )
 
-# 3. Build a measurement-free QPE circuit
+# 3. Build a measurement-free QPE circuit. This whole circuit is the preparation that
+# gets amplified, so the phase register and its ancillas stay inside the amplified
+# register and every round reflects about the full prepared state.
 num_bits = 4
 builder = create(
     "qpe_circuit_builder",
