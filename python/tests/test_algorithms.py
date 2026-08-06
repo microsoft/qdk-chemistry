@@ -12,6 +12,7 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     DynamicalCorrelationCalculator,
+    EffectiveHamiltonianConstructor,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
@@ -43,7 +44,7 @@ from qdk_chemistry.data.symmetry import (
     spin_index_set,
 )
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
 
 
 class MockLocalizationPy(OrbitalLocalizer):
@@ -362,6 +363,25 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
         return -10.0, updated_wavefunction, None
 
 
+class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
+    """A dummy effective-Hamiltonian constructor for testing purposes."""
+
+    def __init__(self):
+        super().__init__()
+        self.received_reference = None
+        self.received_p_indices = None
+
+    def name(self):
+        """Return the algorithm name."""
+        return "mock_effective_hamiltonian_constructor"
+
+    def _run_impl(self, reference, hamiltonian, p_indices):
+        """Record the forwarded reference/P-space and echo the Hamiltonian."""
+        self.received_reference = reference
+        self.received_p_indices = p_indices
+        return hamiltonian
+
+
 class TestAlgorithmClasses:
     """Test cases for the algorithm base classes."""
 
@@ -623,6 +643,30 @@ class TestAlgorithmClasses:
         assert t2_ab is not None
         assert t2_ab.shape == (1,)
         assert np.isclose(t2_ab[0], 0.005)
+
+    @pytest.mark.parametrize(
+        "p_indices",
+        [
+            pytest.param(spin_index_set(4, [1, 2], [1, 2]), id="restricted"),
+            pytest.param(spin_index_set(4, [0, 2], [1, 3], equivalent=False), id="unrestricted"),
+        ],
+    )
+    def test_effective_hamiltonian_constructor_inheritance(self, p_indices):
+        """Test that EffectiveHamiltonianConstructor can be inherited from Python."""
+        constructor = MockEffectiveHamiltonianConstructor()
+        assert isinstance(constructor, EffectiveHamiltonianConstructor)
+
+        # Settings are accessible on the base
+        assert isinstance(constructor.settings(), Settings)
+
+        # run() forwards the reference and the (restricted/unrestricted) P-space
+        # index set unchanged to _run_impl, and returns its result
+        reference = create_test_wavefunction()
+        hamiltonian = create_test_hamiltonian(2)
+        result = constructor.run(reference, hamiltonian, p_indices)
+        assert result is hamiltonian
+        assert constructor.received_reference is reference
+        assert constructor.received_p_indices is p_indices
 
     def test_scf_solver_registration(self):
         """Test that SCF solver can be registered and used."""
