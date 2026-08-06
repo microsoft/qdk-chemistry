@@ -180,6 +180,67 @@ For unrestricted inputs, spin-dependent active-space 1-RDM blocks are combined i
 
 This implementation has no configurable settings.
 
+.. _localizer-qdk-gauge-fixing:
+
+QDK Gauge Fixing
+~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_gauge_fixing"``
+
+Natural orbitals with equal occupation numbers span a well-defined subspace but do not have unique orbital vectors.
+Any orthogonal rotation inside such an occupation-degenerate block spans the same subspace and leaves the exact
+:term:`CASCI` energy unchanged, yet it produces a different qubit Hamiltonian after mapping.
+This localizer resolves that freedom deterministically: it first anchors every degenerate block to the atomic-orbital
+basis, then runs coordinate-descent sweeps over Givens plane rotations inside each block, accepting only rotations
+that reduce the mapped coefficient norm :math:`\lambda = \sum_\ell |h_\ell|`.
+
+Because :math:`\lambda` sets the evolution time in :doc:`phase estimation <phase_estimation>` and the normalization of
+a linear-combination-of-unitaries block encoding, reducing it lowers quantum resource estimates without affecting the
+energy.
+Restricting the rotations to degenerate blocks also means the returned orbitals remain natural orbitals, so their
+occupation numbers are preserved and carried on the returned wavefunction.
+
+Choosing a gauge is a separate objective from finding the natural orbitals, so the two are composed rather than
+combined: run :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` first and pass its result here.
+The input orbitals must be restricted and must diagonalize the active-space 1-RDM.
+The selected indices must be a subset of the active-space indices, and they may not split a degenerate block, because
+rotating a partly selected block would change the selected subspace and therefore the energy.
+
+.. note::
+   Each objective evaluation performs an integral transformation and a qubit mapping, so the cost grows with the
+   number of degenerate planes, ``angle_samples``, and ``max_sweeps``.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``degeneracy_tolerance``
+     - float
+     - ``1e-6``
+     - Occupation-number gap below which orbitals share one degenerate block
+   * - ``angle_samples``
+     - int
+     - ``32``
+     - Uniform samples over :math:`[0, \pi)` used to bracket each plane rotation
+   * - ``max_sweeps``
+     - int
+     - ``3``
+     - Maximum number of deterministic passes over all rotation planes
+   * - ``improvement_tolerance``
+     - float
+     - ``1e-10``
+     - Minimum coefficient-norm reduction, in Hartree, required to accept a rotation
+   * - ``mapper_threshold``
+     - float
+     - ``1e-14``
+     - Coefficient and integral threshold used by the qubit mapper during the search
+
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
