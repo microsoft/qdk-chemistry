@@ -47,6 +47,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
+    /// Lee et al. Even More Efficient Quantum Computations of Chemistry Through Tensor Hypercontraction.
+    /// https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.2.030305
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
@@ -97,10 +99,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Checks the generic schedule against the explicit walk power.
-    ///
-    /// The returned operation expects a register laid out as `address + targets`, with
-    /// `AddressQubits(numQueries + 1)` address qubits followed by the walk's own register.
-    /// It leaves the identity behind when the schedule agrees with `W^(numQueries - 2t)`.
     function MakeTestSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -136,13 +134,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
-    ///
-    /// The reflection is `R = X` on the single target qubit and the block is
-    /// B = Rz(theta)·X·Rz(-theta), a reflection about an axis in the XY plane.
-    /// The block is self-inverse, and it does not commute with the reflection it is paired
-    /// with, so the walk W = B·X = Rz(2*theta) has genuinely distinct powers. A pair of
-    /// commuting factors (two diagonal ones, say) would make every schedule branch collapse
-    /// to the same operator and silently pass no matter what the address decode did.
     operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         let numBits = PhaseRegisterSize(numQueries);
         Fact(2^numBits == numQueries + 1, "numQueries must be one less than a power of two");

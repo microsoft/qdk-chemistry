@@ -138,8 +138,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
         qsharp_factory = QsharpFactoryData(
-            # QIR generation only resolves entry-point callables one level deep, so the oracles
-            # are handed over unstitched and Q# composes them; see ``MakePrepSelPrepCircuit``.
             program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
             parameter={
                 "prepareOp": prepare_op,
