@@ -186,13 +186,7 @@ def test_amplified_qpe_circuit_with_trotter():
 
 
 def test_amplified_qpe_acceptance_follows_the_round_count():
-    """Acceptance on the QPE window obeys the same closed form as a plain preparation.
-
-    The amplified quantity is the weight of the marked phase window, so the law holds with
-    the window weight in place of an eigenvector overlap. The window weight is read off the
-    unamplified circuit rather than assumed, because QPE spreads each eigenvector over
-    several bins and only part of that weight lands inside the window.
-    """
+    """Acceptance on the QPE window obeys the same closed form as a plain preparation."""
     accepted = (8, 9)
     shots = 2000
     observed = {}
@@ -216,13 +210,7 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
 
 
 def test_amplification_matches_the_closed_form_and_overshoots():
-    r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` for k = 0..5, decline included.
-
-    Amplifying a plain state preparation isolates the Grover iterate from QPE, so the
-    overlap is known exactly and the closed form can be asserted rather than just its
-    monotonicity. Rounds 3 to 5 walk back down the sine, which is the overshoot that
-    makes ``rounds`` a real choice instead of "as many as affordable".
-    """
+    r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` for k = 0..5, decline included."""
     amplitude = 0.3
     angle = math.asin(amplitude)
     shots = 4000
