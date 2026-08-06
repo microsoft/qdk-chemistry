@@ -27,8 +27,8 @@ Stretched N2 molecule for the ground-state QPE tutorial
 N    0.000000    0.000000    0.000000
 N    0.000000    0.000000    1.850000
 """)
-# The 1.85-Angstrom bond is substantially longer than the approximately
-# 1.10-Angstrom equilibrium distance, increasing multiconfigurational character.
+# The 1.85-Angstrom bond is substantially longer than the 1.097685-Angstrom
+# equilibrium distance, increasing multiconfigurational character.
 # The target is neutral N2 in its singlet ground state, where all electrons are
 # paired and the spin multiplicity 2S + 1 equals one.
 charge = 0

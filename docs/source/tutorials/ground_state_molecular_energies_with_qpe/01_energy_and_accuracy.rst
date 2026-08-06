@@ -19,8 +19,9 @@ After completing this chapter, you will be able to:
 .. admonition:: Lab notebook assignment
    :class: lab-notebook-assignment
 
-   Complete :ref:`lab-notebook-goal`.
-   Record the target quantity, the 1 milliHartree teaching target, and the reference used to evaluate that target.
+   Complete the :ref:`Calculation goal and reference plan <lab-notebook-goal>` section of the lab notebook.
+   Record the molecular system, target quantity, :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target, and reference used to evaluate that target.
+   For each comparison field, state what changes, what remains fixed, and what the resulting difference will measure; later chapters add the numerical values.
    This entry defines the criteria you will use to interpret every later result.
 
 The energy reported in this tutorial
@@ -47,7 +48,7 @@ The nuclear contribution is the repulsion among the fixed nuclei.
    The fixed-geometry total energy is the sum of the electronic energy and the repulsion energy among the fixed nuclei.
 
 :term:`QDK`/Chemistry reports molecular energies in `hartree <https://en.wikipedia.org/wiki/Hartree>`_, with symbol :math:`E_{\mathrm{h}}`.
-One milliHartree is :math:`10^{-3}\ E_{\mathrm{h}}`, approximately :math:`2.6255\ \mathrm{kJ\,mol^{-1}}` using the 2022 :term:`CODATA` constants :cite:`Mohr2025`.
+One millihartree, written :math:`1\ \mathrm{m}E_{\mathrm{h}}`, is :math:`10^{-3}\ E_{\mathrm{h}}`, approximately :math:`2.6255\ \mathrm{kJ\,mol^{-1}}` using the 2022 :term:`CODATA` constants :cite:`Mohr2025`.
 
 Energy differences require context
 ==================================
@@ -57,6 +58,7 @@ A basis set is a finite collection of mathematical functions used to represent m
 Chemically meaningful questions usually compare energies calculated under a consistent set of choices, including geometry, basis set, and electronic-structure method.
 Examples include the energy difference between two molecular geometries, the reaction energy between products and reactants, and the barrier between a reactant and a transition state.
 Changing the model or numerical method between the two calculations can make the difference difficult to interpret.
+If several choices change at once, their effects are combined in one number, so the difference cannot be attributed to a particular geometry, basis set, or method.
 
 Why energy accuracy matters
 ===========================
@@ -85,10 +87,9 @@ Similarly, the `Eyring equation <https://en.wikipedia.org/wiki/Eyring_equation>`
 
    k \propto \exp\left(-\frac{\Delta G^\ddagger}{RT}\right).
 
-Both relations depend exponentially on a free-energy difference; therefore, the predicted equilibrium constant or rate can be too large or too small by a factor that scales exponentially with the magnitude of the error.
-At :math:`298.15\ \mathrm{K}`, :math:`RT \approx 2.479\ \mathrm{kJ\,mol^{-1}}`, an error of 1 milliHartree can produce a factor of approximately :math:`2.88` in a predicted equilibrium constant or rate if the other free-energy contributions are exact.
-An error of approximately :math:`5.71\ \mathrm{kJ\,mol^{-1}}`, or :math:`2.17` milliHartree, produces a factor of ten.
-These estimates illustrate why errors of only a few milliHartrees can have a significant impact on accuracy.
+Because both relations are exponential, a small free-energy error can substantially change the predicted equilibrium constant or rate.
+At :math:`298.15\ \mathrm{K}`, a :math:`1\ \mathrm{m}E_{\mathrm{h}}` error can change the prediction by a factor of approximately :math:`2.88` if all other contributions are exact.
+An error of approximately :math:`2.17\ \mathrm{m}E_{\mathrm{h}}` produces a factor of ten.
 
 .. admonition:: Why can a small free-energy error cause a large error in a predicted equilibrium constant or reaction rate?
    :class: quiz-question
@@ -116,9 +117,9 @@ A calculation can be precise but inaccurate, or have fine resolution without a s
 The teaching target
 ===================
 
-This tutorial uses 1 milliHartree as a teaching target for the absolute difference between the final :term:`QPE` total energy and a classical reference energy for the same Hamiltonian.
+This tutorial uses :math:`1\ \mathrm{m}E_{\mathrm{h}}` as a teaching target for the absolute difference between the final :term:`QPE` total energy and a classical reference energy for the same Hamiltonian.
 The threshold is often associated with the term "chemical accuracy" because it is close to the thermal energy :math:`RT` at room temperature.
-Definitions of chemical accuracy vary, so the tutorial always states the numerical 1 milliHartree target and the two energies being compared.
+Definitions of chemical accuracy vary, so the tutorial always states the numerical :math:`1\ \mathrm{m}E_{\mathrm{h}}` target and the two energies being compared.
 Meeting this target shows that the quantum algorithm reproduced its classical reference to the requested tolerance.
 It does not show that the molecular model agrees with experiment, nor does it remove errors from the geometry, basis set, electronic-structure model, or omitted free-energy contributions.
 

@@ -128,20 +128,18 @@ A finite basis restricts the shapes available to the molecular orbitals and ther
 Adding suitable basis functions gives the orbitals more flexibility, but it also increases computational cost.
 
 This chapter compares the correlation-consistent polarized valence double-zeta basis set, ``cc-pvdz``, with the related triple-zeta basis set, ``cc-pvtz`` :cite:`Dunning1989`.
-Double-zeta and triple-zeta indicate that two or three radial functions, respectively, describe each valence atomic orbital.
-The correlation-consistent family is designed to improve systematically as its zeta level increases and is widely used with the post-Hartree--Fock methods introduced in :doc:`Choosing the active space <03_choosing_the_active_space>`.
-The larger basis provides more radial flexibility for the valence orbitals while both basis sets include polarization functions that describe departures from atomic symmetry.
+Here, double-zeta and triple-zeta mean that two or three radial functions, respectively, describe each valence atomic orbital.
+The larger basis gives the orbitals more radial flexibility but increases computational cost; both basis sets include polarization functions.
 
-The comparison between basis functions in this chapter does not determine the exact basis-set error.
-Instead, it measures how much the calculated energy changes between two related basis choices while the geometry and electronic-structure method (Hartree--Fock) remain fixed.
-This change is the basis-set sensitivity for this comparison.
+This comparison does not determine the exact basis-set error.
+It measures how much the Hartree--Fock energy changes with basis size while the geometry, method, and basis-set family remain fixed.
 
 .. admonition:: Which basis set gives a lower energy and why?
    :class: quiz-question
    :collapsible: closed
 
-   The atomic elements and coordinates, molecular charge, spin multiplicity, and Hartree--Fock method remain fixed.
-   Only the basis set changes.
+   The ``cc-pvtz`` basis should give the lower energy because its additional radial flexibility lets the variational Hartree--Fock calculation optimize over a larger space.
+   The atomic elements and coordinates, molecular charge, spin multiplicity, and Hartree--Fock method remain fixed, so only the basis-set choice contributes to this difference.
 
 Self-consistent wavefunction optimization
 ===========================================
@@ -196,10 +194,10 @@ The reported energies include both the electronic energy and the repulsion among
 
 The absolute difference between the two energies is the observed basis-set sensitivity.
 It does not establish the exact error of either energy because both calculations use finite basis sets.
-Therefore, do not compare this basis-set sensitivity with the 1 milliHartree teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`.
+Therefore, do not compare this basis-set sensitivity with the :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target from :doc:`Energy and accuracy <01_energy_and_accuracy>`.
 
-For the rest of this tutorial, we will use the ``cc-pvdz`` basis set, for the purposes of faster execution of the examples.
-The ``cc-pvtz`` calculation is used only for the basis-set comparison in this chapter, avoiding its greater cost in every later stage.
+For the rest of this tutorial, we use ``cc-pvdz`` because it includes polarization functions while keeping the correlated examples small enough to run quickly; this is a teaching-model cost choice, not a claim that ``cc-pvdz`` is universally preferable.
+The ``cc-pvtz`` calculation is used only for the controlled basis-set comparison in this chapter, avoiding its greater cost in every later stage.
 Bond stretching can increase static correlation and weaken a one-determinant description.
 :doc:`Choosing the active space <03_choosing_the_active_space>` next evaluates this effect for the selected N\ :sub:`2` geometry and identifies which electrons and orbitals must be treated in a multi-configurational wavefunction.
 
