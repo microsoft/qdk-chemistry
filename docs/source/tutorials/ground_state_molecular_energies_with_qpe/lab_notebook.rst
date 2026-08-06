@@ -1,18 +1,27 @@
-Lab notebook
-############
+Set up your lab notebook
+########################
 
-Use this lab notebook to record the inputs, decisions, results, and interpretations that lead to the final ground-state energy estimate.
+The cumulative assignment uses a Markdown lab notebook to record the inputs, decisions, results, and interpretations that lead to the final ground-state energy estimate.
+The lab notebook is a note-taking document, not a Jupyter notebook, and it does not contain executable code.
 Each required chapter adds information to the same record.
-The completed notebook should make the calculation reproducible and should distinguish changes in the molecular model from errors introduced by the quantum algorithm.
+The completed lab notebook should make the calculation reproducible and should distinguish changes in the molecular model from errors introduced by the quantum algorithm.
 
-How to use the notebook
-=======================
+How to use the lab notebook
+===========================
 
-Download :download:`the blank Markdown template <../../_static/examples/ground_state_qpe_lab_notebook_template.md>` or create a copy of the headings and prompts below in your preferred note-taking format.
-Record values with units and enough significant figures to support later comparisons.
-Record the software version and settings associated with each result.
-Keep observations separate from interpretations.
-Do not overwrite earlier results when a later chapter changes an approximation or algorithm setting.
+1. Download :download:`the blank Markdown template <../../_static/examples/ground_state_qpe_lab_notebook_template.md>` and save a working copy in the tutorial folder, or copy its headings into your preferred note-taking format.
+2. Complete only :ref:`lab-notebook-setup` now, using the result from the setup check in :doc:`Before you begin <00_before_you_begin>`.
+3. Leave the remaining sections blank until a chapter links to them.
+4. Record values with units, enough significant figures to support later comparisons, and the settings associated with each result.
+5. Keep observations separate from interpretations, and do not overwrite earlier results when a later chapter changes an approximation or algorithm setting.
+
+After recording the package version and setup-check result, continue to :doc:`Energy and accuracy <01_energy_and_accuracy>`.
+
+Template field guide
+====================
+
+The remainder of this page previews and explains the headings and prompts in the downloaded template.
+You do not need to complete them now; each required chapter links directly to the section used for that stage of the calculation.
 
 .. _lab-notebook-setup:
 
@@ -34,9 +43,9 @@ State what the tutorial calculates and how each comparison will be interpreted.
 - Molecular system:
 - Target quantity:
 - Teaching target:
-- Basis-set comparison:
-- Active-space comparison:
-- Quantum-algorithm reference:
+- Basis-set comparison (which related calculations will be compared, and what does their difference measure?):
+- Active-space comparison (which molecular models will be compared, and what changes between them?):
+- Quantum-algorithm reference (which classical energy for the same selected-space Hamiltonian will validate the final result?):
 - Error sources that remain outside the final algorithmic comparison:
 
 .. _lab-notebook-molecule:
@@ -135,7 +144,7 @@ Record the algorithm settings and final result.
 - Core energy added after phase estimation:
 - Total molecular energy estimate and units:
 - Difference from the algorithmic reference and units:
-- Result relative to the 1 milliHartree teaching target:
+- Result relative to the :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target:
 - Observed runtime:
 
 .. _lab-notebook-conclusion:

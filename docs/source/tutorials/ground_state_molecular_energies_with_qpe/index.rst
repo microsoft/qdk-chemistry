@@ -1,7 +1,7 @@
 Ground-state molecular energies with quantum phase estimation
 #############################################################
 
-This tutorial uses `quantum phase estimation <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ (:term:`QPE`) and the Quantum Development Kit (:term:`QDK`) Chemistry library, called :term:`QDK`/Chemistry in this documentation, to estimate the ground-state electronic energy of a stretched nitrogen molecule, N\ :sub:`2`.
+This tutorial uses `quantum phase estimation <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ (:term:`QPE`) and the `Quantum Development Kit Chemistry library <https://github.com/microsoft/qdk-chemistry>`_, called :term:`QDK`/Chemistry in this documentation, to estimate the ground-state electronic energy of a stretched nitrogen molecule, N\ :sub:`2`.
 It is intended for advanced undergraduate and early-stage graduate students who have introductory knowledge of quantum computing and chemistry.
 :doc:`Before you begin <00_before_you_begin>` describes the prerequisites, software environment, and cumulative lab notebook assignment.
 
@@ -25,7 +25,7 @@ At a chosen molecular geometry, the electronic Hamiltonian includes the electron
 The repulsion among the fixed nuclei contributes separately to the total energy.
 The computational cost of solving its Schrödinger equation grows rapidly with the number of electrons and orbitals, so practical calculations use approximations.
 :doc:`Energy and accuracy <01_energy_and_accuracy>` defines the target energy and the different error comparisons used in the tutorial.
-:doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and basis set and obtains the first Hartree--Fock energy.
+:doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and compares the initial fixed-geometry Hartree--Fock total energies from two related basis sets.
 
 .. _tutorial-orbitals-and-determinants:
 
@@ -72,12 +72,12 @@ The amplitudes of the possible occupations are represented by the quantum state 
 
 .. _tutorial-compute-register:
 
-A *quantum register* is a group of qubits treated as one part of a computation because they serve the same role.
-The occupation-encoding qubits form the *compute register*, which stores the encoded fermionic state and is acted on by the qubit Hamiltonian.
+A quantum register is a group of qubits treated as one part of a computation because they serve the same role.
+The occupation-encoding qubits form the compute register, which stores the encoded fermionic state and is acted on by the qubit Hamiltonian.
 `Ancilla qubits <https://en.wikipedia.org/wiki/Ancilla_bit>`_ are additional qubits used for tasks such as control, temporary workspace, or readout; they do not represent additional spin orbitals and are counted separately.
 :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of this register.
 During Hamiltonian time evolution, each energy eigenstate acquires a phase determined by its energy.
-Quantum phase estimation estimates this phase and converts it to an energy eigenvalue :cite:`AspuruGuzik2005,vonBurg2021`.
+:term:`QPE` estimates this phase and converts it to an energy eigenvalue :cite:`AspuruGuzik2005,vonBurg2021`.
 This representation does not make the calculation automatically efficient.
 Preparing a useful state, implementing time evolution, correcting errors, and repeating measurements can all require substantial resources.
 
@@ -112,34 +112,38 @@ Later chapters quantify it through orbital entropies and determinant weights.
 Tutorial scope and structure
 ============================
 
-The tutorial deliberately selects a compact active-space model that can be solved exactly on a classical computer so each quantum stage can be checked against a classical reference.
-The quantum circuits are also executed on a classical simulator.
-The tutorial therefore does not demonstrate quantum advantage.
-Instead, the classical result provides a reference for validating each step of a workflow intended for future fault-tolerant quantum computers and larger active spaces.
+The tutorial deliberately selects a compact active-space model that can be solved exactly on a classical computer, allowing each quantum stage to be checked against a classical reference.
+The circuits are executed on a classical simulator, so this tutorial validates the workflow rather than demonstrating quantum advantage.
 Complete active space configuration interaction (:term:`CASCI`) performs full configuration interaction within the selected active space rather than across all orbitals in the molecular model.
 The final quantum calculation is compared with the :term:`CASCI` energy of the same selected active-space Hamiltonian.
-The tutorial uses 1 milliHartree (often referred to as "chemical accuracy") as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.
+The tutorial uses one `millihartree <https://en.wikipedia.org/wiki/Hartree>`_ (:math:`1\ \mathrm{m}E_{\mathrm{h}}`), often referred to as "chemical accuracy," as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.
 
-Each required chapter introduces one stage of the calculation, provides a testable Python example where appropriate, and ends with questions and an assignment.
-Most examples are short.
-The final circuit simulation is the only intentionally long required example and may take tens of minutes, depending on the computer.
+Each required chapter:
+
+- introduces one stage of the calculation;
+- provides a testable Python example where appropriate; and
+- ends with questions and a lab notebook assignment.
+
+Most examples are short, while the final circuit simulation may take tens of minutes depending on the computer.
 
 Cumulative assignment
 =====================
 
-Maintain a :doc:`lab notebook <lab_notebook>` throughout the tutorial.
+Download :download:`the blank Markdown lab notebook <../../_static/examples/ground_state_qpe_lab_notebook_template.md>` and maintain a working copy throughout the tutorial.
+This is a note-taking document, not a Jupyter notebook.
+The :doc:`lab notebook setup and field guide <lab_notebook>` explains how to use it.
 Each required chapter asks you to record the inputs, decisions, results, and interpretations needed to reproduce the final calculation.
-The notebook turns the chapter learning objectives into evidence that you can inspect and explain.
-At the end, use the completed notebook to explain the final energy estimate and the limitations that remain.
+The lab notebook turns the chapter learning objectives into evidence that you can inspect and explain.
+At the end, use the completed lab notebook to explain the final energy estimate and the limitations that remain.
 
 .. toctree::
    :maxdepth: 2
 
    00_before_you_begin
+   lab_notebook
    01_energy_and_accuracy
    02_describing_the_molecule
    03_choosing_the_active_space
    04_putting_the_problem_on_qubits
    05_preparing_the_trial_state
    06_iterative_phase_estimation
-   lab_notebook

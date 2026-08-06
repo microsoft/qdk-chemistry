@@ -9,7 +9,9 @@ Before you begin
 .. admonition:: Lab notebook assignment
    :class: lab-notebook-assignment
 
-   Create a working copy of the :doc:`lab notebook <lab_notebook>`.
+   Download :download:`the blank Markdown lab notebook <../../_static/examples/ground_state_qpe_lab_notebook_template.md>` and save a working copy in the tutorial folder.
+   This is a note-taking document, not a Jupyter notebook.
+   Follow :doc:`Set up your lab notebook <lab_notebook>` after completing the software setup below.
    Complete :ref:`lab-notebook-setup` before running a scientific calculation.
    This record identifies the :term:`QDK`/Chemistry version used for the tutorial.
 
@@ -25,7 +27,7 @@ You are ready to begin if you can perform the following tasks with reference mat
 - Describe molecular orbitals and electron configurations qualitatively.
 - Explain how quantum gates change qubit states and how measurement produces classical outcomes.
 
-The tutorial does not assume prior knowledge of active-space methods, fermion-to-qubit encodings, quantum state preparation, or quantum phase estimation.
+The tutorial does not assume prior knowledge of active-space methods, fermion-to-qubit encodings, quantum state preparation, or quantum phase estimation (:term:`QPE`).
 The :doc:`tutorial introduction <index>` provides the chemistry and quantum-computing context needed to begin, and the specialized methods are developed before they are used in calculations.
 Use the `Python tutorial <https://docs.python.org/3/tutorial/>`_, the `NumPy fundamentals <https://numpy.org/doc/stable/user/basics.html>`_, and the `quantum-computing concepts overview <https://learn.microsoft.com/azure/quantum/concepts-overview>`_ to refresh prerequisite material.
 
@@ -49,7 +51,7 @@ The required examples use `Visual Studio Code <https://code.visualstudio.com/dow
 They do not require Qiskit, OpenFermion, or the Quantum Resource Estimator.
 
 Install the desktop version of Visual Studio Code, the `Microsoft Quantum Development Kit extension <https://marketplace.visualstudio.com/items?itemName=quantum.qsharp-lang-vscode>`_, the `Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_, and the `Jupyter extension <https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter>`_.
-These extensions provide the quantum-language, Python, notebook, simulation, debugging, and visualization features used by the tutorial.
+These extensions provide the quantum-language, Python, Jupyter notebook, simulation, debugging, and visualization features used by the tutorial.
 
 .. _tutorial-qsharp:
 
@@ -89,7 +91,7 @@ Install the released :term:`QDK`/Chemistry package into the active environment:
    python -m pip install --upgrade pip
    python -m pip install qdk-chemistry==\ |ground-state-tutorial-version| "ipykernel>=6.0"
 
-This command installs the :term:`QDK`/Chemistry release that matches this documentation and the Python kernel used to run the interactive notebook.
+This command installs the :term:`QDK`/Chemistry release that matches this documentation and the Python kernel used to run the interactive Jupyter notebooks.
 QDK/Chemistry already requests QDK's Jupyter support, which supplies the molecular-orbital widget used in :doc:`Choosing the active space <03_choosing_the_active_space>`.
 The required workflow does not use the ``all``, ``qiskit-extras``, or ``qre`` optional-dependency groups.
 Keep the environment active while completing the tutorial.
@@ -121,7 +123,7 @@ For each chapter:
 1. Download the complete example files and open them in Visual Studio Code.
 2. Read the complete file, including imports and setup code omitted from the excerpts in the chapter.
 3. Read the chapter explanation before running the example.
-4. Run the Python example in the Visual Studio Code integrated terminal, and run any interactive notebook as directed by the chapter.
+4. Run the Python example in the Visual Studio Code integrated terminal, and run any interactive Jupyter notebook as directed by the chapter.
 5. Complete the understanding check, when present.
 6. Update the linked section of the lab notebook before continuing.
 

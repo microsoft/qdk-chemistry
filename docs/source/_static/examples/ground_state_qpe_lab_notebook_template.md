@@ -10,9 +10,9 @@
 - Molecular system:
 - Target quantity:
 - Teaching target:
-- Basis-set comparison:
-- Active-space comparison:
-- Quantum-algorithm reference:
+- Basis-set comparison (which related calculations will be compared, and what does their difference measure?):
+- Active-space comparison (which molecular models will be compared, and what changes between them?):
+- Quantum-algorithm reference (which classical energy for the same selected-space Hamiltonian will validate the final result?):
 - Error sources outside the final algorithmic comparison:
 
 ## Molecular input and mean-field calculation
@@ -83,7 +83,7 @@
 - Core energy added after phase estimation:
 - Total molecular energy estimate and units:
 - Difference from the algorithmic reference and units:
-- Result relative to the 1 milliHartree teaching target:
+- Result relative to the $1\,\mathrm{m}E_{\mathrm{h}}$ teaching target:
 - Observed runtime:
 
 ## Conclusion
