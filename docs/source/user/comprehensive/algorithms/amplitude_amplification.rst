@@ -36,10 +36,10 @@ Using amplitude amplification
       :end-before: # end-cell-create
 
 
-``run`` takes the width of the register both oracles act on.
-The returned circuit measures the whole register. It also carries the same amplification
-without measurement as a Q# callable, so a caller can append its own measurement instead.
-See below for an example of amplifying a measurement-free QPE circuit.
+``run`` takes the two oracles and reads the register width from a resource estimate of
+the state preparation. The returned circuit measures the whole register. It also carries
+the same amplification without measurement as a Q# callable, so a caller can append its
+own measurement instead. See below for an example of amplifying a measurement-free QPE circuit.
 
 Amplitude amplified QPE
 -----------------------

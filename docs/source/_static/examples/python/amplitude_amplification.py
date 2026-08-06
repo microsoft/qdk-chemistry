@@ -74,12 +74,8 @@ target_phase_bins = (8, 9)
 good_state_oracle = phase_marking_oracle(state_prep_oracle, target_phase_bins)
 
 # 5. Amplify, then execute
-params = state_prep_oracle._qsharp_factory.parameter
-num_qubits = params["numBits"] + len(params["systems"]) + params["numAncillaQubits"]
 amplitude_amplification = create("amplitude_amplification", "base", rounds=2)
-circuit = amplitude_amplification.run(
-    state_prep_oracle, good_state_oracle, num_qubits=num_qubits
-)
+circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
 
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400

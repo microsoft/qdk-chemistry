@@ -144,14 +144,12 @@ class AmplitudeAmplification(Algorithm):
         self,
         state_prep_oracle: Circuit,
         good_state_oracle: Circuit,
-        num_qubits: int,
     ) -> Circuit:
         r"""Build an amplitude-amplified circuit.
 
         Args:
             state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.
             good_state_oracle: Flips a flag qubit on the good subspace. Must carry an adjointable Q# operation.
-            num_qubits: Size of the register both oracles act on.
 
         Returns:
             The amplified circuit, measuring the whole register. Its ``qsharp_op`` is the same
@@ -159,7 +157,8 @@ class AmplitudeAmplification(Algorithm):
 
         Raises:
             TypeError: If either circuit carries no adjointable Q# operation.
-            ValueError: If ``num_qubits`` or the ``rounds`` setting is out of range.
+            ValueError: If the ``rounds`` setting is negative.
+            RuntimeError: If the state preparation cannot be resource estimated for its width.
 
         """
         Logger.trace_entering()
@@ -169,8 +168,9 @@ class AmplitudeAmplification(Algorithm):
         good_state_operation = good_state_oracle._qsharp_op  # noqa: SLF001
         if good_state_operation is None:
             raise TypeError("Amplitude amplification requires a good state oracle qsharp operation.")
-        if num_qubits < 1:
-            raise ValueError(f"num_qubits must be positive. Got {num_qubits}.")
+
+        # A Q# callable carries no arity, so take the register width from a resource estimate.
+        num_qubits = int(state_prep_oracle.estimate()["logicalCounts"]["numQubits"])
 
         rounds = int(self._settings.get("rounds"))
         if rounds < 0:

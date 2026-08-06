@@ -95,7 +95,7 @@ def _amplified_qpe_circuit(
     good_state_oracle = phase_marking_oracle(state_prep_oracle, accepted_range)
 
     algorithm = create("amplitude_amplification", **settings)
-    circuit = algorithm.run(state_prep_oracle, good_state_oracle, num_qubits=num_qubits)
+    circuit = algorithm.run(state_prep_oracle, good_state_oracle)
     return circuit, num_qubits, num_ancilla_qubits
 
 
