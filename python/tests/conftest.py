@@ -103,7 +103,15 @@ def base_qdk_ctx() -> qdk.Context:
 
 @pytest.fixture(scope="module")
 def use_base_qdk_ctx(base_qdk_ctx: qdk.Context) -> Iterator[qdk.Context]:
-    """Resolve ``QSHARP_UTILS`` against the Base-profile context for a whole module."""
+    """Resolve ``QSHARP_UTILS`` against the Base-profile context for a whole module.
+
+    Module-scoped on purpose. Pytest instantiates higher-scoped fixtures first, so a
+    function-scoped version of this would be set up *after* any module-scoped fixture
+    that builds a ``Circuit``. Those circuits pin the context their Q# callable was
+    evaluated into, and generating QIR for them once the shared context has been
+    swapped to Base panics in the compiler with "callable should exist in lowered
+    package" rather than raising. Narrowing this scope reintroduces that panic.
+    """
     with use_qsharp_context(base_qdk_ctx) as context:
         yield context
 
