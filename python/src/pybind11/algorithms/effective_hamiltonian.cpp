@@ -56,7 +56,12 @@ Examples:
     >>> effective_hamiltonian = constructor.run(reference, hamiltonian, p_indices)
 )");
 
-  constructor.def(py::init<>());
+  constructor.def(py::init<>(), R"(
+Create an ``EffectiveHamiltonianConstructor`` instance.
+
+Default constructor for the abstract base class; typically called via
+``super().__init__()`` from a derived class.
+)");
   constructor.def("run", &EffectiveHamiltonianConstructor::run,
                   py::arg("reference"), py::arg("hamiltonian"),
                   py::arg("p_indices"), R"(
@@ -72,7 +77,12 @@ Returns:
     The effective Hamiltonian acting on ``P``.
 )");
   constructor.def("settings", &EffectiveHamiltonianConstructor::settings,
-                  py::return_value_policy::reference_internal);
+                  py::return_value_policy::reference_internal, R"(
+Access the constructor's configuration settings.
+
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object.
+)");
   constructor.def_property(
       "_settings",
       [](EffectiveHamiltonianConstructorBase &instance) -> Settings & {
@@ -82,9 +92,24 @@ Returns:
          std::unique_ptr<Settings> new_settings) {
         instance.replace_settings(std::move(new_settings));
       },
-      py::return_value_policy::reference_internal);
-  constructor.def("name", &EffectiveHamiltonianConstructor::name);
-  constructor.def("type_name", &EffectiveHamiltonianConstructor::type_name);
+      py::return_value_policy::reference_internal, R"(
+Internal settings object property.
+
+Allows derived classes to replace the settings object with a specialized
+Settings subclass in their constructor.
+)");
+  constructor.def("name", &EffectiveHamiltonianConstructor::name, R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+)");
+  constructor.def("type_name", &EffectiveHamiltonianConstructor::type_name, R"(
+The algorithm's type name.
+
+Returns:
+    str: The type name of the algorithm
+)");
   constructor.def("hash", &EffectiveHamiltonianConstructor::hash,
                   py::arg("reference"), py::arg("hamiltonian"),
                   py::arg("p_indices"));
