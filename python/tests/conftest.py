@@ -80,12 +80,6 @@ if build_dir.exists():
             break
 
 
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context at the default profile, isolated from the shared one."""
-    return create_qsharp_context()
-
-
 @cache
 def _base_qsharp_context() -> qdk.Context:
     """Build the ``TargetProfile.Base`` context once and share it across tests."""

@@ -119,11 +119,8 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Flips `flags[index]` for the single selected address.
-    ///
-    /// The returned operation acts on `[address | flags]` and restores the address register,
-    /// so the caller allocates `AddressQubits(numActions) + numActions` qubits.
     function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
-        (qs) => {
+        return qs => {
             let numAddressQubits = AddressQubits(numActions);
             let address = qs[0..numAddressQubits - 1];
             let flags = qs[numAddressQubits...];
@@ -137,7 +134,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
     function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
-        (qs) => {
+        return qs => {
             let numAddressQubits = AddressQubits(numActions);
             Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
             let address = qs[0..numAddressQubits - 1];
@@ -146,20 +143,19 @@ namespace QDKChemistry.Utils.UnaryIteration {
             UnaryIteration(address, numActions, (index) => {
                 X(flags[index]);
             });
-        }
+        };
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
     function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
-        (address) => {
-            let numAddressQubits = AddressQubits(numActions);
-            Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
+        return address => {
+            Fact(2^AddressQubits(numActions) == numActions, "numActions must be a power of two");
             ApplyToEach(H, address);
             UnaryIterationWithControl(address, numActions, (index, control) => {
                 if data[index] {
                     Z(control);
                 }
             });
-        }
+        };
     }
 }

@@ -95,10 +95,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     /// Checks the generic schedule against the explicit walk power.
     ///
-    /// The returned operation acts on `[address | targets]`, so the caller allocates
-    /// `AddressQubits(numQueries + 1)` qubits ahead of the target register. The schedule at
-    /// `addressValue` is applied, then `W^(numQueries - 2 * addressValue)` is explicitly undone
-    /// with the same two callables, so a correct schedule leaves the prepared input untouched.
+    /// The returned operation expects a register laid out as `address + targets`, with
+    /// `AddressQubits(numQueries + 1)` address qubits followed by the walk's own register.
+    /// It leaves the identity behind when the schedule agrees with `W^(numQueries - 2t)`.
     function MakeTestSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -106,7 +105,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         addressValue : Int,
         systemAngle : Double,
     ) : (Qubit[] => Unit) {
-        (qs) => {
+        return qs => {
             let numAddressQubits = AddressQubits(numQueries + 1);
             let address = qs[0..numAddressQubits - 1];
             let targets = qs[numAddressQubits...];
@@ -130,7 +129,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             }
 
             ApplyXorInPlace(addressValue, address);
-        }
+        };
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
