@@ -2,13 +2,13 @@
 
 ## Review completion
 
-- [ ] Finish Caroline review using grouped, current-source decisions rather than applying generated-HTML edits mechanically.
+- [x] Finish Caroline review using grouped, current-source decisions rather than applying generated-HTML edits mechanically.
   - [x] Complete objective and staleness audit.
   - [x] Review and implement accepted Chapter 2-4 clarity changes.
   - [x] Review redundant or stale Chapter 5-6 suggestions.
   - [x] Decide whether any landing-page ideas should be retained without adopting the wholesale rewrite.
   - [x] Record final dispositions and validate.
-  - [ ] Commit and reply.
+  - [x] Commit and prepare reply.
 - [ ] Process Yingrong review feedback using a grouped current-source audit.
 - [ ] Process Martin review feedback using a grouped current-source audit.
 - [ ] Process any additional substantive reviewer feedback using the grouped review workflow.
