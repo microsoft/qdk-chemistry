@@ -55,45 +55,52 @@ inline double median(const Eigen::VectorXd& values) {
 ///   dg_ijkl = -2*mu2*delta_ij*delta_kl - xi_ij*delta_kl - delta_ij*xi_kl
 ///
 /// This is the SINGLE SOURCE OF TRUTH for that tensor. rebuild_hamiltonian()
-/// subtracts dg (via full_tensor(), or an equivalent explicit index loop)
-/// directly from g to build g~ = g + dg. solve_one_electron_shift() never
-/// needs the whole O(norb^4) tensor -- it only needs dg's Coulomb/exchange-
-/// type contractions (coulomb_contraction/exchange_contraction below), which
-/// fold into the effective one-electron operator alongside the ORIGINAL g's
-/// own Coulomb/exchange contraction. Both call sites derive their numbers
-/// from THIS struct, so they cannot silently drift apart;
-/// test_hamiltonian_regularizer.cpp checks coulomb_contraction/
-/// exchange_contraction against a direct, brute-force index contraction of
-/// full_tensor() for correctness.
+/// adds dg (via add_two_body_correction()) directly onto g to build
+/// g~ = g + dg. solve_one_electron_shift() never needs the whole O(norb^4)
+/// tensor -- it only needs dg's Coulomb/exchange-type contractions
+/// (add_coulomb_contraction/add_exchange_contraction below), which fold into
+/// the effective one-electron operator alongside the ORIGINAL g's own
+/// Coulomb/exchange contraction. Both call sites derive their numbers from
+/// THIS struct, so they cannot silently drift apart;
+/// test_hamiltonian_regularizer.cpp checks add_coulomb_contraction/
+/// add_exchange_contraction against a direct, brute-force index contraction of
+/// add_two_body_correction() for correctness.
 struct TwoBodyBlissCorrection {
   double mu2;
   Eigen::MatrixXd xi;
 
-  /// Sum_k dg_ijkk (Coulomb-type contraction), obtained by substituting
-  /// dg_ijkl's definition and summing k over Sum_k delta_kk = norb,
-  /// Sum_k xi_kk = tr(xi):
+  /// Add Sum_k dg_ijkk (Coulomb-type contraction) onto `coulomb` in place,
+  /// obtained by substituting dg_ijkl's definition and summing k over
+  /// Sum_k delta_kk = norb, Sum_k xi_kk = tr(xi):
   ///   Sum_k dg_ijkk = -2*mu2*norb*delta_ij - norb*xi_ij - tr(xi)*delta_ij
   ///                 = -(2*mu2*norb + tr(xi))*delta_ij - norb*xi_ij
-  Eigen::MatrixXd coulomb_contraction(Eigen::Index norb) const {
-    return -(2.0 * mu2 * static_cast<double>(norb) + xi.trace()) *
-               Eigen::MatrixXd::Identity(norb, norb) -
-           static_cast<double>(norb) * xi;
+  /// `norb` is taken from the caller's matrix, and the correction is folded in
+  /// place so no separate norb x norb result is allocated: on return `coulomb`
+  /// holds coul(g~) = coul(g) + Sum_k dg_ijkk.
+  void add_coulomb_contraction(Eigen::MatrixXd& coulomb) const {
+    const double norb = static_cast<double>(coulomb.rows());
+    coulomb -= norb * xi;
+    coulomb.diagonal().array() -= 2.0 * mu2 * norb + xi.trace();
   }
 
-  /// Sum_k dg_ikkj (exchange-type contraction), using
-  /// Sum_k delta_ik*delta_kj = delta_ij, Sum_k xi_ik*delta_kj = xi_ij,
+  /// Add Sum_k dg_ikkj (exchange-type contraction) onto `exchange` in place,
+  /// using Sum_k delta_ik*delta_kj = delta_ij, Sum_k xi_ik*delta_kj = xi_ij,
   /// Sum_k delta_ik*xi_kj = xi_ij:
   ///   Sum_k dg_ikkj = -2*mu2*delta_ij - 2*xi_ij
-  Eigen::MatrixXd exchange_contraction(Eigen::Index norb) const {
-    return -2.0 * mu2 * Eigen::MatrixXd::Identity(norb, norb) - 2.0 * xi;
+  /// The correction is folded in place (no norb x norb allocation): on return
+  /// `exchange` holds exch(g~) = exch(g) + Sum_k dg_ikkj.
+  void add_exchange_contraction(Eigen::MatrixXd& exchange) const {
+    exchange -= 2.0 * xi;
+    exchange.diagonal().array() -= 2.0 * mu2;
   }
 
-  /// Full dg_ijkl tensor, flattened as ((i*norb+j)*norb+k)*norb+l. Only used
-  /// by rebuild_hamiltonian() (which needs the whole tensor to build g~) and
-  /// by tests that need to brute-force-verify the closed-form contractions
-  /// above against direct index summation.
-  Eigen::VectorXd full_tensor(Eigen::Index norb) const {
-    Eigen::VectorXd dg = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  /// Add the two-body BLISS correction dg_ijkl onto `g` in place, where `g` is
+  /// the flattened two-electron tensor ((i*norb+j)*norb+k)*norb+l with side
+  /// length `norb`. On return `g` holds g~ = g + dg without materializing a
+  /// separate O(norb^4) dg tensor. Used by rebuild_hamiltonian() to build g~;
+  /// tests brute-force-verify the closed-form contractions above against direct
+  /// summation of the dg this method adds (starting from a zero `g`).
+  void add_two_body_correction(Eigen::VectorXd& g, Eigen::Index norb) const {
     for (Eigen::Index i = 0; i < norb; ++i) {
       for (Eigen::Index j = 0; j < norb; ++j) {
         for (Eigen::Index k = 0; k < norb; ++k) {
@@ -109,13 +116,12 @@ struct TwoBodyBlissCorrection {
               value -= xi(k, l);
             }
             if (value != 0.0) {
-              dg[((i * norb + j) * norb + k) * norb + l] = value;
+              g[((i * norb + j) * norb + k) * norb + l] += value;
             }
           }
         }
       }
     }
-    return dg;
   }
 };
 

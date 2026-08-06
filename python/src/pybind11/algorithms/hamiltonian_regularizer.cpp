@@ -8,7 +8,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
-#include "microsoft/flr_bliss/flr_bliss_regularizer.hpp"
+#include "qdk/chemistry/algorithms/microsoft/flr_bliss/flr_bliss_regularizer.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;

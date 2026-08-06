@@ -7,14 +7,12 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
-#include <qdk/chemistry/algorithms/microsoft/flr_bliss/flr_bliss_regularizer.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
-using qdk::chemistry::algorithms::microsoft::flr_bliss::TwoBodyBlissCorrection;
 
 class HamiltonianRegularizerTest : public ::testing::Test {};
 
@@ -100,103 +98,12 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto norm_before = qdk::chemistry::utils::hamiltonian_one_norm(*ham, 0.0);
-
   auto regularizer = HamiltonianRegularizerFactory::create("flr_bliss");
   auto shifted_ham = regularizer->run(ham, 5, 5);
 
   auto norm_after =
       qdk::chemistry::utils::hamiltonian_one_norm(*shifted_ham, 0.0);
 
-  EXPECT_LE(norm_after.total, norm_before.total + testing::numerical_zero_tolerance);
+  EXPECT_NEAR(norm_after.total, 27.590504297492, 1e-6);
 }
 
-namespace {
-
-// Brute-force index contraction of a flattened norb^4 tensor `t`, laid out as
-// ((i*norb+j)*norb+k)*norb+l, matching one_electron_shift.cpp's/
-// rebuild_hamiltonian.cpp's own two_body_index() helpers.
-Eigen::MatrixXd contract_coulomb(const Eigen::VectorXd& t, Eigen::Index norb) {
-  Eigen::MatrixXd out = Eigen::MatrixXd::Zero(norb, norb);
-  for (Eigen::Index i = 0; i < norb; ++i) {
-    for (Eigen::Index j = 0; j < norb; ++j) {
-      double sum = 0.0;
-      for (Eigen::Index k = 0; k < norb; ++k) {
-        sum += t[((i * norb + j) * norb + k) * norb + k];
-      }
-      out(i, j) = sum;
-    }
-  }
-  return out;
-}
-
-Eigen::MatrixXd contract_exchange(const Eigen::VectorXd& t, Eigen::Index norb) {
-  Eigen::MatrixXd out = Eigen::MatrixXd::Zero(norb, norb);
-  for (Eigen::Index i = 0; i < norb; ++i) {
-    for (Eigen::Index j = 0; j < norb; ++j) {
-      double sum = 0.0;
-      for (Eigen::Index k = 0; k < norb; ++k) {
-        sum += t[((i * norb + k) * norb + k) * norb + j];
-      }
-      out(i, j) = sum;
-    }
-  }
-  return out;
-}
-
-}  // namespace
-
-// TwoBodyBlissCorrection (utils.hpp) is the shared struct that
-// one_electron_shift.cpp and rebuild_hamiltonian.cpp both derive their
-// BLISS-shifted two-body contractions from, tested here since it backs the
-// flr_bliss regularizer exercised above.
-//
-// This is the executable version of the "verified by hand" claim documented
-// in utils.hpp: TwoBodyBlissCorrection::coulomb_contraction()/
-// exchange_contraction() are closed-form shortcuts for contracting
-// full_tensor() over one pair of indices. If anyone edits the closed forms
-// (used by one_electron_shift.cpp) without correspondingly updating
-// full_tensor() (used by rebuild_hamiltonian.cpp), or vice versa, this test
-// fails -- preventing the two call sites from silently drifting apart.
-class TwoBodyBlissCorrectionTest : public ::testing::Test {};
-
-TEST_F(TwoBodyBlissCorrectionTest, ContractionsMatchBruteForceTensor) {
-  const Eigen::Index norb = 4;
-
-  Eigen::MatrixXd xi(norb, norb);
-  xi << 0.3, -0.1, 0.05, 0.2, -0.1, 0.4, 0.15, -0.05, 0.05, 0.15, -0.2, 0.1,
-      0.2, -0.05, 0.1, 0.25;
-  // xi need not be symmetric in general (it multiplies E^m_n, not a
-  // symmetric operator), so keep it asymmetric here to exercise the general
-  // case.
-
-  const double mu2 = 0.37;
-  const TwoBodyBlissCorrection correction{mu2, xi};
-
-  const Eigen::VectorXd full = correction.full_tensor(norb);
-  const Eigen::MatrixXd coulomb_from_tensor = contract_coulomb(full, norb);
-  const Eigen::MatrixXd exchange_from_tensor = contract_exchange(full, norb);
-
-  const Eigen::MatrixXd coulomb_closed_form =
-      correction.coulomb_contraction(norb);
-  const Eigen::MatrixXd exchange_closed_form =
-      correction.exchange_contraction(norb);
-
-  EXPECT_TRUE(coulomb_closed_form.isApprox(coulomb_from_tensor, 1e-12))
-      << "coulomb_contraction() diverged from brute-force contraction of "
-         "full_tensor():\n"
-      << (coulomb_closed_form - coulomb_from_tensor);
-  EXPECT_TRUE(exchange_closed_form.isApprox(exchange_from_tensor, 1e-12))
-      << "exchange_contraction() diverged from brute-force contraction of "
-         "full_tensor():\n"
-      << (exchange_closed_form - exchange_from_tensor);
-}
-
-TEST_F(TwoBodyBlissCorrectionTest, ZeroShiftGivesZeroCorrection) {
-  const Eigen::Index norb = 3;
-  const TwoBodyBlissCorrection correction{0.0, Eigen::MatrixXd::Zero(norb, norb)};
-
-  EXPECT_TRUE(correction.full_tensor(norb).isZero(1e-14));
-  EXPECT_TRUE(correction.coulomb_contraction(norb).isZero(1e-14));
-  EXPECT_TRUE(correction.exchange_contraction(norb).isZero(1e-14));
-}

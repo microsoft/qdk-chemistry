@@ -100,36 +100,10 @@ OneElectronShiftResult solve_one_electron_shift(
 
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(norb, norb);
 
-  // Contractions of the BLISS-shifted tensor
-  //   g~ = g - 2*mu2*d*d - xi*d - d*xi   (matching rebuild_hamiltonian):
-  //   sum_k g~[i,j,k,k] = coul + coulomb_contraction
-  //   sum_k g~[i,k,k,j] = exch + exchange_contraction
-  // TwoBodyBlissCorrection is the SAME struct rebuild_hamiltonian() uses to
-  // build the full g~ tensor, so these two closed-form contractions are
-  // guaranteed consistent with the g~ actually written into the shifted
-  // Hamiltonian -- see the top of this file for the index-algebra
-  // derivation and test_hamiltonian_regularizer.cpp for a brute-force
-  // numerical check.
-  const TwoBodyBlissCorrection correction{mu2, xi};
-  const Eigen::MatrixXd coulomb_shifted =
-      coulomb + correction.coulomb_contraction(static_cast<Eigen::Index>(norb));
-  const Eigen::MatrixXd exchange_shifted =
-      exchange +
-      correction.exchange_contraction(static_cast<Eigen::Index>(norb));
-
-  // Effective one-electron tensor of H - K with mu1 = 0 (Eq. 14):
-  //   Heff0 = h + (Ne-1)*xi - mu2*I + coul(g~) - 1/2 exch(g~).
-  const Eigen::MatrixXd h0 =
-      h + (num_electrons - 1.0) * xi - mu2 * identity;
-  Eigen::MatrixXd effective_one_body =
-      h0 + coulomb_shifted - 0.5 * exchange_shifted;
-
-  // Baseline: 1-norm of the ORIGINAL effective one-electron operator
-  //   Heff = h + coul - 1/2 exch  (no BLISS shift), for before/after reporting.
-  // lapack::syev overwrites its input buffer in place and only reads the
-  // lower triangle (matching Eigen::SelfAdjointEigenSolver's default
-  // convention); Job::NoVec skips eigenvector computation since only the
-  // eigenvalues are needed here.
+  // Baseline 1-norm of the ORIGINAL (unshifted) effective operator
+  // Heff = h + coul - 1/2 exch, computed BEFORE the BLISS correction is folded
+  // into coulomb/exchange in place below. (lapack::syev overwrites its input
+  // and reads only the lower triangle; Job::NoVec skips eigenvectors.)
   Eigen::MatrixXd effective_one_body_original =
       h + coulomb - 0.5 * exchange;
   Eigen::VectorXd eigenvalues_baseline(norb);
@@ -138,7 +112,18 @@ OneElectronShiftResult solve_one_electron_shift(
                static_cast<int64_t>(norb), eigenvalues_baseline.data());
   result.lambda_1e_baseline = eigenvalues_baseline.array().abs().sum();
 
-  // Eq. 23's LP has a closed-form solution: mu1 = median{eigenvalues}.
+  // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
+  // exch(g~). See TwoBodyBlissCorrection (header) for the g~ definition and
+  // why this stays consistent with rebuild_hamiltonian's full tensor.
+  const TwoBodyBlissCorrection correction{mu2, xi};
+  correction.add_coulomb_contraction(coulomb);
+  correction.add_exchange_contraction(exchange);
+
+  // Effective one-electron operator of H - K with mu1 = 0 (see header).
+  const Eigen::MatrixXd h0 =
+      h + (num_electrons - 1.0) * xi - mu2 * identity;
+  Eigen::MatrixXd effective_one_body = h0 + coulomb - 0.5 * exchange;
+
   Eigen::VectorXd eigenvalues(norb);
   lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower,
                static_cast<int64_t>(norb), effective_one_body.data(),
@@ -166,39 +151,23 @@ std::shared_ptr<qdk::chemistry::data::Hamiltonian> rebuild_hamiltonian(
 
   const size_t norb = static_cast<size_t>(h_prime.rows());
 
-  // The BLISS shift operator (subtracted from H) is
-  //   K = mu1*(N - Ne) + mu2*(N^2 - Ne^2) + (N - Ne)*sum_ij xi_ij E_ij,
-  // which annihilates every Ne-electron state, so H_tilde = H - K leaves the
-  // Ne-sector energy invariant for ANY (mu1, mu2, xi). Expanding -K into the
-  // canonical chemist integrals g[i,j,k,l] = (ij|kl) of this container gives
-  // the shifts below. These were derived directly in the container's own
-  // convention and verified to machine precision against explicit
-  // single-determinant energies -- NOT copied from Appendix C / the qdk BLISS
-  // helper, whose (different) two-body normalisation would introduce spurious
-  // factors of 2 here.
-  //
-  // CAUTION: h_prime carries h_ij + Ne*xi_ij, which is only Appendix C's
-  // *effective* one-body operator (the number operator that multiplies xi is
-  // replaced by its eigenvalue Ne to estimate the 1-norm and optimise mu1); it
-  // is NOT the physical one-body tensor. Recover the true integrals first.
+  // Recover the physical one-body tensor: h_prime carries h + Ne*xi (the
+  // effective operator used only for the mu1 1-norm optimisation), not h.
   const Eigen::MatrixXd h = h_prime - num_electrons * xi;
 
-  // One-body part of -K:
-  //   h_tilde_ij = h_ij + (Ne - 1)*xi_ij - (mu1 + mu2)*delta_ij
+  // Expand -K into this container's chemist integrals (see the header docstring
+  // for the operator K, the full derivation, and the normalisation caveats).
+  // One-body part: h_tilde_ij = h_ij + (Ne-1)*xi_ij - (mu1+mu2)*delta_ij.
   Eigen::MatrixXd h_tilde = h + (num_electrons - 1.0) * xi;
   h_tilde.diagonal().array() -= (mu1 + mu2);
 
-  // Two-body part of -K:
-  //   g_tilde_ijkl = g_ijkl - 2*mu2*delta_ij*delta_kl
-  //                          - xi_ij*delta_kl - delta_ij*xi_kl
-  // TwoBodyBlissCorrection::full_tensor() is the single source of truth for
-  // this dg_ijkl tensor -- solve_one_electron_shift() derives its Coulomb/
-  // exchange-type contractions of the SAME tensor from the same struct, so
-  // the two steps cannot silently drift apart.
+  // Two-body part: g_tilde = g + dg, with dg the correction whose closed-form
+  // contractions solve_one_electron_shift() reuses (single source of truth in
+  // TwoBodyBlissCorrection). dg is folded into a copy of the original integrals
+  // in place, avoiding a separate O(norb^4) allocation.
   const TwoBodyBlissCorrection correction{mu2, xi};
-  const Eigen::VectorXd g_tilde =
-      two_body_integrals +
-      correction.full_tensor(static_cast<Eigen::Index>(norb));
+  Eigen::VectorXd g_tilde = two_body_integrals;
+  correction.add_two_body_correction(g_tilde, static_cast<Eigen::Index>(norb));
 
   // Constant part of -K in the Ne-electron sector: +mu1*Ne + mu2*Ne^2.
   const double core_energy_new = original.get_core_energy() +
