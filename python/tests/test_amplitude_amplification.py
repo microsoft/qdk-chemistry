@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create

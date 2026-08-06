@@ -31,7 +31,7 @@ def phase_marking_oracle(
     A QPE circuit with :math:`n` phase qubits writes the phase :math:`\varphi` of the
     eigenvalue :math:`e^{2\pi i\varphi}` into the bin :math:`\lfloor 2^n\varphi\rceil`, so a
     target eigenvalue is selected by the bin its phase falls in. Bins are marked over the
-    half-open interval ``(start, stop)``. 
+    half-open interval ``(start, stop)``.
 
     Args:
         qpe_circuit: The measurement-free QPE circuit whose phase register is marked.
