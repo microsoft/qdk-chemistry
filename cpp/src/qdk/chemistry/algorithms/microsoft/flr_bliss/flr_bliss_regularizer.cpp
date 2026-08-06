@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft::flr_bliss {
@@ -113,8 +112,9 @@ OneElectronShiftResult solve_one_electron_shift(
   result.lambda_1e_baseline = eigenvalues_baseline.array().abs().sum();
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
-  // exch(g~). See TwoBodyBlissCorrection (header) for the g~ definition and
-  // why this stays consistent with rebuild_hamiltonian's full tensor.
+  // exch(g~). See TwoBodyBlissCorrection (hamiltonian_regularizer.hpp) for the
+  // g~ definition and why this stays consistent with rebuild_hamiltonian's
+  // full tensor.
   const TwoBodyBlissCorrection correction{mu2, xi};
   correction.add_coulomb_contraction(coulomb);
   correction.add_exchange_contraction(exchange);
@@ -131,98 +131,37 @@ OneElectronShiftResult solve_one_electron_shift(
   result.mu1 = median(eigenvalues);
   result.lambda_1e = (eigenvalues.array() - result.mu1).abs().sum();
 
-  // h + Ne*xi, kept so rebuild_hamiltonian can recover h = h_prime - Ne*xi.
-  result.h_prime = h + num_electrons * xi;
-
   return result;
 }
 
 // ---------------------------------------------------------------------------
-// Step 4: apply (mu1, mu2, xi) to the dense integrals and rebuild H.
+// Top-level FLR-BLISS driver: wires steps 1-3 into a BlissShift.
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<qdk::chemistry::data::Hamiltonian> rebuild_hamiltonian(
-    const qdk::chemistry::data::Hamiltonian& original,
-    const Eigen::MatrixXd& h_prime, double mu1, double mu2,
-    const Eigen::MatrixXd& xi, const Eigen::VectorXd& two_body_integrals,
-    double num_electrons) {
-  using qdk::chemistry::data::CanonicalFourCenterHamiltonianContainer;
-  using qdk::chemistry::data::Hamiltonian;
-
-  const size_t norb = static_cast<size_t>(h_prime.rows());
-
-  // Recover the physical one-body tensor: h_prime carries h + Ne*xi (the
-  // effective operator used only for the mu1 1-norm optimisation), not h.
-  const Eigen::MatrixXd h = h_prime - num_electrons * xi;
-
-  // Expand -K into this container's chemist integrals (see the header docstring
-  // for the operator K, the full derivation, and the normalisation caveats).
-  // One-body part: h_tilde_ij = h_ij + (Ne-1)*xi_ij - (mu1+mu2)*delta_ij.
-  Eigen::MatrixXd h_tilde = h + (num_electrons - 1.0) * xi;
-  h_tilde.diagonal().array() -= (mu1 + mu2);
-
-  // Two-body part: g_tilde = g + dg, with dg the correction whose closed-form
-  // contractions solve_one_electron_shift() reuses (single source of truth in
-  // TwoBodyBlissCorrection). dg is folded into a copy of the original integrals
-  // in place, avoiding a separate O(norb^4) allocation.
-  const TwoBodyBlissCorrection correction{mu2, xi};
-  Eigen::VectorXd g_tilde = two_body_integrals;
-  correction.add_two_body_correction(g_tilde, static_cast<Eigen::Index>(norb));
-
-  // Constant part of -K in the Ne-electron sector: +mu1*Ne + mu2*Ne^2.
-  const double core_energy_new = original.get_core_energy() +
-                                 mu1 * num_electrons +
-                                 mu2 * num_electrons * num_electrons;
-
-  const Eigen::MatrixXd inactive_fock =
-      original.has_inactive_fock_matrix()
-          ? original.get_inactive_fock_matrix().first
-          : Eigen::MatrixXd(0, 0);
-
-  auto container = std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-      h_tilde, g_tilde, original.get_orbitals(), core_energy_new,
-      inactive_fock, original.get_type());
-
-  return std::make_shared<Hamiltonian>(std::move(container));
-}
-
-}  // namespace qdk::chemistry::algorithms::microsoft::flr_bliss
-
-namespace qdk::chemistry::algorithms::microsoft {
-
-// ---------------------------------------------------------------------------
-// Top-level driver: wires together the four steps above.
-// ---------------------------------------------------------------------------
-
-std::shared_ptr<qdk::chemistry::data::Hamiltonian>
-FlrBlissRegularizer::_run_impl(
-    std::shared_ptr<qdk::chemistry::data::Hamiltonian> hamiltonian,
-    unsigned int n_alpha_electrons, unsigned int n_beta_electrons) const {
+BlissShift compute_flr_bliss_shift(
+    const qdk::chemistry::data::Hamiltonian& hamiltonian,
+    unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
+    double df_truncation_threshold) {
   QDK_LOG_TRACE_ENTERING();
 
-  if (!hamiltonian) {
-    throw std::invalid_argument("FlrBlissRegularizer: hamiltonian is null");
-  }
-  if (!hamiltonian->is_restricted()) {
+  if (!hamiltonian.is_restricted()) {
     throw std::invalid_argument(
-        "FlrBlissRegularizer currently only supports restricted "
+        "compute_flr_bliss_shift currently only supports restricted "
         "(spin-restricted) Hamiltonians.");
   }
 
-  const double df_truncation_threshold =
-      _settings->get<double>("df_truncation_threshold");
-  const double num_electrons =
-      static_cast<double>(n_alpha_electrons) + static_cast<double>(n_beta_electrons);
+  const double num_electrons = static_cast<double>(n_alpha_electrons) +
+                               static_cast<double>(n_beta_electrons);
 
-  auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
+  auto [h_alpha, h_beta] = hamiltonian.get_one_body_integrals();
   (void)h_beta;
-  auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian->get_two_body_integrals();
+  auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian.get_two_body_integrals();
   (void)g_aabb;
   (void)g_bbbb;
 
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(
-      "FlrBlissRegularizer: num_orbitals={}, num_electrons={}, "
+      "compute_flr_bliss_shift: num_orbitals={}, num_electrons={}, "
       "df_truncation_threshold={}",
       norb, num_electrons, df_truncation_threshold);
 
@@ -230,14 +169,10 @@ FlrBlissRegularizer::_run_impl(
   auto fragments = qdk::chemistry::utils::double_factorize(
       two_body_coefficient, norb, df_truncation_threshold);
 
-  auto global_shift = flr_bliss::accumulate_fragment_shifts(fragments);
+  auto global_shift = accumulate_fragment_shifts(fragments);
 
-  auto one_electron = flr_bliss::solve_one_electron_shift(
+  auto one_electron = solve_one_electron_shift(
       h_alpha, g_aaaa, global_shift.mu2, global_shift.xi, num_electrons);
-
-  auto shifted_hamiltonian = flr_bliss::rebuild_hamiltonian(
-      *hamiltonian, one_electron.h_prime, one_electron.mu1, global_shift.mu2,
-      global_shift.xi, g_aaaa, num_electrons);
 
   const double lambda_total_before =
       global_shift.lambda_df_baseline + one_electron.lambda_1e_baseline;
@@ -245,8 +180,8 @@ FlrBlissRegularizer::_run_impl(
       global_shift.lambda_df_shifted + one_electron.lambda_1e;
 
   QDK_LOGGER().debug(
-      "FlrBlissRegularizer: lambda_total before={} ({} + {}), after={} ({} + "
-      "{}); lambda_DF baseline={}, shifted={}; lambda_1e baseline={}, "
+      "compute_flr_bliss_shift: lambda_total before={} ({} + {}), after={} ({} "
+      "+ {}); lambda_DF baseline={}, shifted={}; lambda_1e baseline={}, "
       "shifted={}; mu1={}, mu2={}",
       lambda_total_before, one_electron.lambda_1e_baseline,
       global_shift.lambda_df_baseline, lambda_total_after,
@@ -255,7 +190,11 @@ FlrBlissRegularizer::_run_impl(
       one_electron.lambda_1e_baseline, one_electron.lambda_1e,
       one_electron.mu1, global_shift.mu2);
 
-  return shifted_hamiltonian;
+  BlissShift shift;
+  shift.mu1 = one_electron.mu1;
+  shift.mu2 = global_shift.mu2;
+  shift.xi = global_shift.xi;
+  return shift;
 }
 
-}  // namespace qdk::chemistry::algorithms::microsoft
+}  // namespace qdk::chemistry::algorithms::microsoft::flr_bliss

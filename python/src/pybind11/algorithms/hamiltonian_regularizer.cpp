@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -18,16 +19,15 @@ using ReturnType = std::shared_ptr<Hamiltonian>;
 
 // Trampoline class for enabling Python inheritance
 class HamiltonianRegularizerBase
-    : public HamiltonianRegularizer,
+    : public BlissRegularizer,
       public pybind11::trampoline_self_life_support {
  public:
   std::string name() const override {
-    PYBIND11_OVERRIDE_PURE(std::string, HamiltonianRegularizer, name);
+    PYBIND11_OVERRIDE(std::string, BlissRegularizer, name);
   }
 
   std::vector<std::string> aliases() const override {
-    PYBIND11_OVERRIDE(std::vector<std::string>, HamiltonianRegularizer,
-                      aliases);
+    PYBIND11_OVERRIDE(std::vector<std::string>, BlissRegularizer, aliases);
   }
 
   // Helper method to expose _settings for Python binding
@@ -40,45 +40,96 @@ class HamiltonianRegularizerBase
   ReturnType _run_impl(std::shared_ptr<Hamiltonian> hamiltonian,
                        unsigned int n_alpha_electrons,
                        unsigned int n_beta_electrons) const override {
-    PYBIND11_OVERRIDE_PURE(ReturnType, HamiltonianRegularizer, _run_impl,
-                           hamiltonian, n_alpha_electrons, n_beta_electrons);
+    PYBIND11_OVERRIDE(ReturnType, BlissRegularizer, _run_impl, hamiltonian,
+                      n_alpha_electrons, n_beta_electrons);
   }
 };
 
 void bind_hamiltonian_regularizer(py::module &m) {
-  py::class_<HamiltonianRegularizer, HamiltonianRegularizerBase,
+  // BlissShift: the (mu1, mu2, xi) shift parameters, decoupled from how they
+  // were produced so they can be inspected or supplied from any source.
+  py::class_<BlissShift>(m, "BlissShift", R"(
+Block-invariant symmetry shift (BLISS) parameters.
+
+Bundles the three quantities (mu1, mu2, xi) that define the BLISS operator
+subtracted from a Hamiltonian to reduce its fermionic 1-norm while leaving the
+target electron-number sector's energy invariant. A BlissShift carries only the
+*result* of a shift computation, so it can come from
+:meth:`HamiltonianRegularizer.compute_shift` or from an external source and be
+applied via :func:`rebuild_hamiltonian`.
+
+Attributes:
+    mu1 (float): One-electron BLISS shift.
+    mu2 (float): Two-electron BLISS shift.
+    xi (numpy.ndarray): Two-electron BLISS shift matrix (norb x norb).
+)")
+      .def(py::init<>())
+      .def_readwrite("mu1", &BlissShift::mu1)
+      .def_readwrite("mu2", &BlissShift::mu2)
+      .def_readwrite("xi", &BlissShift::xi)
+      .def("__repr__", [](const BlissShift &s) {
+        return "<qdk_chemistry.algorithms.BlissShift mu1=" +
+               std::to_string(s.mu1) + " mu2=" + std::to_string(s.mu2) +
+               " xi=" + std::to_string(s.xi.rows()) + "x" +
+               std::to_string(s.xi.cols()) + ">";
+      });
+
+  // Module-level rebuild_hamiltonian: apply a BlissShift to a Hamiltonian.
+  m.def("rebuild_hamiltonian", &rebuild_hamiltonian, py::arg("original"),
+        py::arg("shift"), py::arg("num_electrons"), R"(
+Apply a BLISS shift to a Hamiltonian and assemble the shifted Hamiltonian.
+
+Applies the shift parameters (mu1, mu2, xi) in ``shift`` to the dense one- and
+two-electron integrals of ``original``. Because the underlying BLISS operator
+annihilates every ``num_electrons``-electron state, the energy of that sector
+is left invariant. The shift may come from
+:meth:`HamiltonianRegularizer.compute_shift` or from any external source.
+
+Args:
+    original (qdk_chemistry.data.Hamiltonian): The Hamiltonian to shift. Must be restricted.
+    shift (qdk_chemistry.algorithms.BlissShift): The BLISS shift parameters to apply.
+    num_electrons (float): Target number of active electrons (Ne).
+
+Returns:
+    qdk_chemistry.data.Hamiltonian: The BLISS-shifted Hamiltonian.
+
+Raises:
+    ValueError: If ``original`` is unrestricted or ``shift.xi`` is not norb x norb.
+)");
+
+  py::class_<BlissRegularizer, HamiltonianRegularizerBase,
              py::smart_holder>
       regularizer(m, "HamiltonianRegularizer",
                  R"(
-Abstract base class for Hamiltonian regularization/shift algorithms.
+Hamiltonian regularizer implementing block-invariant symmetry shifts (BLISS).
 
 A HamiltonianRegularizer maps a Hamiltonian, together with the target
 number of alpha/beta electrons, to a new Hamiltonian that is energetically
 equivalent within the target electron-number sector but whose LCU/qubitization
 coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 
+It is a thin composition of two public steps: :meth:`compute_shift` computes
+the BLISS parameters (mu1, mu2, xi) via the method selected by the
+``shift_method`` setting (default ``"flr_bliss"``), and
+:func:`rebuild_hamiltonian` applies a shift to a Hamiltonian. Callers can
+obtain a :class:`BlissShift` on its own, or supply an externally computed one to
+:func:`rebuild_hamiltonian` directly.
+
 Examples:
-    >>> # To create a custom regularizer, inherit from this class.
     >>> import qdk_chemistry.algorithms as alg
-    >>> import qdk_chemistry.data as data
-    >>> class MyHamiltonianRegularizer(alg.HamiltonianRegularizer):
-    ...     def __init__(self):
-    ...         super().__init__()
-    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_alpha_electrons: int, n_beta_electrons: int) -> data.Hamiltonian:
-    ...         # Custom regularization implementation
-    ...         return shifted_hamiltonian
+    >>> regularizer = alg.HamiltonianRegularizer()
+    >>> shift = regularizer.compute_shift(hamiltonian, n_alpha, n_beta)
+    >>> shifted = alg.rebuild_hamiltonian(hamiltonian, shift, n_alpha + n_beta)
 
 )");
 
   regularizer.def(py::init<>(), R"(
-Create a HamiltonianRegularizer instance.
-
-Default constructor for the abstract base class.
-This should typically be called from derived class constructors.
+Create a HamiltonianRegularizer instance with default settings
+(shift_method = "flr_bliss", df_truncation_threshold = 0.0).
 
 )");
 
-  regularizer.def("run", &HamiltonianRegularizer::run,
+  regularizer.def("run", &BlissRegularizer::run,
                   R"(
 Regularize/shift a Hamiltonian for a target electron count.
 
@@ -99,7 +150,32 @@ Raises:
                   py::arg("hamiltonian"), py::arg("n_alpha_electrons"),
                   py::arg("n_beta_electrons"));
 
-  regularizer.def("settings", &HamiltonianRegularizer::settings,
+  regularizer.def("compute_shift", &BlissRegularizer::compute_shift,
+                  R"(
+Compute the BLISS shift (mu1, mu2, xi) for a target electron count.
+
+Dispatches to the method selected by the ``shift_method`` setting and returns
+the resulting parameters *without* rebuilding the Hamiltonian. Use
+:func:`rebuild_hamiltonian` to apply the returned (or an externally sourced)
+:class:`BlissShift`.
+
+Args:
+    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to analyze. Must be restricted.
+    n_alpha_electrons (int): The target number of alpha electrons
+    n_beta_electrons (int): The target number of beta electrons
+
+Returns:
+    qdk_chemistry.algorithms.BlissShift: The computed shift parameters.
+
+Raises:
+    ValueError: If the Hamiltonian is unrestricted or the configured
+        ``shift_method`` is unknown.
+
+)",
+                  py::arg("hamiltonian"), py::arg("n_alpha_electrons"),
+                  py::arg("n_beta_electrons"));
+
+  regularizer.def("settings", &BlissRegularizer::settings,
                   R"(
 Access the regularizer's configuration settings.
 
@@ -127,7 +203,7 @@ This property allows derived classes to replace the settings object with a speci
 
 )");
 
-  regularizer.def("name", &HamiltonianRegularizer::name, R"(
+  regularizer.def("name", &BlissRegularizer::name, R"(
 The algorithm's name.
 
 Returns:
@@ -135,7 +211,7 @@ Returns:
 
 )");
 
-  regularizer.def("type_name", &HamiltonianRegularizer::type_name, R"(
+  regularizer.def("type_name", &BlissRegularizer::type_name, R"(
 The algorithm's type name.
 
 Returns:
@@ -146,50 +222,12 @@ Returns:
   // Factory class binding - creates HamiltonianRegularizerFactory class with
   // static methods
   qdk::chemistry::python::bind_algorithm_factory<
-      HamiltonianRegularizerFactory, HamiltonianRegularizer,
+      HamiltonianRegularizerFactory, BlissRegularizer,
       HamiltonianRegularizerBase>(m, "HamiltonianRegularizerFactory");
 
-  regularizer.def("__repr__", [](const HamiltonianRegularizer &) {
+  regularizer.def("__repr__", [](const BlissRegularizer &) {
     return "<qdk_chemistry.algorithms.HamiltonianRegularizer>";
   });
 
   qdk::chemistry::python::bind_create_nested(regularizer);
-
-  // Bind concrete microsoft::FlrBlissRegularizer implementation
-  py::class_<microsoft::FlrBlissRegularizer, HamiltonianRegularizer,
-             py::smart_holder>(m, "QdkFlrBlissRegularizer", R"(
-QDK FLR-BLISS Hamiltonian regularizer.
-
-This class provides a concrete implementation of the HamiltonianRegularizer
-interface using the block-invariant symmetry shift (BLISS) technique applied
-to the fermionic double-factorized representation of a Hamiltonian
-(Patel et al., arXiv:2409.18277). It reduces the Hamiltonian's fermionic
-1-norm while leaving its energy invariant within a target
-(n_alpha, n_beta)-electron sector.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    regularizer = alg.QdkFlrBlissRegularizer()
-
-    # Optionally opt into DF truncation (default is 0.0, i.e. no truncation)
-    regularizer.settings().set("df_truncation_threshold", 1e-8)
-
-    shifted_hamiltonian = regularizer.run(hamiltonian, n_alpha, n_beta)
-
-See Also:
-    :class:`HamiltonianRegularizer`
-    :class:`qdk_chemistry.data.Hamiltonian`
-
-)")
-      .def(py::init<>(), R"(
-Default constructor.
-
-Initializes a FLR-BLISS regularizer with default settings
-(df_truncation_threshold = 0.0, i.e. no truncation).
-
-)");
 }

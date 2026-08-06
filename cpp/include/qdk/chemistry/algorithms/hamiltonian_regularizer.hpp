@@ -3,6 +3,7 @@
 // license information.
 
 #pragma once
+#include <Eigen/Dense>
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -12,48 +13,204 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @class HamiltonianRegularizer
- * @brief Abstract base class for Hamiltonian regularization/shift algorithms
+ * @struct BlissShift
+ * @brief The block-invariant symmetry shift (BLISS) parameters.
  *
- * A HamiltonianRegularizer maps a Hamiltonian, together with the target
- * number of alpha/beta electrons, to a new Hamiltonian that is
- * energetically equivalent within the target electron-number sector but
- * whose LCU/qubitization coefficients (e.g. the fermionic 1-norm lambda)
- * may be reduced. Implementations typically apply a symmetry shift built
- * from operators that annihilate every state with the target electron
- * count (e.g. block-invariant symmetry shift / BLISS techniques), so the
- * physical energy of the target-electron-count sector is preserved while
- * the operator's norm outside that sector -- and hence resource estimates
- * for algorithms like qubitized phase estimation -- can shrink.
+ * A BlissShift bundles the three quantities that define the BLISS operator
+ * K = mu1*(N - Ne) + mu2*(N^2 - Ne^2) + (N - Ne)*sum_ij xi_ij E_ij
+ * subtracted from a Hamiltonian H (Patel et al., arXiv:2409.18277). Because K
+ * annihilates every Ne-electron state, subtracting it leaves the Ne-sector
+ * energy invariant while reducing the fermionic LCU 1-norm.
  *
- * @see data::Hamiltonian
- * @see qdk::chemistry::utils::hamiltonian_one_norm for a standalone,
- *      Algorithm-independent way to inspect a Hamiltonian's fermionic
- *      1-norm without running a regularizer.
+ * BlissShift deliberately carries only the *result* of a shift computation, so
+ * the parameters can come from any method (see BlissRegularizer's
+ * "shift_method" setting) -- or from an entirely external source -- and be
+ * applied to a Hamiltonian via rebuild_hamiltonian().
  */
-class HamiltonianRegularizer
-    : public Algorithm<HamiltonianRegularizer,
-                       std::shared_ptr<data::Hamiltonian>,
+struct BlissShift {
+  double mu1 = 0.0;      ///< One-electron BLISS shift.
+  double mu2 = 0.0;      ///< Two-electron BLISS shift.
+  Eigen::MatrixXd xi;    ///< Two-electron BLISS shift matrix (norb x norb).
+};
+
+/// The two-body correction that the aggregated BLISS shift (mu2, xi) adds to
+/// the two-electron integral tensor g_ijkl:
+///
+///   dg_ijkl = -2*mu2*delta_ij*delta_kl - xi_ij*delta_kl - delta_ij*xi_kl
+///
+/// This is the SINGLE SOURCE OF TRUTH for that tensor. rebuild_hamiltonian()
+/// adds dg (via add_two_body_correction()) directly onto g to build
+/// g~ = g + dg. A one-electron shift solver (e.g. the flr_bliss method's
+/// solve_one_electron_shift()) never needs the whole O(norb^4) tensor -- it
+/// only needs dg's Coulomb/exchange-type contractions
+/// (add_coulomb_contraction/add_exchange_contraction below), which fold into
+/// the effective one-electron operator alongside the ORIGINAL g's own
+/// Coulomb/exchange contraction. Both call sites derive their numbers from
+/// THIS struct, so they cannot silently drift apart.
+struct TwoBodyBlissCorrection {
+  double mu2;
+  Eigen::MatrixXd xi;
+
+  /// Add Sum_k dg_ijkk (Coulomb-type contraction) onto `coulomb` in place,
+  /// obtained by substituting dg_ijkl's definition and summing k over
+  /// Sum_k delta_kk = norb, Sum_k xi_kk = tr(xi):
+  ///   Sum_k dg_ijkk = -2*mu2*norb*delta_ij - norb*xi_ij - tr(xi)*delta_ij
+  ///                 = -(2*mu2*norb + tr(xi))*delta_ij - norb*xi_ij
+  /// `norb` is taken from the caller's matrix, and the correction is folded in
+  /// place so no separate norb x norb result is allocated: on return `coulomb`
+  /// holds coul(g~) = coul(g) + Sum_k dg_ijkk.
+  void add_coulomb_contraction(Eigen::MatrixXd& coulomb) const {
+    const double norb = static_cast<double>(coulomb.rows());
+    coulomb -= norb * xi;
+    coulomb.diagonal().array() -= 2.0 * mu2 * norb + xi.trace();
+  }
+
+  /// Add Sum_k dg_ikkj (exchange-type contraction) onto `exchange` in place,
+  /// using Sum_k delta_ik*delta_kj = delta_ij, Sum_k xi_ik*delta_kj = xi_ij,
+  /// Sum_k delta_ik*xi_kj = xi_ij:
+  ///   Sum_k dg_ikkj = -2*mu2*delta_ij - 2*xi_ij
+  /// The correction is folded in place (no norb x norb allocation): on return
+  /// `exchange` holds exch(g~) = exch(g) + Sum_k dg_ikkj.
+  void add_exchange_contraction(Eigen::MatrixXd& exchange) const {
+    exchange -= 2.0 * xi;
+    exchange.diagonal().array() -= 2.0 * mu2;
+  }
+
+  /// Add the two-body BLISS correction dg_ijkl onto `g` in place, where `g` is
+  /// the flattened two-electron tensor ((i*norb+j)*norb+k)*norb+l with side
+  /// length `norb`. On return `g` holds g~ = g + dg without materializing a
+  /// separate O(norb^4) dg tensor. Used by rebuild_hamiltonian() to build g~.
+  void add_two_body_correction(Eigen::VectorXd& g, Eigen::Index norb) const {
+    for (Eigen::Index i = 0; i < norb; ++i) {
+      for (Eigen::Index j = 0; j < norb; ++j) {
+        for (Eigen::Index k = 0; k < norb; ++k) {
+          for (Eigen::Index l = 0; l < norb; ++l) {
+            double value = 0.0;
+            if (i == j && k == l) {
+              value -= 2.0 * mu2;
+            }
+            if (k == l) {
+              value -= xi(i, j);
+            }
+            if (i == j) {
+              value -= xi(k, l);
+            }
+            if (value != 0.0) {
+              g[((i * norb + j) * norb + k) * norb + l] += value;
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+/**
+ * @brief Apply a BLISS shift to a Hamiltonian and assemble the shifted one.
+ *
+ * Applies the global BLISS shift (mu1, mu2, xi) of Patel et al.
+ * (arXiv:2409.18277) directly to the dense one- and two-electron integrals of
+ * `original` and assembles the resulting Hamiltonian. In this container's
+ * canonical chemist convention g[i,j,k,l] = (ij|kl) the shift reproduces the
+ * operator
+ *   K = mu1*(N - Ne) + mu2*(N^2 - Ne^2) + (N - Ne)*sum_ij xi_ij E_ij
+ * subtracted from H. Because K annihilates every Ne-electron state, the
+ * Ne-sector energy is invariant for any (mu1, mu2, xi). Expanding -K gives
+ *   h_tilde_ij   = h_ij + (Ne - 1)*xi_ij - (mu1 + mu2)*delta_ij
+ *   g_tilde_ijkl = g_ijkl - 2*mu2*delta_ij*delta_kl
+ *                          - xi_ij*delta_kl - delta_ij*xi_kl
+ *   E_core'      = E_core + mu1*Ne + mu2*Ne^2
+ * These coefficients were derived in the container's own convention and
+ * verified to machine precision against explicit single-determinant energies.
+ *
+ * This function is intentionally independent of how the shift was computed:
+ * `shift` may come from BlissRegularizer::compute_shift() or from any external
+ * source. Everything else (the physical one- and two-electron integrals, core
+ * energy, orbitals, inactive Fock matrix, and Hamiltonian type) is read from
+ * `original`.
+ *
+ * @param original The Hamiltonian being shifted. Must be restricted.
+ * @param shift The BLISS shift parameters (mu1, mu2, xi) to apply.
+ * @param num_electrons Target number of active electrons (Ne).
+ * @return The BLISS-shifted Hamiltonian.
+ *
+ * @throws std::invalid_argument if `original` is unrestricted or if
+ *         `shift.xi` is not norb x norb.
+ */
+std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
+    const data::Hamiltonian& original, const BlissShift& shift,
+    double num_electrons);
+
+/**
+ * @class BlissSettings
+ * @brief Settings container for the BLISS Hamiltonian regularizer.
+ *
+ * Default settings:
+ * - shift_method: "flr_bliss" - selects how the BLISS shift (mu1, mu2, xi) is
+ *   computed. "flr_bliss" is the fermionic-low-rank BLISS method of Patel et
+ *   al. (arXiv:2409.18277).
+ * - df_truncation_threshold: 0.0 - (flr_bliss method) fragments produced by
+ *   double-factorizing the two-electron integrals whose |eigenvalue| falls
+ *   below this threshold are dropped. The default of 0.0 performs no
+ *   truncation (an exact/lossless double factorization).
+ */
+class BlissSettings : public qdk::chemistry::data::Settings {
+ public:
+  BlissSettings() {
+    set_default("shift_method", std::string("flr_bliss"));
+    set_default("df_truncation_threshold", 0.0);
+  }
+};
+
+/**
+ * @class BlissRegularizer
+ * @brief Hamiltonian regularizer implementing block-invariant symmetry shifts.
+ *
+ * A BlissRegularizer maps a Hamiltonian, together with the target number of
+ * alpha/beta electrons, to a new Hamiltonian that is energetically equivalent
+ * within the target electron-number sector but whose LCU/qubitization
+ * coefficients (e.g. the fermionic 1-norm lambda) may be reduced. It does so by
+ * subtracting a block-invariant symmetry shift (BLISS) operator that
+ * annihilates every state with the target electron count, so the physical
+ * energy of the target-electron-count sector is preserved while the operator's
+ * norm outside that sector -- and hence resource estimates for algorithms like
+ * qubitized phase estimation -- can shrink.
+ *
+ * The regularizer is a thin composition of two steps:
+ *  1. compute_shift() -- compute the BLISS parameters (mu1, mu2, xi) via the
+ *     method selected by the "shift_method" setting (default "flr_bliss").
+ *  2. rebuild_hamiltonian() -- apply that BlissShift to the dense integrals.
+ * Both steps are public so callers can obtain a BlissShift on its own, or
+ * supply an externally computed BlissShift to rebuild_hamiltonian() directly.
+ *
+ * Only restricted (spin-restricted) Hamiltonians are currently supported.
+ *
+ * @see BlissShift
+ * @see rebuild_hamiltonian
+ * @see BlissSettings
+ * @see qdk::chemistry::utils::hamiltonian_one_norm for a standalone way to
+ *      inspect a Hamiltonian's fermionic 1-norm without running a regularizer.
+ */
+class BlissRegularizer
+    : public Algorithm<BlissRegularizer, std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Hamiltonian>, unsigned int,
                        unsigned int> {
  public:
   /**
-   * @brief Default constructor
+   * @brief Default constructor.
    *
-   * Creates a Hamiltonian regularizer with default settings.
+   * Creates a BLISS regularizer with default settings (shift_method =
+   * "flr_bliss", df_truncation_threshold = 0.0).
    */
-  HamiltonianRegularizer() = default;
+  BlissRegularizer() { _settings = std::make_unique<BlissSettings>(); }
 
   /**
-   * @brief Virtual destructor
-   *
-   * Ensures proper cleanup of derived classes.
+   * @brief Virtual destructor.
    */
-  virtual ~HamiltonianRegularizer() = default;
+  ~BlissRegularizer() override = default;
 
   /**
-   * @brief Regularize/shift a Hamiltonian for a target electron count
-   *
+   * @brief Regularize/shift a Hamiltonian for a target electron count.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param hamiltonian The Hamiltonian to regularize
@@ -64,58 +221,59 @@ class HamiltonianRegularizer
    *         Hamiltonian's energy in the (n_alpha_electrons,
    *         n_beta_electrons)-electron sector.
    *
-   * @throws std::runtime_error if the regularization fails
-   * @throws std::invalid_argument if the Hamiltonian is invalid or
-   *         unsupported (e.g. unrestricted, when the implementation only
-   *         supports restricted Hamiltonians)
-   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
-   * settings after run() is called
-   *
-   * @note Settings are automatically locked when this method is called and
-   * cannot be modified during or after execution.
-   *
-   * @see data::Hamiltonian
+   * @note Settings are automatically locked when this method is called.
    */
   using Algorithm::run;
 
   /**
-   * @brief Access the algorithm's name
+   * @brief Compute the BLISS shift (mu1, mu2, xi) for a target electron count.
    *
-   * @return The algorithm's name
+   * Dispatches to the method selected by the "shift_method" setting and
+   * returns the resulting parameters *without* rebuilding the Hamiltonian.
+   * Use rebuild_hamiltonian() to apply the returned (or an externally
+   * sourced) BlissShift.
+   *
+   * @param hamiltonian The Hamiltonian to analyze. Must be restricted.
+   * @param n_alpha_electrons The target number of alpha electrons.
+   * @param n_beta_electrons The target number of beta electrons.
+   * @return The computed BLISS shift parameters.
+   *
+   * @throws std::invalid_argument if the Hamiltonian is unrestricted or the
+   *         configured "shift_method" is unknown.
    */
-  virtual std::string name() const = 0;
+  BlissShift compute_shift(const data::Hamiltonian& hamiltonian,
+                           unsigned int n_alpha_electrons,
+                           unsigned int n_beta_electrons) const;
 
   /**
-   * @brief Access the algorithm's type name
+   * @brief Access the algorithm's name.
    *
-   * @return The algorithm's type name
+   * @return The algorithm's name.
+   */
+  std::string name() const override { return "flr_bliss"; }
+
+  /**
+   * @brief Access the algorithm's type name.
+   *
+   * @return The algorithm's type name.
    */
   std::string type_name() const final { return "hamiltonian_regularizer"; };
 
  protected:
   /**
-   * @brief Implementation of Hamiltonian regularization
+   * @brief Implementation of Hamiltonian regularization.
    *
-   * This method contains the actual regularization logic. It is
-   * automatically called by run() after settings have been locked.
-   *
-   * @param hamiltonian The Hamiltonian to regularize
-   * @param n_alpha_electrons The target number of alpha electrons
-   * @param n_beta_electrons The target number of beta electrons
-   * @return The regularized/shifted Hamiltonian
+   * Composes compute_shift() and rebuild_hamiltonian(). Automatically called
+   * by run() after settings have been locked.
    */
-  virtual std::shared_ptr<data::Hamiltonian> _run_impl(
+  std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
       unsigned int n_alpha_electrons,
-      unsigned int n_beta_electrons) const = 0;
+      unsigned int n_beta_electrons) const override;
 };
 
 /**
- * @brief Factory class for creating Hamiltonian regularizer instances.
- *
- * The HamiltonianRegularizerFactory implements the Factory design pattern to
- * dynamically create and manage different implementations of Hamiltonian
- * regularizers (e.g. different symmetry-shift/BLISS-style strategies).
+ * @brief Factory class for creating BLISS regularizer instances.
  *
  * Typical usage:
  * ```
@@ -125,11 +283,10 @@ class HamiltonianRegularizer
  * auto shifted = regularizer->run(hamiltonian, n_alpha, n_beta);
  * ```
  *
- * @see HamiltonianRegularizer for the interface implemented by concrete
- * regularizers
+ * @see BlissRegularizer
  */
 struct HamiltonianRegularizerFactory
-    : public AlgorithmFactory<HamiltonianRegularizer,
+    : public AlgorithmFactory<BlissRegularizer,
                               HamiltonianRegularizerFactory> {
   static std::string algorithm_type_name() {
     return "hamiltonian_regularizer";

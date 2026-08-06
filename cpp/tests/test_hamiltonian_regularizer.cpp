@@ -107,3 +107,59 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
   EXPECT_NEAR(norm_after.total, 27.590504297492, 1e-6);
 }
 
+/**
+ * @brief compute_shift() + rebuild_hamiltonian() must reproduce run() exactly.
+ * This locks the refactor that split the regularizer into a public
+ * shift-computation step and a public, shift-agnostic rebuild step.
+ */
+TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+
+  auto regularizer = HamiltonianRegularizerFactory::create("flr_bliss");
+  auto shifted_run = regularizer->run(ham, 5, 5);
+  ASSERT_NE(shifted_run, nullptr);
+
+  auto regularizer2 = HamiltonianRegularizerFactory::create("flr_bliss");
+  auto shift = regularizer2->compute_shift(*ham, 5, 5);
+  auto shifted_manual = rebuild_hamiltonian(*ham, shift, 10.0);
+  ASSERT_NE(shifted_manual, nullptr);
+
+  auto [h_run, h_run_beta] = shifted_run->get_one_body_integrals();
+  auto [h_man, h_man_beta] = shifted_manual->get_one_body_integrals();
+  (void)h_run_beta;
+  (void)h_man_beta;
+  EXPECT_TRUE(h_run.isApprox(h_man, 1e-12));
+
+  auto [g_run, g_run_ab, g_run_bb] = shifted_run->get_two_body_integrals();
+  auto [g_man, g_man_ab, g_man_bb] = shifted_manual->get_two_body_integrals();
+  (void)g_run_ab;
+  (void)g_run_bb;
+  (void)g_man_ab;
+  (void)g_man_bb;
+  EXPECT_TRUE(g_run.isApprox(g_man, 1e-12));
+
+  EXPECT_NEAR(shifted_run->get_core_energy(),
+              shifted_manual->get_core_energy(), 1e-12);
+}
+
+/**
+ * @brief An unknown shift_method must be rejected by compute_shift()/run().
+ */
+TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+
+  auto regularizer = HamiltonianRegularizerFactory::create("flr_bliss");
+  regularizer->settings().set("shift_method", std::string("nonexistent"));
+  EXPECT_THROW(regularizer->run(ham, 5, 5), std::invalid_argument);
+}
+
