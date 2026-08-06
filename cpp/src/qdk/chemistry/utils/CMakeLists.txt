@@ -3,4 +3,6 @@ target_sources(chemistry PRIVATE
     valence_space.cpp
     orbital_rotation.cpp
     logger.cpp
+    double_factorization.cpp
+    hamiltonian_one_norm.cpp
 )

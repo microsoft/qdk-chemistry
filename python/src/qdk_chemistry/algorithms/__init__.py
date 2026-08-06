@@ -32,6 +32,10 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_regularizer import (
+    HamiltonianRegularizer,
+    QdkFlrBlissRegularizer,
+)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
@@ -77,6 +81,7 @@ __all__ = [
     "GeometryOptimizerSettings",
     "HadamardTest",
     "HamiltonianConstructor",
+    "HamiltonianRegularizer",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
@@ -87,6 +92,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
+    "QdkFlrBlissRegularizer",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",

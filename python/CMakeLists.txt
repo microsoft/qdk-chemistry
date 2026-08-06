@@ -179,6 +179,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/nuclear_derivative.cpp
     src/pybind11/algorithms/geometry_optimization.cpp
     src/pybind11/algorithms/active_space.cpp
+    src/pybind11/algorithms/hamiltonian_regularizer.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp
@@ -186,6 +187,8 @@ pybind11_add_module(_core
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp
     src/pybind11/utils/model_hamiltonians.cpp
+    src/pybind11/utils/double_factorization.cpp
+    src/pybind11/utils/hamiltonian_one_norm.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp

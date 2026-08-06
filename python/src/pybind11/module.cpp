@@ -36,6 +36,7 @@ void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
 void bind_geometry_optimization(py::module& m);
 void bind_active_space(py::module& m);
+void bind_hamiltonian_regularizer(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
 void bind_configuration(py::module& m);
@@ -50,6 +51,8 @@ void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
+void bind_double_factorization(py::module& m);
+void bind_hamiltonian_one_norm(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -102,6 +105,7 @@ PYBIND11_MODULE(_core, m) {
   bind_nuclear_derivative(algorithms);
   bind_geometry_optimization(algorithms);
   bind_active_space(algorithms);
+  bind_hamiltonian_regularizer(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
@@ -112,6 +116,8 @@ PYBIND11_MODULE(_core, m) {
   bind_valence_space(utils);
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
+  bind_double_factorization(utils);
+  bind_hamiltonian_one_norm(utils);
   bind_logger(utils);
 
   // Bind constants and config at the top level

@@ -6,6 +6,7 @@
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
@@ -21,4 +22,6 @@
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/double_factorization.hpp>
+#include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <qdk/chemistry/utils/model_hamiltonians.hpp>
