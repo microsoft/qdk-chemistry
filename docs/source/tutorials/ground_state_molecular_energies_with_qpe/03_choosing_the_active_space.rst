@@ -54,8 +54,8 @@ A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_intera
 where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
 Every determinant :math:`\Phi_i`, including :math:`\Phi_{\mathrm{HF}}`, is constructed from one allowed choice of occupied spin orbitals.
 Different choices represent different electron configurations.
-Allowing every possible determinant in all 28 ``cc-pvdz`` spatial orbitals would be unnecessarily expensive for this tutorial.
-An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ restricts which orbital occupations are allowed to vary, reducing the computational costs.
+Full configuration interaction (:term:`FCI`) is exact for a chosen finite orbital basis because it includes every allowed determinant, but its cost grows combinatorially with basis size.
+An `active-space model <https://en.wikipedia.org/wiki/Complete_active_space>`_ controls that cost by allowing occupations to vary only among selected orbitals, trading some model accuracy for a smaller determinant space.
 If that model contains :math:`n_o` active spatial orbitals, :math:`n_\alpha` active :math:`\alpha` electrons, and :math:`n_\beta` active :math:`\beta` electrons, the choices of occupied :math:`\alpha` and :math:`\beta` spin orbitals give
 
 .. _tutorial-determinant-count:

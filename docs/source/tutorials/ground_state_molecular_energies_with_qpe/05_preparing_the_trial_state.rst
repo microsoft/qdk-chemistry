@@ -198,7 +198,9 @@ It can change if the state-preparation or circuit-decomposition implementation c
 Trial-state quality and preparation cost
 ========================================
 
-Retaining more determinants gives the projected calculation more flexibility and can improve fidelity, but loading more nonzero amplitudes generally requires a more complex preparation logical circuit.
+Trial-state truncation introduces a separate cost--quality tradeoff within the selected active space.
+Retaining more determinants can improve fidelity with the selected-space ground state, but preparing more nonzero amplitudes generally requires more logical gates.
+The relevant question is therefore how much fidelity is gained for each increase in state-preparation cost.
 
 All three trial states describe the same selected active spin-orbital space, so they use the same compute register size.
 Changing the number of retained determinants changes amplitudes and logical-circuit structure, not the number of spin orbitals represented.
@@ -226,6 +228,8 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
    The one-, two-, and four-determinant fidelities are approximately :math:`0.4825`, :math:`0.5864`, and :math:`0.7324`, respectively.
    Their generated logical circuits have preparation logical gate counts of 6, 14, and 30, respectively, while every logical circuit uses twelve compute qubits.
+   From one to two determinants, fidelity increases by approximately :math:`0.104` while the gate count increases by eight.
+   From two to four determinants, fidelity increases by approximately :math:`0.146` while the gate count increases by sixteen, so the fidelity gained per additional gate decreases.
 
 .. admonition:: What does the single-determinant fidelity reveal about multireference character?
    :class: quiz-question

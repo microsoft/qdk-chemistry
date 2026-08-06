@@ -131,7 +131,7 @@ For example:
 
 - The fixed molecular geometry and Born--Oppenheimer approximation define the physical model considered by the tutorial.
 - A finite basis set restricts the one-electron functions used to describe the molecule.
-- Classical electronic-structure methods use approximations to obtain tractable solutions of the Schrödinger equation.
+- Restricting the determinant space, as Hartree--Fock and active-space models do, introduces model error; full configuration interaction (:term:`FCI`) avoids this determinant truncation but remains limited by the finite orbital basis.
 - Hamiltonian time evolution is approximated when the quantum circuit is constructed.
 - Finite phase resolution and measurement sampling limit the reported :term:`QPE` estimate.
 
