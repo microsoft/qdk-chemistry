@@ -131,7 +131,7 @@ For example:
 
 - The fixed molecular geometry and Born--Oppenheimer approximation define the physical model considered by the tutorial.
 - A finite basis set restricts the one-electron functions used to describe the molecule.
-- Restricting the determinant space, as Hartree--Fock and active-space models do, introduces model error; full configuration interaction (:term:`FCI`) avoids this determinant truncation but remains limited by the finite orbital basis.
+- Hartree--Fock restricts the wavefunction to one determinant, while an active-space model allows occupations to vary only within selected orbitals and fixes occupations outside them. These restrictions introduce model error relative to full configuration interaction (:term:`FCI`) in the same finite orbital basis. FCI includes every allowed determinant, but their number grows exponentially at a fixed electron-to-orbital ratio, making FCI impractical for large systems.
 - Hamiltonian time evolution is approximated when the quantum circuit is constructed.
 - Finite phase resolution and measurement sampling limit the reported :term:`QPE` estimate.
 
