@@ -28,6 +28,7 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
+GEOMETRIC_AVAILABLE = importlib.util.find_spec("geometric") is not None
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # Release-note example scripts are snapshots that only work with the matching
@@ -43,15 +44,15 @@ def _generic_python_examples() -> list[Path]:
     return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
-    """Check if an example file requires qiskit, pyscf, openfermion or contains slow tests.
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool]:
+    """Check if an example file requires qiskit, pyscf, openfermion, geomeTRIC or contains slow tests.
 
     Args:
         example_file: Path to the example file to check
 
     Returns:
         Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature,
-                  requires_openfermion, is_slow)
+                  requires_openfermion, requires_geometric, is_slow)
 
     """
     content = example_file.read_text(encoding="utf-8")
@@ -61,6 +62,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit_aer = False
     requires_qiskit_nature = False
     requires_openfermion = False
+    requires_geometric = False
     is_slow = False
 
     # Check for explicit imports
@@ -72,6 +74,9 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
 
     if "import openfermion" in content or "from openfermion" in content:
         requires_openfermion = True
+
+    if "import geometric" in content or "from geometric" in content:
+        requires_geometric = True
 
     # Check for plugin usage patterns in create() calls
     # Look for create(..., "pyscf") or create(..., 'pyscf') patterns
@@ -108,6 +113,12 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
         requires_pyscf = True
     if "import qdk_chemistry.plugins.qiskit" in content:
         requires_qiskit = True
+    if "import qdk_chemistry.plugins.geometric" in content:
+        requires_geometric = True
+
+    # The only registered geometry optimizer is the geomeTRIC plugin
+    if 'create("geometry_optimizer"' in content or "create('geometry_optimizer'" in content:
+        requires_geometric = True
 
     if any(
         pattern in content
@@ -139,7 +150,15 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if "# docs-example: slow" in content:
         is_slow = True
 
-    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
+    return (
+        requires_pyscf,
+        requires_qiskit,
+        requires_qiskit_aer,
+        requires_qiskit_nature,
+        requires_openfermion,
+        requires_geometric,
+        is_slow,
+    )
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -200,12 +219,20 @@ def _create_test_methods():
                 requires_qiskit_aer,
                 requires_qiskit_nature,
                 requires_openfermion,
+                requires_geometric,
                 is_slow,
             ) = check_example_requirements(example_file)
 
             # Create the test method
             def make_test(
-                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion, slow
+                filepath,
+                needs_pyscf,
+                needs_qiskit,
+                needs_qiskit_aer,
+                needs_qiskit_nature,
+                needs_openfermion,
+                needs_geometric,
+                slow,
             ):
                 """Create a test method for the given example file."""
 
@@ -231,6 +258,8 @@ def _create_test_methods():
                         self.skipTest("Qiskit Nature not available")
                     if needs_openfermion and not OPENFERMION_AVAILABLE:
                         self.skipTest("OpenFermion not available")
+                    if needs_geometric and not GEOMETRIC_AVAILABLE:
+                        self.skipTest("geomeTRIC not available")
                     if slow and not _RUN_SLOW_TESTS:
                         self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
@@ -249,6 +278,7 @@ def _create_test_methods():
                     requires_qiskit_aer,
                     requires_qiskit_nature,
                     requires_openfermion,
+                    requires_geometric,
                     is_slow,
                 ),
             )
