@@ -75,13 +75,13 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             -1,
             "Number of walk blocks the signed-power schedule applies.",
         )
-        self._set_default("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=False))
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("circuit_mapper", "prepare_select_prepare"),
             "Mapper producing the uncontrolled block encoding the schedule applies.",
         )
+        self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
 
 
 class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
