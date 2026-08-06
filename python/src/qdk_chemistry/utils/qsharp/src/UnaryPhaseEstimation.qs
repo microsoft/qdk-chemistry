@@ -94,38 +94,42 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Checks the generic schedule against the explicit walk power.
-    operation TestSignedPowerScheduleAgainstWalk(
+    ///
+    /// The returned operation expects a register laid out as `address + targets`, with
+    /// `AddressQubits(numQueries + 1)` address qubits followed by the walk's own register.
+    /// It leaves the identity behind when the schedule agrees with `W^(numQueries - 2t)`.
+    function MakeTestSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
         addressValue : Int,
-        numTargets : Int,
         systemAngle : Double,
-    ) : Unit {
-        let numAddressQubits = AddressQubits(numQueries + 1);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numTargets);
-        let address = qs[0..numAddressQubits - 1];
-        let targets = qs[numAddressQubits...];
+    ) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numQueries + 1);
+            let address = qs[0..numAddressQubits - 1];
+            let targets = qs[numAddressQubits...];
 
-        ApplyXorInPlace(addressValue, address);
-        Ry(systemAngle, targets[0]);
+            ApplyXorInPlace(addressValue, address);
+            Ry(systemAngle, targets[0]);
 
-        ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
+            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
 
-        let walk = (register) => {
-            applyBlockEncoding(register);
-            applyReflection(register);
-        };
-        let power = numQueries - 2 * addressValue;
-        for _ in 1..AbsI(power) {
-            if power > 0 {
-                Adjoint walk(targets);
-            } else {
-                walk(targets);
+            let walk = (register) => {
+                applyBlockEncoding(register);
+                applyReflection(register);
+            };
+            let power = numQueries - 2 * addressValue;
+            for _ in 1..AbsI(power) {
+                if power > 0 {
+                    Adjoint walk(targets);
+                } else {
+                    walk(targets);
+                }
             }
-        }
 
-        ApplyXorInPlace(addressValue, address);
+            ApplyXorInPlace(addressValue, address);
+        };
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.

@@ -44,7 +44,7 @@ def cosine_window_state(num_queries: int) -> list[float]:
     r"""Return the phase-register amplitudes, zero-padded to a whole number of qubits.
 
     The cosine window is the Heisenberg-limited control state of
-    Babbush et al. (2018), :math:`\psi_t \propto \sin(\pi (t + 1) / (p + 2))`
+    :cite:`Babbush2018` (Eq. 17), :math:`\psi_t \propto \sin(\pi (t + 1) / (p + 2))`
     over the :math:`p + 1` reflection slots. It is the optimal single-lobe
     window for phase estimation and needs no special functions.
 
@@ -73,7 +73,10 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "num_queries",
             "int",
             -1,
-            "Number of walk blocks the signed-power schedule applies.",
+            "Number of walk blocks the signed-power schedule applies. Sizing it as "
+            "ceil(pi * lambda / (2 * epsilon)) targets an energy error epsilon for a block encoding "
+            "of normalization lambda (Lee et al. 2021, Eq. 45); unlike standard QPE it need not be "
+            "a power of two.",
         )
         self._set_default(
             "circuit_mapper",
@@ -131,6 +134,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
     def resolve_num_queries(self, unitary_rep: UnitaryRepresentation) -> int:
         """Return the configured query count, ignoring any power carried by the container.
+
+        The schedule applies exactly ``num_queries`` walk blocks, so the count is the query
+        complexity of the estimate. Choosing ``ceil(pi * lambda / (2 * epsilon))`` targets an
+        energy error ``epsilon`` for a block encoding of normalization ``lambda``
+        (:cite:`Lee2021`, Eq. 45).
 
         Args:
             unitary_rep: The unitary representation the schedule will be built from.

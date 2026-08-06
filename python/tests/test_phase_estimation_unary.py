@@ -7,6 +7,7 @@
 
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     cosine_window_state,
@@ -18,7 +19,7 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 )
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 _PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
 _PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
@@ -43,22 +44,22 @@ class TestUnaryIterationQsharp:
         ("num_actions", "address_value"),
         [(n, a) for n in (1, 2, 3, 4, 5, 6, 7, 8, 11) for a in range(n)],
     )
-    def test_selects_exactly_one_action_per_address(self, qdk_ctx, num_actions, address_value):
+    def test_selects_exactly_one_action_per_address(self, num_actions, address_value):
         """Address ``i`` must flip flag ``i`` and nothing else, for every valid address."""
         num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationOneHot(num_actions, address_value)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationOneHotOp(num_actions, address_value)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions))
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         expected[1 << (num_actions - 1 - address_value)] = 1.0
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
-    def test_superposed_address_stays_coherent(self, qdk_ctx, num_actions):
+    def test_superposed_address_stays_coherent(self, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationSuperposedAddress(num_actions)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions))
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -74,11 +75,11 @@ class TestUnaryIterationQsharp:
             (8, [True, False, False, False, False, True, True, False]),
         ],
     )
-    def test_exposed_control_is_an_equality_predicate(self, qdk_ctx, num_actions, data):
+    def test_exposed_control_is_an_equality_predicate(self, num_actions, data):
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationControlPhases(num_actions, data)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
+        state = np.array(dump_operation_on_state(op, num_address_qubits))
 
         expected = np.zeros(1 << num_address_qubits, dtype=complex)
         for address_value in range(num_actions):
@@ -94,28 +95,28 @@ class TestBlockEncodingAgnosticSchedule:
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
     )
-    def test_psp_schedule_matches_the_explicit_walk_power(self, qdk_ctx, num_queries, address_value):
+    def test_psp_schedule_matches_the_explicit_walk_power(self, num_queries, address_value):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
-        psp = qdk_ctx.code.QDKChemistry.Utils.PrepSelPrep
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSignedPowerScheduleAgainstWalk(
-            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 2, 0.9
+        psp = QSHARP_UTILS.PrepSelPrep
+        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
+            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 0.9
         )
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
-
         num_address_qubits = _address_qubits(num_queries + 1)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + 2))
+
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
-    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qdk_ctx, theta):
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, theta):
         """The contract must not depend on what the block encoding encodes."""
-        psp = qdk_ctx.code.QDKChemistry.Utils.PrepSelPrep
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSignedPowerScheduleAgainstWalk(
-            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 2, 0.9
+        psp = QSHARP_UTILS.PrepSelPrep
+        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
+            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 0.9
         )
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        state = np.array(dump_operation_on_state(op, 4))
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)
@@ -171,31 +172,30 @@ class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(qdk_ctx, num_queries: int, k: int, system_state: int) -> int:
+    def _measure(num_queries: int, k: int, system_state: int) -> int:
         """Run the synthetic-walk QPE circuit and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(
-            num_queries, theta, system_state
-        )
+        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_state)
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
-    def test_measured_bin_is_twice_the_walk_phase(self, qdk_ctx, num_queries, k, system_state):
+    def test_measured_bin_is_twice_the_walk_phase(self, num_queries, k, system_state):
         """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(qdk_ctx, num_queries, k, system_state) == expected
+        assert self._measure(num_queries, k, system_state) == expected
 
-    def test_slot_sweep_grows_linearly_with_the_query_count(self, qdk_ctx):
+    def test_slot_sweep_grows_linearly_with_the_query_count(self):
         """The schedule must sweep ``num_queries + 1`` slots, not apply one controlled block."""
         theta = -np.pi / 4
+        context = get_qsharp_context()
         counts = {
-            num_queries: qdk_ctx.logical_counts(
-                qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk,
+            num_queries: context.logical_counts(
+                QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk,
                 num_queries,
                 theta,
                 1,
@@ -210,7 +210,7 @@ class TestUnaryQpeEndToEnd:
         assert max(per_query) / min(per_query) < 1.5, counts
 
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, qdk_ctx, k):
+    def test_decoder_recovers_the_walk_phase(self, k):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
@@ -222,7 +222,7 @@ class TestUnaryQpeEndToEnd:
 
         expected_phase = k / (2 * num_states)
         for system_state in (0, 1):
-            measured_bin = self._measure(qdk_ctx, num_queries, k, system_state)
+            measured_bin = self._measure(num_queries, k, system_state)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=True)
             assert phase_fraction == pytest.approx(expected_phase)

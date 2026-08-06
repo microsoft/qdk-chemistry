@@ -119,41 +119,50 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Flips `flags[index]` for the single selected address.
-    operation TestUnaryIterationOneHot(numActions : Int, addressValue : Int) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
-        let address = qs[0..numAddressQubits - 1];
-        let flags = qs[numAddressQubits...];
-        ApplyXorInPlace(addressValue, address);
-        UnaryIteration(address, numActions, (index) => {
-            X(flags[index]);
-        });
-        ApplyXorInPlace(addressValue, address);
+    ///
+    /// The returned operation expects a register laid out as `address + flags`, with
+    /// `AddressQubits(numActions)` address qubits followed by `numActions` flags.
+    function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numActions);
+            let address = qs[0..numAddressQubits - 1];
+            let flags = qs[numAddressQubits...];
+            ApplyXorInPlace(addressValue, address);
+            UnaryIteration(address, numActions, (index) => {
+                X(flags[index]);
+            });
+            ApplyXorInPlace(addressValue, address);
+        };
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    operation TestUnaryIterationSuperposedAddress(numActions : Int) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
-        let address = qs[0..numAddressQubits - 1];
-        let flags = qs[numAddressQubits...];
-        ApplyToEach(H, address);
-        UnaryIteration(address, numActions, (index) => {
-            X(flags[index]);
-        });
+    ///
+    /// The returned operation expects a register laid out as `address + flags`.
+    function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numActions);
+            Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
+            let address = qs[0..numAddressQubits - 1];
+            let flags = qs[numAddressQubits...];
+            ApplyToEach(H, address);
+            UnaryIteration(address, numActions, (index) => {
+                X(flags[index]);
+            });
+        };
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    operation TestUnaryIterationControlPhases(numActions : Int, data : Bool[]) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
-        let address = QIR.Runtime.AllocateQubitArray(numAddressQubits);
-        ApplyToEach(H, address);
-        UnaryIterationWithControl(address, numActions, (index, control) => {
-            if data[index] {
-                Z(control);
-            }
-        });
+    ///
+    /// The returned operation expects a register of `AddressQubits(numActions)` address qubits.
+    function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
+        return address => {
+            Fact(2^AddressQubits(numActions) == numActions, "numActions must be a power of two");
+            ApplyToEach(H, address);
+            UnaryIterationWithControl(address, numActions, (index, control) => {
+                if data[index] {
+                    Z(control);
+                }
+            });
+        };
     }
 }

@@ -235,8 +235,6 @@ def _run_iterative_with_parameters(
     )
 
 
-pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
-
 # Parametrize over both qdk_iterative and qiskit_iterative builders
 _builder_params = [
     pytest.param("qdk_iterative", id="qdk_iterative"),
@@ -258,6 +256,7 @@ _unitary_builder_params = [
 
 @pytest.mark.parametrize("builder_name", _builder_params)
 @pytest.mark.parametrize("unitary_builder_name", _unitary_builder_params)
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_iterative_phase_estimation_extracts_phase_and_energy(
     two_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
@@ -283,6 +282,7 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(
 
 @pytest.mark.parametrize("builder_name", _builder_params)
 @pytest.mark.parametrize("unitary_builder_name", _unitary_builder_params)
+@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     four_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
