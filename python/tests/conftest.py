@@ -98,23 +98,6 @@ def use_base_qdk_ctx() -> Iterator[qdk.Context]:
     with use_qsharp_context(_base_qsharp_context()) as context:
         yield context
 
-
-@pytest.fixture
-def qiskit_params_use_base_qdk_ctx(request: pytest.FixtureRequest) -> None:
-    """Compile under Base for any parametrization whose backend name starts with ``qiskit``.
-
-    Qiskit interop converts the Q# to QIR, which has to come out measurement-free, so those
-    parameters need the Base context while their QDK counterparts do not. ``pytest.param``
-    rejects ``pytest.mark.usefixtures`` outright, so the choice cannot be expressed as a mark
-    on the individual parameter and is resolved here instead.
-    """
-    callspec = getattr(request.node, "callspec", None)
-    if callspec is None:
-        return
-    if any(isinstance(value, str) and value.startswith("qiskit") for value in callspec.params.values()):
-        request.getfixturevalue("use_base_qdk_ctx")
-
-
 @pytest.fixture
 def basic_orbital():
     """Create a basic valid Orbitals object for testing."""
