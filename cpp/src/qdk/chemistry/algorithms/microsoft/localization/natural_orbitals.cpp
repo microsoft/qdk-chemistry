@@ -198,7 +198,7 @@ std::shared_ptr<data::Wavefunction> NaturalOrbitalLocalizer::_run_impl(
   transformed_beta = 0.5 * (transformed_beta + transformed_beta.transpose());
   auto active_one_rdm = data::make_spin_diagonal_rank2_sbt_variant(
       data::ContainerTypes::MatrixVariant(transformed_alpha),
-      data::ContainerTypes::MatrixVariant(transformed_beta), false);
+      data::ContainerTypes::MatrixVariant(transformed_beta), true);
   return detail::new_aufbau_determinant_wavefunction(
       wavefunction, new_orbitals,
       data::ContainerTypes::MatrixVariant(diagonal_one_rdm), active_one_rdm);
