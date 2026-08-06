@@ -5,14 +5,17 @@
 namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     import Std.Arrays.Reversed;
+    import Std.Arrays.SequenceI;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEach;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
+    import Std.Core.Length;
     import Std.Diagnostics.Fact;
+    import Std.Math.AbsI;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
-    import Std.Math.AbsI;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
@@ -84,12 +87,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
         Adjoint ApplyQFT(phaseAncillas);
 
-        ResetAll(allTargets);
         mutable results = [Zero, size = numBits];
-
         for idx in 0..numBits - 1 {
             set results w/= idx <- MResetZ(phaseAncillas[idx]);
         }
+
+        ResetAll(allTargets);
         return results;
     }
 
@@ -140,16 +143,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// with, so the walk W = B·X = Rz(2*theta) has genuinely distinct powers. A pair of
     /// commuting factors (two diagonal ones, say) would make every schedule branch collapse
     /// to the same operator and silently pass no matter what the address decode did.
-    operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemState : Int) : Result[] {
+    operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         let numBits = PhaseRegisterSize(numQueries);
         Fact(2^numBits == numQueries + 1, "numQueries must be one less than a power of two");
 
         return MakeUnaryQPECircuit(
-            (systems) => {
-                if systemState == 1 {
-                    X(systems[0]);
-                }
-            },
+            (systems) => Ry(systemAngle, systems[0]),
             (qubits) => {
                 Rz(-theta, qubits[0]);
                 X(qubits[0]);
@@ -158,7 +157,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             (qubits) => X(qubits[0]),
             ApplyToEach(H, _),
             numQueries,
-            Std.Arrays.SequenceI(0, numBits - 1),
+            SequenceI(0, numBits - 1),
             [numBits],
             0
         );

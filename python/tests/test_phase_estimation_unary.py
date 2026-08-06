@@ -181,11 +181,11 @@ class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(num_queries: int, k: int, system_state: int) -> int:
-        """Run the synthetic-walk QPE circuit and decode the phase register."""
+    def _measure(num_queries: int, k: int, system_angle: float) -> int:
+        """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_state)
+        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_angle)
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
@@ -196,7 +196,23 @@ class TestUnaryQpeEndToEnd:
         """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(num_queries, k, system_state) == expected
+        assert self._measure(num_queries, k, system_state * np.pi) == expected
+
+    @pytest.mark.parametrize("system_angle", [np.pi / 2, 2 * np.pi / 3])
+    def test_superposed_input_splits_across_both_eigenphase_bins(self, system_angle):
+        """A non-eigenstate must land in the two eigenphase bins with the overlap weights.
+
+        Both eigenphases sit exactly on the phase grid, so every shot has to read one of the
+        two bins; their frequencies track the squared overlaps of ``Ry(system_angle)|0>``.
+        """
+        num_queries, k, shots = 7, 3, 256
+        num_states = num_queries + 1
+        ground_bin, excited_bin = k, (-k) % num_states
+
+        measured = np.array([self._measure(num_queries, k, system_angle) for _ in range(shots)])
+
+        assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
+        assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
     def test_slot_sweep_grows_linearly_with_the_query_count(self):
         """The schedule must sweep ``num_queries + 1`` slots, not apply one controlled block."""
@@ -207,7 +223,7 @@ class TestUnaryQpeEndToEnd:
                 QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk,
                 num_queries,
                 theta,
-                1,
+                np.pi,
             )["measurementCount"]
             for num_queries in (3, 7, 15, 31)
         }
@@ -231,7 +247,7 @@ class TestUnaryQpeEndToEnd:
 
         expected_phase = k / (2 * num_states)
         for system_state in (0, 1):
-            measured_bin = self._measure(num_queries, k, system_state)
+            measured_bin = self._measure(num_queries, k, system_state * np.pi)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=True)
             assert phase_fraction == pytest.approx(expected_phase)

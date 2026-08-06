@@ -5,15 +5,19 @@
 namespace QDKChemistry.Utils.UnaryIteration {
 
     import Std.Arrays.MostAndTail;
+    import Std.Canon.ApplyToEach;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
+    import Std.Core.Length;
     import Std.Diagnostics.Fact;
+    import Std.Intrinsic.AND;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
 
 
     /// Unary iteration
     /// References:
-    ///   Babbush et al. (arXiv:1805.03662), Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
+    ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity (arXiv:1805.03662)
     operation UnaryIteration(
         address : Qubit[],
         numActions : Int,
@@ -115,7 +119,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
     /// Number of address qubits needed to enumerate `numActions` values.
     function AddressQubits(numActions : Int) : Int {
-        Ceiling(Lg(IntAsDouble(numActions)))
+        return Ceiling(Lg(IntAsDouble(numActions)));
     }
 
     /// Flips `flags[index]` for the single selected address.

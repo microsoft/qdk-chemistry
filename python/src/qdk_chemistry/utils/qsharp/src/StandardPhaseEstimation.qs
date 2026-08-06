@@ -61,11 +61,11 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         Adjoint ApplyQFT(ancillas);
 
         // Step 5: Measure ancilla qubits and reset system qubits
-        ResetAll(allTargets);
         mutable results = [Zero, size = params.numBits];
         for idx in 0..params.numBits - 1 {
             set results w/= idx <- MResetZ(ancillas[idx]);
         }
+        ResetAll(allTargets);
         return results;
     }
 

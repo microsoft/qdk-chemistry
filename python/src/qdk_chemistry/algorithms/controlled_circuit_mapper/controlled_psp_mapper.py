@@ -5,12 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
-
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -91,7 +90,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         mapper.settings().set("prepare", self._settings.get("prepare"))
         return mapper
 
-    def num_ancillary_qubits(self, container: Any) -> int:
+    def num_ancilla_qubits(self, container: UnitaryContainer) -> int:
         """The number of ancilla qubits the block encoding needs beyond the system register.
 
         Args:
@@ -101,7 +100,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             The size of the PREPARE ancilla register.
 
         """
-        return self._block_mapper().num_ancillary_qubits(container)
+        return self._block_mapper().num_ancilla_qubits(container)
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a controlled block-encoding circuit.

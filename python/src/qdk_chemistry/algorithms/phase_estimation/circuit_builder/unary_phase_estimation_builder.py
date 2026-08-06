@@ -189,7 +189,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_bits = num_phase_bits(num_queries)
 
         mapper = self._create_nested("circuit_mapper")
-        num_ancilla_qubits = mapper.num_ancillary_qubits(container)
+        num_ancilla_qubits = mapper.num_ancilla_qubits(container)
         if num_ancilla_qubits == 0:
             raise ValueError("Requires a non-empty ancilla register to reflect about.")
 

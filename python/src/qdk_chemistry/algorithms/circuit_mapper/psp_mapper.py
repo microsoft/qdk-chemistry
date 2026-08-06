@@ -12,6 +12,7 @@ from qdk import qsharp
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -119,7 +120,7 @@ class PSPMapper(CircuitMapper):
         )
         return QSHARP_UTILS.Select.MakeSelectOp(select_params)
 
-    def resolve_lcu(self, container: Any) -> tuple[LCUContainer, bool]:
+    def resolve_lcu(self, container: UnitaryContainer) -> tuple[LCUContainer, bool]:
         """Unwrap a container into its LCU data and whether it is a quantum walk.
 
         Args:
@@ -141,7 +142,7 @@ class PSPMapper(CircuitMapper):
             "PSPMapper requires LCUContainer or LCUWalkContainer."
         )
 
-    def build_prepare_select_ops(self, container: Any) -> tuple[Any, Any, int]:
+    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int]:
         """Return the PREPARE and SELECT Q# oracles and the system register size.
 
         Args:
@@ -158,7 +159,7 @@ class PSPMapper(CircuitMapper):
             prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
         return prepare_op, self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
 
-    def block_encoding_op(self, container: Any):
+    def block_encoding_op(self, container: UnitaryContainer):
         """Return one application of the block encoding, without reflection or power.
 
         Args:
@@ -171,7 +172,7 @@ class PSPMapper(CircuitMapper):
         prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
         return QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
 
-    def reflection_op(self, container: Any):
+    def reflection_op(self, container: UnitaryContainer):
         """Return the reflection a qubitization walk pairs the block encoding with.
 
         Args:
@@ -184,7 +185,7 @@ class PSPMapper(CircuitMapper):
         lcu, _ = self.resolve_lcu(container)
         return QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(lcu.select.num_target_qubits)
 
-    def num_ancillary_qubits(self, container: Any) -> int:
+    def num_ancilla_qubits(self, container: UnitaryContainer) -> int:
         """The number of ancilla qubits the block encoding needs beyond the system register.
 
         Args:
