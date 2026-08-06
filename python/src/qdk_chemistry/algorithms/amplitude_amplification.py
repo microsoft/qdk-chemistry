@@ -149,6 +149,8 @@ class AmplitudeAmplification(Algorithm):
 
         Args:
             state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.
+                Its register width is read from a resource estimate, so its circuit must allocate
+                exactly the register the oracle acts on and no extra scratch qubits.
             good_state_oracle: Flips a flag qubit on the good subspace. Must carry an adjointable Q# operation.
 
         Returns:
