@@ -92,6 +92,7 @@ def use_base_qdk_ctx() -> Iterator[qdk.Context]:
     with use_qsharp_context(_base_qsharp_context()) as context:
         yield context
 
+
 @pytest.fixture
 def basic_orbital():
     """Create a basic valid Orbitals object for testing."""
