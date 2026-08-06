@@ -509,6 +509,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
         )
         < 1e-12
     )
+    assert abs(phase_converter.eigenvalue_from_phase(0.5) + np.pi / phase_converter.scale) < 1e-12
 
     if _RUN_TUTORIAL_SNAPSHOTS:
         assert abs(problem.trial_state.fidelity - 0.732385025483) < 1e-8

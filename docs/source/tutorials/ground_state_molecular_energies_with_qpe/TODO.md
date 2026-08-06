@@ -1,0 +1,40 @@
+# Ground-state QPE tutorial TODO
+
+## Review completion
+
+- [ ] Finish Caroline review using grouped, current-source decisions rather than applying generated-HTML edits mechanically.
+  - [x] Complete objective and staleness audit.
+  - [x] Review and implement accepted Chapter 2-4 clarity changes.
+  - [x] Review redundant or stale Chapter 5-6 suggestions.
+  - [x] Decide whether any landing-page ideas should be retained without adopting the wholesale rewrite.
+  - [x] Record final dispositions and validate.
+  - [ ] Commit and reply.
+- [ ] Process Yingrong review feedback using a grouped current-source audit.
+- [ ] Process Martin review feedback using a grouped current-source audit.
+- [ ] Process any additional substantive reviewer feedback using the grouped review workflow.
+- [ ] Run the end-stage review after substantive feedback is complete.
+- [ ] Monitor Conrad's re-review and pending QDK/Chemistry typesetting clarification.
+
+## Code changes
+
+- [ ] Move some of the tutorial functions into the main code base (David)
+
+## CI
+
+- [ ] Confirm PR #604 Build and Test jobs pass after merging the QDK/Chemistry 2.1.0 release.
+- [ ] Rerun the failed macOS tutorial-compatibility job after its workflow finishes. The runner failed before checkout because GitHub Actions could not download actions.
+
+## Visual design
+
+- [ ] Add visuals directly to the Sphinx tutorial to reduce walls of text.
+  - [ ] Start with an active/inactive/virtual orbital partition figure.
+  - [ ] Audit each chapter for concepts that genuinely benefit from a visual.
+  - [ ] Reuse existing molecular-orbital widgets and circuit notebooks where appropriate.
+  - [ ] Provide accessible captions and alt text, then validate rendered documentation.
+
+## Low-priority cleanup
+
+- [ ] Consider importing `PauliProductFormulaContainer` directly from `qdk_chemistry.data` in the tutorial test.
+- [ ] Audit analogous concrete internal imports if time remains.
+- [ ] Revisit nonblocking student-review friction only if later feedback confirms a learning obstacle: phase-kickback derivation, feedback recurrence, occupation-symbol-to-bit mapping, gate-family output, and the Chapter 3 coefficient-norm forward reference.
+- [ ] Delete this TODO file after every item is complete.

@@ -116,7 +116,7 @@ In a larger problem where exact :term:`CASCI` is unavailable, an approximate cla
 
 The script first prints the leading terms in the selected-space wavefunction.
 Each occupation string contains one symbol for each selected active spatial orbital: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
-The amplitude is the signed coefficient :math:`c_i` in :math:`\vert\Psi_0\rangle=\sum_i c_i\vert\Phi_i\rangle`, while the weight :math:`\left\vert c_i\right\vert^2` is that determinant's contribution to the squared norm.
+The amplitude is the signed coefficient :math:`c_I` in :math:`\vert\Psi_0\rangle=\sum_I c_I\vert\Phi_I\rangle`, while the weight :math:`\left\vert c_I\right\vert^2` is that determinant's contribution to the squared norm.
 The cumulative weight shows how much of the norm is captured by the listed determinants.
 The script computes these quantities directly from the leading :term:`CASCI` coefficients.
 
@@ -132,9 +132,9 @@ The trial wavefunction is therefore
 .. math::
 
    \vert\Psi_{\mathrm{trial}}\rangle
-   =\sum_{i=1}^{K}\widetilde{c}_i\vert b_i\rangle,
+   =\sum_{I=1}^{K}\widetilde{c}_I\vert b_I\rangle,
 
-where :math:`\vert b_i\rangle` is the occupation bitstring for retained determinant :math:`\Phi_i`, and :math:`\widetilde{c}_i` is its reoptimized amplitude.
+where :math:`\vert b_I\rangle` is the occupation bitstring for retained determinant :math:`\Phi_I`, and :math:`\widetilde{c}_I` is its reoptimized amplitude.
 
 The script constructs each projected trial state, forms the reference and trial coefficient vectors for the same retained determinants, and evaluates their squared inner product directly:
 

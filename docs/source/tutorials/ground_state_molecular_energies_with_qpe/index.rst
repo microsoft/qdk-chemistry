@@ -23,6 +23,7 @@ This tutorial seeks an approximate solution for the ground-state energy of stret
 This tutorial uses the `Born--Oppenheimer approximation <https://en.wikipedia.org/wiki/Born%E2%80%93Oppenheimer_approximation>`_, which holds the nuclei at fixed positions while solving for the electrons.
 At a chosen molecular geometry, the electronic Hamiltonian includes the electron kinetic energy, electron--nucleus attraction, and electron--electron repulsion.
 The repulsion among the fixed nuclei contributes separately to the total energy.
+:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` develops the selected active-space form of this Hamiltonian and explains how it is mapped to qubits.
 The computational cost of solving its Schrödinger equation grows rapidly with the number of electrons and orbitals, so practical calculations use approximations.
 :doc:`Energy and accuracy <01_energy_and_accuracy>` defines the target energy and the different error comparisons used in the tutorial.
 :doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and compares the initial fixed-geometry Hartree--Fock total energies from two related basis sets.
@@ -36,12 +37,12 @@ Each spin orbital can be occupied by at most one electron.
 Each spatial orbital therefore corresponds to two spin orbitals and can accommodate at most two electrons, one with each spin projection.
 An `electron configuration <https://en.wikipedia.org/wiki/Electron_configuration>`_ specifies which spin orbitals are occupied.
 A `Slater determinant <https://en.wikipedia.org/wiki/Slater_determinant>`_ constructs a valid many-electron wavefunction for one configuration and enforces the `Pauli exclusion principle <https://en.wikipedia.org/wiki/Pauli_exclusion_principle>`_.
-The `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ approximates the molecular wavefunction with one optimized Slater determinant.
-This single-configuration approximation is an important starting point, but it becomes inadequate when several electron configurations make substantial contributions to the state.
-When several configurations contribute substantially, the ground-state wavefunction must combine their Slater determinants.
+Electron--electron interactions can couple different electron configurations, so a molecular state can require a combination of many Slater determinants.
+The `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ retains one optimized determinant as a tractable starting approximation, whereas active-space methods retain multiple determinants while restricting which orbital occupations can vary.
+
+When several configurations contribute substantially, the ground-state wavefunction combines their Slater determinants.
 A coefficient for each determinant specifies its contribution to the wavefunction.
 This need for several important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_, and the resulting wavefunction is called multi-configurational.
-
 The number of possible configurations grows rapidly with the number of electrons and orbitals.
 An `active space <https://en.wikipedia.org/wiki/Complete_active_space>`_ selects the electrons and orbitals whose occupations vary among the determinants in the multi-configurational wavefunction :cite:`Stein2016,Stein2019`.
 The remaining orbital occupations are fixed, and their energy contributions are tracked separately.
@@ -60,6 +61,7 @@ For :math:`N` active electrons distributed among :math:`M` active spin orbitals,
    N_{\mathrm{det}} = \binom{M}{N}
 
 states before applying additional spin or molecular symmetries.
+Fixing separate :math:`\alpha` and :math:`\beta` electron counts reduces this dimension to the sector-specific count derived in :doc:`Choosing the active space <03_choosing_the_active_space>`, but does not remove the exponential growth.
 At a fixed ratio of electrons to orbitals, this number grows exponentially with :math:`M`.
 `Full configuration interaction <https://en.wikipedia.org/wiki/Full_configuration_interaction>`_ combines all allowed determinants in a chosen orbital space and therefore becomes impractical as that orbital space grows.
 Approximate classical methods can reach larger spaces by retaining or compressing selected information, but their accuracy depends on preserving the correlations that matter.
@@ -67,8 +69,11 @@ When many configurations contribute substantially, omitted correlations can caus
 
 .. _tutorial-occupation-encoding:
 
+The determinant count :math:`N_{\mathrm{det}}` is also the number of coefficients needed to store a general full configuration-interaction wavefunction explicitly on a classical computer.
 An occupation-number encoding assigns one qubit to each spin orbital to record whether that orbital is unoccupied or occupied.
-The amplitudes of the possible occupations are represented by the quantum state rather than stored as an explicit classical list.
+Once prepared, the qubit register carries amplitudes for a superposition of these :math:`N_{\mathrm{det}}` occupation patterns.
+Entanglement links occupations across spin orbitals, so the joint quantum state represents configuration mixing without an explicit classical coefficient vector.
+Preparing that state may still require classically supplied amplitudes and substantial resources.
 
 .. _tutorial-compute-register:
 
@@ -123,6 +128,15 @@ Each required chapter:
 - introduces one stage of the calculation;
 - provides a testable Python example where appropriate; and
 - ends with questions and a lab notebook assignment.
+
+The required workflow proceeds through six stages:
+
+- :doc:`Define the target energy and accuracy comparison <01_energy_and_accuracy>`.
+- :doc:`Construct the molecular system and Hartree--Fock starting wavefunction <02_describing_the_molecule>`.
+- :doc:`Select a correlated active-space model <03_choosing_the_active_space>`.
+- :doc:`Map the active-space Hamiltonian to qubits <04_putting_the_problem_on_qubits>`.
+- :doc:`Prepare a trial state <05_preparing_the_trial_state>`.
+- :doc:`Estimate the energy with IQPE and compare it with the matching classical reference <06_iterative_phase_estimation>`.
 
 The final circuit simulation is the only intentionally long required example and reports progress after each complete run.
 

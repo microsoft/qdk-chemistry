@@ -57,6 +57,8 @@ A basis set is a finite collection of mathematical functions used to represent m
 :doc:`Describing the molecule <02_describing_the_molecule>` explains how basis sets are constructed and used.
 Chemically meaningful questions usually compare energies calculated under a consistent set of choices, including geometry, basis set, and electronic-structure method.
 Examples include the energy difference between two molecular geometries, the reaction energy between products and reactants, and the barrier between a reactant and a transition state.
+In a chemical reaction, starting species called reactants transform into resulting species called products.
+A transition state is a high-energy molecular arrangement along this transformation; its energy relative to the reactants defines the reaction barrier.
 Changing the model or numerical method between the two calculations can make the difference difficult to interpret.
 If several choices change at once, their effects are combined in one number, so the difference cannot be attributed to a particular geometry, basis set, or method.
 

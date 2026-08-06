@@ -52,7 +52,7 @@ The Hamiltonian contains one-electron and two-electron terms:
 
 The indices :math:`p,q,r,s` label active spin orbitals, or equivalently fermionic modes.
 The coefficients :math:`h_{pq}` describe one-electron effects, including kinetic energy, attraction to the nuclei, and the effective interaction with frozen inactive electrons.
-The coefficients :math:`g_{pqrs}` describe repulsion between pairs of active electrons.
+The coefficients :math:`g_{pqrs}` describe electron--electron repulsion among the active spin orbitals.
 
 The creation and annihilation operators automatically produce zero when creation acts on an already occupied spin orbital or annihilation acts on an unoccupied one.
 Together, these operators connect the `Slater determinants <https://en.wikipedia.org/wiki/Slater_determinant>`_ introduced in :ref:`Orbitals and determinants <tutorial-orbitals-and-determinants>` that can contribute to the active-space wavefunction.

@@ -13,7 +13,7 @@ After completing this chapter, you will be able to:
 
 - Specify a molecule by its geometry, charge, and spin multiplicity.
 - Explain the role of a finite atomic-orbital basis set.
-- Describe the Hartree--Fock approximation and its Slater determinant.
+- Describe the Hartree--Fock approximation and the Slater-determinant form of its wavefunction.
 - Generate a Hartree--Fock wavefunction with the built-in :term:`QDK`/Chemistry self-consistent field solver.
 - Interpret an energy change caused by changing the basis set.
 
@@ -44,6 +44,7 @@ The molecule is neutral, so its net charge is zero and it has 14 electrons.
 `Spin multiplicity <https://en.wikipedia.org/wiki/Multiplicity_(chemistry)>`_ is defined as :math:`2S+1`, where :math:`S` is the total electron spin produced by combining the spins of all electrons.
 Paired electrons contribute no net spin, whereas unpaired electrons can produce :math:`S>0`.
 A multiplicity of one, two, or three is called a singlet, doublet, or triplet, respectively.
+The labels :math:`\alpha` and :math:`\beta` denote spin projections :math:`+\tfrac{1}{2}` (spin up) and :math:`-\tfrac{1}{2}` (spin down), respectively.
 :term:`QDK`/Chemistry uses the molecular charge and spin multiplicity to determine the numbers of :math:`\alpha` and :math:`\beta` electrons in the calculation.
 For the target N\ :sub:`2` singlet, :math:`S=0`, so the multiplicity is one and the calculation contains seven :math:`\alpha` and seven :math:`\beta` electrons.
 

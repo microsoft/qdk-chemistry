@@ -1,8 +1,6 @@
 Iterative quantum phase estimation
 ##################################
 
-This chapter introduces iterative quantum phase estimation (:term:`IQPE`).
-
 .. admonition:: Chapter focus
    :class: chapter-focus
 
@@ -95,8 +93,8 @@ The phase fraction reported by :term:`QPE` is
 The QDK/Chemistry result object handles the modulo wrapping automatically.
 It converts the measured phase fraction to a signed angle :math:`\alpha\in(-\pi,\pi]` and returns :math:`-\alpha/t`.
 The tutorial script uses this value directly rather than manually applying a sign conversion.
-To avoid aliasing, the active-space Hamiltonian energy eigenvalue :math:`E_j` being estimated must lie in the signed interval :math:`(-\pi/t,\pi/t]`; energies outside that interval can produce the same measured phase.
-The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to :math:`+\pi/t`.
+To avoid aliasing, the active-space Hamiltonian energy eigenvalue :math:`E_j` being estimated must lie in the signed interval :math:`[-\pi/t,\pi/t)`; energies outside that interval can produce the same measured phase.
+The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to :math:`-\pi/t`.
 
 With :math:`m` measured phase bits, the representable fractions are multiples of :math:`2^{-m}`, so adjacent energy-grid points are separated by
 
@@ -115,7 +113,7 @@ If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h
 
    \lambda=\sum_\ell\lvert h_\ell\rvert.
 
-The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient sum as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
+The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient 1-norm as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
 For this Hamiltonian, the reported value is :math:`\lambda=19.610172748837\ E_{\mathrm{h}}`.
 Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice
 
@@ -177,7 +175,7 @@ Immediately before measurement, the readout ancilla has a state
    |\gamma_0|^2+|\gamma_1|^2=1.
 
 The coefficients :math:`\gamma_0` and :math:`\gamma_1` are complex probability amplitudes.
-They play the same mathematical role as the determinant coefficients :math:`c_i` and eigenstate amplitudes :math:`a_j` introduced earlier, but here they describe the two computational-basis states of one qubit.
+They play the same mathematical role as the determinant coefficients :math:`c_I` and eigenstate amplitudes :math:`a_j` introduced earlier, but here they describe the two computational-basis states of one qubit.
 
 Measuring this qubit in the computational basis returns one classical bit.
 The probability of measuring zero is :math:`|\gamma_0|^2`, and the probability of measuring one is :math:`|\gamma_1|^2`.
@@ -202,6 +200,8 @@ One phase bit at a time
 
 Standard phase estimation uses several readout ancillas and an inverse quantum Fourier transform to obtain a complete phase in one coherent circuit.
 The QDK/Chemistry iterative implementation (:term:`IQPE`) instead reuses a single readout ancilla across a sequence of independently executed circuits.
+This reduces each circuit's logical-qubit requirement, both on quantum hardware and in this tutorial's classical simulator, at the cost of repeated state preparation and circuit execution.
+This qubit-resource tradeoff is why the tutorial uses :term:`IQPE`.
 
 For iterations over :math:`k=0,1,\ldots,m-1`, the circuit builder uses the controlled power
 

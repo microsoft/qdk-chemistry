@@ -49,10 +49,10 @@ A `configuration interaction <https://en.wikipedia.org/wiki/Configuration_intera
 
 .. math::
 
-   \vert \Psi \rangle = \sum_i c_i \vert \Phi_i \rangle,
+   \vert \Psi \rangle = \sum_I c_I \vert \Phi_I \rangle,
 
-where :math:`\vert \Phi_i \rangle` is determinant :math:`i` and :math:`c_i` is its coefficient.
-Every determinant :math:`\Phi_i`, including :math:`\Phi_{\mathrm{HF}}`, is constructed from one allowed choice of occupied spin orbitals.
+where :math:`\vert \Phi_I \rangle` is determinant :math:`I` and :math:`c_I` is its coefficient.
+Every determinant :math:`\Phi_I`, including :math:`\Phi_{\mathrm{HF}}`, is constructed from one allowed choice of occupied spin orbitals.
 Different choices represent different electron configurations.
 Full configuration interaction (:term:`FCI`) includes every determinant consistent with a chosen finite orbital basis and fixed :math:`(n_\alpha,n_\beta)` sector.
 It therefore gives the exact eigenvalues of the finite-basis Hamiltonian in that sector, up to numerical solver tolerance.
@@ -135,20 +135,20 @@ Using the determinant-count formula above, the initial valence space in this exa
 Larger active-space studies often use selected :term:`CI` (:term:`SCI`) to obtain approximate active-space diagnostics at lower cost, but that additional approximation is unnecessary here.
 
 The ``calculate_one_rdm`` and ``calculate_two_rdm`` settings request the one- and two-particle reduced density matrices (:term:`RDMs <RDM>`).
-An :term:`RDM` compresses information from the many-electron wavefunction into expectation values involving one or two particles.
+An :term:`RDM` summarizes the parts of the many-electron wavefunction needed to describe one- or two-particle properties.
 The spin-resolved one-particle :term:`RDM` tracks :math:`\alpha` and :math:`\beta` occupations separately, and its diagonal gives the expected occupation of each spin orbital.
 A corresponding diagonal element of the two-particle :term:`RDM` gives the joint occupation of a pair of spin orbitals.
 Each determinant assigns every spatial orbital one of four *local occupation states*: empty, occupied by one :math:`\alpha` electron, occupied by one :math:`\beta` electron, or doubly occupied.
 Here, a local occupation state describes only one orbital, not the complete electronic state of the molecule.
-For these occupation quantities, each determinant contributes according to the squared magnitude of its coefficient in the correlated wavefunction.
+For these occupation quantities, determinant :math:`I` contributes with weight :math:`\lvert c_I\rvert^2`, the squared magnitude of its coefficient in the correlated wavefunction.
 Together, the :term:`RDM` elements collect these contributions into the probabilities of the four local occupation states.
 If the important determinants give an orbital the same occupation, one probability dominates; if they assign different occupations, the probabilities spread among several local states.
 
 Natural-orbital transformation
 ==============================
 
-Molecular orbitals are not unique: a unitary rotation applied within an active orbital subspace changes the individual orbital shapes but not the subspace they span.
-For an exact :term:`CASCI` calculation in a fixed active subspace, such a rotation leaves the total energy unchanged.
+Different sets of molecular orbitals can describe the same active space.
+Changing to natural orbitals changes the individual orbital shapes but not the exact :term:`CASCI` energy for that active space.
 Orbital-resolved quantities, however, can change because they describe the chosen orbital representation.
 
 Natural orbitals diagonalize the one-particle :term:`RDM` :cite:`Lowdin1956`.
@@ -196,8 +196,8 @@ The one-particle occupation :math:`n_{i\alpha}` includes both the :math:`\alpha`
 The empty probability is the remainder after accounting for either spin occupation, with :math:`d_i` added back because double occupation was subtracted twice.
 The four probabilities therefore sum to one.
 
-An entropy near zero means that one local occupation dominates.
-A larger entropy means that several local occupations occur across the important determinants.
+An entropy near zero means that one local occupation state consistently dominates.
+A larger entropy means that the orbital changes among several local occupation states across the important determinants.
 In other words, the important determinants assign different occupations to this orbital together with corresponding occupation differences elsewhere in the active space.
 This correlated variation makes the orbital a stronger candidate for explicit treatment.
 These high-entropy orbitals carry the strongest static-correlation signal because their occupations vary among the important determinants.
