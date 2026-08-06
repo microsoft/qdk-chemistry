@@ -20,6 +20,19 @@ namespace qdk::chemistry::algorithms {
  * Given a reference wavefunction and an input Hamiltonian, a concrete
  * implementation constructs an effective Hamiltonian in an explicitly
  * specified target P-space.
+ *
+ * Typical usage:
+ * @code
+ * auto constructor =
+ *   EffectiveHamiltonianConstructorFactory::create("algorithm_name");
+ * auto effective_hamiltonian =
+ *   constructor->run(reference, hamiltonian, p_indices);
+ * @endcode
+ *
+ * @see EffectiveHamiltonianConstructorFactory for creating instances
+ * @see data::Wavefunction for the reference wavefunction input
+ * @see data::Hamiltonian for the input and output Hamiltonians
+ * @see data::SymmetryBlockedIndexSet for the target P-space indices
  */
 class EffectiveHamiltonianConstructor
     : public Algorithm<EffectiveHamiltonianConstructor,
@@ -28,9 +41,31 @@ class EffectiveHamiltonianConstructor
                        std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
  public:
+  /**
+   * @brief Default constructor.
+   */
   EffectiveHamiltonianConstructor() = default;
+
+  /**
+   * @brief Virtual destructor.
+   */
   virtual ~EffectiveHamiltonianConstructor() = default;
 
+  /**
+   * @brief Construct the effective Hamiltonian acting on the target space P.
+   *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
+   * @param reference Reference wavefunction providing the reference state.
+   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
+   * @param p_indices The target space P (indices into the window's active
+   *        space W).
+   * \endcond
+   * @return The effective Hamiltonian acting on the target space P.
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   *         settings after run() is called.
+   * @note Settings are automatically locked when this method is called and
+   *       cannot be modified during or after execution.
+   */
   using Algorithm::run;
 
   /**
@@ -47,17 +82,22 @@ class EffectiveHamiltonianConstructor
 
  protected:
   /**
-   * @brief Construct an effective Hamiltonian from a reference wavefunction.
+   * @brief Implementation of the effective-Hamiltonian construction.
+   *
+   * Contains the actual construction logic. It is automatically called by
+   * run() after settings have been locked, and must be implemented by derived
+   * classes.
    *
    * @param reference Reference wavefunction providing the reference state.
-   * @param hamiltonian Input Hamiltonian to transform.
-   * @param p_space_indices Target P-space orbital indices.
-   * @return The effective Hamiltonian.
+   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
+   * @param p_indices The target space P (indices into the window's active
+   *        space W).
+   * @return The effective Hamiltonian acting on the target space P.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
       std::shared_ptr<data::Hamiltonian> hamiltonian,
-      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_space_indices)
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices)
       const override = 0;
 };
 

@@ -34,11 +34,10 @@ class EffectiveHamiltonianConstructorBase
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction> reference,
       std::shared_ptr<Hamiltonian> hamiltonian,
-      std::shared_ptr<const SymmetryBlockedIndexSet> p_space_indices)
-      const override {
+      std::shared_ptr<const SymmetryBlockedIndexSet> p_indices) const override {
     PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
                            EffectiveHamiltonianConstructor, _run_impl,
-                           reference, hamiltonian, p_space_indices);
+                           reference, hamiltonian, p_indices);
   }
 };
 
@@ -50,12 +49,28 @@ Abstract base class for effective-Hamiltonian construction.
 
 Concrete implementations construct an effective Hamiltonian from a reference
 wavefunction and an input Hamiltonian in the explicitly specified P-space.
+
+Examples:
+    >>> import qdk_chemistry.algorithms as alg
+    >>> constructor = alg.create("effective_hamiltonian_constructor", "algorithm_name")
+    >>> effective_hamiltonian = constructor.run(reference, hamiltonian, p_indices)
 )");
 
   constructor.def(py::init<>());
   constructor.def("run", &EffectiveHamiltonianConstructor::run,
                   py::arg("reference"), py::arg("hamiltonian"),
-                  py::arg("p_space_indices"));
+                  py::arg("p_indices"), R"(
+Construct the effective Hamiltonian acting on the target space ``P``.
+
+Args:
+    reference: Reference wavefunction providing the reference state.
+    hamiltonian: Input Hamiltonian built over the whole window ``W = P union Q``.
+    p_indices: The target space ``P`` (indices into the window's active
+        space ``W``).
+
+Returns:
+    The effective Hamiltonian acting on ``P``.
+)");
   constructor.def("settings", &EffectiveHamiltonianConstructor::settings,
                   py::return_value_policy::reference_internal);
   constructor.def_property(
@@ -72,7 +87,7 @@ wavefunction and an input Hamiltonian in the explicitly specified P-space.
   constructor.def("type_name", &EffectiveHamiltonianConstructor::type_name);
   constructor.def("hash", &EffectiveHamiltonianConstructor::hash,
                   py::arg("reference"), py::arg("hamiltonian"),
-                  py::arg("p_space_indices"));
+                  py::arg("p_indices"));
   constructor.def("__repr__", [](const EffectiveHamiltonianConstructor &) {
     return "<qdk_chemistry.algorithms.EffectiveHamiltonianConstructor>";
   });
