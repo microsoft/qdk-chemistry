@@ -7,8 +7,6 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
@@ -16,114 +14,104 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @class EffectiveHamiltonianSettings
- * @brief Common settings for effective-Hamiltonian algorithms.
+ * @class EffectiveHamiltonianConstructor
+ * @brief Abstract base for constructing an effective Hamiltonian.
  *
- * Effective-Hamiltonian builders are configured almost entirely by their data
- * inputs: the reference amplitudes are carried by the full-space input
- * @ref data::Wavefunction and the active space by a separate active-space
- * @ref data::Orbitals argument. The only genuine algorithm configuration is the
- * Baker-Campbell-Hausdorff (BCH) truncation level.
- */
-class EffectiveHamiltonianSettings : public data::Settings {
- public:
-  EffectiveHamiltonianSettings() {
-    set_default("ducc_level", static_cast<int64_t>(2),
-                "BCH truncation level: 0 (bare active-space Hamiltonian), "
-                "1 (MBPT(2)-consistent), or 2 (MBPT(3)-consistent).",
-                data::BoundConstraint<int64_t>{0, 2});
-  }
-};
-
-/**
- * @class EffectiveHamiltonian
- * @brief Abstract base class for effective-Hamiltonian algorithms.
+ * Given a reference wavefunction and an input Hamiltonian, a concrete
+ * implementation constructs an effective Hamiltonian in an explicitly
+ * specified target P-space.
  *
- * An effective-Hamiltonian algorithm transforms a full-space Hamiltonian into
- * an effective active-space Hamiltonian that folds in dynamical correlation
- * from the external (non-active) orbitals. The DUCC family realizes this via a
- * unitary coupled-cluster similarity transformation evaluated through a
- * truncated BCH expansion.
- *
- * The run signature takes the full-space Hamiltonian, a full-space
- * @ref data::Wavefunction supplying the reference coupled-cluster amplitudes
- * (through an amplitude container), and a @ref data::SymmetryBlockedIndexSet
- * designating the active (P-space) orbitals per spin channel. The alpha/beta
- * occupancy is derived from the wavefunction. Only the BCH truncation level is
- * a setting.
- *
- * Example usage:
+ * Typical usage:
  * @code
- * auto builder =
- *     qdk::chemistry::algorithms::create<EffectiveHamiltonian>("ducc");
- * builder->settings().set("ducc_level", static_cast<int64_t>(2));
- * auto effective =
- *     builder->run(full_hamiltonian, ccsd_wavefunction, p_space_indices);
+ * auto constructor =
+ *   EffectiveHamiltonianConstructorFactory::create("algorithm_name");
+ * auto effective_hamiltonian =
+ *   constructor->run(reference, hamiltonian, p_indices);
  * @endcode
  *
- * @see data::Hamiltonian
- * @see data::Wavefunction
+ * @see EffectiveHamiltonianConstructorFactory for creating instances
+ * @see data::Wavefunction for the reference wavefunction input
+ * @see data::Hamiltonian for the input and output Hamiltonians
+ * @see data::SymmetryBlockedIndexSet for the target P-space indices
  */
-class EffectiveHamiltonian
-    : public Algorithm<EffectiveHamiltonian, std::shared_ptr<data::Hamiltonian>,
+class EffectiveHamiltonianConstructor
+    : public Algorithm<EffectiveHamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Wavefunction>,
+                       std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
  public:
   /**
-   * @brief Default constructor installing the shared effective-Hamiltonian
-   *        settings.
+   * @brief Default constructor.
    */
-  EffectiveHamiltonian() {
-    _settings = std::make_unique<EffectiveHamiltonianSettings>();
-  }
+  EffectiveHamiltonianConstructor() = default;
 
   /**
-   * @brief Virtual destructor for proper inheritance.
+   * @brief Virtual destructor.
    */
-  virtual ~EffectiveHamiltonian() = default;
+  virtual ~EffectiveHamiltonianConstructor() = default;
 
+  /**
+   * @brief Construct the effective Hamiltonian acting on the target space P.
+   *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
+   * @param reference Reference wavefunction providing the reference state.
+   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
+   * @param p_indices The target space P (indices into the window's active
+   *        space W).
+   * \endcond
+   * @return The effective Hamiltonian acting on the target space P.
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   *         settings after run() is called.
+   * @note Settings are automatically locked when this method is called and
+   *       cannot be modified during or after execution.
+   */
   using Algorithm::run;
 
   /**
-   * @brief Access the algorithm's variant name.
-   * @return The algorithm's name (e.g. "ducc").
+   * @brief Access the algorithm's name.
    */
   virtual std::string name() const override = 0;
 
   /**
    * @brief Access the algorithm's type name.
-   * @return The fixed type name "effective_hamiltonian".
    */
-  std::string type_name() const final { return "effective_hamiltonian"; }
+  std::string type_name() const override {
+    return "effective_hamiltonian_constructor";
+  }
 
  protected:
   /**
-   * @brief Build the effective active-space Hamiltonian.
+   * @brief Implementation of the effective-Hamiltonian construction.
    *
-   * @param hamiltonian The full-space Hamiltonian to transform.
-   * @param wavefunction A full-space wavefunction whose amplitude container
-   *        supplies the reference coupled-cluster amplitudes.
-   * @param p_space_indices Active-space (P-space) orbital indices per spin
-   *        channel.
-   * @return The effective active-space Hamiltonian.
+   * Contains the actual construction logic. It is automatically called by
+   * run() after settings have been locked, and must be implemented by derived
+   * classes.
+   *
+   * @param reference Reference wavefunction providing the reference state.
+   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
+   * @param p_indices The target space P (indices into the window's active
+   *        space W).
+   * @return The effective Hamiltonian acting on the target space P.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
+      std::shared_ptr<data::Wavefunction> reference,
       std::shared_ptr<data::Hamiltonian> hamiltonian,
-      std::shared_ptr<data::Wavefunction> wavefunction,
-      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_space_indices)
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices)
       const override = 0;
 };
 
 /**
- * @brief Factory class for creating effective-Hamiltonian algorithm instances.
+ * @brief Factory for effective-Hamiltonian constructor instances.
  */
-struct EffectiveHamiltonianFactory
-    : public AlgorithmFactory<EffectiveHamiltonian,
-                              EffectiveHamiltonianFactory> {
-  static std::string algorithm_type_name() { return "effective_hamiltonian"; }
+struct EffectiveHamiltonianConstructorFactory
+    : public AlgorithmFactory<EffectiveHamiltonianConstructor,
+                              EffectiveHamiltonianConstructorFactory> {
+  static std::string algorithm_type_name() {
+    return "effective_hamiltonian_constructor";
+  }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "ducc"; }
+  static std::string default_algorithm_name() { return ""; }
 };
 
 }  // namespace qdk::chemistry::algorithms

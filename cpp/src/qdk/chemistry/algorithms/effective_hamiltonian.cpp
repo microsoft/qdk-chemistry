@@ -12,7 +12,7 @@ namespace qdk::chemistry::algorithms {
 /**
  * @brief Factory function to create the BTAS DUCC solver.
  */
-std::unique_ptr<EffectiveHamiltonian> make_ducc_solver() {
+std::unique_ptr<EffectiveHamiltonianConstructor> make_ducc_solver() {
   QDK_LOG_TRACE_ENTERING();
   return std::make_unique<qdk::chemistry::algorithms::microsoft::DuccSolver>();
 }
@@ -20,9 +20,9 @@ std::unique_ptr<EffectiveHamiltonian> make_ducc_solver() {
 /**
  * @brief Register default effective-Hamiltonian implementations.
  */
-void EffectiveHamiltonianFactory::register_default_instances() {
+void EffectiveHamiltonianConstructorFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
-  EffectiveHamiltonianFactory::register_instance(make_ducc_solver);
+  EffectiveHamiltonianConstructorFactory::register_instance(make_ducc_solver);
 }
 
 }  // namespace qdk::chemistry::algorithms

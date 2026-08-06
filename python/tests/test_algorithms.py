@@ -12,6 +12,7 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     DynamicalCorrelationCalculator,
+    EffectiveHamiltonianConstructor,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
@@ -43,7 +44,7 @@ from qdk_chemistry.data.symmetry import (
     spin_index_set,
 )
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
 
 
 class MockLocalizationPy(OrbitalLocalizer):
@@ -174,6 +175,22 @@ class MockHamiltonianConstructor(HamiltonianConstructor):
     def name(self) -> str:
         """Return the algorithm name."""
         return "mock_hamiltonian_constructor"
+
+
+class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
+    """A dummy effective-Hamiltonian constructor for testing purposes."""
+
+    def __init__(self):
+        super().__init__()
+        self._settings = Settings()
+
+    def name(self):
+        """Return the algorithm name."""
+        return "mock_effective_hamiltonian_constructor"
+
+    def _run_impl(self, _reference, hamiltonian, _p_indices):
+        """Echo the Hamiltonian for the inheritance test."""
+        return hamiltonian
 
 
 class MockScfSolver(ScfSolver):
@@ -490,6 +507,18 @@ class TestAlgorithmClasses:
         assert isinstance(result, Hamiltonian)
         # For legacy constructor, check that it has one-body integrals set
         assert result.has_one_body_integrals()
+
+    def test_effective_hamiltonian_constructor_inheritance(self):
+        """Test that EffectiveHamiltonianConstructor can be inherited from Python."""
+        constructor = MockEffectiveHamiltonianConstructor()
+        assert isinstance(constructor, EffectiveHamiltonianConstructor)
+        assert isinstance(constructor.settings(), Settings)
+
+        reference = create_test_wavefunction()
+        hamiltonian = create_test_hamiltonian(2)
+        p_indices = spin_index_set(4, [1, 2], [1, 2])
+        result = constructor.run(reference, hamiltonian, p_indices)
+        assert isinstance(result, Hamiltonian)
 
     def test_scf_solver_inheritance(self):
         """Test that ScfSolver can be inherited from Python."""

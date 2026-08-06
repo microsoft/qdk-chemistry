@@ -1,4 +1,4 @@
-"""Tests for the native DUCC ``effective_hamiltonian`` builder (``ducc_level`` 0-2).
+"""Tests for the native DUCC ``effective_hamiltonian_constructor`` (``ducc_level`` 0-2).
 
 At level 0 there is no BCH dressing, so the effective active-space Hamiltonian
 must reproduce the bare active-space (CASCI) problem exactly: CASCI on the
@@ -6,13 +6,13 @@ original full Hamiltonian equals FCI on the DUCC output Hamiltonian.
 
 Levels 1-2 add the Baker-Campbell-Hausdorff dressing, evaluated by the generated
 BTAS equations. Three properties are checked: (a) the dressed active-space energy
-reproduces ExaChem's independent DUCC implementation for closed-shell active
-spaces with a frozen core, which validates the dressing absolutely; (b) when the
-active space is the whole orbital set there is no external space, so the dressing
-collapses to the bare Hamiltonian and the level-0 identity still holds at every
-level; (c) the dressed output is convention-consistent -- the restricted and
-unrestricted dressings of a closed-shell system agree, and independent CI solvers
-agree on the restricted output.
+reproduces independent reference energies for closed-shell active spaces with a
+frozen core, which validates the dressing absolutely; (b) when the active space
+is the whole orbital set there is no external space, so the dressing collapses to
+the bare Hamiltonian and the level-0 identity still holds at every level; (c) the
+dressed output is convention-consistent -- the restricted and unrestricted
+dressings of a closed-shell system agree, and independent CI solvers agree on the
+restricted output.
 
 References are computed on the standard-convention active Hamiltonian from
 ``hamiltonian_constructor`` (full 8-fold chemist integrals): the native MACIS
@@ -42,6 +42,8 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
+    AmplitudeContainer,
+    AmplitudeType,
     Ansatz,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
@@ -172,12 +174,38 @@ def _ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
     full_ham = create("hamiltonian_constructor").run(orbitals)
     cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
     active_orbitals = _active_orbitals(orbitals, nmo, active, inactive, unrestricted)
-    builder = create("effective_hamiltonian", "ducc")
+    builder = create("effective_hamiltonian_constructor", "ducc")
     builder.settings().set("ducc_level", level)
-    out_ham = builder.run(full_ham, cc_wfn, active_orbitals.active_indices())
+    out_ham = builder.run(cc_wfn, full_ham, active_orbitals.active_indices())
     n_active_a = sum(1 for p in active if p < nocc_a)
     n_active_b = sum(1 for p in active if p < nocc_b)
     return out_ham, active_orbitals, n_active_a, n_active_b
+
+
+def test_complex_amplitudes_not_yet_implemented():
+    """DUCC reports its real-only generated BTAS limitation explicitly."""
+    wfn_hf = _scf(LIH, 1, False)
+    orbitals = wfn_hf.get_orbitals()
+    nmo = orbitals.get_num_molecular_orbitals()
+    nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
+    full_ham = create("hamiltonian_constructor").run(orbitals)
+    cc_wfn = _full_ccsd(full_ham, _hf_determinant(nmo, nocc_a, nocc_b, orbitals))
+    amplitudes = cc_wfn.get_container()
+    t1, _ = amplitudes.get_t1_amplitudes()
+    t2, _, _ = amplitudes.get_t2_amplitudes()
+    complex_wfn = Wavefunction(
+        AmplitudeContainer(
+            orbitals,
+            amplitudes.get_wavefunction(),
+            AmplitudeType.CoupledCluster,
+            np.asarray(t1, dtype=np.complex128),
+            np.asarray(t2, dtype=np.complex128),
+        )
+    )
+    p_space = spin_index_set(nmo, list(range(nmo)), list(range(nmo)), equivalent=True)
+
+    with pytest.raises(RuntimeError, match="Complex DUCC amplitudes not yet implemented"):
+        create("effective_hamiltonian_constructor", "ducc").run(complex_wfn, full_ham, p_space)
 
 
 # Each case: label, geometry, spin multiplicity, unrestricted flag, and the
@@ -364,16 +392,16 @@ def test_ducc_restricted_macis_matches_independent_solvers(label, xyz, active, i
     )
 
 
-# ── Absolute reference: ExaChem's independent DUCC implementation ──
+# ── Absolute reference energies ──
 
 # Closed-shell active spaces with a frozen core, so T_ext != 0 and the BCH dressing
-# is non-trivial. Each is the frontier window ExaChem parameterizes as
-# nactive_oa occupied + nactive_va virtual orbitals about the Fermi level.
+# is non-trivial. Each uses a frontier window of active occupied and virtual orbitals
+# about the Fermi level.
 _REFERENCE_CASES = [*_CLOSED_SHELL_CASES, ("h2o_cas65", H2O, [2, 3, 4, 5, 6], [0, 1])]
 
-# Total active-space energies from ExaChem's DUCC, run in `noscf` mode on these same
-# SCF orbitals and diagonalized with MACIS, using ExaChem's default thresholds.
-_EXACHEM_REFERENCE = {
+# Total active-space energies from an independent DUCC implementation, evaluated
+# on the same SCF orbitals and diagonalized with MACIS.
+_REFERENCE_ENERGIES = {
     ("lih_cas22", 1): -7.8706560183,
     ("lih_cas22", 2): -7.8828224008,
     ("lih_cas23", 1): -7.8705694522,
@@ -382,16 +410,16 @@ _EXACHEM_REFERENCE = {
     ("h2o_cas65", 2): -75.0130624402,
 }
 
-# ExaChem's Cholesky decomposition of the two-electron integrals caps cross-code agreement
-# well above the CI convergence tolerance, yet still far below the deviation a missing or
-# mis-leveled dressing would produce.
-_exachem_reference_tolerance = 100 * ci_energy_tolerance
+# Cholesky decomposition of the reference two-electron integrals caps cross-code
+# agreement well above the CI convergence tolerance, yet still far below the
+# deviation a missing or mis-leveled dressing would produce.
+_reference_energy_tolerance = 100 * ci_energy_tolerance
 
 
 @pytest.mark.parametrize("level", [1, 2], ids=["level1", "level2"])
 @pytest.mark.parametrize(("label", "xyz", "active", "inactive"), _REFERENCE_CASES, ids=[c[0] for c in _REFERENCE_CASES])
-def test_dressed_matches_exachem_reference(label, xyz, active, inactive, level):
-    """The BCH-dressed active Hamiltonian reproduces ExaChem's DUCC.
+def test_dressed_matches_reference_energy(label, xyz, active, inactive, level):
+    """The BCH-dressed active Hamiltonian reproduces an independent reference energy.
 
     An absolute check of the generated BCH equations at levels 1-2 over active spaces
     with a real frozen core: unlike the internal-consistency tests, a systematic error
@@ -400,7 +428,7 @@ def test_dressed_matches_exachem_reference(label, xyz, active, inactive, level):
     """
     out, ao, n_active_a, n_active_b = _ducc_output(xyz, 1, False, active, inactive, level)
     energy = _macis_single_block(out, ao, n_active_a, n_active_b)
-    reference = _EXACHEM_REFERENCE[(label, level)]
-    assert np.isclose(energy, reference, atol=_exachem_reference_tolerance), (
-        f"{label} L{level}: native={energy:.10f} != ExaChem={reference:.10f}"
+    reference = _REFERENCE_ENERGIES[(label, level)]
+    assert np.isclose(energy, reference, atol=_reference_energy_tolerance), (
+        f"{label} L{level}: native={energy:.10f} != reference={reference:.10f}"
     )
