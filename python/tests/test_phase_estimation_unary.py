@@ -37,6 +37,15 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
+def _dump_op(op, num_qubits: int) -> np.ndarray:
+    """Simulate ``op`` on the all-zero state and return the resulting statevector.
+
+    The context has to be the one the operation was resolved from, otherwise the helper
+    that ``dump_operation_on_state`` evaluates cannot bind the callable.
+    """
+    return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
+
+
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
@@ -48,7 +57,7 @@ class TestUnaryIterationQsharp:
         """Address ``i`` must flip flag ``i`` and nothing else, for every valid address."""
         num_address_qubits = _address_qubits(num_actions)
         op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationOneHotOp(num_actions, address_value)
-        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions))
+        state = _dump_op(op, num_address_qubits + num_actions)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         expected[1 << (num_actions - 1 - address_value)] = 1.0
@@ -59,7 +68,7 @@ class TestUnaryIterationQsharp:
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
         op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
-        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions))
+        state = _dump_op(op, num_address_qubits + num_actions)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -79,7 +88,7 @@ class TestUnaryIterationQsharp:
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
         op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
-        state = np.array(dump_operation_on_state(op, num_address_qubits))
+        state = _dump_op(op, num_address_qubits)
 
         expected = np.zeros(1 << num_address_qubits, dtype=complex)
         for address_value in range(num_actions):
@@ -102,7 +111,7 @@ class TestBlockEncodingAgnosticSchedule:
             psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 0.9
         )
         num_address_qubits = _address_qubits(num_queries + 1)
-        state = np.array(dump_operation_on_state(op, num_address_qubits + 2))
+        state = _dump_op(op, num_address_qubits + 2)
 
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
@@ -116,7 +125,7 @@ class TestBlockEncodingAgnosticSchedule:
         op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
             psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 0.9
         )
-        state = np.array(dump_operation_on_state(op, 4))
+        state = _dump_op(op, 4)
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)
