@@ -57,8 +57,8 @@ class EffectiveHamiltonianConstructor
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param reference Reference wavefunction providing the reference state.
    * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
-   * @param p_indices The target space P (indices into the window's active
-   *        space W).
+   * @param p_indices The target space P within the reference wavefunction's
+   *        active orbital space.
    * \endcond
    * @return The effective Hamiltonian acting on the target space P.
    * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
@@ -82,6 +82,28 @@ class EffectiveHamiltonianConstructor
 
  protected:
   /**
+   * @brief Validate the common nested-space input contract.
+   *
+   * Concrete implementations may call this helper before performing
+   * method-specific validation or computation. Validation is opt-in; the base
+   * @ref run method does not call it automatically.
+   *
+   * @param reference Reference wavefunction whose active orbital space must be
+   *        a subset of the Hamiltonian's active orbital window.
+   * @param hamiltonian Input Hamiltonian defining the outer orbital window.
+   * @param p_indices Target P-space, which must be a subset of the reference
+   *        wavefunction's active orbital space.
+   * @throws std::invalid_argument if an input is null, the Hamiltonian and
+   *         wavefunction use incompatible orbital bases or spin restrictions,
+   *         or the spaces do not satisfy P subset W_ref subset W_H.
+   */
+  void _validate_inputs(
+      const std::shared_ptr<data::Wavefunction>& reference,
+      const std::shared_ptr<data::Hamiltonian>& hamiltonian,
+      const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices)
+      const;
+
+  /**
    * @brief Implementation of the effective-Hamiltonian construction.
    *
    * Contains the actual construction logic. It is automatically called by
@@ -90,8 +112,8 @@ class EffectiveHamiltonianConstructor
    *
    * @param reference Reference wavefunction providing the reference state.
    * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
-   * @param p_indices The target space P (indices into the window's active
-   *        space W).
+   * @param p_indices The target space P within the reference wavefunction's
+   *        active orbital space.
    * @return The effective Hamiltonian acting on the target space P.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(

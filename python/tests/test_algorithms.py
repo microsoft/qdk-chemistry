@@ -374,8 +374,9 @@ class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
         """Return the algorithm name."""
         return "mock_effective_hamiltonian_constructor"
 
-    def _run_impl(self, _reference, hamiltonian, _p_indices):
-        """Echo the Hamiltonian for the inheritance test."""
+    def _run_impl(self, reference, hamiltonian, p_indices):
+        """Validate the inputs and echo the Hamiltonian for the inheritance test."""
+        self._validate_inputs(reference, hamiltonian, p_indices)
         return hamiltonian
 
 
@@ -650,7 +651,7 @@ class TestAlgorithmClasses:
 
         reference = create_test_wavefunction()
         hamiltonian = create_test_hamiltonian(2)
-        p_indices = spin_index_set(4, [1, 2], [1, 2])
+        p_indices = spin_index_set(2, [0], [0])
         result = constructor.run(reference, hamiltonian, p_indices)
         assert isinstance(result, Hamiltonian)
 
