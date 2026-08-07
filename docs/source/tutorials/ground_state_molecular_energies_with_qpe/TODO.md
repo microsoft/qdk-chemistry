@@ -18,12 +18,12 @@
   - [x] Discuss and implement accepted current-source changes.
   - [x] Replace the undefined term `quantum advantage` with plain language.
   - [x] Define `phase bit` directly in Chapter 5 and avoid using the term earlier on the landing page.
-  - [ ] Ask Martin to complete the truncated `occupations vary among the determinants ... is somewhat` comment in the wrap-up email.
+  - [x] Ask Martin to complete the truncated `occupations vary among the determinants ... is somewhat` comment in the wrap-up email.
   - [x] Run the bounded coherence gate and grouped validation.
   - [x] Commit and prepare reply.
 - [ ] Process any additional substantive reviewer feedback using the grouped review workflow.
 - [ ] Run the end-stage review after substantive feedback is complete.
-- [ ] Monitor Conrad's re-review and pending QDK/Chemistry typesetting clarification.
+- [x] Confirm Conrad has no additional re-review comments.
 
 ## Review carryover
 
