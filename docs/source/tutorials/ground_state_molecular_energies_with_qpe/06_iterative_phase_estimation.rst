@@ -96,6 +96,19 @@ The tutorial script uses this value directly rather than manually applying a sig
 To avoid aliasing, the active-space Hamiltonian energy eigenvalue :math:`E_j` being estimated must lie in the signed interval :math:`[-\pi/t,\pi/t)`; energies outside that interval can produce the same measured phase.
 The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to :math:`-\pi/t`.
 
+The next figure shows how to read this wrapping convention.
+Follow the upper axis from :math:`\varphi=0` toward :math:`\varphi=1`.
+From zero through one half, the signed angle is nonnegative, so :math:`E=-\alpha/t` runs from zero down to :math:`-\pi/t` along the green branch.
+Immediately above one half, the signed angle wraps from :math:`+\pi` to just above :math:`-\pi`; the corresponding energy jumps to just below :math:`+\pi/t` and then returns toward zero along the purple branch.
+At :math:`\varphi=1/2`, the lower filled point includes :math:`-\pi/t`, while the upper open point excludes the equivalent :math:`+\pi/t` representation.
+
+.. figure:: /_static/diagrams/tutorial_qpe_phase_wrapping.png
+   :alt: Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero.
+   :align: center
+   :width: 100%
+
+   QDK/Chemistry converts the wrapped phase fraction to one signed energy branch. The neutral dashed guide marks the shared phase :math:`\varphi=1/2`; the red bracket spans the :math:`2\pi/t` energy difference between its included and excluded boundary representations. Energies separated by that amount alias to the same reported phase.
+
 With :math:`m` measured phase bits, the representable fractions are multiples of :math:`2^{-m}`, so adjacent energy-grid points are separated by
 
 .. math::
@@ -146,6 +159,16 @@ Finally, we can choose the evolution time so that this grid point reconstructs a
 The script reports this adjusted value as the ``Selected evolution time``.
 Using this time, the reference phase fraction is approximately :math:`0.250025901`, only about :math:`2.59\times10^{-5}` above the selected grid point.
 The grid point therefore reconstructs an active energy exactly :math:`1\ \mathrm{m}E_{\mathrm{h}}` above the classical reference to the displayed precision.
+
+The table below compares the selected point with its neighboring six-bit grid energies and the known reference.
+The rows are ordered by energy rather than by grid index, so the more negative :math:`k=17` energy appears before :math:`k=16`.
+The reference row has no grid index or bitstring because the reference does not lie exactly on the six-bit grid.
+
+.. include:: /_static/diagrams/tutorial_qpe_phase_grid_table.rst
+
+The neighboring grid energies differ by approximately :math:`0.6033\ E_{\mathrm{h}}`.
+By contrast, selected grid point :math:`k=16` is only :math:`0.001\ E_{\mathrm{h}}` above the known reference.
+This small offset is possible because the evolution time was tuned using that reference; it is not the general resolution of the six-bit grid.
 
 **Please note**:  this use of the already known classical energy is circular.
 It is useful for this tutorial, but it is not a generally available strategy when the target energy is unknown.
