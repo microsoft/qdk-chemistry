@@ -243,8 +243,6 @@ class AmplitudeAmplification(Algorithm):
 
         # A Q# callable carries no arity, so the register width is taken from a resource
         # estimate of the state preparation.
-        # `logical_counts` is used rather than indexing the result, because it also resolves
-        # the batch shape the estimator returns for a frontier of parameter sets.
         try:
             num_qubits = int(state_prep_oracle.estimate().logical_counts["numQubits"])
         except Exception as error:
