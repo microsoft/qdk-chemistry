@@ -29,6 +29,16 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 
+def create_stretched_n2_structure() -> Structure:
+    """Create the molecular geometry shared by the tutorial workflow and notebook."""
+    return Structure.from_xyz("""\
+2
+Stretched N2 molecule for the ground-state QPE tutorial
+N    0.000000    0.000000    0.000000
+N    0.000000    0.000000    1.850000
+""")
+
+
 @dataclass
 class ActiveSpaceResult:
     """Results shared by later tutorial chapters and the visualization notebook.
@@ -109,12 +119,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     ################################################################################
     # docs:xyz ../data/tutorial_stretched_n2.structure.xyz
     # start-cell-hartree-fock
-    structure = Structure.from_xyz("""\
-2
-Stretched N2 molecule for the ground-state QPE tutorial
-N    0.000000    0.000000    0.000000
-N    0.000000    0.000000    1.850000
-""")
+    structure = create_stretched_n2_structure()
     charge = 0
     spin_multiplicity = 1
     basis_set = "cc-pvdz"
@@ -443,6 +448,87 @@ def plot_orbital_entropy_selection(result: ActiveSpaceResult) -> "Figure":
     axis.spines[["top", "right"]].set_visible(False)
     axis.legend(frameon=False)
     return figure
+
+
+def generate_basis_function_cube_data(
+    structure: Structure,
+    basis_name: str,
+    grid_size: tuple[int, int, int] = (30, 30, 30),
+    margin: float = 3.0,
+) -> dict[str, dict]:
+    """Generate notebook-viewer data for individual basis functions.
+
+    The companion Jupyter notebook uses this helper to compare the localized
+    basis functions with the natural molecular orbitals built from them. An
+    identity AO coefficient matrix lets the existing orbital cube generator
+    evaluate one basis function per column.
+
+    Args:
+        structure: Molecular geometry on which the basis functions are centered.
+        basis_name: Name of the atomic-orbital basis set to evaluate.
+        grid_size: Cube-grid points along each Cartesian direction. Tests use a
+            smaller grid to reduce runtime; the default supports smooth viewing.
+        margin: Additional cube-grid extent around the molecule in Bohr.
+
+    Returns:
+        A mapping from basis-function labels to cube-file text and display
+        metadata for the molecular viewer.
+
+    """
+    import numpy as np
+    from pyscf import gto
+    from qdk_chemistry.plugins.pyscf.conversion import (
+        pyscf_mol_to_qdk_basis,
+        structure_to_pyscf_atom_labels,
+    )
+    from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
+
+    atoms, _, _ = structure_to_pyscf_atom_labels(structure)
+    pyscf_molecule = gto.Mole(
+        atom=atoms,
+        basis=basis_name,
+        charge=0,
+        spin=0,
+        unit="Bohr",
+    )
+    pyscf_molecule.build()
+    basis_set = pyscf_mol_to_qdk_basis(pyscf_molecule, structure, basis_name)
+    num_basis_functions = pyscf_molecule.nao_nr()
+    basis_function_labels = [
+        " ".join(label.split()[1:]) for label in pyscf_molecule.ao_labels()
+    ]
+    if len(basis_function_labels) != num_basis_functions:
+        raise ValueError("Expected one atom-centered label for each basis function.")
+    basis_functions = Orbitals(
+        np.eye(num_basis_functions),
+        None,
+        None,
+        basis_set,
+    )
+    raw_cube_data = cast(
+        dict[str, str],
+        generate_cubefiles_from_orbitals(
+            orbitals=basis_functions,
+            grid_size=grid_size,
+            margin=margin,
+            label_maker=lambda index: (
+                f"Basis function {index}: {basis_function_labels[index]}"
+            ),
+        ),
+    )
+    cube_data = {}
+    for index, (label, cube_file) in enumerate(raw_cube_data.items()):
+        center, function_type = basis_function_labels[index].split(maxsplit=1)
+        cube_data[label] = {
+            "data": cube_file,
+            "info": {
+                "Representation": "Basis function",
+                "Function index": str(index),
+                "Center": center,
+                "Function type": function_type,
+            },
+        }
+    return cube_data
 
 
 def generate_active_orbital_cube_data(

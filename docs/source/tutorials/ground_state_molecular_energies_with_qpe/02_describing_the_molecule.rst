@@ -123,12 +123,25 @@ The index :math:`p` labels a molecular orbital, and :math:`\mu` labels a basis f
 The coefficients :math:`c_{\mu p}` determine molecular orbital :math:`p`, and the self-consistent field calculation optimizes these coefficients.
 The collection of basis functions is called a `basis set <https://en.wikipedia.org/wiki/Basis_set_(chemistry)>`_.
 
-.. _tutorial-wavefunction-hierarchy:
+The following isosurfaces illustrate this construction for stretched N\ :sub:`2`.
+Blue and orange distinguish opposite signs of each spatial function; they do not represent positive and negative charge.
+The purple spheres mark the nitrogen nuclei.
 
-.. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
-   :alt: Nucleus-centered basis functions chi_mu combine into molecular orbitals phi_p, with alpha or beta labels specifying spin. Choosing occupied orbitals defines an electron configuration, and a Slater determinant Phi_I provides its antisymmetric state. Hartree-Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients c_I.
+.. figure:: /_static/diagrams/tutorial_qpe_atomic_basis_functions.png
+   :alt: Three cc-pVDZ basis-function isosurfaces centered on one nitrogen nucleus: a spherical 2s function, a two-lobed 2p-y function, and a 3d-z-squared function with two lobes and a ring.
    :align: center
-   :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
+   :width: 100%
+
+   Selected ``cc-pvdz`` atomic basis functions (left to right): :math:`2s`, :math:`2p_y`, and :math:`3d_{z^2}`.
+
+Combining atom-centered basis functions with different coefficients produces molecular orbitals that can extend across both nuclei:
+
+.. figure:: /_static/diagrams/tutorial_qpe_example_molecular_orbitals.png
+   :alt: Three example molecular-orbital isosurfaces extending across the two nitrogen nuclei, with blue and orange indicating opposite signs.
+   :align: center
+   :width: 100%
+
+   Example molecular orbitals formed from linear combinations of atom-centered basis functions.
 
 A finite basis restricts the shapes available to the molecular orbitals and therefore introduces another approximation in the electronic description of the system.
 Adding suitable basis functions gives the orbitals more flexibility, but it also increases computational cost.
@@ -139,6 +152,13 @@ The larger basis gives the orbitals more radial flexibility but increases comput
 
 This comparison does not determine the exact basis-set error.
 It measures how much the Hartree--Fock energy changes with basis size while the geometry, method, and basis-set family remain fixed.
+
+.. _tutorial-wavefunction-hierarchy:
+
+.. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
+   :alt: Nucleus-centered basis functions chi_mu combine into molecular orbitals phi_p, with alpha or beta labels specifying spin. Choosing occupied orbitals defines an electron configuration, and a Slater determinant Phi_I provides its antisymmetric state. Hartree-Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients c_I.
+   :align: center
+   :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
 
 .. admonition:: Which basis set gives a lower energy and why?
    :class: quiz-question

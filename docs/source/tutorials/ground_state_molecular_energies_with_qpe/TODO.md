@@ -17,8 +17,9 @@
   - [x] Audit each chapter for concepts that genuinely benefit from a visual.
   - [x] Add an end-to-end Graphviz workflow on the landing page that connects the energy target, molecular model, active-space selection, qubit mapping, trial-state preparation, IQPE, and final reference comparison; use it to shorten or complement the existing six-stage prose roadmap.
   - [x] Add a reusable basis-function-to-multiconfigurational-wavefunction hierarchy in Chapter 2 and cross-reference it from the landing page.
+  - [x] Add labeled examples of atom-centered ``cc-pvdz`` basis functions and unlabeled example molecular orbitals to Chapter 2 using assets exported from the interactive visualization workflow.
   - [x] Add an orbital-entropy chart in Chapter 3 that shows the autoCAS selection gap across all candidate orbitals at once.
-  - [ ] Add a Chapter 3 molecular-orbital image showing representative inactive, active, and virtual orbital isosurfaces from the existing visualization workflow.
+  - [ ] Add a Chapter 3 molecular-orbital image comparing representative selected and excluded candidate natural-orbital isosurfaces from the existing visualization workflow; do not label them as Hartree--Fock HOMO/LUMO orbitals.
   - [ ] Add a worked Jordan--Wigner parity-string figure in Chapter 4 that distinguishes fermionic modes, assigned qubits, and the lower-mode parity sign.
   - [ ] Add a Chapter 5 image comparing representative one- and multi-determinant state-preparation logical circuits exported from the existing circuit notebook.
   - [ ] Add a high-level single-iteration IQPE schematic in Chapter 6 before students inspect the fully decomposed circuit notebook.

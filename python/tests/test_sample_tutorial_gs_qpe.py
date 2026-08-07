@@ -362,6 +362,7 @@ def test_tutorial_choose_active_space_results(tmp_path: Path):
     assert result.num_refined_electrons == 6
     assert result.num_virtual_orbitals == 18
     assert result.num_refined_determinants == comb(6, 3) ** 2 == 400
+    assert result.natural_orbital_casci_wavefunction.get_orbitals().get_basis_set().get_name() == "cc-pvdz"
     assert len(result.orbital_entropies) == 8
     assert all(0.0 <= entropy <= log(4.0) for entropy in result.orbital_entropies)
     assert sum(entropy >= 0.5 for entropy in result.orbital_entropies) == 6
@@ -408,6 +409,48 @@ def test_tutorial_choose_active_space_results(tmp_path: Path):
         )
 
     if PYSCF_AVAILABLE:
+        structure = tutorial_module.create_stretched_n2_structure()
+        basis_function_cube_data = tutorial_module.generate_basis_function_cube_data(
+            structure,
+            "cc-pvdz",
+            grid_size=(8, 8, 8),
+            margin=3.0,
+        )
+        function_types = [
+            "1s",
+            "2s",
+            "3s",
+            "2px",
+            "2py",
+            "2pz",
+            "3px",
+            "3py",
+            "3pz",
+            "3dxy",
+            "3dyz",
+            "3dz^2",
+            "3dxz",
+            "3dx2-y2",
+        ]
+        expected_basis_functions = [
+            (f"N{atom_index}", function_type) for atom_index in (1, 2) for function_type in function_types
+        ]
+        assert len(expected_basis_functions) == 28
+        assert list(basis_function_cube_data) == [
+            f"Basis function {index}: {center} {function_type}"
+            for index, (center, function_type) in enumerate(expected_basis_functions)
+        ]
+        assert all(basis_function["data"] for basis_function in basis_function_cube_data.values())
+        assert [basis_function["info"] for basis_function in basis_function_cube_data.values()] == [
+            {
+                "Representation": "Basis function",
+                "Function index": str(index),
+                "Center": center,
+                "Function type": function_type,
+            }
+            for index, (center, function_type) in enumerate(expected_basis_functions)
+        ]
+
         cube_data = tutorial_module.generate_active_orbital_cube_data(
             result,
             grid_size=(8, 8, 8),
@@ -648,6 +691,17 @@ def test_tutorial_choose_active_space_notebook():
     assert notebook.metadata.get("language_info", {}) == {"name": "python"}
     assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
     assert "Logger.LogLevel.info" in notebook_text
+    basis_viewer_cell = next(
+        index
+        for index, cell in enumerate(notebook.cells)
+        if "generate_basis_function_cube_data" in cell.source and "basis_function_cube_data =" in cell.source
+    )
+    active_space_cell = next(
+        index for index, cell in enumerate(notebook.cells) if "result = run_active_space_workflow()" in cell.source
+    )
+    assert basis_viewer_cell < active_space_cell
+    assert '"cc-pvdz"' in notebook.cells[basis_viewer_cell].source
+    assert "margin=3.0" in notebook.cells[basis_viewer_cell].source
     for cell in notebook.cells:
         expected_language = "python" if cell.cell_type == "code" else "markdown"
         assert cell.metadata.get("language") == expected_language
@@ -659,7 +713,10 @@ def test_tutorial_choose_active_space_notebook():
         notebook_path,
         timeout=360,
         cell_patches={
-            7: {
+            3: {
+                "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
+            },
+            9: {
                 "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
             },
         },
