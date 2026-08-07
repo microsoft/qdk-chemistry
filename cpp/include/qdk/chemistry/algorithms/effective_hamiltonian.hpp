@@ -111,7 +111,7 @@ struct EffectiveHamiltonianConstructorFactory
     return "effective_hamiltonian_constructor";
   }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return ""; }
+  static std::string default_algorithm_name() { return "ducc"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

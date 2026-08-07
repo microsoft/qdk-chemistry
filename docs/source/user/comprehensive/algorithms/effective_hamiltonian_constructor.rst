@@ -69,7 +69,7 @@ Available implementations
 DUCC
 ~~~~
 
-.. rubric:: Factory name: ``"ducc"``
+.. rubric:: Factory name: ``"ducc"`` (default)
 
 The double unitary coupled-cluster (DUCC) implementation constructs a P-space Hamiltonian from a full-space Hamiltonian and coupled-cluster amplitudes.
 It evaluates a truncated Baker-Campbell-Hausdorff transformation
