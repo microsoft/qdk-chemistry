@@ -75,9 +75,8 @@ class TestHamiltonianRegularizerCorrectness:
     """Physics correctness tests: energy invariance and 1-norm reduction."""
 
     def test_energy_invariant_under_shift(self, water_hamiltonian):
-        """The strongest correctness check: FCI energy must be unchanged by
-        the FLR-BLISS shift, both with and without DF truncation.
-        """
+        """The correctness check: FCI energy cannot change after FLR-BLISS shift."""
+
         mc = algorithms.create("multi_configuration_calculator", "macis_cas")
         e_before, _ = mc.run(water_hamiltonian, 5, 5)
 
@@ -109,9 +108,7 @@ class TestHamiltonianRegularizerCorrectness:
 
 
 class TestDoubleFactorizationUtils:
-    """Standalone utility tests: double_factorize and hamiltonian_one_norm can
-    be used independently of HamiltonianRegularizer.
-    """
+    """Tests double_factorize and hamiltonian_one_norm."""
 
     def test_double_factorize_default_no_truncation(self, water_hamiltonian):
         g_aaaa, _, _ = water_hamiltonian.get_two_body_integrals()

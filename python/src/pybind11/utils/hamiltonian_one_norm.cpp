@@ -43,9 +43,9 @@ restricted electronic Hamiltonian.
             hamiltonian : qdk_chemistry.data.Hamiltonian
                 Restricted Hamiltonian to analyze.
             df_truncation_threshold : float, optional
-                Fragments whose reshaped-supermatrix |eigenvalue| is below
-                this are dropped from the two-body 1-norm. Defaults to 0.0
-                (no truncation -- exact/lossless factorization unless the
+                Fragments whose reshaped-supermatrix eigenvalue magnitude is
+                below this are dropped from the two-body 1-norm. Defaults to
+                0.0 (no truncation -- exact/lossless factorization unless the
                 caller explicitly opts into compression).
 
             Returns

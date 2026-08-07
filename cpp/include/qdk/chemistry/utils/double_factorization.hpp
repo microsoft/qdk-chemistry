@@ -47,12 +47,13 @@ struct TwoBodyFragment {
 ///
 /// @param two_body_integrals Flattened g_ijkl tensor, size norb^4.
 /// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose |eigenvalue| of the reshaped
-///        supermatrix falls below this threshold are dropped. Defaults to
-///        0.0 (no truncation -- the factorization is exact/lossless unless
-///        the caller explicitly opts into compression).
+/// @param truncation_threshold Fragments whose eigenvalue magnitude of the
+///        reshaped supermatrix falls below this threshold are dropped.
+///        Defaults to 0.0 (no truncation -- the factorization is
+///        exact/lossless unless the caller explicitly opts into
+///        compression).
 /// @return The list of retained fragments, sorted by decreasing
-///         |eigenvalue|.
+///         eigenvalue magnitude.
 std::vector<TwoBodyFragment> double_factorize(
     const Eigen::VectorXd& two_body_integrals, size_t norb,
     double truncation_threshold = 0.0);

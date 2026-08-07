@@ -167,8 +167,8 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
  *   computed. "flr_bliss" is the fermionic-low-rank BLISS method of Patel et
  *   al. (arXiv:2409.18277).
  * - df_truncation_threshold: 0.0 - (flr_bliss method) fragments produced by
- *   double-factorizing the two-electron integrals whose |eigenvalue| falls
- *   below this threshold are dropped. The default of 0.0 performs no
+ *   double-factorizing the two-electron integrals whose eigenvalue magnitude
+ *   falls below this threshold are dropped. The default of 0.0 performs no
  *   truncation (an exact/lossless double factorization).
  */
 class BlissSettings : public qdk::chemistry::data::Settings {

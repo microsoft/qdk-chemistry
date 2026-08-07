@@ -59,7 +59,8 @@ struct HamiltonianOneNorm {
 ///
 /// @param hamiltonian Restricted Hamiltonian to analyze.
 /// @param df_truncation_threshold Fragments whose reshaped-supermatrix
-///        |eigenvalue| is below this are dropped from the two-body 1-norm.
+///        eigenvalue magnitude is below this are dropped from the two-body
+///        1-norm.
 ///        Defaults to 0.0 (no truncation -- exact/lossless factorization
 ///        unless the caller explicitly opts into compression).
 /// @return The one-body, two-body, and total DF fermionic 1-norm.

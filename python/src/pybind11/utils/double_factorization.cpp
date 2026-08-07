@@ -41,16 +41,16 @@ double factorization of the two-electron integral tensor.
             norb : int
                 Number of (spatial) orbitals.
             truncation_threshold : float, optional
-                Fragments whose |eigenvalue| of the reshaped supermatrix falls
-                below this threshold are dropped. Defaults to 0.0 (no
-                truncation -- the factorization is exact/lossless unless the
-                caller explicitly opts into compression).
+                Fragments whose eigenvalue magnitude of the reshaped
+                supermatrix falls below this threshold are dropped. Defaults
+                to 0.0 (no truncation -- the factorization is exact/lossless
+                unless the caller explicitly opts into compression).
 
             Returns
             -------
             list[TwoBodyFragment]
                 The list of retained fragments, sorted by decreasing
-                |eigenvalue|.
+                eigenvalue magnitude.
         )",
         py::arg("two_body_integrals"), py::arg("norb"),
         py::arg("truncation_threshold") = 0.0);

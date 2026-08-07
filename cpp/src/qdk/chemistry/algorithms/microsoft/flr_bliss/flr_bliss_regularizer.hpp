@@ -122,8 +122,8 @@ OneElectronShiftResult solve_one_electron_shift(
 /// @param hamiltonian The Hamiltonian to analyze (restricted).
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
-/// @param df_truncation_threshold Fragments whose |eigenvalue| falls below this
-///        threshold are dropped (0.0 = no truncation).
+/// @param df_truncation_threshold Fragments whose eigenvalue magnitude falls
+///        below this threshold are dropped (0.0 = no truncation).
 BlissShift compute_flr_bliss_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
