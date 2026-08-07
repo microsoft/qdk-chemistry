@@ -125,7 +125,11 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         container = unitary.get_container()
         lcu, use_quantum_walk = block_mapper.resolve_lcu(container)
 
-        step_op = block_mapper.block_encoding_op(container)
+        # Built once and reused: the oracles feed both the composed op and the QIR entry point,
+        # and rebuilding PREPARE would re-run the nested state-preparation algorithm.
+        prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
+
+        step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
         if use_quantum_walk:
             step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, block_mapper.reflection_op(container))
 
@@ -136,7 +140,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             container.power,
         )
 
-        prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
             parameter={

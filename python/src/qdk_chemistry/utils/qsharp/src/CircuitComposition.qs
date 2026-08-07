@@ -18,12 +18,15 @@ namespace QDKChemistry.Utils.CircuitComposition {
     }
 
     /// Applies `op` to `target` `power` times.
+    ///
+    /// The estimator-caching intrinsics are functions, so the loop stays classically
+    /// controlled and the functors are still derivable.
     operation ApplyRepeated<'T>(
         cacheName : String,
         op : 'T => Unit is Adj + Ctl,
         power : Int,
         target : 'T
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for _ in 1..power {
             if BeginEstimateCaching(cacheName, SingleVariant()) {
                 op(target);
@@ -39,7 +42,7 @@ namespace QDKChemistry.Utils.CircuitComposition {
         cacheName : String,
         op : 'T => Unit is Adj + Ctl,
         power : Int
-    ) : ('T => Unit) {
+    ) : ('T => Unit is Adj + Ctl) {
         ApplyRepeated(cacheName, op, power, _)
     }
 

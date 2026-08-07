@@ -213,16 +213,17 @@ class PSPMapper(CircuitMapper):
         container = unitary.get_container()
         lcu, use_quantum_walk = self.resolve_lcu(container)
 
-        qsharp_op = self.block_encoding_op(container)
+        # Built once and reused: the oracles feed both the composed op and the QIR entry point,
+        # and rebuilding PREPARE would re-run the nested state-preparation algorithm.
+        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
+
+        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
         if use_quantum_walk:
             qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, self.reflection_op(container))
 
         if container.power != 1:
-            # Repetition branches on the estimator cache, which strips Adj/Ctl, so it is only
-            # wrapped on when it repeats. Callers composing further need those functors.
             qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp("PSPMapper", qsharp_op, container.power)
 
-        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
         qsharp_factory = QsharpFactoryData(
             # QIR generation only resolves entry-point callables one level deep, so the oracles
             # are handed over unstitched and Q# composes them; see ``MakePrepSelPrepCircuit``.

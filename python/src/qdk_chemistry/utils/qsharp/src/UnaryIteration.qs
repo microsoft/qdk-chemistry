@@ -16,8 +16,14 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
 
     /// Unary iteration
+    ///
+    /// Produces the one-hot indicator of the address register one qubit at a time, so the
+    /// indicators never have to be materialized all at once. Supports a `numActions` that is
+    /// not a power of two, at a T-count of `4 * numActions - 4`.
+    ///
     /// References:
-    ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity (arXiv:1805.03662)
+    ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity
+    ///   (arXiv:1805.03662), Sec. III.1 "Unary Iteration and Indexed Operations", Figs. 3-7.
     operation UnaryIteration(
         address : Qubit[],
         numActions : Int,
