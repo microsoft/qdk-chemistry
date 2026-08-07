@@ -319,7 +319,7 @@ def test_tutorial_orbital_coordinates_transfer_across_diatomics(
 
 
 @pytest.mark.tutorial_baseline
-def test_tutorial_choose_active_space_results():
+def test_tutorial_choose_active_space_results(tmp_path: Path):
     """Check portable active-space invariants and optional reference snapshots."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
 
@@ -343,6 +343,25 @@ def test_tutorial_choose_active_space_results():
     assert coordinate_minimization.selected_blocks == ((4,), (5, 6), (7, 8), (9,))
     assert coordinate_minimization.coefficient_norm_after <= coordinate_minimization.coefficient_norm_before + 1e-10
     assert coordinate_minimization.effective_pauli_terms_after <= coordinate_minimization.effective_pauli_terms_before
+
+    entropy_figure = tutorial_module.plot_orbital_entropy_selection(result)
+    entropy_axis = entropy_figure.axes[0]
+    expected_order = [
+        str(orbital_index)
+        for orbital_index, _ in sorted(
+            zip(result.valence_indices, result.orbital_entropies, strict=True),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    ]
+    assert [label.get_text() for label in entropy_axis.get_xticklabels()] == expected_order
+    expected_cut = len(result.refined_indices) - 0.5
+    assert any(
+        len(line.get_xdata()) == 2 and np.allclose(line.get_xdata(), [expected_cut, expected_cut])
+        for line in entropy_axis.lines
+    )
+    entropy_figure.savefig(tmp_path / "orbital_entropy.png")
+    assert (tmp_path / "orbital_entropy.png").stat().st_size > 0
 
     if _RUN_TUTORIAL_SNAPSHOTS:
         assert abs(coordinate_minimization.coefficient_norm_after - 19.610172748878) < 1e-7
@@ -611,7 +630,7 @@ def test_tutorial_choose_active_space_notebook():
         notebook_path,
         timeout=360,
         cell_patches={
-            5: {
+            7: {
                 "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
             },
         },

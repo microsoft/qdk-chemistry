@@ -8,16 +8,25 @@
 
 - [ ] Move some of the tutorial functions into the main code base (David)
 
+## Output clarity
+
+- [ ] Reduce QDK/Chemistry library logging that obscures instructional output in tutorial notebooks and scripts.
+  - [ ] Audit the default log output for every required script and notebook.
+  - [ ] Suppress library logs explicitly at script entry points and in notebook setup cells; do not mutate global logging at module import time.
+  - [ ] Preserve tutorial-owned results, progress messages, and warnings while library logs are quiet.
+  - [ ] Document a simple opt-in setting for students who need diagnostic QDK/Chemistry logs.
+  - [ ] Validate quiet output through the script and notebook test paths.
+
 ## Visual design
 
 - [ ] Add visuals directly to the Sphinx tutorial to reduce walls of text.
   - [x] Use the existing Sphinx Graphviz pipeline for simple conceptual diagrams: commit ``.dot`` sources under ``docs/source/_static/diagrams`` and include them with ``.. graphviz::``; do not add Mermaid, custom build steps, or another diagram dependency.
-  - [ ] Use committed static images only for quantitative plots that Graphviz cannot represent naturally; keep any reproducible generation script outside the Sphinx build.
+  - [x] Use committed static images only for quantitative plots that Graphviz cannot represent naturally; keep any reproducible generation script outside the Sphinx build.
   - [x] Start with an active/inactive/virtual orbital partition figure.
   - [x] Audit each chapter for concepts that genuinely benefit from a visual.
   - [x] Add an end-to-end Graphviz workflow on the landing page that connects the energy target, molecular model, active-space selection, qubit mapping, trial-state preparation, IQPE, and final reference comparison; use it to shorten or complement the existing six-stage prose roadmap.
   - [x] Add a reusable basis-function-to-multiconfigurational-wavefunction hierarchy in Chapter 2 and cross-reference it from the landing page.
-  - [ ] Add an orbital-entropy chart in Chapter 3 that shows the autoCAS selection gap across all candidate orbitals at once.
+  - [x] Add an orbital-entropy chart in Chapter 3 that shows the autoCAS selection gap across all candidate orbitals at once.
   - [ ] Add a Chapter 3 molecular-orbital image showing representative inactive, active, and virtual orbital isosurfaces from the existing visualization workflow.
   - [ ] Add a worked Jordan--Wigner parity-string figure in Chapter 4 that distinguishes fermionic modes, assigned qubits, and the lower-mode parity sign.
   - [ ] Add a Chapter 5 image comparing representative one- and multi-determinant state-preparation logical circuits exported from the existing circuit notebook.

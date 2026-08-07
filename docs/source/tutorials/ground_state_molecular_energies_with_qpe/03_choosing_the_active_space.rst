@@ -220,6 +220,17 @@ The selector then repartitions the orbitals according to the selected group:
    :start-after: # start-cell-refine
    :end-before: # end-cell-refine
 
+.. The figure intentionally reveals the selected group before the later
+   observed-result question. Showing the entropy gap is necessary to teach how
+   autoCAS makes the selection, which outweighs preserving the answer as a surprise.
+
+.. figure:: /_static/diagrams/tutorial_qpe_orbital_entropy.png
+   :alt: Entropy-ranked candidate orbitals. Selected orbitals 8, 7, 5, 6, 9, and 4 have entropies of approximately 0.966, 0.966, 0.964, 0.964, 0.554, and 0.548. Excluded orbitals 3 and 2 have entropies of approximately 0.030 and 0.022. A dashed vertical cut separates the sixth and seventh entropy ranks.
+   :align: center
+   :width: 90%
+
+   Candidate natural orbitals sorted by decreasing single-orbital entropy. autoCAS retains the high-entropy group to the left of the dashed cut.
+
 The asterisks in the script output identify the selected orbitals.
 The selected high-entropy group determines the refined active space.
 Equal natural-orbital occupations can leave the corresponding orbital vectors free to rotate within a degenerate subspace.

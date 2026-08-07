@@ -14,7 +14,7 @@ CASCI energy.
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Orbitals, Structure, Wavefunction
@@ -24,6 +24,9 @@ from tutorial_orbital_coordinates import (
     NaturalOrbitalCoordinateMinimizationResult,
     coordinate_minimize_natural_orbital_coefficient_norm,
 )
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 @dataclass
@@ -344,6 +347,102 @@ def print_active_space_results(result: ActiveSpaceResult) -> None:
     print(
         f"Energy increase from reducing the active space: {energy_increase:.12f} Hartree"
     )
+
+
+def plot_orbital_entropy_selection(result: ActiveSpaceResult) -> "Figure":
+    """Plot entropy-ranked candidate orbitals and the autoCAS selection cut.
+
+    The companion Jupyter notebook uses this helper to display and regenerate
+    the entropy profile after students modify the shared workflow.
+
+    Args:
+        result: Active-space workflow result containing candidate orbital
+            indices, single-orbital entropies, and selected orbital indices.
+
+    Returns:
+        A Matplotlib figure with orbitals sorted by decreasing entropy.
+
+    Raises:
+        ValueError: If the entropy data do not match the candidate orbitals or
+            the selected orbitals do not form one entropy-ranked prefix.
+
+    """
+    import matplotlib.pyplot as plt
+
+    if len(result.valence_indices) != len(result.orbital_entropies):
+        raise ValueError(
+            "Expected one single-orbital entropy for each candidate orbital."
+        )
+
+    ranked_orbitals = sorted(
+        zip(result.valence_indices, result.orbital_entropies, strict=True),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    selected_indices = set(result.refined_indices)
+    selected_flags = [
+        orbital_index in selected_indices for orbital_index, _ in ranked_orbitals
+    ]
+    cut_position = len(selected_indices)
+    expected_flags = [True] * cut_position + [False] * (
+        len(ranked_orbitals) - cut_position
+    )
+    if selected_flags != expected_flags:
+        raise ValueError(
+            "The selected orbitals do not form a contiguous prefix when sorted "
+            "by decreasing entropy."
+        )
+
+    ranks = list(range(len(ranked_orbitals)))
+    orbital_indices = [orbital_index for orbital_index, _ in ranked_orbitals]
+    entropies = [entropy for _, entropy in ranked_orbitals]
+    selected_ranks = [
+        rank for rank, selected in zip(ranks, selected_flags, strict=True) if selected
+    ]
+    excluded_ranks = [
+        rank
+        for rank, selected in zip(ranks, selected_flags, strict=True)
+        if not selected
+    ]
+
+    figure, axis = plt.subplots(figsize=(7.2, 4.2), layout="constrained")
+    axis.plot(ranks, entropies, color="#455A64", linewidth=1.5, zorder=1)
+    if selected_ranks:
+        axis.scatter(
+            selected_ranks,
+            [entropies[rank] for rank in selected_ranks],
+            color="#00796B",
+            marker="o",
+            s=55,
+            label="Selected by autoCAS",
+            zorder=2,
+        )
+    if excluded_ranks:
+        axis.scatter(
+            excluded_ranks,
+            [entropies[rank] for rank in excluded_ranks],
+            color="#7B1FA2",
+            marker="s",
+            s=55,
+            label="Excluded",
+            zorder=2,
+        )
+    if 0 < cut_position < len(ranked_orbitals):
+        axis.axvline(
+            cut_position - 0.5,
+            color="#5C6BC0",
+            linestyle="--",
+            linewidth=1.5,
+            label="autoCAS cut",
+        )
+
+    axis.set_xticks(ranks, [str(index) for index in orbital_indices])
+    axis.set_xlabel("Natural-orbital index (sorted by decreasing entropy)")
+    axis.set_ylabel("Single-orbital entropy")
+    axis.set_ylim(bottom=0.0)
+    axis.spines[["top", "right"]].set_visible(False)
+    axis.legend(frameon=False)
+    return figure
 
 
 def generate_active_orbital_cube_data(
