@@ -69,24 +69,47 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     }
 
     /// # Summary
-    /// Flips `target` when the phase register lies in [`lowerBound`,
-    /// `upperBound`) and every signal ancilla is $|0\rangle$. Signal-ancilla
-    /// indices are relative to the register that follows the phase qubits.
+    /// Flips `target` when the phase-register value lies in any of the half-open
+    /// intervals [`lowerBounds[i]`, `upperBounds[i]`).
+    ///
+    /// # Description
+    /// The intervals must be pairwise disjoint. Each one flips `target`
+    /// independently, so a value covered twice would be flipped twice and left
+    /// unmarked. Several intervals are needed because a qubitization walk has
+    /// eigenvalues $e^{\pm i \arccos(E/\lambda)}$, which places one energy in two
+    /// mirrored phase bins.
+    operation MarkPhaseRanges(
+        numPhaseQubits : Int,
+        lowerBounds : Int[],
+        upperBounds : Int[],
+        register : Qubit[],
+        target : Qubit,
+    ) : Unit is Adj {
+        for index in 0..Length(lowerBounds) - 1 {
+            MarkPhaseRange(numPhaseQubits, lowerBounds[index], upperBounds[index], register, target);
+        }
+    }
+
+    /// # Summary
+    /// Flips `target` when the phase register lies in one of the half-open
+    /// intervals [`lowerBounds[i]`, `upperBounds[i]`) and every signal ancilla is
+    /// $|0\rangle$. Signal-ancilla indices are relative to the register that
+    /// follows the phase qubits.
     operation MarkAcceptedPhase(
         numPhaseQubits : Int,
         signalAncillaIndices : Int[],
-        lowerBound : Int,
-        upperBound : Int,
+        lowerBounds : Int[],
+        upperBounds : Int[],
         register : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
         let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
         if Length(signalAncillas) == 0 {
-            MarkPhaseRange(numPhaseQubits, lowerBound, upperBound, register, target);
+            MarkPhaseRanges(numPhaseQubits, lowerBounds, upperBounds, register, target);
         } else {
             use inRange = Qubit();
             within {
-                MarkPhaseRange(numPhaseQubits, lowerBound, upperBound, register, inRange);
+                MarkPhaseRanges(numPhaseQubits, lowerBounds, upperBounds, register, inRange);
                 ApplyToEachCA(X, signalAncillas);
             } apply {
                 Controlled X(signalAncillas + [inRange], target);
@@ -97,10 +120,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     function MarkTargetStateOp(
         numPhaseQubits : Int,
         signalAncillaIndices : Int[],
-        lowerBound : Int,
-        upperBound : Int,
+        lowerBounds : Int[],
+        upperBounds : Int[],
     ) : (Qubit[], Qubit) => Unit is Adj {
-        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBound, upperBound, _, _)
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBounds, upperBounds, _, _)
     }
 
     /// # Summary
@@ -110,13 +133,13 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     operation MakeMarkedPhaseCircuit(
         numPhaseQubits : Int,
         signalAncillaIndices : Int[],
-        lowerBound : Int,
-        upperBound : Int,
+        lowerBounds : Int[],
+        upperBounds : Int[],
         numQubits : Int,
     ) : Result[] {
         use register = Qubit[numQubits];
         use flag = Qubit();
-        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBound, upperBound, register, flag);
+        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBounds, upperBounds, register, flag);
         let outcome = MResetZ(flag);
         ResetAll(register);
         return [outcome];

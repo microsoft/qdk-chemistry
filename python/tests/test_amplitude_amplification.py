@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
@@ -142,9 +143,9 @@ def _dominant_accepted_phase(
 
 
 def test_amplitude_amplification_is_registered():
-    assert available("amplitude_amplification") == ["base"]
+    assert available("amplitude_amplification") == ["qdk_base"]
     default = create("amplitude_amplification")
-    assert default.name() == "base"
+    assert default.name() == "qdk_base"
     assert default.type_name() == "amplitude_amplification"
     assert isinstance(default, AmplitudeAmplification)
 
@@ -239,6 +240,57 @@ def test_marking_oracle_circuit_is_executable():
     qpe_circuit, _, _ = _qpe_preparation(_diagonal_hamiltonian(), _guiding_state(0.3, 3), num_bits=3)
     assert executor.run(phase_marking_oracle(qpe_circuit, (0, 1)), shots=20).bitstring_counts == {"1": 20}
     assert executor.run(phase_marking_oracle(qpe_circuit, (1, 8)), shots=20).bitstring_counts == {"0": 20}
+
+
+def test_energy_window_selects_the_same_bins_as_the_hand_computed_window():
+    """An energy window around -lambda reproduces the hand-computed bin 8 of 16."""
+    hamiltonian = _diagonal_hamiltonian()
+    qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
+    oracle = phase_marking_oracle(
+        qpe_circuit,
+        target_energy_range=(-math.inf, -0.99 * hamiltonian.schatten_norm),
+        qubit_hamiltonian=hamiltonian,
+    )
+    parameters = oracle._qsharp_factory.parameter
+    assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([8], [9])
+
+
+def test_energy_window_marks_both_walk_branches():
+    """A walk has eigenvalues exp(+-i arccos(E/lambda)), so one energy needs two mirrored bins."""
+    coefficients = np.array([0.3, 0.5])
+    hamiltonian = QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=coefficients)
+    # |01> has energy 0.3 - 0.5 = -0.2, away from +-lambda, so the two branches are distinct bins.
+    energy = float(coefficients[0] - coefficients[1])
+    qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(1.0, 1), num_bits=4)
+    oracle = phase_marking_oracle(
+        qpe_circuit,
+        target_energy_range=(energy - 0.02, energy + 0.02),
+        qubit_hamiltonian=hamiltonian,
+    )
+    parameters = oracle._qsharp_factory.parameter
+    marked = {
+        phase_bin
+        for lower, upper in zip(parameters["lowerBounds"], parameters["upperBounds"], strict=True)
+        for phase_bin in range(lower, upper)
+    }
+    # arccos(-0.25) / 2pi = 0.2902 -> bin 4.64, and the mirror at 1 - 0.2902 -> bin 11.36.
+    assert len(parameters["lowerBounds"]) == 2
+    assert {5, 11} <= marked
+    assert 8 not in marked
+
+
+def test_energy_window_rejects_an_ambiguous_or_incomplete_request():
+    """The two ways of naming the target are mutually exclusive, and energy needs a Hamiltonian."""
+    hamiltonian = _diagonal_hamiltonian()
+    qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
+    with pytest.raises(ValueError, match="exactly one"):
+        phase_marking_oracle(qpe_circuit)
+    with pytest.raises(ValueError, match="exactly one"):
+        phase_marking_oracle(qpe_circuit, (8, 9), target_energy_range=(-2.0, -1.0), qubit_hamiltonian=hamiltonian)
+    with pytest.raises(ValueError, match="qubit_hamiltonian"):
+        phase_marking_oracle(qpe_circuit, target_energy_range=(-2.0, -1.0))
+    with pytest.raises(ValueError, match="low < high"):
+        phase_marking_oracle(qpe_circuit, target_energy_range=(-1.0, -2.0), qubit_hamiltonian=hamiltonian)
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():

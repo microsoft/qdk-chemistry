@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms import create
 
 # Number of Grover iterates. Choose it from an estimate of the overlap a,
 # the success probability after k rounds is sin^2((2k+1) arcsin(sqrt(a))).
-amplitude_amplification = create("amplitude_amplification", "base", rounds=2)
+amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
 
 # end-cell-create
 ################################################################################
@@ -75,8 +75,17 @@ state_prep_oracle = builder.run(
 target_phase_bins = (8, 9)
 good_state_oracle = phase_marking_oracle(state_prep_oracle, target_phase_bins)
 
+# The same window can be named by energy instead. The walk maps E to
+# phi = arccos(E / lambda) / 2 pi, with lambda the L1 norm of the Hamiltonian, and
+# marks both signs of that phase. Here it selects bin 8 again.
+good_state_oracle = phase_marking_oracle(
+    state_prep_oracle,
+    target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
+    qubit_hamiltonian=qubit_hamiltonian,
+)
+
 # 5. Amplify, then execute
-amplitude_amplification = create("amplitude_amplification", "base", rounds=2)
+amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
 circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
 
 executor = create("circuit_executor", "qdk_sparse_state_simulator")

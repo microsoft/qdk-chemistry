@@ -5,11 +5,12 @@ r"""QDK/Chemistry amplitude amplification."""
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 import operator
 from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Circuit, Settings
+from qdk_chemistry.data import Circuit, QubitOperator, Settings
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -22,9 +23,56 @@ __all__: list[str] = [
 ]
 
 
+def _merge_bin_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Merge half-open bin ranges into a sorted, pairwise-disjoint list."""
+    merged: list[tuple[int, int]] = []
+    for start, stop in sorted(ranges):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], stop))
+        else:
+            merged.append((start, stop))
+    return merged
+
+
+def _phase_bins_from_energy_range(
+    target_energy_range: tuple[float, float],
+    normalization: float,
+    num_phase_qubits: int,
+) -> list[tuple[int, int]]:
+    r"""Convert an energy window into the phase bins a qubitization walk maps it to.
+
+    A qubitization walk on a block encoding of :math:`H/\lambda` has eigenvalues
+    :math:`e^{\pm i\arccos(E/\lambda)}`, the inverse of
+    :meth:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase`.
+    Both signs occur, so one energy lands in two mirrored bins and both must be marked.
+    """
+    try:
+        low_energy, high_energy = (float(bound) for bound in target_energy_range)
+    except (TypeError, ValueError) as error:
+        raise TypeError("target_energy_range must be a (low, high) tuple of floats.") from error
+    if not low_energy < high_energy:
+        raise ValueError(f"target_energy_range must satisfy low < high. Got {target_energy_range}.")
+    if not normalization > 0.0:
+        raise ValueError(f"normalization must be positive. Got {normalization}.")
+
+    # arccos is decreasing, so the higher energy gives the lower phase.
+    lower_phase = math.acos(min(max(high_energy / normalization, -1.0), 1.0)) / (2 * math.pi)
+    upper_phase = math.acos(min(max(low_energy / normalization, -1.0), 1.0)) / (2 * math.pi)
+
+    phase_bin_count = 1 << num_phase_qubits
+    start = min(round(lower_phase * phase_bin_count), phase_bin_count - 1)
+    stop = min(round(upper_phase * phase_bin_count) + 1, phase_bin_count)
+    # The mirrored branch sits at bin -> phase_bin_count - bin.
+    mirrored = (max(phase_bin_count - stop + 1, 0), min(phase_bin_count - start + 1, phase_bin_count))
+    return _merge_bin_ranges([(start, stop), mirrored])
+
+
 def phase_marking_oracle(
     qpe_circuit: Circuit,
-    target_phase_bins: tuple[int, int],
+    target_phase_bins: tuple[int, int] | None = None,
+    *,
+    target_energy_range: tuple[float, float] | None = None,
+    qubit_hamiltonian: QubitOperator | None = None,
 ) -> Circuit:
     r"""Build a good state oracle marking a range of phase bins of a QPE circuit.
 
@@ -33,16 +81,29 @@ def phase_marking_oracle(
     target eigenvalue is selected by the bin its phase falls in. Bins are marked over the
     half-open interval ``(start, stop)``.
 
+    The target can be given as an energy window instead, which only makes sense for a QPE
+    circuit built on a qubitization walk: its eigenvalues are
+    :math:`e^{\pm i\arccos(E/\lambda)}`, where :math:`\lambda` is the L1 norm of the
+    Hamiltonian, so the window is converted with :math:`\varphi = \arccos(E/\lambda)/2\pi`.
+    Both signs occur, so an energy is marked in two mirrored bins. Any other encoding, a
+    Trotter step for instance, follows a different law and has to use ``target_phase_bins``.
+
     Args:
         qpe_circuit: The measurement-free QPE circuit whose phase register is marked.
         target_phase_bins: Half-open phase-bin interval ``(start, stop)`` to mark.
+        target_energy_range: Half-open energy window ``(low, high)`` to mark, as an
+            alternative to ``target_phase_bins``. Pass ``-math.inf`` or ``math.inf`` for a
+            one-sided threshold; bounds are clipped to the representable range
+            :math:`[-\lambda, \lambda]`. Requires ``qubit_hamiltonian``.
+        qubit_hamiltonian: The Hamiltonian the QPE circuit estimates, supplying the L1 norm
+            :math:`\lambda`. Required with ``target_energy_range`` and ignored otherwise.
 
     Returns:
         A circuit for use as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
 
     Raises:
         ValueError: If the target range is invalid or the circuit is not a standard QPE circuit.
-        TypeError: If the range endpoints are not integers.
+        TypeError: If the range endpoints are not the expected type.
 
     """
     factory = qpe_circuit._qsharp_factory  # noqa: SLF001
@@ -53,33 +114,46 @@ def phase_marking_oracle(
     num_phase_qubits = parameters["numBits"]
     num_system_qubits = len(parameters["systems"])
     num_ancilla_qubits = parameters["numAncillaQubits"]
-
-    try:
-        start, stop = target_phase_bins
-    except (TypeError, ValueError) as error:
-        raise TypeError("target_phase_bins must be a (start, stop) tuple.") from error
-    try:
-        lower_bound = operator.index(start)
-        upper_bound = operator.index(stop)
-    except TypeError as error:
-        raise TypeError("target_phase_bins endpoints must be integers.") from error
-
     phase_bin_count = 1 << num_phase_qubits
-    if not 0 <= lower_bound < upper_bound <= phase_bin_count:
-        raise ValueError(
-            f"target_phase_bins must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_phase_bins}."
+
+    if (target_phase_bins is None) == (target_energy_range is None):
+        raise ValueError("Pass exactly one of target_phase_bins or target_energy_range.")
+
+    if target_energy_range is not None:
+        if qubit_hamiltonian is None:
+            raise ValueError("target_energy_range requires qubit_hamiltonian to supply the L1 norm.")
+        bin_ranges = _phase_bins_from_energy_range(
+            target_energy_range, qubit_hamiltonian.schatten_norm, num_phase_qubits
         )
+    else:
+        try:
+            start, stop = target_phase_bins  # type: ignore[misc]
+        except (TypeError, ValueError) as error:
+            raise TypeError("target_phase_bins must be a (start, stop) tuple.") from error
+        try:
+            lower_bound = operator.index(start)
+            upper_bound = operator.index(stop)
+        except TypeError as error:
+            raise TypeError("target_phase_bins endpoints must be integers.") from error
+
+        if not 0 <= lower_bound < upper_bound <= phase_bin_count:
+            raise ValueError(
+                f"target_phase_bins must satisfy 0 <= start < stop <= {phase_bin_count}. Got {target_phase_bins}."
+            )
+        bin_ranges = [(lower_bound, upper_bound)]
 
     ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
+    lower_bounds = [start for start, _ in bin_ranges]
+    upper_bounds = [stop for _, stop in bin_ranges]
     parameters = {
         "numPhaseQubits": num_phase_qubits,
         "signalAncillaIndices": ancilla_indices,
-        "lowerBound": lower_bound,
-        "upperBound": upper_bound,
+        "lowerBounds": lower_bounds,
+        "upperBounds": upper_bounds,
         "numQubits": num_phase_qubits + num_system_qubits + num_ancilla_qubits,
     }
     amplification = QSHARP_UTILS.AmplitudeAmplification
-    operation = amplification.MarkTargetStateOp(num_phase_qubits, ancilla_indices, lower_bound, upper_bound)
+    operation = amplification.MarkTargetStateOp(num_phase_qubits, ancilla_indices, lower_bounds, upper_bounds)
 
     return Circuit(
         qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=parameters),
@@ -137,8 +211,8 @@ class AmplitudeAmplification(Algorithm):
         return "amplitude_amplification"
 
     def name(self) -> str:
-        """Return the algorithm name as base."""
-        return "base"
+        """Return the algorithm name as qdk_base."""
+        return "qdk_base"
 
     def _run_impl(
         self,
@@ -149,8 +223,6 @@ class AmplitudeAmplification(Algorithm):
 
         Args:
             state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.
-                Its register width is read from a resource estimate, so its circuit must allocate
-                exactly the register the oracle acts on and no extra scratch qubits.
             good_state_oracle: Flips a flag qubit on the good subspace. Must carry an adjointable Q# operation.
 
         Returns:
@@ -171,7 +243,10 @@ class AmplitudeAmplification(Algorithm):
         if good_state_operation is None:
             raise TypeError("Amplitude amplification requires a good state oracle qsharp operation.")
 
-        # A Q# callable carries no arity, so take the register width from a resource estimate.
+        # A Q# callable carries no arity, so the register width is taken from a resource
+        # estimate of the state preparation. That counts every qubit the circuit allocates,
+        # so it is only the width of the amplified register when the preparation allocates
+        # no extra scratch. Replace this with the declared width once one is available.
         num_qubits = int(state_prep_oracle.estimate()["logicalCounts"]["numQubits"])
 
         rounds = int(self._settings.get("rounds"))
@@ -203,5 +278,5 @@ class AmplitudeAmplificationFactory(AlgorithmFactory):
         return "amplitude_amplification"
 
     def default_algorithm_name(self) -> str:
-        """Return base as the default algorithm name."""
-        return "base"
+        """Return qdk_base as the default algorithm name."""
+        return "qdk_base"
