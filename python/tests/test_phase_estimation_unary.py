@@ -11,7 +11,6 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     cosine_window_state,
-    num_phase_bits,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     UnaryPhaseEstimation,
@@ -243,7 +242,7 @@ class TestUnaryQpeEndToEnd:
         """
         num_queries = 7
         num_states = num_queries + 1
-        num_bits = num_phase_bits(num_queries)
+        num_bits = num_queries.bit_length()
 
         expected_phase = k / (2 * num_states)
         for system_state in (0, 1):

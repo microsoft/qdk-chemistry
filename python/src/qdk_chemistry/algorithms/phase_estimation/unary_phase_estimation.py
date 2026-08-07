@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation, PhaseEstimationSettings
-from .circuit_builder.unary_phase_estimation_builder import QdkUnaryQpeCircuitBuilder, num_phase_bits
+from .circuit_builder.unary_phase_estimation_builder import QdkUnaryQpeCircuitBuilder
 
 __all__: list[str] = [
     "UnaryPhaseEstimation",
@@ -138,7 +138,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
-        num_bits = num_phase_bits(circuit_builder.resolve_num_queries(unitary_rep))
+        _, num_bits = circuit_builder.resolve_num_queries()
         circuits = circuit_builder.run(
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,

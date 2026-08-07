@@ -9,7 +9,6 @@ import numpy as np
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -20,24 +19,6 @@ __all__: list[str] = [
     "QdkUnaryQpeCircuitBuilder",
     "QdkUnaryQpeCircuitBuilderSettings",
 ]
-
-
-def num_phase_bits(num_queries: int) -> int:
-    """Return the phase-register size addressing ``num_queries + 1``.
-
-    Args:
-        num_queries: Number of walk blocks applied by the schedule.
-
-    Returns:
-        The number of phase qubits.
-
-    Raises:
-        ValueError: If ``num_queries`` is not positive.
-
-    """
-    if num_queries <= 0:
-        raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-    return int(num_queries).bit_length()
 
 
 def cosine_window_state(num_queries: int) -> list[float]:
@@ -55,7 +36,7 @@ def cosine_window_state(num_queries: int) -> list[float]:
         Real amplitudes normalized to unit norm, zero-padded to a whole number of qubits.
 
     """
-    dimension = 1 << num_phase_bits(num_queries)
+    dimension = 1 << int(num_queries).bit_length()
     num_states = num_queries + 1
     amplitudes = np.sin(np.pi * (np.arange(num_states) + 1) / (num_states + 1))
     padded = np.zeros(dimension)
@@ -132,32 +113,26 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if circuit_mapper is not None:
             self._settings.set("circuit_mapper", circuit_mapper)
 
-    def resolve_num_queries(self, unitary_rep: UnitaryRepresentation) -> int:
-        """Return the configured query count, ignoring any power carried by the container.
+    def resolve_num_queries(self) -> tuple[int, int]:
+        """Return the configured query count and the phase-register size addressing it.
 
         The schedule applies exactly ``num_queries`` walk blocks, so the count is the query
         complexity of the estimate. Choosing ``ceil(pi * lambda / (2 * epsilon))`` targets an
         energy error ``epsilon`` for a block encoding of normalization ``lambda``
         (:cite:`Lee2021`, Eq. 45).
 
-        Args:
-            unitary_rep: The unitary representation the schedule will be built from.
-
         Returns:
-            The number of walk blocks the schedule applies.
+            The number of walk blocks the schedule applies, and the number of phase qubits
+            needed to address its ``num_queries + 1`` reflection slots.
 
         Raises:
             ValueError: If the configured ``num_queries`` is not a positive integer.
 
         """
-        container_power = getattr(unitary_rep.get_container(), "power", 1)
-        if container_power != 1:
-            Logger.warn(f"The unitary representation carries power {container_power}, which is ignored.")
-
-        num_queries = self._settings.get("num_queries")
+        num_queries = int(self._settings.get("num_queries"))
         if num_queries <= 0:
             raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-        return int(num_queries)
+        return num_queries, num_queries.bit_length()
 
     def _run_impl(
         self,
@@ -185,8 +160,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if not isinstance(container, LCUWalkContainer):
             raise ValueError(f"Requires a block encoding unitary representation, got '{type(container).__name__}'.")
 
-        num_queries = self.resolve_num_queries(unitary_rep)
-        num_bits = num_phase_bits(num_queries)
+        container_power = getattr(container, "power", 1)
+        if container_power != 1:
+            Logger.warn(f"The unitary representation carries power {container_power}, which is ignored.")
+
+        num_queries, num_bits = self.resolve_num_queries()
         configured_num_bits = self._settings.get("num_bits")
         if configured_num_bits > 0 and configured_num_bits != num_bits:
             Logger.warn(
