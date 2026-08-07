@@ -87,16 +87,14 @@ def phase_marking_oracle(
     Hamiltonian, so the window is converted with :math:`\varphi = \arccos(E/\lambda)/2\pi`.
     Both signs occur, so an energy is marked in two mirrored bins. Any other encoding, a
     Trotter step for instance, follows a different law and has to use ``target_phase_bins``.
+    Energy bounds are clipped to the representable range :math:`[-\lambda, \lambda]`, so
+    passing an infinite bound gives a one-sided threshold.
 
     Args:
         qpe_circuit: The measurement-free QPE circuit whose phase register is marked.
         target_phase_bins: Half-open phase-bin interval ``(start, stop)`` to mark.
-        target_energy_range: Half-open energy window ``(low, high)`` to mark, as an
-            alternative to ``target_phase_bins``. Pass ``-math.inf`` or ``math.inf`` for a
-            one-sided threshold; bounds are clipped to the representable range
-            :math:`[-\lambda, \lambda]`. Requires ``qubit_hamiltonian``.
-        qubit_hamiltonian: The Hamiltonian the QPE circuit estimates, supplying the L1 norm
-            :math:`\lambda`. Required with ``target_energy_range`` and ignored otherwise.
+        target_energy_range: Half-open energy window ``(low, high)``, an alternative to ``target_phase_bins``.
+        qubit_hamiltonian: The Hamiltonian the QPE circuit estimates, supplying :math:`\lambda`.
 
     Returns:
         A circuit for use as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.
