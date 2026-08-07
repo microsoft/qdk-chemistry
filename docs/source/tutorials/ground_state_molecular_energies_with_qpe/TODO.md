@@ -28,7 +28,6 @@ GitHub issues created from this file should be assigned to Nathan for tracking. 
   - [x] Add a high-level single-iteration IQPE schematic in Chapter 6 before students inspect the fully decomposed circuit notebook.
   - [x] Add an annotated Chapter 6 image of the rendered power-one IQPE circuit that identifies the readout ancilla, compute register, state preparation, feedback rotation, controlled evolution, and measurement.
   - [ ] Add a phase-grid number line in Chapter 6 that relates phase fraction, signed energy, grid spacing, reference alignment, and aliasing.
-  - [ ] Consider a generated Chapter 1 plot showing the exponential sensitivity of equilibrium and rate predictions to free-energy error.
   - [ ] Consider a Chapter 6 energy-accounting figure that distinguishes the measured active energy, classically added core energy, reconstructed total, and CASCI reference.
   - [ ] Reuse the existing circuit workflows to export stable in-page assets; do not capture editor or widget UI screenshots.
   - [ ] Provide an ``:alt:`` description for every Graphviz directive and accessible captions/data descriptions for quantitative plots, then validate the rendered documentation.
