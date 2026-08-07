@@ -24,9 +24,14 @@ __all__: list[str] = [
 
 
 def _merge_bin_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Merge half-open bin ranges into a sorted, pairwise-disjoint list."""
+    """Merge half-open bin ranges into a sorted, pairwise-disjoint list.
+
+    Empty ranges are dropped. Bin 0 is its own mirror because bin ``phase_bin_count``
+    is bin 0, but the mirror arithmetic names it ``phase_bin_count``, which the phase
+    register cannot hold.
+    """
     merged: list[tuple[int, int]] = []
-    for start, stop in sorted(ranges):
+    for start, stop in sorted(bin_range for bin_range in ranges if bin_range[0] < bin_range[1]):
         if merged and start <= merged[-1][1]:
             merged[-1] = (merged[-1][0], max(merged[-1][1], stop))
         else:
@@ -45,6 +50,7 @@ def _phase_bins_from_energy_range(
     :math:`e^{\pm i\arccos(E/\lambda)}`, the inverse of
     :meth:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase`.
     Both signs occur, so one energy lands in two mirrored bins and both must be marked.
+    The band edges :math:`E = \pm\lambda` are their own mirror and collapse to one bin.
     """
     try:
         low_energy, high_energy = (float(bound) for bound in target_energy_range)
@@ -85,10 +91,11 @@ def phase_marking_oracle(
     circuit built on a qubitization walk: its eigenvalues are
     :math:`e^{\pm i\arccos(E/\lambda)}`, where :math:`\lambda` is the L1 norm of the
     Hamiltonian, so the window is converted with :math:`\varphi = \arccos(E/\lambda)/2\pi`.
-    Both signs occur, so an energy is marked in two mirrored bins. Any other encoding, a
-    Trotter step for instance, follows a different law and has to use ``target_phase_bins``.
-    Energy bounds are clipped to the representable range :math:`[-\lambda, \lambda]`, so
-    passing an infinite bound gives a one-sided threshold.
+    Both signs occur, so an energy is marked in two mirrored bins, except at the band
+    edges :math:`E = \pm\lambda`, which are their own mirror and collapse to one. Any
+    other encoding, a Trotter step for instance, follows a different law and has to use
+    ``target_phase_bins``. Energy bounds are clipped to the representable range
+    :math:`[-\lambda, \lambda]`, so passing an infinite bound gives a one-sided threshold.
 
     Args:
         qpe_circuit: The measurement-free QPE circuit whose phase register is marked.

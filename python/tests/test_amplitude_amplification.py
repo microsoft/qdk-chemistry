@@ -14,7 +14,11 @@ import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
+from qdk_chemistry.algorithms.amplitude_amplification import (
+    AmplitudeAmplification,
+    _phase_bins_from_energy_range,
+    phase_marking_oracle,
+)
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
@@ -299,6 +303,64 @@ def test_energy_window_rejects_an_ambiguous_or_incomplete_request():
         phase_marking_oracle(qpe_circuit, target_energy_range=(-2.0, -1.0))
     with pytest.raises(ValueError, match="low < high"):
         phase_marking_oracle(qpe_circuit, target_energy_range=(-1.0, -2.0), qubit_hamiltonian=hamiltonian)
+
+
+@pytest.mark.parametrize(
+    ("target_energy_range", "expected_bins"),
+    [
+        # arccos is decreasing, so E = +lambda is phase 0 and E = -lambda is phase 0.5.
+        # Both are their own mirror, so each edge of the band collapses to a single bin.
+        pytest.param((0.99, math.inf), [(0, 1)], id="top-of-band"),
+        pytest.param((1.0, math.inf), [(0, 1)], id="top-of-band-exact"),
+        pytest.param((-math.inf, -0.99), [(8, 9)], id="bottom-of-band"),
+        pytest.param((-math.inf, -1.0), [(8, 9)], id="bottom-of-band-exact"),
+        pytest.param((-math.inf, math.inf), [(0, 16)], id="whole-band"),
+        # Bounds outside [-lambda, lambda] clamp onto the edge rather than marking nothing.
+        pytest.param((2.0, 3.0), [(0, 1)], id="entirely-above-band"),
+        pytest.param((-3.0, -2.0), [(8, 9)], id="entirely-below-band"),
+        # A window straddling zero keeps the two mirrored branches apart.
+        pytest.param((-0.1, 0.1), [(4, 5), (12, 13)], id="straddling-zero"),
+    ],
+)
+def test_energy_window_edges_map_onto_representable_bins(target_energy_range, expected_bins):
+    """Energy windows at and beyond the band edges stay inside the phase register."""
+    bins = _phase_bins_from_energy_range(target_energy_range, normalization=1.0, num_phase_qubits=4)
+    assert bins == expected_bins
+    assert all(0 <= start < stop <= 16 for start, stop in bins)
+
+
+@pytest.mark.parametrize(
+    "target_energy_range",
+    [
+        pytest.param((math.nan, 1.0), id="nan-low"),
+        pytest.param((1.0, math.nan), id="nan-high"),
+        pytest.param((1.0, 1.0), id="empty-window"),
+        pytest.param((1.0, 0.0), id="reversed"),
+        pytest.param((math.inf, math.inf), id="both-infinite"),
+        pytest.param((math.inf, -math.inf), id="reversed-infinite"),
+    ],
+)
+def test_energy_window_rejects_degenerate_bounds(target_energy_range):
+    """A window that does not name a nonempty interval is rejected instead of clamped."""
+    with pytest.raises(ValueError, match="low < high"):
+        _phase_bins_from_energy_range(target_energy_range, normalization=1.0, num_phase_qubits=4)
+
+
+def test_energy_window_at_the_top_of_the_band_builds_a_runnable_oracle():
+    """Mirroring bin 0 names bin 2^n, which the phase register cannot hold, so it must be dropped."""
+    hamiltonian = _diagonal_hamiltonian()
+    qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
+    oracle = phase_marking_oracle(
+        qpe_circuit,
+        target_energy_range=(0.99 * hamiltonian.schatten_norm, math.inf),
+        qubit_hamiltonian=hamiltonian,
+    )
+    parameters = oracle._qsharp_factory.parameter
+    assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([0], [1])
+
+    # An out-of-range bound reaches Q# as ApplyXorInPlace(2^n, Qubit[n]) and fails to run.
+    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+    assert executor.run(oracle, shots=20).bitstring_counts == {"1": 20}
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():
