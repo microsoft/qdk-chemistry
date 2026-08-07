@@ -24,7 +24,7 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
-#include "swpt2_test_utils.hpp"
+#include "testing_utilities_swpt2.hpp"
 #include "ut_common.hpp"
 
 namespace {
@@ -129,7 +129,7 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
   return es.eigenvalues()(0);
 }
 
-TEST(SchriefferWolffPT2, FactoryRegistration) {
+TEST(SchriefferWolffPT2Test, FactoryRegistration) {
   const auto available = EffectiveHamiltonianConstructorFactory::available();
   EXPECT_NE(std::find(available.begin(), available.end(), "qdk_swpt2"),
             available.end());
@@ -152,7 +152,7 @@ TEST(SchriefferWolffPT2, FactoryRegistration) {
             "qdk_swpt2");
 }
 
-TEST(SchriefferWolffPT2, SettingsKnobs) {
+TEST(SchriefferWolffPT2Test, SettingsKnobs) {
   auto ctor = EffectiveHamiltonianConstructorFactory::create("swpt2");
   auto& settings = ctor->settings();
   // denominator knobs: flow regularization is on by default at this layer
@@ -163,6 +163,8 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
   EXPECT_DOUBLE_EQ(settings.get<double>("intruder_warn_amplitude"), 1.0);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
   EXPECT_DOUBLE_EQ(settings.get<double>("semicanonical_tolerance"), 1e-10);
+  EXPECT_DOUBLE_EQ(settings.get<double>("max_folded_occupation_deviation"),
+                   0.5);
   EXPECT_ANY_THROW(settings.set("regularizer", std::string("unknown")));
   EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
 
@@ -189,7 +191,7 @@ TEST(SchriefferWolffPT2, SettingsKnobs) {
 // and the resulting small pp-ladder denominator makes bare second-order PT
 // overshoot -- a classic intruder tamed by the flow regularizer, not a bug in
 // the container/solver or the denominators.
-TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
+TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -249,7 +251,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
   {
     const auto [T_a, T_b] = H_eff->get_one_body_integrals();
     const int m = static_cast<int>(T_a.rows());
-    const auto H_so = swpt2_test::build_spin_orbital_tensors(
+    const auto H_so = testing::build_spin_orbital_tensors(
         T_a, T_a, ge, ge, ge, H_eff->get_core_energy(), m);
     std::vector<int> orbs(2 * m);
     for (int i = 0; i < 2 * m; ++i) orbs[i] = i;
@@ -278,7 +280,7 @@ TEST(SchriefferWolffPT2, DownfoldRunsEndToEndWater) {
 // A mean-field HF reference (single determinant, no active 1-RDM) must work:
 // the downfold reads active orbital occupations directly from the reference
 // determinant. Mirrors the SCF -> active_space_selector -> downfold user flow.
-TEST(SchriefferWolffPT2, AcceptsMeanFieldHfReference) {
+TEST(SchriefferWolffPT2Test, AcceptsMeanFieldHfReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -329,7 +331,7 @@ TEST(SchriefferWolffPT2, AcceptsMeanFieldHfReference) {
 // The kept space P can be given explicitly via the `active_indices` setting,
 // independently of the reference wavefunction's active space, as long as every
 // folded orbital is closed-shell in the reference.
-TEST(SchriefferWolffPT2, CustomActiveSpaceOverridesReference) {
+TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -405,9 +407,76 @@ TEST(SchriefferWolffPT2, CustomActiveSpaceOverridesReference) {
   EXPECT_EQ(
       std::vector<std::size_t>(core_inactive.begin(), core_inactive.end()),
       (std::vector<std::size_t>{0, 1, 2}));
+
+  // (4) A spin-dependent P is rejected rather than silently reduced to its
+  // alpha channel.
+  auto swpt2_spin = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  EXPECT_THROW(swpt2_spin->run(reference, H_window,
+                               testing::unrestricted_index_set(
+                                   orbitals->get_num_molecular_orbitals(),
+                                   {3, 4, 5}, {3, 4, 6})),
+               std::invalid_argument);
 }
 
-TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
+// Folding an orbital whose correlated natural occupation is not exactly 2 or 0.
+// The occupation is rounded to the nearer integer; the total electron count is
+// still exact because the active space receives whatever the folded orbitals do
+// not take. `max_folded_occupation_deviation` bounds how much rounding error is
+// accepted, and setting it to zero restores the strict integer-occupation rule.
+TEST(SchriefferWolffPT2Test, FoldsFractionallyOccupiedExternalOrbital) {
+  auto water = testing::create_water_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+  const auto num_mo = orbitals->get_num_molecular_orbitals();
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
+  cas_ref->settings().set("calculate_one_rdm", true);
+  // HOMO/LUMO CAS(2,2): natural occupations near 2 and 0 but not exactly, so
+  // orbital 4 is a fractionally occupied orbital available to fold.
+  auto [E_bare, reference] = cas_ref->run(
+      ham->run(testing::with_active_space(orbitals, {4, 5}, {0, 1, 2, 3})), 1,
+      1);
+
+  // Window {3,4,5,6} holds 2 + n_4 + n_5 + 0 = 4 electrons. Folding the
+  // fractionally occupied orbital 4 as doubly occupied and 6 as empty leaves
+  // exactly 2 electrons for P = {3, 5}.
+  auto H_window =
+      ham->run(testing::with_active_space(orbitals, {3, 4, 5, 6}, {0, 1, 2}));
+  const auto p_indices =
+      testing::restricted_index_set(num_mo, std::vector<std::size_t>{3, 5});
+
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  auto H_eff = swpt2->run(reference, H_window, p_indices);
+  ASSERT_NE(H_eff, nullptr);
+
+  namespace qcd2 = qdk::chemistry::data;
+  const auto emitted_active = qcd2::spin_channel_indices(
+      H_eff->get_orbitals()->active_indices(), qcd2::axes::alpha());
+  EXPECT_EQ(
+      std::vector<std::size_t>(emitted_active.begin(), emitted_active.end()),
+      (std::vector<std::size_t>{3, 5}));
+  // reference core {0,1,2} plus the folded doubly-occupied orbital {4}
+  const auto emitted_inactive = qcd2::spin_channel_indices(
+      H_eff->get_orbitals()->inactive_indices(), qcd2::axes::alpha());
+  EXPECT_EQ(std::vector<std::size_t>(emitted_inactive.begin(),
+                                     emitted_inactive.end()),
+            (std::vector<std::size_t>{0, 1, 2, 4}));
+
+  // The derived active electron count (2) is the one the solver must be given.
+  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 1);
+  EXPECT_TRUE(std::isfinite(E_sw));
+
+  // Demanding exactly integer folded occupations rejects the same partition.
+  auto strict = EffectiveHamiltonianConstructorFactory::create("swpt2");
+  strict->settings().set("max_folded_occupation_deviation", 0.0);
+  EXPECT_THROW(strict->run(reference, H_window, p_indices),
+               std::invalid_argument);
+}
+
+TEST(SchriefferWolffPT2Test, AcceptsRestrictedOpenShellHfReference) {
   auto hydroxyl = testing::create_oh_structure();
   auto scf = ScfSolverFactory::create();
   scf->settings().set("enable_gdm", false);
@@ -457,7 +526,8 @@ TEST(SchriefferWolffPT2, AcceptsRestrictedOpenShellHfReference) {
   EXPECT_TRUE(std::isfinite(E_sw));
 }
 
-TEST(SchriefferWolffPT2, AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
+TEST(SchriefferWolffPT2Test,
+     AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
   auto hydroxyl = testing::create_oh_structure();
   auto scf = ScfSolverFactory::create();
   scf->settings().set("enable_gdm", false);
@@ -528,7 +598,7 @@ TEST(SchriefferWolffPT2, AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
   EXPECT_TRUE(std::isfinite(E_sw_no_semicanon));
 }
 
-TEST(SchriefferWolffPT2, RejectsUnrestrictedHfReference) {
+TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfReference) {
   auto oxygen = testing::create_o2_structure();
   auto scf = ScfSolverFactory::create();
   auto [energy, reference] = scf->run(oxygen, 0, 3, "sto-3g");

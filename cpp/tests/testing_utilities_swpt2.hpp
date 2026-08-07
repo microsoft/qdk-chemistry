@@ -9,7 +9,7 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
 
-namespace swpt2_test {
+namespace testing {
 
 namespace sw = qdk::chemistry::algorithms::microsoft::swpt2;
 
@@ -53,4 +53,4 @@ inline SpinOrbitalTensors build_spin_orbital_tensors(
   return tensors;
 }
 
-}  // namespace swpt2_test
+}  // namespace testing

@@ -201,8 +201,12 @@ The kept space ``P`` is a required ``run()`` argument (``p_indices``): a
 :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window
 (spatial) orbital indices. The reference wavefunction supplies
 the density over ``W``; ``P`` selects which orbitals are kept and need not
-coincide with the reference active space. Every folded external orbital must be
-closed-shell in the reference (doubly occupied or empty).
+coincide with the reference active space. A folded external orbital has its
+reference occupation rounded to doubly occupied or empty, bounded by
+``max_folded_occupation_deviation``. Rounding never changes the total electron
+count, because the active space receives whatever the folded orbitals do not
+take; the derived active electron count is logged and is the value to pass to
+the active-space solver.
 
 Typical usage:
 

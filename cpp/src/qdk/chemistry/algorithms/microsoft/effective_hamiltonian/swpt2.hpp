@@ -44,9 +44,11 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * The kept space P is a required `run()` argument (`p_indices`): a
  * `SymmetryBlockedIndexSet` of window (spatial) orbital indices. The reference
  * wavefunction supplies the density over W; P selects which orbitals are kept
- * and need not coincide with the reference active space. Every folded
- * (external) orbital must be closed-shell in the reference (doubly occupied or
- * empty).
+ * and need not coincide with the reference active space. Folded (external)
+ * orbitals have their reference occupation rounded to doubly occupied or
+ * empty, bounded by `max_folded_occupation_deviation`; the total electron
+ * count is preserved because the active space receives whatever the folded
+ * orbitals do not take.
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor

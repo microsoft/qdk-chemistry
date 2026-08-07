@@ -29,8 +29,9 @@ Preparing the inputs
 The three inputs describe different orbital spaces:
 
 ``reference``
-   A :class:`~qdk_chemistry.data.Wavefunction` whose active orbitals define the
-   retained space :math:`P`. A CAS reference should contain its active one-body
+   A :class:`~qdk_chemistry.data.Wavefunction` whose occupations and reduced
+   density matrices define the reference density over the window :math:`W`. It
+   does not select :math:`P`. A CAS reference should contain its active one-body
    reduced density matrix. A restricted mean-field reference can also be used
    directly.
 
@@ -44,10 +45,28 @@ The three inputs describe different orbital spaces:
 ``p_indices``
    A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` naming the
    kept space :math:`P` as window orbital indices. It need not equal the
-   reference active space, but every folded (external) orbital must be
-   closed-shell in the reference. Reusing
+   reference active space. Reusing
    ``reference.get_orbitals().active_indices()`` keeps :math:`P` equal to the
    reference active space.
+
+Each folded orbital's reference occupation is rounded to doubly occupied or
+empty. Rounding does not change the total electron count: the active space
+receives whatever the folded orbitals do not take, and the resulting integer
+active electron count is logged. That is the count to pass to the active-space
+solver. ``max_folded_occupation_deviation`` bounds how far a folded occupation
+may sit from an integer; a half-occupied orbital can never be folded, because
+rounding it either way would change the electron count and break spin symmetry.
+
+Rounding a fractional occupation perturbs the mean field the active space feels
+at first order, and this error is not damped by denominator regularization. The
+active space itself is unaffected: it receives an integer electron count and its
+density is determined by the subsequent active-space solve. The error lives
+entirely on the folded side, and is summarized by the net electron count the
+folded core carries in excess of the reference density. Individual roundings of
+opposite sign cancel in that sum, so keeping a correlated pair together on the
+folded side is preferable: the leftover density error is then neutral and short
+ranged. Both the largest folded deviation and the excess are logged, and a
+warning is raised when either is large.
 
 The reference and window Hamiltonian must use the same restricted molecular
 orbital basis, and every reference-active orbital must occur in the window.
@@ -114,6 +133,11 @@ Settings
      - float
      - ``1\times10^{-10}``
      - Skip a role-block rotation below this off-diagonal tolerance.
+   * - ``max_folded_occupation_deviation``
+     - float
+     - ``0.5``
+     - Largest deviation from an integer reference occupation allowed for a
+       folded orbital. Must be below 1.
 
 For example, select shifted denominators before the first run:
 
@@ -129,7 +153,8 @@ Diagnostic logging
 ------------------
 
 The constructor logs the selected regularizer, minimum denominator, maximum raw
-amplitude, and whether a semicanonical rotation was applied. Small denominators
+amplitude, whether a semicanonical rotation was applied, and the derived active
+electron count. Small denominators
 and large raw amplitudes indicate sensitivity to intruder states; amplitudes
 above ``intruder_warn_amplitude`` also produce a warning. The default flow
 parameter is a policy default, not a universal accuracy guarantee. Compare

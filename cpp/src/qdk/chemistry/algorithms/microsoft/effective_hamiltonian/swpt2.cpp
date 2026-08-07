@@ -18,6 +18,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -66,6 +67,15 @@ SchriefferWolffPT2Settings::SchriefferWolffPT2Settings() {
       "Skip a block rotation when its largest off-diagonal Fock element does "
       "not exceed this threshold.",
       data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+  set_default(
+      "max_folded_occupation_deviation", 0.5,
+      "Largest allowed deviation from an integer reference occupation (0 or "
+      "2) for an orbital folded into the external space. Folded occupations "
+      "are rounded to the nearest of 0 or 2; the total electron count is "
+      "preserved because the active space receives whatever the folded "
+      "orbitals do not take. Must be below 1, so a singly occupied orbital is "
+      "never folded on an arbitrary rounding.",
+      data::BoundConstraint<double>{0.0, 1.0});
 }
 
 std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
@@ -90,6 +100,10 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         "SchriefferWolffPT2 requires a non-empty p_indices argument: the "
         "kept space P as a SymmetryBlockedIndexSet of global (spatial) orbital "
         "indices into the window Hamiltonian's active space W = P u Q.");
+  if (data::spin_channel_indices(p_indices, data::axes::beta()) != kept_global)
+    throw std::invalid_argument(
+        "SchriefferWolffPT2 requires p_indices to select the same orbitals in "
+        "both spin channels; this is a spin-restricted method.");
 
   // Spin-restricted method: H0 is the spin-averaged diagonal Fock and the
   // effective two-body is emitted as a single (spin-free) chemist tensor, so an
@@ -190,6 +204,19 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         throw std::invalid_argument(
             "SchriefferWolffPT2: active occupation dimensions do not match "
             "the reference active-space size.");
+      // Occupations are mapped onto orbital indices positionally, which only
+      // holds for a determinant: a multi-determinant state reports occupations
+      // obtained by diagonalizing its 1-RDM, in natural-orbital order.
+      constexpr double determinant_tolerance = 1e-6;
+      for (Eigen::Index k = 0; k < occ_a.size(); ++k)
+        for (double n : {occ_a(k), occ_b(k)})
+          if (std::abs(n) > determinant_tolerance &&
+              std::abs(n - 1.0) > determinant_tolerance)
+            throw std::invalid_argument(
+                "SchriefferWolffPT2: the reference reports fractional active "
+                "orbital occupations but exposes no active 1-RDM, so they "
+                "cannot be assigned to orbitals. Enable one-RDM calculation "
+                "on the reference.");
       p_density = (occ_a + occ_b).asDiagonal();
     } catch (const std::runtime_error&) {
       throw std::runtime_error(
@@ -229,6 +256,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         "SchriefferWolffPT2: the reference active space is not fully "
         "contained in the window Hamiltonian.");
 
+  constexpr double occupation_bound_tolerance = 1e-6;
+  for (int i = 0; i < norb; ++i)
+    if (occupation[i] < -occupation_bound_tolerance ||
+        occupation[i] > 2.0 + occupation_bound_tolerance)
+      throw std::invalid_argument(
+          "SchriefferWolffPT2: window orbital " + std::to_string(W_global[i]) +
+          " has unphysical reference occupation " +
+          std::to_string(occupation[i]) + "; expected a value in [0, 2].");
+
   // Kept space P: the mandatory explicit index set of global (spatial) MO
   // indices into the window W = P u Q (a run() argument, extracted above). The
   // reference wavefunction supplies the density over W; P selects which
@@ -246,79 +282,150 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
           "SchriefferWolffPT2: every p_indices orbital must lie in the "
           "window Hamiltonian's active space W = P u Q.");
 
-  // Partition the window: kept -> active P; the folded rest -> Q, split by the
-  // reference occupation into inactive (doubly occupied) / virtual (empty).
-  // Folded orbitals must be closed-shell; keep open-shell/fractionally occupied
-  // orbitals in P.
-  constexpr double occupation_tolerance = 1e-6;
+  // Every fractionally occupied reference orbital lies inside the window (the
+  // containment check above), and the rest are exactly doubly occupied or
+  // empty, so the window must carry an integer number of electrons.
+  double window_electrons = 0.0;
+  for (double n : occupation) window_electrons += n;
+  const double window_electrons_integer = std::round(window_electrons);
+  constexpr double electron_count_tolerance = 1e-6;
+  if (std::abs(window_electrons - window_electrons_integer) >
+      electron_count_tolerance)
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: the reference density over the window does not "
+        "carry an integer number of electrons (" +
+        std::to_string(window_electrons) + ").");
+
+  // Partition the window: kept -> active P; the folded rest -> Q, split by
+  // rounding its reference occupation to the nearer of 2 (inactive) or 0
+  // (virtual). Rounding cannot change the total electron count -- the active
+  // space receives whatever the folded orbitals do not take -- but it does
+  // perturb the mean field the active space feels, so track the worst case.
+  const double max_deviation =
+      _settings->get<double>("max_folded_occupation_deviation");
+  if (!std::isfinite(max_deviation) || max_deviation < 0.0 ||
+      max_deviation >= 1.0)
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: max_folded_occupation_deviation must lie in "
+        "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
+
   std::vector<int> active_spatial, inactive_spatial, virtual_spatial;
+  double worst_deviation = 0.0;
+  double worst_occupation = 0.0;
+  std::size_t worst_orbital = 0;
   for (int i = 0; i < norb; ++i) {
-    if (kept_set.count(W_global[i]))
+    if (kept_set.count(W_global[i])) {
       active_spatial.push_back(i);
-    else if (std::abs(occupation[i] - 2.0) <= occupation_tolerance)
-      inactive_spatial.push_back(i);
-    else if (std::abs(occupation[i]) <= occupation_tolerance)
-      virtual_spatial.push_back(i);
-    else
+      continue;
+    }
+    const double to_occupied = std::abs(occupation[i] - 2.0);
+    const double to_empty = std::abs(occupation[i]);
+    const double deviation = std::min(to_occupied, to_empty);
+    if (deviation > max_deviation)
       throw std::invalid_argument(
-          "SchriefferWolffPT2: a folded external orbital has fractional "
-          "reference occupation; keep open-shell / partially occupied "
-          "orbitals in the active space P (active_indices).");
+          "SchriefferWolffPT2: folded external orbital " +
+          std::to_string(W_global[i]) + " has reference occupation " +
+          std::to_string(occupation[i]) +
+          ", which deviates from an integer occupation by more than "
+          "max_folded_occupation_deviation. Keep strongly correlated or "
+          "open-shell orbitals in the active space P (p_indices), or raise "
+          "the setting to accept the rounding.");
+    if (deviation > worst_deviation) {
+      worst_deviation = deviation;
+      worst_occupation = occupation[i];
+      worst_orbital = W_global[i];
+    }
+    (to_occupied <= to_empty ? inactive_spatial : virtual_spatial).push_back(i);
   }
   if (active_spatial.empty())
     throw std::invalid_argument(
         "SchriefferWolffPT2: the kept active space P is empty.");
 
-  Eigen::MatrixXd semicanonical_rotation =
+  // Rounding preserves the total, so the active electron count is fixed by
+  // what the folded orbitals take. This is the count to hand the active-space
+  // solver; it need not equal the reference occupation summed over P.
+  const int folded_electrons = 2 * static_cast<int>(inactive_spatial.size());
+  const int active_electrons =
+      static_cast<int>(window_electrons_integer) - folded_electrons;
+  if (active_electrons < 0 ||
+      active_electrons > 2 * static_cast<int>(active_spatial.size()))
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: the rounded external occupation leaves an "
+        "impossible active electron count; the active/external partition is "
+        "inconsistent with the reference density.");
+  // Net electron-count error of the folded core: the rounded external density
+  // minus the reference one. Individual roundings of opposite sign cancel here,
+  // so this is the monopole of the density error, and it accumulates over many
+  // folded orbitals in a way the largest single deviation cannot show.
+  double folded_occupation = 0.0;
+  for (int i : inactive_spatial) folded_occupation += occupation[i];
+  for (int i : virtual_spatial) folded_occupation += occupation[i];
+  const double folded_charge_error = folded_electrons - folded_occupation;
+
+  QDK_LOGGER().info(
+      "SW-PT2 partition: active={}, folded inactive={}, folded virtual={}; "
+      "active electrons={}, largest folded occupation deviation={:.3g}, "
+      "folded core electron excess={:.3g}",
+      active_spatial.size(), inactive_spatial.size(), virtual_spatial.size(),
+      active_electrons, worst_deviation, folded_charge_error);
+
+  // Rounding a folded occupation is benign when the correlated pair stays
+  // together on the folded side: the roundings then cancel and the leftover
+  // density error is neutral and short ranged. Warn when the folded core ends
+  // up with a net charge error, or when an orbital fractional enough that the
+  // occupation-based active-space selector would have kept it is folded anyway.
+  constexpr double charge_error_warning = 0.01;
+  constexpr double deviation_warning = 0.1;
+  if (std::abs(folded_charge_error) > charge_error_warning ||
+      worst_deviation > deviation_warning)
+    QDK_LOGGER().warn(
+        "swpt2 downfold: folded orbital {} has fractional reference "
+        "occupation {:.4f} (deviation {:.3g}), and the folded core carries "
+        "{:.3g} electrons more than the reference density. Rounding the "
+        "folded density perturbs the mean field the active space feels at "
+        "first order -- an error the regularizer does not damp. Keeping a "
+        "correlated pair together on the folded side makes its roundings "
+        "cancel.",
+        worst_orbital, worst_occupation, worst_deviation, folded_charge_error);
+
+  // Denominators come from the full-density generalized Fock, so a correlated
+  // reference's off-diagonal 1-RDM is retained rather than dropped by a
+  // diagonal-occupation Fock.
+  Eigen::MatrixXd fock =
+      kern::generalized_fock_matrix(h1a, g_aaaa, density, norb);
+  Eigen::MatrixXd semicanonical_transform =
       Eigen::MatrixXd::Identity(norb, norb);
-  bool semicanonical_rotation_applied = false;
-  Eigen::VectorXd eps;
+  bool semicanonical_applied = false;
   if (_settings->get<bool>("semicanonicalize")) {
     const double tolerance = _settings->get<double>("semicanonical_tolerance");
     if (!std::isfinite(tolerance) || tolerance < 0.0)
       throw std::invalid_argument(
           "SchriefferWolffPT2: semicanonical_tolerance must be finite and "
           "non-negative.");
-    const auto fock = kern::generalized_fock_matrix(h1a, g_aaaa, density, norb);
-    semicanonical_rotation = kern::semicanonical_rotation(
+    semicanonical_transform = kern::semicanonical_rotation(
         fock, {inactive_spatial, active_spatial, virtual_spatial}, tolerance);
-    semicanonical_rotation_applied = !semicanonical_rotation.isIdentity(0.0);
-    Eigen::MatrixXd fock_rotated = fock;
-    if (semicanonical_rotation_applied) {
-      h1a = kern::rotate_one_body(h1a, semicanonical_rotation);
-      h1b = kern::rotate_one_body(h1b, semicanonical_rotation);
-      g_aaaa = kern::rotate_two_body(g_aaaa, semicanonical_rotation, norb);
-      density = kern::rotate_one_body(density, semicanonical_rotation);
-      fock_rotated = kern::rotate_one_body(fock, semicanonical_rotation);
-    }
-    eps = Eigen::VectorXd::Zero(2 * norb);
-    for (int i = 0; i < norb; ++i) {
-      occupation[i] = density(i, i);
-      eps(2 * i) = fock_rotated(i, i);
-      eps(2 * i + 1) = fock_rotated(i, i);
+    semicanonical_applied = !semicanonical_transform.isIdentity(0.0);
+    if (semicanonical_applied) {
+      h1a = kern::rotate_one_body(h1a, semicanonical_transform);
+      h1b = kern::rotate_one_body(h1b, semicanonical_transform);
+      g_aaaa = kern::rotate_two_body(g_aaaa, semicanonical_transform, norb);
+      density = kern::rotate_one_body(density, semicanonical_transform);
+      fock = kern::rotate_one_body(fock, semicanonical_transform);
     }
   }
+
+  Eigen::VectorXd eps(2 * norb);
+  for (int i = 0; i < norb; ++i) eps(2 * i) = eps(2 * i + 1) = fock(i, i);
 
   // --- kernel pipeline (spin-blocked: the antisymmetric two-body tensor is
   // stored as spatial spin blocks and every element is formed on the fly, so
   // the dense n_so^4 objects are never materialized) ---
-  const auto blk = kern::build_two_body_blocked_restricted(g_aaaa, norb);
+  const auto blk = kern::build_two_body_blocked(g_aaaa, norb);
   const auto f = kern::spin_orbital_one_body(h1a, h1b, norb);
-  const auto part = kern::make_partition(norb, active_spatial, occupation);
+  const auto part = kern::make_partition(norb, active_spatial, inactive_spatial,
+                                         virtual_spatial);
 
-  if (eps.size() == 0) {
-    // Denominators from the full-density generalized Fock (the same operator as
-    // the semicanonical branch), so a correlated reference's off-diagonal 1-RDM
-    // is retained rather than dropped by a diagonal-occupation Fock.
-    const auto fock = kern::generalized_fock_matrix(h1a, g_aaaa, density, norb);
-    eps = Eigen::VectorXd::Zero(2 * norb);
-    for (int i = 0; i < norb; ++i) {
-      eps(2 * i) = fock(i, i);
-      eps(2 * i + 1) = fock(i, i);
-    }
-  }
-
-  kern::RegOptions reg;
+  kern::RegularizerOptions reg;
   reg.denom_floor = _settings->get<double>("denom_floor");
   if (!std::isfinite(reg.denom_floor) || reg.denom_floor <= 0.0)
     throw std::invalid_argument(
@@ -357,7 +464,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       "SW-PT2 downfold complete: regularizer='{}', minimum denominator={:.3g} "
       "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}",
       regularizer, down.min_denominator, down.max_amplitude,
-      semicanonical_rotation_applied);
+      semicanonical_applied);
   if (warn_amp > 0.0 && down.max_amplitude > warn_amp) {
     if (regularizer == "bare")
       QDK_LOGGER().warn(
@@ -377,13 +484,13 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   }
 
   auto active = kern::to_spatial_chemist(down, part);
-  if (semicanonical_rotation_applied) {
+  if (semicanonical_applied) {
     const int nactive = static_cast<int>(active_spatial.size());
     Eigen::MatrixXd active_rotation(nactive, nactive);
     for (int i = 0; i < nactive; ++i)
       for (int j = 0; j < nactive; ++j)
         active_rotation(i, j) =
-            semicanonical_rotation(active_spatial[i], active_spatial[j]);
+            semicanonical_transform(active_spatial[i], active_spatial[j]);
     active.one_body =
         kern::rotate_one_body(active.one_body, active_rotation.transpose());
     active.two_body = kern::rotate_two_body(

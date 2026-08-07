@@ -65,6 +65,7 @@ class TestEffectiveHamiltonianConstructor:
         assert settings.get("intruder_warn_amplitude") == pytest.approx(1.0)
         assert settings.get("semicanonicalize") is True
         assert settings.get("semicanonical_tolerance") == pytest.approx(1e-10)
+        assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
 
         settings.set("regularizer", "shift")
         settings.set("denom_shift", 0.5)
