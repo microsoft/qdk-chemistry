@@ -159,19 +159,6 @@ class PSPMapper(CircuitMapper):
             prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
         return prepare_op, self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
 
-    def block_encoding_op(self, container: UnitaryContainer):
-        """Return one application of the block encoding, without reflection or power.
-
-        Args:
-            container: The container held by the unitary representation.
-
-        Returns:
-            A Q# callable applying ``B[H]`` once to the flat ``[system | ancilla]`` register.
-
-        """
-        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
-        return QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
-
     def reflection_op(self, container: UnitaryContainer):
         """Return the reflection a qubitization walk pairs the block encoding with.
 

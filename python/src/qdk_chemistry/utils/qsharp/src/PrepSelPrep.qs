@@ -10,6 +10,7 @@
 /// the two callables and this module handles the stitching.
 namespace QDKChemistry.Utils.PrepSelPrep {
 
+    import Std.Arrays.Subarray;
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
     import Std.Intrinsic.AND;
@@ -128,6 +129,15 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// `[systemReg | ancillaReg]` register.
     function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
         (allQubits) => Reflect(allQubits[numSystemQubits...])
+    }
+
+    /// # Summary
+    /// Reflection about the all-zero state of the qubits `reflectIndices` picks out.
+    ///
+    /// Indices make the register layout explicit, so a caller that already knows where the
+    /// block-encoding ancillas sit does not have to ask the mapper for a reflection.
+    function MakeIndexReflectionOp(reflectIndices : Int[]) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => Reflect(Subarray(reflectIndices, allQubits))
     }
 
     /// Block encoding on the flat `[systemReg | ancillaReg]` register.

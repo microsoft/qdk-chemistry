@@ -9,6 +9,8 @@ import numpy as np
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -161,8 +163,15 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Requires a block encoding unitary representation, got '{type(container).__name__}'.")
 
         container_power = getattr(container, "power", 1)
-        if container_power != 1:
-            Logger.warn(f"The unitary representation carries power {container_power}, which is ignored.")
+        block_encoding_container = container.block_encoding
+        if container_power != 1 or block_encoding_container.power != 1:
+            Logger.warn(
+                f"The unitary representation carries power {container_power}, which is ignored: the schedule "
+                "picks its own power for each phase-register slot."
+            )
+            block_encoding_container = LCUContainer(
+                prepare=block_encoding_container.prepare, select=block_encoding_container.select, power=1
+            )
 
         num_queries, num_bits = self.resolve_num_queries()
         configured_num_bits = self._settings.get("num_bits")
@@ -172,16 +181,23 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 f"phase bits to address its {num_queries + 1} reflection slots."
             )
 
+        # The schedule interleaves the block encoding and the reflection itself, so that it can drop the
+        # reflection the phase register addresses. It therefore maps the bare block encoding rather than
+        # the walk that the mapper would otherwise hand back already composed.
         mapper = self._create_nested("circuit_mapper")
-        # run() hands the block encoding and the reflection back already composed into a walk, but
-        # the schedule has to interleave them itself so it can omit the reflection the phase
-        # register addresses, and it needs num_ancilla_qubits to size the register it reflects about.
-        num_ancilla_qubits = mapper.num_ancilla_qubits(container)
+        block_encoding = mapper.run(UnitaryRepresentation(container=block_encoding_container))
+        block_encoding_op = block_encoding._qsharp_op  # noqa: SLF001
+
+        num_system_qubits = qubit_hamiltonian.num_qubits
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
         if num_ancilla_qubits == 0:
             raise ValueError("Requires a non-empty ancilla register to reflect about.")
 
-        block_encoding_op = mapper.block_encoding_op(container)
-        apply_reflection = mapper.reflection_op(container)
+        # MakeUnaryQPECircuit lays the walk register out as [system | ancilla], so the builder can name
+        # the qubits to reflect about instead of asking the mapper for a reflection.
+        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeIndexReflectionOp(
+            list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
+        )
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
