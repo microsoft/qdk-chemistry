@@ -190,6 +190,10 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     std::shared_ptr<const data::SymmetryBlockedIndexSet> p_space) const {
   QDK_LOG_TRACE_ENTERING();
+  if (!reference)
+    throw std::invalid_argument("ducc: reference wavefunction must not be null");
+  if (!hamiltonian)
+    throw std::invalid_argument("ducc: input Hamiltonian must not be null");
   if (!p_space)
     throw std::invalid_argument("ducc: p_space_indices must not be null");
 
