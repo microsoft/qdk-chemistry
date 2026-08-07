@@ -9,10 +9,10 @@
   - [x] Decide whether any landing-page ideas should be retained without adopting the wholesale rewrite.
   - [x] Record final dispositions and validate.
   - [x] Commit and prepare reply.
-- [ ] Finish Yingrong review feedback.
+- [x] Finish Yingrong review feedback.
   - [x] Complete grouped current-source decisions and implement accepted wording.
   - [x] Run grouped validation.
-  - [ ] Commit and prepare reply.
+  - [x] Commit and prepare reply.
 - [ ] Process Martin review feedback using a grouped current-source audit.
 - [ ] Process any additional substantive reviewer feedback using the grouped review workflow.
 - [ ] Run the end-stage review after substantive feedback is complete.
