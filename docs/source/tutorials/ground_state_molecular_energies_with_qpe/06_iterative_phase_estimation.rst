@@ -124,7 +124,7 @@ Because :math:`\lambda` bounds the magnitudes of the Hamiltonian eigenvalues, th
 
 keeps the spectrum within the signed, unaliased phase interval.
 The script reports this value as the ``Initial unaliased time bound`` in its pre-simulation settings.
-Using the active-space reference from :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653276065987\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
+Using the active-space reference from :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`, :math:`E_{\mathrm{ref}}=-9.653276065987\ E_{\mathrm{h}}`, this initial time gives the implementation phase fraction
 
 .. math::
 
@@ -388,7 +388,7 @@ Negating that angle and dividing by the evolution time maps the measured phase t
 
 This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
 Finite phase resolution, sampling, and product-formula time evolution all contribute error.
-As :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
+As :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
 The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
 Because these contributions are not measured by phase estimation, the script adds them classically:
 
@@ -439,7 +439,7 @@ A successful run completes all twenty runs and prints the complete-run bitstring
 
    The reconstructed total is :math:`+1\ \mathrm{m}E_{\mathrm{h}}` above the selected-space :term:`CASCI` reference, meeting the teaching target at its boundary.
    That offset was deliberately set by the reference-guided phase-grid alignment, while Trotter approximation and finite sampling can still affect which bitstring is selected.
-   The result therefore validates this configured teaching workflow; it does not remove molecular-model error, establish agreement with experiment, or demonstrate quantum advantage.
+   This classical simulation of the quantum calculation therefore validates this configured teaching workflow; it does not remove molecular-model error or establish agreement with experiment.
 
 Record all settings, bitstring counts, energies, error, and observed runtime in the :ref:`phase-estimation section of the lab notebook <lab-notebook-phase-estimation>`.
 Then complete the :ref:`conclusion <lab-notebook-conclusion>` by separating basis-set, active-space, and quantum-algorithm limitations.
@@ -467,7 +467,6 @@ What you accomplished
 You completed an end-to-end molecular-energy workflow: defining stretched N\ :sub:`2` in an orbital basis, selecting an active space, mapping its Hamiltonian to qubits, preparing a multiconfigurational trial state, simulating iterative phase estimation, and reconstructing the molecular total energy by adding the core energy.
 
 The final comparison shows that this configured :term:`IQPE` workflow reproduces the matching selected-space :term:`CASCI` reference within the tutorial's :math:`1\ \mathrm{m}E_{\mathrm{h}}` target.
-It does not establish agreement with experiment or quantum advantage, because basis-set, active-space, and quantum-algorithm limitations remain distinct.
 
 Your lab notebook records where those choices enter and what evidence supports the result.
 A useful next investigation would change one layer at a time: enlarge the molecular model, choose a different trial state, or vary the phase-estimation controls, then identify which accuracy and cost measures respond.

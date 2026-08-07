@@ -39,7 +39,7 @@ The quantity ultimately reported by this tutorial is the corresponding fixed-geo
 where :math:`\mathbf{R}` denotes the fixed nuclear coordinates.
 The electronic contribution includes the electron kinetic energy, electron--nucleus attraction, and electron--electron repulsion.
 The nuclear contribution is the repulsion among the fixed nuclei.
-:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` explains how these contributions are tracked when the molecular Hamiltonian is represented on qubits.
+:doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` explains how these contributions are tracked when the molecular Hamiltonian is represented on qubits.
 
 .. admonition:: Which contributions make up the fixed-geometry total energy reported by this tutorial?
    :class: quiz-question

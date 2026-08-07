@@ -15,16 +15,14 @@ For a system whose Hamiltonian does not depend explicitly on time, its stationar
 
    \hat{H} \vert\Psi\rangle = E \vert\Psi\rangle.
 
-The `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_ :math:`\vert\Psi\rangle` is a mathematical description of an electronic state.
-The Hamiltonian operator :math:`\hat{H}` represents the energy of the system, and the eigenvalue :math:`E` is the energy associated with that wavefunction.
+Here, :math:`\vert\Psi\rangle` is the `wavefunction <https://en.wikipedia.org/wiki/Wave_function>`_ of a stationary electronic state, and :math:`E` is its energy.
 The possible solutions include the ground state, which has the lowest energy, and excited states with higher energies.
 This tutorial seeks an approximate solution for the ground-state energy of stretched N\ :sub:`2`.
 
-This tutorial uses the `Born--Oppenheimer approximation <https://en.wikipedia.org/wiki/Born%E2%80%93Oppenheimer_approximation>`_, which holds the nuclei at fixed positions while solving for the electrons.
+This tutorial uses the `Born--Oppenheimer approximation <https://en.wikipedia.org/wiki/Born%E2%80%93Oppenheimer_approximation>`_, which holds the nuclei at fixed positions while solving for the electronic structure.
 At a chosen molecular geometry, the electronic Hamiltonian includes the electron kinetic energy, electron--nucleus attraction, and electron--electron repulsion.
 The repulsion among the fixed nuclei contributes separately to the total energy.
-:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` develops the selected active-space form of this Hamiltonian and explains how it is mapped to qubits.
-The computational cost of solving its Schrödinger equation grows rapidly with the number of electrons and orbitals, so practical calculations use approximations.
+:doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` develops the selected active-space form of this Hamiltonian and explains how it is mapped to qubits.
 :doc:`Energy and accuracy <01_energy_and_accuracy>` defines the target energy and the different error comparisons used in the tutorial.
 :doc:`Describing the molecule <02_describing_the_molecule>` then specifies the molecular geometry and compares the initial fixed-geometry Hartree--Fock total energies from two related basis sets.
 
@@ -44,7 +42,7 @@ When several configurations contribute substantially, the ground-state wavefunct
 A coefficient for each determinant specifies its contribution to the wavefunction.
 This need for several important configurations is called `static correlation <https://en.wikipedia.org/wiki/Electronic_correlation>`_, and the resulting wavefunction is called multi-configurational.
 The number of possible configurations grows rapidly with the number of electrons and orbitals.
-An `active space <https://en.wikipedia.org/wiki/Complete_active_space>`_ selects the electrons and orbitals whose occupations vary among the determinants in the multi-configurational wavefunction :cite:`Stein2016,Stein2019`.
+An `active space <https://en.wikipedia.org/wiki/Complete_active_space>`_ specifies a set of orbitals and a number of electrons whose distribution among those orbitals can vary across determinants in the multi-configurational wavefunction :cite:`Stein2016,Stein2019`.
 The remaining orbital occupations are fixed, and their energy contributions are tracked separately.
 The active space therefore controls a central tradeoff in this tutorial: a larger space can describe more correlation, but it also produces a larger calculation and eventually requires more qubits.
 :doc:`Choosing the active space <03_choosing_the_active_space>` develops the correlated molecular model and selects the determinants that can contribute to its wavefunction.
@@ -80,7 +78,7 @@ Preparing that state may still require classically supplied amplitudes and subst
 A quantum register is a group of qubits treated as one part of a computation because they serve the same role.
 The occupation-encoding qubits form the compute register, which stores the encoded fermionic state and is acted on by the qubit Hamiltonian.
 `Ancilla qubits <https://en.wikipedia.org/wiki/Ancilla_bit>`_ are additional qubits used for tasks such as control, temporary workspace, or readout; they do not represent additional spin orbitals and are counted separately.
-:doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>` maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of this register.
+:doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of this register.
 During Hamiltonian time evolution, each energy eigenstate acquires a phase determined by its energy.
 :term:`QPE` estimates this phase and converts it to an energy eigenvalue :cite:`AspuruGuzik2005,vonBurg2021`.
 This representation does not make the calculation automatically efficient.
@@ -101,7 +99,7 @@ Their squared overlap is the ground-state fidelity
 
 Fidelity measures the weight of the ground state in the trial state.
 In an ideal coherent phase-estimation measurement that uses one prepared system state to produce one complete phase result, :math:`F` is the probability of sampling the ground-state eigenphase.
-The iterative implementation used by this tutorial instead prepares a new system state for each phase-bit circuit, so fidelity influences its bit statistics but does not by itself determine a complete-run success probability or trial count.
+The iterative implementation used by this tutorial instead prepares a new system state for each circuit that estimates one bit of the phase, so fidelity influences its bit statistics but does not by itself determine a complete-run success probability or trial count.
 For this classically tractable teaching example, the classical active-space calculation supplies the important determinants and coefficients used to construct the trial state and later validate the quantum result.
 :doc:`Preparing the trial state <05_preparing_the_trial_state>` develops overlap and fidelity, and :doc:`Iterative quantum phase estimation <06_iterative_phase_estimation>` explains how the energy is measured.
 
@@ -109,7 +107,7 @@ Why stretched nitrogen?
 =======================
 
 In `molecular orbital theory <https://en.wikipedia.org/wiki/Molecular_orbital_theory>`_, occupying a bonding orbital stabilizes a bond, whereas occupying the corresponding antibonding orbital opposes that stabilization.
-Near the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}` for N\ :sub:`2`, one electron configuration dominates, and its Slater determinant provides a useful first approximation to the ground-state wavefunction.
+Near the `equilibrium bond length <https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1000>`_ of :math:`1.097685\ \text{Å}` for N\ :sub:`2`, moving electrons from bonding to antibonding orbitals is energetically unfavorable, so one electron configuration dominates the ground-state wavefunction.
 Bond stretching can make configurations with different occupations of the bonding and antibonding orbitals comparable in importance, increasing the multiconfigurational character of the ground state.
 The selected stretched N\ :sub:`2` geometry is chosen to make this effect visible.
 Later chapters quantify it through orbital entropies and determinant weights.
@@ -118,7 +116,7 @@ Tutorial scope and structure
 ============================
 
 The tutorial deliberately selects a compact active-space model that can be solved exactly on a classical computer, allowing each quantum stage to be checked against a classical reference.
-The circuits are executed on a classical simulator, so this tutorial validates the workflow rather than demonstrating quantum advantage.
+The circuits are executed on a classical simulator to validate the workflow.
 Complete active space configuration interaction (:term:`CASCI`) performs full configuration interaction within the selected active space rather than across all orbitals in the molecular model.
 The final quantum calculation is compared with the :term:`CASCI` energy of the same selected active-space Hamiltonian.
 The tutorial uses one `millihartree <https://en.wikipedia.org/wiki/Hartree>`_ (:math:`1\ \mathrm{m}E_{\mathrm{h}}`) as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.

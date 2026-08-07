@@ -36,9 +36,9 @@ The Jupyter notebook runs that workflow, renders the one-, two-, and four-determ
 Connection to the selected-space workflow
 =========================================
 
-The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the :math:`(n_\alpha,n_\beta)=(3,3)` determinant sector introduced in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
+The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the :math:`(n_\alpha,n_\beta)=(3,3)` determinant sector introduced in :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`.
 Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
-The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Putting the problem on qubits <04_putting_the_problem_on_qubits>`.
+The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`.
 
 .. _tutorial-trial-state-definition:
 
@@ -51,6 +51,7 @@ The phase-to-energy relationship and the :term:`QPE` logical circuit are develop
 For now, the important point is that the compute register must contain a chosen quantum state before phase estimation can begin.
 
 A state-preparation logical circuit initializes the compute register in this chosen normalized quantum state.
+Here, *logical* means gates in the generated algorithmic circuit before error-correction code synthesis and hardware mapping.
 This input is the trial state.
 It is an approximation intended to contain a substantial contribution from the target ground state; :term:`QPE` cannot begin from an unspecified state or create the ground state by searching through all possible wavefunctions.
 
@@ -92,7 +93,8 @@ The fidelity :math:`F` is the weight of the target ground state in the trial-sta
 For the textbook coherent measurement described above, it is also the probability of sampling the ground-state eigenphase.
 
 The QDK/Chemistry iterative quantum phase estimation (:term:`IQPE`) implementation used later performs a different sampling procedure.
-It builds a separate circuit for each phase bit, and every circuit execution freshly prepares the trial state.
+Each *phase bit* is one binary digit of the estimated phase fraction.
+The implementation builds a separate circuit for each phase bit, and every circuit execution freshly prepares the trial state.
 Each phase bit is selected by a majority vote over a specified number of circuit executions, then used as feedback for the next bit.
 The final bit string therefore combines bitwise decisions from many state preparations rather than recording one eigenstate sample.
 
@@ -192,7 +194,7 @@ The factory key :ref:`sparse_isometry_gf2x <sparse-isometry-gf2x>` is the implem
    :end-before: # end-cell-preparation-circuit
 
 The reported *preparation logical gate count* is the number of these childless gate records in the generated Q# logical-circuit representation after the state-preparation operation has been decomposed.
-Here, *logical* means gates in the generated algorithmic circuit before error-correction code synthesis and hardware mapping; this software-level logical gate count is not logical-circuit depth, a fault-tolerant resource estimate, or a physical-resource estimate.
+This software-level logical gate count is not logical-circuit depth, a fault-tolerant resource estimate, or a physical-resource estimate.
 It can change if the state-preparation or circuit-decomposition implementation changes; error correction affects downstream fault-tolerant and physical costs instead.
 
 Trial-state quality and preparation cost

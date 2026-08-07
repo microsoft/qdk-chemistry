@@ -1,4 +1,4 @@
-Putting the problem on qubits
+Mapping the problem to qubits
 #############################
 
 .. admonition:: Chapter focus
