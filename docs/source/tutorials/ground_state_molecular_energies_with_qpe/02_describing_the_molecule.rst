@@ -128,7 +128,7 @@ Blue and orange distinguish opposite signs of each spatial function; they do not
 The purple spheres mark the nitrogen nuclei.
 
 .. figure:: /_static/diagrams/tutorial_qpe_atomic_basis_functions.png
-   :alt: Three cc-pVDZ basis-function isosurfaces centered on one nitrogen nucleus: a spherical 2s function, a two-lobed 2p-y function, and a 3d-z-squared function with two lobes and a ring.
+   :alt: Three panels show cc-pVDZ basis-function isosurfaces centered on one of two nitrogen nuclei. From left to right, they are a spherical 2s function, a two-lobed 2p-y function, and a 3d-z-squared function with two axial lobes and a ring. Blue and orange surfaces mark opposite signs of each spatial function, not opposite electric charges.
    :align: center
    :width: 100%
 
@@ -137,7 +137,7 @@ The purple spheres mark the nitrogen nuclei.
 Combining atom-centered basis functions with different coefficients produces molecular orbitals that can extend across both nuclei:
 
 .. figure:: /_static/diagrams/tutorial_qpe_example_molecular_orbitals.png
-   :alt: Three example molecular-orbital isosurfaces extending across the two nitrogen nuclei, with blue and orange indicating opposite signs.
+   :alt: Three panels show example molecular-orbital isosurfaces formed from the atom-centered basis functions. Each orbital has lobes extending across both nitrogen nuclei. Blue and orange surfaces mark opposite signs of the spatial orbital, not opposite electric charges.
    :align: center
    :width: 100%
 
@@ -156,7 +156,7 @@ It measures how much the Hartree--Fock energy changes with basis size while the 
 .. _tutorial-wavefunction-hierarchy:
 
 .. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
-   :alt: Nucleus-centered basis functions chi_mu combine into molecular orbitals phi_p, with alpha or beta labels specifying spin. Choosing occupied orbitals defines an electron configuration, and a Slater determinant Phi_I provides its antisymmetric state. Hartree-Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients c_I.
+   :alt: Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients.
    :align: center
    :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
 

@@ -251,7 +251,7 @@ After the last iteration, the reported phase fraction is :math:`\Phi_m/\pi`.
 The following figure summarizes one iteration, from fresh register preparation through repeated shots, majority voting, and the feedback update for the next phase bit.
 
 .. graphviz:: /_static/diagrams/tutorial_qpe_iqpe_iteration.dot
-   :alt: One IQPE iteration begins with a freshly prepared trial state on the compute register and a fresh readout ancilla. The ancilla receives a Hadamard gate and a feedback rotation determined by earlier measured bits, then controls the iteration's time-evolution power on the compute register. A final Hadamard gate and ancilla measurement produce one shot outcome. Repeating the circuit with freshly prepared registers gives an odd number of outcomes whose majority selects phase bit b k. That bit updates the classical feedback angle used by the next iteration.
+   :alt: Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1.
    :align: center
    :caption: One :term:`IQPE` iteration estimates phase bit :math:`b_k`. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates :math:`\Phi_{k+1}=\Phi_k/2+\pi b_k/2` for the next controlled power.
 

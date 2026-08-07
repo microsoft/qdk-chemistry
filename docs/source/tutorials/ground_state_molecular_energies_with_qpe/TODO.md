@@ -6,14 +6,14 @@
 
 ## Pre-merge issue migration
 
-- [ ] Convert every remaining unchecked item in this file into a GitHub issue assigned to Nathan, recording any QDK/Chemistry 2.2 dependency explicitly.
+- [ ] Convert every remaining unchecked item in this file into a GitHub issue, recording ownership and any QDK/Chemistry 2.2 dependency explicitly. Assign issues to Nathan for tracking except where an upstream implementation owner is named.
 - [ ] Delete this TODO file only after every remaining item has been represented by a GitHub issue.
 
-GitHub issues created from this file should be assigned to Nathan for tracking. Issues A and B depend on David's QDK/Chemistry 2.2 work before Nathan's downstream tutorial cleanup can begin.
+GitHub issues created from this file should be assigned to Nathan for tracking unless an upstream implementation owner is named. Issues A and B are assigned to David and depend on his QDK/Chemistry 2.2 work before Nathan's downstream tutorial cleanup can begin.
 
 ## Issues to resolve before merge
 
-- [ ] Add visuals directly to the Sphinx tutorial to reduce walls of text.
+- [x] Add visuals directly to the Sphinx tutorial to reduce walls of text.
   - [x] Use the existing Sphinx Graphviz pipeline for simple conceptual diagrams: commit ``.dot`` sources under ``docs/source/_static/diagrams`` and include them with ``.. graphviz::``; do not add Mermaid, custom build steps, or another diagram dependency.
   - [x] Use committed static images only for quantitative plots that Graphviz cannot represent naturally; keep any reproducible generation script outside the Sphinx build.
   - [x] Start with an active/inactive/virtual orbital partition figure.
@@ -28,11 +28,11 @@ GitHub issues created from this file should be assigned to Nathan for tracking. 
   - [x] Add a high-level single-iteration IQPE schematic in Chapter 6 before students inspect the fully decomposed circuit notebook.
   - [x] Add an annotated Chapter 6 image of the rendered power-one IQPE circuit that identifies the readout ancilla, compute register, state preparation, feedback rotation, controlled evolution, and measurement.
   - [x] Add a phase-grid number line in Chapter 6 that relates phase fraction, signed energy, grid spacing, reference alignment, and aliasing.
-  - [ ] Provide an ``:alt:`` description for every Graphviz directive and accessible captions/data descriptions for quantitative plots, then validate the rendered documentation.
+  - [x] Provide an ``:alt:`` description for every Graphviz directive and accessible captions/data descriptions for quantitative plots, then validate the rendered documentation.
 
 ## Issues to resolve after merge
 
-- [ ] **Issue A — blocked by QDK/Chemistry 2.2; upstream implementation owner: David.** Remove the direct PySCF dependency from the ground-state QPE tutorial examples after native replacement functionality is released.
+- [ ] **Issue A — #624; blocked by QDK/Chemistry 2.2; assigned to David.** Remove the direct PySCF dependency from the ground-state QPE tutorial examples after native replacement functionality is released.
 - [ ] **Issue B — blocked by QDK/Chemistry 2.2; upstream implementation owner: David.** Replace the functionality in ``tutorial_orbital_coordinates.py`` with the corresponding native QDK/Chemistry functionality, then remove the tutorial helper.
 - [ ] **Blocked by issues A and B; owner: Nathan.** Clean up the tutorial Python scripts for pedagogical accessibility and determine which implementation details and learning activities should move from scripts into notebooks.
 - [ ] Explore the possibility of reusing the existing circuit workflows to export stable in-page assets; do not capture editor or widget UI screenshots.

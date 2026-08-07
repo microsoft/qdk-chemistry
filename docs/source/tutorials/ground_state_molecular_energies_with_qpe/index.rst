@@ -8,7 +8,7 @@ It is intended for advanced undergraduate and early-stage graduate students who 
 .. _tutorial-qpe-workflow:
 
 .. graphviz:: /_static/diagrams/tutorial_qpe_workflow.dot
-   :alt: Workflow from defining the energy target and stretched-N2 molecular model through active-space selection, Jordan--Wigner mapping, trial-state preparation, IQPE energy estimation, and comparison of the reconstructed total energy with the matching CASCI reference.
+   :alt: Six-stage workflow. Define the energy target and matching classical reference; describe stretched nitrogen and select its correlated active space; map that model to qubits and prepare a trial state; estimate the active energy with IQPE; then add the core energy and compare the reconstructed total with the matching CASCI reference.
    :align: center
    :caption: The tutorial builds a compact classical molecular model, maps it to qubits, estimates the energy with IQPE, and checks the reconstructed total against the matching CASCI reference.
 
