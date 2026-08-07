@@ -80,16 +80,12 @@ If that model contains :math:`n_o` active spatial orbitals, :math:`n_\alpha` act
 The active space
 =======================
 
-An active-space calculation partitions the spatial molecular orbitals into three groups:
+.. _tutorial-orbital-partition:
 
-Inactive orbitals
-   Remain doubly occupied in every determinant.
-   Their electrons contribute to the energy, but their occupations do not vary.
-Active orbitals
-   May be empty, singly occupied, or doubly occupied in different determinants.
-   The calculation treats correlation among the active electrons explicitly.
-Virtual orbitals
-   Remain empty in every determinant and do not participate explicitly in the correlated calculation.
+.. graphviz:: /_static/diagrams/tutorial_qpe_orbital_partition.dot
+   :alt: The spatial molecular orbitals are partitioned into inactive orbitals that remain doubly occupied and contribute to the core energy, active orbitals whose occupations vary among determinants and whose correlation is treated explicitly, and virtual orbitals that remain empty and are excluded from the correlated calculation.
+   :align: center
+   :caption: An active-space calculation varies occupations only among the active orbitals; inactive and virtual occupations remain fixed across determinants.
 
 .. admonition:: Why can an inactive orbital still contribute to the molecular energy?
    :class: quiz-question
