@@ -251,8 +251,18 @@ class TestUnaryQpeEndToEnd:
             phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=True)
             assert phase_fraction == pytest.approx(expected_phase)
 
-    def test_builder_defaults_recover_the_ground_state_energy(self):
-        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
+    @pytest.mark.parametrize("num_queries", [6, 11, 23, 63])
+    def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
+        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end.
+
+        Only ``63`` fills its phase register exactly. ``6``, ``11`` and ``23`` sweep ``7``,
+        ``12`` and ``24`` reflection slots inside registers that hold ``8``, ``16`` and
+        ``32``, so the window is zero-padded and the schedule addresses only part of the
+        register — the case a power-of-two-only construction cannot express.
+        """
+        num_bits = num_queries.bit_length()
+        assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
+
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
         energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
         state_prep_params = {
@@ -270,7 +280,9 @@ class TestUnaryQpeEndToEnd:
         )
 
         qpe = UnaryPhaseEstimation(shots=200)
-        qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=63))
+        qpe.settings().set(
+            "qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=num_queries)
+        )
         qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 

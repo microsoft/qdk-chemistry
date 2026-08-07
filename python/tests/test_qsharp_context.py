@@ -20,6 +20,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import (
+    DEFAULT_TARGET_PROFILE,
     QSHARP_UTILS,
     create_qsharp_context,
     get_qsharp_context,
@@ -31,6 +32,30 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import qdk
+
+#: Modules the vendored Q# project exposes under every target profile.
+_PORTABLE_MODULES = (
+    "StatePreparation",
+    "CircuitComposition",
+    "IterativePhaseEstimation",
+    "StandardPhaseEstimation",
+    "ControlledPauliExp",
+    "HadamardTest",
+    "PauliExp",
+    "MeasurementBasis",
+    "Select",
+    "PrepSelPrep",
+)
+
+#: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
+#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
+_ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
+
+
+@pytest.fixture(scope="module")
+def base_context() -> qdk.Context:
+    """A ``TargetProfile.Base`` context, built once for this module."""
+    return create_qsharp_context(TargetProfile.Base)
 
 
 @pytest.fixture(autouse=True)
@@ -138,3 +163,41 @@ class TestCrossContextComposition:
         state_prep = _make_state_prep_from_context(user_context)
         circuit = _build_standard_qpe(state_prep)
         circuit.get_qsharp_circuit()
+
+
+class TestTargetProfiles:
+    """Which Q# sources each target profile is allowed to see, and what it can lower to."""
+
+    def test_the_default_profile_is_adaptive_rif(self) -> None:
+        """Adaptive_RIF is the profile the vendored project is compiled for."""
+        assert TargetProfile.Adaptive_RIF == DEFAULT_TARGET_PROFILE
+
+    @pytest.mark.parametrize("module", _PORTABLE_MODULES)
+    def test_base_exposes_the_portable_modules(self, base_context: qdk.Context, module: str) -> None:
+        """Everything the Qiskit interop lowers has to survive the Base build."""
+        assert hasattr(base_context.code.QDKChemistry.Utils, module)
+
+    @pytest.mark.parametrize("module", _ADAPTIVE_ONLY_MODULES)
+    def test_base_withholds_the_measurement_based_modules(self, base_context: qdk.Context, module: str) -> None:
+        """Withheld sources must fail loudly as missing rather than return wrong results."""
+        assert not hasattr(base_context.code.QDKChemistry.Utils, module)
+
+    @pytest.mark.parametrize("module", _PORTABLE_MODULES + _ADAPTIVE_ONLY_MODULES)
+    def test_the_default_profile_exposes_every_module(self, module: str) -> None:
+        """Nothing is withheld from the profile the library actually runs on."""
+        assert hasattr(get_qsharp_context().code.QDKChemistry.Utils, module)
+
+    def test_the_utils_proxy_follows_the_active_profile(self, base_context: qdk.Context) -> None:
+        """``QSHARP_UTILS`` resolves lazily, so it must track whichever context is in force."""
+        assert QSHARP_UTILS.UnaryIteration is not None
+        with use_qsharp_context(base_context):
+            assert QSHARP_UTILS.StatePreparation is not None
+            with pytest.raises(AttributeError):
+                _ = QSHARP_UTILS.UnaryIteration
+        assert QSHARP_UTILS.UnaryIteration is not None
+
+    def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
+        """The Base build exists to be lowered through QIR, so prove that it compiles."""
+        state_preparation = base_context.code.QDKChemistry.Utils.StatePreparation
+        qir = str(base_context.compile(state_preparation.MakeStatePreparationCircuit, [0], [1.0, 0.0], [], 1))
+        assert "define" in qir
