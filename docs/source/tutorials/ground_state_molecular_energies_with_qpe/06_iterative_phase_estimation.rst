@@ -307,6 +307,24 @@ The rendered circuit is still long because it contains the four-determinant stat
 Before opening the answers below, trace the operations on each wire to infer its role and compare the dimensions reported for all six iteration circuits.
 Record the evidence you used in the Jupyter notebook's interpretation task.
 
+.. figure:: /_static/diagrams/tutorial_qpe_power_one_circuit_overview.png
+   :alt: Overview of the power-one IQPE circuit on thirteen wires. The top wire is the readout ancilla and receives an H gate, an Rz feedback rotation labeled zero, the controlled Pauli-evolution block, a final H gate, and measurement and reset. The remaining twelve wires form the compute register. State-preparation blocks act on the compute wires that require preparation operations, the controlled Pauli-evolution block spans the ancilla and compute register, and reset operations return the compute wires to zero after evolution.
+   :align: center
+   :width: 60%
+
+   Overview of the rendered power-one iteration circuit. Dashed outlines mark the nested ``MakeIQPECircuit`` and ``RunIQPE`` Q# operations; the solid boxes show their principal composite operations.
+
+The top wire, :math:`\lvert\psi_0\rangle`, is readout ancilla q0.
+Its first H gate creates a superposition, and the ``Rz(0.0000)`` block applies the phase-feedback rotation.
+This static preview constructs all six circuits with the builder's initial feedback angle of zero, so the displayed rotation is zero.
+During an actual IQPE run, each iteration circuit is rebuilt using the accumulated feedback from earlier measured bits; the power-one iteration can therefore have a nonzero feedback rotation.
+
+The lower wires, :math:`\lvert\psi_1\rangle` through :math:`\lvert\psi_{12}\rangle`, are compute-register qubits q1--q12.
+The ``StatePreparation`` blocks load the four-determinant trial state on the subsets of compute wires that require preparation operations; blank wires remain part of the compute register.
+The ``RepControlledPauliExp`` block is the power-one controlled first-order Trotter evolution.
+The ancilla controls this block, and the resulting phase kickback places the Hamiltonian eigenphase on the ancilla's relative phase.
+The final H gate converts that relative phase into measurement probabilities, the measurement produces one shot outcome, and the blue reset operations return the allocated qubits to :math:`\lvert0\rangle`.
+
 .. admonition:: How can you identify the readout ancilla in the rendered circuit?
    :class: quiz-question
    :collapsible: closed
