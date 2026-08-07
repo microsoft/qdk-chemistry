@@ -587,6 +587,7 @@ def print_iqpe_results(result: IqpeWorkflowResult) -> None:
 
 def main() -> None:
     """Run the complete IQPE workflow and print final lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_iqpe_workflow()
     print_iqpe_results(result)

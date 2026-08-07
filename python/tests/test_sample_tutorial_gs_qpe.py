@@ -61,6 +61,18 @@ TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source"
 GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
 
 
+def _assert_notebook_library_logs_suppressed(notebook) -> None:
+    """Check that executed notebook output excludes QDK/Chemistry library logs."""
+    stream_text = "\n".join(
+        str(output.get("text", ""))
+        for cell in notebook.cells
+        for output in cell.get("outputs", [])
+        if output.get("output_type") == "stream"
+    )
+    for log_level in ("trace", "debug", "info", "warning", "error", "critical"):
+        assert f"[{log_level}]" not in stream_text
+
+
 def _require_snapshot_version(
     installed_version: str,
     required_version: str = GROUND_STATE_TUTORIAL_VERSION,
@@ -159,6 +171,21 @@ def test_tutorial_module_imports_preserve_global_logging():
         assert Logger.get_global_level() == "warn"
     finally:
         Logger.set_global_level(previous_level)
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_executable_scripts_expose_logging_control():
+    """Keep calculation scripts quiet by default with a documented log opt-in."""
+    for script_name in (
+        "tutorial_describe_n2.py",
+        "tutorial_choose_active_space.py",
+        "tutorial_map_n2_to_qubits.py",
+        "tutorial_prepare_trial_state.py",
+        "tutorial_run_iqpe.py",
+    ):
+        script_text = (DOCS_PYTHON_EXAMPLES_DIR / script_name).read_text(encoding="utf-8")
+        assert "Logger.set_global_level(Logger.LogLevel.off)" in script_text
+        assert ("Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.") in script_text
 
 
 @pytest.mark.tutorial_baseline
@@ -619,6 +646,8 @@ def test_tutorial_choose_active_space_notebook():
     assert "\\Users\\" not in notebook_text
     assert "kernelspec" not in notebook.metadata
     assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
     for cell in notebook.cells:
         expected_language = "python" if cell.cell_type == "code" else "markdown"
         assert cell.metadata.get("language") == expected_language
@@ -626,7 +655,7 @@ def test_tutorial_choose_active_space_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    _execute_notebook_skip_visualizations(
+    executed_notebook = _execute_notebook_skip_visualizations(
         notebook_path,
         timeout=360,
         cell_patches={
@@ -635,6 +664,7 @@ def test_tutorial_choose_active_space_notebook():
             },
         },
     )
+    _assert_notebook_library_logs_suppressed(executed_notebook)
 
 
 @_requires_notebook_deps
@@ -656,6 +686,8 @@ def test_tutorial_prepare_trial_state_notebook():
     assert "\\Users\\" not in notebook_text
     assert "kernelspec" not in notebook.metadata
     assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
     for cell in notebook.cells:
         expected_language = "python" if cell.cell_type == "code" else "markdown"
         assert cell.metadata.get("language") == expected_language
@@ -663,7 +695,8 @@ def test_tutorial_prepare_trial_state_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    _assert_notebook_library_logs_suppressed(executed_notebook)
 
 
 @_requires_notebook_deps
@@ -685,6 +718,8 @@ def test_tutorial_visualize_iqpe_circuit_notebook():
     assert "\\Users\\" not in notebook_text
     assert "kernelspec" not in notebook.metadata
     assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
     for cell in notebook.cells:
         expected_language = "python" if cell.cell_type == "code" else "markdown"
         assert cell.metadata.get("id") == cell.id
@@ -693,4 +728,5 @@ def test_tutorial_visualize_iqpe_circuit_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    _assert_notebook_library_logs_suppressed(executed_notebook)

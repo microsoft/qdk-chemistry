@@ -512,6 +512,7 @@ def generate_active_orbital_cube_data(
 
 def main() -> None:
     """Run the command-line workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
     Logger.set_global_level(Logger.LogLevel.off)
     # Earlier tutorial scripts execute one linear calculation. This chapter also
     # provides an interactive notebook, so functions keep both versions on the

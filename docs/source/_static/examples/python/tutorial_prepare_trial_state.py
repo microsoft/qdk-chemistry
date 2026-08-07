@@ -381,6 +381,7 @@ def print_trial_state_results(result: TrialStateWorkflowResult) -> None:
 
 def main() -> None:
     """Run the trial-state workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_trial_state_workflow()
     print_trial_state_results(result)

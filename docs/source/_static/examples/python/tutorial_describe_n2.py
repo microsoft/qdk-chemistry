@@ -16,6 +16,7 @@ from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import Logger
 
 if __name__ == "__main__":
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
     Logger.set_global_level(Logger.LogLevel.off)
 
 ################################################################################

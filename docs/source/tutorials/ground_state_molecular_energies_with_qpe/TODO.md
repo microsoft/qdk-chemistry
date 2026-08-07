@@ -8,15 +8,6 @@
 
 - [ ] Move some of the tutorial functions into the main code base (David)
 
-## Output clarity
-
-- [ ] Reduce QDK/Chemistry library logging that obscures instructional output in tutorial notebooks and scripts.
-  - [ ] Audit the default log output for every required script and notebook.
-  - [ ] Suppress library logs explicitly at script entry points and in notebook setup cells; do not mutate global logging at module import time.
-  - [ ] Preserve tutorial-owned results, progress messages, and warnings while library logs are quiet.
-  - [ ] Document a simple opt-in setting for students who need diagnostic QDK/Chemistry logs.
-  - [ ] Validate quiet output through the script and notebook test paths.
-
 ## Visual design
 
 - [ ] Add visuals directly to the Sphinx tutorial to reduce walls of text.

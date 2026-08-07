@@ -10,6 +10,7 @@ import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -125,7 +126,7 @@ def _execute_notebook_skip_visualizations(
     notebook_path: Path,
     timeout: int = 1800,
     cell_patches: dict[int, dict[str, str]] | None = None,
-) -> None:
+) -> Any:
     """Execute a notebook after removing visualization-only code.
 
     Args:
@@ -160,7 +161,7 @@ def _execute_notebook_skip_visualizations(
         kernel_name="python3",
         resources={"metadata": {"path": str(notebook_path.parent)}},
     )
-    client.execute()
+    return client.execute()
 
 
 def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:

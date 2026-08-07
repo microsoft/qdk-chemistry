@@ -326,6 +326,7 @@ def print_qubit_mapping_results(result: QubitMappingResult) -> None:
 
 def main() -> None:
     """Run the mapping workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_qubit_mapping_workflow()
     print_qubit_mapping_results(result)
