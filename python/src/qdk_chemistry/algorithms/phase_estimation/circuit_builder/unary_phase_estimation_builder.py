@@ -175,9 +175,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the unitary representation is not a quantum walk, if the configured
-                circuit mapper does not expose the block-encoding API, or if the block encoding
-                has no ancilla register for the walk to reflect about.
+            ValueError: If the unitary representation is not a quantum walk, or if the block
+                encoding has no ancilla register for the walk to reflect about.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -189,25 +188,16 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_queries = self.resolve_num_queries(unitary_rep)
         num_bits = num_phase_bits(num_queries)
         configured_num_bits = self._settings.get("num_bits")
-        if configured_num_bits > 0:
-            Logger.info(
-                f"num_bits={configured_num_bits} is ignored; the phase register is sized to {num_bits} "
-                f"bits so it can address the {num_queries + 1} reflection slots of num_queries={num_queries}."
+        if configured_num_bits > 0 and configured_num_bits != num_bits:
+            Logger.warn(
+                f"num_bits={configured_num_bits} is ignored; num_queries={num_queries} needs {num_bits} "
+                f"phase bits to address its {num_queries + 1} reflection slots."
             )
 
         mapper = self._create_nested("circuit_mapper")
-        # The schedule interleaves the reflections itself so it can omit the one the phase
-        # register addresses, so it needs the block encoding and the reflection separately.
-        # run() only hands them back already composed into a walk, which cannot be split again.
-        missing = [
-            name for name in ("num_ancilla_qubits", "block_encoding_op", "reflection_op") if not hasattr(mapper, name)
-        ]
-        if missing:
-            raise ValueError(
-                f"Circuit mapper '{type(mapper).__name__}' does not expose {', '.join(missing)}. "
-                "Unary QPE needs a block-encoding mapper such as 'prepare_select_prepare'."
-            )
-
+        # run() hands the block encoding and the reflection back already composed into a walk, but
+        # the schedule has to interleave them itself so it can omit the reflection the phase
+        # register addresses, and it needs num_ancilla_qubits to size the register it reflects about.
         num_ancilla_qubits = mapper.num_ancilla_qubits(container)
         if num_ancilla_qubits == 0:
             raise ValueError("Requires a non-empty ancilla register to reflect about.")
