@@ -9,6 +9,7 @@
 #include <lapack.hh>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <string>
 
 namespace qdk::chemistry::algorithms::microsoft::flr_bliss {
 
@@ -103,9 +104,16 @@ OneElectronShiftResult solve_one_electron_shift(
   // and reads only the lower triangle; Job::NoVec skips eigenvectors.)
   Eigen::MatrixXd effective_one_body_original = h + coulomb - 0.5 * exchange;
   Eigen::VectorXd eigenvalues_baseline(norb);
-  lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower,
-               static_cast<int64_t>(norb), effective_one_body_original.data(),
-               static_cast<int64_t>(norb), eigenvalues_baseline.data());
+  const int64_t baseline_info = lapack::syev(
+      lapack::Job::NoVec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
+      effective_one_body_original.data(), static_cast<int64_t>(norb),
+      eigenvalues_baseline.data());
+  if (baseline_info != 0) {
+    throw std::runtime_error(
+        "solve_one_electron_shift: LAPACK syev failed on the baseline "
+        "effective one-body operator (info=" +
+        std::to_string(baseline_info) + ").");
+  }
   result.lambda_1e_baseline = eigenvalues_baseline.array().abs().sum();
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
@@ -121,9 +129,16 @@ OneElectronShiftResult solve_one_electron_shift(
   Eigen::MatrixXd effective_one_body = h0 + coulomb - 0.5 * exchange;
 
   Eigen::VectorXd eigenvalues(norb);
-  lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower,
-               static_cast<int64_t>(norb), effective_one_body.data(),
-               static_cast<int64_t>(norb), eigenvalues.data());
+  const int64_t shifted_info = lapack::syev(
+      lapack::Job::NoVec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
+      effective_one_body.data(), static_cast<int64_t>(norb),
+      eigenvalues.data());
+  if (shifted_info != 0) {
+    throw std::runtime_error(
+        "solve_one_electron_shift: LAPACK syev failed on the shifted "
+        "effective one-body operator (info=" +
+        std::to_string(shifted_info) + ").");
+  }
   result.mu1 = median(eigenvalues);
   result.lambda_1e = (eigenvalues.array() - result.mu1).abs().sum();
 

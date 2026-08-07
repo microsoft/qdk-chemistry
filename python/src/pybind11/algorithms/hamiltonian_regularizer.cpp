@@ -88,13 +88,16 @@ is left invariant. The shift may come from
 Args:
     original (qdk_chemistry.data.Hamiltonian): The Hamiltonian to shift. Must be restricted.
     shift (qdk_chemistry.algorithms.BlissShift): The BLISS shift parameters to apply.
-    num_electrons (float): Target number of active electrons (Ne).
+    num_electrons (int): Target number of active electrons (Ne). Must be a
+        non-negative integer; the invariance guarantee only holds for an
+        integer electron count.
 
 Returns:
     qdk_chemistry.data.Hamiltonian: The BLISS-shifted Hamiltonian.
 
 Raises:
-    ValueError: If ``original`` is unrestricted or ``shift.xi`` is not norb x norb.
+    ValueError: If ``original`` is unrestricted, ``shift.xi`` is not norb x norb,
+        or ``num_electrons`` is negative or non-integer.
 )");
 
   py::class_<BlissRegularizer, HamiltonianRegularizerBase, py::smart_holder>

@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <lapack.hh>
 #include <qdk/chemistry/utils/double_factorization.hpp>
+#include <stdexcept>
+#include <string>
 
 namespace qdk::chemistry::utils {
 
@@ -47,9 +49,16 @@ std::vector<TwoBodyFragment> double_factorize(
   // and only reads the lower triangle (matching Eigen::SelfAdjointEigenSolver's
   // default convention). Job::Vec is needed here since the eigenvectors are
   // used below to build each fragment's orbital matrix.
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower,
-               static_cast<int64_t>(pair_dim), supermatrix_eigenvectors.data(),
-               static_cast<int64_t>(pair_dim), supermatrix_eigenvalues.data());
+  const int64_t supermatrix_info = lapack::syev(
+      lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(pair_dim),
+      supermatrix_eigenvectors.data(), static_cast<int64_t>(pair_dim),
+      supermatrix_eigenvalues.data());
+  if (supermatrix_info != 0) {
+    throw std::runtime_error(
+        "double_factorize: LAPACK syev failed to diagonalize the two-body "
+        "supermatrix (info=" +
+        std::to_string(supermatrix_info) + ").");
+  }
 
   // Process fragment candidates by decreasing |eigenvalue| so the largest
   // contributions are retained first if a caller wants to further truncate
@@ -85,9 +94,16 @@ std::vector<TwoBodyFragment> double_factorize(
 
     Eigen::MatrixXd fragment_eigenvectors = fragment_matrix;
     Eigen::VectorXd fragment_eigenvalues(norb);
-    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower,
-                 static_cast<int64_t>(norb), fragment_eigenvectors.data(),
-                 static_cast<int64_t>(norb), fragment_eigenvalues.data());
+    const int64_t fragment_info = lapack::syev(
+        lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
+        fragment_eigenvectors.data(), static_cast<int64_t>(norb),
+        fragment_eigenvalues.data());
+    if (fragment_info != 0) {
+      throw std::runtime_error(
+          "double_factorize: LAPACK syev failed to diagonalize a fragment "
+          "matrix (info=" +
+          std::to_string(fragment_info) + ").");
+    }
 
     TwoBodyFragment fragment;
     fragment.U = fragment_eigenvectors;

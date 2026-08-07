@@ -159,6 +159,9 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
   auto regularizer = HamiltonianRegularizerFactory::create("flr_bliss");
-  regularizer->settings().set("shift_method", std::string("nonexistent"));
-  EXPECT_THROW(regularizer->run(ham, 5, 5), std::invalid_argument);
+  // The "shift_method" setting is constrained to the known methods, so an
+  // unknown value is rejected at set-time rather than deferred to run().
+  EXPECT_THROW(regularizer->settings().set("shift_method",
+                                           std::string("nonexistent")),
+               std::invalid_argument);
 }

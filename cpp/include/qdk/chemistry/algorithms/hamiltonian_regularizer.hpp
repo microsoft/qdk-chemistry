@@ -80,25 +80,40 @@ struct TwoBodyBlissCorrection {
   /// the flattened two-electron tensor ((i*norb+j)*norb+k)*norb+l with side
   /// length `norb`. On return `g` holds g~ = g + dg without materializing a
   /// separate O(norb^4) dg tensor. Used by rebuild_hamiltonian() to build g~.
+  ///
+  /// dg is structurally sparse -- each of its three terms is delta-supported --
+  /// so instead of an O(norb^4) full sweep we apply only the non-zero entries:
+  ///   * -2*mu2*delta_ij*delta_kl : the O(norb^2) block i==j, k==l,
+  ///   * -xi_ij*delta_kl          : the O(norb^3) block k==l,
+  ///   * -delta_ij*xi_kl          : the O(norb^3) block i==j.
   void add_two_body_correction(Eigen::VectorXd& g, Eigen::Index norb) const {
+    const auto index = [norb](Eigen::Index i, Eigen::Index j, Eigen::Index k,
+                              Eigen::Index l) {
+      return ((i * norb + j) * norb + k) * norb + l;
+    };
+
+    // Term 1: -2*mu2 * delta_ij * delta_kl  (i==j and k==l).
+    for (Eigen::Index i = 0; i < norb; ++i) {
+      for (Eigen::Index k = 0; k < norb; ++k) {
+        g[index(i, i, k, k)] -= 2.0 * mu2;
+      }
+    }
+
+    // Term 2: -xi_ij * delta_kl  (k==l, all i,j).
     for (Eigen::Index i = 0; i < norb; ++i) {
       for (Eigen::Index j = 0; j < norb; ++j) {
+        const double xi_ij = xi(i, j);
         for (Eigen::Index k = 0; k < norb; ++k) {
-          for (Eigen::Index l = 0; l < norb; ++l) {
-            double value = 0.0;
-            if (i == j && k == l) {
-              value -= 2.0 * mu2;
-            }
-            if (k == l) {
-              value -= xi(i, j);
-            }
-            if (i == j) {
-              value -= xi(k, l);
-            }
-            if (value != 0.0) {
-              g[((i * norb + j) * norb + k) * norb + l] += value;
-            }
-          }
+          g[index(i, j, k, k)] -= xi_ij;
+        }
+      }
+    }
+
+    // Term 3: -delta_ij * xi_kl  (i==j, all k,l).
+    for (Eigen::Index i = 0; i < norb; ++i) {
+      for (Eigen::Index k = 0; k < norb; ++k) {
+        for (Eigen::Index l = 0; l < norb; ++l) {
+          g[index(i, i, k, l)] -= xi(k, l);
         }
       }
     }
@@ -131,11 +146,14 @@ struct TwoBodyBlissCorrection {
  *
  * @param original The Hamiltonian being shifted. Must be restricted.
  * @param shift The BLISS shift parameters (mu1, mu2, xi) to apply.
- * @param num_electrons Target number of active electrons (Ne).
+ * @param num_electrons Target number of active electrons (Ne). Must be a
+ *        non-negative integer; the invariance guarantee only holds for an
+ *        integer electron count.
  * @return The BLISS-shifted Hamiltonian.
  *
- * @throws std::invalid_argument if `original` is unrestricted or if
- *         `shift.xi` is not norb x norb.
+ * @throws std::invalid_argument if `original` is unrestricted, if
+ *         `shift.xi` is not norb x norb, or if `num_electrons` is negative or
+ *         non-integer.
  */
 std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
     const data::Hamiltonian& original, const BlissShift& shift,
@@ -157,7 +175,10 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
 class BlissSettings : public qdk::chemistry::data::Settings {
  public:
   BlissSettings() {
-    set_default("shift_method", std::string("flr_bliss"));
+    set_default("shift_method", std::string("flr_bliss"),
+                "Method used to compute the BLISS shift (mu1, mu2, xi).",
+                data::ListConstraint<std::string>{
+                    {std::vector<std::string>{"flr_bliss"}}});
     set_default("df_truncation_threshold", 0.0);
   }
 };
