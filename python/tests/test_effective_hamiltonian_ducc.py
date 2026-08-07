@@ -205,7 +205,7 @@ def test_complex_amplitudes_not_yet_implemented():
     )
     p_space = spin_index_set(nmo, list(range(nmo)), list(range(nmo)), equivalent=True)
 
-    with pytest.raises(RuntimeError, match="Complex DUCC amplitudes not yet implemented"):
+    with pytest.raises(RuntimeError, match="ducc: complex amplitudes not yet implemented"):
         create("effective_hamiltonian_constructor", "ducc").run(complex_wfn, full_ham, p_space)
 
 
