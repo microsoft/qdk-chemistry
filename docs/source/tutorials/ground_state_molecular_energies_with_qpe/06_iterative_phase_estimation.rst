@@ -225,13 +225,12 @@ If iteration :math:`k` selects bit :math:`b_k`, QDK/Chemistry updates its accumu
    \qquad \Phi_0=0.
 
 After the last iteration, the reported phase fraction is :math:`\Phi_m/\pi`.
-Each circuit performs the following steps:
+The following figure summarizes one iteration, from fresh register preparation through repeated shots, majority voting, and the feedback update for the next phase bit.
 
-1. Freshly prepare the selected trial state on the compute register.
-2. Apply an H gate to the readout ancilla.
-3. Apply a classically determined phase-feedback rotation to that ancilla.
-4. Apply the controlled time-evolution power between the readout ancilla and compute register.
-5. Apply a second H gate and measure the readout ancilla.
+.. graphviz:: /_static/diagrams/tutorial_qpe_iqpe_iteration.dot
+   :alt: One IQPE iteration begins with a freshly prepared trial state on the compute register and a fresh readout ancilla. The ancilla receives a Hadamard gate and a feedback rotation determined by earlier measured bits, then controls the iteration's time-evolution power on the compute register. A final Hadamard gate and ancilla measurement produce one shot outcome. Repeating the circuit with freshly prepared registers gives an odd number of outcomes whose majority selects phase bit b k. That bit updates the classical feedback angle used by the next iteration.
+   :align: center
+   :caption: One :term:`IQPE` iteration estimates phase bit :math:`b_k`. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates :math:`\Phi_{k+1}=\Phi_k/2+\pi b_k/2` for the next controlled power.
 
 After all iterations, the feedback accumulator determines the final phase fraction.
 
