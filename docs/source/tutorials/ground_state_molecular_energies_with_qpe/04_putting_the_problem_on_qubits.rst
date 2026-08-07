@@ -134,6 +134,11 @@ Each occupied lower-indexed mode contributes an eigenvalue of :math:`-1`, so the
 Acting on mode :math:`p` crosses the occupied lower-indexed modes in the chosen fermionic ordering, with each crossing contributing a minus sign.
 The parity string supplies their combined sign, so the mapped operators satisfy the fermionic anticommutation relations.
 
+.. graphviz:: /_static/diagrams/tutorial_qpe_jordan_wigner_parity.dot
+   :alt: Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. The preceding active spin orbitals 0, 1, and 2 map to lower-indexed qubits and contribute a string of Pauli Z operators whose eigenvalue is minus one raised to the number of occupied lower modes. The target qubit carries the X minus or plus iY raising or lowering action. Combining both factors gives the mapped creation or annihilation operator and preserves the fermionic ordering sign.
+   :align: center
+   :caption: A fermionic mode is one active spin orbital. For target spin orbital :math:`p=3`, the qubits assigned to preceding spin orbitals supply the parity string :math:`Z_{\ell_0}Z_{\ell_1}Z_{\ell_2}`, while qubit :math:`\ell_3` changes the target occupation. The same pattern extends to any target :math:`p`.
+
 Because the parity strings depend on mode ordering, the ordering must be specified: :term:`QDK`/Chemistry places all active :math:`\alpha` modes before all active :math:`\beta` modes, a convention called *blocked ordering*.
 
 .. admonition:: Why does Jordan--Wigner need a string of Pauli Z operators?

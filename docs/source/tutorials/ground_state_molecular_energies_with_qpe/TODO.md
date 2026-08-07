@@ -20,7 +20,7 @@
   - [x] Add labeled examples of atom-centered ``cc-pvdz`` basis functions and unlabeled example molecular orbitals to Chapter 2 using assets exported from the interactive visualization workflow.
   - [x] Add an orbital-entropy chart in Chapter 3 that shows the autoCAS selection gap across all candidate orbitals at once.
   - [x] Keep the selected-versus-excluded natural-orbital comparison interactive in the Chapter 3 notebook instead of duplicating it as a static Sphinx figure; prompt students to inspect at least one orbital from each group.
-  - [ ] Add a worked Jordan--Wigner parity-string figure in Chapter 4 that distinguishes fermionic modes, assigned qubits, and the lower-mode parity sign.
+  - [x] Add a worked Jordan--Wigner parity-string figure in Chapter 4 that distinguishes fermionic modes, assigned qubits, and the lower-mode parity sign.
   - [ ] Add a Chapter 5 image comparing representative one- and multi-determinant state-preparation logical circuits exported from the existing circuit notebook.
   - [ ] Add a high-level single-iteration IQPE schematic in Chapter 6 before students inspect the fully decomposed circuit notebook.
   - [ ] Add an annotated Chapter 6 image of the rendered power-one IQPE circuit that identifies the readout ancilla, compute register, state preparation, feedback rotation, controlled evolution, and measurement.

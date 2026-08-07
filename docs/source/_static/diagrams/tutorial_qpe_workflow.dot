@@ -9,7 +9,7 @@ digraph TutorialQpeWorkflow {
     pad=0.2;
     bgcolor="#FAFAFA";
 
-    node [shape=box, style="rounded,filled", fontname="Arial", width=2.8, height=0.8, margin=0.18];
+    node [shape=box, style="rounded,filled", fontname="Arial", width=2.8, height=0.9, margin="0.20,0.16"];
     edge [penwidth=2.5, arrowsize=1.0];
 
     subgraph cluster_goal {
@@ -22,7 +22,7 @@ digraph TutorialQpeWorkflow {
         fontname="Arial Bold";
         fontcolor="#3949AB";
 
-        Goal [label=<<B>Define the energy target</B><BR/><FONT POINT-SIZE="11">Choose the matching classical reference</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
+        Goal [label=<<B>Define the energy target</B><BR/><BR/><FONT POINT-SIZE="11">Choose the matching classical reference</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
     }
 
     subgraph cluster_classical {
@@ -36,8 +36,8 @@ digraph TutorialQpeWorkflow {
         fontcolor="#1976D2";
         rank=same;
 
-        Molecule [label=<<B>Describe stretched N<SUB>2</SUB></B><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Geometry, charge, spin, Hartree-Fock</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=left];
-        ActiveSpace [label=<<B>Select the active space</B><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Define the correlated molecular model</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+        Molecule [label=<<B>Describe stretched N<SUB>2</SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Geometry, charge, spin, Hartree-Fock</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        ActiveSpace [label=<<B>Select the active space</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Define the correlated molecular model</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=right];
 
         Molecule -> ActiveSpace [color="#1976D2"];
     }
@@ -53,9 +53,9 @@ digraph TutorialQpeWorkflow {
         fontcolor="#00796B";
         rank=same;
 
-        Mapping [label=<<B>Map to qubits</B><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Jordan-Wigner occupation encoding</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=right];
-        TrialState [label=<<B>Prepare the trial state</B><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Approximate the target ground state</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=center];
-        Iqpe [label=<<B>Estimate the energy</B><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Iterative phase-estimation simulation</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        Mapping [label=<<B>Map to qubits</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Jordan-Wigner occupation encoding</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+        TrialState [label=<<B>Prepare the trial state</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Approximate the target ground state</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=center];
+        Iqpe [label=<<B>Estimate the energy</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Iterative phase-estimation simulation</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=left];
 
         Mapping -> TrialState -> Iqpe [color="#00796B"];
     }
@@ -70,7 +70,7 @@ digraph TutorialQpeWorkflow {
         fontname="Arial Bold";
         fontcolor="#7B1FA2";
 
-        Result [label=<<B>Reconstruct and compare</B><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Add core energy; compare with CASCI</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        Result [label=<<B>Reconstruct and compare</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Add core energy; compare with CASCI</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
     }
 
     Goal:s -> Molecule:n [color="#1976D2", ltail=cluster_goal, lhead=cluster_classical, weight=10];
