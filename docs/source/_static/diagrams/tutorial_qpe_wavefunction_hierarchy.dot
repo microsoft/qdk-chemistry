@@ -1,0 +1,59 @@
+digraph TutorialQpeWavefunctionHierarchy {
+    rankdir=TB;
+    ranksep=0.75;
+    nodesep=0.45;
+    newrank=true;
+    compound=true;
+    overlap=false;
+    splines=spline;
+    pad=0.2;
+    bgcolor="#FAFAFA";
+
+    node [shape=box, style="rounded,filled", fontname="Arial", width=3.0, height=0.8, margin=0.18];
+    edge [penwidth=2.5, arrowsize=1.0];
+
+    subgraph cluster_one_electron {
+        label="One-electron representation";
+        style="filled,rounded";
+        fillcolor="#E8EAF6";
+        color="#5C6BC0";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#3949AB";
+        rank=same;
+
+        Basis [label=<<B>Basis functions χ<SUB>μ</SUB></B><BR/><FONT POINT-SIZE="11">Nucleus-centered spatial functions</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
+        MolecularOrbital [label=<<B>Molecular orbital φ<SUB>p</SUB></B><BR/><FONT POINT-SIZE="11">With α or β spin: spin orbital ψ<SUB>p</SUB></FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=right];
+
+        Basis -> MolecularOrbital [label="  combine  ", color="#5C6BC0", fontname="Arial", fontcolor="#3949AB"];
+    }
+
+    subgraph cluster_configuration {
+        label="Choose occupations";
+        style="filled,rounded";
+        fillcolor="#E0F2F1";
+        color="#26A69A";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#00796B";
+        rank=same;
+
+        Configuration [label=<<B>Electron configuration</B><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Pattern of occupied spin orbitals</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+        Determinant [label=<<B>Slater determinant Φ<SUB>I</SUB></B><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Antisymmetric state for one configuration</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+
+        Configuration -> Determinant [label="  construct  ", color="#00796B", fontname="Arial", fontcolor="#00796B"];
+    }
+
+    subgraph wavefunctions {
+        rank=same;
+
+        HartreeFock [label=<<B>Hartree-Fock Φ<SUB>HF</SUB></B><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">One optimized determinant</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        MultiConfig [label=<<B>Multiconfigurational Ψ</B><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Combination ∑<SUB>I</SUB> c<SUB>I</SUB> Φ<SUB>I</SUB></FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+    }
+
+    MolecularOrbital:s -> Configuration:n [color="#00796B", ltail=cluster_one_electron, lhead=cluster_configuration, weight=10];
+    Determinant:s -> HartreeFock:n [color="#7B1FA2", ltail=cluster_configuration, weight=5];
+    Determinant:s -> MultiConfig:n [color="#7B1FA2", ltail=cluster_configuration, weight=5];
+}

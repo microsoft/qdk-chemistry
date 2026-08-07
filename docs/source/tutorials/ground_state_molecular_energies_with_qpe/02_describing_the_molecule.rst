@@ -122,7 +122,13 @@ Electronic-structure calculations expand each molecular orbital :math:`\phi_p` i
 The index :math:`p` labels a molecular orbital, and :math:`\mu` labels a basis function.
 The coefficients :math:`c_{\mu p}` determine molecular orbital :math:`p`, and the self-consistent field calculation optimizes these coefficients.
 The collection of basis functions is called a `basis set <https://en.wikipedia.org/wiki/Basis_set_(chemistry)>`_.
-These objects form a hierarchy: nucleus-centered basis functions :math:`\chi_\mu` provide localized radial and angular shapes; molecular orbitals :math:`\phi_p` combine these functions and can extend across multiple nuclei; each spatial molecular orbital combines with an :math:`\alpha` or :math:`\beta` spin function to form a spin orbital :math:`\psi_p`; and the occupied spin orbitals form the many-electron determinant :math:`\Phi_{\mathrm{HF}}`.
+
+.. _tutorial-wavefunction-hierarchy:
+
+.. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
+   :alt: Nucleus-centered basis functions chi_mu combine into molecular orbitals phi_p, with alpha or beta labels specifying spin. Choosing occupied orbitals defines an electron configuration, and a Slater determinant Phi_I provides its antisymmetric state. Hartree-Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients c_I.
+   :align: center
+   :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
 
 A finite basis restricts the shapes available to the molecular orbitals and therefore introduces another approximation in the electronic description of the system.
 Adding suitable basis functions gives the orbitals more flexibility, but it also increases computational cost.

@@ -44,6 +44,7 @@ An `electron configuration <https://en.wikipedia.org/wiki/Electron_configuration
 A `Slater determinant <https://en.wikipedia.org/wiki/Slater_determinant>`_ constructs a valid many-electron wavefunction for one configuration and enforces the `Pauli exclusion principle <https://en.wikipedia.org/wiki/Pauli_exclusion_principle>`_.
 Electron--electron interactions can couple different electron configurations, so a molecular state can require a combination of many Slater determinants.
 The `Hartree--Fock method <https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method>`_ retains one optimized determinant as a tractable starting approximation, whereas active-space methods retain multiple determinants while restricting which orbital occupations can vary.
+The :ref:`wavefunction hierarchy in Describing the molecule <tutorial-wavefunction-hierarchy>` summarizes how basis functions, orbitals, determinants, and many-electron wavefunctions relate.
 
 When several configurations contribute substantially, the ground-state wavefunction combines their Slater determinants.
 A coefficient for each determinant specifies its contribution to the wavefunction.
