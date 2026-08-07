@@ -5,6 +5,13 @@ This tutorial uses `quantum phase estimation <https://en.wikipedia.org/wiki/Quan
 It is intended for advanced undergraduate and early-stage graduate students who have introductory knowledge of quantum computing and chemistry.
 :doc:`Before you begin <00_before_you_begin>` describes the prerequisites, software environment, and cumulative lab notebook assignment.
 
+.. _tutorial-qpe-workflow:
+
+.. graphviz:: /_static/diagrams/tutorial_qpe_workflow.dot
+   :alt: Workflow from defining the energy target and stretched-N2 molecular model through active-space selection, Jordan--Wigner mapping, trial-state preparation, IQPE energy estimation, and comparison of the reconstructed total energy with the matching CASCI reference.
+   :align: center
+   :caption: The tutorial builds a compact classical molecular model, maps it to qubits, estimates the energy with IQPE, and checks the reconstructed total against the matching CASCI reference.
+
 Quantum chemistry background
 ============================
 
@@ -127,7 +134,7 @@ Each required chapter:
 - provides a testable Python example where appropriate; and
 - ends with questions and a lab notebook assignment.
 
-The required workflow proceeds through six stages:
+The required chapters follow the stages in the :ref:`workflow diagram <tutorial-qpe-workflow>`:
 
 - :doc:`Define the target energy and accuracy comparison <01_energy_and_accuracy>`.
 - :doc:`Construct the molecular system and Hartree--Fock starting wavefunction <02_describing_the_molecule>`.
