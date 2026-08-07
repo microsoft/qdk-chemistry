@@ -94,10 +94,10 @@ std::vector<TwoBodyFragment> double_factorize(
 
     Eigen::MatrixXd fragment_eigenvectors = fragment_matrix;
     Eigen::VectorXd fragment_eigenvalues(norb);
-    const int64_t fragment_info = lapack::syev(
-        lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
-        fragment_eigenvectors.data(), static_cast<int64_t>(norb),
-        fragment_eigenvalues.data());
+    const int64_t fragment_info =
+        lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower,
+                     static_cast<int64_t>(norb), fragment_eigenvectors.data(),
+                     static_cast<int64_t>(norb), fragment_eigenvalues.data());
     if (fragment_info != 0) {
       throw std::runtime_error(
           "double_factorize: LAPACK syev failed to diagonalize a fragment "

@@ -146,18 +146,17 @@ struct TwoBodyBlissCorrection {
  *
  * @param original The Hamiltonian being shifted. Must be restricted.
  * @param shift The BLISS shift parameters (mu1, mu2, xi) to apply.
- * @param num_electrons Target number of active electrons (Ne). Must be a
+ * @param input_num_electrons Target number of active electrons (Ne). Must be a
  *        non-negative integer; the invariance guarantee only holds for an
  *        integer electron count.
  * @return The BLISS-shifted Hamiltonian.
  *
  * @throws std::invalid_argument if `original` is unrestricted, if
- *         `shift.xi` is not norb x norb, or if `num_electrons` is negative or
- *         non-integer.
+ *         `shift.xi` is not norb x norb
  */
 std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
     const data::Hamiltonian& original, const BlissShift& shift,
-    double num_electrons);
+    unsigned int input_num_electrons);
 
 /**
  * @class BlissSettings

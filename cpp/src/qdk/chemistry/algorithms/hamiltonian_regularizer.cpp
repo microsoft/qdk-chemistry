@@ -2,8 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <cstddef>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
@@ -22,7 +22,7 @@ namespace qdk::chemistry::algorithms {
 
 std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
     const data::Hamiltonian& original, const BlissShift& shift,
-    double num_electrons) {
+    unsigned int input_num_electrons) {
   using qdk::chemistry::data::CanonicalFourCenterHamiltonianContainer;
   using qdk::chemistry::data::Hamiltonian;
 
@@ -34,13 +34,6 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
 
   // The BLISS operator only annihilates the Ne-electron sector (leaving its
   // energy invariant) when Ne is a non-negative integer electron count.
-  if (num_electrons < 0.0 ||
-      num_electrons != std::floor(num_electrons)) {
-    throw std::invalid_argument(
-        "rebuild_hamiltonian: num_electrons must be a non-negative integer "
-        "electron count (Ne); the BLISS invariance guarantee does not hold "
-        "otherwise.");
-  }
 
   auto [h_alpha, h_beta] = original.get_one_body_integrals();
   (void)h_beta;
@@ -59,6 +52,7 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
   const double mu1 = shift.mu1;
   const double mu2 = shift.mu2;
   const Eigen::MatrixXd& xi = shift.xi;
+  const double num_electrons = static_cast<double>(input_num_electrons);
 
   // One-body part: h_tilde_ij = h_ij + (Ne-1)*xi_ij - (mu1+mu2)*delta_ij.
   Eigen::MatrixXd h_tilde = h_alpha + (num_electrons - 1.0) * xi;
@@ -127,8 +121,7 @@ std::shared_ptr<data::Hamiltonian> BlissRegularizer::_run_impl(
 
   const BlissShift shift =
       compute_shift(*hamiltonian, n_alpha_electrons, n_beta_electrons);
-  const double num_electrons = static_cast<double>(n_alpha_electrons) +
-                               static_cast<double>(n_beta_electrons);
+  unsigned int num_electrons = n_alpha_electrons + n_beta_electrons;
 
   return rebuild_hamiltonian(*hamiltonian, shift, num_electrons);
 }

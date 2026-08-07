@@ -129,10 +129,10 @@ OneElectronShiftResult solve_one_electron_shift(
   Eigen::MatrixXd effective_one_body = h0 + coulomb - 0.5 * exchange;
 
   Eigen::VectorXd eigenvalues(norb);
-  const int64_t shifted_info = lapack::syev(
-      lapack::Job::NoVec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
-      effective_one_body.data(), static_cast<int64_t>(norb),
-      eigenvalues.data());
+  const int64_t shifted_info =
+      lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower,
+                   static_cast<int64_t>(norb), effective_one_body.data(),
+                   static_cast<int64_t>(norb), eigenvalues.data());
   if (shifted_info != 0) {
     throw std::runtime_error(
         "solve_one_electron_shift: LAPACK syev failed on the shifted "

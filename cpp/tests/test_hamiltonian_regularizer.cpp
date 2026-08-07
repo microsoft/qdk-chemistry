@@ -161,7 +161,7 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
   auto regularizer = HamiltonianRegularizerFactory::create("flr_bliss");
   // The "shift_method" setting is constrained to the known methods, so an
   // unknown value is rejected at set-time rather than deferred to run().
-  EXPECT_THROW(regularizer->settings().set("shift_method",
-                                           std::string("nonexistent")),
-               std::invalid_argument);
+  EXPECT_THROW(
+      regularizer->settings().set("shift_method", std::string("nonexistent")),
+      std::invalid_argument);
 }
