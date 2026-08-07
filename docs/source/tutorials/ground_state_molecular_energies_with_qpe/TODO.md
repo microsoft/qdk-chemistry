@@ -13,10 +13,21 @@
   - [x] Complete grouped current-source decisions and implement accepted wording.
   - [x] Run grouped validation.
   - [x] Commit and prepare reply.
-- [ ] Process Martin review feedback using a grouped current-source audit.
+- [ ] Finish Martin review feedback.
+  - [x] Complete objective and staleness audit.
+  - [x] Discuss and implement accepted current-source changes.
+  - [x] Replace the undefined term `quantum advantage` with plain language.
+  - [x] Define `phase bit` directly in Chapter 5 and avoid using the term earlier on the landing page.
+  - [ ] Ask Martin to complete the truncated `occupations vary among the determinants ... is somewhat` comment in the wrap-up email.
+  - [x] Run the bounded coherence gate and grouped validation.
+  - [x] Commit and prepare reply.
 - [ ] Process any additional substantive reviewer feedback using the grouped review workflow.
 - [ ] Run the end-stage review after substantive feedback is complete.
 - [ ] Monitor Conrad's re-review and pending QDK/Chemistry typesetting clarification.
+
+## Review carryover
+
+- [ ] Evaluate near-zero-friction or one-click installation options in response to Conrad's participation-barrier concern.
 
 ## Code changes
 
@@ -37,6 +48,8 @@
 
 ## Low-priority cleanup
 
+- [ ] Audit assumed-knowledge transitions for the mixed chemistry and quantum-computing audience; label prerequisite domains and balance refresher links without forcing every chapter to the same depth.
+- [ ] Evaluate whether to retain the mixed Python-script and Jupyter-notebook workflow or consolidate it; compare testability, reuse, interactivity, duplication, and reader experience, and improve terse output where interpretation remains unclear.
 - [ ] Consider importing `PauliProductFormulaContainer` directly from `qdk_chemistry.data` in the tutorial test.
 - [ ] Audit analogous concrete internal imports if time remains.
 - [ ] Revisit nonblocking student-review friction only if later feedback confirms a learning obstacle: phase-kickback derivation, feedback recurrence, occupation-symbol-to-bit mapping, gate-family output, and the Chapter 3 coefficient-norm forward reference.
