@@ -126,7 +126,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
-    ) : (Qubit, Qubit[]) => Unit {
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
         (control, allQubits) => {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
@@ -150,7 +150,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
-    ) : (Qubit, Qubit[]) => Unit {
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
         (control, allQubits) => {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];

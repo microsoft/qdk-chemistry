@@ -20,7 +20,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         pauliCoefficients : Double[],
         control : Qubit,
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for idx in 0..Length(pauliExponents) - 1 {
             let paulis = pauliExponents[idx];
             let coeff = pauliCoefficients[idx];
@@ -55,7 +55,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         params : RepControlledPauliExpParams,
         control : Qubit,
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for i in 1..params.repetitions {
             if BeginEstimateCaching("ControlledPauliExp", 0) {
                 ControlledPauliExp(params.pauliExponents, params.pauliCoefficients, control, systems);
@@ -92,8 +92,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// # Parameters
     /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
-    /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
-    function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit {
+    /// - `(Qubit, Qubit[]) => Unit is Adj + Ctl`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
+    function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
         RepControlledPauliExp(params, _, _)
     }
 }
