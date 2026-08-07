@@ -55,13 +55,9 @@ register layout from the QPE circuit, so only the target bins have to be given:
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-The target can also be named as an energy window, which is usually the quantity at hand.
+The target can also be named as an energy window.
 This only applies to a QPE circuit built on a qubitization walk, whose eigenvalues are
 :math:`e^{\pm i\arccos(E/\lambda)}` for :math:`\lambda` the L1 norm of the Hamiltonian.
-The window is converted with :math:`\varphi = \arccos(E/\lambda)/2\pi` and, because both
-signs occur, marked in two mirrored bins: half the weight of an eigenvector sits in each,
-so marking only one would halve the overlap. Other encodings follow a different law and
-have to name their bins directly.
 
 Alternatively, the marked phase window can be replaced by a reflection onto the target
 eigenspace built with quantum signal processing on a block encoding of the Hamiltonian,

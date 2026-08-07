@@ -234,6 +234,14 @@ def test_amplification_matches_the_closed_form_and_overshoots():
     assert observed[4] < observed[3]
 
 
+def test_unestimable_state_prep_reports_a_runtime_error():
+    """The register width comes from a resource estimate, so a preparation that cannot be costed fails cleanly."""
+    # The marking oracle takes (Qubit[], Qubit), so costing it as a standalone entry point fails.
+    unestimable = _all_ones_marking_oracle()
+    with pytest.raises(RuntimeError, match="register width"):
+        create("amplitude_amplification").run(unestimable, _all_ones_marking_oracle())
+
+
 def test_marking_oracle_circuit_is_executable():
     """The oracle circuit runs on its own: it marks the all-zeros register when bin 0 is accepted."""
     executor = create("circuit_executor", "qdk_sparse_state_simulator")

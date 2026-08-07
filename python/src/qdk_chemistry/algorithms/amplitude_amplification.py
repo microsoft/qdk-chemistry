@@ -242,10 +242,15 @@ class AmplitudeAmplification(Algorithm):
             raise TypeError("Amplitude amplification requires a good state oracle qsharp operation.")
 
         # A Q# callable carries no arity, so the register width is taken from a resource
-        # estimate of the state preparation. That counts every qubit the circuit allocates,
-        # so it is only the width of the amplified register when the preparation allocates
-        # no extra scratch. Replace this with the declared width once one is available.
-        num_qubits = int(state_prep_oracle.estimate()["logicalCounts"]["numQubits"])
+        # estimate of the state preparation.
+        # `logical_counts` is used rather than indexing the result, because it also resolves
+        # the batch shape the estimator returns for a frontier of parameter sets.
+        try:
+            num_qubits = int(state_prep_oracle.estimate().logical_counts["numQubits"])
+        except Exception as error:
+            raise RuntimeError(
+                "Could not read the register width from a resource estimate of the state prep oracle."
+            ) from error
 
         rounds = int(self._settings.get("rounds"))
         if rounds < 0:
