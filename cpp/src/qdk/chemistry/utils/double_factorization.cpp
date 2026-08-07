@@ -2,20 +2,18 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/utils/double_factorization.hpp>
-
-#include <lapack.hh>
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <lapack.hh>
+#include <qdk/chemistry/utils/double_factorization.hpp>
 
 namespace qdk::chemistry::utils {
 
 namespace {
 
 inline size_t two_body_index(size_t i, size_t j, size_t k, size_t l,
-                              size_t norb) {
+                             size_t norb) {
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
 }
 

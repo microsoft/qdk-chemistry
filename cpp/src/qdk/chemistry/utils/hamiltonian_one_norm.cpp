@@ -2,12 +2,10 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
-
-#include <qdk/chemistry/utils/double_factorization.hpp>
-
 #include <Eigen/Eigenvalues>
 #include <cstddef>
+#include <qdk/chemistry/utils/double_factorization.hpp>
+#include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::utils {

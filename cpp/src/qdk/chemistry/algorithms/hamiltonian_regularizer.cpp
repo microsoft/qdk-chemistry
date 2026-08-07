@@ -2,15 +2,13 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
-
 #include <cstddef>
 #include <memory>
-#include <stdexcept>
-#include <string>
-
+#include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
+#include <string>
 
 #include "microsoft/flr_bliss/flr_bliss_regularizer.hpp"
 
@@ -72,8 +70,8 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
           : Eigen::MatrixXd(0, 0);
 
   auto container = std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-      h_tilde, g_tilde, original.get_orbitals(), core_energy_new,
-      inactive_fock, original.get_type());
+      h_tilde, g_tilde, original.get_orbitals(), core_energy_new, inactive_fock,
+      original.get_type());
 
   return std::make_shared<Hamiltonian>(std::move(container));
 }

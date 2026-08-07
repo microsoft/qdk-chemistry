@@ -28,9 +28,9 @@ namespace qdk::chemistry::algorithms {
  * applied to a Hamiltonian via rebuild_hamiltonian().
  */
 struct BlissShift {
-  double mu1 = 0.0;      ///< One-electron BLISS shift.
-  double mu2 = 0.0;      ///< Two-electron BLISS shift.
-  Eigen::MatrixXd xi;    ///< Two-electron BLISS shift matrix (norb x norb).
+  double mu1 = 0.0;    ///< One-electron BLISS shift.
+  double mu2 = 0.0;    ///< Two-electron BLISS shift.
+  Eigen::MatrixXd xi;  ///< Two-electron BLISS shift matrix (norb x norb).
 };
 
 /// The two-body correction that the aggregated BLISS shift (mu2, xi) adds to
@@ -286,11 +286,8 @@ class BlissRegularizer
  * @see BlissRegularizer
  */
 struct HamiltonianRegularizerFactory
-    : public AlgorithmFactory<BlissRegularizer,
-                              HamiltonianRegularizerFactory> {
-  static std::string algorithm_type_name() {
-    return "hamiltonian_regularizer";
-  }
+    : public AlgorithmFactory<BlissRegularizer, HamiltonianRegularizerFactory> {
+  static std::string algorithm_type_name() { return "hamiltonian_regularizer"; }
   static void register_default_instances();
   static std::string default_algorithm_name() { return "flr_bliss"; }
 };

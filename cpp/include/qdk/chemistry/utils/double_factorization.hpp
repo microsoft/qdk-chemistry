@@ -23,14 +23,14 @@ namespace qdk::chemistry::utils {
 /// generalization derived to also cover negative-eigenvalue fragments,
 /// worth double-checking against the reference implementation).
 struct TwoBodyFragment {
-  Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Columns are the
-                       ///< orthonormal new-orbital vectors expressed in the
-                       ///< original orbital basis.
-  Eigen::VectorXd eps;  ///< norb eigenvalues (epsilon_p^(alpha)).
-  double sign = 1.0;    ///< +1.0 or -1.0.
+  Eigen::MatrixXd U;       ///< norb x norb orbital rotation. Columns are the
+                           ///< orthonormal new-orbital vectors expressed in the
+                           ///< original orbital basis.
+  Eigen::VectorXd eps;     ///< norb eigenvalues (epsilon_p^(alpha)).
+  double sign = 1.0;       ///< +1.0 or -1.0.
   double lambda_df = 0.0;  ///< Baseline fermionic 1-norm contribution of
-                          ///< this fragment (Eq. 17), before any BLISS
-                          ///< shift.
+                           ///< this fragment (Eq. 17), before any BLISS
+                           ///< shift.
 };
 
 /// Double-factorize the spin-free two-electron integral tensor g_ijkl

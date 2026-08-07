@@ -97,10 +97,9 @@ Raises:
     ValueError: If ``original`` is unrestricted or ``shift.xi`` is not norb x norb.
 )");
 
-  py::class_<BlissRegularizer, HamiltonianRegularizerBase,
-             py::smart_holder>
+  py::class_<BlissRegularizer, HamiltonianRegularizerBase, py::smart_holder>
       regularizer(m, "HamiltonianRegularizer",
-                 R"(
+                  R"(
 Hamiltonian regularizer implementing block-invariant symmetry shifts (BLISS).
 
 A HamiltonianRegularizer maps a Hamiltonian, together with the target
@@ -221,9 +220,10 @@ Returns:
 
   // Factory class binding - creates HamiltonianRegularizerFactory class with
   // static methods
-  qdk::chemistry::python::bind_algorithm_factory<
-      HamiltonianRegularizerFactory, BlissRegularizer,
-      HamiltonianRegularizerBase>(m, "HamiltonianRegularizerFactory");
+  qdk::chemistry::python::bind_algorithm_factory<HamiltonianRegularizerFactory,
+                                                 BlissRegularizer,
+                                                 HamiltonianRegularizerBase>(
+      m, "HamiltonianRegularizerFactory");
 
   regularizer.def("__repr__", [](const BlissRegularizer &) {
     return "<qdk_chemistry.algorithms.HamiltonianRegularizer>";

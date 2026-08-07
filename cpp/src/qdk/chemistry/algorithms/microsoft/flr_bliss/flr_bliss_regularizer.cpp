@@ -4,13 +4,11 @@
 
 #include "flr_bliss_regularizer.hpp"
 
-#include <lapack.hh>
-
 #include <cstddef>
 #include <cstdint>
-#include <stdexcept>
-
+#include <lapack.hh>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
 
 namespace qdk::chemistry::algorithms::microsoft::flr_bliss {
 
@@ -103,8 +101,7 @@ OneElectronShiftResult solve_one_electron_shift(
   // Heff = h + coul - 1/2 exch, computed BEFORE the BLISS correction is folded
   // into coulomb/exchange in place below. (lapack::syev overwrites its input
   // and reads only the lower triangle; Job::NoVec skips eigenvectors.)
-  Eigen::MatrixXd effective_one_body_original =
-      h + coulomb - 0.5 * exchange;
+  Eigen::MatrixXd effective_one_body_original = h + coulomb - 0.5 * exchange;
   Eigen::VectorXd eigenvalues_baseline(norb);
   lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower,
                static_cast<int64_t>(norb), effective_one_body_original.data(),
@@ -120,8 +117,7 @@ OneElectronShiftResult solve_one_electron_shift(
   correction.add_exchange_contraction(exchange);
 
   // Effective one-electron operator of H - K with mu1 = 0 (see header).
-  const Eigen::MatrixXd h0 =
-      h + (num_electrons - 1.0) * xi - mu2 * identity;
+  const Eigen::MatrixXd h0 = h + (num_electrons - 1.0) * xi - mu2 * identity;
   Eigen::MatrixXd effective_one_body = h0 + coulomb - 0.5 * exchange;
 
   Eigen::VectorXd eigenvalues(norb);
@@ -187,8 +183,8 @@ BlissShift compute_flr_bliss_shift(
       global_shift.lambda_df_baseline, lambda_total_after,
       one_electron.lambda_1e, global_shift.lambda_df_shifted,
       global_shift.lambda_df_baseline, global_shift.lambda_df_shifted,
-      one_electron.lambda_1e_baseline, one_electron.lambda_1e,
-      one_electron.mu1, global_shift.mu2);
+      one_electron.lambda_1e_baseline, one_electron.lambda_1e, one_electron.mu1,
+      global_shift.mu2);
 
   BlissShift shift;
   shift.mu1 = one_electron.mu1;

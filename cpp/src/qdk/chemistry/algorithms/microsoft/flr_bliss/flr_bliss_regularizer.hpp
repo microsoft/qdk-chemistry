@@ -6,11 +6,10 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
-#include <vector>
-
 #include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/utils/double_factorization.hpp>
+#include <vector>
 
 // This header collects the internal building blocks of the FLR-BLISS shift
 // method (Patel et al., arXiv:2409.18277), which is the default "shift_method"
@@ -55,10 +54,10 @@ inline double median(const Eigen::VectorXd& values) {
 /// that is SUBTRACTED from H; the per-fragment operators are negated
 /// during aggregation because the DF+LRPS identity (Eq. C6) adds them.
 struct GlobalTwoBodyShift {
-  double mu2 = 0.0;                 ///< Aggregated mu_2 (for H - K).
-  Eigen::MatrixXd xi;                ///< Aggregated xi_ij (for H - K), norb x norb.
-  double lambda_df_baseline = 0.0;   ///< Sum of pre-shift fragment 1-norms.
-  double lambda_df_shifted = 0.0;    ///< Sum of post-shift fragment 1-norms.
+  double mu2 = 0.0;    ///< Aggregated mu_2 (for H - K).
+  Eigen::MatrixXd xi;  ///< Aggregated xi_ij (for H - K), norb x norb.
+  double lambda_df_baseline = 0.0;  ///< Sum of pre-shift fragment 1-norms.
+  double lambda_df_shifted = 0.0;   ///< Sum of post-shift fragment 1-norms.
 };
 
 /// Apply the FLR-BLISS per-fragment median shift (Eq. 27) to every
@@ -75,13 +74,13 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
 /// one-electron operator.
 struct OneElectronShiftResult {
   double mu1 = 0.0;
-  double lambda_1e = 0.0;            ///< 1-norm of the shifted, mu1-optimized
-                                     ///< effective one-electron operator
-                                     ///< (Patel et al., arXiv:2409.18277,
-                                     ///< Eq. 15).
-  double lambda_1e_baseline = 0.0;   ///< 1-norm of the ORIGINAL (unshifted)
-                                     ///< effective one-electron operator, for a
-                                     ///< before/after comparison.
+  double lambda_1e = 0.0;           ///< 1-norm of the shifted, mu1-optimized
+                                    ///< effective one-electron operator
+                                    ///< (Patel et al., arXiv:2409.18277,
+                                    ///< Eq. 15).
+  double lambda_1e_baseline = 0.0;  ///< 1-norm of the ORIGINAL (unshifted)
+                                    ///< effective one-electron operator, for a
+                                    ///< before/after comparison.
 };
 
 /// Determine the optimal one-electron BLISS shift mu_1 (Patel et al.,

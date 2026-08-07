@@ -33,7 +33,8 @@ struct HamiltonianOneNorm {
 /// call this function directly.
 ///
 /// The Hamiltonian is written (chemist convention, spatial orbitals) as
-///   H = E_core + sum_ij h_ij E_ij + 1/2 sum_ijkl (ij|kl) (E_ij E_kl - d_jk E_il)
+///   H = E_core + sum_ij h_ij E_ij + 1/2 sum_ijkl (ij|kl) (E_ij E_kl - d_jk
+///   E_il)
 /// where g[i,j,k,l] = (ij|kl) is the container's two-electron tensor. The DF
 /// fermionic 1-norm is assembled as:
 ///

@@ -35,7 +35,8 @@ TEST_F(HamiltonianOneNormTest, WaterSTO3GIsPositiveAndConsistent) {
   // No truncation is the default: calling without an explicit threshold
   // should give the same result as threshold=0.0.
   auto norm_default = hamiltonian_one_norm(*ham);
-  EXPECT_NEAR(norm_default.total, norm.total, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(norm_default.total, norm.total,
+              testing::numerical_zero_tolerance);
 }
 
 TEST_F(HamiltonianOneNormTest, TruncationNeverIncreasesTwoBodyNorm) {
@@ -51,7 +52,8 @@ TEST_F(HamiltonianOneNormTest, TruncationNeverIncreasesTwoBodyNorm) {
   // Truncating fragments removes contributions to the low-rank
   // reconstruction, so the reported two-body 1-norm (computed from the
   // retained fragments only) should not exceed the exact value.
-  EXPECT_LE(norm_truncated.two_body, norm_exact.two_body + testing::numerical_zero_tolerance);
+  EXPECT_LE(norm_truncated.two_body,
+            norm_exact.two_body + testing::numerical_zero_tolerance);
 }
 
 namespace {
@@ -59,7 +61,7 @@ namespace {
 /// Reconstruct the flattened g_ijkl tensor from a set of DF fragments:
 ///   g_ijkl = sum_alpha sign_alpha * sum_pq U_ip U_jp eps_p eps_q U_kq U_lq
 Eigen::VectorXd reconstruct(const std::vector<TwoBodyFragment>& fragments,
-                           size_t norb) {
+                            size_t norb) {
   Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
   for (const auto& fragment : fragments) {
     // M_ij = sum_p U_ip eps_p U_jp  (i.e. U * diag(eps) * U^T)
@@ -98,20 +100,23 @@ TEST_F(DoubleFactorizationTest, ExactReconstructionNoTruncation) {
   auto [g_aaaa, g_aabb, g_bbbb] = ham->get_two_body_integrals();
   (void)g_aabb;
   (void)g_bbbb;
-  const size_t n = static_cast<size_t>(ham->get_orbitals()->get_num_molecular_orbitals());
+  const size_t n =
+      static_cast<size_t>(ham->get_orbitals()->get_num_molecular_orbitals());
 
   // Double-factorize with threshold=0.0 (no truncation): reconstruction
   // should reproduce the original tensor to machine precision.
   auto fragments = double_factorize(g_aaaa, n, 0.0);
   ASSERT_FALSE(fragments.empty());
   Eigen::VectorXd g_reconstructed = reconstruct(fragments, n);
-  EXPECT_TRUE(g_reconstructed.isApprox(g_aaaa, testing::numerical_zero_tolerance * 100))
+  EXPECT_TRUE(
+      g_reconstructed.isApprox(g_aaaa, testing::numerical_zero_tolerance * 100))
       << "Reconstruction max abs diff: "
       << (g_reconstructed - g_aaaa).cwiseAbs().maxCoeff();
   (void)norb;
 }
 
-TEST_F(DoubleFactorizationTest, TruncationReducesFragmentCountAndDefaultsToZero) {
+TEST_F(DoubleFactorizationTest,
+       TruncationReducesFragmentCountAndDefaultsToZero) {
   auto water = testing::create_water_structure();
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
@@ -121,7 +126,8 @@ TEST_F(DoubleFactorizationTest, TruncationReducesFragmentCountAndDefaultsToZero)
   auto [g_aaaa, g_aabb, g_bbbb] = ham->get_two_body_integrals();
   (void)g_aabb;
   (void)g_bbbb;
-  const size_t n = static_cast<size_t>(ham->get_orbitals()->get_num_molecular_orbitals());
+  const size_t n =
+      static_cast<size_t>(ham->get_orbitals()->get_num_molecular_orbitals());
 
   // The default threshold argument is 0.0 (no truncation): calling without
   // specifying it should give the same fragment count as threshold=0.0.

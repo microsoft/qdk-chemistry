@@ -29,7 +29,7 @@ TEST_F(HamiltonianRegularizerTest, FactoryHygiene) {
   EXPECT_EQ(regularizer_named->name(), "flr_bliss");
 
   EXPECT_THROW(HamiltonianRegularizerFactory::create("nonexistent"),
-              std::runtime_error);
+               std::runtime_error);
 }
 
 TEST_F(HamiltonianRegularizerTest, DefaultTruncationThresholdIsZero) {
@@ -143,8 +143,8 @@ TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
   (void)g_man_bb;
   EXPECT_TRUE(g_run.isApprox(g_man, 1e-12));
 
-  EXPECT_NEAR(shifted_run->get_core_energy(),
-              shifted_manual->get_core_energy(), 1e-12);
+  EXPECT_NEAR(shifted_run->get_core_energy(), shifted_manual->get_core_energy(),
+              1e-12);
 }
 
 /**
@@ -162,4 +162,3 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
   regularizer->settings().set("shift_method", std::string("nonexistent"));
   EXPECT_THROW(regularizer->run(ham, 5, 5), std::invalid_argument);
 }
-
