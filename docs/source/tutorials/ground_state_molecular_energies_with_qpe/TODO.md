@@ -19,7 +19,7 @@
   - [x] Add a reusable basis-function-to-multiconfigurational-wavefunction hierarchy in Chapter 2 and cross-reference it from the landing page.
   - [x] Add labeled examples of atom-centered ``cc-pvdz`` basis functions and unlabeled example molecular orbitals to Chapter 2 using assets exported from the interactive visualization workflow.
   - [x] Add an orbital-entropy chart in Chapter 3 that shows the autoCAS selection gap across all candidate orbitals at once.
-  - [ ] Add a Chapter 3 molecular-orbital image comparing representative selected and excluded candidate natural-orbital isosurfaces from the existing visualization workflow; do not label them as Hartree--Fock HOMO/LUMO orbitals.
+  - [x] Keep the selected-versus-excluded natural-orbital comparison interactive in the Chapter 3 notebook instead of duplicating it as a static Sphinx figure; prompt students to inspect at least one orbital from each group.
   - [ ] Add a worked Jordan--Wigner parity-string figure in Chapter 4 that distinguishes fermionic modes, assigned qubits, and the lower-mode parity sign.
   - [ ] Add a Chapter 5 image comparing representative one- and multi-determinant state-preparation logical circuits exported from the existing circuit notebook.
   - [ ] Add a high-level single-iteration IQPE schematic in Chapter 6 before students inspect the fully decomposed circuit notebook.
@@ -27,7 +27,7 @@
   - [ ] Add a phase-grid number line in Chapter 6 that relates phase fraction, signed energy, grid spacing, reference alignment, and aliasing.
   - [ ] Consider a generated Chapter 1 plot showing the exponential sensitivity of equilibrium and rate predictions to free-energy error.
   - [ ] Consider a Chapter 6 energy-accounting figure that distinguishes the measured active energy, classically added core energy, reconstructed total, and CASCI reference.
-  - [ ] Reuse the existing molecular-orbital and circuit workflows to export stable in-page assets; do not capture editor or widget UI screenshots.
+  - [ ] Reuse the existing circuit workflows to export stable in-page assets; do not capture editor or widget UI screenshots.
   - [ ] Provide an ``:alt:`` description for every Graphviz directive and accessible captions/data descriptions for quantitative plots, then validate the rendered documentation.
 
 ## Low-priority cleanup
