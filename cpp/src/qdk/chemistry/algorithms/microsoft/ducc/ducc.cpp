@@ -206,7 +206,7 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
 
   const auto& amplitudes = reference->get_container<data::AmplitudeContainer>();
   if (amplitudes.is_complex())
-    throw std::runtime_error("Complex DUCC amplitudes not yet implemented");
+    throw std::runtime_error("ducc: complex amplitudes not yet implemented");
 
   const auto& canonical =
       hamiltonian

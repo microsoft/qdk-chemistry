@@ -165,9 +165,10 @@ def _qubit_ground_state(ham):
     return float(np.linalg.eigvalsh(matrix)[0]) + ham.get_core_energy()
 
 
-def _ducc_output(xyz, multiplicity, unrestricted, active, inactive, level):
+def _ducc_output(xyz, multiplicity, unrestricted, active, inactive, level, wfn_hf=None):
     """Build the DUCC output Hamiltonian, its active orbitals and active electron counts."""
-    wfn_hf = _scf(xyz, multiplicity, unrestricted)
+    if wfn_hf is None:
+        wfn_hf = _scf(xyz, multiplicity, unrestricted)
     orbitals = wfn_hf.get_orbitals()
     nmo = orbitals.get_num_molecular_orbitals()
     nocc_a, nocc_b = wfn_hf.get_total_num_electrons()
@@ -311,8 +312,11 @@ _REDUCE_CASES = [
 )
 def test_level_gt0_reduces_to_bare_when_active_is_all(label, xyz, multiplicity, unrestricted, level):
     """With every orbital active, the BCH dressing collapses to the bare Hamiltonian."""
-    active = list(range(_scf(xyz, multiplicity, unrestricted).get_orbitals().get_num_molecular_orbitals()))
-    out_ham, active_orbitals, n_active_a, n_active_b = _ducc_output(xyz, multiplicity, unrestricted, active, [], level)
+    wfn_hf = _scf(xyz, multiplicity, unrestricted)
+    active = list(range(wfn_hf.get_orbitals().get_num_molecular_orbitals()))
+    out_ham, active_orbitals, n_active_a, n_active_b = _ducc_output(
+        xyz, multiplicity, unrestricted, active, [], level, wfn_hf=wfn_hf
+    )
 
     cas_ham = create("hamiltonian_constructor").run(active_orbitals)
     ci = _ci_unrestricted if unrestricted else _ci_restricted

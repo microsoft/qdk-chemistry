@@ -516,7 +516,7 @@ class TestAlgorithmClasses:
 
         reference = create_test_wavefunction()
         hamiltonian = create_test_hamiltonian(2)
-        p_indices = spin_index_set(4, [1, 2], [1, 2])
+        p_indices = spin_index_set(2, [0, 1], [0, 1])
         result = constructor.run(reference, hamiltonian, p_indices)
         assert isinstance(result, Hamiltonian)
 
