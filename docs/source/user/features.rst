@@ -257,6 +257,15 @@ Adaptive Sampling Configuration Interaction (:term:`ASCI`)
    This enables treatment of active spaces that would be intractable for conventional :term:`CASCI`. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
 
 
+Nuclear Derivatives and Geometry Optimization
+"""""""""""""""""""""""""""""""""""""""""""""
+
+Nuclear derivative calculators evaluate the energy, its gradient with respect to nuclear coordinates, and optionally the nuclear Hessian, for any electronic structure method exposed through the algorithm registry.
+
+Geometry optimizers build on these derivatives to relax a molecular structure to a stationary point, returning the converged energy, the optimized structure, and optionally a Hessian and the converged wavefunction.
+Both minimizations and transition-state searches are supported, and the derivative engine is selected through settings, so the same optimizer drives any registered nuclear derivative calculator.
+
+
 Community Open Source Software Dependencies
 -------------------------------------------
 
@@ -315,6 +324,10 @@ PySCF Plugin
 Qiskit Plugin
    Enables interoperability between QDK/Chemistry and the Qiskit quantum computing framework
    See the `Qiskit documentation <https://qiskit.org/documentation/getting_started.html>`_ for guidance on citing Qiskit.
+
+geomeTRIC Plugin
+   Provides molecular geometry optimization in translation-rotation internal coordinates, driven by QDK/Chemistry's nuclear derivative calculators.
+   See the `geomeTRIC repository <https://github.com/leeping/geomeTRIC>`_ for guidance on citing geomeTRIC.
 
 
 Visual Studio Code Integration
