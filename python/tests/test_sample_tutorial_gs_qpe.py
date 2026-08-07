@@ -30,11 +30,8 @@ with suppress(ImportError):
     import nbformat
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import MajoranaMapping, Structure
+from qdk_chemistry.data import MajoranaMapping, PauliProductFormulaContainer, Structure
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    PauliProductFormulaContainer,
-)
 from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 
 from .test_sample_workflow_utils import (
