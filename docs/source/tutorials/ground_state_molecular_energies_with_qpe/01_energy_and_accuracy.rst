@@ -76,6 +76,7 @@ This tutorial calculates only the fixed-geometry electronic and nuclear componen
    Electronic and nuclear energies are only some of the contributions to a free energy.
    Zero-point, thermal, entropic, and environmental contributions can also affect an equilibrium constant or reaction rate.
 
+When an electronic-and-nuclear energy difference contributes to a free-energy difference, any uncanceled error in that component also contributes to the free-energy error.
 The dimensionless `equilibrium constant <https://en.wikipedia.org/wiki/Equilibrium_constant>`_ :math:`K` is related to the standard reaction Gibbs free energy :math:`\Delta G^\circ` by
 
 .. math::
@@ -120,6 +121,7 @@ The teaching target
 ===================
 
 This tutorial uses :math:`1\ \mathrm{m}E_{\mathrm{h}}` as a teaching target for the absolute difference between the final :term:`QPE` total energy and a classical reference energy for the same Hamiltonian.
+This target concerns accuracy relative to the selected-space classical reference; resolution, precision, and uncertainty describe separate properties of the calculation.
 Meeting this target shows that the quantum algorithm reproduced its classical reference to the requested tolerance.
 It does not show that the molecular model agrees with experiment, nor does it remove errors from the geometry, basis set, electronic-structure model, or omitted free-energy contributions.
 

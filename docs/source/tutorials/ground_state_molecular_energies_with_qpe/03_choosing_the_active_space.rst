@@ -204,7 +204,8 @@ These high-entropy orbitals carry the strongest static-correlation signal becaus
 Freezing a high-entropy orbital would prevent its occupation from changing with the occupations of the other orbitals and would therefore remove an important part of the multi-configurational wavefunction.
 By contrast, a low-entropy orbital remains close to one local occupation state and is a better candidate to freeze as inactive or virtual.
 :term:`QDK`/Chemistry evaluates these probabilities and entropies from the :term:`RDMs <RDM>` stored in the :term:`CASCI` wavefunction.
-The resulting data flow is therefore: the correlated wavefunction determines the local-state probabilities, those probabilities determine one entropy for each orbital, and autoCAS compares the orbital entropies to select the active group.
+Automated active-space selection (autoCAS) uses orbital entropies to identify which orbitals should remain active.
+The resulting data flow is therefore: the correlated wavefunction determines the local-state probabilities, those probabilities determine one entropy for each orbital, and autoCAS uses the entropies to select the orbitals in the active space.
 
 .. admonition:: Why does autoCAS require a correlated calculation before it can select orbitals?
    :class: quiz-question
@@ -213,11 +214,9 @@ The resulting data flow is therefore: the correlated wavefunction determines the
    The selector uses single-orbital entropies derived from local occupation probabilities.
    Those probabilities require one- and two-particle :term:`RDMs <RDM>` from a correlated wavefunction; a Hartree--Fock determinant alone does not provide the required correlation evidence.
 
-The entropy-difference :ref:`qdk_autocas_eos selector <qdk-autocas-eos>` sorts the normalized orbital entropies and tests the consecutive gaps against its entropy and difference thresholds :cite:`Stein2016,Stein2019`.
-It selects the largest high-entropy group separated by a qualifying gap.
-A large gap provides evidence of a natural boundary between orbitals with similarly strong occupation coupling and orbitals whose occupations are much less coupled to the rest of the active space.
-These thresholds are configurable; see :doc:`Active-space selection <../../user/comprehensive/algorithms/active_space>` for their defaults and use with less clearly separated entropy values.
-It then repartitions the orbitals according to the selected group:
+The QDK/Chemistry :ref:`qdk_autocas_eos selector <qdk-autocas-eos>` sorts the orbital entropies and selects a high-entropy group separated from the remaining orbitals by a sufficiently large gap :cite:`Stein2016,Stein2019`.
+The thresholds are configurable; see :doc:`Active-space selection <../../user/comprehensive/algorithms/active_space>` for their defaults and use with less clearly separated entropy values.
+The selector then repartitions the orbitals according to the selected group:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_choose_active_space.py
    :language: python

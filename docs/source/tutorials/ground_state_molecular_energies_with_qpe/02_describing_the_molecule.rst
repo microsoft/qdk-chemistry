@@ -176,7 +176,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
 
 The following code runs the built-in :term:`QDK`/Chemistry Hartree--Fock solver once for each basis set.
 The primary result is the ``cc-pvdz`` wavefunction, whose self-consistent molecular orbitals serve as the starting point for the multi-configurational calculation in :doc:`Choosing the active space <03_choosing_the_active_space>`.
-The two energies support the basis-set sensitivity exercise that follows.
+The ``cc-pvdz`` and ``cc-pvtz`` Hartree--Fock energies support the basis-set sensitivity exercise that follows.
 
 .. literalinclude:: ../../_static/examples/python/tutorial_describe_n2.py
    :language: python
