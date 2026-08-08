@@ -57,6 +57,14 @@ _RUN_TUTORIAL_SNAPSHOTS = os.getenv("QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS", "").
 
 
 DOCS_PYTHON_EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
+COMPLETED_LAB_NOTEBOOK = (
+    Path(__file__).parent.parent.parent
+    / "docs"
+    / "source"
+    / "_static"
+    / "examples"
+    / "ground_state_qpe_lab_notebook_completed.md"
+)
 TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
 GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
 
@@ -87,6 +95,13 @@ def _require_snapshot_version(
 
 if _RUN_TUTORIAL_SNAPSHOTS:
     _require_snapshot_version(importlib.metadata.version("qdk-chemistry"))
+
+
+def test_completed_lab_notebook_uses_tutorial_version():
+    """Keep completed lab-notebook provenance aligned with the tutorial pin."""
+    completed_notebook = COMPLETED_LAB_NOTEBOOK.read_text(encoding="utf-8")
+    assert f"documented QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION} workflow" in completed_notebook
+    assert f"QDK/Chemistry version: {GROUND_STATE_TUTORIAL_VERSION}" in completed_notebook
 
 
 def _load_tutorial_module(module_name: str):
