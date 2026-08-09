@@ -4,6 +4,20 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.1.0
+=============
+
+See :ref:`release-v2.1.0` for full details.
+
+- Geometry optimization as a first-class algorithm type (``geometry_optimizer``), with a geomeTRIC-backed implementation driven by the existing nuclear derivative calculators
+- Vendored Q# utilities load into a private ``qdk.Context`` instead of the global interpreter, so importing ``qdk_chemistry`` no longer changes the caller's target profile
+- Qiskit extras supported on Python 3.14
+
+Bug fixes:
+
+- Corrected the iterative phase estimation phase convention: for :math:`U = e^{-iHt}` the energy is recovered as :math:`E = -\theta / t`, the feedback phase is negated, and ``QpeResult.bits_msb_first`` is now genuinely most-significant-bit first
+- ``QpeResult`` files written by v1 are now upgraded by ``python -m qdk_chemistry.migrate``
+
 Version 2.0.0
 =============
 
