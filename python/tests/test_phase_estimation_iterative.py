@@ -541,3 +541,72 @@ def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: Phas
             state_preparation=two_qubit_phase_problem.state_prep,
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
+
+
+def test_iterative_qpe_measures_lsb_first_and_returns_msb_first(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """IQPE measures the LSB first but returns bits most-significant-first (issue #618).
+
+    The first executed iteration applies the largest controlled power and therefore
+    determines the least-significant phase bit, while
+    :attr:`~qdk_chemistry.data.QpeResult.bits_msb_first` reverses the execution order
+    into the conventional most-significant-first bitstring. This test scripts the
+    per-iteration measurement outcomes so the execution-order-vs-returned-order
+    distinction is asserted directly, independent of the simulator.
+    """
+    problem = two_qubit_phase_problem
+    # Scripted measurement outcomes in execution order; the first entry is the LSB.
+    # Asymmetric so an accidental reversal (or dropped reversal) is visible.
+    execution_order_bits = [1, 0, 0, 0]
+
+    class _ScriptedResult:
+        def __init__(self, bit: int) -> None:
+            self.bitstring_counts = {str(bit): 1}
+
+    class _ScriptedExecutor:
+        """Returns the scripted bit for each successive iteration circuit."""
+
+        def __init__(self, bits: list[int]) -> None:
+            self._bits = list(bits)
+            self._index = 0
+
+        def run(self, circuit: Circuit, shots: int, noise: QuantumErrorProfile | None = None) -> _ScriptedResult:  # noqa: ARG002
+            result = _ScriptedResult(self._bits[self._index])
+            self._index += 1
+            return result
+
+    iqpe = IterativePhaseEstimation(shots_per_bit=1)
+    iqpe.settings().set(
+        "qpe_circuit_builder",
+        _make_iterative_circuit_builder_ref("qdk_iterative", problem.num_bits, problem.evolution_time),
+    )
+    iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
+
+    scripted_executor = _ScriptedExecutor(execution_order_bits)
+    original_create_nested = iqpe._create_nested
+
+    def _patched_create_nested(setting_name: str):
+        if setting_name == "circuit_executor":
+            return scripted_executor
+        return original_create_nested(setting_name)
+
+    iqpe._create_nested = _patched_create_nested  # type: ignore[method-assign]
+
+    result = iqpe.run(
+        qubit_hamiltonian=problem.hamiltonian,
+        state_preparation=problem.state_prep,
+    )
+
+    # The returned bitstring is the reverse of the execution order (most-significant first).
+    assert list(result.bits_msb_first) == execution_order_bits[::-1]
+
+    # The first-measured bit is the LSB: the phase fraction weights bit k by 2**-(n-k).
+    num_bits = problem.num_bits
+    expected_phase_fraction = sum(bit / 2 ** (num_bits - k) for k, bit in enumerate(execution_order_bits))
+    assert np.isclose(
+        result.phase_fraction,
+        expected_phase_fraction,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )

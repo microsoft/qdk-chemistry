@@ -126,7 +126,8 @@ def run_iterative_exact_qpe(
         synthesis: Matrix exponential synthesizer employed by Qiskit.
 
     Returns:
-        Tuple ``(bits, phase_fraction)`` with the measured bits (MSB to LSB) and
+        Tuple ``(bits, phase_fraction)`` with the measured bits in execution order
+        (LSB first, MSB last) and
         the resulting phase fraction.
 
     Notes:
